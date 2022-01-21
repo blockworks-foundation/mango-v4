@@ -6,7 +6,9 @@
 
 ### Module structure
 As and when we move to a more complete project, we should think of having multiple modules
-e.g. core/shared, spot, perpetuals, etc., and then each would have its own instructions and state sub module
+e.g. core/shared, spot, perpetuals, etc., and then each would have its own instructions 
+and state sub module. Goal is that new contributors find relevant code easily and can navigate
+easily.
 ```
 programs
 └── mango-v4
