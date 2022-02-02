@@ -20,3 +20,12 @@ pub mod mango_v4 {
     }
 
 }
+
+#[derive(Clone)]
+pub struct Mango;
+
+impl anchor_lang::Id for Mango {
+    fn id() -> Pubkey {
+        ID
+    }
+}
