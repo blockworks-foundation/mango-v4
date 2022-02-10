@@ -6,6 +6,6 @@ use crate::error::*;
 pub struct Initialize {}
 
 pub fn handler(ctx: Context<Initialize>) -> ProgramResult {
-    require!(1==1, ErrorCode::SomeError);
+    require!(1 == 1, ErrorCode::SomeError);
     Ok(())
 }
