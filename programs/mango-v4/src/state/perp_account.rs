@@ -1,3 +1,5 @@
+use fixed::types::I80F48;
+
 pub struct PerpAccount {
     pub base_position: i64,     // measured in base lots
     pub quote_position: I80F48, // measured in native quote

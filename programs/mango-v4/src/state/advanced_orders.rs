@@ -1,4 +1,4 @@
-
+use fixed::types::I80F48;
 
 pub struct AnyAdvancedOrder {
     pub advanced_order_type: AdvancedOrderType,

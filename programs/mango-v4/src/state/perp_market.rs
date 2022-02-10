@@ -1,3 +1,6 @@
+use anchor_lang::prelude::*;
+use fixed::types::I80F48;
+
 pub struct LiquidityMiningInfo {
     /// Used to convert liquidity points to MNGO
     pub rate: I80F48,

@@ -1,3 +1,6 @@
+use anchor_lang::prelude::*;
+use fixed::types::I80F48;
+
 pub struct RootBank {
     pub meta_data: MetaData,
 

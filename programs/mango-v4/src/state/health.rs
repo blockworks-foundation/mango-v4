@@ -1,3 +1,5 @@
+use fixed::types::I80F48;
+
 pub struct UserActiveAssets {
     pub spot: [bool; MAX_PAIRS],
     pub perps: [bool; MAX_PAIRS],

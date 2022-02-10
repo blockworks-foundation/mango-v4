@@ -1,3 +1,5 @@
+use fixed::types::I80F48;
+
 pub struct PriceCache {
     pub price: I80F48, // unit is interpreted as how many quote native tokens for 1 base native token
     pub last_update: u64,

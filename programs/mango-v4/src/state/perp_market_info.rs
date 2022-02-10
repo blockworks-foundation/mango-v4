@@ -1,3 +1,6 @@
+use crate::Pubkey;
+use fixed::types::I80F48;
+
 pub struct PerpMarketInfo {
     pub perp_market: Pubkey, // One of these may be empty
     pub maint_asset_weight: I80F48,

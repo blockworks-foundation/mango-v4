@@ -1,3 +1,7 @@
+use crate::state::perp_market_info::PerpMarketInfo;
+use crate::state::spot_market_info::SpotMarketInfo;
+use anchor_lang::prelude::*;
+
 pub struct MangoGroup {
     pub meta_data: MetaData,
     pub num_oracles: usize, // incremented every time add_oracle is called

@@ -1,3 +1,7 @@
+use crate::state::perp_account::PerpAccount;
+use anchor_lang::prelude::*;
+use fixed::types::I80F48;
+
 pub struct MangoAccount {
     pub meta_data: MetaData,
 
