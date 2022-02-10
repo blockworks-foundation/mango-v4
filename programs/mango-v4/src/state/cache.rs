@@ -8,6 +8,7 @@ pub struct PriceCache {
 }
 
 // todo: can we use rootbank directly?
+// what about write locks? sleep on this!
 pub struct RootBankCache {
     pub deposit_index: I80F48,
     pub borrow_index: I80F48,
@@ -15,6 +16,7 @@ pub struct RootBankCache {
 }
 
 // todo: can we just use the perpmarket directly?
+// what about write locks? sleep on this!
 pub struct PerpMarketCache {
     pub long_funding: I80F48,
     pub short_funding: I80F48,
