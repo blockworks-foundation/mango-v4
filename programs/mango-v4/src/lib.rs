@@ -3,9 +3,9 @@ extern crate static_assertions;
 
 use anchor_lang::prelude::*;
 
-mod state;
-mod instructions;
 mod error;
+mod instructions;
+mod state;
 
 use instructions::*;
 
@@ -18,7 +18,6 @@ pub mod mango_v4 {
     pub fn initialize(ctx: Context<Initialize>) -> ProgramResult {
         instructions::initialiaze::handler(ctx)
     }
-
 }
 
 #[derive(Clone)]
