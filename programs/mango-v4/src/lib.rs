@@ -26,6 +26,10 @@ pub mod mango_v4 {
     pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()> {
         instructions::create_account(ctx, account_num)
     }
+
+    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+        instructions::deposit(ctx, amount)
+    }
 }
 
 #[derive(Clone)]

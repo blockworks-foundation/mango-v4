@@ -9,8 +9,10 @@ pub type TokenIndex = u16;
 pub struct TokenInfo {
     pub mint: Pubkey,
     pub decimals: u8,
+    pub bank_bump: u8,
+    pub vault_bump: u8,
     // TODO: store oracle index here?
-    pub reserved: [u8; 31], // TODO: size?
+    pub reserved: [u8; 30], // TODO: size?
                             // token's bank account is a PDA
 }
 // TODO: static assert the size and alignment
@@ -21,8 +23,29 @@ impl TokenInfo {
     }
 }
 
+#[zero_copy]
+pub struct Tokens {
+    pub infos: [TokenInfo; MAX_TOKENS],
+}
+
+// Needs to be manual because large static arrays don't have Default
+impl Default for Tokens {
+    fn default() -> Self {
+        Self {
+            infos: [TokenInfo::default(); MAX_TOKENS],
+        }
+    }
+}
+
+impl Tokens {
+    pub fn info_for_mint<'a>(&'a self, mint: &Pubkey) -> Option<&'a TokenInfo> {
+        self.infos.iter().find(|ti| ti.mint == *mint)
+    }
+}
+
 // TODO: Should we call this `Group` instead of `MangoGroup`? And `Account` instead of `MangoAccount`?
 #[account(zero_copy)]
+#[derive(Default)]
 pub struct MangoGroup {
     // Relying on Anchor's discriminator be sufficient for our versioning needs?
     // pub meta_data: MetaData,
@@ -30,7 +53,7 @@ pub struct MangoGroup {
 
     //pub num_oracles: usize, // incremented every time add_oracle is called
     //pub oracles: [Pubkey; MAX_PAIRS],
-    pub tokens: [TokenInfo; MAX_TOKENS],
+    pub tokens: Tokens,
     //pub spot_markets: [SpotMarketInfo; MAX_PAIRS],
     //pub perp_markets: [PerpMarketInfo; MAX_PAIRS],
 
@@ -52,13 +75,3 @@ pub struct MangoGroup {
     //pub ref_mngo_required: u64,
 }
 // TODO: static assert the size and alignment
-
-// Needs to be manual because large static arrays don't have Default
-impl Default for MangoGroup {
-    fn default() -> Self {
-        Self {
-            owner: Pubkey::default(),
-            tokens: [TokenInfo::default(); MAX_TOKENS],
-        }
-    }
-}

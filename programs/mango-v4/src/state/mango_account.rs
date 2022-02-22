@@ -13,10 +13,10 @@ pub struct IndexedPosition {
     // todo: see https://github.com/blockworks-foundation/mango-v4/issues/1
     // todo: how does ftx do this?
     /// The deposit_index (if positive) or borrow_index (if negative) scaled position
-    value: I80F48,
+    pub value: I80F48,
 
     /// index into MangoGroup.tokens
-    token_index: TokenIndex,
+    pub token_index: TokenIndex,
 }
 // TODO: static assert the size and alignment
 
@@ -37,7 +37,8 @@ pub struct MangoAccount {
 
     // pub in_margin_basket: [bool; MAX_PAIRS],
     // pub num_in_margin_basket: u8,
-    pub indexed_position: [IndexedPosition; MAX_INDEXED_POSITIONS],
+    // TODO: this should be a separate struct for convenient use, like MangoGroup::tokens
+    pub indexed_positions: [IndexedPosition; MAX_INDEXED_POSITIONS],
 
     // pub spot_open_orders: [Pubkey; MAX_PAIRS],
     // pub perp_accounts: [PerpAccount; MAX_PAIRS],
@@ -65,7 +66,7 @@ impl Default for MangoAccount {
             group: Pubkey::default(),
             owner: Pubkey::default(),
             delegate: Pubkey::default(),
-            indexed_position: [IndexedPosition::default(); MAX_INDEXED_POSITIONS],
+            indexed_positions: [IndexedPosition::default(); MAX_INDEXED_POSITIONS],
             being_liquidated: false,
             is_bankrupt: false,
             reserved: [0u8; 5],

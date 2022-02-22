@@ -27,8 +27,10 @@ pub struct RegisterToken<'info> {
 
     #[account(
         init,
-        associated_token::authority = bank,
-        associated_token::mint = mint,
+        seeds = [group.key().as_ref(), b"tokenvault".as_ref(), mint.key().as_ref()],
+        bump,
+        token::authority = group,
+        token::mint = mint,
         payer = payer
     )]
     pub vault: Account<'info, TokenAccount>,
@@ -50,15 +52,19 @@ pub fn register_token(ctx: Context<RegisterToken>, decimals: u8) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
     // TODO: Error if mint is already configured (techincally, init of vault will fail)
     // TOOD: Error type
+    // TODO: Should be a function: Tokens::add() or so
     let token_index = group
         .tokens
+        .infos
         .iter()
         .position(|ti| !ti.is_valid())
         .ok_or(MangoError::SomeError)?;
-    group.tokens[token_index] = TokenInfo {
+    group.tokens.infos[token_index] = TokenInfo {
         mint: ctx.accounts.mint.key(),
         decimals,
-        reserved: [0u8; 31],
+        bank_bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?, // TODO: error
+        vault_bump: *ctx.bumps.get("vault").ok_or(MangoError::SomeError)?, // TODO: error
+        reserved: [0u8; 30],
     };
     Ok(())
 }
