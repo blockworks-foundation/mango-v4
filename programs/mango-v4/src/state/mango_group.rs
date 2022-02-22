@@ -1,3 +1,4 @@
+use crate::error::*;
 use anchor_lang::prelude::*;
 
 const MAX_TOKENS: usize = 100;
@@ -28,8 +29,15 @@ pub struct Tokens {
 }
 
 impl Tokens {
-    pub fn info_for_mint<'a>(&'a self, mint: &Pubkey) -> Option<&'a TokenInfo> {
-        self.infos.iter().find(|ti| ti.mint == *mint)
+    pub fn info_for_mint<'a>(&'a self, mint: &Pubkey) -> Result<&'a TokenInfo> {
+        Ok(&self.infos[self.index_for_mint(mint)?])
+    }
+
+    pub fn index_for_mint(&self, mint: &Pubkey) -> Result<usize> {
+        self.infos
+            .iter()
+            .position(|ti| ti.mint == *mint)
+            .ok_or(error!(MangoError::SomeError)) // TODO: no such token err
     }
 }
 

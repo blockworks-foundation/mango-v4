@@ -19,7 +19,7 @@ pub struct Deposit<'info> {
         mut,
         seeds = [group.key().as_ref(), b"tokenbank".as_ref(), deposit_token.mint.as_ref()],
         // TODO: not sure if getting the bump like this is worth it!
-        bump = group.load()?.tokens.info_for_mint(&deposit_token.mint).ok_or(MangoError::SomeError)?.bank_bump,
+        bump = group.load()?.tokens.info_for_mint(&deposit_token.mint)?.bank_bump,
     )]
     pub bank: AccountLoader<'info, TokenBank>,
 
@@ -27,7 +27,7 @@ pub struct Deposit<'info> {
         mut,
         seeds = [group.key().as_ref(), b"tokenvault".as_ref(), deposit_token.mint.as_ref()],
         // TODO: not sure if getting the bump like this is worth it!
-        bump = group.load()?.tokens.info_for_mint(&deposit_token.mint).ok_or(MangoError::SomeError)?.vault_bump,
+        bump = group.load()?.tokens.info_for_mint(&deposit_token.mint)?.vault_bump,
     )]
     pub vault: Account<'info, TokenAccount>,
 
@@ -57,24 +57,11 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     // Find the mint's token index
     let group = ctx.accounts.group.load()?;
     let mint = ctx.accounts.deposit_token.mint;
-    // TODO: should be a function on Tokens
-    let token_index = group
-        .tokens
-        .infos
-        .iter()
-        .position(|ti| ti.mint == mint)
-        .ok_or(MangoError::SomeError)?;
+    let token_index = group.tokens.index_for_mint(&mint)?;
 
     // Get the account's position for that token index
-    // TODO: Deal with it not existing yet and
-    //       deal with invalid entries (token_index defaults to 0, but 0 is a valid index)
-    //       This should be a helper function on indexed_positions, like find_or_create()
     let mut account = ctx.accounts.account.load_mut()?;
-    let position = account
-        .indexed_positions
-        .iter_mut()
-        .find(|p| p.token_index as usize == token_index)
-        .ok_or(MangoError::SomeError)?;
+    let position = account.indexed_positions.get_mut_or_create(token_index)?;
 
     // Update the bank and position
     let mut bank = ctx.accounts.bank.load_mut()?;

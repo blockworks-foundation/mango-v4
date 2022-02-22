@@ -1,4 +1,5 @@
 use super::mango_group::*;
+use crate::error::*;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
@@ -26,6 +27,37 @@ impl IndexedPosition {
     }
 }
 
+#[zero_copy]
+pub struct IndexedPositions {
+    pub values: [IndexedPosition; MAX_INDEXED_POSITIONS],
+}
+
+impl IndexedPositions {
+    pub fn get_mut_or_create(&mut self, token_index: usize) -> Result<&mut IndexedPosition> {
+        // This function looks complex because of lifetimes.
+        // Maybe there's a smart way to write it with double iter_mut()
+        // that doesn't confuse the borrow checker.
+        let mut pos = self
+            .values
+            .iter()
+            .position(|p| p.token_index as usize == token_index && p.is_active());
+        if pos.is_none() {
+            pos = self.values.iter().position(|p| !p.is_active());
+            if let Some(i) = pos {
+                self.values[i] = IndexedPosition {
+                    value: I80F48::ZERO,
+                    token_index: token_index as TokenIndex,
+                };
+            }
+        }
+        if let Some(i) = pos {
+            Ok(&mut self.values[i])
+        } else {
+            err!(MangoError::SomeError) // TODO: No free space
+        }
+    }
+}
+
 #[account(zero_copy)]
 pub struct MangoAccount {
     pub group: Pubkey,
@@ -37,7 +69,7 @@ pub struct MangoAccount {
     // pub in_margin_basket: [bool; MAX_PAIRS],
     // pub num_in_margin_basket: u8,
     // TODO: this should be a separate struct for convenient use, like MangoGroup::tokens
-    pub indexed_positions: [IndexedPosition; MAX_INDEXED_POSITIONS],
+    pub indexed_positions: IndexedPositions,
 
     // pub spot_open_orders: [Pubkey; MAX_PAIRS],
     // pub perp_accounts: [PerpAccount; MAX_PAIRS],
