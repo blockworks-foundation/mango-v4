@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
+// todo: might be folded into rootbank
 pub struct NodeBank {
     pub meta_data: MetaData,
 
