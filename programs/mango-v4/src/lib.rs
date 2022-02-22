@@ -18,6 +18,10 @@ pub mod mango_v4 {
     pub fn create_group(ctx: Context<CreateGroup>) -> Result<()> {
         instructions::create_group(ctx)
     }
+
+    pub fn register_token(ctx: Context<RegisterToken>, decimals: u8) -> Result<()> {
+        instructions::register_token(ctx, decimals)
+    }
 }
 
 #[derive(Clone)]

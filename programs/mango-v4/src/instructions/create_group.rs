@@ -23,6 +23,7 @@ pub struct CreateGroup<'info> {
 }
 
 pub fn create_group(ctx: Context<CreateGroup>) -> Result<()> {
-    require!(1 == 1, MangoError::SomeError);
+    let mut group = ctx.accounts.group.load_init()?;
+    group.owner = ctx.accounts.owner.key();
     Ok(())
 }
