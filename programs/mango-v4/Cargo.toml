@@ -17,8 +17,8 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = "0.20.1"
-anchor-spl = "0.20.1"
+anchor-lang = "0.22.0"
+anchor-spl = "0.22.0"
 fixed = { version = "=1.9.0", features = ["serde"] }
 fixed-macro = "^1.1.1"
 static_assertions = "1.1"

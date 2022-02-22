@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
-#[error]
-pub enum ErrorCode {
+#[error_code]
+pub enum MangoError {
     #[msg("")]
     SomeError,
 }

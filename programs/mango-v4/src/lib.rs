@@ -15,7 +15,7 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 pub mod mango_v4 {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> ProgramResult {
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         instructions::initialiaze::handler(ctx)
     }
 }

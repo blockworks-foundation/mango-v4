@@ -5,7 +5,7 @@ use crate::error::*;
 #[derive(Accounts)]
 pub struct Initialize {}
 
-pub fn handler(ctx: Context<Initialize>) -> ProgramResult {
-    require!(1 == 1, ErrorCode::SomeError);
+pub fn handler(ctx: Context<Initialize>) -> Result<()> {
+    require!(1 == 1, MangoError::SomeError);
     Ok(())
 }
