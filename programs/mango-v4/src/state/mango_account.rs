@@ -5,7 +5,6 @@ use fixed::types::I80F48;
 const MAX_INDEXED_POSITIONS: usize = 32;
 
 #[zero_copy]
-#[derive(Default)]
 pub struct IndexedPosition {
     // TODO: Why did we have deposits and borrows as two different values
     //       if only one of them was allowed to be != 0 at a time?
@@ -59,17 +58,3 @@ pub struct MangoAccount {
     pub reserved: [u8; 5],
 }
 // TODO: static assert the size and alignment
-
-impl Default for MangoAccount {
-    fn default() -> Self {
-        Self {
-            group: Pubkey::default(),
-            owner: Pubkey::default(),
-            delegate: Pubkey::default(),
-            indexed_positions: [IndexedPosition::default(); MAX_INDEXED_POSITIONS],
-            being_liquidated: false,
-            is_bankrupt: false,
-            reserved: [0u8; 5],
-        }
-    }
-}

@@ -10,6 +10,7 @@ pub struct CreateGroup<'info> {
         seeds = [b"group".as_ref(), owner.key().as_ref()],
         bump,
         payer = payer,
+        space = 8 + std::mem::size_of::<MangoGroup>(),
     )]
     pub group: AccountLoader<'info, MangoGroup>,
 

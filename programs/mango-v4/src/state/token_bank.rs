@@ -4,7 +4,6 @@ use fixed::types::I80F48;
 use super::IndexedPosition;
 
 #[account(zero_copy)]
-#[derive(Default)]
 pub struct TokenBank {
     /// native tokens deposited into or borrowed from this bank
     pub deposits: u64,

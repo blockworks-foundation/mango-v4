@@ -5,7 +5,6 @@ const MAX_TOKENS: usize = 100;
 pub type TokenIndex = u16;
 
 #[zero_copy] // is repr(packed) still a problem
-#[derive(Default)]
 pub struct TokenInfo {
     pub mint: Pubkey,
     pub decimals: u8,
@@ -28,15 +27,6 @@ pub struct Tokens {
     pub infos: [TokenInfo; MAX_TOKENS],
 }
 
-// Needs to be manual because large static arrays don't have Default
-impl Default for Tokens {
-    fn default() -> Self {
-        Self {
-            infos: [TokenInfo::default(); MAX_TOKENS],
-        }
-    }
-}
-
 impl Tokens {
     pub fn info_for_mint<'a>(&'a self, mint: &Pubkey) -> Option<&'a TokenInfo> {
         self.infos.iter().find(|ti| ti.mint == *mint)
@@ -45,7 +35,6 @@ impl Tokens {
 
 // TODO: Should we call this `Group` instead of `MangoGroup`? And `Account` instead of `MangoAccount`?
 #[account(zero_copy)]
-#[derive(Default)]
 pub struct MangoGroup {
     // Relying on Anchor's discriminator be sufficient for our versioning needs?
     // pub meta_data: MetaData,

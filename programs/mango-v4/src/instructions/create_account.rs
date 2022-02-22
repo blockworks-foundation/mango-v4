@@ -13,6 +13,7 @@ pub struct CreateAccount<'info> {
         seeds = [group.key().as_ref(), b"account".as_ref(), owner.key().as_ref(), &[account_num]],
         bump,
         payer = payer,
+        space = 8 + std::mem::size_of::<MangoAccount>(),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
 

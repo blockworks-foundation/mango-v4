@@ -22,6 +22,7 @@ pub struct RegisterToken<'info> {
         seeds = [group.key().as_ref(), b"tokenbank".as_ref(), mint.key().as_ref()],
         bump,
         payer = payer,
+        space = 8 + std::mem::size_of::<TokenBank>(),
     )]
     pub bank: AccountLoader<'info, TokenBank>,
 
