@@ -7,7 +7,6 @@ use crate::error::*;
 use crate::state::*;
 
 #[derive(Accounts)]
-#[instruction(account_num: u8)]
 pub struct Deposit<'info> {
     pub group: AccountLoader<'info, MangoGroup>,
 
