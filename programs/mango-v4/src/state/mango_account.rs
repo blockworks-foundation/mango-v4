@@ -1,10 +1,11 @@
-use anchor_lang::prelude::*;
 use super::mango_group::*;
+use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
 const MAX_INDEXED_POSITIONS: usize = 32;
 
 #[zero_copy]
+#[derive(Default)]
 pub struct IndexedPosition {
     // TODO: Why did we have deposits and borrows as two different values
     //       if only one of them was allowed to be != 0 at a time?
@@ -28,7 +29,7 @@ impl IndexedPosition {
 
 #[account(zero_copy)]
 pub struct MangoAccount {
-    pub mango_group: Pubkey,
+    pub group: Pubkey,
     pub owner: Pubkey,
 
     // Alternative authority/signer of transactions for a mango account
@@ -36,8 +37,7 @@ pub struct MangoAccount {
 
     // pub in_margin_basket: [bool; MAX_PAIRS],
     // pub num_in_margin_basket: u8,
-
-    pub indexed_position: [I80F48; MAX_INDEXED_POSITIONS],
+    pub indexed_position: [IndexedPosition; MAX_INDEXED_POSITIONS],
 
     // pub spot_open_orders: [Pubkey; MAX_PAIRS],
     // pub perp_accounts: [PerpAccount; MAX_PAIRS],
@@ -48,7 +48,6 @@ pub struct MangoAccount {
     // pub client_order_ids: [u64; MAX_PERP_OPEN_ORDERS],
 
     // pub msrm_amount: u64,
-
     /// This account cannot open new positions or borrow until `init_health >= 0`
     pub being_liquidated: bool, // TODO: for strict Pod compat, these should be u8, not bool
 
@@ -56,8 +55,20 @@ pub struct MangoAccount {
     pub is_bankrupt: bool,
 
     // pub info: [u8; INFO_LEN], // TODO: Info could be in a separate PDA?
-
-
     pub reserved: [u8; 5],
 }
 // TODO: static assert the size and alignment
+
+impl Default for MangoAccount {
+    fn default() -> Self {
+        Self {
+            group: Pubkey::default(),
+            owner: Pubkey::default(),
+            delegate: Pubkey::default(),
+            indexed_position: [IndexedPosition::default(); MAX_INDEXED_POSITIONS],
+            being_liquidated: false,
+            is_bankrupt: false,
+            reserved: [0u8; 5],
+        }
+    }
+}

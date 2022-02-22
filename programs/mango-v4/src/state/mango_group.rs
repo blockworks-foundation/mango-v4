@@ -11,7 +11,7 @@ pub struct TokenInfo {
     pub decimals: u8,
     // TODO: store oracle index here?
     pub reserved: [u8; 31], // TODO: size?
-    // token's bank account is a PDA
+                            // token's bank account is a PDA
 }
 // TODO: static assert the size and alignment
 
@@ -26,14 +26,11 @@ impl TokenInfo {
 pub struct MangoGroup {
     // Relying on Anchor's discriminator be sufficient for our versioning needs?
     // pub meta_data: MetaData,
-
     pub owner: Pubkey,
 
     //pub num_oracles: usize, // incremented every time add_oracle is called
     //pub oracles: [Pubkey; MAX_PAIRS],
-
     pub tokens: [TokenInfo; MAX_TOKENS],
-
     //pub spot_markets: [SpotMarketInfo; MAX_PAIRS],
     //pub perp_markets: [PerpMarketInfo; MAX_PAIRS],
 

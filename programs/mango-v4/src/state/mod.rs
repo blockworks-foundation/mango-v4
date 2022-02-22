@@ -12,5 +12,5 @@ mod mango_group;
 // mod root_bank;
 // mod spot_market_info;
 
-pub use mango_group::*;
 pub use mango_account::*;
+pub use mango_group::*;

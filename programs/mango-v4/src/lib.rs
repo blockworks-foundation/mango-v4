@@ -22,6 +22,10 @@ pub mod mango_v4 {
     pub fn register_token(ctx: Context<RegisterToken>, decimals: u8) -> Result<()> {
         instructions::register_token(ctx, decimals)
     }
+
+    pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()> {
+        instructions::create_account(ctx, account_num)
+    }
 }
 
 #[derive(Clone)]

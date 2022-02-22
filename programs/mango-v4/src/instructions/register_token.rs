@@ -12,12 +12,10 @@ pub struct RegisterToken<'info> {
     pub group: AccountLoader<'info, MangoGroup>,
     pub owner: Signer<'info>,
 
-
     pub mint: Account<'info, Mint>,
 
     // TODO: Create the bank PDA
     // TODO: Create the vault PDA
-
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -30,7 +28,11 @@ pub struct RegisterToken<'info> {
 pub fn register_token(ctx: Context<RegisterToken>, decimals: u8) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
     // TOOD: Error type
-    let token_index = group.tokens.iter().position(|ti| !ti.is_valid()).ok_or(MangoError::SomeError)?;
+    let token_index = group
+        .tokens
+        .iter()
+        .position(|ti| !ti.is_valid())
+        .ok_or(MangoError::SomeError)?;
     group.tokens[token_index] = TokenInfo {
         mint: ctx.accounts.mint.key(),
         decimals,
