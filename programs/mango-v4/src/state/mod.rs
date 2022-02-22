@@ -1,8 +1,8 @@
 // mod advanced_orders;
 // mod cache;
 // mod health;
-// mod mango_account;
-// mod mango_group;
+mod mango_account;
+mod mango_group;
 // mod node_bank;
 // mod order_book_state_header;
 // mod perp_account;
