@@ -2,6 +2,8 @@
 .DS_Store
 target
 **/*.rs.bk
+dist
 node_modules
+
 
 .idea
