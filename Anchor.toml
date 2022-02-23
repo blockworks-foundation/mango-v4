@@ -1,6 +1,9 @@
 [programs.localnet]
 mango_v4 = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
 
+[features]
+seeds = true
+
 [registry]
 url = "https://anchor.projectserum.com"
 

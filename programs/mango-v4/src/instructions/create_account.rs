@@ -10,7 +10,7 @@ pub struct CreateAccount<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"account".as_ref(), owner.key().as_ref(), &[account_num]],
+        seeds = [group.key().as_ref(), b"account".as_ref(), owner.key().as_ref(), &account_num.to_le_bytes()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<MangoAccount>(),
