@@ -1,5 +1,5 @@
-use super::mango_group::*;
 use crate::error::*;
+use crate::state::*;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
@@ -13,7 +13,7 @@ pub struct IndexedPosition {
     // todo: see https://github.com/blockworks-foundation/mango-v4/issues/1
     // todo: how does ftx do this?
     /// The deposit_index (if positive) or borrow_index (if negative) scaled position
-    pub value: I80F48,
+    pub indexed_value: I80F48,
 
     /// index into MangoGroup.tokens
     pub token_index: TokenIndex,
@@ -23,7 +23,15 @@ pub struct IndexedPosition {
 impl IndexedPosition {
     pub fn is_active(&self) -> bool {
         // maybe want to reserve token_index == 0?
-        self.value != I80F48::ZERO
+        self.indexed_value != I80F48::ZERO
+    }
+
+    pub fn native(&self, bank: &TokenBank) -> I80F48 {
+        if self.indexed_value.is_positive() {
+            self.indexed_value * bank.deposit_index
+        } else {
+            self.indexed_value * bank.borrow_index
+        }
     }
 }
 
@@ -45,7 +53,7 @@ impl IndexedPositions {
             pos = self.values.iter().position(|p| !p.is_active());
             if let Some(i) = pos {
                 self.values[i] = IndexedPosition {
-                    value: I80F48::ZERO,
+                    indexed_value: I80F48::ZERO,
                     token_index: token_index as TokenIndex,
                 };
             }
