@@ -7,14 +7,14 @@ use crate::state::*;
 pub struct CreateGroup<'info> {
     #[account(
         init,
-        seeds = [b"group".as_ref(), owner.key().as_ref()],
+        seeds = [b"group".as_ref(), admin.key().as_ref()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<MangoGroup>(),
     )]
     pub group: AccountLoader<'info, MangoGroup>,
 
-    pub owner: Signer<'info>,
+    pub admin: Signer<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -25,6 +25,6 @@ pub struct CreateGroup<'info> {
 
 pub fn create_group(ctx: Context<CreateGroup>) -> Result<()> {
     let mut group = ctx.accounts.group.load_init()?;
-    group.owner = ctx.accounts.owner.key();
+    group.admin = ctx.accounts.admin.key();
     Ok(())
 }

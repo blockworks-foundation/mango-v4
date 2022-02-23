@@ -46,7 +46,7 @@ impl Tokens {
 pub struct MangoGroup {
     // Relying on Anchor's discriminator be sufficient for our versioning needs?
     // pub meta_data: MetaData,
-    pub owner: Pubkey,
+    pub admin: Pubkey,
 
     //pub num_oracles: usize, // incremented every time add_oracle is called
     //pub oracles: [Pubkey; MAX_PAIRS],

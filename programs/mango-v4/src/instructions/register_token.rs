@@ -10,10 +10,10 @@ use crate::state::*;
 #[derive(Accounts)]
 pub struct RegisterToken<'info> {
     #[account(
-        has_one = owner,
+        has_one = admin,
     )]
     pub group: AccountLoader<'info, MangoGroup>,
-    pub owner: Signer<'info>,
+    pub admin: Signer<'info>,
 
     pub mint: Account<'info, Mint>,
 
