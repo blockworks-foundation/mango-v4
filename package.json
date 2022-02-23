@@ -36,7 +36,7 @@
     "trailingComma": "all"
   },
   "dependencies": {
-    "@project-serum/anchor": "^0.18.0"
+    "@project-serum/anchor": "^0.22.0"
   },
   "license": "MIT"
 }
