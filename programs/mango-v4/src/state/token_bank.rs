@@ -1,7 +1,10 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
+use fixed_macro::types::I80F48;
 
 use super::IndexedPosition;
+
+const INDEX_START: I80F48 = I80F48!(1_000_000);
 
 #[account(zero_copy)]
 pub struct TokenBank {
@@ -20,6 +23,11 @@ pub struct TokenBank {
 }
 
 impl TokenBank {
+    pub fn initialize(&mut self) {
+        self.deposit_index = INDEX_START;
+        self.borrow_index = INDEX_START;
+    }
+
     pub fn deposit(&mut self, position: &mut IndexedPosition, native_amount: u64) {
         let mut native_amount = I80F48::from_num(native_amount);
         let native_position = position.native(self);

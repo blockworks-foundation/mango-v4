@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
+use fixed::types::I80F48;
 
 use crate::error::*;
 use crate::state::*;
@@ -46,7 +47,8 @@ pub struct RegisterToken<'info> {
 // TODO: should this be "configure_mint", we pass an explicit index, and allow
 // overwriting config as long as the mint account stays the same?
 pub fn register_token(ctx: Context<RegisterToken>, decimals: u8) -> Result<()> {
-    ctx.accounts.bank.load_init()?;
+    let mut bank = ctx.accounts.bank.load_init()?;
+    bank.initialize();
 
     let mut group = ctx.accounts.group.load_mut()?;
     // TODO: Error if mint is already configured (techincally, init of vault will fail)
