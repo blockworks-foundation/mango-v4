@@ -1,7 +1,8 @@
 use crate::error::*;
 use anchor_lang::prelude::*;
+use fixed::types::I80F48;
 
-const MAX_TOKENS: usize = 100;
+const MAX_TOKENS: usize = 60;
 // TODO: Assuming we allow up to 65536 different tokens
 pub type TokenIndex = u16;
 
@@ -11,6 +12,13 @@ pub struct TokenInfo {
     pub decimals: u8,
     pub bank_bump: u8,
     pub vault_bump: u8,
+
+    // This is a _lot_ of bytes (64)
+    pub maint_asset_weight: I80F48,
+    pub init_asset_weight: I80F48,
+    pub maint_liab_weight: I80F48,
+    pub init_liab_weight: I80F48,
+
     // TODO: store oracle index here?
     pub reserved: [u8; 30], // TODO: size?
                             // token's bank account is a PDA
@@ -25,6 +33,8 @@ impl TokenInfo {
 
 #[zero_copy]
 pub struct Tokens {
+    // TODO: With TokenInfo > 100 bytes, we can have < 100 tokens max due to the 10kb limit
+    // We could make large accounts not be PDAs, or hope for resize()
     pub infos: [TokenInfo; MAX_TOKENS],
 }
 
@@ -70,7 +80,6 @@ pub struct MangoGroup {
     //pub ref_surcharge_centibps: u32, // 100
     //pub ref_share_centibps: u32,     // 80 (must be less than surcharge)
     //pub ref_mngo_required: u64,
-
     pub bump: u8,
 }
 // TODO: static assert the size and alignment
@@ -78,11 +87,7 @@ pub struct MangoGroup {
 #[macro_export]
 macro_rules! group_seeds {
     ( $group:expr ) => {
-        &[
-            b"group".as_ref(),
-            $group.admin.as_ref(),
-            &[$group.bump],
-        ]
+        &[b"group".as_ref(), $group.admin.as_ref(), &[$group.bump]]
     };
 }
 

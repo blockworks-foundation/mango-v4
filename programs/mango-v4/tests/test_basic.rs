@@ -38,6 +38,10 @@ async fn test_basic() -> Result<(), TransportError> {
         &context.solana,
         RegisterTokenInstruction {
             decimals: context.mints[0].decimals,
+            maint_asset_weight: 0.9,
+            init_asset_weight: 0.8,
+            maint_liab_weight: 1.1,
+            init_liab_weight: 1.2,
             group,
             admin,
             mint: context.mints[0].pubkey,
@@ -49,7 +53,11 @@ async fn test_basic() -> Result<(), TransportError> {
     let vault = register_token_accounts.vault;
 
     let deposit_from_account = context.users[1].token_accounts[0];
-    let start_balance = context.solana.token_account_balance(deposit_from_account).await.unwrap();
+    let start_balance = context
+        .solana
+        .token_account_balance(deposit_from_account)
+        .await
+        .unwrap();
 
     send_tx(
         &context.solana,
@@ -68,7 +76,11 @@ async fn test_basic() -> Result<(), TransportError> {
         100
     );
     assert_eq!(
-        context.solana.token_account_balance(deposit_from_account).await.unwrap(),
+        context
+            .solana
+            .token_account_balance(deposit_from_account)
+            .await
+            .unwrap(),
         start_balance - 100
     );
     let account_data: MangoAccount = context.solana.get_account(account).await.unwrap();
@@ -88,14 +100,19 @@ async fn test_basic() -> Result<(), TransportError> {
             owner,
             token_account: deposit_from_account, // withdraw back
         },
-    ).await;
+    )
+    .await;
 
     assert_eq!(
         context.solana.token_account_balance(vault).await.unwrap(),
         50
     );
     assert_eq!(
-        context.solana.token_account_balance(deposit_from_account).await.unwrap(),
+        context
+            .solana
+            .token_account_balance(deposit_from_account)
+            .await
+            .unwrap(),
         start_balance - 50
     );
     let account_data: MangoAccount = context.solana.get_account(account).await.unwrap();

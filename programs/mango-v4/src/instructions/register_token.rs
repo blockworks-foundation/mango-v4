@@ -47,7 +47,14 @@ pub struct RegisterToken<'info> {
 
 // TODO: should this be "configure_mint", we pass an explicit index, and allow
 // overwriting config as long as the mint account stays the same?
-pub fn register_token(ctx: Context<RegisterToken>, decimals: u8) -> Result<()> {
+pub fn register_token(
+    ctx: Context<RegisterToken>,
+    decimals: u8,
+    maint_asset_weight: f32,
+    init_asset_weight: f32,
+    maint_liab_weight: f32,
+    init_liab_weight: f32,
+) -> Result<()> {
     let mut bank = ctx.accounts.bank.load_init()?;
     bank.initialize();
 
@@ -64,6 +71,10 @@ pub fn register_token(ctx: Context<RegisterToken>, decimals: u8) -> Result<()> {
     group.tokens.infos[token_index] = TokenInfo {
         mint: ctx.accounts.mint.key(),
         decimals,
+        maint_asset_weight: I80F48::from_num(maint_asset_weight),
+        init_asset_weight: I80F48::from_num(init_asset_weight),
+        maint_liab_weight: I80F48::from_num(maint_liab_weight),
+        init_liab_weight: I80F48::from_num(init_liab_weight),
         bank_bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?, // TODO: error
         vault_bump: *ctx.bumps.get("vault").ok_or(MangoError::SomeError)?, // TODO: error
         reserved: [0u8; 30],

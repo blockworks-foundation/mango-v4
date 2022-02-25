@@ -181,6 +181,10 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
 
 pub struct RegisterTokenInstruction<'keypair> {
     pub decimals: u8,
+    pub maint_asset_weight: f32,
+    pub init_asset_weight: f32,
+    pub maint_liab_weight: f32,
+    pub init_liab_weight: f32,
 
     pub group: Pubkey,
     pub admin: &'keypair Keypair,
@@ -198,6 +202,10 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             decimals: self.decimals,
+            maint_asset_weight: self.maint_asset_weight,
+            init_asset_weight: self.init_asset_weight,
+            maint_liab_weight: self.maint_liab_weight,
+            init_liab_weight: self.init_liab_weight,
         };
 
         let bank = Pubkey::find_program_address(

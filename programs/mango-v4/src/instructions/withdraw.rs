@@ -65,20 +65,36 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
     let mut account = ctx.accounts.account.load_mut()?;
     let position = account.indexed_positions.get_mut_or_create(token_index)?;
 
-    let amount = if allow_borrow {
-        amount
+    let mut bank = ctx.accounts.bank.load_mut()?;
+    let native_position = position.native(&bank);
+
+    // Handle amount special case for withdrawing everything
+    let amount = if amount == u64::MAX && !allow_borrow {
+        if native_position.is_positive() {
+            // TODO: This rounding may mean that if we deposit and immediately withdraw
+            //       we can't withdraw the full amount!
+            native_position.floor().to_num::<u64>()
+        } else {
+            return Ok(());
+        }
     } else {
-        // TODO: compute limit
-        0
+        amount
     };
 
+    require!(
+        allow_borrow || amount < native_position,
+        MangoError::SomeError
+    );
+
     // Update the bank and position
-    let mut bank = ctx.accounts.bank.load_mut()?;
     bank.withdraw(position, amount);
 
     // Transfer the actual tokens
     let group_seeds = group_seeds!(group);
-    token::transfer(ctx.accounts.transfer_ctx().with_signer(&[group_seeds]), amount)?;
+    token::transfer(
+        ctx.accounts.transfer_ctx().with_signer(&[group_seeds]),
+        amount,
+    )?;
 
     // TODO: Health check
 

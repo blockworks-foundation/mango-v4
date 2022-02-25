@@ -19,8 +19,22 @@ pub mod mango_v4 {
         instructions::create_group(ctx)
     }
 
-    pub fn register_token(ctx: Context<RegisterToken>, decimals: u8) -> Result<()> {
-        instructions::register_token(ctx, decimals)
+    pub fn register_token(
+        ctx: Context<RegisterToken>,
+        decimals: u8,
+        maint_asset_weight: f32,
+        init_asset_weight: f32,
+        maint_liab_weight: f32,
+        init_liab_weight: f32,
+    ) -> Result<()> {
+        instructions::register_token(
+            ctx,
+            decimals,
+            maint_asset_weight,
+            init_asset_weight,
+            maint_liab_weight,
+            init_liab_weight,
+        )
     }
 
     pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()> {
