@@ -28,6 +28,10 @@ impl TokenBank {
         self.borrow_index = INDEX_START;
     }
 
+    pub fn native_total_deposits(&self) -> I80F48 {
+        self.deposit_index * self.indexed_total_deposits
+    }
+
     pub fn deposit(&mut self, position: &mut IndexedPosition, native_amount: u64) {
         let mut native_amount = I80F48::from_num(native_amount);
         let native_position = position.native(self);

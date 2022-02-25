@@ -11,6 +11,7 @@ pub struct Deposit<'info> {
     pub group: AccountLoader<'info, MangoGroup>,
 
     #[account(
+        mut,
         has_one = group,
     )]
     pub account: AccountLoader<'info, MangoAccount>,
