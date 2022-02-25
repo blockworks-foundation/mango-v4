@@ -26,6 +26,10 @@ impl IndexedPosition {
         self.indexed_value != I80F48::ZERO
     }
 
+    pub fn is_active_for_index(&self, index: usize) -> bool {
+        self.token_index as usize == index && self.is_active()
+    }
+
     pub fn native(&self, bank: &TokenBank) -> I80F48 {
         if self.indexed_value.is_positive() {
             self.indexed_value * bank.deposit_index
@@ -41,6 +45,13 @@ pub struct IndexedPositions {
 }
 
 impl IndexedPositions {
+    pub fn get_mut(&mut self, token_index: usize) -> Result<&mut IndexedPosition> {
+        self.values
+            .iter_mut()
+            .find(|p| p.is_active_for_index(token_index))
+            .ok_or(error!(MangoError::SomeError)) // TODO: not found error
+    }
+
     pub fn get_mut_or_create(&mut self, token_index: usize) -> Result<&mut IndexedPosition> {
         // This function looks complex because of lifetimes.
         // Maybe there's a smart way to write it with double iter_mut()
@@ -48,7 +59,7 @@ impl IndexedPositions {
         let mut pos = self
             .values
             .iter()
-            .position(|p| p.token_index as usize == token_index && p.is_active());
+            .position(|p| p.is_active_for_index(token_index));
         if pos.is_none() {
             pos = self.values.iter().position(|p| !p.is_active());
             if let Some(i) = pos {

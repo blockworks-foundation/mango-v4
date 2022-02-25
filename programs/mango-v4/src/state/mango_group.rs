@@ -70,5 +70,20 @@ pub struct MangoGroup {
     //pub ref_surcharge_centibps: u32, // 100
     //pub ref_share_centibps: u32,     // 80 (must be less than surcharge)
     //pub ref_mngo_required: u64,
+
+    pub bump: u8,
 }
 // TODO: static assert the size and alignment
+
+#[macro_export]
+macro_rules! group_seeds {
+    ( $group:expr ) => {
+        &[
+            b"group".as_ref(),
+            $group.admin.as_ref(),
+            &[$group.bump],
+        ]
+    };
+}
+
+pub use group_seeds;

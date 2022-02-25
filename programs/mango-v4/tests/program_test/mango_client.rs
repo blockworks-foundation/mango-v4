@@ -55,13 +55,76 @@ pub trait ClientInstruction {
 // ClientInstruction impl
 //
 
+pub struct WithdrawInstruction<'keypair> {
+    pub amount: u64,
+    pub allow_borrow: bool,
+
+    pub group: Pubkey,
+    pub account: Pubkey,
+    pub owner: &'keypair Keypair,
+    pub token_account: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::Withdraw;
+    type Instruction = mango_v4::instruction::Withdraw;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Pubkey, Self::Accounts, Self::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            amount: self.amount,
+            allow_borrow: self.allow_borrow,
+        };
+
+        // load account so we know its mint
+        let token_account: TokenAccount = account_loader.load(&self.token_account).await.unwrap();
+
+        let bank = Pubkey::find_program_address(
+            &[
+                self.group.as_ref(),
+                b"tokenbank".as_ref(),
+                token_account.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let vault = Pubkey::find_program_address(
+            &[
+                self.group.as_ref(),
+                b"tokenvault".as_ref(),
+                token_account.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            account: self.account,
+            owner: self.owner.pubkey(),
+            bank,
+            vault,
+            token_account: self.token_account,
+            token_program: Token::id(),
+        };
+
+        (program_id, accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.owner]
+    }
+}
+
 pub struct DepositInstruction<'keypair> {
     pub amount: u64,
 
     pub group: Pubkey,
     pub account: Pubkey,
-    pub deposit_token: Pubkey,
-    pub deposit_authority: &'keypair Keypair,
+    pub token_account: Pubkey,
+    pub token_authority: &'keypair Keypair,
 }
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
@@ -76,14 +139,14 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
             amount: self.amount,
         };
 
-        // load deposit_token so we know its mint
-        let deposit_token: TokenAccount = account_loader.load(&self.deposit_token).await.unwrap();
+        // load account so we know its mint
+        let token_account: TokenAccount = account_loader.load(&self.token_account).await.unwrap();
 
         let bank = Pubkey::find_program_address(
             &[
                 self.group.as_ref(),
                 b"tokenbank".as_ref(),
-                deposit_token.mint.as_ref(),
+                token_account.mint.as_ref(),
             ],
             &program_id,
         )
@@ -92,7 +155,7 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
             &[
                 self.group.as_ref(),
                 b"tokenvault".as_ref(),
-                deposit_token.mint.as_ref(),
+                token_account.mint.as_ref(),
             ],
             &program_id,
         )
@@ -103,8 +166,8 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
             account: self.account,
             bank,
             vault,
-            deposit_token: self.deposit_token,
-            deposit_authority: self.deposit_authority.pubkey(),
+            token_account: self.token_account,
+            token_authority: self.token_authority.pubkey(),
             token_program: Token::id(),
         };
 
@@ -112,7 +175,7 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
     }
 
     fn signers(&self) -> Vec<&Keypair> {
-        vec![self.deposit_authority]
+        vec![self.token_authority]
     }
 }
 

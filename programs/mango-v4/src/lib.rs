@@ -30,6 +30,10 @@ pub mod mango_v4 {
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         instructions::deposit(ctx, amount)
     }
+
+    pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
+        instructions::withdraw(ctx, amount, allow_borrow)
+    }
 }
 
 #[derive(Clone)]

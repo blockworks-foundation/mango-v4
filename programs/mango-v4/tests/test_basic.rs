@@ -48,14 +48,17 @@ async fn test_basic() -> Result<(), TransportError> {
     let bank = register_token_accounts.bank;
     let vault = register_token_accounts.vault;
 
+    let deposit_from_account = context.users[1].token_accounts[0];
+    let start_balance = context.solana.token_account_balance(deposit_from_account).await.unwrap();
+
     send_tx(
         &context.solana,
         DepositInstruction {
             amount: 100,
             group,
             account,
-            deposit_token: context.users[1].token_accounts[0],
-            deposit_authority: payer,
+            token_account: deposit_from_account,
+            token_authority: payer,
         },
     )
     .await;
@@ -64,13 +67,43 @@ async fn test_basic() -> Result<(), TransportError> {
         context.solana.token_account_balance(vault).await.unwrap(),
         100
     );
-
+    assert_eq!(
+        context.solana.token_account_balance(deposit_from_account).await.unwrap(),
+        start_balance - 100
+    );
     let account_data: MangoAccount = context.solana.get_account(account).await.unwrap();
     let bank_data: TokenBank = context.solana.get_account(bank).await.unwrap();
     assert!(
         account_data.indexed_positions.values[0].native(&bank_data) - I80F48::from_num(100.0) < 0.1
     );
     assert!(bank_data.native_total_deposits() - I80F48::from_num(100.0) < 0.1);
+
+    send_tx(
+        &context.solana,
+        WithdrawInstruction {
+            amount: 50,
+            allow_borrow: true,
+            group,
+            account,
+            owner,
+            token_account: deposit_from_account, // withdraw back
+        },
+    ).await;
+
+    assert_eq!(
+        context.solana.token_account_balance(vault).await.unwrap(),
+        50
+    );
+    assert_eq!(
+        context.solana.token_account_balance(deposit_from_account).await.unwrap(),
+        start_balance - 50
+    );
+    let account_data: MangoAccount = context.solana.get_account(account).await.unwrap();
+    let bank_data: TokenBank = context.solana.get_account(bank).await.unwrap();
+    assert!(
+        account_data.indexed_positions.values[0].native(&bank_data) - I80F48::from_num(50.0) < 0.1
+    );
+    assert!(bank_data.native_total_deposits() - I80F48::from_num(50.0) < 0.1);
 
     Ok(())
 }

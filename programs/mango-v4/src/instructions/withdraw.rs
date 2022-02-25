@@ -7,14 +7,16 @@ use crate::error::*;
 use crate::state::*;
 
 #[derive(Accounts)]
-pub struct Deposit<'info> {
+pub struct Withdraw<'info> {
     pub group: AccountLoader<'info, MangoGroup>,
 
     #[account(
         mut,
         has_one = group,
+        has_one = owner,
     )]
     pub account: AccountLoader<'info, MangoAccount>,
+    pub owner: Signer<'info>,
 
     #[account(
         mut,
@@ -34,18 +36,17 @@ pub struct Deposit<'info> {
 
     #[account(mut)]
     pub token_account: Box<Account<'info, TokenAccount>>,
-    pub token_authority: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
 }
 
-impl<'info> Deposit<'info> {
+impl<'info> Withdraw<'info> {
     pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
         let program = self.token_program.to_account_info();
         let accounts = token::Transfer {
-            from: self.token_account.to_account_info(),
-            to: self.vault.to_account_info(),
-            authority: self.token_authority.to_account_info(),
+            from: self.vault.to_account_info(),
+            to: self.token_account.to_account_info(),
+            authority: self.group.to_account_info(),
         };
         CpiContext::new(program, accounts)
     }
@@ -54,7 +55,7 @@ impl<'info> Deposit<'info> {
 // TODO: It may make sense to have the token_index passed in from the outside.
 //       That would save a lot of computation that needs to go into finding the
 //       right index for the mint.
-pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
     // Find the mint's token index
     let group = ctx.accounts.group.load()?;
     let mint = ctx.accounts.token_account.mint;
@@ -64,12 +65,22 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     let mut account = ctx.accounts.account.load_mut()?;
     let position = account.indexed_positions.get_mut_or_create(token_index)?;
 
+    let amount = if allow_borrow {
+        amount
+    } else {
+        // TODO: compute limit
+        0
+    };
+
     // Update the bank and position
     let mut bank = ctx.accounts.bank.load_mut()?;
-    bank.deposit(position, amount);
+    bank.withdraw(position, amount);
 
     // Transfer the actual tokens
-    token::transfer(ctx.accounts.transfer_ctx(), amount)?;
+    let group_seeds = group_seeds!(group);
+    token::transfer(ctx.accounts.transfer_ctx().with_signer(&[group_seeds]), amount)?;
+
+    // TODO: Health check
 
     Ok(())
 }
