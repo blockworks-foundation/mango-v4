@@ -78,6 +78,9 @@ pub fn register_token(
 
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = TokenBank {
+        group: ctx.accounts.group.key(),
+        mint: ctx.accounts.mint.key(),
+        vault: ctx.accounts.vault.key(),
         deposit_index: INDEX_START,
         borrow_index: INDEX_START,
         indexed_total_deposits: I80F48::ZERO,

@@ -18,18 +18,13 @@ pub struct Deposit<'info> {
 
     #[account(
         mut,
-        seeds = [group.key().as_ref(), b"tokenbank".as_ref(), token_account.mint.as_ref()],
-        // TODO: not sure if getting the bump like this is worth it!
-        bump = group.load()?.tokens.info_for_mint(&token_account.mint)?.bank_bump,
+        has_one = group,
+        has_one = vault,
+        constraint = bank.load()?.mint == token_account.mint,
     )]
     pub bank: AccountLoader<'info, TokenBank>,
 
-    #[account(
-        mut,
-        seeds = [group.key().as_ref(), b"tokenvault".as_ref(), token_account.mint.as_ref()],
-        // TODO: not sure if getting the bump like this is worth it!
-        bump = group.load()?.tokens.info_for_mint(&token_account.mint)?.vault_bump,
-    )]
+    #[account(mut)]
     pub vault: Account<'info, TokenAccount>,
 
     #[account(mut)]
