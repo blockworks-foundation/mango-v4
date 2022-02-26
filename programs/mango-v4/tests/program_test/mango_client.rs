@@ -24,13 +24,9 @@ impl ClientAccountLoader for &SolanaCookie {
 
 // TODO: report error outwards etc
 pub async fn send_tx<CI: ClientInstruction>(solana: &SolanaCookie, ix: CI) -> CI::Accounts {
-    let (program_id, accounts, instruction) = ix.to_instruction(solana).await;
+    let (accounts, instruction) = ix.to_instruction(solana).await;
     let signers = ix.signers();
-    let instructions = vec![instruction::Instruction {
-        program_id,
-        accounts: anchor_lang::ToAccountMetas::to_account_metas(&accounts, None),
-        data: anchor_lang::InstructionData::data(&instruction),
-    }];
+    let instructions = vec![instruction];
     solana
         .process_transaction(&instructions, Some(&signers[..]))
         .await
@@ -46,8 +42,20 @@ pub trait ClientInstruction {
     async fn to_instruction(
         &self,
         loader: impl ClientAccountLoader + 'async_trait,
-    ) -> (Pubkey, Self::Accounts, Self::Instruction);
+    ) -> (Self::Accounts, instruction::Instruction);
     fn signers(&self) -> Vec<&Keypair>;
+}
+
+fn make_instruction(
+    program_id: Pubkey,
+    accounts: &impl anchor_lang::ToAccountMetas,
+    data: impl anchor_lang::InstructionData,
+) -> instruction::Instruction {
+    instruction::Instruction {
+        program_id,
+        accounts: anchor_lang::ToAccountMetas::to_account_metas(accounts, None),
+        data: anchor_lang::InstructionData::data(&data),
+    }
 }
 
 //
@@ -63,6 +71,8 @@ pub struct WithdrawInstruction<'keypair> {
     pub account: Pubkey,
     pub owner: &'keypair Keypair,
     pub token_account: Pubkey,
+
+    pub banks: Vec<Pubkey>,
 }
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
@@ -71,7 +81,7 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
-    ) -> (Pubkey, Self::Accounts, Self::Instruction) {
+    ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             amount: self.amount,
@@ -110,7 +120,16 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
             token_program: Token::id(),
         };
 
-        (program_id, accounts, instruction)
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction
+            .accounts
+            .extend(self.banks.iter().map(|&pubkey| AccountMeta {
+                pubkey,
+                is_writable: false,
+                is_signer: false,
+            }));
+
+        (accounts, instruction)
     }
 
     fn signers(&self) -> Vec<&Keypair> {
@@ -133,7 +152,7 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
-    ) -> (Pubkey, Self::Accounts, Self::Instruction) {
+    ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             amount: self.amount,
@@ -171,7 +190,8 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
             token_program: Token::id(),
         };
 
-        (program_id, accounts, instruction)
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
     }
 
     fn signers(&self) -> Vec<&Keypair> {
@@ -198,7 +218,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
-    ) -> (Pubkey, Self::Accounts, Self::Instruction) {
+    ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             decimals: self.decimals,
@@ -239,7 +259,8 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
             rent: sysvar::rent::Rent::id(),
         };
 
-        (program_id, accounts, instruction)
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
     }
 
     fn signers(&self) -> Vec<&Keypair> {
@@ -258,7 +279,7 @@ impl<'keypair> ClientInstruction for CreateGroupInstruction<'keypair> {
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
-    ) -> (Pubkey, Self::Accounts, Self::Instruction) {
+    ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
 
@@ -276,7 +297,8 @@ impl<'keypair> ClientInstruction for CreateGroupInstruction<'keypair> {
             rent: sysvar::rent::Rent::id(),
         };
 
-        (program_id, accounts, instruction)
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
     }
 
     fn signers(&self) -> Vec<&Keypair> {
@@ -298,7 +320,7 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
-    ) -> (Pubkey, Self::Accounts, Self::Instruction) {
+    ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = mango_v4::instruction::CreateAccount {
             account_num: self.account_num,
@@ -324,7 +346,8 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
             rent: sysvar::rent::Rent::id(),
         };
 
-        (program_id, accounts, instruction)
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
     }
 
     fn signers(&self) -> Vec<&Keypair> {

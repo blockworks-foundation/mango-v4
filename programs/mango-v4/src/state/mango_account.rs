@@ -23,6 +23,7 @@ pub struct IndexedPosition {
 impl IndexedPosition {
     pub fn is_active(&self) -> bool {
         // maybe want to reserve token_index == 0?
+        // TODO: possibly consider inactive if there's less than one native token there? - that's impossible to withdraw...
         self.indexed_value != I80F48::ZERO
     }
 
@@ -74,6 +75,10 @@ impl IndexedPositions {
         } else {
             err!(MangoError::SomeError) // TODO: No free space
         }
+    }
+
+    pub fn iter_active(&self) -> impl Iterator<Item = &IndexedPosition> {
+        self.values.iter().filter(|p| p.is_active())
     }
 }
 

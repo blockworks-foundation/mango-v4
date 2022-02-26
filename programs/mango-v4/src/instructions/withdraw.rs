@@ -61,49 +61,81 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
     let mut account = ctx.accounts.account.load_mut()?;
     let position = account.indexed_positions.get_mut_or_create(token_index)?;
 
-    let mut bank = ctx.accounts.bank.load_mut()?;
-    let native_position = position.native(&bank);
+    // The bank will also be passed in remainingAccounts. Use an explicit scope
+    // to drop the &mut before we borrow it immutably again later.
+    {
+        let mut bank = ctx.accounts.bank.load_mut()?;
+        let native_position = position.native(&bank);
 
-    // Handle amount special case for withdrawing everything
-    let amount = if amount == u64::MAX && !allow_borrow {
-        if native_position.is_positive() {
-            // TODO: This rounding may mean that if we deposit and immediately withdraw
-            //       we can't withdraw the full amount!
-            native_position.floor().to_num::<u64>()
+        // Handle amount special case for withdrawing everything
+        let amount = if amount == u64::MAX && !allow_borrow {
+            if native_position.is_positive() {
+                // TODO: This rounding may mean that if we deposit and immediately withdraw
+                //       we can't withdraw the full amount!
+                native_position.floor().to_num::<u64>()
+            } else {
+                return Ok(());
+            }
         } else {
-            return Ok(());
-        }
-    } else {
-        amount
-    };
+            amount
+        };
 
+        require!(
+            allow_borrow || amount < native_position,
+            MangoError::SomeError
+        );
+
+        // Update the bank and position
+        bank.withdraw(position, amount);
+
+        // Transfer the actual tokens
+        let group_seeds = group_seeds!(group);
+        token::transfer(
+            ctx.accounts.transfer_ctx().with_signer(&[group_seeds]),
+            amount,
+        )?;
+    }
+
+    //
+    // Health check (WIP)
+    //
+    let active_len = account.indexed_positions.iter_active().count();
     require!(
-        allow_borrow || amount < native_position,
+        ctx.remaining_accounts.len() == active_len,
         MangoError::SomeError
     );
 
-    // Update the bank and position
-    bank.withdraw(position, amount);
+    let mut assets = I80F48::ZERO;
+    let mut liabilities = I80F48::ZERO; // absolute value
+    for (position, bank_ai) in account
+        .indexed_positions
+        .iter_active()
+        .zip(ctx.remaining_accounts.iter())
+    {
+        let bank_loader = AccountLoader::<'_, TokenBank>::try_from(bank_ai)?;
+        let bank = bank_loader.load()?;
 
-    // Transfer the actual tokens
-    let group_seeds = group_seeds!(group);
-    token::transfer(
-        ctx.accounts.transfer_ctx().with_signer(&[group_seeds]),
-        amount,
-    )?;
+        // TODO: This assumes banks are passed in order - is that an ok assumption?
+        require!(
+            bank.token_index == position.token_index,
+            MangoError::SomeError
+        );
 
-    // TODO: Health check
+        // converts the token value to the basis token value for health computations
+        // TODO: oracles
+        // TODO: health basis token == USDC?
+        let dummy_price = I80F48::ONE;
+
+        let native_basis = position.native(&bank) * dummy_price;
+        if native_basis.is_positive() {
+            assets += bank.init_asset_weight * native_basis;
+        } else {
+            liabilities -= bank.init_liab_weight * native_basis;
+        }
+    }
+    let health = assets - liabilities;
+    msg!("health: {}", health);
+    require!(health > 0, MangoError::SomeError);
 
     Ok(())
 }
-
-/*
-fn health(account: &MangoAccount, group: &MangoGroup) -> (I80F48, I80F48) {
-    let mut assets = I80F48::ZERO;
-    let mut liabilities = I80F48::ZERO;
-
-    for indexed_pos in account.indexed_positions.values {
-
-    }
-}
-*/

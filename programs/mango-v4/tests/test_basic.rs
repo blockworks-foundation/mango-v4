@@ -99,6 +99,7 @@ async fn test_basic() -> Result<(), TransportError> {
             account,
             owner,
             token_account: deposit_from_account, // withdraw back
+            banks: vec![bank],
         },
     )
     .await;
