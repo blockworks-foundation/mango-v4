@@ -1,10 +1,7 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
-use fixed_macro::types::I80F48;
 
-use super::IndexedPosition;
-
-const INDEX_START: I80F48 = I80F48!(1_000_000);
+use super::{IndexedPosition, TokenIndex};
 
 #[account(zero_copy)]
 pub struct TokenBank {
@@ -20,14 +17,20 @@ pub struct TokenBank {
     // pub optimal_util: I80F48,
     // pub optimal_rate: I80F48,
     // pub max_rate: I80F48,
+
+    // This is a _lot_ of bytes (64) - seems unnecessary
+    // (could maybe store them in one byte each, as an informal U1F7?
+    // that could store values between 0-2 and converting to I80F48 would be a cheap expand+shift)
+    pub maint_asset_weight: I80F48,
+    pub init_asset_weight: I80F48,
+    pub maint_liab_weight: I80F48,
+    pub init_liab_weight: I80F48,
+
+    // Index into TokenInfo on the group
+    pub token_index: TokenIndex,
 }
 
 impl TokenBank {
-    pub fn initialize(&mut self) {
-        self.deposit_index = INDEX_START;
-        self.borrow_index = INDEX_START;
-    }
-
     pub fn native_total_deposits(&self) -> I80F48 {
         self.deposit_index * self.indexed_total_deposits
     }

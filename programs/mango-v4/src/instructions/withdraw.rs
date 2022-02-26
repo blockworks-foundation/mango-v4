@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
+use fixed::types::I80F48;
 
 use crate::error::*;
 use crate::state::*;
@@ -100,3 +101,14 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
 
     Ok(())
 }
+
+/*
+fn health(account: &MangoAccount, group: &MangoGroup) -> (I80F48, I80F48) {
+    let mut assets = I80F48::ZERO;
+    let mut liabilities = I80F48::ZERO;
+
+    for indexed_pos in account.indexed_positions.values {
+
+    }
+}
+*/

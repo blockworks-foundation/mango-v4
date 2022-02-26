@@ -13,12 +13,6 @@ pub struct TokenInfo {
     pub bank_bump: u8,
     pub vault_bump: u8,
 
-    // This is a _lot_ of bytes (64)
-    pub maint_asset_weight: I80F48,
-    pub init_asset_weight: I80F48,
-    pub maint_liab_weight: I80F48,
-    pub init_liab_weight: I80F48,
-
     // TODO: store oracle index here?
     pub reserved: [u8; 30], // TODO: size?
                             // token's bank account is a PDA
@@ -33,8 +27,8 @@ impl TokenInfo {
 
 #[zero_copy]
 pub struct Tokens {
-    // TODO: With TokenInfo > 100 bytes, we can have < 100 tokens max due to the 10kb limit
-    // We could make large accounts not be PDAs, or hope for resize()
+    // TODO: If TokenInfo is 70 bytes, we can have < 142 tokens max due to the 10kb limit
+    // We could make large accounts not be PDAs, hope for resize(), or store tokeninfo itself in a pda?
     pub infos: [TokenInfo; MAX_TOKENS],
 }
 
