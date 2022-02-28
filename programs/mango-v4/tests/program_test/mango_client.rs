@@ -250,6 +250,11 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
             &program_id,
         )
         .0;
+        let oracle = Pubkey::find_program_address(
+            &[b"stub_oracle".as_ref(), self.mint.as_ref()],
+            &program_id,
+        )
+        .0;
 
         let accounts = Self::Accounts {
             group: self.group,
@@ -257,6 +262,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
             mint: self.mint,
             bank,
             vault,
+            oracle,
             payer: self.payer.pubkey(),
             token_program: Token::id(),
             system_program: System::id(),

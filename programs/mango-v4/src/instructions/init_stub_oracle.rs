@@ -8,7 +8,7 @@ use crate::state::*;
 pub struct InitStubOracle<'info> {
     #[account(
         init,
-        seeds = [payer.key().as_ref(), b"stub_oracle".as_ref(), token_mint.key().as_ref()],
+        seeds = [b"stub_oracle".as_ref(), token_mint.key().as_ref()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<StubOracle>(),
