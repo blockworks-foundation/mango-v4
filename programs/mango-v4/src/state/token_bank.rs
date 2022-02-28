@@ -8,6 +8,7 @@ pub struct TokenBank {
     pub group: Pubkey,
     pub mint: Pubkey,
     pub vault: Pubkey,
+    pub oracle: Pubkey,
 
     /// the index used to scale the value of an IndexedPosition
     /// TODO: should always be >= 0, add checks?

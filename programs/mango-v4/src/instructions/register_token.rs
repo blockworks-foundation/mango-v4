@@ -40,6 +40,8 @@ pub struct RegisterToken<'info> {
     )]
     pub vault: Account<'info, TokenAccount>,
 
+    pub oracle: UncheckedAccount<'info>,
+
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -81,6 +83,7 @@ pub fn register_token(
         group: ctx.accounts.group.key(),
         mint: ctx.accounts.mint.key(),
         vault: ctx.accounts.vault.key(),
+        oracle: ctx.accounts.oracle.key(),
         deposit_index: INDEX_START,
         borrow_index: INDEX_START,
         indexed_total_deposits: I80F48::ZERO,
