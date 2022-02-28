@@ -48,6 +48,14 @@ impl<'info> Withdraw<'info> {
     }
 }
 
+macro_rules! zip {
+    ($x: expr) => ($x);
+    ($x: expr, $($y: expr), +) => (
+        $x.zip(
+            zip!($($y), +))
+    )
+}
+
 // TODO: It may make sense to have the token_index passed in from the outside.
 //       That would save a lot of computation that needs to go into finding the
 //       right index for the mint.
@@ -101,17 +109,17 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
     //
     let active_len = account.indexed_positions.iter_active().count();
     require!(
-        ctx.remaining_accounts.len() == active_len,
+        ctx.remaining_accounts.len() == active_len * 2, // banks + oracles
         MangoError::SomeError
     );
 
     let mut assets = I80F48::ZERO;
     let mut liabilities = I80F48::ZERO; // absolute value
-    for (position, bank_ai) in account
-        .indexed_positions
-        .iter_active()
-        .zip(ctx.remaining_accounts.iter())
-    {
+    for (position, (bank_ai, oracle_ai)) in zip!(
+        account.indexed_positions.iter_active(),
+        ctx.remaining_accounts.iter(),
+        ctx.remaining_accounts.iter().skip(active_len)
+    ) {
         let bank_loader = AccountLoader::<'_, TokenBank>::try_from(bank_ai)?;
         let bank = bank_loader.load()?;
 
@@ -122,11 +130,17 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
         );
 
         // converts the token value to the basis token value for health computations
-        // TODO: oracles
         // TODO: health basis token == USDC?
-        let dummy_price = I80F48::ONE;
+        let oracle_type = determine_oracle_type(oracle_ai)?;
+        let price = match oracle_type {
+            OracleType::Stub => {
+                AccountLoader::<'_, StubOracle>::try_from(oracle_ai)?
+                    .load()?
+                    .price
+            }
+        };
 
-        let native_basis = position.native(&bank) * dummy_price;
+        let native_basis = position.native(&bank) * price;
         if native_basis.is_positive() {
             assets += bank.init_asset_weight * native_basis;
         } else {

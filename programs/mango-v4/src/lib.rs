@@ -52,8 +52,8 @@ pub mod mango_v4 {
     // because generic anchor clients won't know how to deal with it
     // and it's tricky to use in typescript generally
     // lets do an interface pass later
-    pub fn init_stub_oracle(ctx: Context<InitStubOracle>, price: I80F48) -> Result<()> {
-        instructions::init_stub_oracle(ctx, price)
+    pub fn create_stub_oracle(ctx: Context<CreateStubOracle>, price: I80F48) -> Result<()> {
+        instructions::create_stub_oracle(ctx, price)
     }
 
     pub fn set_stub_oracle(ctx: Context<SetStubOracle>, price: I80F48) -> Result<()> {

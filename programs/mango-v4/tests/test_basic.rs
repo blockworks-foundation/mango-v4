@@ -5,6 +5,7 @@ use solana_program::pubkey::Pubkey;
 use solana_program_test::*;
 use solana_sdk::instruction::Instruction;
 use solana_sdk::{signature::Keypair, signer::Signer, transport::TransportError};
+use std::cmp::min;
 
 use mango_v4::state::*;
 use program_test::*;
@@ -47,6 +48,37 @@ async fn test_basic() -> Result<(), TransportError> {
     .await
     .unwrap()
     .account;
+
+    let create_stub_oracle_accounts = send_tx(
+        solana,
+        CreateStubOracle {
+            mint: mint0.pubkey,
+            payer,
+        },
+    )
+    .await
+    .unwrap();
+    let oracle = create_stub_oracle_accounts.oracle;
+
+    send_tx(
+        solana,
+        SetStubOracle {
+            mint: mint0.pubkey,
+            payer,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        CreateStubOracle {
+            mint: mint0.pubkey,
+            payer,
+        },
+    )
+    .await
+    .unwrap();
 
     let register_token_accounts = send_tx(
         solana,
@@ -119,6 +151,7 @@ async fn test_basic() -> Result<(), TransportError> {
                 owner,
                 token_account: payer_mint0_account,
                 banks: vec![bank],
+                oracles: vec![oracle],
             },
         )
         .await
