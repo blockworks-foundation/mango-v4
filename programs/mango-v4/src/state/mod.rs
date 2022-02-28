@@ -3,6 +3,7 @@
 // mod health;
 mod mango_account;
 mod mango_group;
+mod oracle;
 mod token_bank;
 // mod order_book_state_header;
 // mod perp_account;
@@ -13,4 +14,5 @@ mod token_bank;
 
 pub use mango_account::*;
 pub use mango_group::*;
+pub use oracle::*;
 pub use token_bank::*;
