@@ -25,7 +25,6 @@ pub struct InitStubOracle<'info> {
 
 pub fn handler(ctx: Context<InitStubOracle>, price: I80F48) -> Result<()> {
     let mut oracle = ctx.accounts.oracle.load_init()?;
-    oracle.magic = 0x6F676E4D;
     oracle.price = price;
     oracle.last_updated = Clock::get()?.unix_timestamp;
 

@@ -1,10 +1,11 @@
 use std::cell::Ref;
 
 use crate::error::MangoError;
-use anchor_lang::prelude::*;
-use fixed::types::I80F48;
-
 use crate::Mango;
+use anchor_lang::prelude::*;
+use anchor_lang::Discriminator;
+use arrayref::array_ref;
+use fixed::types::I80F48;
 
 pub enum OracleType {
     Stub,
@@ -13,16 +14,17 @@ pub enum OracleType {
 // TODO: what name would be better - stub or mock or integration test oracle?
 #[account(zero_copy)]
 pub struct StubOracle {
-    pub magic: u32,
     pub price: I80F48,
     pub last_updated: i64,
 }
 
 pub fn determine_oracle_type(account: &AccountInfo) -> Result<OracleType> {
-    let borrowed = &account.data.borrow();
-    // todo: remove magic from stub oracle and look at anchor disciminator instead
-    if borrowed[0] == 224 && borrowed[1] == 251 && borrowed[2] == 254 && borrowed[3] == 99 {
+    let data = &account.data.borrow();
+    let disc_bytes = array_ref![data, 0, 8];
+
+    if disc_bytes == &StubOracle::discriminator() {
         return Ok(OracleType::Stub);
     }
+
     Err(MangoError::UnknownOracle.into())
 }
