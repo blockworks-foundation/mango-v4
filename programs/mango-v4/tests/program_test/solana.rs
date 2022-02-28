@@ -116,15 +116,20 @@ impl SolanaCookie {
     }
 
     #[allow(dead_code)]
-    pub async fn get_account<T: AccountDeserialize>(&self, address: Pubkey) -> Option<T> {
+    pub async fn get_account_opt<T: AccountDeserialize>(&self, address: Pubkey) -> Option<T> {
         let data = self.get_account_data(address).await?;
         let mut data_slice: &[u8] = &data;
         AccountDeserialize::try_deserialize(&mut data_slice).ok()
     }
 
     #[allow(dead_code)]
-    pub async fn token_account_balance(&self, address: Pubkey) -> Option<u64> {
-        Some(self.get_account::<TokenAccount>(address).await?.amount)
+    pub async fn get_account<T: AccountDeserialize>(&self, address: Pubkey) -> T {
+        self.get_account_opt(address).await.unwrap()
+    }
+
+    #[allow(dead_code)]
+    pub async fn token_account_balance(&self, address: Pubkey) -> u64 {
+        self.get_account::<TokenAccount>(address).await.amount
     }
 
     #[allow(dead_code)]
