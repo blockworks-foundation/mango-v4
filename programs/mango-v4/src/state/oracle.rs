@@ -20,6 +20,7 @@ pub struct StubOracle {
 
 pub fn determine_oracle_type(account: &AccountInfo) -> Result<OracleType> {
     let borrowed = &account.data.borrow();
+    // todo: remove magic from stub oracle and look at anchor disciminator instead
     if borrowed[0] == 224 && borrowed[1] == 251 && borrowed[2] == 254 && borrowed[3] == 99 {
         return Ok(OracleType::Stub);
     }
