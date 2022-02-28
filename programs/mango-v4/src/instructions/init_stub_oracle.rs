@@ -23,7 +23,7 @@ pub struct InitStubOracle<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<InitStubOracle>, price: I80F48) -> Result<()> {
+pub fn init_stub_oracle(ctx: Context<InitStubOracle>, price: I80F48) -> Result<()> {
     let mut oracle = ctx.accounts.oracle.load_init()?;
     oracle.price = price;
     oracle.last_updated = Clock::get()?.unix_timestamp;

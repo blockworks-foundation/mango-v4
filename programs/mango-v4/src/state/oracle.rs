@@ -22,7 +22,7 @@ pub fn determine_oracle_type(account: &AccountInfo) -> Result<OracleType> {
     let data = &account.data.borrow();
     let disc_bytes = &data[0..8];
 
-    if disc_bytes == &StubOracle::discriminator() {
+    if disc_bytes == StubOracle::discriminator() {
         return Ok(OracleType::Stub);
     }
 

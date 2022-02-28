@@ -1,3 +1,5 @@
+use fixed::types::I80F48;
+
 #[macro_use]
 extern crate static_assertions;
 
@@ -39,6 +41,19 @@ pub mod mango_v4 {
 
     pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()> {
         instructions::create_account(ctx, account_num)
+    }
+
+    // todo:
+    // ckamm: generally, using an I80F48 arg will make it harder to call
+    // because generic anchor clients won't know how to deal with it
+    // and it's tricky to use in typescript generally
+    // lets do an interface pass later
+    pub fn init_stub_oracle(ctx: Context<InitStubOracle>, price: I80F48) -> Result<()> {
+        instructions::init_stub_oracle(ctx, price)
+    }
+
+    pub fn set_stub_oracle(ctx: Context<SetStubOracle>, price: I80F48) -> Result<()> {
+        instructions::set_stub_oracle(ctx, price)
     }
 
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {

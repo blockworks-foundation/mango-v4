@@ -9,7 +9,7 @@ pub struct SetStubOracle<'info> {
     pub stub_oracle: AccountLoader<'info, StubOracle>,
 }
 
-pub fn handler(ctx: Context<SetStubOracle>, price: I80F48) -> Result<()> {
+pub fn set_stub_oracle(ctx: Context<SetStubOracle>, price: I80F48) -> Result<()> {
     let mut stub_oracle = ctx.accounts.stub_oracle.load_init()?;
     stub_oracle.price = price;
     stub_oracle.last_updated = Clock::get()?.unix_timestamp;
