@@ -1,11 +1,12 @@
 #![cfg(feature = "test-bpf")]
+
 use fixed::types::I80F48;
-use mango_v4::state::*;
 use solana_program::pubkey::Pubkey;
 use solana_program_test::*;
 use solana_sdk::instruction::Instruction;
 use solana_sdk::{signature::Keypair, signer::Signer, transport::TransportError};
 
+use mango_v4::state::*;
 use program_test::*;
 
 mod program_test;

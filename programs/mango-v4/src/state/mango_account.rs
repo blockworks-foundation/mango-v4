@@ -1,7 +1,8 @@
-use crate::error::*;
-use crate::state::*;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
+
+use crate::error::*;
+use crate::state::*;
 
 const MAX_INDEXED_POSITIONS: usize = 32;
 

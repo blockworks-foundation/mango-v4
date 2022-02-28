@@ -1,11 +1,12 @@
 use std::cell::Ref;
 
-use crate::error::MangoError;
-use crate::Mango;
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 use arrayref::array_ref;
 use fixed::types::I80F48;
+
+use crate::error::MangoError;
+use crate::Mango;
 
 pub enum OracleType {
     Stub,

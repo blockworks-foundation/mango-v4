@@ -1,7 +1,7 @@
-use log::*;
 use std::cell::RefCell;
 use std::{str::FromStr, sync::Arc, sync::RwLock};
 
+use log::*;
 use solana_program::{program_option::COption, program_pack::Pack};
 use solana_program_test::*;
 use solana_sdk::{

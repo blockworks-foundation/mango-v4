@@ -1,6 +1,7 @@
-use crate::utils::*;
 use solana_program::pubkey::*;
 use solana_sdk::signature::Keypair;
+
+use crate::utils::*;
 
 pub struct MintCookie {
     pub index: usize,

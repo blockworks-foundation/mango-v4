@@ -1,5 +1,6 @@
-use crate::Pubkey;
 use fixed::types::I80F48;
+
+use crate::Pubkey;
 
 pub struct PerpMarketInfo {
     pub perp_market: Pubkey, // One of these may be empty

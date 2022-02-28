@@ -3,11 +3,11 @@ extern crate static_assertions;
 
 use anchor_lang::prelude::*;
 
+use instructions::*;
+
 mod error;
 mod instructions;
 pub mod state;
-
-use instructions::*;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
