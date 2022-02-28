@@ -1,7 +1,6 @@
 use std::cell::Ref;
 
 use crate::error::MangoError;
-use anchor_lang::__private::bytemuck::{Pod, Zeroable};
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
