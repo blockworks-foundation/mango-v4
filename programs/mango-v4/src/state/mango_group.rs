@@ -1,8 +1,6 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
-pub use group_seeds;
-
 use crate::error::*;
 
 const MAX_TOKENS: usize = 60;
@@ -87,3 +85,5 @@ macro_rules! group_seeds {
         &[b"group".as_ref(), $group.admin.as_ref(), &[$group.bump]]
     };
 }
+
+pub use group_seeds;
