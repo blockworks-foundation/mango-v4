@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
+use solana_program::pubkey::PUBKEY_BYTES;
 
 use crate::solana_address_lookup_table_instruction;
 use crate::state::*;
@@ -51,11 +52,22 @@ impl<'info> Deposit<'info> {
     }
 }
 
+fn address_lookup_table_contains(table: &AccountInfo, pubkey: &Pubkey) -> Result<bool> {
+    let table_data = table.try_borrow_data()?;
+    let pk_ref = pubkey.as_ref();
+    Ok(
+        table_data[solana_address_lookup_table_instruction::LOOKUP_TABLE_META_SIZE..]
+            .chunks(PUBKEY_BYTES)
+            .find(|&d| d == pk_ref)
+            .is_some(),
+    )
+}
+
 // TODO: It may make sense to have the token_index passed in from the outside.
 //       That would save a lot of computation that needs to go into finding the
 //       right index for the mint.
 pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
-    let (is_new, oracle) = {
+    let (is_new_position, oracle) = {
         // Find the mint's token index
         let group = ctx.accounts.group.load()?;
         let mint = ctx.accounts.token_account.mint;
@@ -64,7 +76,7 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         // Get the account's position for that token index
         let mut account = ctx.accounts.account.load_mut()?;
         let position = account.indexed_positions.get_mut_or_create(token_index)?;
-        let is_new = !position.is_active();
+        let is_new_position = !position.is_active();
 
         // Update the bank and position
         let mut bank = ctx.accounts.bank.load_mut()?;
@@ -73,14 +85,15 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         // Transfer the actual tokens
         token::transfer(ctx.accounts.transfer_ctx(), amount)?;
 
-        (is_new, bank.oracle)
+        (is_new_position, bank.oracle)
     };
 
-    // TODO: Also check if these accounts are already on the table? Otherwise a deposit-withdraw
-    // cycle would quickly fill up the lookup table with the same two accounts!
-    if is_new {
-        // Add the bank and oracle to the address map
-        //
+    // Do we need to add (oracle, bank) to the user's address lookup table?
+    //
+    // Since they are always added as a pair, checking for one is sufficient.
+    let add_to_lookup_table = is_new_position
+        && !address_lookup_table_contains(&ctx.accounts.address_lookup_table, &oracle)?;
+    if add_to_lookup_table {
         // NOTE: Unfortunately extend() _requires_ a payer, even though we've already
         // fully funded the address lookup table. No further transfer will be necessary.
         // We'll pass the account as payer.

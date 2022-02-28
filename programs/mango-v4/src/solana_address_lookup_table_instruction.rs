@@ -25,7 +25,7 @@ pub const LOOKUP_TABLE_MAX_ADDRESSES: usize = 256;
 pub const LOOKUP_TABLE_META_SIZE: usize = 56;
 
 pub const LOOKUP_TABLE_MAX_ACCOUNT_SIZE: usize =
-    LOOKUP_TABLE_META_SIZE + LOOKUP_TABLE_MAX_ADDRESSES * 32;
+    LOOKUP_TABLE_META_SIZE + LOOKUP_TABLE_MAX_ADDRESSES * solana_program::pubkey::PUBKEY_BYTES;
 // NOTE: Manual additions end
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
