@@ -25,11 +25,12 @@ async fn test_basic() -> Result<(), TransportError> {
     let dust_threshold = 0.01;
 
     //
-    // SETUP: Create a group, register a token (mint0)
+    // SETUP: Create a group, account, register a token (mint0)
     //
 
     let group = send_tx(solana, CreateGroupInstruction { admin, payer })
         .await
+        .unwrap()
         .group;
 
     let account = send_tx(
@@ -42,6 +43,7 @@ async fn test_basic() -> Result<(), TransportError> {
         },
     )
     .await
+    .unwrap()
     .account;
 
     let register_token_accounts = send_tx(
@@ -58,7 +60,8 @@ async fn test_basic() -> Result<(), TransportError> {
             payer,
         },
     )
-    .await;
+    .await
+    .unwrap();
     let bank = register_token_accounts.bank;
     let vault = register_token_accounts.vault;
 
@@ -79,7 +82,8 @@ async fn test_basic() -> Result<(), TransportError> {
                 token_authority: payer,
             },
         )
-        .await;
+        .await
+        .unwrap();
 
         assert_eq!(solana.token_account_balance(vault).await, deposit_amount);
         assert_eq!(
@@ -117,7 +121,8 @@ async fn test_basic() -> Result<(), TransportError> {
                 banks: vec![bank],
             },
         )
-        .await;
+        .await
+        .unwrap();
 
         assert_eq!(solana.token_account_balance(vault).await, withdraw_amount);
         assert_eq!(

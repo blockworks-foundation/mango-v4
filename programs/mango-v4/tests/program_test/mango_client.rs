@@ -5,6 +5,7 @@ use anchor_lang::Key;
 use anchor_spl::token::{Token, TokenAccount};
 use solana_sdk::instruction;
 use solana_sdk::signature::{Keypair, Signer};
+use solana_sdk::transport::TransportError;
 
 #[async_trait::async_trait(?Send)]
 pub trait ClientAccountLoader {
@@ -23,15 +24,17 @@ impl ClientAccountLoader for &SolanaCookie {
 }
 
 // TODO: report error outwards etc
-pub async fn send_tx<CI: ClientInstruction>(solana: &SolanaCookie, ix: CI) -> CI::Accounts {
+pub async fn send_tx<CI: ClientInstruction>(
+    solana: &SolanaCookie,
+    ix: CI,
+) -> std::result::Result<CI::Accounts, TransportError> {
     let (accounts, instruction) = ix.to_instruction(solana).await;
     let signers = ix.signers();
     let instructions = vec![instruction];
     solana
         .process_transaction(&instructions, Some(&signers[..]))
-        .await
-        .unwrap();
-    accounts
+        .await?;
+    Ok(accounts)
 }
 
 #[async_trait::async_trait(?Send)]
