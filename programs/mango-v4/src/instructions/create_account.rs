@@ -50,10 +50,7 @@ pub fn create_account(
         account.bump = *ctx.bumps.get("account").ok_or(MangoError::SomeError)?;
     }
 
-    //
-    // Setup address lookup tables initial state:
-    // - one is active and empty
-    // - other one is deacivated
+    // Setup the address lookup table
     //
     // TODO: We could save some CU here by not using create_lookup_table():
     //       it - unnecessarily - derives the lookup table address again.
