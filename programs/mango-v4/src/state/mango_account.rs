@@ -51,7 +51,7 @@ impl IndexedPositions {
         self.values
             .iter_mut()
             .find(|p| p.is_active_for_index(token_index))
-            .ok_or(error!(MangoError::SomeError)) // TODO: not found error
+            .ok_or_else(|| error!(MangoError::SomeError)) // TODO: not found error
     }
 
     pub fn get_mut_or_create(&mut self, token_index: usize) -> Result<&mut IndexedPosition> {

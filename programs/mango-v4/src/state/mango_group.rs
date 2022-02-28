@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use fixed::types::I80F48;
 
 use crate::error::*;
 
@@ -42,7 +41,7 @@ impl Tokens {
         self.infos
             .iter()
             .position(|ti| ti.mint == *mint)
-            .ok_or(error!(MangoError::SomeError)) // TODO: no such token err
+            .ok_or_else(|| error!(MangoError::SomeError)) // TODO: no such token err
     }
 }
 

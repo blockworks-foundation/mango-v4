@@ -3,7 +3,6 @@ use anchor_spl::token;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 
-use crate::error::*;
 use crate::state::*;
 
 #[derive(Accounts)]
