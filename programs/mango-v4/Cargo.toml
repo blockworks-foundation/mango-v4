@@ -21,7 +21,6 @@ test-bpf = []
 # possibly need init-if-needed feature
 anchor-lang = { version = "0.22.0", features = [] }
 anchor-spl = "0.22.0"
-arrayref = "^0.3.6"
 fixed = { version = "=1.9.0", features = ["serde"] }
 fixed-macro = "^1.1.1"
 static_assertions = "1.1"

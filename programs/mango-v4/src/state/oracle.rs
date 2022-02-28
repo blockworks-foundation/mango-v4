@@ -2,7 +2,6 @@ use std::cell::Ref;
 
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
-use arrayref::array_ref;
 use fixed::types::I80F48;
 
 use crate::error::MangoError;
@@ -21,7 +20,7 @@ pub struct StubOracle {
 
 pub fn determine_oracle_type(account: &AccountInfo) -> Result<OracleType> {
     let data = &account.data.borrow();
-    let disc_bytes = array_ref![data, 0, 8];
+    let disc_bytes = &data[0..8];
 
     if disc_bytes == &StubOracle::discriminator() {
         return Ok(OracleType::Stub);
