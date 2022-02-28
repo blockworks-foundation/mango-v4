@@ -8,6 +8,7 @@ use instructions::*;
 
 mod error;
 mod instructions;
+pub mod solana_address_lookup_table_instruction;
 pub mod state;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
@@ -38,8 +39,12 @@ pub mod mango_v4 {
         )
     }
 
-    pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()> {
-        instructions::create_account(ctx, account_num)
+    pub fn create_account(
+        ctx: Context<CreateAccount>,
+        account_num: u8,
+        address_lookup_table_recent_slot: u64,
+    ) -> Result<()> {
+        instructions::create_account(ctx, account_num, address_lookup_table_recent_slot)
     }
 
     // todo:

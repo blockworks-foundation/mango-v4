@@ -91,6 +91,8 @@ pub struct MangoAccount {
     // Alternative authority/signer of transactions for a mango account
     pub delegate: Pubkey,
 
+    pub address_lookup_table: Pubkey,
+
     // pub in_margin_basket: [bool; MAX_PAIRS],
     // pub num_in_margin_basket: u8,
     // TODO: this should be a separate struct for convenient use, like MangoGroup::tokens
@@ -111,7 +113,25 @@ pub struct MangoAccount {
     /// This account cannot do anything except go through `resolve_bankruptcy`
     pub is_bankrupt: bool,
 
+    pub account_num: u8,
+    pub bump: u8,
+
     // pub info: [u8; INFO_LEN], // TODO: Info could be in a separate PDA?
     pub reserved: [u8; 5],
 }
 // TODO: static assert the size and alignment
+
+#[macro_export]
+macro_rules! account_seeds {
+    ( $account:expr ) => {
+        &[
+            $account.group.as_ref(),
+            b"account".as_ref(),
+            $account.owner.as_ref(),
+            &$account.account_num.to_le_bytes(),
+            &[$account.bump],
+        ]
+    };
+}
+
+pub use account_seeds;

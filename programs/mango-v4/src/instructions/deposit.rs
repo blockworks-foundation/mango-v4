@@ -12,6 +12,7 @@ pub struct Deposit<'info> {
     #[account(
         mut,
         has_one = group,
+        has_one = address_lookup_table,
     )]
     pub account: AccountLoader<'info, MangoAccount>,
 
@@ -30,7 +31,11 @@ pub struct Deposit<'info> {
     pub token_account: Box<Account<'info, TokenAccount>>,
     pub token_authority: Signer<'info>,
 
+    #[account(mut)]
+    pub address_lookup_table: UncheckedAccount<'info>, // TODO: wrapper?
+
     pub token_program: Program<'info, Token>,
+    pub address_lookup_table_program: UncheckedAccount<'info>, // TODO: force address?
 }
 
 impl<'info> Deposit<'info> {

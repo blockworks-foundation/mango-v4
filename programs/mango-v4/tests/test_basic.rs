@@ -38,6 +38,7 @@ async fn test_basic() -> Result<(), TransportError> {
         solana,
         CreateAccountInstruction {
             account_num: 0,
+            recent_slot: 0, // TODO: get a real recent_slot, probably from SlotHistory
             group,
             owner,
             payer,
@@ -77,7 +78,6 @@ async fn test_basic() -> Result<(), TransportError> {
             solana,
             DepositInstruction {
                 amount: deposit_amount,
-                group,
                 account,
                 token_account: payer_mint0_account,
                 token_authority: payer,
@@ -115,7 +115,6 @@ async fn test_basic() -> Result<(), TransportError> {
             WithdrawInstruction {
                 amount: withdraw_amount,
                 allow_borrow: true,
-                group,
                 account,
                 owner,
                 token_account: payer_mint0_account,

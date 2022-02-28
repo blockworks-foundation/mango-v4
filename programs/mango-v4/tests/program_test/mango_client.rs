@@ -7,6 +7,7 @@ use solana_sdk::signature::{Keypair, Signer};
 use solana_sdk::transport::TransportError;
 
 use super::solana::SolanaCookie;
+use mango_v4::state::*;
 
 #[async_trait::async_trait(?Send)]
 pub trait ClientAccountLoader {
@@ -71,7 +72,6 @@ pub struct WithdrawInstruction<'keypair> {
     pub amount: u64,
     pub allow_borrow: bool,
 
-    pub group: Pubkey,
     pub account: Pubkey,
     pub owner: &'keypair Keypair,
     pub token_account: Pubkey,
@@ -94,10 +94,11 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
 
         // load account so we know its mint
         let token_account: TokenAccount = account_loader.load(&self.token_account).await.unwrap();
+        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
 
         let bank = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
+                account.group.as_ref(),
                 b"tokenbank".as_ref(),
                 token_account.mint.as_ref(),
             ],
@@ -106,7 +107,7 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         .0;
         let vault = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
+                account.group.as_ref(),
                 b"tokenvault".as_ref(),
                 token_account.mint.as_ref(),
             ],
@@ -115,7 +116,7 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         .0;
 
         let accounts = Self::Accounts {
-            group: self.group,
+            group: account.group,
             account: self.account,
             owner: self.owner.pubkey(),
             bank,
@@ -144,7 +145,6 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
 pub struct DepositInstruction<'keypair> {
     pub amount: u64,
 
-    pub group: Pubkey,
     pub account: Pubkey,
     pub token_account: Pubkey,
     pub token_authority: &'keypair Keypair,
@@ -164,10 +164,11 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
 
         // load account so we know its mint
         let token_account: TokenAccount = account_loader.load(&self.token_account).await.unwrap();
+        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
 
         let bank = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
+                account.group.as_ref(),
                 b"tokenbank".as_ref(),
                 token_account.mint.as_ref(),
             ],
@@ -176,7 +177,7 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
         .0;
         let vault = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
+                account.group.as_ref(),
                 b"tokenvault".as_ref(),
                 token_account.mint.as_ref(),
             ],
@@ -185,13 +186,15 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
         .0;
 
         let accounts = Self::Accounts {
-            group: self.group,
+            group: account.group,
             account: self.account,
             bank,
             vault,
+            address_lookup_table: account.address_lookup_table,
             token_account: self.token_account,
             token_authority: self.token_authority.pubkey(),
             token_program: Token::id(),
+            address_lookup_table_program: mango_v4::solana_address_lookup_table_instruction::id(),
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);
@@ -318,6 +321,7 @@ impl<'keypair> ClientInstruction for CreateGroupInstruction<'keypair> {
 
 pub struct CreateAccountInstruction<'keypair> {
     pub account_num: u8,
+    pub recent_slot: u64,
 
     pub group: Pubkey,
     pub owner: &'keypair Keypair,
@@ -334,6 +338,7 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = mango_v4::instruction::CreateAccount {
             account_num: self.account_num,
+            address_lookup_table_recent_slot: self.recent_slot,
         };
 
         let account = Pubkey::find_program_address(
@@ -346,14 +351,22 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
             &program_id,
         )
         .0;
+        let address_lookup_table =
+            mango_v4::solana_address_lookup_table_instruction::derive_lookup_table_address(
+                &account,
+                self.recent_slot,
+            )
+            .0;
 
         let accounts = mango_v4::accounts::CreateAccount {
             group: self.group,
             owner: self.owner.pubkey(),
             account,
+            address_lookup_table,
             payer: self.payer.pubkey(),
             system_program: System::id(),
             rent: sysvar::rent::Rent::id(),
+            address_lookup_table_program: mango_v4::solana_address_lookup_table_instruction::id(),
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);
