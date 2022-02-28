@@ -7,3 +7,5 @@ node_modules
 
 
 .idea
+
+programs/mango-v4/src/lib-expanded.rs
