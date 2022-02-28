@@ -52,6 +52,28 @@ pub fn create_account(
 
     // Setup the address lookup table
     //
+    // First: Pre-pay for max-length address lookup table -- otherwise extending it
+    // (later, in deposit etc) will need a payer!
+    let rent = Rent::get()?;
+    let required_lamports = rent
+        .minimum_balance(solana_address_lookup_table_instruction::LOOKUP_TABLE_MAX_ACCOUNT_SIZE)
+        .max(1)
+        .saturating_sub(ctx.accounts.address_lookup_table.lamports());
+    if required_lamports > 0 {
+        solana_program::program::invoke(
+            &solana_program::system_instruction::transfer(
+                &ctx.accounts.payer.key(),
+                &ctx.accounts.address_lookup_table.key(),
+                required_lamports,
+            ),
+            &[
+                ctx.accounts.payer.to_account_info(),
+                ctx.accounts.address_lookup_table.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+        )?;
+    }
+    // Now create the account.
     // TODO: We could save some CU here by not using create_lookup_table():
     //       it - unnecessarily - derives the lookup table address again.
     let (instruction, _expected_adress_map_address) =

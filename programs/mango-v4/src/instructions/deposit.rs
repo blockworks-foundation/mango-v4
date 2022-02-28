@@ -3,6 +3,7 @@ use anchor_spl::token;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 
+use crate::solana_address_lookup_table_instruction;
 use crate::state::*;
 
 #[derive(Accounts)]
@@ -54,21 +55,68 @@ impl<'info> Deposit<'info> {
 //       That would save a lot of computation that needs to go into finding the
 //       right index for the mint.
 pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
-    // Find the mint's token index
-    let group = ctx.accounts.group.load()?;
-    let mint = ctx.accounts.token_account.mint;
-    let token_index = group.tokens.index_for_mint(&mint)?;
+    let (is_new, oracle) = {
+        // Find the mint's token index
+        let group = ctx.accounts.group.load()?;
+        let mint = ctx.accounts.token_account.mint;
+        let token_index = group.tokens.index_for_mint(&mint)?;
 
-    // Get the account's position for that token index
-    let mut account = ctx.accounts.account.load_mut()?;
-    let position = account.indexed_positions.get_mut_or_create(token_index)?;
+        // Get the account's position for that token index
+        let mut account = ctx.accounts.account.load_mut()?;
+        let position = account.indexed_positions.get_mut_or_create(token_index)?;
+        let is_new = !position.is_active();
 
-    // Update the bank and position
-    let mut bank = ctx.accounts.bank.load_mut()?;
-    bank.deposit(position, amount);
+        // Update the bank and position
+        let mut bank = ctx.accounts.bank.load_mut()?;
+        bank.deposit(position, amount);
 
-    // Transfer the actual tokens
-    token::transfer(ctx.accounts.transfer_ctx(), amount)?;
+        // Transfer the actual tokens
+        token::transfer(ctx.accounts.transfer_ctx(), amount)?;
+
+        (is_new, bank.oracle)
+    };
+
+    // TODO: Also check if these accounts are already on the table? Otherwise a deposit-withdraw
+    // cycle would quickly fill up the lookup table with the same two accounts!
+    if is_new {
+        // Add the bank and oracle to the address map
+        //
+        // NOTE: Unfortunately extend() _requires_ a payer, even though we've already
+        // fully funded the address lookup table. No further transfer will be necessary.
+        // We'll pass the account as payer.
+        let mut instruction = solana_address_lookup_table_instruction::extend_lookup_table(
+            ctx.accounts.address_lookup_table.key(),
+            ctx.accounts.account.key(),
+            ctx.accounts.account.key(),
+            vec![ctx.accounts.bank.key(), oracle],
+        );
+        // Sneakily remove the system_program account: that way any attempted transfer would error.
+        instruction.accounts.pop();
+        let account_infos = [
+            ctx.accounts.address_lookup_table.to_account_info(),
+            ctx.accounts.account.to_account_info(),
+            ctx.accounts.account.to_account_info(),
+        ];
+        // Signing for the account is complicated because it must work as a payer which means
+        // a mutable borrow. Thus we must make copies of the values in the seed.
+        struct AccountSeedValues {
+            group: Pubkey,
+            owner: Pubkey,
+            account_num: u8,
+            bump: u8,
+        }
+        let account_seed_values = {
+            let account = ctx.accounts.account.load()?;
+            AccountSeedValues {
+                group: account.group,
+                owner: account.owner,
+                account_num: account.account_num,
+                bump: account.bump,
+            }
+        };
+        let account_seeds = account_seeds!(account_seed_values);
+        solana_program::program::invoke_signed(&instruction, &account_infos, &[account_seeds])?;
+    }
 
     Ok(())
 }
