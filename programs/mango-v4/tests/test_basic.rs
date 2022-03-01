@@ -65,16 +65,7 @@ async fn test_basic() -> Result<(), TransportError> {
         SetStubOracle {
             mint: mint0.pubkey,
             payer,
-        },
-    )
-    .await
-    .unwrap();
-
-    send_tx(
-        solana,
-        CreateStubOracle {
-            mint: mint0.pubkey,
-            payer,
+            price: "1.0",
         },
     )
     .await

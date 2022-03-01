@@ -7,6 +7,7 @@ use solana_program::instruction::Instruction;
 use solana_sdk::instruction;
 use solana_sdk::signature::{Keypair, Signer};
 use solana_sdk::transport::TransportError;
+use std::str::FromStr;
 
 use super::solana::SolanaCookie;
 use mango_v4::state::*;
@@ -294,6 +295,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
 pub struct SetStubOracle<'keypair> {
     pub mint: Pubkey,
     pub payer: &'keypair Keypair,
+    pub price: &'static str,
 }
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for SetStubOracle<'keypair> {
@@ -306,7 +308,7 @@ impl<'keypair> ClientInstruction for SetStubOracle<'keypair> {
     ) -> (Self::Accounts, Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            price: I80F48::from_num(1.0),
+            price: I80F48::from_str(self.price).unwrap(),
         };
 
         let oracle = Pubkey::find_program_address(
