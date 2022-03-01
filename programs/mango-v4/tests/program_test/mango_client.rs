@@ -77,9 +77,6 @@ pub struct WithdrawInstruction<'keypair> {
     pub account: Pubkey,
     pub owner: &'keypair Keypair,
     pub token_account: Pubkey,
-
-    pub banks: Vec<Pubkey>,
-    pub oracles: Vec<Pubkey>,
 }
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
@@ -98,6 +95,10 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         // load account so we know its mint
         let token_account: TokenAccount = account_loader.load(&self.token_account).await.unwrap();
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let lookup_table = account_loader
+            .load_bytes(&account.address_lookup_table)
+            .await
+            .unwrap();
 
         let bank = Pubkey::find_program_address(
             &[
@@ -129,20 +130,15 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
-        instruction
-            .accounts
-            .extend(self.banks.iter().map(|&pubkey| AccountMeta {
-                pubkey,
-                is_writable: false,
-                is_signer: false,
-            }));
-        instruction
-            .accounts
-            .extend(self.oracles.iter().map(|&pubkey| AccountMeta {
-                pubkey,
-                is_writable: false,
-                is_signer: false,
-            }));
+        instruction.accounts.extend(
+            mango_v4::address_lookup_table::addresses(&lookup_table)
+                .iter()
+                .map(|&pubkey| AccountMeta {
+                    pubkey,
+                    is_writable: false,
+                    is_signer: false,
+                }),
+        );
 
         (accounts, instruction)
     }

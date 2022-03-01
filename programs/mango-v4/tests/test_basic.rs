@@ -55,7 +55,7 @@ async fn test_basic() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    let oracle = create_stub_oracle_accounts.oracle;
+    let _oracle = create_stub_oracle_accounts.oracle;
 
     send_tx(
         solana,
@@ -138,8 +138,6 @@ async fn test_basic() -> Result<(), TransportError> {
                 account,
                 owner,
                 token_account: payer_mint0_account,
-                banks: vec![bank],
-                oracles: vec![oracle],
             },
         )
         .await

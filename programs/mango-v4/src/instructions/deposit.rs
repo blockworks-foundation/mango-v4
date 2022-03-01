@@ -80,7 +80,10 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     //
     // Since they are always added as a pair, checking for one is sufficient.
     let add_to_lookup_table = is_new_position
-        && !address_lookup_table::contains(&ctx.accounts.address_lookup_table, &oracle)?;
+        && !address_lookup_table::contains(
+            &ctx.accounts.address_lookup_table.try_borrow_data()?,
+            &oracle,
+        );
     if add_to_lookup_table {
         // NOTE: Unfortunately extend() _requires_ a payer, even though we've already
         // fully funded the address lookup table. No further transfer will be necessary.
