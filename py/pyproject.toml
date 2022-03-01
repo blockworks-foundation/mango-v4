@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "mangopy"
+name = "mango-client"
 version = "0.1.0"
 description = "A Python client for Mango Markets"
 authors = [""]
