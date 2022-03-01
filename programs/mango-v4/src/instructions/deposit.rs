@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 use anchor_spl::token;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
-use solana_program::pubkey::PUBKEY_BYTES;
 
 use crate::address_lookup_table;
 use crate::state::*;
@@ -52,15 +51,6 @@ impl<'info> Deposit<'info> {
     }
 }
 
-fn address_lookup_table_contains(table: &AccountInfo, pubkey: &Pubkey) -> Result<bool> {
-    let table_data = table.try_borrow_data()?;
-    let pk_ref = pubkey.as_ref();
-    Ok(table_data[address_lookup_table::LOOKUP_TABLE_META_SIZE..]
-        .chunks(PUBKEY_BYTES)
-        .find(|&d| d == pk_ref)
-        .is_some())
-}
-
 // TODO: It may make sense to have the token_index passed in from the outside.
 //       That would save a lot of computation that needs to go into finding the
 //       right index for the mint.
@@ -90,7 +80,7 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     //
     // Since they are always added as a pair, checking for one is sufficient.
     let add_to_lookup_table = is_new_position
-        && !address_lookup_table_contains(&ctx.accounts.address_lookup_table, &oracle)?;
+        && !address_lookup_table::contains(&ctx.accounts.address_lookup_table, &oracle)?;
     if add_to_lookup_table {
         // NOTE: Unfortunately extend() _requires_ a payer, even though we've already
         // fully funded the address lookup table. No further transfer will be necessary.
