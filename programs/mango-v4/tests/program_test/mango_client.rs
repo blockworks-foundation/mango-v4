@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::{self, SysvarId};
-use anchor_lang::Key;
 use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use solana_program::instruction::Instruction;
@@ -304,7 +303,7 @@ impl<'keypair> ClientInstruction for SetStubOracle<'keypair> {
 
     async fn to_instruction(
         &self,
-        loader: impl ClientAccountLoader + 'async_trait,
+        _loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -339,7 +338,7 @@ impl<'keypair> ClientInstruction for CreateStubOracle<'keypair> {
 
     async fn to_instruction(
         &self,
-        loader: impl ClientAccountLoader + 'async_trait,
+        _loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
