@@ -3,6 +3,7 @@ use anchor_spl::token;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 use fixed::types::I80F48;
+use pyth_client::load_price;
 
 use crate::error::*;
 use crate::state::*;
@@ -131,7 +132,8 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
 
         // converts the token value to the basis token value for health computations
         // TODO: health basis token == USDC?
-        let oracle_type = determine_oracle_type(oracle_ai)?;
+        let oracle_data = &oracle_ai.try_borrow_data().unwrap();
+        let oracle_type = determine_oracle_type(oracle_data)?;
         require!(bank.oracle == oracle_ai.key(), MangoError::UnexpectedOracle);
 
         let price = match oracle_type {
@@ -139,6 +141,10 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
                 AccountLoader::<'_, StubOracle>::try_from(oracle_ai)?
                     .load()?
                     .price
+            }
+            OracleType::Pyth => {
+                let price_struct = load_price(&oracle_data).unwrap();
+                I80F48::from_num(price_struct.agg.price)
             }
         };
 
