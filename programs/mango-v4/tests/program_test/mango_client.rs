@@ -2,9 +2,12 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::{self, SysvarId};
 use anchor_lang::Key;
 use anchor_spl::token::{Token, TokenAccount};
+use fixed::types::I80F48;
+use solana_program::instruction::Instruction;
 use solana_sdk::instruction;
 use solana_sdk::signature::{Keypair, Signer};
 use solana_sdk::transport::TransportError;
+use std::str::FromStr;
 
 use super::solana::SolanaCookie;
 use mango_v4::state::*;
@@ -77,6 +80,7 @@ pub struct WithdrawInstruction<'keypair> {
     pub token_account: Pubkey,
 
     pub banks: Vec<Pubkey>,
+    pub oracles: Vec<Pubkey>,
 }
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
@@ -129,6 +133,13 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         instruction
             .accounts
             .extend(self.banks.iter().map(|&pubkey| AccountMeta {
+                pubkey,
+                is_writable: false,
+                is_signer: false,
+            }));
+        instruction
+            .accounts
+            .extend(self.oracles.iter().map(|&pubkey| AccountMeta {
                 pubkey,
                 is_writable: false,
                 is_signer: false,
@@ -278,6 +289,82 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
 
     fn signers(&self) -> Vec<&Keypair> {
         vec![self.admin, self.payer]
+    }
+}
+
+pub struct SetStubOracle<'keypair> {
+    pub mint: Pubkey,
+    pub payer: &'keypair Keypair,
+    pub price: &'static str,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for SetStubOracle<'keypair> {
+    type Accounts = mango_v4::accounts::SetStubOracle;
+    type Instruction = mango_v4::instruction::SetStubOracle;
+
+    async fn to_instruction(
+        &self,
+        loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            price: I80F48::from_str(self.price).unwrap(),
+        };
+
+        let oracle = Pubkey::find_program_address(
+            &[b"stub_oracle".as_ref(), self.mint.as_ref()],
+            &program_id,
+        )
+        .0;
+
+        let accounts = Self::Accounts { oracle };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![]
+    }
+}
+
+pub struct CreateStubOracle<'keypair> {
+    pub mint: Pubkey,
+    pub payer: &'keypair Keypair,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for CreateStubOracle<'keypair> {
+    type Accounts = mango_v4::accounts::CreateStubOracle;
+    type Instruction = mango_v4::instruction::CreateStubOracle;
+
+    async fn to_instruction(
+        &self,
+        loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            price: I80F48::from_num(1.0),
+        };
+
+        let oracle = Pubkey::find_program_address(
+            &[b"stub_oracle".as_ref(), self.mint.as_ref()],
+            &program_id,
+        )
+        .0;
+
+        let accounts = Self::Accounts {
+            oracle,
+            token_mint: self.mint,
+            payer: self.payer.pubkey(),
+            system_program: System::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.payer]
     }
 }
 

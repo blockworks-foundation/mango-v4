@@ -5,7 +5,7 @@ use fixed::types::I80F48;
 use crate::state::*;
 
 #[derive(Accounts)]
-pub struct InitStubOracle<'info> {
+pub struct CreateStubOracle<'info> {
     #[account(
         init,
         seeds = [b"stub_oracle".as_ref(), token_mint.key().as_ref()],
@@ -23,7 +23,7 @@ pub struct InitStubOracle<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn init_stub_oracle(ctx: Context<InitStubOracle>, price: I80F48) -> Result<()> {
+pub fn create_stub_oracle(ctx: Context<CreateStubOracle>, price: I80F48) -> Result<()> {
     let mut oracle = ctx.accounts.oracle.load_init()?;
     oracle.price = price;
     oracle.last_updated = Clock::get()?.unix_timestamp;

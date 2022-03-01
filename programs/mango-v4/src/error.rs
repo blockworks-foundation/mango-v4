@@ -7,5 +7,7 @@ pub enum MangoError {
     #[msg("")]
     SomeError,
     #[msg("")]
-    UnknownOracle,
+    UnexpectedOracle,
+    #[msg("")]
+    UnknownOracleType,
 }

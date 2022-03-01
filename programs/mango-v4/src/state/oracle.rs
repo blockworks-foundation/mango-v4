@@ -23,5 +23,5 @@ pub fn determine_oracle_type(account: &AccountInfo) -> Result<OracleType> {
         return Ok(OracleType::Stub);
     }
 
-    Err(MangoError::UnknownOracle.into())
+    Err(MangoError::UnknownOracleType.into())
 }
