@@ -54,7 +54,10 @@ impl IndexedPositions {
             .ok_or_else(|| error!(MangoError::SomeError)) // TODO: not found error
     }
 
-    pub fn get_mut_or_create(&mut self, token_index: usize) -> Result<&mut IndexedPosition> {
+    pub fn get_mut_or_create(
+        &mut self,
+        token_index: usize,
+    ) -> Result<(&mut IndexedPosition, usize)> {
         // This function looks complex because of lifetimes.
         // Maybe there's a smart way to write it with double iter_mut()
         // that doesn't confuse the borrow checker.
@@ -72,7 +75,7 @@ impl IndexedPositions {
             }
         }
         if let Some(i) = pos {
-            Ok(&mut self.values[i])
+            Ok((&mut self.values[i], i))
         } else {
             err!(MangoError::SomeError) // TODO: No free space
         }
@@ -92,6 +95,8 @@ pub struct MangoAccount {
     pub delegate: Pubkey,
 
     pub address_lookup_table: Pubkey,
+    pub address_lookup_table_selection_size: u8,
+    pub address_lookup_table_selection: [u8; 255],
 
     // pub in_margin_basket: [bool; MAX_PAIRS],
     // pub num_in_margin_basket: u8,

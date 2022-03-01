@@ -67,7 +67,7 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;
-    let position = account.indexed_positions.get_mut_or_create(token_index)?;
+    let position = account.indexed_positions.get_mut_or_create(token_index)?.0;
 
     // The bank will also be passed in remainingAccounts. Use an explicit scope
     // to drop the &mut before we borrow it immutably again later.

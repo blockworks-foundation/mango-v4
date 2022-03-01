@@ -130,15 +130,16 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
-        instruction.accounts.extend(
-            mango_v4::address_lookup_table::addresses(&lookup_table)
-                .iter()
-                .map(|&pubkey| AccountMeta {
-                    pubkey,
-                    is_writable: false,
-                    is_signer: false,
-                }),
-        );
+        let address_selection = &account.address_lookup_table_selection
+            [0..account.address_lookup_table_selection_size as usize];
+        let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
+        instruction
+            .accounts
+            .extend(address_selection.iter().map(|&idx| AccountMeta {
+                pubkey: addresses[idx as usize],
+                is_writable: false,
+                is_signer: false,
+            }));
 
         (accounts, instruction)
     }
