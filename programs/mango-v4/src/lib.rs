@@ -6,9 +6,9 @@ use anchor_lang::prelude::*;
 
 use instructions::*;
 
+pub mod address_lookup_table;
 mod error;
 mod instructions;
-pub mod solana_address_lookup_table_instruction;
 pub mod state;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");

@@ -4,7 +4,7 @@ use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 use solana_program::pubkey::PUBKEY_BYTES;
 
-use crate::solana_address_lookup_table_instruction;
+use crate::address_lookup_table;
 use crate::state::*;
 
 #[derive(Accounts)]
@@ -55,12 +55,10 @@ impl<'info> Deposit<'info> {
 fn address_lookup_table_contains(table: &AccountInfo, pubkey: &Pubkey) -> Result<bool> {
     let table_data = table.try_borrow_data()?;
     let pk_ref = pubkey.as_ref();
-    Ok(
-        table_data[solana_address_lookup_table_instruction::LOOKUP_TABLE_META_SIZE..]
-            .chunks(PUBKEY_BYTES)
-            .find(|&d| d == pk_ref)
-            .is_some(),
-    )
+    Ok(table_data[address_lookup_table::LOOKUP_TABLE_META_SIZE..]
+        .chunks(PUBKEY_BYTES)
+        .find(|&d| d == pk_ref)
+        .is_some())
 }
 
 // TODO: It may make sense to have the token_index passed in from the outside.
@@ -97,7 +95,7 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         // NOTE: Unfortunately extend() _requires_ a payer, even though we've already
         // fully funded the address lookup table. No further transfer will be necessary.
         // We'll pass the account as payer.
-        let mut instruction = solana_address_lookup_table_instruction::extend_lookup_table(
+        let mut instruction = address_lookup_table::extend_lookup_table(
             ctx.accounts.address_lookup_table.key(),
             ctx.accounts.account.key(),
             ctx.accounts.account.key(),

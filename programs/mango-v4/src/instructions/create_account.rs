@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
+use crate::address_lookup_table;
 use crate::error::*;
-use crate::solana_address_lookup_table_instruction;
 use crate::state::*;
 
 #[derive(Accounts)]
@@ -56,7 +56,7 @@ pub fn create_account(
     // (later, in deposit etc) will need a payer!
     let rent = Rent::get()?;
     let required_lamports = rent
-        .minimum_balance(solana_address_lookup_table_instruction::LOOKUP_TABLE_MAX_ACCOUNT_SIZE)
+        .minimum_balance(address_lookup_table::LOOKUP_TABLE_MAX_ACCOUNT_SIZE)
         .max(1)
         .saturating_sub(ctx.accounts.address_lookup_table.lamports());
     if required_lamports > 0 {
@@ -76,12 +76,11 @@ pub fn create_account(
     // Now create the account.
     // TODO: We could save some CU here by not using create_lookup_table():
     //       it - unnecessarily - derives the lookup table address again.
-    let (instruction, _expected_adress_map_address) =
-        solana_address_lookup_table_instruction::create_lookup_table(
-            ctx.accounts.account.key(),
-            ctx.accounts.payer.key(),
-            address_lookup_table_recent_slot,
-        );
+    let (instruction, _expected_adress_map_address) = address_lookup_table::create_lookup_table(
+        ctx.accounts.account.key(),
+        ctx.accounts.payer.key(),
+        address_lookup_table_recent_slot,
+    );
     let account_infos = [
         ctx.accounts.address_lookup_table.to_account_info(),
         ctx.accounts.account.to_account_info(),

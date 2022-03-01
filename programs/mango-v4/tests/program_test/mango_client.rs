@@ -204,7 +204,7 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
             token_account: self.token_account,
             token_authority: self.token_authority.pubkey(),
             token_program: Token::id(),
-            address_lookup_table_program: mango_v4::solana_address_lookup_table_instruction::id(),
+            address_lookup_table_program: mango_v4::address_lookup_table::id(),
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);
@@ -438,11 +438,8 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
         )
         .0;
         let address_lookup_table =
-            mango_v4::solana_address_lookup_table_instruction::derive_lookup_table_address(
-                &account,
-                self.recent_slot,
-            )
-            .0;
+            mango_v4::address_lookup_table::derive_lookup_table_address(&account, self.recent_slot)
+                .0;
 
         let accounts = mango_v4::accounts::CreateAccount {
             group: self.group,
@@ -452,7 +449,7 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
             payer: self.payer.pubkey(),
             system_program: System::id(),
             rent: sysvar::rent::Rent::id(),
-            address_lookup_table_program: mango_v4::solana_address_lookup_table_instruction::id(),
+            address_lookup_table_program: mango_v4::address_lookup_table::id(),
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);
