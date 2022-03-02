@@ -17,10 +17,10 @@ pub struct StubOracle {
 }
 
 pub fn determine_oracle_type(data: &[u8]) -> Result<OracleType> {
-    if data[0..8] == StubOracle::discriminator() {
-        return Ok(OracleType::Stub);
-    } else if u32::from_le_bytes(data[0..4].try_into().unwrap()) == pyth_client::MAGIC {
+    if u32::from_le_bytes(data[0..4].try_into().unwrap()) == pyth_client::MAGIC {
         return Ok(OracleType::Pyth);
+    } else if data[0..8] == StubOracle::discriminator() {
+        return Ok(OracleType::Stub);
     }
 
     Err(MangoError::UnknownOracleType.into())

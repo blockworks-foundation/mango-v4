@@ -132,7 +132,7 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
 
         // converts the token value to the basis token value for health computations
         // TODO: health basis token == USDC?
-        let oracle_data = &oracle_ai.try_borrow_data().unwrap();
+        let oracle_data = &oracle_ai.try_borrow_data()?;
         let oracle_type = determine_oracle_type(oracle_data)?;
         require!(bank.oracle == oracle_ai.key(), MangoError::UnexpectedOracle);
 
