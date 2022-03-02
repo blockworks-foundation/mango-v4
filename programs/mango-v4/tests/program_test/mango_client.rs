@@ -126,7 +126,9 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
             bank,
             vault,
             token_account: self.token_account,
+            address_lookup_table: account.address_lookup_table,
             token_program: Token::id(),
+            address_lookup_table_program: mango_v4::address_lookup_table::id(),
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);

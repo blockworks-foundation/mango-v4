@@ -33,7 +33,11 @@ pub struct Withdraw<'info> {
     #[account(mut)]
     pub token_account: Box<Account<'info, TokenAccount>>,
 
+    #[account(mut)]
+    pub address_lookup_table: UncheckedAccount<'info>, // TODO: wrapper?
+
     pub token_program: Program<'info, Token>,
+    pub address_lookup_table_program: UncheckedAccount<'info>, // TODO: force address?
 }
 
 impl<'info> Withdraw<'info> {
@@ -67,7 +71,9 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;
+    let old_position_len = account.indexed_positions.iter_active().count();
     let position = account.indexed_positions.get_mut_or_create(token_index)?.0;
+    let position_was_active = position.is_active();
 
     // The bank will also be passed in remainingAccounts. Use an explicit scope
     // to drop the &mut before we borrow it immutably again later.
@@ -104,54 +110,58 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
         )?;
     }
 
+    let position_is_active = position.is_active();
+
     //
     // Health check (WIP)
     //
-    let active_len = account.indexed_positions.iter_active().count();
-    require!(
-        ctx.remaining_accounts.len() == active_len * 2, // banks + oracles
-        MangoError::SomeError
-    );
-
-    let mut assets = I80F48::ZERO;
-    let mut liabilities = I80F48::ZERO; // absolute value
-    for (position, (bank_ai, oracle_ai)) in zip!(
-        account.indexed_positions.iter_active(),
-        ctx.remaining_accounts.iter(),
-        ctx.remaining_accounts.iter().skip(active_len)
-    ) {
-        let bank_loader = AccountLoader::<'_, TokenBank>::try_from(bank_ai)?;
-        let bank = bank_loader.load()?;
-
-        // TODO: This assumes banks are passed in order - is that an ok assumption?
+    {
+        let active_len = account.indexed_positions.iter_active().count();
         require!(
-            bank.token_index == position.token_index,
+            ctx.remaining_accounts.len() == active_len * 2, // banks + oracles
             MangoError::SomeError
         );
 
-        // converts the token value to the basis token value for health computations
-        // TODO: health basis token == USDC?
-        let oracle_type = determine_oracle_type(oracle_ai)?;
-        require!(bank.oracle == oracle_ai.key(), MangoError::UnexpectedOracle);
+        let mut assets = I80F48::ZERO;
+        let mut liabilities = I80F48::ZERO; // absolute value
+        for (position, (bank_ai, oracle_ai)) in zip!(
+            account.indexed_positions.iter_active(),
+            ctx.remaining_accounts.iter(),
+            ctx.remaining_accounts.iter().skip(active_len)
+        ) {
+            let bank_loader = AccountLoader::<'_, TokenBank>::try_from(bank_ai)?;
+            let bank = bank_loader.load()?;
 
-        let price = match oracle_type {
-            OracleType::Stub => {
-                AccountLoader::<'_, StubOracle>::try_from(oracle_ai)?
-                    .load()?
-                    .price
+            // TODO: This assumes banks are passed in order - is that an ok assumption?
+            require!(
+                bank.token_index == position.token_index,
+                MangoError::SomeError
+            );
+
+            // converts the token value to the basis token value for health computations
+            // TODO: health basis token == USDC?
+            let oracle_type = determine_oracle_type(oracle_ai)?;
+            require!(bank.oracle == oracle_ai.key(), MangoError::UnexpectedOracle);
+
+            let price = match oracle_type {
+                OracleType::Stub => {
+                    AccountLoader::<'_, StubOracle>::try_from(oracle_ai)?
+                        .load()?
+                        .price
+                }
+            };
+
+            let native_basis = position.native(&bank) * price;
+            if native_basis.is_positive() {
+                assets += bank.init_asset_weight * native_basis;
+            } else {
+                liabilities -= bank.init_liab_weight * native_basis;
             }
-        };
-
-        let native_basis = position.native(&bank) * price;
-        if native_basis.is_positive() {
-            assets += bank.init_asset_weight * native_basis;
-        } else {
-            liabilities -= bank.init_liab_weight * native_basis;
         }
+        let health = assets - liabilities;
+        msg!("health: {}", health);
+        require!(health > 0, MangoError::SomeError);
     }
-    let health = assets - liabilities;
-    msg!("health: {}", health);
-    require!(health > 0, MangoError::SomeError);
 
     Ok(())
 }
