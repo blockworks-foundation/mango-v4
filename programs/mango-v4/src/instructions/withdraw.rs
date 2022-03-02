@@ -71,8 +71,7 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;
-    let old_position_len = account.indexed_positions.iter_active().count();
-    let position = account.indexed_positions.get_mut_or_create(token_index)?.0;
+    let (position, position_info) = account.indexed_positions.get_mut_or_create(token_index)?;
     let position_was_active = position.is_active();
 
     // The bank will also be passed in remainingAccounts. Use an explicit scope
@@ -111,14 +110,22 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
     }
 
     let position_is_active = position.is_active();
+    let is_new = position_is_active && !position_was_active;
+    let is_removed = !position_is_active && position_was_active;
 
     //
     // Health check (WIP)
     //
     {
-        let active_len = account.indexed_positions.iter_active().count();
+        // TODO: If we activated a new position, we need to splice in bank/oracle
+        // and if we deactivated a position, we need to skip them
+        //
+        // This would really be a lot easier if activating and deactivating an indexed position
+        // was explicit and wouldn't need to happen as part of deposit/withdraw
+        //
+
         require!(
-            ctx.remaining_accounts.len() == active_len * 2, // banks + oracles
+            ctx.remaining_accounts.len() == position_info.active_len * 2, // banks + oracles
             MangoError::SomeError
         );
 
@@ -127,7 +134,7 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
         for (position, (bank_ai, oracle_ai)) in zip!(
             account.indexed_positions.iter_active(),
             ctx.remaining_accounts.iter(),
-            ctx.remaining_accounts.iter().skip(active_len)
+            ctx.remaining_accounts.iter().skip(position_info.active_len)
         ) {
             let bank_loader = AccountLoader::<'_, TokenBank>::try_from(bank_ai)?;
             let bank = bank_loader.load()?;
@@ -160,8 +167,20 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
         }
         let health = assets - liabilities;
         msg!("health: {}", health);
-        require!(health > 0, MangoError::SomeError);
+        require!(health >= 0, MangoError::SomeError);
     }
+
+    let oracle = ctx.accounts.bank.load()?.oracle;
+    super::deposit::update_bank_and_oracle_in_alt(
+        ctx.accounts.address_lookup_table.to_account_info(),
+        &ctx.accounts.account,
+        ctx.accounts.bank.key(),
+        oracle,
+        !position_was_active && position_is_active,
+        position_was_active && !position_is_active,
+        position_info.active_index,
+        position_info.active_len,
+    )?;
 
     Ok(())
 }

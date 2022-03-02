@@ -220,7 +220,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // TEST: Withdraw funds
     //
     {
-        let withdraw_amount = 50;
+        let withdraw_amount = 100;
         let start_balance = solana.token_account_balance(payer_mint0_account).await;
 
         send_tx(

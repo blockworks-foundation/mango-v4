@@ -55,7 +55,7 @@ impl<'info> Deposit<'info> {
 //       That would save a lot of computation that needs to go into finding the
 //       right index for the mint.
 pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
-    let (position_was_active, position_is_active, position_index, old_position_len, oracle) = {
+    let (position_was_active, position_is_active, position_info, oracle) = {
         // Find the mint's token index
         let group = ctx.accounts.group.load()?;
         let mint = ctx.accounts.token_account.mint;
@@ -63,8 +63,7 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
 
         // Get the account's position for that token index
         let mut account = ctx.accounts.account.load_mut()?;
-        let old_position_len = account.indexed_positions.iter_active().count();
-        let (position, position_index) =
+        let (position, position_info) =
             account.indexed_positions.get_mut_or_create(token_index)?;
         let position_was_active = position.is_active();
 
@@ -80,8 +79,7 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         (
             position_was_active,
             position_is_active,
-            position_index,
-            old_position_len,
+            position_info,
             bank.oracle,
         )
     };
@@ -89,12 +87,12 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     update_bank_and_oracle_in_alt(
         ctx.accounts.address_lookup_table.to_account_info(),
         &ctx.accounts.account,
-        &ctx.accounts.bank.key(),
-        &oracle,
+        ctx.accounts.bank.key(),
+        oracle,
         !position_was_active && position_is_active,
         position_was_active && !position_is_active,
-        position_index,
-        old_position_len,
+        position_info.active_index,
+        position_info.active_len,
     )?;
 
     Ok(())
@@ -103,12 +101,12 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
 pub fn update_bank_and_oracle_in_alt<'info>(
     lookup_table_ai: AccountInfo<'info>,
     account_ai: &AccountLoader<'info, MangoAccount>,
-    bank: &Pubkey,
-    oracle: &Pubkey,
+    bank: Pubkey,
+    oracle: Pubkey,
     is_new: bool,
     is_removed: bool,
-    position_index: usize,
-    old_position_len: usize,
+    active_index: usize,
+    active_len: usize,
 ) -> Result<()> {
     // If the position is newly active, add (bank, oracle) to the address lookup table selection,
     // and maybe to the address lookup table, if they're not on there already.
@@ -116,14 +114,14 @@ pub fn update_bank_and_oracle_in_alt<'info>(
         // maybe add to lookup table?
         let existing_opt = address_lookup_table::addresses(&lookup_table_ai.try_borrow_data()?)
             .iter()
-            .position(|a| a == bank);
+            .position(|&a| a == bank);
         let bank_pos = if let Some(existing) = existing_opt {
             existing
         } else {
             let old_lookup_table_size =
                 address_lookup_table::addresses(&lookup_table_ai.try_borrow_data()?).len();
 
-            add_to_alt(lookup_table_ai, account_ai, vec![*bank, *oracle])?;
+            add_to_alt(lookup_table_ai, account_ai, vec![bank, oracle])?;
 
             old_lookup_table_size
         };
@@ -133,18 +131,18 @@ pub fn update_bank_and_oracle_in_alt<'info>(
         // insert the oracle (right to left insertion, to not confuse incides)
         add_to_alt_selection(
             &mut account,
-            old_position_len + position_index,
+            active_len + active_index,
             bank_pos as u8 + 1,
         );
         // insert the bank
-        add_to_alt_selection(&mut account, position_index, bank_pos as u8);
+        add_to_alt_selection(&mut account, active_index, bank_pos as u8);
     } else if is_removed {
         // Remove from lookup table selection
         let mut account = account_ai.load_mut()?;
         // remove the oracle (right to left removal, to not confuse incides)
-        remove_from_alt_selection(&mut account, old_position_len + position_index);
+        remove_from_alt_selection(&mut account, active_len + active_index);
         // remove the bank
-        remove_from_alt_selection(&mut account, position_index);
+        remove_from_alt_selection(&mut account, active_index);
     }
 
     Ok(())

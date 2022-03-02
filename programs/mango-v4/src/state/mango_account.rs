@@ -46,6 +46,12 @@ pub struct IndexedPositions {
     pub values: [IndexedPosition; MAX_INDEXED_POSITIONS],
 }
 
+pub struct IndexedPositionInfo {
+    pub active_index: usize,
+    pub active_len: usize,
+    pub raw_index: usize,
+}
+
 impl IndexedPositions {
     pub fn get_mut(&mut self, token_index: usize) -> Result<&mut IndexedPosition> {
         self.values
@@ -54,31 +60,47 @@ impl IndexedPositions {
             .ok_or_else(|| error!(MangoError::SomeError)) // TODO: not found error
     }
 
+    // NOTE: If no position for that token was found, info will have the active_index
+    // that position will have when activated, even though the position that is returned
+    // is not yet active yet. Also active_len returns the number of active positions without
+    // including the potential new position.
+    // TODO: Avoid confusion by storing info about "is this position active?" explicitly?
     pub fn get_mut_or_create(
         &mut self,
         token_index: usize,
-    ) -> Result<(&mut IndexedPosition, usize)> {
-        // This function looks complex because of lifetimes.
-        // Maybe there's a smart way to write it with double iter_mut()
-        // that doesn't confuse the borrow checker.
-        let mut pos = self
-            .values
-            .iter()
-            .position(|p| p.is_active_for_index(token_index));
-        if pos.is_none() {
-            pos = self.values.iter().position(|p| !p.is_active());
-            if let Some(i) = pos {
-                self.values[i] = IndexedPosition {
-                    indexed_value: I80F48::ZERO,
-                    token_index: token_index as TokenIndex,
-                };
+    ) -> Result<(&mut IndexedPosition, IndexedPositionInfo)> {
+        let mut found = false;
+        let mut info = IndexedPositionInfo {
+            active_index: 0,
+            active_len: 0,
+            raw_index: usize::MAX,
+        };
+        for raw_index in 0..self.values.len() {
+            let position = &self.values[raw_index];
+            if position.is_active() {
+                if position.token_index == token_index as TokenIndex {
+                    found = true;
+                    info.raw_index = raw_index;
+                    info.active_index = info.active_len;
+                }
+                info.active_len += 1;
+            } else if info.raw_index == usize::MAX {
+                // Store the data for the first non-active entry
+                info.raw_index = raw_index;
+                info.active_index = info.active_len;
             }
         }
-        if let Some(i) = pos {
-            Ok((&mut self.values[i], i))
-        } else {
-            err!(MangoError::SomeError) // TODO: No free space
+
+        if !found {
+            if info.raw_index == usize::MAX {
+                return Err(error!(MangoError::SomeError)); // full
+            }
+            self.values[info.raw_index] = IndexedPosition {
+                indexed_value: I80F48::ZERO,
+                token_index: token_index as TokenIndex,
+            };
         }
+        Ok((&mut self.values[info.raw_index], info))
     }
 
     pub fn iter_active(&self) -> impl Iterator<Item = &IndexedPosition> {
