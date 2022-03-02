@@ -4,6 +4,7 @@ use fixed::types::I80F48;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, transport::TransportError};
 
+use mango_v4::address_lookup_table;
 use mango_v4::state::*;
 use program_test::*;
 
@@ -20,11 +21,13 @@ async fn test_basic() -> Result<(), TransportError> {
     let owner = &context.users[0].key;
     let payer = &context.users[1].key;
     let mint0 = &context.mints[0];
+    let mint1 = &context.mints[1];
     let payer_mint0_account = context.users[1].token_accounts[0];
+    let payer_mint1_account = context.users[1].token_accounts[1];
     let dust_threshold = 0.01;
 
     //
-    // SETUP: Create a group, account, register a token (mint0)
+    // SETUP: Create a group, account, register tokens (mint0, mint1)
     //
 
     let group = send_tx(solana, CreateGroupInstruction { admin, payer })
@@ -55,7 +58,7 @@ async fn test_basic() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    let _oracle = create_stub_oracle_accounts.oracle;
+    let oracle0 = create_stub_oracle_accounts.oracle;
 
     send_tx(
         solana,
@@ -84,8 +87,49 @@ async fn test_basic() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    let bank = register_token_accounts.bank;
-    let vault = register_token_accounts.vault;
+    let bank0 = register_token_accounts.bank;
+    let vault0 = register_token_accounts.vault;
+
+    let create_stub_oracle_accounts = send_tx(
+        solana,
+        CreateStubOracle {
+            mint: mint1.pubkey,
+            payer,
+        },
+    )
+    .await
+    .unwrap();
+    let oracle1 = create_stub_oracle_accounts.oracle;
+
+    send_tx(
+        solana,
+        SetStubOracle {
+            mint: mint1.pubkey,
+            payer,
+            price: "1.0",
+        },
+    )
+    .await
+    .unwrap();
+
+    let register_token_accounts = send_tx(
+        solana,
+        RegisterTokenInstruction {
+            decimals: mint1.decimals,
+            maint_asset_weight: 0.9,
+            init_asset_weight: 0.8,
+            maint_liab_weight: 1.1,
+            init_liab_weight: 1.2,
+            group,
+            admin,
+            mint: mint1.pubkey,
+            payer,
+        },
+    )
+    .await
+    .unwrap();
+    let bank1 = register_token_accounts.bank;
+    let vault1 = register_token_accounts.vault;
 
     //
     // TEST: Deposit funds
@@ -106,13 +150,15 @@ async fn test_basic() -> Result<(), TransportError> {
         .await
         .unwrap();
 
-        assert_eq!(solana.token_account_balance(vault).await, deposit_amount);
+        let account_data: MangoAccount = solana.get_account(account).await;
+        let bank_data: TokenBank = solana.get_account(bank0).await;
+
+        // Check that the deposit happened
+        assert_eq!(solana.token_account_balance(vault0).await, deposit_amount);
         assert_eq!(
             solana.token_account_balance(payer_mint0_account).await,
             start_balance - deposit_amount
         );
-        let account_data: MangoAccount = solana.get_account(account).await;
-        let bank_data: TokenBank = solana.get_account(bank).await;
         assert!(
             account_data.indexed_positions.values[0].native(&bank_data)
                 - I80F48::from_num(deposit_amount)
@@ -120,6 +166,53 @@ async fn test_basic() -> Result<(), TransportError> {
         );
         assert!(
             bank_data.native_total_deposits() - I80F48::from_num(deposit_amount) < dust_threshold
+        );
+
+        // Check the lookup table
+        let lookup_data = solana
+            .get_account_data(account_data.address_lookup_table)
+            .await
+            .unwrap();
+        assert_eq!(
+            address_lookup_table::addresses(&lookup_data),
+            [bank0, oracle0]
+        );
+        assert_eq!(
+            account_data.address_lookup_table_selection
+                [0..account_data.address_lookup_table_selection_size as usize],
+            [0, 1]
+        );
+    }
+
+    {
+        let deposit_amount = 100;
+
+        send_tx(
+            solana,
+            DepositInstruction {
+                amount: deposit_amount,
+                account,
+                token_account: payer_mint1_account,
+                token_authority: payer,
+            },
+        )
+        .await
+        .unwrap();
+
+        // Check the lookup table
+        let account_data: MangoAccount = solana.get_account(account).await;
+        let lookup_data = solana
+            .get_account_data(account_data.address_lookup_table)
+            .await
+            .unwrap();
+        assert_eq!(
+            address_lookup_table::addresses(&lookup_data),
+            [bank0, oracle0, bank1, oracle1]
+        );
+        assert_eq!(
+            account_data.address_lookup_table_selection
+                [0..account_data.address_lookup_table_selection_size as usize],
+            [0, 2, 1, 3]
         );
     }
 
@@ -143,13 +236,13 @@ async fn test_basic() -> Result<(), TransportError> {
         .await
         .unwrap();
 
-        assert_eq!(solana.token_account_balance(vault).await, withdraw_amount);
+        assert_eq!(solana.token_account_balance(vault0).await, withdraw_amount);
         assert_eq!(
             solana.token_account_balance(payer_mint0_account).await,
             start_balance + withdraw_amount
         );
         let account_data: MangoAccount = solana.get_account(account).await;
-        let bank_data: TokenBank = solana.get_account(bank).await;
+        let bank_data: TokenBank = solana.get_account(bank0).await;
         assert!(
             account_data.indexed_positions.values[0].native(&bank_data)
                 - I80F48::from_num(withdraw_amount)
