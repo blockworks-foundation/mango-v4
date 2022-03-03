@@ -33,7 +33,7 @@ pub fn margin_trade(ctx: Context<MarginTrade>, cpi_data: Vec<u8>) -> Result<()> 
     // abuse this ix to do unwanted changes
     for cpi_ai in cpi_ais {
         require!(
-            *ctx.remaining_accounts[active_len].key != Mango::id(),
+            cpi_ai.key() != Mango::id(),
             MangoError::InvalidMarginTradeTargetCpiProgram
         );
     }

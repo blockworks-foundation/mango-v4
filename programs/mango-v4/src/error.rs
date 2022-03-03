@@ -12,4 +12,6 @@ pub enum MangoError {
     UnknownOracleType,
     #[msg("")]
     InvalidMarginTradeTargetCpiProgram,
+    #[msg("")]
+    HealthMustBePositive,
 }
