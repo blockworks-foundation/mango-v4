@@ -25,3 +25,7 @@ programs
     └── tests # rust tests, TODO  
 ```
 
+### How to open and manage pull requests
+- when in doubt dont squash commits, specially when merge request is very large, specially if your branch contains unrelated commits
+- use the why along with what for commit messages, code comments, makes it easy to understand the context
+- add descriptions to your merge requests if they are non trivial, helps code reviewer watch out for things, understand the motivation for the merge request

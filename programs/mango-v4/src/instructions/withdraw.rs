@@ -2,8 +2,6 @@ use anchor_lang::prelude::*;
 use anchor_spl::token;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
-use fixed::types::I80F48;
-use pyth_client::load_price;
 
 use crate::error::*;
 use crate::state::*;
@@ -47,14 +45,6 @@ impl<'info> Withdraw<'info> {
         };
         CpiContext::new(program, accounts)
     }
-}
-
-macro_rules! zip {
-    ($x: expr) => ($x);
-    ($x: expr, $($y: expr), +) => (
-        $x.zip(
-            zip!($($y), +))
-    )
 }
 
 // TODO: It may make sense to have the token_index passed in from the outside.
@@ -114,48 +104,10 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
         MangoError::SomeError
     );
 
-    let mut assets = I80F48::ZERO;
-    let mut liabilities = I80F48::ZERO; // absolute value
-    for (position, (bank_ai, oracle_ai)) in zip!(
-        account.indexed_positions.iter_active(),
-        ctx.remaining_accounts.iter(),
-        ctx.remaining_accounts.iter().skip(active_len)
-    ) {
-        let bank_loader = AccountLoader::<'_, TokenBank>::try_from(bank_ai)?;
-        let bank = bank_loader.load()?;
+    let banks = &ctx.remaining_accounts[0..active_len];
+    let oracles = &ctx.remaining_accounts[active_len..active_len * 2];
 
-        // TODO: This assumes banks are passed in order - is that an ok assumption?
-        require!(
-            bank.token_index == position.token_index,
-            MangoError::SomeError
-        );
-
-        // converts the token value to the basis token value for health computations
-        // TODO: health basis token == USDC?
-        let oracle_data = &oracle_ai.try_borrow_data()?;
-        let oracle_type = determine_oracle_type(oracle_data)?;
-        require!(bank.oracle == oracle_ai.key(), MangoError::UnexpectedOracle);
-
-        let price = match oracle_type {
-            OracleType::Stub => {
-                AccountLoader::<'_, StubOracle>::try_from(oracle_ai)?
-                    .load()?
-                    .price
-            }
-            OracleType::Pyth => {
-                let price_struct = load_price(&oracle_data).unwrap();
-                I80F48::from_num(price_struct.agg.price)
-            }
-        };
-
-        let native_basis = position.native(&bank) * price;
-        if native_basis.is_positive() {
-            assets += bank.init_asset_weight * native_basis;
-        } else {
-            liabilities -= bank.init_liab_weight * native_basis;
-        }
-    }
-    let health = assets - liabilities;
+    let health = compute_health(&mut account, &banks, &oracles)?;
     msg!("health: {}", health);
     require!(health > 0, MangoError::SomeError);
 
