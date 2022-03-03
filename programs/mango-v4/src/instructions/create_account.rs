@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 
-use crate::address_lookup_table;
 use crate::error::*;
 use crate::state::*;
 
@@ -20,80 +19,19 @@ pub struct CreateAccount<'info> {
 
     pub owner: Signer<'info>,
 
-    // We can't use anchor's `init` here because the create_lookup_table instruction
-    // expects an unallocated table.
-    // Even though this is a PDA, we can't use anchor's `seeds` here because the
-    // address must be based on a recent slot hash, and create_lookup_table() will
-    // validate in anyway.
-    #[account(mut)]
-    pub address_lookup_table: UncheckedAccount<'info>, // TODO: wrapper?
-
     #[account(mut)]
     pub payer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
-    pub address_lookup_table_program: UncheckedAccount<'info>, // TODO: force address?
 }
 
-pub fn create_account(
-    ctx: Context<CreateAccount>,
-    account_num: u8,
-    address_lookup_table_recent_slot: u64,
-) -> Result<()> {
-    {
-        let mut account = ctx.accounts.account.load_init()?;
-        account.group = ctx.accounts.group.key();
-        account.owner = ctx.accounts.owner.key();
-        account.address_lookup_table = ctx.accounts.address_lookup_table.key();
-        account.account_num = account_num;
-        account.bump = *ctx.bumps.get("account").ok_or(MangoError::SomeError)?;
-    }
-
-    // Setup the address lookup table
-    //
-    // First: Pre-pay for max-length address lookup table -- otherwise extending it
-    // (later, in deposit etc) will need a payer!
-    let rent = Rent::get()?;
-    let required_lamports = rent
-        .minimum_balance(address_lookup_table::LOOKUP_TABLE_MAX_ACCOUNT_SIZE)
-        .max(1)
-        .saturating_sub(ctx.accounts.address_lookup_table.lamports());
-    if required_lamports > 0 {
-        solana_program::program::invoke(
-            &solana_program::system_instruction::transfer(
-                &ctx.accounts.payer.key(),
-                &ctx.accounts.address_lookup_table.key(),
-                required_lamports,
-            ),
-            &[
-                ctx.accounts.payer.to_account_info(),
-                ctx.accounts.address_lookup_table.to_account_info(),
-                ctx.accounts.system_program.to_account_info(),
-            ],
-        )?;
-    }
-    // Now create the account.
-    // TODO: We could save some CU here by not using create_lookup_table():
-    //       it - unnecessarily - derives the lookup table address again.
-    let (instruction, _expected_adress_map_address) = address_lookup_table::create_lookup_table(
-        ctx.accounts.account.key(),
-        ctx.accounts.payer.key(),
-        address_lookup_table_recent_slot,
-    );
-    let account_infos = [
-        ctx.accounts.address_lookup_table.to_account_info(),
-        ctx.accounts.account.to_account_info(),
-        ctx.accounts.payer.to_account_info(),
-        ctx.accounts.system_program.to_account_info(),
-    ];
-    // Anchor only sets the discriminator after this function finishes,
-    // calling load() right now would cause an error. But we _do_ need an immutable borrow
-    // so hack it by calling exit() early (which only sets the discriminator)
-    ctx.accounts.account.exit(&crate::id())?;
-    let account = ctx.accounts.account.load()?;
-    let seeds = account_seeds!(account);
-    solana_program::program::invoke_signed(&instruction, &account_infos, &[seeds])?;
+pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()> {
+    let mut account = ctx.accounts.account.load_init()?;
+    account.group = ctx.accounts.group.key();
+    account.owner = ctx.accounts.owner.key();
+    account.account_num = account_num;
+    account.bump = *ctx.bumps.get("account").ok_or(MangoError::SomeError)?;
 
     Ok(())
 }

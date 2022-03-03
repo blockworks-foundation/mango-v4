@@ -92,13 +92,10 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
             allow_borrow: self.allow_borrow,
         };
 
-        // load account so we know its mint
+        // load accounts, find PDAs, find remainingAccounts
         let token_account: TokenAccount = account_loader.load(&self.token_account).await.unwrap();
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
-        let lookup_table = account_loader
-            .load_bytes(&account.address_lookup_table)
-            .await
-            .unwrap();
+        let group: MangoGroup = account_loader.load(&account.group).await.unwrap();
 
         let bank = Pubkey::find_program_address(
             &[
@@ -119,6 +116,30 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         )
         .0;
 
+        // figure out all the banks/oracles that need to be passed for the health check
+        let mut banks = vec![];
+        let mut oracles = vec![];
+        for position in account.indexed_positions.iter_active() {
+            let mint_pk = group.tokens.infos[position.token_index as usize].mint;
+            let mint_info_pk = Pubkey::find_program_address(
+                &[
+                    account.group.as_ref(),
+                    b"mintinfo".as_ref(),
+                    mint_pk.as_ref(),
+                ],
+                &program_id,
+            )
+            .0;
+            let mint_info: MintInfo = account_loader.load(&mint_info_pk).await.unwrap();
+            let lookup_table = account_loader
+                .load_bytes(&mint_info.address_lookup_table)
+                .await
+                .unwrap();
+            let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
+            banks.push(addresses[mint_info.address_lookup_table_bank_index as usize]);
+            oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
+        }
+
         let accounts = Self::Accounts {
             group: account.group,
             account: self.account,
@@ -130,15 +151,18 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
-        instruction.accounts.extend(
-            mango_v4::address_lookup_table::addresses(&lookup_table)
-                .iter()
-                .map(|&pubkey| AccountMeta {
-                    pubkey,
-                    is_writable: false,
-                    is_signer: false,
-                }),
-        );
+        instruction
+            .accounts
+            .extend(
+                banks
+                    .iter()
+                    .chain(oracles.iter())
+                    .map(|&pubkey| AccountMeta {
+                        pubkey,
+                        is_writable: false,
+                        is_signer: false,
+                    }),
+            );
 
         (accounts, instruction)
     }
@@ -196,11 +220,9 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
             account: self.account,
             bank,
             vault,
-            address_lookup_table: account.address_lookup_table,
             token_account: self.token_account,
             token_authority: self.token_authority.pubkey(),
             token_program: Token::id(),
-            address_lookup_table_program: mango_v4::address_lookup_table::id(),
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);
@@ -222,6 +244,7 @@ pub struct RegisterTokenInstruction<'keypair> {
     pub group: Pubkey,
     pub admin: &'keypair Keypair,
     pub mint: Pubkey,
+    pub address_lookup_table: Pubkey,
     pub payer: &'keypair Keypair,
 }
 #[async_trait::async_trait(?Send)]
@@ -259,6 +282,15 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
             &program_id,
         )
         .0;
+        let mint_info = Pubkey::find_program_address(
+            &[
+                self.group.as_ref(),
+                b"mintinfo".as_ref(),
+                self.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
         let oracle = Pubkey::find_program_address(
             &[b"stub_oracle".as_ref(), self.mint.as_ref()],
             &program_id,
@@ -271,10 +303,13 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
             mint: self.mint,
             bank,
             vault,
+            mint_info,
             oracle,
+            address_lookup_table: self.address_lookup_table,
             payer: self.payer.pubkey(),
             token_program: Token::id(),
             system_program: System::id(),
+            address_lookup_table_program: mango_v4::address_lookup_table::id(),
             rent: sysvar::rent::Rent::id(),
         };
 
@@ -403,7 +438,6 @@ impl<'keypair> ClientInstruction for CreateGroupInstruction<'keypair> {
 
 pub struct CreateAccountInstruction<'keypair> {
     pub account_num: u8,
-    pub recent_slot: u64,
 
     pub group: Pubkey,
     pub owner: &'keypair Keypair,
@@ -420,7 +454,6 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = mango_v4::instruction::CreateAccount {
             account_num: self.account_num,
-            address_lookup_table_recent_slot: self.recent_slot,
         };
 
         let account = Pubkey::find_program_address(
@@ -433,19 +466,14 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
             &program_id,
         )
         .0;
-        let address_lookup_table =
-            mango_v4::address_lookup_table::derive_lookup_table_address(&account, self.recent_slot)
-                .0;
 
         let accounts = mango_v4::accounts::CreateAccount {
             group: self.group,
             owner: self.owner.pubkey(),
             account,
-            address_lookup_table,
             payer: self.payer.pubkey(),
             system_program: System::id(),
             rent: sysvar::rent::Rent::id(),
-            address_lookup_table_program: mango_v4::address_lookup_table::id(),
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);

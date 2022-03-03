@@ -1,6 +1,7 @@
 pub use health::*;
 pub use mango_account::*;
 pub use mango_group::*;
+pub use mint_info::*;
 pub use oracle::*;
 pub use token_bank::*;
 
@@ -9,6 +10,7 @@ pub use token_bank::*;
 mod health;
 mod mango_account;
 mod mango_group;
+mod mint_info;
 mod oracle;
 mod token_bank;
 // mod order_book_state_header;
