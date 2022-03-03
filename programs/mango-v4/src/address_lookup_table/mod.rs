@@ -1,3 +1,4 @@
+use anchor_lang::prelude::*;
 mod solana_address_lookup_table_instruction;
 pub use solana_address_lookup_table_instruction::*;
 use solana_program::pubkey::{Pubkey, PUBKEY_BYTES};
@@ -25,4 +26,25 @@ pub fn contains(table: &[u8], pubkey: &Pubkey) -> bool {
         .iter()
         .find(|&addr| addr == pubkey)
         .is_some()
+}
+
+pub fn extend<'info>(
+    lookup_table_ai: AccountInfo<'info>,
+    authority_ai: AccountInfo<'info>,
+    payer_ai: AccountInfo<'info>,
+    signer_seeds: &[&[&[u8]]],
+    new_addresses: Vec<Pubkey>,
+) -> std::result::Result<(), ProgramError> {
+    let instruction = extend_lookup_table(
+        lookup_table_ai.key(),
+        authority_ai.key(),
+        payer_ai.key(),
+        new_addresses,
+    );
+    let account_infos = [
+        lookup_table_ai,
+        authority_ai,
+        payer_ai,
+    ];
+    solana_program::program::invoke_signed(&instruction, &account_infos, signer_seeds)
 }

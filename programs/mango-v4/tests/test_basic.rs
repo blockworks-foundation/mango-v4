@@ -36,7 +36,6 @@ async fn test_basic() -> Result<(), TransportError> {
         solana,
         CreateAccountInstruction {
             account_num: 0,
-            recent_slot: 0, // TODO: get a real recent_slot, probably from SlotHistory
             group,
             owner,
             payer,
@@ -68,6 +67,8 @@ async fn test_basic() -> Result<(), TransportError> {
     .await
     .unwrap();
 
+    let address_lookup_table = solana.create_address_lookup_table(admin, payer).await;
+
     let register_token_accounts = send_tx(
         solana,
         RegisterTokenInstruction {
@@ -79,6 +80,7 @@ async fn test_basic() -> Result<(), TransportError> {
             group,
             admin,
             mint: mint0.pubkey,
+            address_lookup_table,
             payer,
         },
     )

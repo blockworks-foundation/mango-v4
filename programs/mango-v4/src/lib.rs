@@ -40,12 +40,8 @@ pub mod mango_v4 {
         )
     }
 
-    pub fn create_account(
-        ctx: Context<CreateAccount>,
-        account_num: u8,
-        address_lookup_table_recent_slot: u64,
-    ) -> Result<()> {
-        instructions::create_account(ctx, account_num, address_lookup_table_recent_slot)
+    pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()> {
+        instructions::create_account(ctx, account_num)
     }
 
     // todo:

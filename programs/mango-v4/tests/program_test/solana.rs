@@ -102,6 +102,23 @@ impl SolanaCookie {
     }
 
     #[allow(dead_code)]
+    pub async fn create_address_lookup_table(
+        &self,
+        authority: &Keypair,
+        payer: &Keypair,
+    ) -> Pubkey {
+        let (instruction, alt_address) = mango_v4::address_lookup_table::create_lookup_table(
+            authority.pubkey(),
+            payer.pubkey(),
+            0, // TODO: get a good recent slot value from a sysvar
+        );
+        self.process_transaction(&[instruction], Some(&[authority, payer]))
+            .await
+            .unwrap();
+        alt_address
+    }
+
+    #[allow(dead_code)]
     pub async fn get_account_data(&self, address: Pubkey) -> Option<Vec<u8>> {
         Some(
             self.context
