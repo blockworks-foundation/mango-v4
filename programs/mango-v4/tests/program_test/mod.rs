@@ -114,6 +114,15 @@ impl TestContext {
                 authority: Keypair::new(),
             }, // symbol: "MNGO".to_string()
             MintCookie {
+                index: 0,
+                decimals: 6,
+                unit: 10u64.pow(6) as f64,
+                base_lot: 100 as f64,
+                quote_lot: 10 as f64,
+                pubkey: Pubkey::default(),
+                authority: Keypair::new(),
+            },
+            MintCookie {
                 index: 1,
                 decimals: 6,
                 unit: 10u64.pow(6) as f64,
