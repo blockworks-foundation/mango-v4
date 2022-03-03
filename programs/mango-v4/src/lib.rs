@@ -7,9 +7,10 @@ use anchor_lang::prelude::*;
 use instructions::*;
 
 pub mod address_lookup_table;
-mod error;
-mod instructions;
+pub mod error;
+pub mod instructions;
 pub mod state;
+pub mod util;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -66,6 +67,10 @@ pub mod mango_v4 {
 
     pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
         instructions::withdraw(ctx, amount, allow_borrow)
+    }
+
+    pub fn margin_trade(ctx: Context<MarginTrade>, cpi_data: Vec<u8>) -> Result<()> {
+        instructions::margin_trade(ctx, cpi_data)
     }
 }
 

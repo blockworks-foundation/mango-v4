@@ -10,4 +10,6 @@ pub enum MangoError {
     UnexpectedOracle,
     #[msg("")]
     UnknownOracleType,
+    #[msg("")]
+    InvalidMarginTradeTargetCpiProgram,
 }
