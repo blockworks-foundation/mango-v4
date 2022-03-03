@@ -41,10 +41,6 @@ pub fn extend<'info>(
         payer_ai.key(),
         new_addresses,
     );
-    let account_infos = [
-        lookup_table_ai,
-        authority_ai,
-        payer_ai,
-    ];
+    let account_infos = [lookup_table_ai, authority_ai, payer_ai];
     solana_program::program::invoke_signed(&instruction, &account_infos, signer_seeds)
 }

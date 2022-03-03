@@ -65,12 +65,22 @@ impl SolanaCookie {
     }
 
     #[allow(dead_code)]
-    pub async fn advance_clock_by_slots(&self, slots: u64) {
+    pub async fn advance_by_slots(&self, slots: u64) {
         let clock = self.get_clock().await;
         self.context
             .borrow_mut()
-            .warp_to_slot(clock.slot + slots)
+            .warp_to_slot(clock.slot + slots + 1)
             .unwrap();
+    }
+
+    pub async fn get_newest_slot_from_history(&self) -> u64 {
+        self.context
+            .borrow_mut()
+            .banks_client
+            .get_sysvar::<solana_program::slot_history::SlotHistory>()
+            .await
+            .unwrap()
+            .newest()
     }
 
     #[allow(dead_code)]
@@ -101,6 +111,7 @@ impl SolanaCookie {
         return keypair.pubkey();
     }
 
+    // Note: Only one table can be created per authority per slot!
     #[allow(dead_code)]
     pub async fn create_address_lookup_table(
         &self,
@@ -110,7 +121,7 @@ impl SolanaCookie {
         let (instruction, alt_address) = mango_v4::address_lookup_table::create_lookup_table(
             authority.pubkey(),
             payer.pubkey(),
-            0, // TODO: get a good recent slot value from a sysvar
+            self.get_newest_slot_from_history().await,
         );
         self.process_transaction(&[instruction], Some(&[authority, payer]))
             .await
