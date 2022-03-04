@@ -58,11 +58,11 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;
-    let position = account.indexed_positions.get_mut_or_create(token_index)?;
+    let (position, position_index) = account.indexed_positions.get_mut_or_create(token_index)?;
 
     // The bank will also be passed in remainingAccounts. Use an explicit scope
     // to drop the &mut before we borrow it immutably again later.
-    {
+    let position_is_active = {
         let mut bank = ctx.accounts.bank.load_mut()?;
         let native_position = position.native(&bank);
 
@@ -85,7 +85,7 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
         );
 
         // Update the bank and position
-        bank.withdraw(position, amount);
+        let position_is_active = bank.withdraw(position, amount);
 
         // Transfer the actual tokens
         let group_seeds = group_seeds!(group);
@@ -93,10 +93,12 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
             ctx.accounts.transfer_ctx().with_signer(&[group_seeds]),
             amount,
         )?;
-    }
+
+        position_is_active
+    };
 
     //
-    // Health check (WIP)
+    // Health check
     //
     let active_len = account.indexed_positions.iter_active().count();
     require!(
@@ -109,7 +111,16 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
 
     let health = compute_health(&mut account, &banks, &oracles)?;
     msg!("health: {}", health);
-    require!(health > 0, MangoError::SomeError);
+    require!(health >= 0, MangoError::SomeError);
+
+    //
+    // Deactivate the position only after the health check because the user passed in
+    // remaining_accounts for all banks/oracles, including the account that will now be
+    // deactivated.
+    //
+    if !position_is_active {
+        account.indexed_positions.deactivate(position_index);
+    }
 
     Ok(())
 }

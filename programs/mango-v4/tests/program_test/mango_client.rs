@@ -116,11 +116,8 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         )
         .0;
 
-        // figure out all the banks/oracles that need to be passed for the health check
-        let mut banks = vec![];
-        let mut oracles = vec![];
-        for position in account.indexed_positions.iter_active() {
-            let mint_pk = group.tokens.infos[position.token_index as usize].mint;
+        let account_loader = &account_loader;
+        let get_mint_info = move |mint_pk: Pubkey| async move {
             let mint_info_pk = Pubkey::find_program_address(
                 &[
                     account.group.as_ref(),
@@ -131,6 +128,15 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
             )
             .0;
             let mint_info: MintInfo = account_loader.load(&mint_info_pk).await.unwrap();
+            mint_info
+        };
+
+        // figure out all the banks/oracles that need to be passed for the health check
+        let mut banks = vec![];
+        let mut oracles = vec![];
+        for position in account.indexed_positions.iter_active() {
+            let mint_pk = group.tokens.infos[position.token_index as usize].mint;
+            let mint_info = get_mint_info(mint_pk).await;
             let lookup_table = account_loader
                 .load_bytes(&mint_info.address_lookup_table)
                 .await
@@ -138,6 +144,19 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
             let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
             banks.push(addresses[mint_info.address_lookup_table_bank_index as usize]);
             oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
+        }
+        if banks.iter().find(|&&v| v == bank).is_none() {
+            // If there is not yet an active position for the token, we need to pass
+            // the bank/oracle for health check anyway.
+            let new_position = account
+                .indexed_positions
+                .values
+                .iter()
+                .position(|p| !p.is_active())
+                .unwrap();
+            let mint_info = get_mint_info(token_account.mint).await;
+            banks.insert(new_position, bank);
+            oracles.insert(new_position, mint_info.oracle);
         }
 
         let accounts = Self::Accounts {

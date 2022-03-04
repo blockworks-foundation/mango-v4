@@ -23,13 +23,11 @@ pub struct IndexedPosition {
 
 impl IndexedPosition {
     pub fn is_active(&self) -> bool {
-        // maybe want to reserve token_index == 0?
-        // TODO: possibly consider inactive if there's less than one native token there? - that's impossible to withdraw...
-        self.indexed_value != I80F48::ZERO
+        self.token_index != TokenIndex::MAX
     }
 
-    pub fn is_active_for_index(&self, index: usize) -> bool {
-        self.token_index as usize == index && self.is_active()
+    pub fn is_active_for_token(&self, token_index: usize) -> bool {
+        self.token_index as usize == token_index
     }
 
     pub fn native(&self, bank: &TokenBank) -> I80F48 {
@@ -47,21 +45,33 @@ pub struct IndexedPositions {
 }
 
 impl IndexedPositions {
+    pub fn new() -> Self {
+        Self {
+            values: [IndexedPosition {
+                indexed_value: I80F48::ZERO,
+                token_index: TokenIndex::MAX,
+            }; MAX_INDEXED_POSITIONS],
+        }
+    }
+
     pub fn get_mut(&mut self, token_index: usize) -> Result<&mut IndexedPosition> {
         self.values
             .iter_mut()
-            .find(|p| p.is_active_for_index(token_index))
+            .find(|p| p.is_active_for_token(token_index))
             .ok_or_else(|| error!(MangoError::SomeError)) // TODO: not found error
     }
 
-    pub fn get_mut_or_create(&mut self, token_index: usize) -> Result<&mut IndexedPosition> {
+    pub fn get_mut_or_create(
+        &mut self,
+        token_index: usize,
+    ) -> Result<(&mut IndexedPosition, usize)> {
         // This function looks complex because of lifetimes.
         // Maybe there's a smart way to write it with double iter_mut()
         // that doesn't confuse the borrow checker.
         let mut pos = self
             .values
             .iter()
-            .position(|p| p.is_active_for_index(token_index));
+            .position(|p| p.is_active_for_token(token_index));
         if pos.is_none() {
             pos = self.values.iter().position(|p| !p.is_active());
             if let Some(i) = pos {
@@ -72,10 +82,14 @@ impl IndexedPositions {
             }
         }
         if let Some(i) = pos {
-            Ok(&mut self.values[i])
+            Ok((&mut self.values[i], i))
         } else {
             err!(MangoError::SomeError) // TODO: No free space
         }
+    }
+
+    pub fn deactivate(&mut self, index: usize) {
+        self.values[index].token_index = TokenIndex::MAX;
     }
 
     pub fn iter_active(&self) -> impl Iterator<Item = &IndexedPosition> {

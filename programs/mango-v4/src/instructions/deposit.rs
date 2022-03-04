@@ -56,14 +56,18 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;
-    let position = account.indexed_positions.get_mut_or_create(token_index)?;
+    let (position, position_index) = account.indexed_positions.get_mut_or_create(token_index)?;
 
     // Update the bank and position
     let mut bank = ctx.accounts.bank.load_mut()?;
-    bank.deposit(position, amount);
+    let position_is_active = bank.deposit(position, amount);
 
     // Transfer the actual tokens
     token::transfer(ctx.accounts.transfer_ctx(), amount)?;
+
+    if !position_is_active {
+        account.indexed_positions.deactivate(position_index);
+    }
 
     Ok(())
 }

@@ -31,6 +31,9 @@ pub struct TokenBank {
     pub maint_liab_weight: I80F48,
     pub init_liab_weight: I80F48,
 
+    // Collection of all fractions-of-native-tokens that got rounded away
+    pub dust: I80F48,
+
     // Index into TokenInfo on the group
     pub token_index: TokenIndex,
 }
@@ -40,53 +43,81 @@ impl TokenBank {
         self.deposit_index * self.indexed_total_deposits
     }
 
-    pub fn deposit(&mut self, position: &mut IndexedPosition, native_amount: u64) {
+    /// Returns whether the position is active
+    pub fn deposit(&mut self, position: &mut IndexedPosition, native_amount: u64) -> bool {
         let mut native_amount = I80F48::from_num(native_amount);
         let native_position = position.native(self);
 
         if native_position.is_negative() {
-            if -native_position >= native_amount {
-                // pay back borrows only
-                let indexed_change = native_amount / self.borrow_index;
+            let new_native_position = native_position + native_amount;
+            if new_native_position.is_negative() {
+                // pay back borrows only, leaving a negative position
+                let indexed_change = native_amount / self.borrow_index + I80F48::DELTA;
                 self.indexed_total_borrows -= indexed_change;
                 position.indexed_value += indexed_change;
-                return;
+                return true;
+            } else if new_native_position < I80F48::ONE {
+                // if there's less than one token deposited, zero the position
+                self.dust += new_native_position;
+                self.indexed_total_borrows += position.indexed_value;
+                position.indexed_value = I80F48::ZERO;
+                return false;
             }
 
-            // pay back all borrows first
+            // pay back all borrows
             self.indexed_total_borrows += position.indexed_value; // position.value is negative
             position.indexed_value = I80F48::ZERO;
+            // deposit the rest
             native_amount += native_position;
         }
 
         // add to deposits
-        let indexed_change = native_amount / self.deposit_index;
+        // Adding DELTA to amount/index helps because (amount/index)*index <= amount, but
+        // we want to ensure that users can withdraw the same amount they have deposited, so
+        // (amount/index + delta)*index >= amount is a better guarantee.
+        let indexed_change = native_amount / self.deposit_index + I80F48::DELTA;
         self.indexed_total_deposits += indexed_change;
         position.indexed_value += indexed_change;
+
+        true
     }
 
-    pub fn withdraw(&mut self, position: &mut IndexedPosition, native_amount: u64) {
+    /// Returns whether the position is active
+    pub fn withdraw(&mut self, position: &mut IndexedPosition, native_amount: u64) -> bool {
         let mut native_amount = I80F48::from_num(native_amount);
         let native_position = position.native(self);
 
         if native_position.is_positive() {
-            if native_position >= native_amount {
+            let new_native_position = native_position - native_amount;
+            if !new_native_position.is_negative() {
                 // withdraw deposits only
-                let indexed_change = native_amount / self.deposit_index;
-                self.indexed_total_deposits -= indexed_change;
-                position.indexed_value -= indexed_change;
-                return;
+                if new_native_position < I80F48::ONE {
+                    // zero the account collecting the leftovers in `dust`
+                    self.dust += new_native_position;
+                    self.indexed_total_deposits -= position.indexed_value;
+                    position.indexed_value = I80F48::ZERO;
+                    return false;
+                } else {
+                    // withdraw some deposits leaving >1 native token
+                    let indexed_change = native_amount / self.deposit_index;
+                    self.indexed_total_deposits -= indexed_change;
+                    position.indexed_value -= indexed_change;
+                    return true;
+                }
             }
 
-            // withdraw all deposits first
+            // withdraw all deposits
             self.indexed_total_deposits -= position.indexed_value;
             position.indexed_value = I80F48::ZERO;
-            native_amount -= native_position;
+            // borrow the rest
+            native_amount = -new_native_position;
         }
 
         // add to borrows
         let indexed_change = native_amount / self.borrow_index;
         self.indexed_total_borrows += indexed_change;
         position.indexed_value -= indexed_change;
+
+        true
     }
 }

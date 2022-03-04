@@ -31,6 +31,7 @@ pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()
     account.group = ctx.accounts.group.key();
     account.owner = ctx.accounts.owner.key();
     account.account_num = account_num;
+    account.indexed_positions = IndexedPositions::new();
     account.bump = *ctx.bumps.get("account").ok_or(MangoError::SomeError)?;
 
     Ok(())
