@@ -78,7 +78,18 @@ pub struct TestContext {
 }
 
 impl TestContext {
-    pub async fn new() -> Self {
+    pub async fn new(
+        test_opt: Option<ProgramTest>,
+        margin_trade_program_id: Option<&Pubkey>,
+        margin_trade_token_account: Option<&Keypair>,
+        mtta_owner: Option<&Pubkey>,
+    ) -> Self {
+        let mut test = if test_opt.is_some() {
+            test_opt.unwrap()
+        } else {
+            ProgramTest::new("mango_v4", mango_v4::id(), processor!(mango_v4::entry))
+        };
+
         // We need to intercept logs to capture program log output
         let log_filter = "solana_rbpf=trace,\
                     solana_runtime::message_processor=debug,\
@@ -94,11 +105,8 @@ impl TestContext {
             program_log: program_log_capture.clone(),
         }));
 
-        let program_id = mango_v4::id();
-
-        let mut test = ProgramTest::new("mango_v4", program_id, processor!(mango_v4::entry));
         // intentionally set to half the limit, to catch potential problems early
-        test.set_compute_max_units(100000);
+        test.set_compute_max_units(200000);
 
         // Setup the environment
 
@@ -155,6 +163,28 @@ impl TestContext {
             );
         }
         let quote_index = mints.len() - 1;
+
+        // margin trade
+        if margin_trade_program_id.is_some() {
+            test.add_program(
+                "margin_trade",
+                *margin_trade_program_id.unwrap(),
+                std::option::Option::None,
+            );
+            test.add_packable_account(
+                margin_trade_token_account.unwrap().pubkey(),
+                u32::MAX as u64,
+                &Account {
+                    mint: mints[0].pubkey,
+                    owner: *mtta_owner.unwrap(),
+                    amount: 10,
+                    state: AccountState::Initialized,
+                    is_native: COption::None,
+                    ..Account::default()
+                },
+                &spl_token::id(),
+            );
+        }
 
         // Users
         let num_users = 4;

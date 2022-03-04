@@ -6,23 +6,16 @@ use pyth_client::load_price;
 
 use crate::error::MangoError;
 use crate::state::{determine_oracle_type, MangoAccount, OracleType, StubOracle, TokenBank};
-
-macro_rules! zip {
-    ($x: expr) => ($x);
-    ($x: expr, $($y: expr), +) => (
-        $x.zip(
-            zip!($($y), +))
-    )
-}
+use crate::util;
 
 pub fn compute_health(
-    account: &mut RefMut<MangoAccount>,
+    account: &RefMut<MangoAccount>,
     banks: &[AccountInfo],
     oracles: &[AccountInfo],
 ) -> Result<I80F48> {
     let mut assets = I80F48::ZERO;
     let mut liabilities = I80F48::ZERO; // absolute value
-    for (position, (bank_ai, oracle_ai)) in zip!(
+    for (position, (bank_ai, oracle_ai)) in util::zip!(
         account.indexed_positions.iter_active(),
         banks.iter(),
         oracles.iter()
