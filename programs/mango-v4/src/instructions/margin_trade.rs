@@ -89,6 +89,8 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     )?;
 
     // compute post cpi health
+    // todo: this is not working, the health is computed on old bank state and not taking into account
+    // withdraws done in adjust_for_post_cpi_token_amounts
     let post_cpi_health = compute_health(&account, &banks, &oracles)?;
     require!(post_cpi_health > 0, MangoError::HealthMustBePositive);
     msg!("post_cpi_health {:?}", post_cpi_health);
@@ -142,7 +144,6 @@ fn adjust_for_post_cpi_token_amounts(
             let mut position = *account.indexed_positions.get_mut_or_create(token_index)?;
             let bank_loader = AccountLoader::<'_, TokenBank>::try_from(bank_ai)?;
             let mut bank = bank_loader.load_mut()?;
-            // todo: this doesnt work since bank is not mut in the tests atm
             bank.withdraw(&mut position, still_loaned_amount);
         }
     }
