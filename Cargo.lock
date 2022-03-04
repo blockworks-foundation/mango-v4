@@ -1494,6 +1494,7 @@ dependencies = [
  "fixed",
  "fixed-macro",
  "log",
+ "margin-trade",
  "pyth-client",
  "serde",
  "solana-logger",
@@ -1503,6 +1504,15 @@ dependencies = [
  "spl-associated-token-account",
  "spl-token",
  "static_assertions",
+]
+
+[[package]]
+name = "margin-trade"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "solana-program",
 ]
 
 [[package]]

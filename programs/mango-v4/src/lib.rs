@@ -1,5 +1,8 @@
 use fixed::types::I80F48;
 
+#[macro_use]
+pub mod util;
+
 extern crate static_assertions;
 
 use anchor_lang::prelude::*;
@@ -10,7 +13,6 @@ pub mod address_lookup_table;
 pub mod error;
 pub mod instructions;
 pub mod state;
-pub mod util;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -69,7 +71,10 @@ pub mod mango_v4 {
         instructions::withdraw(ctx, amount, allow_borrow)
     }
 
-    pub fn margin_trade(ctx: Context<MarginTrade>, cpi_data: Vec<u8>) -> Result<()> {
+    pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, MarginTrade<'info>>,
+        cpi_data: Vec<u8>,
+    ) -> Result<()> {
         instructions::margin_trade(ctx, cpi_data)
     }
 }

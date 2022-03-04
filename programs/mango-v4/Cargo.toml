@@ -27,9 +27,9 @@ bytemuck = "^1.7.2"
 fixed = { version = "=1.11.0", features = ["serde", "borsh"] }
 fixed-macro = "^1.1.1"
 pyth-client = {version = "0.5.0", features = ["no-entrypoint"]}
-static_assertions = "1.1"
-solana-program = "1.9.5"
 serde = "^1.0"
+solana-program = "1.9.5"
+static_assertions = "1.1"
 
 
 [dev-dependencies]
@@ -43,3 +43,4 @@ log = "0.4.14"
 env_logger = "0.9.0"
 base64 = "0.13.0"
 async-trait = "0.1.52"
+margin-trade = { path = "../margin-trade", features = ["cpi"] }

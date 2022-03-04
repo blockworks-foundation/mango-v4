@@ -1,8 +1,8 @@
+pub use self::margin_trade::*;
 pub use create_account::*;
 pub use create_group::*;
 pub use create_stub_oracle::*;
 pub use deposit::*;
-pub use margin_trade::*;
 pub use register_token::*;
 pub use set_stub_oracle::*;
 pub use withdraw::*;

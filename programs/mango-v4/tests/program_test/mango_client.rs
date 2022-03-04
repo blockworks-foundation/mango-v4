@@ -70,6 +70,89 @@ fn make_instruction(
 // ClientInstruction impl
 //
 
+pub struct MarginTradeInstruction<'keypair> {
+    pub account: Pubkey,
+    pub owner: &'keypair Keypair,
+    pub mango_token_vault: Pubkey,
+    pub mango_group: Pubkey,
+    pub margin_trade_program_id: Pubkey,
+    pub loan_token_account: Pubkey,
+    pub loan_token_account_owner: Pubkey,
+    pub margin_trade_program_ix_cpi_data: Vec<u8>,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for MarginTradeInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::MarginTrade;
+    type Instruction = mango_v4::instruction::MarginTrade;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            cpi_data: self.margin_trade_program_ix_cpi_data.clone(),
+        };
+
+        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let lookup_table = account_loader
+            .load_bytes(&account.address_lookup_table)
+            .await
+            .unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.group,
+            account: self.account,
+            owner: self.owner.pubkey(),
+        };
+
+        let banks_and_oracles = mango_v4::address_lookup_table::addresses(&lookup_table);
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.push(AccountMeta {
+            pubkey: banks_and_oracles[0],
+            // since user doesnt return all loan after margin trade, we want to mark withdrawal from the bank
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: banks_and_oracles[1],
+            is_writable: false,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.margin_trade_program_id,
+            is_writable: false,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.mango_token_vault,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.loan_token_account,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.loan_token_account_owner,
+            is_writable: false,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: spl_token::ID,
+            is_writable: false,
+            is_signer: false,
+        });
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.owner]
+    }
+}
+
 pub struct WithdrawInstruction<'keypair> {
     pub amount: u64,
     pub allow_borrow: bool,
