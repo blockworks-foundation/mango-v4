@@ -112,6 +112,7 @@ pub fn register_token(
         init_asset_weight: I80F48::from_num(init_asset_weight),
         maint_liab_weight: I80F48::from_num(maint_liab_weight),
         init_liab_weight: I80F48::from_num(init_liab_weight),
+        dust: I80F48::ZERO,
         token_index: token_index as TokenIndex,
     };
 
