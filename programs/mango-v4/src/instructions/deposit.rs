@@ -3,6 +3,7 @@ use anchor_spl::token;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 
+use crate::error::*;
 use crate::state::*;
 
 #[derive(Accounts)]
@@ -59,12 +60,37 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     let (position, position_index) = account.indexed_positions.get_mut_or_create(token_index)?;
 
     // Update the bank and position
-    let mut bank = ctx.accounts.bank.load_mut()?;
-    let position_is_active = bank.deposit(position, amount);
+    let position_is_active = {
+        let mut bank = ctx.accounts.bank.load_mut()?;
+        bank.deposit(position, amount)
+    };
 
     // Transfer the actual tokens
     token::transfer(ctx.accounts.transfer_ctx(), amount)?;
 
+    //
+    // Health computation
+    // TODO: This will be used to disable is_bankrupt or being_liquidated
+    //       when health recovers sufficiently
+    //
+    let active_len = account.indexed_positions.iter_active().count();
+    require!(
+        ctx.remaining_accounts.len() == active_len * 2, // banks + oracles
+        MangoError::SomeError
+    );
+
+    let banks = &ctx.remaining_accounts[0..active_len];
+    let oracles = &ctx.remaining_accounts[active_len..active_len * 2];
+
+    let health = compute_health(&mut account, &banks, &oracles)?;
+    msg!("health: {}", health);
+
+    //
+    // Deactivate the position only after the health check because the user passed in
+    // remaining_accounts for all banks/oracles, including the account that will now be
+    // deactivated.
+    // Deposits can deactivate a position if they cancel out a previous borrow.
+    //
     if !position_is_active {
         account.indexed_positions.deactivate(position_index);
     }
