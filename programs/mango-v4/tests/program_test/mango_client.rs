@@ -65,6 +65,66 @@ fn make_instruction(
     }
 }
 
+async fn get_mint_info(
+    account_loader: &impl ClientAccountLoader,
+    account: &MangoAccount,
+    mint: Pubkey,
+) -> MintInfo {
+    let mint_info_pk = Pubkey::find_program_address(
+        &[account.group.as_ref(), b"mintinfo".as_ref(), mint.as_ref()],
+        &mango_v4::id(),
+    )
+    .0;
+    account_loader.load(&mint_info_pk).await.unwrap()
+}
+
+// all the accounts that instructions like deposit/withdraw need to compute account health
+async fn derive_health_check_remaining_account_metas(
+    account_loader: &impl ClientAccountLoader,
+    account: &MangoAccount,
+    affected_bank: Pubkey,
+) -> Vec<AccountMeta> {
+    let group: MangoGroup = account_loader.load(&account.group).await.unwrap();
+
+    // figure out all the banks/oracles that need to be passed for the health check
+    let mut banks = vec![];
+    let mut oracles = vec![];
+    for position in account.indexed_positions.iter_active() {
+        let mint_pk = group.tokens.infos[position.token_index as usize].mint;
+        let mint_info = get_mint_info(account_loader, account, mint_pk).await;
+        let lookup_table = account_loader
+            .load_bytes(&mint_info.address_lookup_table)
+            .await
+            .unwrap();
+        let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
+        banks.push(addresses[mint_info.address_lookup_table_bank_index as usize]);
+        oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
+    }
+    if banks.iter().find(|&&v| v == affected_bank).is_none() {
+        // If there is not yet an active position for the token, we need to pass
+        // the bank/oracle for health check anyway.
+        let new_position = account
+            .indexed_positions
+            .values
+            .iter()
+            .position(|p| !p.is_active())
+            .unwrap();
+        banks.insert(new_position, affected_bank);
+        let affected_bank: TokenBank = account_loader.load(&affected_bank).await.unwrap();
+        oracles.insert(new_position, affected_bank.oracle);
+    }
+
+    banks
+        .iter()
+        .chain(oracles.iter())
+        .map(|&pubkey| AccountMeta {
+            pubkey,
+            is_writable: false,
+            is_signer: false,
+        })
+        .collect()
+}
+
 //
 // a struct for each instruction along with its
 // ClientInstruction impl
@@ -95,7 +155,6 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         // load accounts, find PDAs, find remainingAccounts
         let token_account: TokenAccount = account_loader.load(&self.token_account).await.unwrap();
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
-        let group: MangoGroup = account_loader.load(&account.group).await.unwrap();
 
         let bank = Pubkey::find_program_address(
             &[
@@ -116,48 +175,8 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         )
         .0;
 
-        let account_loader = &account_loader;
-        let get_mint_info = move |mint_pk: Pubkey| async move {
-            let mint_info_pk = Pubkey::find_program_address(
-                &[
-                    account.group.as_ref(),
-                    b"mintinfo".as_ref(),
-                    mint_pk.as_ref(),
-                ],
-                &program_id,
-            )
-            .0;
-            let mint_info: MintInfo = account_loader.load(&mint_info_pk).await.unwrap();
-            mint_info
-        };
-
-        // figure out all the banks/oracles that need to be passed for the health check
-        let mut banks = vec![];
-        let mut oracles = vec![];
-        for position in account.indexed_positions.iter_active() {
-            let mint_pk = group.tokens.infos[position.token_index as usize].mint;
-            let mint_info = get_mint_info(mint_pk).await;
-            let lookup_table = account_loader
-                .load_bytes(&mint_info.address_lookup_table)
-                .await
-                .unwrap();
-            let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
-            banks.push(addresses[mint_info.address_lookup_table_bank_index as usize]);
-            oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
-        }
-        if banks.iter().find(|&&v| v == bank).is_none() {
-            // If there is not yet an active position for the token, we need to pass
-            // the bank/oracle for health check anyway.
-            let new_position = account
-                .indexed_positions
-                .values
-                .iter()
-                .position(|p| !p.is_active())
-                .unwrap();
-            let mint_info = get_mint_info(token_account.mint).await;
-            banks.insert(new_position, bank);
-            oracles.insert(new_position, mint_info.oracle);
-        }
+        let health_check_metas =
+            derive_health_check_remaining_account_metas(&account_loader, &account, bank).await;
 
         let accounts = Self::Accounts {
             group: account.group,
@@ -170,18 +189,7 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
-        instruction
-            .accounts
-            .extend(
-                banks
-                    .iter()
-                    .chain(oracles.iter())
-                    .map(|&pubkey| AccountMeta {
-                        pubkey,
-                        is_writable: false,
-                        is_signer: false,
-                    }),
-            );
+        instruction.accounts.extend(health_check_metas.into_iter());
 
         (accounts, instruction)
     }
@@ -234,6 +242,9 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
         )
         .0;
 
+        let health_check_metas =
+            derive_health_check_remaining_account_metas(&account_loader, &account, bank).await;
+
         let accounts = Self::Accounts {
             group: account.group,
             account: self.account,
@@ -244,7 +255,9 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
             token_program: Token::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+
         (accounts, instruction)
     }
 
