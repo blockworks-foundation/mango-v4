@@ -8,7 +8,7 @@ use crate::state::*;
 
 #[derive(Accounts)]
 pub struct Deposit<'info> {
-    pub group: AccountLoader<'info, MangoGroup>,
+    pub group: AccountLoader<'info, Group>,
 
     #[account(
         mut,
@@ -22,7 +22,7 @@ pub struct Deposit<'info> {
         has_one = vault,
         constraint = bank.load()?.mint == token_account.mint,
     )]
-    pub bank: AccountLoader<'info, TokenBank>,
+    pub bank: AccountLoader<'info, Bank>,
 
     #[account(mut)]
     pub vault: Account<'info, TokenAccount>,

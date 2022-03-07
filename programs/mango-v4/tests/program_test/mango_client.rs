@@ -85,7 +85,7 @@ async fn derive_health_check_remaining_account_metas(
     affected_bank: Option<Pubkey>,
     writable_banks: bool,
 ) -> Vec<AccountMeta> {
-    let group: MangoGroup = account_loader.load(&account.group).await.unwrap();
+    let group: Group = account_loader.load(&account.group).await.unwrap();
 
     // figure out all the banks/oracles that need to be passed for the health check
     let mut banks = vec![];
@@ -112,7 +112,7 @@ async fn derive_health_check_remaining_account_metas(
                 .position(|p| !p.is_active())
                 .unwrap();
             banks.insert(new_position, affected_bank);
-            let affected_bank: TokenBank = account_loader.load(&affected_bank).await.unwrap();
+            let affected_bank: Bank = account_loader.load(&affected_bank).await.unwrap();
             oracles.insert(new_position, affected_bank.oracle);
         }
     }

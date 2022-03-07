@@ -6,7 +6,7 @@ use crate::state::*;
 #[derive(Accounts)]
 #[instruction(account_num: u8)]
 pub struct CreateAccount<'info> {
-    pub group: AccountLoader<'info, MangoGroup>,
+    pub group: AccountLoader<'info, Group>,
 
     #[account(
         init,

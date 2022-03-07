@@ -17,7 +17,7 @@ pub struct RegisterToken<'info> {
         mut,
         has_one = admin,
     )]
-    pub group: AccountLoader<'info, MangoGroup>,
+    pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
 
     pub mint: Account<'info, Mint>,
@@ -27,9 +27,9 @@ pub struct RegisterToken<'info> {
         seeds = [group.key().as_ref(), b"tokenbank".as_ref(), mint.key().as_ref()],
         bump,
         payer = payer,
-        space = 8 + std::mem::size_of::<TokenBank>(),
+        space = 8 + std::mem::size_of::<Bank>(),
     )]
-    pub bank: AccountLoader<'info, TokenBank>,
+    pub bank: AccountLoader<'info, Bank>,
 
     #[account(
         init,
@@ -99,7 +99,7 @@ pub fn register_token(
     };
 
     let mut bank = ctx.accounts.bank.load_init()?;
-    *bank = TokenBank {
+    *bank = Bank {
         group: ctx.accounts.group.key(),
         mint: ctx.accounts.mint.key(),
         vault: ctx.accounts.vault.key(),

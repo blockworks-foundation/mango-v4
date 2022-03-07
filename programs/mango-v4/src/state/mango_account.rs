@@ -16,7 +16,7 @@ pub struct IndexedPosition {
     /// The deposit_index (if positive) or borrow_index (if negative) scaled position
     pub indexed_value: I80F48,
 
-    /// index into MangoGroup.tokens
+    /// index into Group.tokens
     pub token_index: TokenIndex,
 }
 // TODO: static assert the size and alignment
@@ -30,7 +30,7 @@ impl IndexedPosition {
         self.token_index as usize == token_index
     }
 
-    pub fn native(&self, bank: &TokenBank) -> I80F48 {
+    pub fn native(&self, bank: &Bank) -> I80F48 {
         if self.indexed_value.is_positive() {
             self.indexed_value * bank.deposit_index
         } else {
@@ -107,7 +107,7 @@ pub struct MangoAccount {
 
     // pub in_margin_basket: [bool; MAX_PAIRS],
     // pub num_in_margin_basket: u8,
-    // TODO: this should be a separate struct for convenient use, like MangoGroup::tokens
+    // TODO: this should be a separate struct for convenient use, like Group::tokens
     pub indexed_positions: IndexedPositions,
 
     // pub spot_open_orders: [Pubkey; MAX_PAIRS],

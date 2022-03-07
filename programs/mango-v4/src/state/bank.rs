@@ -4,7 +4,7 @@ use fixed::types::I80F48;
 use super::{IndexedPosition, TokenIndex};
 
 #[account(zero_copy)]
-pub struct TokenBank {
+pub struct Bank {
     pub group: Pubkey,
     pub mint: Pubkey,
     pub vault: Pubkey,
@@ -38,7 +38,7 @@ pub struct TokenBank {
     pub token_index: TokenIndex,
 }
 
-impl TokenBank {
+impl Bank {
     pub fn native_total_deposits(&self) -> I80F48 {
         self.deposit_index * self.indexed_total_deposits
     }

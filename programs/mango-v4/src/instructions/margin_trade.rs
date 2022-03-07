@@ -1,5 +1,5 @@
 use crate::error::MangoError;
-use crate::state::{compute_health, MangoAccount, MangoGroup, TokenBank};
+use crate::state::{compute_health, MangoAccount, Group, Bank};
 use crate::{group_seeds, util, Mango};
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
@@ -8,7 +8,7 @@ use std::cell::{Ref, RefMut};
 
 #[derive(Accounts)]
 pub struct MarginTrade<'info> {
-    pub group: AccountLoader<'info, MangoGroup>,
+    pub group: AccountLoader<'info, Group>,
 
     #[account(
         mut,
@@ -118,7 +118,7 @@ fn adjust_for_post_cpi_token_amounts(
     ctx: &Context<MarginTrade>,
     cpi_ais: &Vec<AccountInfo>,
     pre_cpi_token_vault_amounts: Vec<u64>,
-    group: Ref<MangoGroup>,
+    group: Ref<Group>,
     banks: &mut Vec<AccountInfo>,
     account: &mut RefMut<MangoAccount>,
 ) -> Result<()> {
@@ -142,7 +142,7 @@ fn adjust_for_post_cpi_token_amounts(
                 .tokens
                 .index_for_mint(&maybe_mango_vault_token_account.mint)?;
             let mut position = *account.indexed_positions.get_mut_or_create(token_index)?.0;
-            let bank_loader = AccountLoader::<'_, TokenBank>::try_from(bank_ai)?;
+            let bank_loader = AccountLoader::<'_, Bank>::try_from(bank_ai)?;
             let mut bank = bank_loader.load_mut()?;
             bank.withdraw(&mut position, still_loaned_amount);
         }

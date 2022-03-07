@@ -45,9 +45,9 @@ impl Tokens {
     }
 }
 
-// TODO: Should we call this `Group` instead of `MangoGroup`? And `Account` instead of `MangoAccount`?
+// TODO: Should we call this `Group` instead of `Group`? And `Account` instead of `MangoAccount`?
 #[account(zero_copy)]
-pub struct MangoGroup {
+pub struct Group {
     // Relying on Anchor's discriminator be sufficient for our versioning needs?
     // pub meta_data: MetaData,
     pub admin: Pubkey,

@@ -129,7 +129,7 @@ async fn test_basic() -> Result<(), TransportError> {
             start_balance - deposit_amount
         );
         let account_data: MangoAccount = solana.get_account(account).await;
-        let bank_data: TokenBank = solana.get_account(bank).await;
+        let bank_data: Bank = solana.get_account(bank).await;
         assert!(
             account_data.indexed_positions.values[0].native(&bank_data)
                 - I80F48::from_num(deposit_amount)
@@ -198,7 +198,7 @@ async fn test_basic() -> Result<(), TransportError> {
             start_balance + withdraw_amount
         );
         let account_data: MangoAccount = solana.get_account(account).await;
-        let bank_data: TokenBank = solana.get_account(bank).await;
+        let bank_data: Bank = solana.get_account(bank).await;
         assert!(
             account_data.indexed_positions.values[0].native(&bank_data)
                 - I80F48::from_num(withdraw_amount)
