@@ -82,7 +82,8 @@ async fn get_mint_info(
 async fn derive_health_check_remaining_account_metas(
     account_loader: &impl ClientAccountLoader,
     account: &MangoAccount,
-    affected_bank: Pubkey,
+    affected_bank: Option<Pubkey>,
+    writable_banks: bool,
 ) -> Vec<AccountMeta> {
     let group: MangoGroup = account_loader.load(&account.group).await.unwrap();
 
@@ -100,28 +101,34 @@ async fn derive_health_check_remaining_account_metas(
         banks.push(addresses[mint_info.address_lookup_table_bank_index as usize]);
         oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
     }
-    if banks.iter().find(|&&v| v == affected_bank).is_none() {
-        // If there is not yet an active position for the token, we need to pass
-        // the bank/oracle for health check anyway.
-        let new_position = account
-            .indexed_positions
-            .values
-            .iter()
-            .position(|p| !p.is_active())
-            .unwrap();
-        banks.insert(new_position, affected_bank);
-        let affected_bank: TokenBank = account_loader.load(&affected_bank).await.unwrap();
-        oracles.insert(new_position, affected_bank.oracle);
+    if let Some(affected_bank) = affected_bank {
+        if banks.iter().find(|&&v| v == affected_bank).is_none() {
+            // If there is not yet an active position for the token, we need to pass
+            // the bank/oracle for health check anyway.
+            let new_position = account
+                .indexed_positions
+                .values
+                .iter()
+                .position(|p| !p.is_active())
+                .unwrap();
+            banks.insert(new_position, affected_bank);
+            let affected_bank: TokenBank = account_loader.load(&affected_bank).await.unwrap();
+            oracles.insert(new_position, affected_bank.oracle);
+        }
     }
 
     banks
         .iter()
-        .chain(oracles.iter())
         .map(|&pubkey| AccountMeta {
+            pubkey,
+            is_writable: writable_banks,
+            is_signer: false,
+        })
+        .chain(oracles.iter().map(|&pubkey| AccountMeta {
             pubkey,
             is_writable: false,
             is_signer: false,
-        })
+        }))
         .collect()
 }
 
@@ -154,10 +161,6 @@ impl<'keypair> ClientInstruction for MarginTradeInstruction<'keypair> {
         };
 
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
-        let lookup_table = account_loader
-            .load_bytes(&account.address_lookup_table)
-            .await
-            .unwrap();
 
         let accounts = Self::Accounts {
             group: account.group,
@@ -165,20 +168,12 @@ impl<'keypair> ClientInstruction for MarginTradeInstruction<'keypair> {
             owner: self.owner.pubkey(),
         };
 
-        let banks_and_oracles = mango_v4::address_lookup_table::addresses(&lookup_table);
+        let health_check_metas =
+            derive_health_check_remaining_account_metas(&account_loader, &account, None, true)
+                .await;
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
-        instruction.accounts.push(AccountMeta {
-            pubkey: banks_and_oracles[0],
-            // since user doesnt return all loan after margin trade, we want to mark withdrawal from the bank
-            is_writable: true,
-            is_signer: false,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: banks_and_oracles[1],
-            is_writable: false,
-            is_signer: false,
-        });
+        instruction.accounts.extend(health_check_metas.into_iter());
         instruction.accounts.push(AccountMeta {
             pubkey: self.margin_trade_program_id,
             is_writable: false,
@@ -258,8 +253,13 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         )
         .0;
 
-        let health_check_metas =
-            derive_health_check_remaining_account_metas(&account_loader, &account, bank).await;
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            Some(bank),
+            false,
+        )
+        .await;
 
         let accounts = Self::Accounts {
             group: account.group,
@@ -325,8 +325,13 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
         )
         .0;
 
-        let health_check_metas =
-            derive_health_check_remaining_account_metas(&account_loader, &account, bank).await;
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            Some(bank),
+            false,
+        )
+        .await;
 
         let accounts = Self::Accounts {
             group: account.group,

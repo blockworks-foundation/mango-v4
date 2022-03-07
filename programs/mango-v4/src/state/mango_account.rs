@@ -105,8 +105,6 @@ pub struct MangoAccount {
     // Alternative authority/signer of transactions for a mango account
     pub delegate: Pubkey,
 
-    pub address_lookup_table: Pubkey,
-
     // pub in_margin_basket: [bool; MAX_PAIRS],
     // pub num_in_margin_basket: u8,
     // TODO: this should be a separate struct for convenient use, like MangoGroup::tokens
