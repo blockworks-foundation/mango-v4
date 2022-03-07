@@ -141,7 +141,7 @@ fn adjust_for_post_cpi_token_amounts(
             let token_index = group
                 .tokens
                 .index_for_mint(&maybe_mango_vault_token_account.mint)?;
-            let mut position = *account.indexed_positions.get_mut_or_create(token_index)?;
+            let mut position = *account.indexed_positions.get_mut_or_create(token_index)?.0;
             let bank_loader = AccountLoader::<'_, TokenBank>::try_from(bank_ai)?;
             let mut bank = bank_loader.load_mut()?;
             bank.withdraw(&mut position, still_loaned_amount);
