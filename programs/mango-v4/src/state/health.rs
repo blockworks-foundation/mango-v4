@@ -5,7 +5,7 @@ use fixed::types::I80F48;
 use pyth_client::load_price;
 
 use crate::error::MangoError;
-use crate::state::{determine_oracle_type, MangoAccount, OracleType, StubOracle, Bank};
+use crate::state::{determine_oracle_type, Bank, MangoAccount, OracleType, StubOracle};
 use crate::util;
 
 pub fn compute_health(
