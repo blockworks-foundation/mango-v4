@@ -1,6 +1,6 @@
 use crate::error::MangoError;
-use crate::state::{compute_health, MangoAccount, Group, Bank};
-use crate::{group_seeds, util, Mango};
+use crate::state::{compute_health, Bank, Group, MangoAccount};
+use crate::{group_seeds, Mango};
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 use solana_program::instruction::Instruction;
@@ -20,49 +20,77 @@ pub struct MarginTrade<'info> {
     pub owner: Signer<'info>,
 }
 
-/// reference https://github.com/blockworks-foundation/mango-v3/blob/mc/flash_loan/program/src/processor.rs#L5323
 pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, MarginTrade<'info>>,
+    banks_len: usize,
     cpi_data: Vec<u8>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
     let mut account = ctx.accounts.account.load_mut()?;
-    let active_len = account.indexed_positions.iter_active().count();
 
     // remaining_accounts layout is expected as follows
-    // * active_len number of banks
-    // * active_len number of oracles
+    // * banks_len number of banks
+    // * banks_len number of oracles
     // * cpi_program
     // * cpi_accounts
 
-    let banks = &ctx.remaining_accounts[0..active_len];
-    let oracles = &ctx.remaining_accounts[active_len..active_len * 2];
+    // assert that user has passed in enough banks, this might be greater than his current
+    // total number of indexed positions, since
+    // user might end up withdrawing or depositing and activating a new indexed position
+    require!(
+        banks_len >= account.indexed_positions.iter_active().count(),
+        MangoError::SomeError // todo: SomeError
+    );
 
-    let cpi_program_id = *ctx.remaining_accounts[active_len * 2].key;
+    // unpack remaining_accounts
+    let banks = &ctx.remaining_accounts[0..banks_len];
+    let oracles = &ctx.remaining_accounts[banks_len..banks_len * 2];
+    let cpi_program_id = *ctx.remaining_accounts[banks_len * 2].key;
 
-    // prepare for cpi
+    // prepare account for cpi ix
     let (cpi_ais, cpi_ams) = {
         // we also need the group
         let mut cpi_ais = [ctx.accounts.group.to_account_info()].to_vec();
         // skip banks, oracles and cpi program from the remaining_accounts
-        let mut remaining_cpi_ais = ctx.remaining_accounts[active_len * 2 + 1..].to_vec();
+        let mut remaining_cpi_ais = ctx.remaining_accounts[banks_len * 2 + 1..].to_vec();
         cpi_ais.append(&mut remaining_cpi_ais);
 
+        // todo: I'm wondering if there's a way to do this without putting cpi_ais on the heap.
+        // But fine to defer to the future
         let mut cpi_ams = cpi_ais.to_account_metas(Option::None);
-        // we want group to be the signer, so that loans can be taken from the token vaults
+        // we want group to be the signer, so that token vaults can be credited to or withdrawn from
         cpi_ams[0].is_signer = true;
 
         (cpi_ais, cpi_ams)
     };
 
-    // since we are using group signer seeds to invoke cpi,
-    // assert that none of the cpi accounts is the mango program to prevent that invoker doesn't
-    // abuse this ix to do unwanted changes
+    // sanity checks
     for cpi_ai in &cpi_ais {
+        // since we are using group signer seeds to invoke cpi,
+        // assert that none of the cpi accounts is the mango program to prevent that invoker doesn't
+        // abuse this ix to do unwanted changes
         require!(
             cpi_ai.key() != Mango::id(),
             MangoError::InvalidMarginTradeTargetCpiProgram
         );
+
+        // assert that user has passed in the bank for every
+        // token account he wants to deposit/withdraw from in cpi
+        if cpi_ai.owner == &TokenAccount::owner() {
+            let maybe_mango_vault_token_account =
+                Account::<TokenAccount>::try_from(cpi_ai).unwrap();
+            if maybe_mango_vault_token_account.owner == ctx.accounts.group.key() {
+                require!(
+                    banks.iter().any(|bank_ai| {
+                        let bank_loader = AccountLoader::<'_, Bank>::try_from(bank_ai).unwrap();
+                        let bank = bank_loader.load().unwrap();
+                        bank.mint == maybe_mango_vault_token_account.mint
+                    }),
+                    // todo: errorcode
+                    MangoError::SomeError
+                )
+            }
+        }
     }
 
     // compute pre cpi health
@@ -77,12 +105,12 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
         accounts: cpi_ams,
     };
     let group_seeds = group_seeds!(group);
-    let pre_cpi_token_vault_amounts = get_pre_cpi_token_amounts(&ctx, &cpi_ais);
+    let pre_cpi_amounts = get_pre_cpi_amounts(&ctx, &cpi_ais);
     solana_program::program::invoke_signed(&cpi_ix, &cpi_ais, &[group_seeds])?;
-    adjust_for_post_cpi_token_amounts(
+    adjust_for_post_cpi_amounts(
         &ctx,
         &cpi_ais,
-        pre_cpi_token_vault_amounts,
+        pre_cpi_amounts,
         group,
         &mut banks.to_vec(),
         &mut account,
@@ -98,53 +126,59 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     Ok(())
 }
 
-fn get_pre_cpi_token_amounts(ctx: &Context<MarginTrade>, cpi_ais: &Vec<AccountInfo>) -> Vec<u64> {
-    let mut mango_vault_token_account_amounts = vec![];
-    for maybe_token_account in cpi_ais
+fn get_pre_cpi_amounts(ctx: &Context<MarginTrade>, cpi_ais: &Vec<AccountInfo>) -> Vec<u64> {
+    let mut amounts = vec![];
+    for token_account in cpi_ais
         .iter()
         .filter(|ai| ai.owner == &TokenAccount::owner())
     {
-        let maybe_mango_vault_token_account =
-            Account::<TokenAccount>::try_from(maybe_token_account).unwrap();
-        if maybe_mango_vault_token_account.owner == ctx.accounts.group.key() {
-            mango_vault_token_account_amounts.push(maybe_mango_vault_token_account.amount)
+        let vault = Account::<TokenAccount>::try_from(token_account).unwrap();
+        if vault.owner == ctx.accounts.group.key() {
+            amounts.push(vault.amount)
         }
     }
-    mango_vault_token_account_amounts
+    amounts
 }
 
-/// withdraws from bank, on users behalf, if he hasn't returned back entire loan amount
-fn adjust_for_post_cpi_token_amounts(
+fn adjust_for_post_cpi_amounts(
     ctx: &Context<MarginTrade>,
     cpi_ais: &Vec<AccountInfo>,
-    pre_cpi_token_vault_amounts: Vec<u64>,
+    pre_cpi_amounts: Vec<u64>,
     group: Ref<Group>,
     banks: &mut Vec<AccountInfo>,
     account: &mut RefMut<MangoAccount>,
 ) -> Result<()> {
-    let x = cpi_ais
+    let token_accounts_iter = cpi_ais
         .iter()
         .filter(|ai| ai.owner == &TokenAccount::owner());
 
-    for (maybe_token_account, (pre_cpi_token_vault_amount, bank_ai)) in
-        util::zip!(x, pre_cpi_token_vault_amounts.iter(), banks.iter())
+    for (token_account, pre_cpi_amount) in
+        // token_accounts and pre_cpi_amounts are assumed to be in correct order
+        token_accounts_iter.zip(pre_cpi_amounts.iter())
     {
-        let maybe_mango_vault_token_account =
-            Account::<TokenAccount>::try_from(maybe_token_account).unwrap();
-        if maybe_mango_vault_token_account.owner == ctx.accounts.group.key() {
-            let still_loaned_amount =
-                pre_cpi_token_vault_amount - maybe_mango_vault_token_account.amount;
-            if still_loaned_amount <= 0 {
-                continue;
-            }
-
-            let token_index = group
-                .tokens
-                .index_for_mint(&maybe_mango_vault_token_account.mint)?;
+        let vault = Account::<TokenAccount>::try_from(token_account).unwrap();
+        if vault.owner == ctx.accounts.group.key() {
+            let token_index = group.tokens.index_for_mint(&vault.mint)?;
             let mut position = *account.indexed_positions.get_mut_or_create(token_index)?.0;
+
+            // find bank for token account
+            let bank_ai = banks
+                .iter()
+                .find(|bank_ai| {
+                    let bank_loader = AccountLoader::<'_, Bank>::try_from(bank_ai).unwrap();
+                    let bank = bank_loader.load().unwrap();
+                    bank.mint == vault.mint
+                })
+                .ok_or(MangoError::SomeError)?; // todo: replace SomeError
             let bank_loader = AccountLoader::<'_, Bank>::try_from(bank_ai)?;
             let mut bank = bank_loader.load_mut()?;
-            bank.withdraw(&mut position, still_loaned_amount);
+
+            // user has either withdrawn or deposited
+            if *pre_cpi_amount > vault.amount {
+                bank.withdraw(&mut position, pre_cpi_amount - vault.amount);
+            } else {
+                bank.deposit(&mut position, vault.amount - pre_cpi_amount);
+            }
         }
     }
     Ok(())

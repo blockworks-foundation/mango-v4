@@ -16,8 +16,19 @@ mod program_test;
 // This is an unspecific happy-case test that just runs a few instructions to check
 // that they work in principle. It should be split up / renamed.
 #[tokio::test]
-async fn test_basic() -> Result<(), TransportError> {
-    let context = TestContext::new(Option::None, Option::None, Option::None, Option::None).await;
+async fn test_margin_trade() -> Result<(), TransportError> {
+    let margin_trade_program_id =
+        Pubkey::from_str("J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix").unwrap();
+    let margin_trade_token_account = Keypair::new();
+    let (mtta_owner, mtta_bump_seeds) =
+        Pubkey::find_program_address(&[b"margintrade"], &margin_trade_program_id);
+    let context = TestContext::new(
+        Option::None,
+        Some(&margin_trade_program_id),
+        Some(&margin_trade_token_account),
+        Some(&mtta_owner),
+    )
+    .await;
     let solana = &context.solana.clone();
 
     let admin = &Keypair::new();
@@ -96,14 +107,14 @@ async fn test_basic() -> Result<(), TransportError> {
     //
     // TEST: Deposit funds
     //
+    let deposit_amount_initial = 100;
     {
-        let deposit_amount = 100;
         let start_balance = solana.token_account_balance(payer_mint0_account).await;
 
         send_tx(
             solana,
             DepositInstruction {
-                amount: deposit_amount,
+                amount: deposit_amount_initial,
                 account,
                 token_account: payer_mint0_account,
                 token_authority: payer,
@@ -112,59 +123,65 @@ async fn test_basic() -> Result<(), TransportError> {
         .await
         .unwrap();
 
-        assert_eq!(solana.token_account_balance(vault).await, deposit_amount);
+        assert_eq!(
+            solana.token_account_balance(vault).await,
+            deposit_amount_initial
+        );
         assert_eq!(
             solana.token_account_balance(payer_mint0_account).await,
-            start_balance - deposit_amount
+            start_balance - deposit_amount_initial
         );
         let account_data: MangoAccount = solana.get_account(account).await;
         let bank_data: Bank = solana.get_account(bank).await;
         assert!(
             account_data.indexed_positions.values[0].native(&bank_data)
-                - I80F48::from_num(deposit_amount)
+                - I80F48::from_num(deposit_amount_initial)
                 < dust_threshold
         );
         assert!(
-            bank_data.native_total_deposits() - I80F48::from_num(deposit_amount) < dust_threshold
+            bank_data.native_total_deposits() - I80F48::from_num(deposit_amount_initial)
+                < dust_threshold
         );
     }
 
     //
-    // TEST: Withdraw funds
+    // TEST: Margin trade
     //
+    let withdraw_amount = 2;
+    let deposit_amount = 1;
     {
-        let withdraw_amount = 50;
-        let start_balance = solana.token_account_balance(payer_mint0_account).await;
-
         send_tx(
             solana,
-            WithdrawInstruction {
-                amount: withdraw_amount,
-                allow_borrow: true,
+            MarginTradeInstruction {
                 account,
                 owner,
-                token_account: payer_mint0_account,
+                mango_token_vault: vault,
+                margin_trade_program_id,
+                deposit_account: margin_trade_token_account.pubkey(),
+                deposit_account_owner: mtta_owner,
+                margin_trade_program_ix_cpi_data: {
+                    let ix = margin_trade::instruction::MarginTrade {
+                        amount_from: 2,
+                        amount_to: 1,
+                        deposit_account_owner_bump_seeds: mtta_bump_seeds,
+                    };
+                    ix.data()
+                },
             },
         )
         .await
         .unwrap();
-
-        assert_eq!(solana.token_account_balance(vault).await, withdraw_amount);
-        assert_eq!(
-            solana.token_account_balance(payer_mint0_account).await,
-            start_balance + withdraw_amount
-        );
-        let account_data: MangoAccount = solana.get_account(account).await;
-        let bank_data: Bank = solana.get_account(bank).await;
-        assert!(
-            account_data.indexed_positions.values[0].native(&bank_data)
-                - I80F48::from_num(withdraw_amount)
-                < dust_threshold
-        );
-        assert!(
-            bank_data.native_total_deposits() - I80F48::from_num(withdraw_amount) < dust_threshold
-        );
     }
+    assert_eq!(
+        solana.token_account_balance(vault).await,
+        deposit_amount_initial - withdraw_amount + deposit_amount
+    );
+    assert_eq!(
+        solana
+            .token_account_balance(margin_trade_token_account.pubkey())
+            .await,
+        withdraw_amount - deposit_amount
+    );
 
     Ok(())
 }

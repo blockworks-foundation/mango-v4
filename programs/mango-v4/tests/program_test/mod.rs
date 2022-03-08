@@ -106,7 +106,7 @@ impl TestContext {
         }));
 
         // intentionally set to half the limit, to catch potential problems early
-        test.set_compute_max_units(200000);
+        test.set_compute_max_units(100000);
 
         // Setup the environment
 
@@ -177,7 +177,7 @@ impl TestContext {
                 &Account {
                     mint: mints[0].pubkey,
                     owner: *mtta_owner.unwrap(),
-                    amount: 10,
+                    amount: 0,
                     state: AccountState::Initialized,
                     is_native: COption::None,
                     ..Account::default()

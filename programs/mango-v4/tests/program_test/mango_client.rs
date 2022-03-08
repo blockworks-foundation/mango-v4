@@ -141,10 +141,9 @@ pub struct MarginTradeInstruction<'keypair> {
     pub account: Pubkey,
     pub owner: &'keypair Keypair,
     pub mango_token_vault: Pubkey,
-    pub mango_group: Pubkey,
     pub margin_trade_program_id: Pubkey,
-    pub loan_token_account: Pubkey,
-    pub loan_token_account_owner: Pubkey,
+    pub deposit_account: Pubkey,
+    pub deposit_account_owner: Pubkey,
     pub margin_trade_program_ix_cpi_data: Vec<u8>,
 }
 #[async_trait::async_trait(?Send)]
@@ -156,11 +155,13 @@ impl<'keypair> ClientInstruction for MarginTradeInstruction<'keypair> {
         account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction {
-            cpi_data: self.margin_trade_program_ix_cpi_data.clone(),
-        };
 
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+
+        let instruction = Self::Instruction {
+            banks_len: account.indexed_positions.iter_active().count(),
+            cpi_data: self.margin_trade_program_ix_cpi_data.clone(),
+        };
 
         let accounts = Self::Accounts {
             group: account.group,
@@ -185,12 +186,12 @@ impl<'keypair> ClientInstruction for MarginTradeInstruction<'keypair> {
             is_signer: false,
         });
         instruction.accounts.push(AccountMeta {
-            pubkey: self.loan_token_account,
+            pubkey: self.deposit_account,
             is_writable: true,
             is_signer: false,
         });
         instruction.accounts.push(AccountMeta {
-            pubkey: self.loan_token_account_owner,
+            pubkey: self.deposit_account_owner,
             is_writable: false,
             is_signer: false,
         });

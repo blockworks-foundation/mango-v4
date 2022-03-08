@@ -69,9 +69,10 @@ pub mod mango_v4 {
 
     pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, MarginTrade<'info>>,
+        banks_len: usize,
         cpi_data: Vec<u8>,
     ) -> Result<()> {
-        instructions::margin_trade(ctx, cpi_data)
+        instructions::margin_trade(ctx, banks_len, cpi_data)
     }
 }
 
