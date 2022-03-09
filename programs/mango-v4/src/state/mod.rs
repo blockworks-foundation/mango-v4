@@ -13,6 +13,7 @@ mod health;
 mod mango_account;
 mod mint_info;
 mod oracle;
+mod futures_market;
 // mod order_book_state_header;
 // mod perp_account;
 // mod perp_market;

@@ -14,4 +14,6 @@ pub enum MangoError {
     InvalidMarginTradeTargetCpiProgram,
     #[msg("")]
     HealthMustBePositive,
+    #[msg("")]
+    UpdateTooSoon,
 }
