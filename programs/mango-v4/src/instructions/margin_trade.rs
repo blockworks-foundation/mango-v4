@@ -176,9 +176,9 @@ fn adjust_for_post_cpi_amounts(
 
             // user has either withdrawn or deposited
             if *pre_cpi_amount > vault.amount {
-                bank.withdraw(&mut position, pre_cpi_amount - vault.amount);
+                bank.withdraw(&mut position, pre_cpi_amount - vault.amount)?;
             } else {
-                bank.deposit(&mut position, vault.amount - pre_cpi_amount);
+                bank.deposit(&mut position, vault.amount - pre_cpi_amount)?;
             }
         }
     }

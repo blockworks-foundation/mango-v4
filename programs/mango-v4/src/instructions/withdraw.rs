@@ -85,7 +85,7 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
         );
 
         // Update the bank and position
-        let position_is_active = bank.withdraw(position, amount);
+        let position_is_active = bank.withdraw(position, amount)?;
 
         // Transfer the actual tokens
         let group_seeds = group_seeds!(group);
