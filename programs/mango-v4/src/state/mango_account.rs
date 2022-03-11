@@ -5,6 +5,7 @@ use crate::error::*;
 use crate::state::*;
 
 const MAX_INDEXED_POSITIONS: usize = 32;
+const MAX_SERUM_OPEN_ORDERS: usize = 16;
 
 #[zero_copy]
 pub struct IndexedPosition {
@@ -97,6 +98,68 @@ impl IndexedPositions {
     }
 }
 
+#[zero_copy]
+pub struct SerumOpenOrders {
+    pub open_orders: Pubkey,
+
+    pub market_index: SerumMarketIndex,
+}
+// TODO: static assert the size and alignment
+
+impl SerumOpenOrders {
+    pub fn is_active(&self) -> bool {
+        self.market_index != SerumMarketIndex::MAX
+    }
+
+    pub fn is_active_for_market(&self, market_index: SerumMarketIndex) -> bool {
+        self.market_index == market_index
+    }
+}
+
+#[zero_copy]
+pub struct SerumOpenOrdersMap {
+    pub values: [SerumOpenOrders; MAX_SERUM_OPEN_ORDERS],
+}
+
+impl SerumOpenOrdersMap {
+    pub fn new() -> Self {
+        Self {
+            values: [SerumOpenOrders {
+                open_orders: Pubkey::default(),
+                market_index: SerumMarketIndex::MAX,
+            }; MAX_SERUM_OPEN_ORDERS],
+        }
+    }
+
+    pub fn create(&mut self, market_index: SerumMarketIndex) -> Result<&mut SerumOpenOrders> {
+        if self
+            .values
+            .iter()
+            .find(|p| p.is_active_for_market(market_index))
+            .is_some()
+        {
+            return err!(MangoError::SomeError); // exists already
+        }
+        if let Some(v) = self.values.iter_mut().find(|p| !p.is_active()) {
+            *v = SerumOpenOrders {
+                open_orders: Pubkey::default(),
+                market_index: market_index as SerumMarketIndex,
+            };
+            Ok(v)
+        } else {
+            err!(MangoError::SomeError) // no space
+        }
+    }
+
+    pub fn deactivate(&mut self, index: usize) {
+        self.values[index].market_index = SerumMarketIndex::MAX;
+    }
+
+    pub fn iter_active(&self) -> impl Iterator<Item = &SerumOpenOrders> {
+        self.values.iter().filter(|p| p.is_active())
+    }
+}
+
 #[account(zero_copy)]
 pub struct MangoAccount {
     pub group: Pubkey,
@@ -107,8 +170,9 @@ pub struct MangoAccount {
 
     // pub in_margin_basket: [bool; MAX_PAIRS],
     // pub num_in_margin_basket: u8,
-    // TODO: this should be a separate struct for convenient use, like Group::tokens
     pub indexed_positions: IndexedPositions,
+
+    pub serum_open_orders_map: SerumOpenOrdersMap,
 
     // pub spot_open_orders: [Pubkey; MAX_PAIRS],
     // pub perp_accounts: [PerpAccount; MAX_PAIRS],

@@ -27,11 +27,18 @@ pub struct CreateAccount<'info> {
 
 pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()> {
     let mut account = ctx.accounts.account.load_init()?;
-    account.group = ctx.accounts.group.key();
-    account.owner = ctx.accounts.owner.key();
-    account.account_num = account_num;
-    account.indexed_positions = IndexedPositions::new();
-    account.bump = *ctx.bumps.get("account").ok_or(MangoError::SomeError)?;
+    *account = MangoAccount {
+        group: ctx.accounts.group.key(),
+        owner: ctx.accounts.owner.key(),
+        delegate: Pubkey::default(),
+        indexed_positions: IndexedPositions::new(),
+        serum_open_orders_map: SerumOpenOrdersMap::new(),
+        being_liquidated: false,
+        is_bankrupt: false,
+        account_num,
+        bump: *ctx.bumps.get("account").ok_or(MangoError::SomeError)?,
+        reserved: [0; 5],
+    };
 
     Ok(())
 }

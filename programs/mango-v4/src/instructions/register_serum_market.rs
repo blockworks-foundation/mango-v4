@@ -45,7 +45,7 @@ pub fn register_serum_market(
         group: ctx.accounts.group.key(),
         serum_program: ctx.accounts.serum_program.key(),
         serum_market_external: ctx.accounts.serum_market_external.key(),
-        index: 0, // TODO: likely globally tracked in the group?
+        market_index: 0, // TODO: likely globally tracked in the group?
         base_token_index,
         quote_token_index,
         bump: *ctx.bumps.get("serum_market").ok_or(MangoError::SomeError)?,

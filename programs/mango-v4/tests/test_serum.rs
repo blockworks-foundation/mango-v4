@@ -4,6 +4,7 @@ use solana_program::pubkey::Pubkey;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, transport::TransportError};
 
+use mango_v4::state::*;
 use program_test::*;
 
 mod program_test;
@@ -119,7 +120,7 @@ async fn test_serum() -> Result<(), TransportError> {
     //
     // TEST: Create an open orders account
     //
-    send_tx(
+    let open_orders = send_tx(
         solana,
         CreateSerumOpenOrdersInstruction {
             account,
@@ -129,7 +130,18 @@ async fn test_serum() -> Result<(), TransportError> {
         },
     )
     .await
-    .unwrap();
+    .unwrap()
+    .open_orders;
+
+    let account_data: MangoAccount = solana.get_account(account).await;
+    assert_eq!(
+        account_data
+            .serum_open_orders_map
+            .iter_active()
+            .map(|v| (v.open_orders, v.market_index))
+            .collect::<Vec<_>>(),
+        [(open_orders, 0)]
+    );
 
     Ok(())
 }

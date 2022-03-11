@@ -65,5 +65,11 @@ pub fn create_serum_open_orders(ctx: Context<CreateSerumOpenOrders>) -> Result<(
     //       necessary.
     dex::init_open_orders(context.with_signer(&[seeds]))?;
 
+    let mut account = ctx.accounts.account.load_mut()?;
+    let oos = account
+        .serum_open_orders_map
+        .create(serum_market.market_index)?;
+    oos.open_orders = ctx.accounts.open_orders.key();
+
     Ok(())
 }
