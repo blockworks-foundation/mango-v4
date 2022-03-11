@@ -20,7 +20,6 @@ pub struct CreateGroup<'info> {
     pub payer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
-    pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn create_group(ctx: Context<CreateGroup>) -> Result<()> {

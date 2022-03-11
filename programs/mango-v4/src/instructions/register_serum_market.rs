@@ -29,7 +29,6 @@ pub struct RegisterSerumMarket<'info> {
     pub payer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
-    pub rent: Sysvar<'info, Rent>,
 }
 
 // TODO: should this be "configure_serum_market", which allows reconfiguring?

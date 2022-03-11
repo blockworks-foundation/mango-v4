@@ -23,7 +23,6 @@ pub struct CreateAccount<'info> {
     pub payer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
-    pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()> {

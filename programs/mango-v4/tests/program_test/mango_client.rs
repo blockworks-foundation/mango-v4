@@ -545,7 +545,6 @@ impl<'keypair> ClientInstruction for CreateGroupInstruction<'keypair> {
             admin: self.admin.pubkey(),
             payer: self.payer.pubkey(),
             system_program: System::id(),
-            rent: sysvar::rent::Rent::id(),
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);
@@ -594,7 +593,6 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
             account,
             payer: self.payer.pubkey(),
             system_program: System::id(),
-            rent: sysvar::rent::Rent::id(),
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);
@@ -649,7 +647,6 @@ impl<'keypair> ClientInstruction for RegisterSerumMarketInstruction<'keypair> {
             serum_market,
             payer: self.payer.pubkey(),
             system_program: System::id(),
-            rent: sysvar::rent::Rent::id(),
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);
