@@ -14,6 +14,8 @@ pub mod error;
 pub mod instructions;
 pub mod state;
 
+use state::TokenIndex;
+
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
 #[program]
@@ -73,6 +75,18 @@ pub mod mango_v4 {
         cpi_data: Vec<u8>,
     ) -> Result<()> {
         instructions::margin_trade(ctx, banks_len, cpi_data)
+    }
+
+    pub fn register_serum_market(
+        ctx: Context<RegisterSerumMarket>,
+        base_token_index: TokenIndex,
+        quote_token_index: TokenIndex,
+    ) -> Result<()> {
+        instructions::register_serum_market(ctx, base_token_index, quote_token_index)
+    }
+
+    pub fn create_serum_open_orders(ctx: Context<CreateSerumOpenOrders>) -> Result<()> {
+        instructions::create_serum_open_orders(ctx)
     }
 }
 
