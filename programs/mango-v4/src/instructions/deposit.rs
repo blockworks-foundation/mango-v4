@@ -61,7 +61,7 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     // Update the bank and position
     let position_is_active = {
         let mut bank = ctx.accounts.bank.load_mut()?;
-        bank.deposit(position, amount)
+        bank.deposit(position, amount)?
     };
 
     // Transfer the actual tokens

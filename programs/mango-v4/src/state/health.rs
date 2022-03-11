@@ -5,6 +5,7 @@ use pyth_client::load_price;
 use crate::error::MangoError;
 use crate::state::{determine_oracle_type, Bank, MangoAccount, OracleType, StubOracle};
 use crate::util;
+use crate::util::checked_math as cm;
 
 pub fn compute_health(account: &MangoAccount, ais: &[AccountInfo]) -> Result<I80F48> {
     let active_len = account.indexed_positions.iter_active().count();
@@ -58,15 +59,16 @@ fn compute_health_detail(
             }
         };
 
-        let native_basis = position.native(&bank) * price;
+        let native_position = position.native(&bank);
+        let native_basis = cm!(native_position * price);
         if native_basis.is_positive() {
-            assets += bank.init_asset_weight * native_basis;
+            assets = cm!(assets + bank.init_asset_weight * native_basis);
         } else {
-            liabilities -= bank.init_liab_weight * native_basis;
+            liabilities = cm!(liabilities - bank.init_liab_weight * native_basis);
         }
     }
 
     // TODO: Serum open orders
 
-    Ok(assets - liabilities)
+    Ok(cm!(assets - liabilities))
 }
