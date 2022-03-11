@@ -697,6 +697,7 @@ impl<'keypair> ClientInstruction for CreateSerumOpenOrdersInstruction<'keypair> 
             owner: self.owner.pubkey(),
             payer: self.payer.pubkey(),
             system_program: System::id(),
+            rent: sysvar::rent::Rent::id(),
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);

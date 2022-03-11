@@ -12,11 +12,13 @@ use spl_token::{state::*, *};
 
 pub use cookies::*;
 pub use mango_client::*;
+pub use serum::*;
 pub use solana::*;
 pub use utils::*;
 
 pub mod cookies;
 pub mod mango_client;
+pub mod serum;
 pub mod solana;
 pub mod utils;
 
@@ -75,6 +77,7 @@ pub struct TestContext {
     pub mints: Vec<MintCookie>,
     pub users: Vec<UserCookie>,
     pub quote_index: usize,
+    pub serum: Arc<SerumCookie>,
 }
 
 impl TestContext {
@@ -89,6 +92,9 @@ impl TestContext {
         } else {
             ProgramTest::new("mango_v4", mango_v4::id(), processor!(mango_v4::entry))
         };
+
+        let serum_program_id = anchor_spl::dex::id();
+        test.add_program("serum_dex", serum_program_id, None);
 
         // We need to intercept logs to capture program log output
         let log_filter = "solana_rbpf=trace,\
@@ -235,11 +241,17 @@ impl TestContext {
             program_log: program_log_capture.clone(),
         });
 
+        let serum = Arc::new(SerumCookie {
+            solana: solana.clone(),
+            program_id: serum_program_id,
+        });
+
         TestContext {
             solana: solana.clone(),
             mints,
             users,
             quote_index,
+            serum,
         }
     }
 }

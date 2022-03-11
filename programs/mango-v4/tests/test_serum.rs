@@ -1,14 +1,9 @@
 #![cfg(feature = "test-bpf")]
 
-use anchor_lang::InstructionData;
-use fixed::types::I80F48;
 use solana_program::pubkey::Pubkey;
 use solana_program_test::*;
-use solana_sdk::signature::Signer;
 use solana_sdk::{signature::Keypair, transport::TransportError};
-use std::str::FromStr;
 
-use mango_v4::state::*;
 use program_test::*;
 
 mod program_test;
@@ -23,7 +18,11 @@ async fn test_serum() -> Result<(), TransportError> {
     let payer = &context.users[1].key;
     let mint0 = &context.mints[0];
     let mint1 = &context.mints[1];
-    let payer_mint0_account = context.users[1].token_accounts[0];
+
+    //
+    // SETUP: Create serum market
+    //
+    let serum_market_cookie = context.serum.list_spot_market(mint0, mint1).await;
 
     //
     // SETUP: Create a group and an account
@@ -95,8 +94,8 @@ async fn test_serum() -> Result<(), TransportError> {
     };
 
     let address_lookup_table = solana.create_address_lookup_table(admin, payer).await;
-    let (oracle0, bank0) = register_mint(mint0.clone(), address_lookup_table).await;
-    let (oracle1, bank1) = register_mint(mint1.clone(), address_lookup_table).await;
+    let (_oracle0, _bank0) = register_mint(mint0.clone(), address_lookup_table).await;
+    let (_oracle1, _bank1) = register_mint(mint1.clone(), address_lookup_table).await;
 
     //
     // TEST: Register a serum market
@@ -106,8 +105,8 @@ async fn test_serum() -> Result<(), TransportError> {
         RegisterSerumMarketInstruction {
             group,
             admin,
-            serum_program: Pubkey::default(),
-            serum_market_external: Pubkey::default(),
+            serum_program: context.serum.program_id,
+            serum_market_external: serum_market_cookie.market,
             base_token_index: 0, // TODO: better way of getting these numbers
             quote_token_index: 1,
             payer,

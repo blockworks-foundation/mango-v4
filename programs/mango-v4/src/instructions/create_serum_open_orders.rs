@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_spl::dex;
 
 use crate::state::*;
 
@@ -31,6 +32,7 @@ pub struct CreateSerumOpenOrders<'info> {
         seeds = [account.key().as_ref(), b"serumoo".as_ref(), serum_market.key().as_ref()],
         bump,
         payer = payer,
+        owner = serum_program.key(),
         // 12 is the padding serum uses for accounts ("serum" prefix, "padding" postfix)
         space = 12 + std::mem::size_of::<serum_dex::state::OpenOrders>(),
     )]
@@ -42,10 +44,26 @@ pub struct CreateSerumOpenOrders<'info> {
     pub payer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn create_serum_open_orders(_ctx: Context<CreateSerumOpenOrders>) -> Result<()> {
-    // TODO: Call serum_dex::instruction::MarketInstruction::InitOpenOrders
+pub fn create_serum_open_orders(ctx: Context<CreateSerumOpenOrders>) -> Result<()> {
+    let serum_market = ctx.accounts.serum_market.load()?;
+    let context = CpiContext::new(
+        ctx.accounts.serum_program.to_account_info(),
+        dex::InitOpenOrders {
+            open_orders: ctx.accounts.open_orders.to_account_info(),
+            // TODO: Should the authority be the account or the market account or the group?
+            authority: ctx.accounts.serum_market.to_account_info(),
+            market: ctx.accounts.serum_market_external.to_account_info(),
+            rent: ctx.accounts.rent.to_account_info(),
+        },
+    );
+    let seeds = serum_market_seeds!(serum_market);
+    // TODO: Anchor's code _forces_ anchor_spl::dex::id() as a program id.
+    //       Are we ok with that? that would mean storing serum_program is not
+    //       necessary.
+    dex::init_open_orders(context.with_signer(&[seeds]))?;
 
     Ok(())
 }

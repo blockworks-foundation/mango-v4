@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+use crate::error::MangoError;
 use crate::state::*;
 
 #[derive(Accounts)]
@@ -47,6 +48,7 @@ pub fn register_serum_market(
         index: 0, // TODO: likely globally tracked in the group?
         base_token_index,
         quote_token_index,
+        bump: *ctx.bumps.get("serum_market").ok_or(MangoError::SomeError)?,
     };
 
     Ok(())
