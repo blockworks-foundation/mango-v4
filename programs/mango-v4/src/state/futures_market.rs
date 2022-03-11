@@ -1,10 +1,10 @@
 use crate::error::MangoError;
-use crate::util::ONE_I80F48;
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
 use anchor_lang::prelude::*;
 
+#[account(zero_copy)]
 pub struct FuturesMarket {
     pub mango_group: Pubkey,
     pub bids: Pubkey,
@@ -32,40 +32,24 @@ pub struct FuturesMarkPrice {
     pub asks: Pubkey,
 
     /// The ema update parameter. Typically 2 / (n + 1) where n is number of periods
-    alpha: I80F48,
+    pub alpha: I80F48,
 
     /// Exponential moving average of the basis;
-    /// UNIT: decimal
-    basis_ema: I80F48,
+    /// UNIT: number
+    pub basis_ema: I80F48,
 
     /// timestamp of last update
-    last_update: u64,
+    pub last_update: u64,
 
-    update_min_interval: u64,
+    pub update_min_interval: u64,
 
     /// The mark price as of the last update.
     /// index * (1 + ema(basis))
     /// UNIT: native quote units per one native base
-    price: I80F48,
+    pub price: I80F48,
 }
 
 impl FuturesMarkPrice {
-    /// May only be called once immediately after `load_init()`
-    pub fn init(
-        &mut self,
-        futures_market: &Pubkey,
-        bids: &Pubkey,
-        asks: &Pubkey,
-        alpha: I80F48,
-        update_min_interval: u64,
-    ) {
-        self.futures_market = *futures_market;
-        self.bids = *bids;
-        self.asks = *asks;
-        self.alpha = alpha;
-        self.update_min_interval = update_min_interval;
-    }
-
     /// Update the basis ema and store
     /// TODO: `bid` and `ask` are temp until the order book is built.
     pub fn update_mark_price(
@@ -82,9 +66,9 @@ impl FuturesMarkPrice {
 
         // TODO make alpha a function of time between last update
         let mid = (bid + ask) / I80F48!(2);
-        let basis = mid / index - ONE_I80F48;
-        self.basis_ema = self.alpha * basis + (ONE_I80F48 - self.alpha) * self.basis_ema;
-        self.price = index * (ONE_I80F48 + self.basis_ema);
+        let basis = mid / index - I80F48::ONE;
+        self.basis_ema = self.alpha * basis + (I80F48::ONE - self.alpha) * self.basis_ema;
+        self.price = index * (I80F48::ONE + self.basis_ema);
         self.last_update = now_ts;
         Ok(())
     }

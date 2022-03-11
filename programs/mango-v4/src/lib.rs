@@ -4,7 +4,6 @@ use fixed::types::I80F48;
 pub mod util;
 
 extern crate static_assertions;
-extern crate core;
 
 use anchor_lang::prelude::*;
 
