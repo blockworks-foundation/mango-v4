@@ -79,7 +79,7 @@ export type MangoV4 = {
               {
                 "kind": "const",
                 "type": "string",
-                "value": "tokenbank"
+                "value": "TokenBank"
               },
               {
                 "kind": "account",
@@ -104,7 +104,7 @@ export type MangoV4 = {
               {
                 "kind": "const",
                 "type": "string",
-                "value": "tokenvault"
+                "value": "TokenVault"
               },
               {
                 "kind": "account",
@@ -235,7 +235,7 @@ export type MangoV4 = {
               {
                 "kind": "const",
                 "type": "string",
-                "value": "tokenbank"
+                "value": "TokenBank"
               },
               {
                 "kind": "account",
@@ -260,7 +260,7 @@ export type MangoV4 = {
               {
                 "kind": "const",
                 "type": "string",
-                "value": "tokenvault"
+                "value": "TokenVault"
               },
               {
                 "kind": "account",
@@ -358,7 +358,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "tokenBank",
+      "name": "TokenBank",
       "type": {
         "kind": "struct",
         "fields": [
@@ -573,7 +573,7 @@ export const IDL: MangoV4 = {
               {
                 "kind": "const",
                 "type": "string",
-                "value": "tokenbank"
+                "value": "TokenBank"
               },
               {
                 "kind": "account",
@@ -598,7 +598,7 @@ export const IDL: MangoV4 = {
               {
                 "kind": "const",
                 "type": "string",
-                "value": "tokenvault"
+                "value": "TokenVault"
               },
               {
                 "kind": "account",
@@ -729,7 +729,7 @@ export const IDL: MangoV4 = {
               {
                 "kind": "const",
                 "type": "string",
-                "value": "tokenbank"
+                "value": "TokenBank"
               },
               {
                 "kind": "account",
@@ -754,7 +754,7 @@ export const IDL: MangoV4 = {
               {
                 "kind": "const",
                 "type": "string",
-                "value": "tokenvault"
+                "value": "TokenVault"
               },
               {
                 "kind": "account",
@@ -852,7 +852,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "tokenBank",
+      "name": "TokenBank",
       "type": {
         "kind": "struct",
         "fields": [

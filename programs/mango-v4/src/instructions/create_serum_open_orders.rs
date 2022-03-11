@@ -29,7 +29,7 @@ pub struct CreateSerumOpenOrders<'info> {
     // initialized by this instruction via cpi to serum
     #[account(
         init,
-        seeds = [account.key().as_ref(), b"serumoo".as_ref(), serum_market.key().as_ref()],
+        seeds = [account.key().as_ref(), b"SerumOO".as_ref(), serum_market.key().as_ref()],
         bump,
         payer = payer,
         owner = serum_program.key(),

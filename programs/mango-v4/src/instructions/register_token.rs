@@ -24,7 +24,7 @@ pub struct RegisterToken<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"tokenbank".as_ref(), mint.key().as_ref()],
+        seeds = [group.key().as_ref(), b"TokenBank".as_ref(), mint.key().as_ref()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<Bank>(),
@@ -33,7 +33,7 @@ pub struct RegisterToken<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"tokenvault".as_ref(), mint.key().as_ref()],
+        seeds = [group.key().as_ref(), b"TokenVault".as_ref(), mint.key().as_ref()],
         bump,
         token::authority = group,
         token::mint = mint,
@@ -43,7 +43,7 @@ pub struct RegisterToken<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"mintinfo".as_ref(), mint.key().as_ref()],
+        seeds = [group.key().as_ref(), b"MintInfo".as_ref(), mint.key().as_ref()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<MintInfo>(),

@@ -71,7 +71,7 @@ async fn get_mint_info(
     mint: Pubkey,
 ) -> MintInfo {
     let mint_info_pk = Pubkey::find_program_address(
-        &[account.group.as_ref(), b"mintinfo".as_ref(), mint.as_ref()],
+        &[account.group.as_ref(), b"MintInfo".as_ref(), mint.as_ref()],
         &mango_v4::id(),
     )
     .0;
@@ -238,7 +238,7 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         let bank = Pubkey::find_program_address(
             &[
                 account.group.as_ref(),
-                b"tokenbank".as_ref(),
+                b"TokenBank".as_ref(),
                 token_account.mint.as_ref(),
             ],
             &program_id,
@@ -247,7 +247,7 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         let vault = Pubkey::find_program_address(
             &[
                 account.group.as_ref(),
-                b"tokenvault".as_ref(),
+                b"TokenVault".as_ref(),
                 token_account.mint.as_ref(),
             ],
             &program_id,
@@ -310,7 +310,7 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
         let bank = Pubkey::find_program_address(
             &[
                 account.group.as_ref(),
-                b"tokenbank".as_ref(),
+                b"TokenBank".as_ref(),
                 token_account.mint.as_ref(),
             ],
             &program_id,
@@ -319,7 +319,7 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
         let vault = Pubkey::find_program_address(
             &[
                 account.group.as_ref(),
-                b"tokenvault".as_ref(),
+                b"TokenVault".as_ref(),
                 token_account.mint.as_ref(),
             ],
             &program_id,
@@ -388,7 +388,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
         let bank = Pubkey::find_program_address(
             &[
                 self.group.as_ref(),
-                b"tokenbank".as_ref(),
+                b"TokenBank".as_ref(),
                 self.mint.as_ref(),
             ],
             &program_id,
@@ -397,7 +397,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
         let vault = Pubkey::find_program_address(
             &[
                 self.group.as_ref(),
-                b"tokenvault".as_ref(),
+                b"TokenVault".as_ref(),
                 self.mint.as_ref(),
             ],
             &program_id,
@@ -406,7 +406,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
         let mint_info = Pubkey::find_program_address(
             &[
                 self.group.as_ref(),
-                b"mintinfo".as_ref(),
+                b"MintInfo".as_ref(),
                 self.mint.as_ref(),
             ],
             &program_id,
@@ -680,7 +680,7 @@ impl<'keypair> ClientInstruction for CreateSerumOpenOrdersInstruction<'keypair> 
         let open_orders = Pubkey::find_program_address(
             &[
                 self.account.as_ref(),
-                b"serumoo".as_ref(),
+                b"SerumOO".as_ref(),
                 self.serum_market.as_ref(),
             ],
             &program_id,

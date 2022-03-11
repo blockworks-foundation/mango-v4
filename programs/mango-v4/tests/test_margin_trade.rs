@@ -21,7 +21,7 @@ async fn test_margin_trade() -> Result<(), TransportError> {
         Pubkey::from_str("J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix").unwrap();
     let margin_trade_token_account = Keypair::new();
     let (mtta_owner, mtta_bump_seeds) =
-        Pubkey::find_program_address(&[b"margintrade"], &margin_trade_program_id);
+        Pubkey::find_program_address(&[b"MarginTrade"], &margin_trade_program_id);
     let context = TestContext::new(
         Option::None,
         Some(&margin_trade_program_id),

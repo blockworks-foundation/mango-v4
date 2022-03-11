@@ -28,7 +28,7 @@ pub mod margin_trade {
             amount_to,
             ctx.accounts.deposit_account.mint
         );
-        let seeds = &[b"margintrade".as_ref(), &[deposit_account_owner_bump_seeds]];
+        let seeds = &[b"MarginTrade".as_ref(), &[deposit_account_owner_bump_seeds]];
         token::transfer(
             ctx.accounts
                 .transfer_back_to_mango_vault_ctx()
