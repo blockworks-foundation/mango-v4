@@ -26,13 +26,26 @@ async fn test_serum() -> Result<(), TransportError> {
     let payer_mint0_account = context.users[1].token_accounts[0];
 
     //
-    // SETUP: Create a group
+    // SETUP: Create a group and an account
     //
 
     let group = send_tx(solana, CreateGroupInstruction { admin, payer })
         .await
         .unwrap()
         .group;
+
+    let account = send_tx(
+        solana,
+        CreateAccountInstruction {
+            account_num: 0,
+            group,
+            owner,
+            payer,
+        },
+    )
+    .await
+    .unwrap()
+    .account;
 
     //
     // SETUP: Register mints (and make oracles for them)
@@ -88,7 +101,7 @@ async fn test_serum() -> Result<(), TransportError> {
     //
     // TEST: Register a serum market
     //
-    send_tx(
+    let serum_market = send_tx(
         solana,
         RegisterSerumMarketInstruction {
             group,
@@ -97,6 +110,22 @@ async fn test_serum() -> Result<(), TransportError> {
             serum_market_external: Pubkey::default(),
             base_token_index: 0, // TODO: better way of getting these numbers
             quote_token_index: 1,
+            payer,
+        },
+    )
+    .await
+    .unwrap()
+    .serum_market;
+
+    //
+    // TEST: Create an open orders account
+    //
+    send_tx(
+        solana,
+        CreateSerumOpenOrdersInstruction {
+            account,
+            serum_market,
+            owner,
             payer,
         },
     )
