@@ -605,3 +605,58 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
         vec![self.owner, self.payer]
     }
 }
+
+pub struct RegisterSerumMarketInstruction<'keypair> {
+    pub group: Pubkey,
+    pub admin: &'keypair Keypair,
+    pub payer: &'keypair Keypair,
+
+    pub serum_program: Pubkey,
+    pub serum_market_external: Pubkey,
+
+    pub base_token_index: TokenIndex,
+    pub quote_token_index: TokenIndex,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for RegisterSerumMarketInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::RegisterSerumMarket;
+    type Instruction = mango_v4::instruction::RegisterSerumMarket;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            base_token_index: self.base_token_index,
+            quote_token_index: self.quote_token_index,
+        };
+
+        let serum_market = Pubkey::find_program_address(
+            &[
+                self.group.as_ref(),
+                b"serum".as_ref(),
+                self.serum_market_external.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            serum_program: self.serum_program,
+            serum_market_external: self.serum_market_external,
+            serum_market,
+            payer: self.payer.pubkey(),
+            system_program: System::id(),
+            rent: sysvar::rent::Rent::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.admin, self.payer]
+    }
+}
