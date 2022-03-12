@@ -100,16 +100,7 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
     //
     // Health check
     //
-    let active_len = account.indexed_positions.iter_active().count();
-    require!(
-        ctx.remaining_accounts.len() == active_len * 2, // banks + oracles
-        MangoError::SomeError
-    );
-
-    let banks = &ctx.remaining_accounts[0..active_len];
-    let oracles = &ctx.remaining_accounts[active_len..active_len * 2];
-
-    let health = compute_health(&mut account, &banks, &oracles)?;
+    let health = compute_health(&account, &ctx.remaining_accounts)?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::SomeError);
 

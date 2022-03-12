@@ -1,5 +1,3 @@
-use std::cell::RefMut;
-
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 use pyth_client::load_price;
@@ -8,8 +6,21 @@ use crate::error::MangoError;
 use crate::state::{determine_oracle_type, Bank, MangoAccount, OracleType, StubOracle};
 use crate::util;
 
-pub fn compute_health(
-    account: &RefMut<MangoAccount>,
+pub fn compute_health(account: &MangoAccount, ais: &[AccountInfo]) -> Result<I80F48> {
+    let active_len = account.indexed_positions.iter_active().count();
+    require!(
+        ais.len() == active_len * 2, // banks + oracles
+        MangoError::SomeError
+    );
+
+    let banks = &ais[0..active_len];
+    let oracles = &ais[active_len..active_len * 2];
+
+    compute_health_detail(account, banks, oracles)
+}
+
+fn compute_health_detail(
+    account: &MangoAccount,
     banks: &[AccountInfo],
     oracles: &[AccountInfo],
 ) -> Result<I80F48> {

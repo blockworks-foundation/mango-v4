@@ -3,6 +3,7 @@ use anchor_spl::dex;
 use anchor_spl::token::{Token, TokenAccount};
 use dex::serum_dex;
 
+use crate::error::*;
 use crate::state::*;
 
 #[derive(Accounts)]
@@ -98,7 +99,11 @@ pub fn place_serum_order(
         order.limit,
     )?;
 
-    // TODO: health check
+    // Health check
+    let account = ctx.accounts.account.load()?;
+    let health = compute_health(&account, &ctx.remaining_accounts)?;
+    msg!("health: {}", health);
+    require!(health >= 0, MangoError::SomeError);
 
     Ok(())
 }

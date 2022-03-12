@@ -43,8 +43,9 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     );
 
     // unpack remaining_accounts
+    let health_ais = &ctx.remaining_accounts[0..banks_len * 2];
+    // TODO: This relies on the particular shape of health_ais
     let banks = &ctx.remaining_accounts[0..banks_len];
-    let oracles = &ctx.remaining_accounts[banks_len..banks_len * 2];
     let cpi_program_id = *ctx.remaining_accounts[banks_len * 2].key;
 
     // prepare account for cpi ix
@@ -94,7 +95,7 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     }
 
     // compute pre cpi health
-    let pre_cpi_health = compute_health(&mut account, &banks, &oracles)?;
+    let pre_cpi_health = compute_health(&account, health_ais)?;
     require!(pre_cpi_health > 0, MangoError::HealthMustBePositive);
     msg!("pre_cpi_health {:?}", pre_cpi_health);
 
@@ -119,7 +120,7 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     // compute post cpi health
     // todo: this is not working, the health is computed on old bank state and not taking into account
     // withdraws done in adjust_for_post_cpi_token_amounts
-    let post_cpi_health = compute_health(&account, &banks, &oracles)?;
+    let post_cpi_health = compute_health(&account, health_ais)?;
     require!(post_cpi_health > 0, MangoError::HealthMustBePositive);
     msg!("post_cpi_health {:?}", post_cpi_health);
 

@@ -3,7 +3,6 @@ use anchor_spl::token;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 
-use crate::error::*;
 use crate::state::*;
 
 #[derive(Accounts)]
@@ -73,16 +72,7 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     // TODO: This will be used to disable is_bankrupt or being_liquidated
     //       when health recovers sufficiently
     //
-    let active_len = account.indexed_positions.iter_active().count();
-    require!(
-        ctx.remaining_accounts.len() == active_len * 2, // banks + oracles
-        MangoError::SomeError
-    );
-
-    let banks = &ctx.remaining_accounts[0..active_len];
-    let oracles = &ctx.remaining_accounts[active_len..active_len * 2];
-
-    let health = compute_health(&mut account, &banks, &oracles)?;
+    let health = compute_health(&account, &ctx.remaining_accounts)?;
     msg!("health: {}", health);
 
     //
