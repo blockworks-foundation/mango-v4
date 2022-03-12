@@ -54,5 +54,8 @@ pub fn compute_health(
             liabilities -= bank.init_liab_weight * native_basis;
         }
     }
+
+    // TODO: Serum open orders
+
     Ok(assets - liabilities)
 }

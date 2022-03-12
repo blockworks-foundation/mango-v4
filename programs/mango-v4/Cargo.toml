@@ -30,7 +30,7 @@ pyth-client = {version = "0.5.0", features = ["no-entrypoint"]}
 serde = "^1.0"
 solana-program = "1.9.5"
 static_assertions = "1.1"
-serum_dex = { version = "0.4.0", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false, features = ["no-entrypoint", "program"] }
+#serum_dex = { version = "0.4.0", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false, features = ["no-entrypoint", "program"] }
 
 
 [dev-dependencies]
