@@ -7,7 +7,7 @@ use crate::state::*;
 pub struct CreateGroup<'info> {
     #[account(
         init,
-        seeds = [b"group".as_ref(), admin.key().as_ref()],
+        seeds = [b"Group".as_ref(), admin.key().as_ref()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<Group>(),

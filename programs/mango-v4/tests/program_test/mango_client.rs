@@ -86,7 +86,7 @@ async fn get_mint_info_by_token_index(
     let bank_pk = Pubkey::find_program_address(
         &[
             account.group.as_ref(),
-            b"TokenBank".as_ref(),
+            b"Bank".as_ref(),
             &token_index.to_le_bytes(),
         ],
         &mango_v4::id(),
@@ -387,7 +387,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
         let bank = Pubkey::find_program_address(
             &[
                 self.group.as_ref(),
-                b"TokenBank".as_ref(),
+                b"Bank".as_ref(),
                 &self.token_index.to_le_bytes(),
             ],
             &program_id,
@@ -396,7 +396,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
         let vault = Pubkey::find_program_address(
             &[
                 self.group.as_ref(),
-                b"TokenVault".as_ref(),
+                b"Vault".as_ref(),
                 &self.token_index.to_le_bytes(),
             ],
             &program_id,
@@ -412,7 +412,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
         )
         .0;
         let oracle = Pubkey::find_program_address(
-            &[b"stub_oracle".as_ref(), self.mint.as_ref()],
+            &[b"StubOracle".as_ref(), self.mint.as_ref()],
             &program_id,
         )
         .0;
@@ -462,7 +462,7 @@ impl<'keypair> ClientInstruction for SetStubOracle<'keypair> {
         };
 
         let oracle = Pubkey::find_program_address(
-            &[b"stub_oracle".as_ref(), self.mint.as_ref()],
+            &[b"StubOracle".as_ref(), self.mint.as_ref()],
             &program_id,
         )
         .0;
@@ -497,7 +497,7 @@ impl<'keypair> ClientInstruction for CreateStubOracle<'keypair> {
         };
 
         let oracle = Pubkey::find_program_address(
-            &[b"stub_oracle".as_ref(), self.mint.as_ref()],
+            &[b"StubOracle".as_ref(), self.mint.as_ref()],
             &program_id,
         )
         .0;
@@ -534,7 +534,7 @@ impl<'keypair> ClientInstruction for CreateGroupInstruction<'keypair> {
         let instruction = Self::Instruction {};
 
         let group = Pubkey::find_program_address(
-            &[b"group".as_ref(), self.admin.pubkey().as_ref()],
+            &[b"Group".as_ref(), self.admin.pubkey().as_ref()],
             &program_id,
         )
         .0;
@@ -578,7 +578,7 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
         let account = Pubkey::find_program_address(
             &[
                 self.group.as_ref(),
-                b"account".as_ref(),
+                b"MangoAccount".as_ref(),
                 self.owner.pubkey().as_ref(),
                 &self.account_num.to_le_bytes(),
             ],
@@ -631,7 +631,7 @@ impl<'keypair> ClientInstruction for RegisterSerumMarketInstruction<'keypair> {
         let serum_market = Pubkey::find_program_address(
             &[
                 self.group.as_ref(),
-                b"serum".as_ref(),
+                b"SerumMarket".as_ref(),
                 self.serum_market_external.as_ref(),
             ],
             &program_id,

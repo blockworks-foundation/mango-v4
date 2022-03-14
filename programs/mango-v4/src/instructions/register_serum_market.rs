@@ -19,7 +19,7 @@ pub struct RegisterSerumMarket<'info> {
     #[account(
         init,
         // TODO: possibly use the market index instead of serum_market in the seed
-        seeds = [group.key().as_ref(), b"serum".as_ref(), serum_market_external.key().as_ref()],
+        seeds = [group.key().as_ref(), b"SerumMarket".as_ref(), serum_market_external.key().as_ref()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<SerumMarket>(),

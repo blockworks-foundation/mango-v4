@@ -39,7 +39,7 @@ pub struct Group {
 #[macro_export]
 macro_rules! group_seeds {
     ( $group:expr ) => {
-        &[b"group".as_ref(), $group.admin.as_ref(), &[$group.bump]]
+        &[b"Group".as_ref(), $group.admin.as_ref(), &[$group.bump]]
     };
 }
 
