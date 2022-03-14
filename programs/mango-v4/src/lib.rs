@@ -89,6 +89,13 @@ pub mod mango_v4 {
     pub fn create_serum_open_orders(ctx: Context<CreateSerumOpenOrders>) -> Result<()> {
         instructions::create_serum_open_orders(ctx)
     }
+
+    pub fn place_serum_order(
+        ctx: Context<PlaceSerumOrder>,
+        order: instructions::NewOrderInstructionData,
+    ) -> Result<()> {
+        instructions::place_serum_order(ctx, order)
+    }
 }
 
 #[derive(Clone)]
