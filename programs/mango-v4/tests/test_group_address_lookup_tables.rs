@@ -5,6 +5,7 @@ use solana_program_test::*;
 use solana_sdk::signature::Keypair;
 
 use mango_v4::address_lookup_table;
+use mango_v4::state::*;
 use program_test::*;
 
 mod program_test;
@@ -51,7 +52,7 @@ async fn test_group_address_lookup_tables() -> Result<()> {
     // SETUP: Register three mints (and make oracles for them)
     //
 
-    let register_mint = |mint: MintCookie, address_lookup_table: Pubkey| async move {
+    let register_mint = |index: TokenIndex, mint: MintCookie, address_lookup_table: Pubkey| async move {
         let create_stub_oracle_accounts = send_tx(
             solana,
             CreateStubOracle {
@@ -75,6 +76,7 @@ async fn test_group_address_lookup_tables() -> Result<()> {
         let register_token_accounts = send_tx(
             solana,
             RegisterTokenInstruction {
+                token_index: index,
                 decimals: mint.decimals,
                 maint_asset_weight: 0.9,
                 init_asset_weight: 0.8,
@@ -100,9 +102,9 @@ async fn test_group_address_lookup_tables() -> Result<()> {
     solana.advance_by_slots(1).await; // to get a different address
     let address_lookup_table2 = solana.create_address_lookup_table(admin, payer).await;
 
-    let (oracle0, bank0) = register_mint(mint0.clone(), address_lookup_table1).await;
-    let (oracle1, bank1) = register_mint(mint1.clone(), address_lookup_table1).await;
-    let (oracle2, bank2) = register_mint(mint2.clone(), address_lookup_table2).await;
+    let (oracle0, bank0) = register_mint(0, mint0.clone(), address_lookup_table1).await;
+    let (oracle1, bank1) = register_mint(1, mint1.clone(), address_lookup_table1).await;
+    let (oracle2, bank2) = register_mint(2, mint2.clone(), address_lookup_table2).await;
 
     // check the resulting address maps
     let data = solana

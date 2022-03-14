@@ -234,30 +234,21 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
         // load accounts, find PDAs, find remainingAccounts
         let token_account: TokenAccount = account_loader.load(&self.token_account).await.unwrap();
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
-
-        let bank = Pubkey::find_program_address(
+        let mint_info = Pubkey::find_program_address(
             &[
                 account.group.as_ref(),
-                b"TokenBank".as_ref(),
+                b"MintInfo".as_ref(),
                 token_account.mint.as_ref(),
             ],
             &program_id,
         )
         .0;
-        let vault = Pubkey::find_program_address(
-            &[
-                account.group.as_ref(),
-                b"TokenVault".as_ref(),
-                token_account.mint.as_ref(),
-            ],
-            &program_id,
-        )
-        .0;
+        let mint_info: MintInfo = account_loader.load(&mint_info).await.unwrap();
 
         let health_check_metas = derive_health_check_remaining_account_metas(
             &account_loader,
             &account,
-            Some(bank),
+            Some(mint_info.bank),
             false,
         )
         .await;
@@ -266,8 +257,8 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
             group: account.group,
             account: self.account,
             owner: self.owner.pubkey(),
-            bank,
-            vault,
+            bank: mint_info.bank,
+            vault: mint_info.vault,
             token_account: self.token_account,
             token_program: Token::id(),
         };
@@ -306,30 +297,21 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
         // load account so we know its mint
         let token_account: TokenAccount = account_loader.load(&self.token_account).await.unwrap();
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
-
-        let bank = Pubkey::find_program_address(
+        let mint_info = Pubkey::find_program_address(
             &[
                 account.group.as_ref(),
-                b"TokenBank".as_ref(),
+                b"MintInfo".as_ref(),
                 token_account.mint.as_ref(),
             ],
             &program_id,
         )
         .0;
-        let vault = Pubkey::find_program_address(
-            &[
-                account.group.as_ref(),
-                b"TokenVault".as_ref(),
-                token_account.mint.as_ref(),
-            ],
-            &program_id,
-        )
-        .0;
+        let mint_info: MintInfo = account_loader.load(&mint_info).await.unwrap();
 
         let health_check_metas = derive_health_check_remaining_account_metas(
             &account_loader,
             &account,
-            Some(bank),
+            Some(mint_info.bank),
             false,
         )
         .await;
@@ -337,8 +319,8 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
         let accounts = Self::Accounts {
             group: account.group,
             account: self.account,
-            bank,
-            vault,
+            bank: mint_info.bank,
+            vault: mint_info.vault,
             token_account: self.token_account,
             token_authority: self.token_authority.pubkey(),
             token_program: Token::id(),
@@ -356,6 +338,7 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
 }
 
 pub struct RegisterTokenInstruction<'keypair> {
+    pub token_index: TokenIndex,
     pub decimals: u8,
     pub maint_asset_weight: f32,
     pub init_asset_weight: f32,
@@ -378,6 +361,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
+            token_index: self.token_index,
             decimals: self.decimals,
             maint_asset_weight: self.maint_asset_weight,
             init_asset_weight: self.init_asset_weight,
@@ -389,7 +373,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
             &[
                 self.group.as_ref(),
                 b"TokenBank".as_ref(),
-                self.mint.as_ref(),
+                &self.token_index.to_le_bytes(),
             ],
             &program_id,
         )
@@ -398,7 +382,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
             &[
                 self.group.as_ref(),
                 b"TokenVault".as_ref(),
-                self.mint.as_ref(),
+                &self.token_index.to_le_bytes(),
             ],
             &program_id,
         )
@@ -708,3 +692,46 @@ impl<'keypair> ClientInstruction for CreateSerumOpenOrdersInstruction<'keypair> 
         vec![self.owner, self.payer]
     }
 }
+
+/*
+pub struct PlaceSerumOrderInstruction<'keypair> {
+    pub account: Pubkey,
+    pub serum_market: Pubkey,
+    pub owner: &'keypair Keypair,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for PlaceSerumOrderInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::PlaceSerumOrder;
+    type Instruction = mango_v4::instruction::PlaceSerumOrder;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let serum_market: SerumMarket = account_loader.load(&self.serum_market).await.unwrap();
+        let open_orders = account.serum_open_orders_map.find(serum_market.market_index).unwrap().open_orders;
+
+        let accounts = Self::Accounts {
+            group: account.group,
+            account: self.account,
+            open_orders,
+            serum_market: self.serum_market,
+            serum_program: serum_market.serum_program,
+            serum_market_external: serum_market.serum_market_external,
+            owner: self.owner.pubkey(),
+            payer: self.payer.pubkey(),
+            system_program: System::id(),
+            rent: sysvar::rent::Rent::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.owner]
+    }
+}*/

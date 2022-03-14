@@ -132,12 +132,7 @@ impl SerumOpenOrdersMap {
     }
 
     pub fn create(&mut self, market_index: SerumMarketIndex) -> Result<&mut SerumOpenOrders> {
-        if self
-            .values
-            .iter()
-            .find(|p| p.is_active_for_market(market_index))
-            .is_some()
-        {
+        if self.find(market_index).is_some() {
             return err!(MangoError::SomeError); // exists already
         }
         if let Some(v) = self.values.iter_mut().find(|p| !p.is_active()) {
@@ -157,6 +152,12 @@ impl SerumOpenOrdersMap {
 
     pub fn iter_active(&self) -> impl Iterator<Item = &SerumOpenOrders> {
         self.values.iter().filter(|p| p.is_active())
+    }
+
+    pub fn find(&self, market_index: SerumMarketIndex) -> Option<&SerumOpenOrders> {
+        self.values
+            .iter()
+            .find(|p| p.is_active_for_market(market_index))
     }
 }
 

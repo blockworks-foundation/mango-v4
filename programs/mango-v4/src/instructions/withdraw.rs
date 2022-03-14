@@ -22,7 +22,8 @@ pub struct Withdraw<'info> {
         mut,
         has_one = group,
         has_one = vault,
-        constraint = bank.load()?.mint == token_account.mint,
+        // the mints of bank/vault/token_account are implicitly the same because
+        // spl::token::transfer succeeds between token_account and vault
     )]
     pub bank: AccountLoader<'info, Bank>,
 
@@ -51,10 +52,10 @@ impl<'info> Withdraw<'info> {
 //       That would save a lot of computation that needs to go into finding the
 //       right index for the mint.
 pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
-    // Find the mint's token index
     let group = ctx.accounts.group.load()?;
-    let mint = ctx.accounts.token_account.mint;
-    let token_index = group.tokens.index_for_mint(&mint)?;
+
+    // Find the mint's token index
+    let token_index = ctx.accounts.bank.load()?.token_index as usize;
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;

@@ -72,6 +72,7 @@ async fn test_basic() -> Result<(), TransportError> {
     let register_token_accounts = send_tx(
         solana,
         RegisterTokenInstruction {
+            token_index: 0,
             decimals: mint0.decimals,
             maint_asset_weight: 0.9,
             init_asset_weight: 0.8,

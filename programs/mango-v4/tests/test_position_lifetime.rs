@@ -65,7 +65,7 @@ async fn test_position_lifetime() -> Result<()> {
 
     let address_lookup_table = solana.create_address_lookup_table(admin, payer).await;
 
-    let register_mint = |mint: MintCookie| async move {
+    let register_mint = |index: TokenIndex, mint: MintCookie| async move {
         let create_stub_oracle_accounts = send_tx(
             solana,
             CreateStubOracle {
@@ -89,6 +89,7 @@ async fn test_position_lifetime() -> Result<()> {
         let register_token_accounts = send_tx(
             solana,
             RegisterTokenInstruction {
+                token_index: index,
                 decimals: mint.decimals,
                 maint_asset_weight: 0.9,
                 init_asset_weight: 0.8,
@@ -107,9 +108,9 @@ async fn test_position_lifetime() -> Result<()> {
 
         (oracle, bank)
     };
-    register_mint(mint0.clone()).await;
-    register_mint(mint1.clone()).await;
-    register_mint(mint2.clone()).await;
+    register_mint(0, mint0.clone()).await;
+    register_mint(1, mint1.clone()).await;
+    register_mint(2, mint2.clone()).await;
 
     //
     // SETUP: Put some tokens into the funding account to allow borrowing

@@ -51,7 +51,7 @@ async fn test_serum() -> Result<(), TransportError> {
     // SETUP: Register mints (and make oracles for them)
     //
 
-    let register_mint = |mint: MintCookie, address_lookup_table: Pubkey| async move {
+    let register_mint = |index: TokenIndex, mint: MintCookie, address_lookup_table: Pubkey| async move {
         let create_stub_oracle_accounts = send_tx(
             solana,
             CreateStubOracle {
@@ -75,6 +75,7 @@ async fn test_serum() -> Result<(), TransportError> {
         let register_token_accounts = send_tx(
             solana,
             RegisterTokenInstruction {
+                token_index: index,
                 decimals: mint.decimals,
                 maint_asset_weight: 0.9,
                 init_asset_weight: 0.8,
@@ -95,8 +96,12 @@ async fn test_serum() -> Result<(), TransportError> {
     };
 
     let address_lookup_table = solana.create_address_lookup_table(admin, payer).await;
-    let (_oracle0, _bank0) = register_mint(mint0.clone(), address_lookup_table).await;
-    let (_oracle1, _bank1) = register_mint(mint1.clone(), address_lookup_table).await;
+    let base_token_index = 0;
+    let (_oracle0, _bank0) =
+        register_mint(base_token_index, mint0.clone(), address_lookup_table).await;
+    let quote_token_index = 1;
+    let (_oracle1, _bank1) =
+        register_mint(quote_token_index, mint1.clone(), address_lookup_table).await;
 
     //
     // TEST: Register a serum market
@@ -108,8 +113,8 @@ async fn test_serum() -> Result<(), TransportError> {
             admin,
             serum_program: context.serum.program_id,
             serum_market_external: serum_market_cookie.market,
-            base_token_index: 0, // TODO: better way of getting these numbers
-            quote_token_index: 1,
+            base_token_index,
+            quote_token_index,
             payer,
         },
     )

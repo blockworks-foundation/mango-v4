@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+use super::TokenIndex;
+
 // This struct describes which address lookup table can be used to pass
 // the accounts that are relevant for this mint. The idea is that clients
 // can load this account to figure out which address maps to use when calling
@@ -11,6 +13,7 @@ pub struct MintInfo {
     pub bank: Pubkey,
     pub vault: Pubkey,
     pub oracle: Pubkey,
+    pub token_index: TokenIndex,
 
     // describe what address map relevant accounts are found on
     pub address_lookup_table: Pubkey,

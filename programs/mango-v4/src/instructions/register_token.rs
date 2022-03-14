@@ -12,6 +12,7 @@ use crate::state::*;
 const INDEX_START: I80F48 = I80F48!(1_000_000);
 
 #[derive(Accounts)]
+#[instruction(token_index: TokenIndex)]
 pub struct RegisterToken<'info> {
     #[account(
         mut,
@@ -24,7 +25,7 @@ pub struct RegisterToken<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"TokenBank".as_ref(), mint.key().as_ref()],
+        seeds = [group.key().as_ref(), b"TokenBank".as_ref(), &token_index.to_le_bytes()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<Bank>(),
@@ -33,7 +34,7 @@ pub struct RegisterToken<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"TokenVault".as_ref(), mint.key().as_ref()],
+        seeds = [group.key().as_ref(), b"TokenVault".as_ref(), &token_index.to_le_bytes()],
         bump,
         token::authority = group,
         token::mint = mint,
@@ -74,6 +75,7 @@ pub struct RegisterToken<'info> {
 // overwriting config as long as the mint account stays the same?
 pub fn register_token(
     ctx: Context<RegisterToken>,
+    token_index: TokenIndex,
     decimals: u8,
     maint_asset_weight: f32,
     init_asset_weight: f32,
@@ -82,15 +84,7 @@ pub fn register_token(
 ) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
     // TODO: Error if mint is already configured (techincally, init of vault will fail)
-    // TOOD: Error type
-    // TODO: Should be a function: Tokens::add() or so
-    let token_index = group
-        .tokens
-        .infos
-        .iter()
-        .position(|ti| !ti.is_valid())
-        .ok_or(MangoError::SomeError)?;
-    group.tokens.infos[token_index] = TokenInfo {
+    group.tokens.infos[token_index as usize] = TokenInfo {
         mint: ctx.accounts.mint.key(),
         decimals,
         bank_bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?, // TODO: error
@@ -113,7 +107,7 @@ pub fn register_token(
         maint_liab_weight: I80F48::from_num(maint_liab_weight),
         init_liab_weight: I80F48::from_num(init_liab_weight),
         dust: I80F48::ZERO,
-        token_index: token_index as TokenIndex,
+        token_index,
     };
 
     let alt_previous_size =
@@ -126,6 +120,7 @@ pub fn register_token(
         vault: ctx.accounts.vault.key(),
         oracle: ctx.accounts.oracle.key(),
         bank: ctx.accounts.bank.key(),
+        token_index,
         address_lookup_table: ctx.accounts.address_lookup_table.key(),
         address_lookup_table_bank_index: alt_previous_size as u8,
         address_lookup_table_oracle_index: alt_previous_size as u8 + 1,
