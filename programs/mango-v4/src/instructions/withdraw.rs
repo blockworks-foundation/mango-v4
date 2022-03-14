@@ -53,9 +53,7 @@ impl<'info> Withdraw<'info> {
 //       right index for the mint.
 pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
     let group = ctx.accounts.group.load()?;
-
-    // Find the mint's token index
-    let token_index = ctx.accounts.bank.load()?.token_index as usize;
+    let token_index = ctx.accounts.bank.load()?.token_index;
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;

@@ -29,7 +29,6 @@ pub mod mango_v4 {
     pub fn register_token(
         ctx: Context<RegisterToken>,
         token_index: TokenIndex,
-        decimals: u8,
         maint_asset_weight: f32,
         init_asset_weight: f32,
         maint_liab_weight: f32,
@@ -38,7 +37,6 @@ pub mod mango_v4 {
         instructions::register_token(
             ctx,
             token_index,
-            decimals,
             maint_asset_weight,
             init_asset_weight,
             maint_liab_weight,

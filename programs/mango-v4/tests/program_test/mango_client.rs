@@ -65,7 +65,7 @@ fn make_instruction(
     }
 }
 
-async fn get_mint_info(
+async fn get_mint_info_by_mint(
     account_loader: &impl ClientAccountLoader,
     account: &MangoAccount,
     mint: Pubkey,
@@ -78,6 +78,24 @@ async fn get_mint_info(
     account_loader.load(&mint_info_pk).await.unwrap()
 }
 
+async fn get_mint_info_by_token_index(
+    account_loader: &impl ClientAccountLoader,
+    account: &MangoAccount,
+    token_index: TokenIndex,
+) -> MintInfo {
+    let bank_pk = Pubkey::find_program_address(
+        &[
+            account.group.as_ref(),
+            b"TokenBank".as_ref(),
+            &token_index.to_le_bytes(),
+        ],
+        &mango_v4::id(),
+    )
+    .0;
+    let bank: Bank = account_loader.load(&bank_pk).await.unwrap();
+    get_mint_info_by_mint(account_loader, account, bank.mint).await
+}
+
 // all the accounts that instructions like deposit/withdraw need to compute account health
 async fn derive_health_check_remaining_account_metas(
     account_loader: &impl ClientAccountLoader,
@@ -85,14 +103,12 @@ async fn derive_health_check_remaining_account_metas(
     affected_bank: Option<Pubkey>,
     writable_banks: bool,
 ) -> Vec<AccountMeta> {
-    let group: Group = account_loader.load(&account.group).await.unwrap();
-
     // figure out all the banks/oracles that need to be passed for the health check
     let mut banks = vec![];
     let mut oracles = vec![];
     for position in account.indexed_positions.iter_active() {
-        let mint_pk = group.tokens.infos[position.token_index as usize].mint;
-        let mint_info = get_mint_info(account_loader, account, mint_pk).await;
+        let mint_info =
+            get_mint_info_by_token_index(account_loader, account, position.token_index).await;
         let lookup_table = account_loader
             .load_bytes(&mint_info.address_lookup_table)
             .await
@@ -362,7 +378,6 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             token_index: self.token_index,
-            decimals: self.decimals,
             maint_asset_weight: self.maint_asset_weight,
             init_asset_weight: self.init_asset_weight,
             maint_liab_weight: self.maint_liab_weight,

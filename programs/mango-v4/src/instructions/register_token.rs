@@ -6,7 +6,6 @@ use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
 use crate::address_lookup_table;
-use crate::error::*;
 use crate::state::*;
 
 const INDEX_START: I80F48 = I80F48!(1_000_000);
@@ -15,7 +14,6 @@ const INDEX_START: I80F48 = I80F48!(1_000_000);
 #[instruction(token_index: TokenIndex)]
 pub struct RegisterToken<'info> {
     #[account(
-        mut,
         has_one = admin,
     )]
     pub group: AccountLoader<'info, Group>,
@@ -76,21 +74,12 @@ pub struct RegisterToken<'info> {
 pub fn register_token(
     ctx: Context<RegisterToken>,
     token_index: TokenIndex,
-    decimals: u8,
     maint_asset_weight: f32,
     init_asset_weight: f32,
     maint_liab_weight: f32,
     init_liab_weight: f32,
 ) -> Result<()> {
-    let mut group = ctx.accounts.group.load_mut()?;
     // TODO: Error if mint is already configured (techincally, init of vault will fail)
-    group.tokens.infos[token_index as usize] = TokenInfo {
-        mint: ctx.accounts.mint.key(),
-        decimals,
-        bank_bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?, // TODO: error
-        vault_bump: *ctx.bumps.get("vault").ok_or(MangoError::SomeError)?, // TODO: error
-        reserved: [0u8; 30],
-    };
 
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {

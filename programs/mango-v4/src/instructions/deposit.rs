@@ -50,7 +50,7 @@ impl<'info> Deposit<'info> {
 //       That would save a lot of computation that needs to go into finding the
 //       right index for the mint.
 pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
-    let token_index = ctx.accounts.bank.load()?.token_index as usize;
+    let token_index = ctx.accounts.bank.load()?.token_index;
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;

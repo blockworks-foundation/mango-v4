@@ -1,49 +1,7 @@
 use anchor_lang::prelude::*;
 
-use crate::error::*;
-
-const MAX_TOKENS: usize = 60;
 // TODO: Assuming we allow up to 65536 different tokens
 pub type TokenIndex = u16;
-
-#[zero_copy] // is repr(packed) still a problem
-pub struct TokenInfo {
-    pub mint: Pubkey,
-    pub decimals: u8,
-    pub bank_bump: u8,
-    pub vault_bump: u8,
-
-    // TODO: store oracle index here?
-    pub reserved: [u8; 30], // TODO: size?
-                            // token's bank account is a PDA
-}
-// TODO: static assert the size and alignment
-
-impl TokenInfo {
-    pub fn is_valid(&self) -> bool {
-        self.mint != Pubkey::default()
-    }
-}
-
-#[zero_copy]
-pub struct Tokens {
-    // TODO: If TokenInfo is 70 bytes, we can have < 142 tokens max due to the 10kb limit
-    // We could make large accounts not be PDAs, hope for resize(), or store tokeninfo itself in a pda?
-    pub infos: [TokenInfo; MAX_TOKENS],
-}
-
-impl Tokens {
-    pub fn info_for_mint<'a>(&'a self, mint: &Pubkey) -> Result<&'a TokenInfo> {
-        Ok(&self.infos[self.index_for_mint(mint)?])
-    }
-
-    pub fn index_for_mint(&self, mint: &Pubkey) -> Result<usize> {
-        self.infos
-            .iter()
-            .position(|ti| ti.mint == *mint)
-            .ok_or_else(|| error!(MangoError::SomeError)) // TODO: no such token err
-    }
-}
 
 // TODO: Should we call this `Group` instead of `Group`? And `Account` instead of `MangoAccount`?
 #[account(zero_copy)]
@@ -54,7 +12,7 @@ pub struct Group {
 
     //pub num_oracles: usize, // incremented every time add_oracle is called
     //pub oracles: [Pubkey; MAX_PAIRS],
-    pub tokens: Tokens,
+
     //pub spot_markets: [SpotMarketInfo; MAX_PAIRS],
     //pub perp_markets: [PerpMarketInfo; MAX_PAIRS],
 

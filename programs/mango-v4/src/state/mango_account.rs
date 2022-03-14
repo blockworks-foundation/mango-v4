@@ -27,8 +27,8 @@ impl IndexedPosition {
         self.token_index != TokenIndex::MAX
     }
 
-    pub fn is_active_for_token(&self, token_index: usize) -> bool {
-        self.token_index as usize == token_index
+    pub fn is_active_for_token(&self, token_index: TokenIndex) -> bool {
+        self.token_index == token_index
     }
 
     pub fn native(&self, bank: &Bank) -> I80F48 {
@@ -55,7 +55,7 @@ impl IndexedPositions {
         }
     }
 
-    pub fn get_mut(&mut self, token_index: usize) -> Result<&mut IndexedPosition> {
+    pub fn get_mut(&mut self, token_index: TokenIndex) -> Result<&mut IndexedPosition> {
         self.values
             .iter_mut()
             .find(|p| p.is_active_for_token(token_index))
@@ -64,7 +64,7 @@ impl IndexedPositions {
 
     pub fn get_mut_or_create(
         &mut self,
-        token_index: usize,
+        token_index: TokenIndex,
     ) -> Result<(&mut IndexedPosition, usize)> {
         // This function looks complex because of lifetimes.
         // Maybe there's a smart way to write it with double iter_mut()
@@ -78,7 +78,7 @@ impl IndexedPositions {
             if let Some(i) = pos {
                 self.values[i] = IndexedPosition {
                     indexed_value: I80F48::ZERO,
-                    token_index: token_index as TokenIndex,
+                    token_index: token_index,
                 };
             }
         }

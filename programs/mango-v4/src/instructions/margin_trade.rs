@@ -4,7 +4,7 @@ use crate::{group_seeds, Mango};
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 use solana_program::instruction::Instruction;
-use std::cell::{Ref, RefMut};
+use std::cell::RefMut;
 
 #[derive(Accounts)]
 pub struct MarginTrade<'info> {
@@ -112,7 +112,6 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
         &ctx,
         &cpi_ais,
         pre_cpi_amounts,
-        group,
         &mut banks.to_vec(),
         &mut account,
     )?;
@@ -145,7 +144,6 @@ fn adjust_for_post_cpi_amounts(
     ctx: &Context<MarginTrade>,
     cpi_ais: &Vec<AccountInfo>,
     pre_cpi_amounts: Vec<u64>,
-    group: Ref<Group>,
     banks: &mut Vec<AccountInfo>,
     account: &mut RefMut<MangoAccount>,
 ) -> Result<()> {
@@ -159,9 +157,6 @@ fn adjust_for_post_cpi_amounts(
     {
         let vault = Account::<TokenAccount>::try_from(token_account).unwrap();
         if vault.owner == ctx.accounts.group.key() {
-            let token_index = group.tokens.index_for_mint(&vault.mint)?;
-            let mut position = *account.indexed_positions.get_mut_or_create(token_index)?.0;
-
             // find bank for token account
             let bank_ai = banks
                 .iter()
@@ -173,6 +168,11 @@ fn adjust_for_post_cpi_amounts(
                 .ok_or(MangoError::SomeError)?; // todo: replace SomeError
             let bank_loader = AccountLoader::<'_, Bank>::try_from(bank_ai)?;
             let mut bank = bank_loader.load_mut()?;
+
+            let mut position = *account
+                .indexed_positions
+                .get_mut_or_create(bank.token_index)?
+                .0;
 
             // user has either withdrawn or deposited
             if *pre_cpi_amount > vault.amount {
