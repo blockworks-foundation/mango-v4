@@ -69,6 +69,10 @@ fn compute_health_detail(
     }
 
     // TODO: Serum open orders
+    // - for each active serum market, pass the OpenOrders in order
+    // - store the base_token_index and quote_token_index in the account, so we don't
+    //   need to also pass SerumMarket
+    // - find the bank and oracle for base and quote, and add appropriately
 
     Ok(cm!(assets - liabilities))
 }

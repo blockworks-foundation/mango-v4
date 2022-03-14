@@ -111,10 +111,8 @@ pub struct PlaceSerumOrder<'info> {
     pub account: AccountLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
-    #[account(
-        mut,
-        //constraint = open_orders in account.spot_open_orders_map
-    )]
+    // Validated inline
+    #[account(mut)]
     pub open_orders: UncheckedAccount<'info>,
 
     #[account(
@@ -123,12 +121,12 @@ pub struct PlaceSerumOrder<'info> {
         has_one = serum_market_external,
     )]
     pub serum_market: AccountLoader<'info, SerumMarket>,
-
-    // TODO: limit?
     pub serum_program: UncheckedAccount<'info>,
     #[account(mut)]
     pub serum_market_external: UncheckedAccount<'info>,
 
+    // These accounts are forwarded directly to the serum cpi call
+    // and are validated there.
     #[account(mut)]
     pub market_bids: UncheckedAccount<'info>,
     #[account(mut)]
@@ -142,11 +140,12 @@ pub struct PlaceSerumOrder<'info> {
     #[account(mut)]
     pub market_quote_vault: UncheckedAccount<'info>,
 
-    // TODO: everything; do we need to pass both, or just payer?
+    // TODO: do we need to pass both, or just payer?
     // TODO: if we potentially settle immediately, they all need to be mut?
     // TODO: Can we reduce the number of accounts by requiring the banks
     // to be in the remainingAccounts (where they need to be anyway, for
-    // health checks)
+    // health checks - but they need to be mut)
+    // Validated inline
     #[account(mut)]
     pub quote_bank: AccountLoader<'info, Bank>,
     #[account(mut)]
@@ -164,12 +163,53 @@ pub fn place_serum_order(
     ctx: Context<PlaceSerumOrder>,
     order: NewOrderInstructionData,
 ) -> Result<()> {
+    let account = ctx.accounts.account.load()?;
+    let serum_market = ctx.accounts.serum_market.load()?;
+
+    // Validate open_orders
+    require!(
+        account
+            .serum_open_orders_map
+            .find(serum_market.market_index)
+            .ok_or(error!(MangoError::SomeError))?
+            .open_orders
+            == ctx.accounts.open_orders.key(),
+        MangoError::SomeError
+    );
+
+    // Validate banks and vaults
+    let quote_bank = ctx.accounts.quote_bank.load()?;
+    require!(
+        quote_bank.vault == ctx.accounts.quote_vault.key(),
+        MangoError::SomeError
+    );
+    require!(
+        quote_bank.token_index == serum_market.quote_token_index,
+        MangoError::SomeError
+    );
+    let base_bank = ctx.accounts.base_bank.load()?;
+    require!(
+        base_bank.vault == ctx.accounts.base_vault.key(),
+        MangoError::SomeError
+    );
+    require!(
+        base_bank.token_index == serum_market.base_token_index,
+        MangoError::SomeError
+    );
+
+    // TODO: pre-health check
+    // TODO: track vault balance before
+
+    //
+    // Place the order
+    //
+
     // unwrap our newtype
     let order = order.0;
 
     let order_payer_token_account = match order.side {
-        Side::Ask => ctx.accounts.base_vault.to_account_info(),
         Side::Bid => ctx.accounts.quote_vault.to_account_info(),
+        Side::Ask => ctx.accounts.base_vault.to_account_info(),
     };
 
     let context = CpiContext::new(
@@ -208,7 +248,12 @@ pub fn place_serum_order(
         order.limit,
     )?;
 
+    // TODO: immediately call settle_funds?
+    // TODO: track vault balance after, apply to user position
+
+    //
     // Health check
+    //
     let account = ctx.accounts.account.load()?;
     let health = compute_health(&account, &ctx.remaining_accounts)?;
     msg!("health: {}", health);
