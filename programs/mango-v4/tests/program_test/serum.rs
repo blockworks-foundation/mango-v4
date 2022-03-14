@@ -20,7 +20,7 @@ pub struct ListingKeys {
     vault_signer_nonce: u64,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SpotMarketCookie {
     pub market: Pubkey,
     pub req_q: Pubkey,

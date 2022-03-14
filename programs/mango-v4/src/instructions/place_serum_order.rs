@@ -15,7 +15,7 @@ use crate::state::*;
 /// Unfortunately NewOrderInstructionV3 isn't borsh serializable.
 ///
 /// Make a newtype and implement the traits for it.
-pub struct NewOrderInstructionData(serum_dex::instruction::NewOrderInstructionV3);
+pub struct NewOrderInstructionData(pub serum_dex::instruction::NewOrderInstructionV3);
 
 /// mango-v3's deserialization code
 fn unpack_dex_new_order_v3(
@@ -143,11 +143,18 @@ pub struct PlaceSerumOrder<'info> {
     pub market_quote_vault: UncheckedAccount<'info>,
 
     // TODO: everything; do we need to pass both, or just payer?
-    // these are all potentially mut too, if we settle immediately?
+    // TODO: if we potentially settle immediately, they all need to be mut?
+    // TODO: Can we reduce the number of accounts by requiring the banks
+    // to be in the remainingAccounts (where they need to be anyway, for
+    // health checks)
+    #[account(mut)]
     pub quote_bank: AccountLoader<'info, Bank>,
-    pub quote_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub quote_vault: Box<Account<'info, TokenAccount>>,
+    #[account(mut)]
     pub base_bank: AccountLoader<'info, Bank>,
-    pub base_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub base_vault: Box<Account<'info, TokenAccount>>,
 
     pub token_program: Program<'info, Token>,
     pub rent: Sysvar<'info, Rent>,
@@ -181,13 +188,14 @@ pub fn place_serum_order(
 
             // user accounts
             open_orders: ctx.accounts.open_orders.to_account_info(),
-            open_orders_authority: ctx.accounts.serum_market.to_account_info(),
+            // NOTE: this is also the user token account authority!
+            open_orders_authority: ctx.accounts.group.to_account_info(),
             order_payer_token_account,
         },
     );
 
-    let serum_market = ctx.accounts.serum_market.load()?;
-    let seeds = serum_market_seeds!(serum_market);
+    let group = ctx.accounts.group.load()?;
+    let seeds = group_seeds!(group);
     dex::new_order_v3(
         context.with_signer(&[seeds]),
         order.side,

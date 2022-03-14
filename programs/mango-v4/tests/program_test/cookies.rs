@@ -3,6 +3,7 @@ use solana_sdk::signature::Keypair;
 
 use crate::utils::*;
 
+#[derive(Debug)]
 pub struct MintCookie {
     pub index: usize,
     pub decimals: u8,

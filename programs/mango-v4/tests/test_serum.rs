@@ -19,6 +19,7 @@ async fn test_serum() -> Result<(), TransportError> {
     let payer = &context.users[1].key;
     let mint0 = &context.mints[0];
     let mint1 = &context.mints[1];
+    let payer_mint_accounts = &context.users[1].token_accounts[0..=2];
 
     //
     // SETUP: Create serum market
@@ -104,6 +105,37 @@ async fn test_serum() -> Result<(), TransportError> {
         register_mint(quote_token_index, mint1.clone(), address_lookup_table).await;
 
     //
+    // SETUP: Deposit user funds
+    //
+    {
+        let deposit_amount = 100;
+
+        send_tx(
+            solana,
+            DepositInstruction {
+                amount: deposit_amount,
+                account,
+                token_account: payer_mint_accounts[0],
+                token_authority: payer,
+            },
+        )
+        .await
+        .unwrap();
+
+        send_tx(
+            solana,
+            DepositInstruction {
+                amount: deposit_amount,
+                account,
+                token_account: payer_mint_accounts[1],
+                token_authority: payer,
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    //
     // TEST: Register a serum market
     //
     let serum_market = send_tx(
@@ -148,6 +180,28 @@ async fn test_serum() -> Result<(), TransportError> {
             .collect::<Vec<_>>(),
         [(open_orders, 0)]
     );
+
+    //
+    // TEST: Place an order
+    //
+    send_tx(
+        solana,
+        PlaceSerumOrderInstruction {
+            side: 0,
+            limit_price: 1,
+            max_base_qty: 1,
+            max_native_quote_qty_including_fees: 1,
+            self_trade_behavior: 0,
+            order_type: 0,
+            client_order_id: 0,
+            limit: 10,
+            account,
+            owner,
+            serum_market,
+        },
+    )
+    .await
+    .unwrap();
 
     Ok(())
 }

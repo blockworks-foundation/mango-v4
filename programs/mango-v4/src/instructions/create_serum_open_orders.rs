@@ -54,13 +54,16 @@ pub fn create_serum_open_orders(ctx: Context<CreateSerumOpenOrders>) -> Result<(
         ctx.accounts.serum_program.to_account_info(),
         dex::InitOpenOrders {
             open_orders: ctx.accounts.open_orders.to_account_info(),
-            // TODO: Should the authority be the account or the market account or the group?
-            authority: ctx.accounts.serum_market.to_account_info(),
+            // The open order authority must be the same as the authority on
+            // the vault accounts, because serum's placeorder doesn't distinguish
+            // the two authorities.
+            authority: ctx.accounts.group.to_account_info(),
             market: ctx.accounts.serum_market_external.to_account_info(),
             rent: ctx.accounts.rent.to_account_info(),
         },
     );
-    let seeds = serum_market_seeds!(serum_market);
+    let group = ctx.accounts.group.load()?;
+    let seeds = group_seeds!(group);
     // TODO: Anchor's code _forces_ anchor_spl::dex::id() as a program id.
     //       Are we ok with that? that would mean storing serum_program is not
     //       necessary.
