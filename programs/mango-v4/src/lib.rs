@@ -14,7 +14,7 @@ pub mod error;
 pub mod instructions;
 pub mod state;
 
-use state::TokenIndex;
+use state::{SerumMarketIndex, TokenIndex};
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -79,10 +79,11 @@ pub mod mango_v4 {
 
     pub fn register_serum_market(
         ctx: Context<RegisterSerumMarket>,
+        market_index: SerumMarketIndex,
         base_token_index: TokenIndex,
         quote_token_index: TokenIndex,
     ) -> Result<()> {
-        instructions::register_serum_market(ctx, base_token_index, quote_token_index)
+        instructions::register_serum_market(ctx, market_index, base_token_index, quote_token_index)
     }
 
     pub fn create_serum_open_orders(ctx: Context<CreateSerumOpenOrders>) -> Result<()> {

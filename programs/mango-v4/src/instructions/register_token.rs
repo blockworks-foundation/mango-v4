@@ -23,6 +23,7 @@ pub struct RegisterToken<'info> {
 
     #[account(
         init,
+        // using the token_index in this seed guards against reusing it
         seeds = [group.key().as_ref(), b"Bank".as_ref(), &token_index.to_le_bytes()],
         bump,
         payer = payer,
@@ -42,6 +43,7 @@ pub struct RegisterToken<'info> {
 
     #[account(
         init,
+        // using the mint in this seed guards against registering the same mint twice
         seeds = [group.key().as_ref(), b"MintInfo".as_ref(), mint.key().as_ref()],
         bump,
         payer = payer,

@@ -611,6 +611,7 @@ pub struct RegisterSerumMarketInstruction<'keypair> {
     pub serum_program: Pubkey,
     pub serum_market_external: Pubkey,
 
+    pub market_index: SerumMarketIndex,
     pub base_token_index: TokenIndex,
     pub quote_token_index: TokenIndex,
 }
@@ -624,6 +625,7 @@ impl<'keypair> ClientInstruction for RegisterSerumMarketInstruction<'keypair> {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
+            market_index: self.market_index,
             base_token_index: self.base_token_index,
             quote_token_index: self.quote_token_index,
         };

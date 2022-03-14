@@ -18,7 +18,7 @@ pub struct RegisterSerumMarket<'info> {
 
     #[account(
         init,
-        // TODO: possibly use the market index instead of serum_market in the seed
+        // using the serum_market_external in the seed guards against registering the same market twice
         seeds = [group.key().as_ref(), b"SerumMarket".as_ref(), serum_market_external.key().as_ref()],
         bump,
         payer = payer,
@@ -35,17 +35,19 @@ pub struct RegisterSerumMarket<'info> {
 // TODO: should this be "configure_serum_market", which allows reconfiguring?
 pub fn register_serum_market(
     ctx: Context<RegisterSerumMarket>,
+    market_index: SerumMarketIndex,
     base_token_index: TokenIndex,
     quote_token_index: TokenIndex,
 ) -> Result<()> {
-    //let mut group = ctx.accounts.group.load_mut()?;
+    // TODO: must guard against accidentally using the same market_index twice!
+    // TODO: verify that base_token_index and quote_token_index are correct!
 
     let mut serum_market = ctx.accounts.serum_market.load_init()?;
     *serum_market = SerumMarket {
         group: ctx.accounts.group.key(),
         serum_program: ctx.accounts.serum_program.key(),
         serum_market_external: ctx.accounts.serum_market_external.key(),
-        market_index: 0, // TODO: likely globally tracked in the group?
+        market_index,
         base_token_index,
         quote_token_index,
         bump: *ctx.bumps.get("serum_market").ok_or(MangoError::SomeError)?,
