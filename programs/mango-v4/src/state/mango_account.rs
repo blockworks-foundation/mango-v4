@@ -19,6 +19,9 @@ pub struct IndexedPosition {
 
     /// index into Group.tokens
     pub token_index: TokenIndex,
+
+    /// incremented when a market requires this position to stay alive
+    pub in_use_count: u8,
 }
 // TODO: static assert the size and alignment
 
@@ -38,6 +41,10 @@ impl IndexedPosition {
             self.indexed_value * bank.borrow_index
         }
     }
+
+    pub fn is_in_use(&self) -> bool {
+        self.in_use_count > 0
+    }
 }
 
 #[zero_copy]
@@ -51,6 +58,7 @@ impl IndexedPositions {
             values: [IndexedPosition {
                 indexed_value: I80F48::ZERO,
                 token_index: TokenIndex::MAX,
+                in_use_count: 0,
             }; MAX_INDEXED_POSITIONS],
         }
     }
@@ -79,6 +87,7 @@ impl IndexedPositions {
                 self.values[i] = IndexedPosition {
                     indexed_value: I80F48::ZERO,
                     token_index: token_index,
+                    in_use_count: 0,
                 };
             }
         }
@@ -90,11 +99,18 @@ impl IndexedPositions {
     }
 
     pub fn deactivate(&mut self, index: usize) {
+        assert!(self.values[index].in_use_count == 0);
         self.values[index].token_index = TokenIndex::MAX;
     }
 
     pub fn iter_active(&self) -> impl Iterator<Item = &IndexedPosition> {
         self.values.iter().filter(|p| p.is_active())
+    }
+
+    pub fn find(&self, token_index: TokenIndex) -> Option<&IndexedPosition> {
+        self.values
+            .iter()
+            .find(|p| p.is_active_for_token(token_index))
     }
 }
 

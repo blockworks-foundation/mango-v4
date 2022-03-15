@@ -98,17 +98,17 @@ async fn test_serum() -> Result<(), TransportError> {
 
     let address_lookup_table = solana.create_address_lookup_table(admin, payer).await;
     let base_token_index = 0;
-    let (_oracle0, _bank0) =
+    let (_oracle0, bank0) =
         register_mint(base_token_index, mint0.clone(), address_lookup_table).await;
     let quote_token_index = 1;
-    let (_oracle1, _bank1) =
+    let (_oracle1, bank1) =
         register_mint(quote_token_index, mint1.clone(), address_lookup_table).await;
 
     //
     // SETUP: Deposit user funds
     //
     {
-        let deposit_amount = 100;
+        let deposit_amount = 1000;
 
         send_tx(
             solana,
@@ -187,12 +187,12 @@ async fn test_serum() -> Result<(), TransportError> {
     send_tx(
         solana,
         PlaceSerumOrderInstruction {
-            side: 0,
-            limit_price: 1,
-            max_base_qty: 1,
-            max_native_quote_qty_including_fees: 1,
+            side: 0,         // TODO: Bid
+            limit_price: 10, // in quote_lot (10) per base lot (100)
+            max_base_qty: 1, // in base lot (100)
+            max_native_quote_qty_including_fees: 100,
             self_trade_behavior: 0,
-            order_type: 0,
+            order_type: 0, // TODO: Limit
             client_order_id: 0,
             limit: 10,
             account,
@@ -202,6 +202,11 @@ async fn test_serum() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+
+    let native0 = account_position(solana, account, bank0).await;
+    let native1 = account_position(solana, account, bank1).await;
+    assert_eq!(native0, 1000);
+    assert_eq!(native1, 900);
 
     Ok(())
 }

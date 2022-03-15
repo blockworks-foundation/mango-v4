@@ -57,7 +57,7 @@ impl Bank {
                 self.indexed_total_borrows = cm!(self.indexed_total_borrows - indexed_change);
                 position.indexed_value = cm!(position.indexed_value + indexed_change);
                 return Ok(true);
-            } else if new_native_position < I80F48::ONE {
+            } else if new_native_position < I80F48::ONE && !position.is_in_use() {
                 // if there's less than one token deposited, zero the position
                 self.dust = cm!(self.dust + new_native_position);
                 self.indexed_total_borrows =
@@ -93,7 +93,7 @@ impl Bank {
             let new_native_position = cm!(native_position - native_amount);
             if !new_native_position.is_negative() {
                 // withdraw deposits only
-                if new_native_position < I80F48::ONE {
+                if new_native_position < I80F48::ONE && !position.is_in_use() {
                     // zero the account collecting the leftovers in `dust`
                     self.dust = cm!(self.dust + new_native_position);
                     self.indexed_total_deposits =
@@ -101,7 +101,7 @@ impl Bank {
                     position.indexed_value = I80F48::ZERO;
                     return Ok(false);
                 } else {
-                    // withdraw some deposits leaving >1 native token
+                    // withdraw some deposits leaving a positive balance
                     let indexed_change = cm!(native_amount / self.deposit_index);
                     self.indexed_total_deposits = cm!(self.indexed_total_deposits - indexed_change);
                     position.indexed_value = cm!(position.indexed_value - indexed_change);
@@ -122,5 +122,13 @@ impl Bank {
         position.indexed_value = cm!(position.indexed_value - indexed_change);
 
         Ok(true)
+    }
+
+    pub fn change(&mut self, position: &mut IndexedPosition, native_amount: i64) -> Result<bool> {
+        if native_amount >= 0 {
+            self.deposit(position, native_amount as u64)
+        } else {
+            self.withdraw(position, (-native_amount) as u64)
+        }
     }
 }

@@ -109,7 +109,7 @@ async fn test_position_lifetime() -> Result<()> {
         (oracle, bank)
     };
     register_mint(0, mint0.clone()).await;
-    register_mint(1, mint1.clone()).await;
+    let (_oracle1, bank1) = register_mint(1, mint1.clone()).await;
     register_mint(2, mint2.clone()).await;
 
     //
@@ -217,6 +217,10 @@ async fn test_position_lifetime() -> Result<()> {
         )
         .await
         .unwrap();
+        assert_eq!(
+            account_position(solana, account, bank1).await,
+            -(borrow_amount as i64)
+        );
 
         // give it back, closing the position
         send_tx(

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::{self, SysvarId};
 use anchor_spl::dex::serum_dex;
@@ -151,6 +153,17 @@ async fn derive_health_check_remaining_account_metas(
 
 fn from_serum_style_pubkey(d: &[u64; 4]) -> Pubkey {
     Pubkey::new(bytemuck::cast_slice(d as &[_]))
+}
+
+pub async fn account_position(solana: &SolanaCookie, account: Pubkey, bank: Pubkey) -> i64 {
+    let account_data: MangoAccount = solana.get_account(account).await;
+    let bank_data: Bank = solana.get_account(bank).await;
+    let native = account_data
+        .indexed_positions
+        .find(bank_data.token_index)
+        .unwrap()
+        .native(&bank_data);
+    native.round().to_num::<i64>()
 }
 
 //

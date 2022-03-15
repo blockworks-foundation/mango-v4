@@ -1,13 +1,15 @@
 use anchor_lang::prelude::*;
-use anchor_spl::dex;
 use anchor_spl::token::{Token, TokenAccount};
 use arrayref::array_refs;
 use borsh::{BorshDeserialize, BorshSerialize};
-use dex::serum_dex;
 use num_enum::TryFromPrimitive;
-use serum_dex::matching::Side;
 use std::io::Write;
 use std::num::NonZeroU64;
+
+use anchor_spl::dex;
+use dex::serum_dex;
+use serum_dex::instruction::NewOrderInstructionV3;
+use serum_dex::matching::Side;
 
 use crate::error::*;
 use crate::state::*;
@@ -163,50 +165,101 @@ pub fn place_serum_order(
     ctx: Context<PlaceSerumOrder>,
     order: NewOrderInstructionData,
 ) -> Result<()> {
-    let account = ctx.accounts.account.load()?;
-    let serum_market = ctx.accounts.serum_market.load()?;
+    //
+    // Validation
+    //
+    {
+        let account = ctx.accounts.account.load()?;
+        let serum_market = ctx.accounts.serum_market.load()?;
 
-    // Validate open_orders
-    require!(
-        account
-            .serum_open_orders_map
-            .find(serum_market.market_index)
-            .ok_or(error!(MangoError::SomeError))?
-            .open_orders
-            == ctx.accounts.open_orders.key(),
-        MangoError::SomeError
-    );
+        // Validate open_orders
+        require!(
+            account
+                .serum_open_orders_map
+                .find(serum_market.market_index)
+                .ok_or(error!(MangoError::SomeError))?
+                .open_orders
+                == ctx.accounts.open_orders.key(),
+            MangoError::SomeError
+        );
 
-    // Validate banks and vaults
-    let quote_bank = ctx.accounts.quote_bank.load()?;
-    require!(
-        quote_bank.vault == ctx.accounts.quote_vault.key(),
-        MangoError::SomeError
-    );
-    require!(
-        quote_bank.token_index == serum_market.quote_token_index,
-        MangoError::SomeError
-    );
-    let base_bank = ctx.accounts.base_bank.load()?;
-    require!(
-        base_bank.vault == ctx.accounts.base_vault.key(),
-        MangoError::SomeError
-    );
-    require!(
-        base_bank.token_index == serum_market.base_token_index,
-        MangoError::SomeError
-    );
+        // Validate banks and vaults
+        let quote_bank = ctx.accounts.quote_bank.load()?;
+        require!(
+            quote_bank.vault == ctx.accounts.quote_vault.key(),
+            MangoError::SomeError
+        );
+        require!(
+            quote_bank.token_index == serum_market.quote_token_index,
+            MangoError::SomeError
+        );
+        let base_bank = ctx.accounts.base_bank.load()?;
+        require!(
+            base_bank.vault == ctx.accounts.base_vault.key(),
+            MangoError::SomeError
+        );
+        require!(
+            base_bank.token_index == serum_market.base_token_index,
+            MangoError::SomeError
+        );
+    }
+
+    //
+    // Before-order tracking
+    //
+
+    let before_base_vault = ctx.accounts.base_vault.amount;
+    let before_quote_vault = ctx.accounts.quote_vault.amount;
 
     // TODO: pre-health check
-    // TODO: track vault balance before
 
     //
     // Place the order
     //
+    cpi_place_order(&ctx, &order.0)?;
 
-    // unwrap our newtype
-    let order = order.0;
+    // TODO: immediately call settle_funds?
 
+    //
+    // After-order tracking
+    //
+    ctx.accounts.base_vault.reload()?;
+    ctx.accounts.quote_vault.reload()?;
+    let after_base_vault = ctx.accounts.base_vault.amount;
+    let after_quote_vault = ctx.accounts.quote_vault.amount;
+
+    // Charge the difference in vault balances to the user's account
+    {
+        let mut account = ctx.accounts.account.load_mut()?;
+
+        let mut base_bank = ctx.accounts.base_bank.load_mut()?;
+        let (base_position, _) = account
+            .indexed_positions
+            .get_mut_or_create(base_bank.token_index)?;
+        base_bank.change(base_position, (after_base_vault - before_base_vault) as i64)?;
+
+        let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
+        let (quote_position, _) = account
+            .indexed_positions
+            .get_mut_or_create(quote_bank.token_index)?;
+        quote_bank.change(
+            quote_position,
+            (after_quote_vault - before_quote_vault) as i64,
+        )?;
+    }
+
+    //
+    // Health check
+    //
+    let account = ctx.accounts.account.load()?;
+    let health = compute_health(&account, &ctx.remaining_accounts)?;
+    msg!("health: {}", health);
+    require!(health >= 0, MangoError::SomeError);
+
+    Ok(())
+}
+
+fn cpi_place_order(ctx: &Context<PlaceSerumOrder>, order: &NewOrderInstructionV3) -> Result<()> {
     let order_payer_token_account = match order.side {
         Side::Bid => ctx.accounts.quote_vault.to_account_info(),
         Side::Ask => ctx.accounts.base_vault.to_account_info(),
@@ -247,17 +300,6 @@ pub fn place_serum_order(
         order.client_order_id,
         order.limit,
     )?;
-
-    // TODO: immediately call settle_funds?
-    // TODO: track vault balance after, apply to user position
-
-    //
-    // Health check
-    //
-    let account = ctx.accounts.account.load()?;
-    let health = compute_health(&account, &ctx.remaining_accounts)?;
-    msg!("health: {}", health);
-    require!(health >= 0, MangoError::SomeError);
 
     Ok(())
 }

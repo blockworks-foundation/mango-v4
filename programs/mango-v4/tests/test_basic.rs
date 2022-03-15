@@ -114,13 +114,11 @@ async fn test_basic() -> Result<(), TransportError> {
             solana.token_account_balance(payer_mint0_account).await,
             start_balance - deposit_amount
         );
-        let account_data: MangoAccount = solana.get_account(account).await;
-        let bank_data: Bank = solana.get_account(bank).await;
-        assert!(
-            account_data.indexed_positions.values[0].native(&bank_data)
-                - I80F48::from_num(deposit_amount)
-                < dust_threshold
+        assert_eq!(
+            account_position(solana, account, bank).await,
+            deposit_amount as i64
         );
+        let bank_data: Bank = solana.get_account(bank).await;
         assert!(
             bank_data.native_total_deposits() - I80F48::from_num(deposit_amount) < dust_threshold
         );
@@ -130,6 +128,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // TEST: Withdraw funds
     //
     {
+        let start_amount = 100;
         let withdraw_amount = 50;
         let start_balance = solana.token_account_balance(payer_mint0_account).await;
 
@@ -151,15 +150,14 @@ async fn test_basic() -> Result<(), TransportError> {
             solana.token_account_balance(payer_mint0_account).await,
             start_balance + withdraw_amount
         );
-        let account_data: MangoAccount = solana.get_account(account).await;
+        assert_eq!(
+            account_position(solana, account, bank).await,
+            (start_amount - withdraw_amount) as i64
+        );
         let bank_data: Bank = solana.get_account(bank).await;
         assert!(
-            account_data.indexed_positions.values[0].native(&bank_data)
-                - I80F48::from_num(withdraw_amount)
+            bank_data.native_total_deposits() - I80F48::from_num(start_amount - withdraw_amount)
                 < dust_threshold
-        );
-        assert!(
-            bank_data.native_total_deposits() - I80F48::from_num(withdraw_amount) < dust_threshold
         );
     }
 
