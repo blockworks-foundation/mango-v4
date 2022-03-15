@@ -169,7 +169,7 @@ fn adjust_for_post_cpi_amounts(
             let bank_loader = AccountLoader::<'_, Bank>::try_from(bank_ai)?;
             let mut bank = bank_loader.load_mut()?;
 
-            let mut position = *account
+            let mut position = account
                 .token_account_map
                 .get_mut_or_create(bank.token_index)?
                 .0;
