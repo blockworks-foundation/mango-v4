@@ -172,7 +172,7 @@ async fn test_position_lifetime() -> Result<()> {
 
         // Check that positions are fully deactivated
         let account: MangoAccount = solana.get_account(account).await;
-        assert_eq!(account.indexed_positions.iter_active().count(), 0);
+        assert_eq!(account.token_account_map.iter_active().count(), 0);
 
         // No user tokens got lost
         for &payer_token in payer_mint_accounts {
@@ -251,7 +251,7 @@ async fn test_position_lifetime() -> Result<()> {
 
         // Check that positions are fully deactivated
         let account: MangoAccount = solana.get_account(account).await;
-        assert_eq!(account.indexed_positions.iter_active().count(), 0);
+        assert_eq!(account.token_account_map.iter_active().count(), 0);
 
         // No user tokens got lost
         for &payer_token in payer_mint_accounts {

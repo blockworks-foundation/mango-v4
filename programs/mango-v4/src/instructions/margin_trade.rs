@@ -38,7 +38,7 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     // total number of indexed positions, since
     // user might end up withdrawing or depositing and activating a new indexed position
     require!(
-        banks_len >= account.indexed_positions.iter_active().count(),
+        banks_len >= account.token_account_map.iter_active().count(),
         MangoError::SomeError // todo: SomeError
     );
 
@@ -170,7 +170,7 @@ fn adjust_for_post_cpi_amounts(
             let mut bank = bank_loader.load_mut()?;
 
             let mut position = *account
-                .indexed_positions
+                .token_account_map
                 .get_mut_or_create(bank.token_index)?
                 .0;
 

@@ -54,7 +54,7 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;
-    let (position, position_index) = account.indexed_positions.get_mut_or_create(token_index)?;
+    let (position, position_index) = account.token_account_map.get_mut_or_create(token_index)?;
 
     // Update the bank and position
     let position_is_active = {
@@ -80,7 +80,7 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     // Deposits can deactivate a position if they cancel out a previous borrow.
     //
     if !position_is_active {
-        account.indexed_positions.deactivate(position_index);
+        account.token_account_map.deactivate(position_index);
     }
 
     Ok(())

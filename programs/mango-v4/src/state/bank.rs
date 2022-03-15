@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
-use super::{IndexedPosition, TokenIndex};
+use super::{TokenAccount, TokenIndex};
 use crate::util::checked_math as cm;
 
 #[account(zero_copy)]
@@ -45,7 +45,7 @@ impl Bank {
     }
 
     /// Returns whether the position is active
-    pub fn deposit(&mut self, position: &mut IndexedPosition, native_amount: u64) -> Result<bool> {
+    pub fn deposit(&mut self, position: &mut TokenAccount, native_amount: u64) -> Result<bool> {
         let mut native_amount = I80F48::from_num(native_amount);
         let native_position = position.native(self);
 
@@ -85,7 +85,7 @@ impl Bank {
     }
 
     /// Returns whether the position is active
-    pub fn withdraw(&mut self, position: &mut IndexedPosition, native_amount: u64) -> Result<bool> {
+    pub fn withdraw(&mut self, position: &mut TokenAccount, native_amount: u64) -> Result<bool> {
         let mut native_amount = I80F48::from_num(native_amount);
         let native_position = position.native(self);
 
@@ -124,7 +124,7 @@ impl Bank {
         Ok(true)
     }
 
-    pub fn change(&mut self, position: &mut IndexedPosition, native_amount: i64) -> Result<bool> {
+    pub fn change(&mut self, position: &mut TokenAccount, native_amount: i64) -> Result<bool> {
         if native_amount >= 0 {
             self.deposit(position, native_amount as u64)
         } else {

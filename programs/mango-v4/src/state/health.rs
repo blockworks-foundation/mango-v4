@@ -8,7 +8,7 @@ use crate::util;
 use crate::util::checked_math as cm;
 
 pub fn compute_health(account: &MangoAccount, ais: &[AccountInfo]) -> Result<I80F48> {
-    let active_len = account.indexed_positions.iter_active().count();
+    let active_len = account.token_account_map.iter_active().count();
     require!(
         ais.len() == active_len * 2, // banks + oracles
         MangoError::SomeError
@@ -28,7 +28,7 @@ fn compute_health_detail(
     let mut assets = I80F48::ZERO;
     let mut liabilities = I80F48::ZERO; // absolute value
     for (position, (bank_ai, oracle_ai)) in util::zip!(
-        account.indexed_positions.iter_active(),
+        account.token_account_map.iter_active(),
         banks.iter(),
         oracles.iter()
     ) {

@@ -8,7 +8,7 @@ const MAX_INDEXED_POSITIONS: usize = 32;
 const MAX_SERUM_OPEN_ORDERS: usize = 16;
 
 #[zero_copy]
-pub struct IndexedPosition {
+pub struct TokenAccount {
     // TODO: Why did we have deposits and borrows as two different values
     //       if only one of them was allowed to be != 0 at a time?
     // todo: maybe we want to split collateral and lending?
@@ -25,7 +25,7 @@ pub struct IndexedPosition {
 }
 // TODO: static assert the size and alignment
 
-impl IndexedPosition {
+impl TokenAccount {
     pub fn is_active(&self) -> bool {
         self.token_index != TokenIndex::MAX
     }
@@ -48,14 +48,14 @@ impl IndexedPosition {
 }
 
 #[zero_copy]
-pub struct IndexedPositions {
-    pub values: [IndexedPosition; MAX_INDEXED_POSITIONS],
+pub struct TokenAccountMap {
+    pub values: [TokenAccount; MAX_INDEXED_POSITIONS],
 }
 
-impl IndexedPositions {
+impl TokenAccountMap {
     pub fn new() -> Self {
         Self {
-            values: [IndexedPosition {
+            values: [TokenAccount {
                 indexed_value: I80F48::ZERO,
                 token_index: TokenIndex::MAX,
                 in_use_count: 0,
@@ -63,7 +63,7 @@ impl IndexedPositions {
         }
     }
 
-    pub fn get_mut(&mut self, token_index: TokenIndex) -> Result<&mut IndexedPosition> {
+    pub fn get_mut(&mut self, token_index: TokenIndex) -> Result<&mut TokenAccount> {
         self.values
             .iter_mut()
             .find(|p| p.is_active_for_token(token_index))
@@ -73,7 +73,7 @@ impl IndexedPositions {
     pub fn get_mut_or_create(
         &mut self,
         token_index: TokenIndex,
-    ) -> Result<(&mut IndexedPosition, usize)> {
+    ) -> Result<(&mut TokenAccount, usize)> {
         // This function looks complex because of lifetimes.
         // Maybe there's a smart way to write it with double iter_mut()
         // that doesn't confuse the borrow checker.
@@ -84,7 +84,7 @@ impl IndexedPositions {
         if pos.is_none() {
             pos = self.values.iter().position(|p| !p.is_active());
             if let Some(i) = pos {
-                self.values[i] = IndexedPosition {
+                self.values[i] = TokenAccount {
                     indexed_value: I80F48::ZERO,
                     token_index: token_index,
                     in_use_count: 0,
@@ -103,11 +103,11 @@ impl IndexedPositions {
         self.values[index].token_index = TokenIndex::MAX;
     }
 
-    pub fn iter_active(&self) -> impl Iterator<Item = &IndexedPosition> {
+    pub fn iter_active(&self) -> impl Iterator<Item = &TokenAccount> {
         self.values.iter().filter(|p| p.is_active())
     }
 
-    pub fn find(&self, token_index: TokenIndex) -> Option<&IndexedPosition> {
+    pub fn find(&self, token_index: TokenIndex) -> Option<&TokenAccount> {
         self.values
             .iter()
             .find(|p| p.is_active_for_token(token_index))
@@ -115,14 +115,14 @@ impl IndexedPositions {
 }
 
 #[zero_copy]
-pub struct SerumOpenOrders {
+pub struct SerumAccount {
     pub open_orders: Pubkey,
 
     pub market_index: SerumMarketIndex,
 }
 // TODO: static assert the size and alignment
 
-impl SerumOpenOrders {
+impl SerumAccount {
     pub fn is_active(&self) -> bool {
         self.market_index != SerumMarketIndex::MAX
     }
@@ -133,26 +133,26 @@ impl SerumOpenOrders {
 }
 
 #[zero_copy]
-pub struct SerumOpenOrdersMap {
-    pub values: [SerumOpenOrders; MAX_SERUM_OPEN_ORDERS],
+pub struct SerumAccountMap {
+    pub values: [SerumAccount; MAX_SERUM_OPEN_ORDERS],
 }
 
-impl SerumOpenOrdersMap {
+impl SerumAccountMap {
     pub fn new() -> Self {
         Self {
-            values: [SerumOpenOrders {
+            values: [SerumAccount {
                 open_orders: Pubkey::default(),
                 market_index: SerumMarketIndex::MAX,
             }; MAX_SERUM_OPEN_ORDERS],
         }
     }
 
-    pub fn create(&mut self, market_index: SerumMarketIndex) -> Result<&mut SerumOpenOrders> {
+    pub fn create(&mut self, market_index: SerumMarketIndex) -> Result<&mut SerumAccount> {
         if self.find(market_index).is_some() {
             return err!(MangoError::SomeError); // exists already
         }
         if let Some(v) = self.values.iter_mut().find(|p| !p.is_active()) {
-            *v = SerumOpenOrders {
+            *v = SerumAccount {
                 open_orders: Pubkey::default(),
                 market_index: market_index as SerumMarketIndex,
             };
@@ -166,11 +166,11 @@ impl SerumOpenOrdersMap {
         self.values[index].market_index = SerumMarketIndex::MAX;
     }
 
-    pub fn iter_active(&self) -> impl Iterator<Item = &SerumOpenOrders> {
+    pub fn iter_active(&self) -> impl Iterator<Item = &SerumAccount> {
         self.values.iter().filter(|p| p.is_active())
     }
 
-    pub fn find(&self, market_index: SerumMarketIndex) -> Option<&SerumOpenOrders> {
+    pub fn find(&self, market_index: SerumMarketIndex) -> Option<&SerumAccount> {
         self.values
             .iter()
             .find(|p| p.is_active_for_market(market_index))
@@ -185,21 +185,14 @@ pub struct MangoAccount {
     // Alternative authority/signer of transactions for a mango account
     pub delegate: Pubkey,
 
-    // pub in_margin_basket: [bool; MAX_PAIRS],
-    // pub num_in_margin_basket: u8,
-    pub indexed_positions: IndexedPositions,
+    // Maps token_index -> deposit/borrow account for each token
+    // that is active on this MangoAccount.
+    pub token_account_map: TokenAccountMap,
 
-    pub serum_open_orders_map: SerumOpenOrdersMap,
+    // Maps serum_market_index -> open orders for each serum market
+    // that is active on this MangoAccount.
+    pub serum_account_map: SerumAccountMap,
 
-    // pub spot_open_orders: [Pubkey; MAX_PAIRS],
-    // pub perp_accounts: [PerpAccount; MAX_PAIRS],
-
-    // pub order_market: [u8; MAX_PERP_OPEN_ORDERS],
-    // pub order_side: [Side; MAX_PERP_OPEN_ORDERS],
-    // pub orders: [i128; MAX_PERP_OPEN_ORDERS],
-    // pub client_order_ids: [u64; MAX_PERP_OPEN_ORDERS],
-
-    // pub msrm_amount: u64,
     /// This account cannot open new positions or borrow until `init_health >= 0`
     pub being_liquidated: bool, // TODO: for strict Pod compat, these should be u8, not bool
 

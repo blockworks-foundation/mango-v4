@@ -109,7 +109,7 @@ async fn derive_health_check_remaining_account_metas(
     // figure out all the banks/oracles that need to be passed for the health check
     let mut banks = vec![];
     let mut oracles = vec![];
-    for position in account.indexed_positions.iter_active() {
+    for position in account.token_account_map.iter_active() {
         let mint_info =
             get_mint_info_by_token_index(account_loader, account, position.token_index).await;
         let lookup_table = account_loader
@@ -125,7 +125,7 @@ async fn derive_health_check_remaining_account_metas(
             // If there is not yet an active position for the token, we need to pass
             // the bank/oracle for health check anyway.
             let new_position = account
-                .indexed_positions
+                .token_account_map
                 .values
                 .iter()
                 .position(|p| !p.is_active())
@@ -159,7 +159,7 @@ pub async fn account_position(solana: &SolanaCookie, account: Pubkey, bank: Pubk
     let account_data: MangoAccount = solana.get_account(account).await;
     let bank_data: Bank = solana.get_account(bank).await;
     let native = account_data
-        .indexed_positions
+        .token_account_map
         .find(bank_data.token_index)
         .unwrap()
         .native(&bank_data);
@@ -193,7 +193,7 @@ impl<'keypair> ClientInstruction for MarginTradeInstruction<'keypair> {
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
 
         let instruction = Self::Instruction {
-            banks_len: account.indexed_positions.iter_active().count(),
+            banks_len: account.token_account_map.iter_active().count(),
             cpi_data: self.margin_trade_program_ix_cpi_data.clone(),
         };
 
@@ -773,7 +773,7 @@ impl<'keypair> ClientInstruction for PlaceSerumOrderInstruction<'keypair> {
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
         let serum_market: SerumMarket = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum_open_orders_map
+            .serum_account_map
             .find(serum_market.market_index)
             .unwrap()
             .open_orders;

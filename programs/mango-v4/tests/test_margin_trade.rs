@@ -135,7 +135,7 @@ async fn test_margin_trade() -> Result<(), TransportError> {
         let account_data: MangoAccount = solana.get_account(account).await;
         let bank_data: Bank = solana.get_account(bank).await;
         assert!(
-            account_data.indexed_positions.values[0].native(&bank_data)
+            account_data.token_account_map.values[0].native(&bank_data)
                 - I80F48::from_num(deposit_amount_initial)
                 < dust_threshold
         );

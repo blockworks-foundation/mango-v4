@@ -71,19 +71,19 @@ pub fn create_serum_open_orders(ctx: Context<CreateSerumOpenOrders>) -> Result<(
 
     let mut account = ctx.accounts.account.load_mut()?;
     let oos = account
-        .serum_open_orders_map
+        .serum_account_map
         .create(serum_market.market_index)?;
     oos.open_orders = ctx.accounts.open_orders.key();
 
-    // Make it so that the indexed_positions for the base and quote currency
+    // Make it so that the token_account_map for the base and quote currency
     // stay permanently blocked. Otherwise users may end up in situations where
-    // they can't settle a market because they don't have free indexed_positions!
+    // they can't settle a market because they don't have free token_account_map!
     let (quote_position, _) = account
-        .indexed_positions
+        .token_account_map
         .get_mut_or_create(serum_market.quote_token_index)?;
     quote_position.in_use_count += 1;
     let (base_position, _) = account
-        .indexed_positions
+        .token_account_map
         .get_mut_or_create(serum_market.base_token_index)?;
     base_position.in_use_count += 1;
 
