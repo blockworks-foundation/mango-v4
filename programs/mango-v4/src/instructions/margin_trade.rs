@@ -4,7 +4,6 @@ use crate::{group_seeds, Mango};
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
 use solana_program::instruction::Instruction;
-use std::cell::RefMut;
 
 #[derive(Accounts)]
 pub struct MarginTrade<'info> {
@@ -145,7 +144,7 @@ fn adjust_for_post_cpi_amounts(
     cpi_ais: &Vec<AccountInfo>,
     pre_cpi_amounts: Vec<u64>,
     banks: &mut Vec<AccountInfo>,
-    account: &mut RefMut<MangoAccount>,
+    account: &mut MangoAccount,
 ) -> Result<()> {
     let token_accounts_iter = cpi_ais
         .iter()
