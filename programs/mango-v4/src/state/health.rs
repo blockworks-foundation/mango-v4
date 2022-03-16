@@ -1,11 +1,12 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
-use pyth_client::load_price;
+use std::cell::Ref;
 
 use crate::error::MangoError;
-use crate::state::{determine_oracle_type, Bank, MangoAccount, OracleType, StubOracle};
+use crate::state::{oracle_price, Bank, MangoAccount, TokenIndex};
 use crate::util;
 use crate::util::checked_math as cm;
+use crate::util::LoadZeroCopy;
 
 pub fn compute_health(account: &MangoAccount, ais: &[AccountInfo]) -> Result<I80F48> {
     let active_token_len = account.token_account_map.iter_active().count();
@@ -20,23 +21,44 @@ pub fn compute_health(account: &MangoAccount, ais: &[AccountInfo]) -> Result<I80
     compute_health_detail(account, banks, oracles, serum_oos)
 }
 
+struct BankAndPrice<'a> {
+    bank: Ref<'a, Bank>,
+    price: I80F48,
+}
+
+fn find_price(token_index: TokenIndex, banks_and_prices: &[BankAndPrice]) -> Result<I80F48> {
+    Ok(banks_and_prices
+        .iter()
+        .find(|b| b.bank.token_index == token_index)
+        .ok_or(error!(MangoError::SomeError))?
+        .price)
+}
+
 fn compute_health_detail(
     account: &MangoAccount,
     banks: &[AccountInfo],
     oracles: &[AccountInfo],
-    _serum_oos: &[AccountInfo],
+    serum_oos: &[AccountInfo],
 ) -> Result<I80F48> {
     let mut assets = I80F48::ZERO;
     let mut liabilities = I80F48::ZERO; // absolute value
-    for (position, (bank_ai, oracle_ai)) in util::zip!(
-        account.token_account_map.iter_active(),
-        banks.iter(),
-        oracles.iter()
-    ) {
-        let bank_loader = AccountLoader::<'_, Bank>::try_from(bank_ai)?;
-        let bank = bank_loader.load()?;
 
-        // TODO: This assumes banks are passed in order - is that an ok assumption?
+    // collect the bank and oracle data once
+    let banks_and_prices = util::zip!(banks.iter(), oracles.iter())
+        .map(|(bank_ai, oracle_ai)| {
+            let bank = bank_ai.load::<Bank>()?;
+            require!(bank.oracle == oracle_ai.key(), MangoError::UnexpectedOracle);
+            let price = oracle_price(oracle_ai)?;
+            Ok(BankAndPrice { bank, price })
+        })
+        .collect::<Result<Vec<BankAndPrice>>>()?;
+
+    // health contribution from token accounts
+    for (position, BankAndPrice { bank, price }) in util::zip!(
+        account.token_account_map.iter_active(),
+        banks_and_prices.iter()
+    ) {
+        // This assumes banks are passed in order
         require!(
             bank.token_index == position.token_index,
             MangoError::SomeError
@@ -44,22 +66,7 @@ fn compute_health_detail(
 
         // converts the token value to the basis token value for health computations
         // TODO: health basis token == USDC?
-        let oracle_data = &oracle_ai.try_borrow_data()?;
-        let oracle_type = determine_oracle_type(oracle_data)?;
-        require!(bank.oracle == oracle_ai.key(), MangoError::UnexpectedOracle);
-
-        let price = match oracle_type {
-            OracleType::Stub => {
-                AccountLoader::<'_, StubOracle>::try_from(oracle_ai)?
-                    .load()?
-                    .price
-            }
-            OracleType::Pyth => {
-                let price_struct = load_price(&oracle_data).unwrap();
-                I80F48::from_num(price_struct.agg.price)
-            }
-        };
-
+        let price = *price;
         let native_position = position.native(&bank);
         let native_basis = cm!(native_position * price);
         if native_basis.is_positive() {
@@ -69,11 +76,21 @@ fn compute_health_detail(
         }
     }
 
-    // TODO: Serum open orders
-    // - for each active serum market, pass the OpenOrders in order
-    // - store the base_token_index and quote_token_index in the account, so we don't
-    //   need to also pass SerumMarket
-    // - find the bank and oracle for base and quote, and add appropriately
+    // health contribution from serum accounts
+    for (serum_account, oo_ai) in
+        util::zip!(account.serum_account_map.iter_active(), serum_oos.iter())
+    {
+        // This assumes serum open orders are passed in order
+        require!(
+            &serum_account.open_orders == oo_ai.key,
+            MangoError::SomeError
+        );
+
+        // find the prices for the market
+        // TODO: each of these is a linear scan through banks_and_prices - is that too expensive?
+        let _base_price = find_price(serum_account.base_token_index, &banks_and_prices)?;
+        let _quote_price = find_price(serum_account.quote_token_index, &banks_and_prices)?;
+    }
 
     Ok(cm!(assets - liabilities))
 }

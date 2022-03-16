@@ -3,6 +3,7 @@ use anchor_lang::Discriminator;
 use fixed::types::I80F48;
 
 use crate::error::MangoError;
+use crate::util::LoadZeroCopy;
 
 #[derive(PartialEq)]
 pub enum OracleType {
@@ -24,6 +25,19 @@ pub fn determine_oracle_type(data: &[u8]) -> Result<OracleType> {
     }
 
     Err(MangoError::UnknownOracleType.into())
+}
+
+pub fn oracle_price(acc_info: &AccountInfo) -> Result<I80F48> {
+    let data = &acc_info.try_borrow_data()?;
+    let oracle_type = determine_oracle_type(data)?;
+
+    Ok(match oracle_type {
+        OracleType::Stub => acc_info.load::<StubOracle>()?.price,
+        OracleType::Pyth => {
+            let price_struct = pyth_client::load_price(&data).unwrap();
+            I80F48::from_num(price_struct.agg.price)
+        }
+    })
 }
 
 #[cfg(test)]
