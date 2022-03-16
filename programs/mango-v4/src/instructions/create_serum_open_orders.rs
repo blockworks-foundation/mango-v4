@@ -70,10 +70,12 @@ pub fn create_serum_open_orders(ctx: Context<CreateSerumOpenOrders>) -> Result<(
     dex::init_open_orders(context.with_signer(&[seeds]))?;
 
     let mut account = ctx.accounts.account.load_mut()?;
-    let oos = account
+    let serum_account = account
         .serum_account_map
         .create(serum_market.market_index)?;
-    oos.open_orders = ctx.accounts.open_orders.key();
+    serum_account.open_orders = ctx.accounts.open_orders.key();
+    serum_account.base_token_index = serum_market.base_token_index;
+    serum_account.quote_token_index = serum_market.quote_token_index;
 
     // Make it so that the token_account_map for the base and quote currency
     // stay permanently blocked. Otherwise users may end up in situations where

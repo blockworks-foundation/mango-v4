@@ -119,6 +119,12 @@ pub struct SerumAccount {
     pub open_orders: Pubkey,
 
     pub market_index: SerumMarketIndex,
+
+    /// Store the base/quote token index, so health computations don't need
+    /// to get passed the static SerumMarket to find which tokens a market
+    /// uses and look up the correct oracles.
+    pub base_token_index: TokenIndex,
+    pub quote_token_index: TokenIndex,
 }
 // TODO: static assert the size and alignment
 
@@ -132,6 +138,17 @@ impl SerumAccount {
     }
 }
 
+impl Default for SerumAccount {
+    fn default() -> Self {
+        Self {
+            open_orders: Pubkey::default(),
+            market_index: SerumMarketIndex::MAX,
+            base_token_index: TokenIndex::MAX,
+            quote_token_index: TokenIndex::MAX,
+        }
+    }
+}
+
 #[zero_copy]
 pub struct SerumAccountMap {
     pub values: [SerumAccount; MAX_SERUM_OPEN_ORDERS],
@@ -140,10 +157,7 @@ pub struct SerumAccountMap {
 impl SerumAccountMap {
     pub fn new() -> Self {
         Self {
-            values: [SerumAccount {
-                open_orders: Pubkey::default(),
-                market_index: SerumMarketIndex::MAX,
-            }; MAX_SERUM_OPEN_ORDERS],
+            values: [SerumAccount::default(); MAX_SERUM_OPEN_ORDERS],
         }
     }
 
@@ -153,8 +167,8 @@ impl SerumAccountMap {
         }
         if let Some(v) = self.values.iter_mut().find(|p| !p.is_active()) {
             *v = SerumAccount {
-                open_orders: Pubkey::default(),
                 market_index: market_index as SerumMarketIndex,
+                ..SerumAccount::default()
             };
             Ok(v)
         } else {
