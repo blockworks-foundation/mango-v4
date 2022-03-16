@@ -8,22 +8,23 @@ use crate::util;
 use crate::util::checked_math as cm;
 
 pub fn compute_health(account: &MangoAccount, ais: &[AccountInfo]) -> Result<I80F48> {
-    let active_len = account.token_account_map.iter_active().count();
-    require!(
-        ais.len() == active_len * 2, // banks + oracles
-        MangoError::SomeError
-    );
+    let active_token_len = account.token_account_map.iter_active().count();
+    let active_serum_len = account.serum_account_map.iter_active().count();
+    let expected_ais = active_token_len * 2 // banks + oracles
+        + active_serum_len; // open_orders
+    require!(ais.len() == expected_ais, MangoError::SomeError);
+    let banks = &ais[0..active_token_len];
+    let oracles = &ais[active_token_len..active_token_len * 2];
+    let serum_oos = &ais[active_token_len * 2..];
 
-    let banks = &ais[0..active_len];
-    let oracles = &ais[active_len..active_len * 2];
-
-    compute_health_detail(account, banks, oracles)
+    compute_health_detail(account, banks, oracles, serum_oos)
 }
 
 fn compute_health_detail(
     account: &MangoAccount,
     banks: &[AccountInfo],
     oracles: &[AccountInfo],
+    _serum_oos: &[AccountInfo],
 ) -> Result<I80F48> {
     let mut assets = I80F48::ZERO;
     let mut liabilities = I80F48::ZERO; // absolute value

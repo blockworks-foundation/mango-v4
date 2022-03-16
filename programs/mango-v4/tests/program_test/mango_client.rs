@@ -136,6 +136,11 @@ async fn derive_health_check_remaining_account_metas(
         }
     }
 
+    let serum_oos = account
+        .serum_account_map
+        .iter_active()
+        .map(|&s| s.open_orders);
+
     banks
         .iter()
         .map(|&pubkey| AccountMeta {
@@ -144,6 +149,11 @@ async fn derive_health_check_remaining_account_metas(
             is_signer: false,
         })
         .chain(oracles.iter().map(|&pubkey| AccountMeta {
+            pubkey,
+            is_writable: false,
+            is_signer: false,
+        }))
+        .chain(serum_oos.map(|pubkey| AccountMeta {
             pubkey,
             is_writable: false,
             is_signer: false,
