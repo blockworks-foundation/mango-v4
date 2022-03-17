@@ -11,6 +11,7 @@ use instructions::*;
 
 pub mod address_lookup_table;
 pub mod error;
+pub mod ids;
 pub mod instructions;
 pub mod state;
 

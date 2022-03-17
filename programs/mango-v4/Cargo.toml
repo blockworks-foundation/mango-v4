@@ -33,7 +33,8 @@ static_assertions = "1.1"
 #serum_dex = { version = "0.4.0", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false, features = ["no-entrypoint", "program"] }
 checked_math = { path = "../../lib/checked_math" }
 arrayref = "0.3.6"
-num_enum = "0.5.1"
+num_enum = "0.5.7"
+mango-macro={path="../../mango-macro"}
 
 [dev-dependencies]
 solana-sdk = { version = "1.9.5", default-features = false }

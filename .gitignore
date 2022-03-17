@@ -9,4 +9,6 @@ node_modules
 .idea
 
 programs/margin-trade/src/lib-expanded.rs
+
 programs/mango-v4/src/lib-expanded.rs
+programs/mango-v4/build-bpf.log

@@ -1,0 +1,14 @@
+[package]
+name = "mango-macro"
+version = "3.0.0"
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "1.0.74"
+solana-program = "^1.8.1"
+bytemuck = "^1.7.2"
+quote = "^1.0.9"
+safe-transmute = "^0.11.1"
