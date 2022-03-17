@@ -27,24 +27,58 @@ struct TokenInfo<'a> {
     oracle_price: I80F48, // native/native
     // in native tokens, summing token deposits/borrows and serum open orders
     balance: I80F48,
+
+    // optimization to avoid computing these multiplications multiple times
+    price_liab_cache: I80F48,
+    price_asset_cache: I80F48,
+    price_inv_cache: I80F48,
 }
 
-fn health_contribution(bank: &Bank, price: I80F48, balance: I80F48) -> Result<I80F48> {
+impl<'a> TokenInfo<'a> {
+    #[inline(always)]
+    fn price_liab(&mut self) -> I80F48 {
+        if self.price_liab_cache.is_zero() {
+            self.price_liab_cache = self.oracle_price * self.bank.init_liab_weight;
+        }
+        self.price_liab_cache
+    }
+
+    #[inline(always)]
+    fn price_asset(&mut self) -> I80F48 {
+        if self.price_asset_cache.is_zero() {
+            self.price_asset_cache = self.oracle_price * self.bank.init_asset_weight;
+        }
+        self.price_asset_cache
+    }
+
+    #[inline(always)]
+    fn price_inv(&mut self) -> I80F48 {
+        if self.price_inv_cache.is_zero() {
+            self.price_inv_cache = I80F48::ONE / self.oracle_price;
+        }
+        self.price_inv_cache
+    }
+}
+
+#[inline(always)]
+fn health_contribution(info: &mut TokenInfo, balance: I80F48) -> Result<I80F48> {
     Ok(if balance.is_negative() {
-        cm!(balance * price * bank.init_liab_weight)
+        cm!(balance * info.price_liab())
     } else {
-        cm!(balance * price * bank.init_asset_weight)
+        cm!(balance * info.price_asset())
     })
 }
 
+#[inline(always)]
 fn pair_health(
-    info1: &TokenInfo,
+    infos: &mut [TokenInfo],
+    index1: usize,
     balance1: I80F48,
-    info2: &TokenInfo,
+    index2: usize,
     balance2: I80F48,
 ) -> Result<I80F48> {
-    let health1 = health_contribution(&info1.bank, info1.oracle_price, balance1)?;
-    let health2 = health_contribution(&info2.bank, info2.oracle_price, balance2)?;
+    let health1 = health_contribution(&mut infos[index1], balance1)?;
+    let health2 = health_contribution(&mut infos[index2], balance2)?;
     Ok(cm!(health1 + health2))
 }
 
@@ -79,6 +113,9 @@ fn compute_health_detail(
                 bank,
                 oracle_price,
                 balance: I80F48::ZERO,
+                price_asset_cache: I80F48::ZERO,
+                price_liab_cache: I80F48::ZERO,
+                price_inv_cache: I80F48::ZERO,
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -116,16 +153,14 @@ fn compute_health_detail(
         let base_index = token_infos
             .iter()
             .position(|ti| ti.bank.token_index == serum_account.base_token_index)
-            .ok_or(error!(MangoError::SomeError))?;
+            .ok_or_else(|| error!(MangoError::SomeError))?;
         let quote_index = token_infos
             .iter()
             .position(|ti| ti.bank.token_index == serum_account.quote_token_index)
-            .ok_or(error!(MangoError::SomeError))?;
+            .ok_or_else(|| error!(MangoError::SomeError))?;
 
-        let base_info = &token_infos[base_index];
-        let quote_info = &token_infos[quote_index];
-        let mut base = base_info.balance;
-        let mut quote = quote_info.balance;
+        let mut base = token_infos[base_index].balance;
+        let mut quote = token_infos[quote_index].balance;
 
         let oo = load_open_orders(oo_ai)?;
 
@@ -142,13 +177,27 @@ fn compute_health_detail(
         let reserved_quote = I80F48::from_num(cm!(oo.native_pc_total - oo.native_pc_free));
         let all_in_base = cm!(base
             + reserved_base
-            + reserved_quote * quote_info.oracle_price / base_info.oracle_price);
+            + reserved_quote
+                * token_infos[quote_index].oracle_price
+                * token_infos[base_index].price_inv());
         let all_in_quote = cm!(quote
             + reserved_quote
-            + reserved_base * base_info.oracle_price / quote_info.oracle_price);
-        if pair_health(base_info, all_in_base, quote_info, quote)?
-            < pair_health(base_info, base, quote_info, all_in_quote)?
-        {
+            + reserved_base
+                * token_infos[base_index].oracle_price
+                * token_infos[quote_index].price_inv());
+        if pair_health(
+            &mut token_infos,
+            base_index,
+            all_in_base,
+            quote_index,
+            quote,
+        )? < pair_health(
+            &mut token_infos,
+            base_index,
+            base,
+            quote_index,
+            all_in_quote,
+        )? {
             base = all_in_base;
         } else {
             quote = all_in_quote;
@@ -160,12 +209,8 @@ fn compute_health_detail(
 
     // convert the token balance to health
     let mut health = I80F48::ZERO;
-    for token_info in token_infos.iter() {
-        let contrib = health_contribution(
-            &token_info.bank,
-            token_info.oracle_price,
-            token_info.balance,
-        )?;
+    for token_info in token_infos.iter_mut() {
+        let contrib = health_contribution(token_info, token_info.balance)?;
         health = cm!(health + contrib);
     }
 
