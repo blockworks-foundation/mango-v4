@@ -109,6 +109,7 @@ fn compute_health_detail(
     let mut token_infos = util::zip!(banks.iter(), oracles.iter())
         .map(|(bank_ai, oracle_ai)| {
             let bank = bank_ai.load::<Bank>()?;
+            require!(bank.group == account.group, MangoError::SomeError);
             require!(bank.oracle == oracle_ai.key(), MangoError::UnexpectedOracle);
             let oracle_price = oracle_price(oracle_ai)?;
             Ok(TokenInfo {
