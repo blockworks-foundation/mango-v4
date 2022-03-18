@@ -223,7 +223,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
         serum_markets.push(
             send_tx(
                 solana,
-                RegisterSerumMarketInstruction {
+                Serum3RegisterMarketInstruction {
                     group,
                     admin,
                     serum_program: context.serum.program_id,
@@ -247,7 +247,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
         println!("adding market {}", i);
         send_tx(
             solana,
-            CreateSerumOpenOrdersInstruction {
+            Serum3CreateOpenOrdersInstruction {
                 account,
                 serum_market,
                 owner,

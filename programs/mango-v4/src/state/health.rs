@@ -11,7 +11,7 @@ use crate::util::LoadZeroCopy;
 
 pub fn compute_health(account: &MangoAccount, ais: &[AccountInfo]) -> Result<I80F48> {
     let active_token_len = account.token_account_map.iter_active().count();
-    let active_serum_len = account.serum_account_map.iter_active().count();
+    let active_serum_len = account.serum3_account_map.iter_active().count();
     let expected_ais = active_token_len * 2 // banks + oracles
         + active_serum_len; // open_orders
     require!(ais.len() == expected_ais, MangoError::SomeError);
@@ -143,7 +143,7 @@ fn compute_health_detail(
 
     // token contribution from serum accounts
     for (serum_account, oo_ai) in
-        util::zip!(account.serum_account_map.iter_active(), serum_oos.iter())
+        util::zip!(account.serum3_account_map.iter_active(), serum_oos.iter())
     {
         // This assumes serum open orders are passed in order
         require!(

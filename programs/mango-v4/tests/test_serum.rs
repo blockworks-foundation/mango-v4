@@ -140,7 +140,7 @@ async fn test_serum() -> Result<(), TransportError> {
     //
     let serum_market = send_tx(
         solana,
-        RegisterSerumMarketInstruction {
+        Serum3RegisterMarketInstruction {
             group,
             admin,
             serum_program: context.serum.program_id,
@@ -160,7 +160,7 @@ async fn test_serum() -> Result<(), TransportError> {
     //
     let open_orders = send_tx(
         solana,
-        CreateSerumOpenOrdersInstruction {
+        Serum3CreateOpenOrdersInstruction {
             account,
             serum_market,
             owner,
@@ -174,7 +174,7 @@ async fn test_serum() -> Result<(), TransportError> {
     let account_data: MangoAccount = solana.get_account(account).await;
     assert_eq!(
         account_data
-            .serum_account_map
+            .serum3_account_map
             .iter_active()
             .map(|v| (v.open_orders, v.market_index))
             .collect::<Vec<_>>(),
@@ -186,7 +186,7 @@ async fn test_serum() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        PlaceSerumOrderInstruction {
+        Serum3PlaceOrderInstruction {
             side: 0,         // TODO: Bid
             limit_price: 10, // in quote_lot (10) per base lot (100)
             max_base_qty: 1, // in base lot (100)

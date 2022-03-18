@@ -137,7 +137,7 @@ async fn derive_health_check_remaining_account_metas(
     }
 
     let serum_oos = account
-        .serum_account_map
+        .serum3_account_map
         .iter_active()
         .map(|&s| s.open_orders);
 
@@ -631,7 +631,7 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
     }
 }
 
-pub struct RegisterSerumMarketInstruction<'keypair> {
+pub struct Serum3RegisterMarketInstruction<'keypair> {
     pub group: Pubkey,
     pub admin: &'keypair Keypair,
     pub payer: &'keypair Keypair,
@@ -639,14 +639,14 @@ pub struct RegisterSerumMarketInstruction<'keypair> {
     pub serum_program: Pubkey,
     pub serum_market_external: Pubkey,
 
-    pub market_index: SerumMarketIndex,
+    pub market_index: Serum3MarketIndex,
     pub base_token_index: TokenIndex,
     pub quote_token_index: TokenIndex,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for RegisterSerumMarketInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::RegisterSerumMarket;
-    type Instruction = mango_v4::instruction::RegisterSerumMarket;
+impl<'keypair> ClientInstruction for Serum3RegisterMarketInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::Serum3RegisterMarket;
+    type Instruction = mango_v4::instruction::Serum3RegisterMarket;
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
@@ -661,7 +661,7 @@ impl<'keypair> ClientInstruction for RegisterSerumMarketInstruction<'keypair> {
         let serum_market = Pubkey::find_program_address(
             &[
                 self.group.as_ref(),
-                b"SerumMarket".as_ref(),
+                b"Serum3Market".as_ref(),
                 self.serum_market_external.as_ref(),
             ],
             &program_id,
@@ -687,16 +687,16 @@ impl<'keypair> ClientInstruction for RegisterSerumMarketInstruction<'keypair> {
     }
 }
 
-pub struct CreateSerumOpenOrdersInstruction<'keypair> {
+pub struct Serum3CreateOpenOrdersInstruction<'keypair> {
     pub account: Pubkey,
     pub serum_market: Pubkey,
     pub owner: &'keypair Keypair,
     pub payer: &'keypair Keypair,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for CreateSerumOpenOrdersInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::CreateSerumOpenOrders;
-    type Instruction = mango_v4::instruction::CreateSerumOpenOrders;
+impl<'keypair> ClientInstruction for Serum3CreateOpenOrdersInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::Serum3CreateOpenOrders;
+    type Instruction = mango_v4::instruction::Serum3CreateOpenOrders;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -705,11 +705,11 @@ impl<'keypair> ClientInstruction for CreateSerumOpenOrdersInstruction<'keypair> 
         let instruction = Self::Instruction {};
 
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
-        let serum_market: SerumMarket = account_loader.load(&self.serum_market).await.unwrap();
+        let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = Pubkey::find_program_address(
             &[
                 self.account.as_ref(),
-                b"SerumOO".as_ref(),
+                b"Serum3OO".as_ref(),
                 self.serum_market.as_ref(),
             ],
             &program_id,
@@ -738,7 +738,7 @@ impl<'keypair> ClientInstruction for CreateSerumOpenOrdersInstruction<'keypair> 
     }
 }
 
-pub struct PlaceSerumOrderInstruction<'keypair> {
+pub struct Serum3PlaceOrderInstruction<'keypair> {
     pub side: u8,
     pub limit_price: u64,
     pub max_base_qty: u64,
@@ -754,9 +754,9 @@ pub struct PlaceSerumOrderInstruction<'keypair> {
     pub serum_market: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for PlaceSerumOrderInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::PlaceSerumOrder;
-    type Instruction = mango_v4::instruction::PlaceSerumOrder;
+impl<'keypair> ClientInstruction for Serum3PlaceOrderInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::Serum3PlaceOrder;
+    type Instruction = mango_v4::instruction::Serum3PlaceOrder;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -781,9 +781,9 @@ impl<'keypair> ClientInstruction for PlaceSerumOrderInstruction<'keypair> {
         };
 
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
-        let serum_market: SerumMarket = account_loader.load(&self.serum_market).await.unwrap();
+        let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum_account_map
+            .serum3_account_map
             .find(serum_market.market_index)
             .unwrap()
             .open_orders;

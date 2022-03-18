@@ -115,10 +115,10 @@ impl TokenAccountMap {
 }
 
 #[zero_copy]
-pub struct SerumAccount {
+pub struct Serum3Account {
     pub open_orders: Pubkey,
 
-    pub market_index: SerumMarketIndex,
+    pub market_index: Serum3MarketIndex,
 
     /// Store the base/quote token index, so health computations don't need
     /// to get passed the static SerumMarket to find which tokens a market
@@ -128,21 +128,21 @@ pub struct SerumAccount {
 }
 // TODO: static assert the size and alignment
 
-impl SerumAccount {
+impl Serum3Account {
     pub fn is_active(&self) -> bool {
-        self.market_index != SerumMarketIndex::MAX
+        self.market_index != Serum3MarketIndex::MAX
     }
 
-    pub fn is_active_for_market(&self, market_index: SerumMarketIndex) -> bool {
+    pub fn is_active_for_market(&self, market_index: Serum3MarketIndex) -> bool {
         self.market_index == market_index
     }
 }
 
-impl Default for SerumAccount {
+impl Default for Serum3Account {
     fn default() -> Self {
         Self {
             open_orders: Pubkey::default(),
-            market_index: SerumMarketIndex::MAX,
+            market_index: Serum3MarketIndex::MAX,
             base_token_index: TokenIndex::MAX,
             quote_token_index: TokenIndex::MAX,
         }
@@ -150,25 +150,25 @@ impl Default for SerumAccount {
 }
 
 #[zero_copy]
-pub struct SerumAccountMap {
-    pub values: [SerumAccount; MAX_SERUM_OPEN_ORDERS],
+pub struct Serum3AccountMap {
+    pub values: [Serum3Account; MAX_SERUM_OPEN_ORDERS],
 }
 
-impl SerumAccountMap {
+impl Serum3AccountMap {
     pub fn new() -> Self {
         Self {
-            values: [SerumAccount::default(); MAX_SERUM_OPEN_ORDERS],
+            values: [Serum3Account::default(); MAX_SERUM_OPEN_ORDERS],
         }
     }
 
-    pub fn create(&mut self, market_index: SerumMarketIndex) -> Result<&mut SerumAccount> {
+    pub fn create(&mut self, market_index: Serum3MarketIndex) -> Result<&mut Serum3Account> {
         if self.find(market_index).is_some() {
             return err!(MangoError::SomeError); // exists already
         }
         if let Some(v) = self.values.iter_mut().find(|p| !p.is_active()) {
-            *v = SerumAccount {
-                market_index: market_index as SerumMarketIndex,
-                ..SerumAccount::default()
+            *v = Serum3Account {
+                market_index: market_index as Serum3MarketIndex,
+                ..Serum3Account::default()
             };
             Ok(v)
         } else {
@@ -177,14 +177,14 @@ impl SerumAccountMap {
     }
 
     pub fn deactivate(&mut self, index: usize) {
-        self.values[index].market_index = SerumMarketIndex::MAX;
+        self.values[index].market_index = Serum3MarketIndex::MAX;
     }
 
-    pub fn iter_active(&self) -> impl Iterator<Item = &SerumAccount> {
+    pub fn iter_active(&self) -> impl Iterator<Item = &Serum3Account> {
         self.values.iter().filter(|p| p.is_active())
     }
 
-    pub fn find(&self, market_index: SerumMarketIndex) -> Option<&SerumAccount> {
+    pub fn find(&self, market_index: Serum3MarketIndex) -> Option<&Serum3Account> {
         self.values
             .iter()
             .find(|p| p.is_active_for_market(market_index))
@@ -205,7 +205,7 @@ pub struct MangoAccount {
 
     // Maps serum_market_index -> open orders for each serum market
     // that is active on this MangoAccount.
-    pub serum_account_map: SerumAccountMap,
+    pub serum3_account_map: Serum3AccountMap,
 
     /// This account cannot open new positions or borrow until `init_health >= 0`
     pub being_liquidated: bool, // TODO: for strict Pod compat, these should be u8, not bool

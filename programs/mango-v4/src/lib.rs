@@ -14,7 +14,7 @@ pub mod error;
 pub mod instructions;
 pub mod state;
 
-use state::{SerumMarketIndex, TokenIndex};
+use state::{Serum3MarketIndex, TokenIndex};
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -77,24 +77,24 @@ pub mod mango_v4 {
         instructions::margin_trade(ctx, banks_len, cpi_data)
     }
 
-    pub fn register_serum_market(
-        ctx: Context<RegisterSerumMarket>,
-        market_index: SerumMarketIndex,
+    pub fn serum3_register_market(
+        ctx: Context<Serum3RegisterMarket>,
+        market_index: Serum3MarketIndex,
         base_token_index: TokenIndex,
         quote_token_index: TokenIndex,
     ) -> Result<()> {
-        instructions::register_serum_market(ctx, market_index, base_token_index, quote_token_index)
+        instructions::serum3_register_market(ctx, market_index, base_token_index, quote_token_index)
     }
 
-    pub fn create_serum_open_orders(ctx: Context<CreateSerumOpenOrders>) -> Result<()> {
-        instructions::create_serum_open_orders(ctx)
+    pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result<()> {
+        instructions::serum3_create_open_orders(ctx)
     }
 
-    pub fn place_serum_order(
-        ctx: Context<PlaceSerumOrder>,
+    pub fn serum3_place_order(
+        ctx: Context<Serum3PlaceOrder>,
         order: instructions::NewOrderInstructionData,
     ) -> Result<()> {
-        instructions::place_serum_order(ctx, order)
+        instructions::serum3_place_order(ctx, order)
     }
 }
 

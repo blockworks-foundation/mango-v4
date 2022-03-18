@@ -4,7 +4,7 @@ use crate::error::MangoError;
 use crate::state::*;
 
 #[derive(Accounts)]
-pub struct RegisterSerumMarket<'info> {
+pub struct Serum3RegisterMarket<'info> {
     #[account(
         mut,
         has_one = admin,
@@ -19,12 +19,12 @@ pub struct RegisterSerumMarket<'info> {
     #[account(
         init,
         // using the serum_market_external in the seed guards against registering the same market twice
-        seeds = [group.key().as_ref(), b"SerumMarket".as_ref(), serum_market_external.key().as_ref()],
+        seeds = [group.key().as_ref(), b"Serum3Market".as_ref(), serum_market_external.key().as_ref()],
         bump,
         payer = payer,
-        space = 8 + std::mem::size_of::<SerumMarket>(),
+        space = 8 + std::mem::size_of::<Serum3Market>(),
     )]
-    pub serum_market: AccountLoader<'info, SerumMarket>,
+    pub serum_market: AccountLoader<'info, Serum3Market>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -33,9 +33,9 @@ pub struct RegisterSerumMarket<'info> {
 }
 
 // TODO: should this be "configure_serum_market", which allows reconfiguring?
-pub fn register_serum_market(
-    ctx: Context<RegisterSerumMarket>,
-    market_index: SerumMarketIndex,
+pub fn serum3_register_market(
+    ctx: Context<Serum3RegisterMarket>,
+    market_index: Serum3MarketIndex,
     base_token_index: TokenIndex,
     quote_token_index: TokenIndex,
 ) -> Result<()> {
@@ -43,7 +43,7 @@ pub fn register_serum_market(
     // TODO: verify that base_token_index and quote_token_index are correct!
 
     let mut serum_market = ctx.accounts.serum_market.load_init()?;
-    *serum_market = SerumMarket {
+    *serum_market = Serum3Market {
         group: ctx.accounts.group.key(),
         serum_program: ctx.accounts.serum_program.key(),
         serum_market_external: ctx.accounts.serum_market_external.key(),

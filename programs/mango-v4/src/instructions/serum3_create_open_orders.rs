@@ -5,7 +5,7 @@ use dex::serum_dex;
 use crate::state::*;
 
 #[derive(Accounts)]
-pub struct CreateSerumOpenOrders<'info> {
+pub struct Serum3CreateOpenOrders<'info> {
     // TODO: do we even need the group?
     pub group: AccountLoader<'info, Group>,
 
@@ -21,7 +21,7 @@ pub struct CreateSerumOpenOrders<'info> {
         has_one = serum_program,
         has_one = serum_market_external,
     )]
-    pub serum_market: AccountLoader<'info, SerumMarket>,
+    pub serum_market: AccountLoader<'info, Serum3Market>,
 
     // TODO: limit?
     pub serum_program: UncheckedAccount<'info>,
@@ -30,7 +30,7 @@ pub struct CreateSerumOpenOrders<'info> {
     // initialized by this instruction via cpi to serum
     #[account(
         init,
-        seeds = [account.key().as_ref(), b"SerumOO".as_ref(), serum_market.key().as_ref()],
+        seeds = [account.key().as_ref(), b"Serum3OO".as_ref(), serum_market.key().as_ref()],
         bump,
         payer = payer,
         owner = serum_program.key(),
@@ -48,7 +48,7 @@ pub struct CreateSerumOpenOrders<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn create_serum_open_orders(ctx: Context<CreateSerumOpenOrders>) -> Result<()> {
+pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result<()> {
     let serum_market = ctx.accounts.serum_market.load()?;
     let context = CpiContext::new(
         ctx.accounts.serum_program.to_account_info(),
@@ -71,7 +71,7 @@ pub fn create_serum_open_orders(ctx: Context<CreateSerumOpenOrders>) -> Result<(
 
     let mut account = ctx.accounts.account.load_mut()?;
     let serum_account = account
-        .serum_account_map
+        .serum3_account_map
         .create(serum_market.market_index)?;
     serum_account.open_orders = ctx.accounts.open_orders.key();
     serum_account.base_token_index = serum_market.base_token_index;

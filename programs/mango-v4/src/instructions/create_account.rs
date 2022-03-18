@@ -32,7 +32,7 @@ pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()
         owner: ctx.accounts.owner.key(),
         delegate: Pubkey::default(),
         token_account_map: TokenAccountMap::new(),
-        serum_account_map: SerumAccountMap::new(),
+        serum3_account_map: Serum3AccountMap::new(),
         being_liquidated: false,
         is_bankrupt: false,
         account_num,

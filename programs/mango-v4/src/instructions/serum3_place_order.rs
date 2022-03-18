@@ -102,7 +102,7 @@ impl BorshSerialize for NewOrderInstructionData {
 }
 
 #[derive(Accounts)]
-pub struct PlaceSerumOrder<'info> {
+pub struct Serum3PlaceOrder<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
@@ -122,7 +122,7 @@ pub struct PlaceSerumOrder<'info> {
         has_one = serum_program,
         has_one = serum_market_external,
     )]
-    pub serum_market: AccountLoader<'info, SerumMarket>,
+    pub serum_market: AccountLoader<'info, Serum3Market>,
     pub serum_program: UncheckedAccount<'info>,
     #[account(mut)]
     pub serum_market_external: UncheckedAccount<'info>,
@@ -163,8 +163,8 @@ pub struct PlaceSerumOrder<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn place_serum_order(
-    ctx: Context<PlaceSerumOrder>,
+pub fn serum3_place_order(
+    ctx: Context<Serum3PlaceOrder>,
     order: NewOrderInstructionData,
 ) -> Result<()> {
     //
@@ -177,7 +177,7 @@ pub fn place_serum_order(
         // Validate open_orders
         require!(
             account
-                .serum_account_map
+                .serum3_account_map
                 .find(serum_market.market_index)
                 .ok_or(error!(MangoError::SomeError))?
                 .open_orders
@@ -257,7 +257,7 @@ pub fn place_serum_order(
     Ok(())
 }
 
-fn cpi_place_order(ctx: &Context<PlaceSerumOrder>, order: NewOrderInstructionV3) -> Result<()> {
+fn cpi_place_order(ctx: &Context<Serum3PlaceOrder>, order: NewOrderInstructionV3) -> Result<()> {
     let order_payer_token_account = match order.side {
         Side::Bid => &ctx.accounts.quote_vault,
         Side::Ask => &ctx.accounts.base_vault,
@@ -305,7 +305,7 @@ fn cpi_place_order(ctx: &Context<PlaceSerumOrder>, order: NewOrderInstructionV3)
     Ok(())
 }
 
-fn cpi_settle_funds(ctx: &Context<PlaceSerumOrder>) -> Result<()> {
+fn cpi_settle_funds(ctx: &Context<Serum3PlaceOrder>) -> Result<()> {
     let data = serum_dex::instruction::MarketInstruction::SettleFunds.pack();
     let instruction = solana_program::instruction::Instruction {
         program_id: *ctx.accounts.serum_program.key,
