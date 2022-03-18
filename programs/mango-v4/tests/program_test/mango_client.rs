@@ -808,6 +808,12 @@ impl<'keypair> ClientInstruction for PlaceSerumOrderInstruction<'keypair> {
         let req_q = market_external.req_q;
         let coin_vault = market_external.coin_vault;
         let pc_vault = market_external.pc_vault;
+        let vault_signer = serum_dex::state::gen_vault_signer_key(
+            market_external.vault_signer_nonce,
+            &serum_market.serum_market_external,
+            &serum_market.serum_program,
+        )
+        .unwrap();
 
         let health_check_metas =
             derive_health_check_remaining_account_metas(&account_loader, &account, None, false)
@@ -830,6 +836,7 @@ impl<'keypair> ClientInstruction for PlaceSerumOrderInstruction<'keypair> {
             market_request_queue: from_serum_style_pubkey(&req_q),
             market_base_vault: from_serum_style_pubkey(&coin_vault),
             market_quote_vault: from_serum_style_pubkey(&pc_vault),
+            market_vault_signer: vault_signer,
             owner: self.owner.pubkey(),
             token_program: Token::id(),
             rent: sysvar::rent::Rent::id(),

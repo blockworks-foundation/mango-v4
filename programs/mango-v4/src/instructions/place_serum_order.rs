@@ -141,6 +141,8 @@ pub struct PlaceSerumOrder<'info> {
     pub market_base_vault: UncheckedAccount<'info>,
     #[account(mut)]
     pub market_quote_vault: UncheckedAccount<'info>,
+    // needed for the automatic settle_funds call
+    pub market_vault_signer: UncheckedAccount<'info>,
 
     // TODO: do we need to pass both, or just payer?
     // TODO: if we potentially settle immediately, they all need to be mut?
@@ -214,11 +216,11 @@ pub fn place_serum_order(
     // TODO: pre-health check
 
     //
-    // Place the order
+    // Apply the order to serum. Also immediately settle, in case the order
+    // matched against an existing other order.
     //
-    cpi_place_order(&ctx, &order.0)?;
-
-    // TODO: immediately call settle_funds?
+    cpi_place_order(&ctx, order.0)?;
+    cpi_settle_funds(&ctx)?;
 
     //
     // After-order tracking
@@ -255,47 +257,90 @@ pub fn place_serum_order(
     Ok(())
 }
 
-fn cpi_place_order(ctx: &Context<PlaceSerumOrder>, order: &NewOrderInstructionV3) -> Result<()> {
+fn cpi_place_order(ctx: &Context<PlaceSerumOrder>, order: NewOrderInstructionV3) -> Result<()> {
     let order_payer_token_account = match order.side {
-        Side::Bid => ctx.accounts.quote_vault.to_account_info(),
-        Side::Ask => ctx.accounts.base_vault.to_account_info(),
+        Side::Bid => &ctx.accounts.quote_vault,
+        Side::Ask => &ctx.accounts.base_vault,
     };
 
-    let context = CpiContext::new(
-        ctx.accounts.serum_program.to_account_info(),
-        dex::NewOrderV3 {
-            // generic accounts
-            market: ctx.accounts.serum_market_external.to_account_info(),
-            request_queue: ctx.accounts.market_request_queue.to_account_info(),
-            event_queue: ctx.accounts.market_event_queue.to_account_info(),
-            market_bids: ctx.accounts.market_bids.to_account_info(),
-            market_asks: ctx.accounts.market_asks.to_account_info(),
-            coin_vault: ctx.accounts.market_base_vault.to_account_info(),
-            pc_vault: ctx.accounts.market_quote_vault.to_account_info(),
-            token_program: ctx.accounts.token_program.to_account_info(),
-            rent: ctx.accounts.rent.to_account_info(),
-
-            // user accounts
-            open_orders: ctx.accounts.open_orders.to_account_info(),
-            // NOTE: this is also the user token account authority!
-            open_orders_authority: ctx.accounts.group.to_account_info(),
-            order_payer_token_account,
-        },
-    );
+    let data = serum_dex::instruction::MarketInstruction::NewOrderV3(order).pack();
+    let instruction = solana_program::instruction::Instruction {
+        program_id: *ctx.accounts.serum_program.key,
+        data,
+        accounts: vec![
+            AccountMeta::new(*ctx.accounts.serum_market_external.key, false),
+            AccountMeta::new(*ctx.accounts.open_orders.key, false),
+            AccountMeta::new(*ctx.accounts.market_request_queue.key, false),
+            AccountMeta::new(*ctx.accounts.market_event_queue.key, false),
+            AccountMeta::new(*ctx.accounts.market_bids.key, false),
+            AccountMeta::new(*ctx.accounts.market_asks.key, false),
+            AccountMeta::new(order_payer_token_account.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.group.key(), true),
+            AccountMeta::new(*ctx.accounts.market_base_vault.key, false),
+            AccountMeta::new(*ctx.accounts.market_quote_vault.key, false),
+            AccountMeta::new_readonly(*ctx.accounts.token_program.key, false),
+            AccountMeta::new_readonly(ctx.accounts.group.key(), false),
+        ],
+    };
+    let account_infos = [
+        ctx.accounts.serum_program.to_account_info(), // Have to add account of the program id
+        ctx.accounts.serum_market_external.to_account_info(),
+        ctx.accounts.open_orders.to_account_info(),
+        ctx.accounts.market_request_queue.to_account_info(),
+        ctx.accounts.market_event_queue.to_account_info(),
+        ctx.accounts.market_bids.to_account_info(),
+        ctx.accounts.market_asks.to_account_info(),
+        order_payer_token_account.to_account_info(),
+        ctx.accounts.group.to_account_info(),
+        ctx.accounts.market_base_vault.to_account_info(),
+        ctx.accounts.market_quote_vault.to_account_info(),
+        ctx.accounts.token_program.to_account_info(),
+        ctx.accounts.group.to_account_info(),
+    ];
 
     let group = ctx.accounts.group.load()?;
     let seeds = group_seeds!(group);
-    dex::new_order_v3(
-        context.with_signer(&[seeds]),
-        order.side,
-        order.limit_price,
-        order.max_coin_qty,
-        order.max_native_pc_qty_including_fees,
-        order.self_trade_behavior,
-        order.order_type,
-        order.client_order_id,
-        order.limit,
-    )?;
+    solana_program::program::invoke_signed_unchecked(&instruction, &account_infos, &[seeds])?;
+
+    Ok(())
+}
+
+fn cpi_settle_funds(ctx: &Context<PlaceSerumOrder>) -> Result<()> {
+    let data = serum_dex::instruction::MarketInstruction::SettleFunds.pack();
+    let instruction = solana_program::instruction::Instruction {
+        program_id: *ctx.accounts.serum_program.key,
+        data,
+        accounts: vec![
+            AccountMeta::new(*ctx.accounts.serum_market_external.key, false),
+            AccountMeta::new(*ctx.accounts.open_orders.key, false),
+            AccountMeta::new_readonly(ctx.accounts.group.key(), true),
+            AccountMeta::new(*ctx.accounts.market_base_vault.key, false),
+            AccountMeta::new(*ctx.accounts.market_quote_vault.key, false),
+            AccountMeta::new(ctx.accounts.base_vault.key(), false),
+            AccountMeta::new(ctx.accounts.quote_vault.key(), false),
+            AccountMeta::new_readonly(*ctx.accounts.market_vault_signer.key, false),
+            AccountMeta::new_readonly(*ctx.accounts.token_program.key, false),
+            AccountMeta::new(ctx.accounts.quote_vault.key(), false),
+        ],
+    };
+
+    let account_infos = [
+        ctx.accounts.serum_market_external.to_account_info(),
+        ctx.accounts.serum_market_external.to_account_info(),
+        ctx.accounts.open_orders.to_account_info(),
+        ctx.accounts.group.to_account_info(),
+        ctx.accounts.market_base_vault.to_account_info(),
+        ctx.accounts.market_quote_vault.to_account_info(),
+        ctx.accounts.base_vault.to_account_info(),
+        ctx.accounts.quote_vault.to_account_info(),
+        ctx.accounts.market_vault_signer.to_account_info(),
+        ctx.accounts.token_program.to_account_info(),
+        ctx.accounts.quote_vault.to_account_info(),
+    ];
+
+    let group = ctx.accounts.group.load()?;
+    let seeds = group_seeds!(group);
+    solana_program::program::invoke_signed_unchecked(&instruction, &account_infos, &[seeds])?;
 
     Ok(())
 }
