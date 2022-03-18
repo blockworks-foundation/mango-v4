@@ -845,3 +845,79 @@ impl<'keypair> ClientInstruction for PlaceSerumOrderInstruction<'keypair> {
         vec![self.owner]
     }
 }
+
+pub struct CreatePerpMarketInstruction<'keypair> {
+    pub group: Pubkey,
+    pub mint: Pubkey,
+    pub admin: &'keypair Keypair,
+    pub payer: &'keypair Keypair,
+    pub quote_lot_size: i64,
+    pub base_lot_size: i64,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for CreatePerpMarketInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::CreatePerpMarket;
+    type Instruction = mango_v4::instruction::CreatePerpMarket;
+    async fn to_instruction(
+        &self,
+        _loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            quote_lot_size: self.quote_lot_size,
+            base_lot_size: self.base_lot_size,
+        };
+
+        let oracle = Pubkey::find_program_address(
+            &[b"StubOracle".as_ref(), self.mint.as_ref()],
+            &program_id,
+        )
+        .0;
+
+        let perp_market = Pubkey::find_program_address(
+            &[self.group.as_ref(), b"PerpMarket".as_ref(), oracle.as_ref()],
+            &program_id,
+        )
+        .0;
+        let asks = Pubkey::find_program_address(
+            &[self.group.as_ref(), b"Asks".as_ref(), perp_market.as_ref()],
+            &program_id,
+        )
+        .0;
+        let bids = Pubkey::find_program_address(
+            &[self.group.as_ref(), b"Bids".as_ref(), perp_market.as_ref()],
+            &program_id,
+        )
+        .0;
+        let event_queue = Pubkey::find_program_address(
+            &[
+                self.group.as_ref(),
+                b"EventQueue".as_ref(),
+                perp_market.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            oracle,
+            perp_market,
+            asks,
+            bids,
+            event_queue,
+            payer: self.payer.pubkey(),
+            system_program: System::id(),
+            token_program: Token::id(),
+            rent: sysvar::rent::Rent::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.admin, self.payer]
+    }
+}

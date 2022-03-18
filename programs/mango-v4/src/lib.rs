@@ -96,6 +96,14 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::place_serum_order(ctx, order)
     }
+
+    pub fn create_perp_market(
+        ctx: Context<CreatePerpMarket>,
+        quote_lot_size: i64,
+        base_lot_size: i64,
+    ) -> Result<()> {
+        instructions::create_perp_market(ctx, quote_lot_size, base_lot_size)
+    }
 }
 
 #[derive(Clone)]
