@@ -8,6 +8,7 @@ pub use register_token::*;
 pub use serum3_create_open_orders::*;
 pub use serum3_place_order::*;
 pub use serum3_register_market::*;
+pub use serum3_settle_funds::*;
 pub use set_stub_oracle::*;
 pub use withdraw::*;
 
@@ -21,5 +22,6 @@ mod register_token;
 mod serum3_create_open_orders;
 mod serum3_place_order;
 mod serum3_register_market;
+mod serum3_settle_funds;
 mod set_stub_oracle;
 mod withdraw;

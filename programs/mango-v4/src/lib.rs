@@ -12,6 +12,7 @@ use instructions::*;
 pub mod address_lookup_table;
 pub mod error;
 pub mod instructions;
+mod serum3_cpi;
 pub mod state;
 
 use state::{Serum3MarketIndex, TokenIndex};
@@ -95,6 +96,10 @@ pub mod mango_v4 {
         order: instructions::NewOrderInstructionData,
     ) -> Result<()> {
         instructions::serum3_place_order(ctx, order)
+    }
+
+    pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
+        instructions::serum3_settle_funds(ctx)
     }
 
     pub fn create_perp_market(

@@ -208,5 +208,17 @@ async fn test_serum() -> Result<(), TransportError> {
     assert_eq!(native0, 1000);
     assert_eq!(native1, 900);
 
+    // TODO: Currently has no effect
+    send_tx(
+        solana,
+        Serum3SettleFundsInstruction {
+            account,
+            owner,
+            serum_market,
+        },
+    )
+    .await
+    .unwrap();
+
     Ok(())
 }
