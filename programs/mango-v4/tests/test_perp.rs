@@ -4,7 +4,7 @@ use solana_program::pubkey::Pubkey;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, transport::TransportError};
 
-use mango_v4::{instructions::CreatePerpMarket, state::*};
+use mango_v4::state::*;
 use program_test::*;
 
 mod program_test;

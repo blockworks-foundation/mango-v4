@@ -916,8 +916,6 @@ impl<'keypair> ClientInstruction for CreatePerpMarketInstruction<'keypair> {
             event_queue,
             payer: self.payer.pubkey(),
             system_program: System::id(),
-            token_program: Token::id(),
-            rent: sysvar::rent::Rent::id(),
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);
