@@ -4,6 +4,12 @@ use fixed::types::I80F48;
 use crate::error::*;
 use crate::state::*;
 
+// todo: these are arbitrary
+// ckamm: Either we put hard limits on everything, or we have a simple model for how much
+// compute a token/serum/perp market needs, so users who don't use serum markets can have
+// more perp markets open at the same time etc
+// In particular if perp markets don't require the base token to be active on the account,
+// we could probably support 1 token (quote currency) + 15 active perp markets at the same time
 const MAX_INDEXED_POSITIONS: usize = 16;
 const MAX_SERUM_OPEN_ORDERS: usize = 8;
 
