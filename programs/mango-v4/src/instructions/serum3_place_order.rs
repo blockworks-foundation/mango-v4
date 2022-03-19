@@ -147,14 +147,14 @@ pub struct Serum3PlaceOrder<'info> {
     // TODO: do we need to pass both, or just payer?
     // TODO: if we potentially settle immediately, they all need to be mut?
     // TODO: Can we reduce the number of accounts by requiring the banks
-    // to be in the remainingAccounts (where they need to be anyway, for
-    // health checks - but they need to be mut)
-    // Validated inline
-    #[account(mut)]
+    //       to be in the remainingAccounts (where they need to be anyway, for
+    //       health checks - but they need to be mut)
+    // token_index and bank.vault == vault is validated inline
+    #[account(mut, has_one = group)]
     pub quote_bank: AccountLoader<'info, Bank>,
     #[account(mut)]
     pub quote_vault: Box<Account<'info, TokenAccount>>,
-    #[account(mut)]
+    #[account(mut, has_one = group)]
     pub base_bank: AccountLoader<'info, Bank>,
     #[account(mut)]
     pub base_vault: Box<Account<'info, TokenAccount>>,

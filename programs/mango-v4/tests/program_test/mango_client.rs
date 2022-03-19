@@ -900,10 +900,6 @@ impl<'keypair> ClientInstruction for Serum3SettleFundsInstruction<'keypair> {
         )
         .unwrap();
 
-        let health_check_metas =
-            derive_health_check_remaining_account_metas(&account_loader, &account, None, false)
-                .await;
-
         let accounts = Self::Accounts {
             group: account.group,
             account: self.account,
@@ -922,9 +918,7 @@ impl<'keypair> ClientInstruction for Serum3SettleFundsInstruction<'keypair> {
             token_program: Token::id(),
         };
 
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
-        instruction.accounts.extend(health_check_metas.into_iter());
-
+        let instruction = make_instruction(program_id, &accounts, instruction);
         (accounts, instruction)
     }
 
@@ -932,6 +926,7 @@ impl<'keypair> ClientInstruction for Serum3SettleFundsInstruction<'keypair> {
         vec![self.owner]
     }
 }
+
 pub struct CreatePerpMarketInstruction<'keypair> {
     pub group: Pubkey,
     pub mint: Pubkey,

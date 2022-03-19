@@ -39,17 +39,12 @@ pub struct Serum3SettleFunds<'info> {
     // needed for the automatic settle_funds call
     pub market_vault_signer: UncheckedAccount<'info>,
 
-    // TODO: do we need to pass both, or just payer?
-    // TODO: if we potentially settle immediately, they all need to be mut?
-    // TODO: Can we reduce the number of accounts by requiring the banks
-    // to be in the remainingAccounts (where they need to be anyway, for
-    // health checks - but they need to be mut)
-    // Validated inline
-    #[account(mut)]
+    // token_index and bank.vault == vault is validated inline
+    #[account(mut, has_one = group)]
     pub quote_bank: AccountLoader<'info, Bank>,
     #[account(mut)]
     pub quote_vault: Box<Account<'info, TokenAccount>>,
-    #[account(mut)]
+    #[account(mut, has_one = group)]
     pub base_bank: AccountLoader<'info, Bank>,
     #[account(mut)]
     pub base_vault: Box<Account<'info, TokenAccount>>,
@@ -109,8 +104,6 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     let before_base_vault = ctx.accounts.base_vault.amount;
     let before_quote_vault = ctx.accounts.quote_vault.amount;
 
-    // TODO: pre-health check
-
     //
     // Settle
     //
@@ -139,15 +132,6 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
             (after_quote_vault - before_quote_vault) as i64,
         )?;
     }
-
-    //
-    // Health check
-    //
-    let account = ctx.accounts.account.load()?;
-    let health = compute_health(&account, &ctx.remaining_accounts)?;
-    msg!("health: {}", health);
-    // TODO: settle_funds should always succeed - check here if the health impact
-    // brings a user back over the liquidation threshold?
 
     Ok(())
 }
