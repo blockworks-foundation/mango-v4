@@ -139,21 +139,17 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
 fn cpi_settle_funds(ctx: &Serum3SettleFunds) -> Result<()> {
     use crate::serum3_cpi;
     let group = ctx.group.load()?;
-    serum3_cpi::settle_funds(
-        &group,
-        serum3_cpi::SettleFunds {
-            program: ctx.serum_program.to_account_info(),
-            market: ctx.serum_market_external.to_account_info(),
-            open_orders: ctx.open_orders.to_account_info(),
-            open_orders_authority: ctx.group.to_account_info(),
-            base_vault: ctx.market_base_vault.to_account_info(),
-            quote_vault: ctx.market_quote_vault.to_account_info(),
-            user_base_wallet: ctx.base_vault.to_account_info(),
-            user_quote_wallet: ctx.quote_vault.to_account_info(),
-            vault_signer: ctx.market_vault_signer.to_account_info(),
-            token_program: ctx.token_program.to_account_info(),
-        },
-    )?;
-
-    Ok(())
+    serum3_cpi::SettleFunds {
+        program: ctx.serum_program.to_account_info(),
+        market: ctx.serum_market_external.to_account_info(),
+        open_orders: ctx.open_orders.to_account_info(),
+        open_orders_authority: ctx.group.to_account_info(),
+        base_vault: ctx.market_base_vault.to_account_info(),
+        quote_vault: ctx.market_quote_vault.to_account_info(),
+        user_base_wallet: ctx.base_vault.to_account_info(),
+        user_quote_wallet: ctx.quote_vault.to_account_info(),
+        vault_signer: ctx.market_vault_signer.to_account_info(),
+        token_program: ctx.token_program.to_account_info(),
+    }
+    .call(&group)
 }

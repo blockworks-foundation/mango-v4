@@ -1,5 +1,6 @@
 #![cfg(feature = "test-bpf")]
 
+use anchor_spl::dex::serum_dex;
 use solana_program::pubkey::Pubkey;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, transport::TransportError};
@@ -208,7 +209,33 @@ async fn test_serum() -> Result<(), TransportError> {
     assert_eq!(native0, 1000);
     assert_eq!(native1, 900);
 
-    // TODO: Currently has no effect
+    // get the order id
+    let open_orders_bytes = solana.get_account_data(open_orders).await.unwrap();
+    let open_orders_data: &serum_dex::state::OpenOrders = bytemuck::from_bytes(
+        &open_orders_bytes[5..5 + std::mem::size_of::<serum_dex::state::OpenOrders>()],
+    );
+    let order_id = open_orders_data.orders[0];
+    assert!(order_id != 0);
+
+    //
+    // TEST: Cancel the order
+    //
+    send_tx(
+        solana,
+        Serum3CancelOrderInstruction {
+            side: 0,
+            order_id,
+            account,
+            owner,
+            serum_market,
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: Settle, moving the freed up funds back
+    //
     send_tx(
         solana,
         Serum3SettleFundsInstruction {
@@ -219,6 +246,11 @@ async fn test_serum() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+
+    let native0 = account_position(solana, account, bank0).await;
+    let native1 = account_position(solana, account, bank1).await;
+    assert_eq!(native0, 1000);
+    assert_eq!(native1, 1000);
 
     Ok(())
 }

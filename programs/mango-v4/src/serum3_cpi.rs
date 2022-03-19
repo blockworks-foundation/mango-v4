@@ -16,43 +16,45 @@ pub struct SettleFunds<'info> {
     pub token_program: AccountInfo<'info>,
 }
 
-pub fn settle_funds(group: &Group, ctx: SettleFunds) -> Result<()> {
-    let data = serum_dex::instruction::MarketInstruction::SettleFunds.pack();
-    let instruction = solana_program::instruction::Instruction {
-        program_id: *ctx.program.key,
-        data,
-        accounts: vec![
-            AccountMeta::new(*ctx.market.key, false),
-            AccountMeta::new(*ctx.open_orders.key, false),
-            AccountMeta::new_readonly(*ctx.open_orders_authority.key, true),
-            AccountMeta::new(*ctx.base_vault.key, false),
-            AccountMeta::new(*ctx.quote_vault.key, false),
-            AccountMeta::new(*ctx.user_base_wallet.key, false),
-            AccountMeta::new(*ctx.user_quote_wallet.key, false),
-            AccountMeta::new_readonly(*ctx.vault_signer.key, false),
-            AccountMeta::new_readonly(*ctx.token_program.key, false),
-            AccountMeta::new(*ctx.user_quote_wallet.key, false),
-        ],
-    };
+impl<'a> SettleFunds<'a> {
+    pub fn call(self, group: &Group) -> Result<()> {
+        let data = serum_dex::instruction::MarketInstruction::SettleFunds.pack();
+        let instruction = solana_program::instruction::Instruction {
+            program_id: *self.program.key,
+            data,
+            accounts: vec![
+                AccountMeta::new(*self.market.key, false),
+                AccountMeta::new(*self.open_orders.key, false),
+                AccountMeta::new_readonly(*self.open_orders_authority.key, true),
+                AccountMeta::new(*self.base_vault.key, false),
+                AccountMeta::new(*self.quote_vault.key, false),
+                AccountMeta::new(*self.user_base_wallet.key, false),
+                AccountMeta::new(*self.user_quote_wallet.key, false),
+                AccountMeta::new_readonly(*self.vault_signer.key, false),
+                AccountMeta::new_readonly(*self.token_program.key, false),
+                AccountMeta::new(*self.user_quote_wallet.key, false),
+            ],
+        };
 
-    let account_infos = [
-        ctx.program,
-        ctx.market,
-        ctx.open_orders,
-        ctx.open_orders_authority,
-        ctx.base_vault,
-        ctx.quote_vault,
-        ctx.user_base_wallet,
-        ctx.user_quote_wallet.clone(),
-        ctx.vault_signer,
-        ctx.token_program,
-        ctx.user_quote_wallet,
-    ];
+        let account_infos = [
+            self.program,
+            self.market,
+            self.open_orders,
+            self.open_orders_authority,
+            self.base_vault,
+            self.quote_vault,
+            self.user_base_wallet,
+            self.user_quote_wallet.clone(),
+            self.vault_signer,
+            self.token_program,
+            self.user_quote_wallet,
+        ];
 
-    let seeds = group_seeds!(group);
-    solana_program::program::invoke_signed_unchecked(&instruction, &account_infos, &[seeds])?;
+        let seeds = group_seeds!(group);
+        solana_program::program::invoke_signed_unchecked(&instruction, &account_infos, &[seeds])?;
 
-    Ok(())
+        Ok(())
+    }
 }
 
 pub struct PlaceOrder<'info> {
@@ -72,48 +74,97 @@ pub struct PlaceOrder<'info> {
     pub user_authority: AccountInfo<'info>,
 }
 
-pub fn place_order(
-    group: &Group,
-    ctx: PlaceOrder,
-    order: serum_dex::instruction::NewOrderInstructionV3,
-) -> Result<()> {
-    let data = serum_dex::instruction::MarketInstruction::NewOrderV3(order).pack();
-    let instruction = solana_program::instruction::Instruction {
-        program_id: *ctx.program.key,
-        data,
-        accounts: vec![
-            AccountMeta::new(*ctx.market.key, false),
-            AccountMeta::new(*ctx.open_orders.key, false),
-            AccountMeta::new(*ctx.request_queue.key, false),
-            AccountMeta::new(*ctx.event_queue.key, false),
-            AccountMeta::new(*ctx.bids.key, false),
-            AccountMeta::new(*ctx.asks.key, false),
-            AccountMeta::new(*ctx.order_payer_token_account.key, false),
-            AccountMeta::new_readonly(*ctx.user_authority.key, true),
-            AccountMeta::new(*ctx.base_vault.key, false),
-            AccountMeta::new(*ctx.quote_vault.key, false),
-            AccountMeta::new_readonly(*ctx.token_program.key, false),
-            AccountMeta::new_readonly(*ctx.user_authority.key, false),
-        ],
-    };
-    let account_infos = [
-        ctx.program,
-        ctx.market,
-        ctx.open_orders,
-        ctx.request_queue,
-        ctx.event_queue,
-        ctx.bids,
-        ctx.asks,
-        ctx.order_payer_token_account,
-        ctx.user_authority.clone(),
-        ctx.base_vault,
-        ctx.quote_vault,
-        ctx.token_program,
-        ctx.user_authority,
-    ];
+impl<'a> PlaceOrder<'a> {
+    pub fn call(
+        self,
+        group: &Group,
+        order: serum_dex::instruction::NewOrderInstructionV3,
+    ) -> Result<()> {
+        let data = serum_dex::instruction::MarketInstruction::NewOrderV3(order).pack();
+        let instruction = solana_program::instruction::Instruction {
+            program_id: *self.program.key,
+            data,
+            accounts: vec![
+                AccountMeta::new(*self.market.key, false),
+                AccountMeta::new(*self.open_orders.key, false),
+                AccountMeta::new(*self.request_queue.key, false),
+                AccountMeta::new(*self.event_queue.key, false),
+                AccountMeta::new(*self.bids.key, false),
+                AccountMeta::new(*self.asks.key, false),
+                AccountMeta::new(*self.order_payer_token_account.key, false),
+                AccountMeta::new_readonly(*self.user_authority.key, true),
+                AccountMeta::new(*self.base_vault.key, false),
+                AccountMeta::new(*self.quote_vault.key, false),
+                AccountMeta::new_readonly(*self.token_program.key, false),
+                AccountMeta::new_readonly(*self.user_authority.key, false),
+            ],
+        };
+        let account_infos = [
+            self.program,
+            self.market,
+            self.open_orders,
+            self.request_queue,
+            self.event_queue,
+            self.bids,
+            self.asks,
+            self.order_payer_token_account,
+            self.user_authority.clone(),
+            self.base_vault,
+            self.quote_vault,
+            self.token_program,
+            self.user_authority,
+        ];
 
-    let seeds = group_seeds!(group);
-    solana_program::program::invoke_signed_unchecked(&instruction, &account_infos, &[seeds])?;
+        let seeds = group_seeds!(group);
+        solana_program::program::invoke_signed_unchecked(&instruction, &account_infos, &[seeds])?;
 
-    Ok(())
+        Ok(())
+    }
+}
+
+pub struct CancelOrder<'info> {
+    pub program: AccountInfo<'info>,
+    pub market: AccountInfo<'info>,
+    pub event_queue: AccountInfo<'info>,
+    pub bids: AccountInfo<'info>,
+    pub asks: AccountInfo<'info>,
+
+    pub open_orders: AccountInfo<'info>,
+    pub open_orders_authority: AccountInfo<'info>,
+}
+
+impl<'a> CancelOrder<'a> {
+    pub fn call(
+        self,
+        group: &Group,
+        order: serum_dex::instruction::CancelOrderInstructionV2,
+    ) -> Result<()> {
+        let data = serum_dex::instruction::MarketInstruction::CancelOrderV2(order).pack();
+        let instruction = solana_program::instruction::Instruction {
+            program_id: *self.program.key,
+            data,
+            accounts: vec![
+                AccountMeta::new(*self.market.key, false),
+                AccountMeta::new(*self.bids.key, false),
+                AccountMeta::new(*self.asks.key, false),
+                AccountMeta::new(*self.open_orders.key, false),
+                AccountMeta::new_readonly(*self.open_orders_authority.key, true),
+                AccountMeta::new(*self.event_queue.key, false),
+            ],
+        };
+        let account_infos = [
+            self.program,
+            self.market,
+            self.bids,
+            self.asks,
+            self.open_orders,
+            self.open_orders_authority,
+            self.event_queue,
+        ];
+
+        let seeds = group_seeds!(group);
+        solana_program::program::invoke_signed_unchecked(&instruction, &account_infos, &[seeds])?;
+
+        Ok(())
+    }
 }

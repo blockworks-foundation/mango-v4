@@ -99,6 +99,13 @@ pub mod mango_v4 {
         instructions::serum3_place_order(ctx, order)
     }
 
+    pub fn serum3_cancel_order(
+        ctx: Context<Serum3CancelOrder>,
+        order: instructions::CancelOrderInstructionData,
+    ) -> Result<()> {
+        instructions::serum3_cancel_order(ctx, order)
+    }
+
     pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         instructions::serum3_settle_funds(ctx)
     }

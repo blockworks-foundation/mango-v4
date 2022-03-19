@@ -852,6 +852,75 @@ impl<'keypair> ClientInstruction for Serum3PlaceOrderInstruction<'keypair> {
     }
 }
 
+pub struct Serum3CancelOrderInstruction<'keypair> {
+    pub side: u8,
+    pub order_id: u128,
+
+    pub account: Pubkey,
+    pub owner: &'keypair Keypair,
+
+    pub serum_market: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for Serum3CancelOrderInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::Serum3CancelOrder;
+    type Instruction = mango_v4::instruction::Serum3CancelOrder;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            order: mango_v4::instructions::CancelOrderInstructionData(
+                anchor_spl::dex::serum_dex::instruction::CancelOrderInstructionV2 {
+                    side: self.side.try_into().unwrap(),
+                    order_id: self.order_id,
+                },
+            ),
+        };
+
+        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
+        let open_orders = account
+            .serum3_account_map
+            .find(serum_market.market_index)
+            .unwrap()
+            .open_orders;
+
+        let market_external_bytes = account_loader
+            .load_bytes(&serum_market.serum_market_external)
+            .await
+            .unwrap();
+        let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
+            &market_external_bytes[5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
+        );
+        // unpack the data, to avoid unaligned references
+        let bids = market_external.bids;
+        let asks = market_external.asks;
+        let event_q = market_external.event_q;
+
+        let accounts = Self::Accounts {
+            group: account.group,
+            account: self.account,
+            open_orders,
+            serum_market: self.serum_market,
+            serum_program: serum_market.serum_program,
+            serum_market_external: serum_market.serum_market_external,
+            market_bids: from_serum_style_pubkey(&bids),
+            market_asks: from_serum_style_pubkey(&asks),
+            market_event_queue: from_serum_style_pubkey(&event_q),
+            owner: self.owner.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.owner]
+    }
+}
+
 pub struct Serum3SettleFundsInstruction<'keypair> {
     pub account: Pubkey,
     pub owner: &'keypair Keypair,
