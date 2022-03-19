@@ -4,8 +4,8 @@ use fixed::types::I80F48;
 use crate::error::*;
 use crate::state::*;
 
-const MAX_INDEXED_POSITIONS: usize = 32;
-const MAX_SERUM_OPEN_ORDERS: usize = 16;
+const MAX_INDEXED_POSITIONS: usize = 16;
+const MAX_SERUM_OPEN_ORDERS: usize = 8;
 
 #[zero_copy]
 pub struct TokenAccount {

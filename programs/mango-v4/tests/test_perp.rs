@@ -140,6 +140,9 @@ async fn test_perp() -> Result<(), TransportError> {
             admin,
             payer,
             mint: mint0.pubkey,
+            perp_market_index: 0,
+            base_token_index,
+            quote_token_index,
             // e.g. BTC mango-v3 mainnet.1
             quote_lot_size: 10,
             base_lot_size: 100,

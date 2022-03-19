@@ -1,5 +1,9 @@
 use anchor_lang::prelude::*;
 
+use crate::state::TokenIndex;
+
+pub type PerpMarketIndex = u16;
+
 #[account(zero_copy)]
 pub struct PerpMarket {
     // todo
@@ -65,4 +69,13 @@ pub struct PerpMarket {
 
     /// pda bump
     pub bump: u8,
+
+    /// useful for looking up respective perp account
+    pub perp_market_index: PerpMarketIndex,
+    /// useful for looking up respective base token,
+    /// note: is optional, since perp market can exist without a corresponding base token,
+    /// should be TokenIndex::MAX in that case
+    pub base_token_index: TokenIndex,
+    /// useful for looking up respective quote token
+    pub quote_token_index: TokenIndex,
 }

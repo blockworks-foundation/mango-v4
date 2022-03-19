@@ -15,12 +15,13 @@ pub mod instructions;
 mod serum3_cpi;
 pub mod state;
 
-use state::{Serum3MarketIndex, TokenIndex};
+use state::{PerpMarketIndex, Serum3MarketIndex, TokenIndex};
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
 #[program]
 pub mod mango_v4 {
+
     use super::*;
 
     pub fn create_group(ctx: Context<CreateGroup>) -> Result<()> {
@@ -104,10 +105,20 @@ pub mod mango_v4 {
 
     pub fn create_perp_market(
         ctx: Context<CreatePerpMarket>,
+        perp_market_index: PerpMarketIndex,
+        base_token_index_opt: Option<TokenIndex>,
+        quote_token_index: TokenIndex,
         quote_lot_size: i64,
         base_lot_size: i64,
     ) -> Result<()> {
-        instructions::create_perp_market(ctx, quote_lot_size, base_lot_size)
+        instructions::create_perp_market(
+            ctx,
+            perp_market_index,
+            base_token_index_opt,
+            quote_token_index,
+            quote_lot_size,
+            base_lot_size,
+        )
     }
 }
 

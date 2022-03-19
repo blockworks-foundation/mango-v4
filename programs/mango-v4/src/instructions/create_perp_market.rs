@@ -4,6 +4,7 @@ use crate::error::MangoError;
 use crate::state::*;
 
 #[derive(Accounts)]
+#[instruction(perp_market_index: PerpMarketIndex)]
 pub struct CreatePerpMarket<'info> {
     #[account(
         has_one = admin,
@@ -15,7 +16,7 @@ pub struct CreatePerpMarket<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"PerpMarket".as_ref(), oracle.key().as_ref()],
+        seeds = [group.key().as_ref(), b"PerpMarket".as_ref(), &perp_market_index.to_le_bytes().as_ref()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<PerpMarket>(),
@@ -54,6 +55,9 @@ pub struct CreatePerpMarket<'info> {
 
 pub fn create_perp_market(
     ctx: Context<CreatePerpMarket>,
+    perp_market_index: PerpMarketIndex,
+    base_token_index_opt: Option<TokenIndex>,
+    quote_token_index: TokenIndex,
     quote_lot_size: i64,
     base_lot_size: i64,
     // todo
@@ -80,7 +84,19 @@ pub fn create_perp_market(
         // liquidity_mining_info,
         // mngo_vault: ctx.accounts.mngo_vault.key(),
         bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
+        perp_market_index,
+        base_token_index: base_token_index_opt.ok_or(TokenIndex::MAX).unwrap(),
+        quote_token_index,
     };
+
+    let mut asks = ctx.accounts.asks.load_init()?;
+    *asks = Book {};
+
+    let mut bids = ctx.accounts.bids.load_init()?;
+    *bids = Book {};
+
+    let mut event_queue = ctx.accounts.event_queue.load_init()?;
+    *event_queue = EventQueue {};
 
     Ok(())
 }

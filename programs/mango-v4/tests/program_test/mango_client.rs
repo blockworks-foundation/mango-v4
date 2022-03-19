@@ -932,12 +932,14 @@ impl<'keypair> ClientInstruction for Serum3SettleFundsInstruction<'keypair> {
         vec![self.owner]
     }
 }
-
 pub struct CreatePerpMarketInstruction<'keypair> {
     pub group: Pubkey,
     pub mint: Pubkey,
     pub admin: &'keypair Keypair,
     pub payer: &'keypair Keypair,
+    pub perp_market_index: PerpMarketIndex,
+    pub base_token_index: TokenIndex,
+    pub quote_token_index: TokenIndex,
     pub quote_lot_size: i64,
     pub base_lot_size: i64,
 }
@@ -951,6 +953,9 @@ impl<'keypair> ClientInstruction for CreatePerpMarketInstruction<'keypair> {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
+            perp_market_index: self.perp_market_index,
+            base_token_index_opt: Option::from(self.base_token_index),
+            quote_token_index: self.quote_token_index,
             quote_lot_size: self.quote_lot_size,
             base_lot_size: self.base_lot_size,
         };
@@ -962,7 +967,11 @@ impl<'keypair> ClientInstruction for CreatePerpMarketInstruction<'keypair> {
         .0;
 
         let perp_market = Pubkey::find_program_address(
-            &[self.group.as_ref(), b"PerpMarket".as_ref(), oracle.as_ref()],
+            &[
+                self.group.as_ref(),
+                b"PerpMarket".as_ref(),
+                self.perp_market_index.to_le_bytes().as_ref(),
+            ],
             &program_id,
         )
         .0;
