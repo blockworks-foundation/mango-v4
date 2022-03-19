@@ -10,6 +10,8 @@ use crate::state::*;
 // more perp markets open at the same time etc
 // In particular if perp markets don't require the base token to be active on the account,
 // we could probably support 1 token (quote currency) + 15 active perp markets at the same time
+// It's a tradeoff between allowing users to trade on many markets with one account,
+// MangoAccount size and health compute needs.
 const MAX_INDEXED_POSITIONS: usize = 16;
 const MAX_SERUM_OPEN_ORDERS: usize = 8;
 

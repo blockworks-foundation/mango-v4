@@ -57,6 +57,11 @@ pub struct Serum3SettleFunds<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+/// Settling means moving free funds from the serum3 open orders account
+/// back into the mango account wallet.
+///
+/// There will be free funds on open_orders when an order was triggered.
+///
 pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     //
     // Validation
@@ -141,7 +146,8 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     let account = ctx.accounts.account.load()?;
     let health = compute_health(&account, &ctx.remaining_accounts)?;
     msg!("health: {}", health);
-    require!(health >= 0, MangoError::SomeError);
+    // TODO: settle_funds should always succeed - check here if the health impact
+    // brings a user back over the liquidation threshold?
 
     Ok(())
 }
