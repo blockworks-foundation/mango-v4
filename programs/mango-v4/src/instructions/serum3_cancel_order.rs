@@ -47,7 +47,7 @@ impl BorshDeserialize for CancelOrderInstructionData {
 impl BorshSerialize for CancelOrderInstructionData {
     fn serialize<W: Write>(&self, writer: &mut W) -> std::result::Result<(), std::io::Error> {
         // serum_dex uses bincode::serialize() internally, see MarketInstruction::pack()
-        writer.write(&bincode::serialize(&self.0).unwrap())?;
+        writer.write_all(&bincode::serialize(&self.0).unwrap())?;
         Ok(())
     }
 }
@@ -104,7 +104,7 @@ pub fn serum3_cancel_order(
             account
                 .serum3_account_map
                 .find(serum_market.market_index)
-                .ok_or(error!(MangoError::SomeError))?
+                .ok_or_else(|| error!(MangoError::SomeError))?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
             MangoError::SomeError

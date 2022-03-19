@@ -70,7 +70,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
             account
                 .serum3_account_map
                 .find(serum_market.market_index)
-                .ok_or(error!(MangoError::SomeError))?
+                .ok_or_else(|| error!(MangoError::SomeError))?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
             MangoError::SomeError
