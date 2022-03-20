@@ -79,6 +79,10 @@ pub mod mango_v4 {
         instructions::margin_trade(ctx, banks_len, cpi_data)
     }
 
+    ///
+    /// Serum
+    ///
+
     pub fn serum3_register_market(
         ctx: Context<Serum3RegisterMarket>,
         market_index: Serum3MarketIndex,
@@ -110,6 +114,10 @@ pub mod mango_v4 {
         instructions::serum3_settle_funds(ctx)
     }
 
+    ///
+    /// Perps
+    ///
+
     pub fn create_perp_market(
         ctx: Context<CreatePerpMarket>,
         perp_market_index: PerpMarketIndex,
@@ -126,6 +134,10 @@ pub mod mango_v4 {
             quote_lot_size,
             base_lot_size,
         )
+    }
+
+    pub fn place_perp_order(ctx: Context<PlacePerpOrder>) -> Result<()> {
+        instructions::place_perp_order(ctx)
     }
 }
 

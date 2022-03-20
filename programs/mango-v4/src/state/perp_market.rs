@@ -5,6 +5,12 @@ use crate::state::TokenIndex;
 pub type PerpMarketIndex = u16;
 
 #[account(zero_copy)]
+pub struct EventQueue {}
+
+#[account(zero_copy)]
+pub struct Book {}
+
+#[account(zero_copy)]
 pub struct PerpMarket {
     // todo
     /// metadata
