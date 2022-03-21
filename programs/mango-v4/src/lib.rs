@@ -114,6 +114,13 @@ pub mod mango_v4 {
         instructions::serum3_settle_funds(ctx)
     }
 
+    pub fn serum3_liq_force_cancel_orders(
+        ctx: Context<Serum3LiqForceCancelOrders>,
+        limit: u8,
+    ) -> Result<()> {
+        instructions::serum3_liq_force_cancel_orders(ctx, limit)
+    }
+
     ///
     /// Perps
     ///

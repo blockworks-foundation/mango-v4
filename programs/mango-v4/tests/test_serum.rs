@@ -1,6 +1,5 @@
 #![cfg(feature = "test-bpf")]
 
-use anchor_spl::dex::serum_dex;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, transport::TransportError};
 

@@ -1,6 +1,4 @@
 use anchor_lang::prelude::*;
-use anchor_spl::dex;
-use dex::serum_dex;
 
 use crate::state::*;
 
@@ -49,26 +47,9 @@ pub struct Serum3CreateOpenOrders<'info> {
 }
 
 pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result<()> {
-    let serum_market = ctx.accounts.serum_market.load()?;
-    let context = CpiContext::new(
-        ctx.accounts.serum_program.to_account_info(),
-        dex::InitOpenOrders {
-            open_orders: ctx.accounts.open_orders.to_account_info(),
-            // The open order authority must be the same as the authority on
-            // the vault accounts, because serum's placeorder doesn't distinguish
-            // the two authorities.
-            authority: ctx.accounts.group.to_account_info(),
-            market: ctx.accounts.serum_market_external.to_account_info(),
-            rent: ctx.accounts.rent.to_account_info(),
-        },
-    );
-    let group = ctx.accounts.group.load()?;
-    let seeds = group_seeds!(group);
-    // TODO: Anchor's code _forces_ anchor_spl::dex::id() as a program id.
-    //       Are we ok with that? that would mean storing serum_program is not
-    //       necessary.
-    dex::init_open_orders(context.with_signer(&[seeds]))?;
+    cpi_init_open_orders(&ctx.accounts)?;
 
+    let serum_market = ctx.accounts.serum_market.load()?;
     let mut account = ctx.accounts.account.load_mut()?;
     let serum_account = account
         .serum3_account_map
@@ -90,4 +71,17 @@ pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result
     base_position.in_use_count += 1;
 
     Ok(())
+}
+
+fn cpi_init_open_orders(ctx: &Serum3CreateOpenOrders) -> Result<()> {
+    use crate::serum3_cpi;
+    let group = ctx.group.load()?;
+    serum3_cpi::InitOpenOrders {
+        program: ctx.serum_program.to_account_info(),
+        market: ctx.serum_market_external.to_account_info(),
+        open_orders: ctx.open_orders.to_account_info(),
+        open_orders_authority: ctx.group.to_account_info(),
+        rent: ctx.rent.to_account_info(),
+    }
+    .call(&group)
 }

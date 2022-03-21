@@ -2,7 +2,6 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::{self, SysvarId};
-use anchor_spl::dex::serum_dex;
 use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use solana_program::instruction::Instruction;
@@ -764,7 +763,7 @@ impl<'keypair> ClientInstruction for Serum3PlaceOrderInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             order: mango_v4::instructions::NewOrderInstructionData(
-                anchor_spl::dex::serum_dex::instruction::NewOrderInstructionV3 {
+                serum_dex::instruction::NewOrderInstructionV3 {
                     side: self.side.try_into().unwrap(),
                     limit_price: self.limit_price.try_into().unwrap(),
                     max_coin_qty: self.max_base_qty.try_into().unwrap(),
@@ -872,7 +871,7 @@ impl<'keypair> ClientInstruction for Serum3CancelOrderInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             order: mango_v4::instructions::CancelOrderInstructionData(
-                anchor_spl::dex::serum_dex::instruction::CancelOrderInstructionV2 {
+                serum_dex::instruction::CancelOrderInstructionV2 {
                     side: self.side.try_into().unwrap(),
                     order_id: self.order_id,
                 },
@@ -993,6 +992,85 @@ impl<'keypair> ClientInstruction for Serum3SettleFundsInstruction<'keypair> {
 
     fn signers(&self) -> Vec<&Keypair> {
         vec![self.owner]
+    }
+}
+
+pub struct Serum3LiqForceCancelOrdersInstruction {
+    pub account: Pubkey,
+    pub serum_market: Pubkey,
+    pub limit: u8,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
+    type Accounts = mango_v4::accounts::Serum3LiqForceCancelOrders;
+    type Instruction = mango_v4::instruction::Serum3LiqForceCancelOrders;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction { limit: self.limit };
+
+        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
+        let open_orders = account
+            .serum3_account_map
+            .find(serum_market.market_index)
+            .unwrap()
+            .open_orders;
+        let quote_info =
+            get_mint_info_by_token_index(&account_loader, &account, serum_market.quote_token_index)
+                .await;
+        let base_info =
+            get_mint_info_by_token_index(&account_loader, &account, serum_market.base_token_index)
+                .await;
+
+        let market_external_bytes = account_loader
+            .load_bytes(&serum_market.serum_market_external)
+            .await
+            .unwrap();
+        let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
+            &market_external_bytes[5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
+        );
+        // unpack the data, to avoid unaligned references
+        let bids = market_external.bids;
+        let asks = market_external.asks;
+        let event_q = market_external.event_q;
+        let coin_vault = market_external.coin_vault;
+        let pc_vault = market_external.pc_vault;
+        let vault_signer = serum_dex::state::gen_vault_signer_key(
+            market_external.vault_signer_nonce,
+            &serum_market.serum_market_external,
+            &serum_market.serum_program,
+        )
+        .unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.group,
+            account: self.account,
+            open_orders,
+            quote_bank: quote_info.bank,
+            quote_vault: quote_info.vault,
+            base_bank: base_info.bank,
+            base_vault: base_info.vault,
+            serum_market: self.serum_market,
+            serum_program: serum_market.serum_program,
+            serum_market_external: serum_market.serum_market_external,
+            market_bids: from_serum_style_pubkey(&bids),
+            market_asks: from_serum_style_pubkey(&asks),
+            market_event_queue: from_serum_style_pubkey(&event_q),
+            market_base_vault: from_serum_style_pubkey(&coin_vault),
+            market_quote_vault: from_serum_style_pubkey(&pc_vault),
+            market_vault_signer: vault_signer,
+            token_program: Token::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![]
     }
 }
 

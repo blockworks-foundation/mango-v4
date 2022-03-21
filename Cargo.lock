@@ -204,7 +204,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e49a20ac8743546bc76a247ff0a81ceb0cee7653b087ccb330bf3553d907d522"
 dependencies = [
  "anchor-lang",
- "serum_dex",
  "solana-program",
  "spl-associated-token-account",
  "spl-token",
@@ -1563,6 +1562,7 @@ dependencies = [
  "num_enum",
  "pyth-client",
  "serde",
+ "serum_dex",
  "solana-logger",
  "solana-program",
  "solana-program-test",
@@ -2400,8 +2400,7 @@ dependencies = [
 [[package]]
 name = "serum_dex"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02705854bae4622e552346c8edd43ab90c7425da35d63d2c689f39238f8d8b25"
+source = "git+https://github.com/blockworks-foundation/serum-dex.git#3104f424ee38a415418a1cdef67970771f832857"
 dependencies = [
  "arrayref",
  "bincode",

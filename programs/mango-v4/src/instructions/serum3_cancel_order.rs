@@ -4,8 +4,6 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use num_enum::TryFromPrimitive;
 use std::io::Write;
 
-use anchor_spl::dex;
-use dex::serum_dex;
 use serum_dex::matching::Side;
 
 use crate::error::*;
@@ -112,7 +110,7 @@ pub fn serum3_cancel_order(
     }
 
     //
-    // Settle
+    // Cancel
     //
     cpi_cancel_order(&ctx.accounts, order)?;
 
@@ -132,5 +130,5 @@ fn cpi_cancel_order(ctx: &Serum3CancelOrder, order: CancelOrderInstructionData) 
         open_orders: ctx.open_orders.to_account_info(),
         open_orders_authority: ctx.group.to_account_info(),
     }
-    .call(&group, order.0)
+    .cancel_one(&group, order.0)
 }

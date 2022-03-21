@@ -215,7 +215,7 @@ impl TestContextBuilder {
     }
 
     pub fn add_serum_program(&mut self) -> Pubkey {
-        let serum_program_id = anchor_spl::dex::id();
+        let serum_program_id = Pubkey::new_unique();
         self.test.add_program("serum_dex", serum_program_id, None);
         serum_program_id
     }

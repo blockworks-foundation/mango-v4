@@ -21,7 +21,7 @@ test-bpf = []
 # todo: when to fix, when to use caret? need a regular chore to bump dependencies
 # note: possibly need init-if-needed feature
 anchor-lang = { version = "0.22.0", features = [] }
-anchor-spl = { version = "0.22.0", features = ["dex"] }
+anchor-spl = { version = "0.22.0", features = [] }
 bytemuck = "^1.7.2"
 # todo: higher versions don't work
 fixed = { version = "=1.11.0", features = ["serde", "borsh"] }
@@ -30,7 +30,7 @@ pyth-client = {version = "0.5.0", features = ["no-entrypoint"]}
 serde = "^1.0"
 solana-program = "1.9.5"
 static_assertions = "1.1"
-#serum_dex = { version = "0.4.0", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false, features = ["no-entrypoint", "program"] }
+serum_dex = { version = "0.4.0", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false, features = ["no-entrypoint", "program"] }
 checked_math = { path = "../../lib/checked_math" }
 arrayref = "0.3.6"
 num_enum = "0.5.1"
