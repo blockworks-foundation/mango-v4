@@ -1,5 +1,6 @@
 #![cfg(feature = "test-bpf")]
 
+use mango_v4::state::BookSide;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, transport::TransportError};
 
@@ -77,13 +78,26 @@ async fn test_perp() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let _perp_market = send_tx(
+    let mango_v4::accounts::CreatePerpMarket {
+        perp_market,
+        asks,
+        bids,
+        ..
+    } = send_tx(
         solana,
         CreatePerpMarketInstruction {
             group,
+            oracle: tokens[0].oracle,
+            asks: context
+                .solana
+                .create_account::<BookSide>(&mango_v4::id())
+                .await,
+            bids: context
+                .solana
+                .create_account::<BookSide>(&mango_v4::id())
+                .await,
             admin,
             payer,
-            mint: mints[0].pubkey,
             perp_market_index: 0,
             base_token_index: tokens[0].index,
             quote_token_index: tokens[1].index,
@@ -93,8 +107,22 @@ async fn test_perp() -> Result<(), TransportError> {
         },
     )
     .await
-    .unwrap()
-    .perp_market;
+    .unwrap();
+
+    send_tx(
+        solana,
+        PlacePerpOrderInstruction {
+            group,
+            account,
+            perp_market,
+            asks,
+            bids,
+            oracle: tokens[0].oracle,
+            owner,
+        },
+    )
+    .await
+    .unwrap();
 
     Ok(())
 }

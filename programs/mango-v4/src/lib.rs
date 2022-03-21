@@ -15,7 +15,7 @@ pub mod instructions;
 mod serum3_cpi;
 pub mod state;
 
-use state::{PerpMarketIndex, Serum3MarketIndex, TokenIndex};
+use state::{OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex};
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -143,8 +143,30 @@ pub mod mango_v4 {
         )
     }
 
-    pub fn place_perp_order(ctx: Context<PlacePerpOrder>) -> Result<()> {
-        instructions::place_perp_order(ctx)
+    pub fn place_perp_order(
+        ctx: Context<PlacePerpOrder>,
+        side: Side,
+        price: i64,
+        max_base_quantity: i64,
+        max_quote_quantity: i64,
+        client_order_id: u64,
+        order_type: OrderType,
+        reduce_only: bool,
+        expiry_timestamp: u64,
+        limit: u8,
+    ) -> Result<()> {
+        instructions::place_perp_order(
+            ctx,
+            // side,
+            price,
+            max_base_quantity,
+            max_quote_quantity,
+            client_order_id,
+            order_type,
+            // reduce_only,
+            // expiry_timestamp,
+            limit,
+        )
     }
 }
 

@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+use crate::state::orderbook::order_type::Side;
 use crate::state::TokenIndex;
 
 pub type PerpMarketIndex = u16;
@@ -8,80 +9,62 @@ pub type PerpMarketIndex = u16;
 pub struct EventQueue {}
 
 #[account(zero_copy)]
-pub struct Book {}
-
-#[account(zero_copy)]
 pub struct PerpMarket {
-    // todo
-    /// metadata
-    // pub meta_data: MetaData,
-
-    /// mango group
     pub group: Pubkey,
 
-    // todo better docs
-    ///
     pub oracle: Pubkey,
 
-    /// order book
     pub bids: Pubkey,
     pub asks: Pubkey,
 
-    // todo better docs
-    ///
-    pub event_queue: Pubkey,
+    /// Event queue of TODO
+    /// pub event_queue: Pubkey,
 
-    /// number of quote native that reresents min tick
-    /// e.g. base lot size 100, quote lot size 10, then tick i.e. price increment is 10/100 i.e. 1
-    // todo: why signed?
+    /// Number of quote native that reresents min tick
+    /// e.g. when base lot size is 100, and quote lot size is 10, then tick i.e. price increment is 10/100 i.e. 0.1
     pub quote_lot_size: i64,
-    /// represents number of base native quantity; greater than 0
-    /// e.g. base decimals 6, base lot size 100, base position 10000, then
+
+    /// Represents number of base native quantity
+    /// e.g. if base decimals for underlying asset are 6, base lot size is 100, and base position is 10000, then
     /// UI position is 1
-    // todo: why signed?
     pub base_lot_size: i64,
 
-    // todo
-    /// an always increasing number (except in case of socializing losses), incremented by
-    /// funding delta, funding delta is difference between book and index price which needs to be paid every day,
-    /// funding delta is measured per day - per base lots - the larger users position the more funding
-    /// he pays, funding is always paid in quote
-    // pub long_funding: I80F48,
-    // pub short_funding: I80F48,
-    // todo
-    /// timestamp when funding was last updated
-    // pub last_updated: u64,
+    /// pub long_funding: I80F48,
+    /// pub short_funding: I80F48,
+    /// pub funding_last_updated: u64,
 
-    // todo
-    /// This is i64 to keep consistent with the units of contracts, but should always be > 0
-    // todo: why signed?
-    // pub open_interest: i64,
+    /// pub open_interest: u64,
 
-    // todo
-    /// number of orders generated
+    /// Total number of orders seen
     pub seq_num: u64,
 
-    // todo
-    /// in native quote currency
-    // pub fees_accrued: I80F48,
+    /// Fees accrued in native quote currency
+    /// pub fees_accrued: I80F48,
 
-    // todo
-    /// liquidity mining
-    // pub liquidity_mining_info: LiquidityMiningInfo,
+    /// Liquidity mining metadata
+    /// pub liquidity_mining_info: LiquidityMiningInfo,
 
-    // todo
-    /// token vault which holds mango tokens to be disbursed as liquidity incentives for this perp market
-    // pub mngo_vault: Pubkey,
+    /// Token vault which holds mango tokens to be disbursed as liquidity incentives for this perp market
+    /// pub mngo_vault: Pubkey,
 
-    /// pda bump
+    /// PDA bump
     pub bump: u8,
 
-    /// useful for looking up respective perp account
+    /// Lookup indices
     pub perp_market_index: PerpMarketIndex,
-    /// useful for looking up respective base token,
-    /// note: is optional, since perp market can exist without a corresponding base token,
-    /// should be TokenIndex::MAX in that case
     pub base_token_index: TokenIndex,
-    /// useful for looking up respective quote token
     pub quote_token_index: TokenIndex,
+}
+
+impl PerpMarket {
+    /// TODO why is this based on price?
+    pub fn gen_order_id(&mut self, side: Side, price: i64) -> i128 {
+        self.seq_num += 1;
+
+        let upper = (price as i128) << 64;
+        match side {
+            Side::Bid => upper | (!self.seq_num as i128),
+            Side::Ask => upper | (self.seq_num as i128),
+        }
+    }
 }

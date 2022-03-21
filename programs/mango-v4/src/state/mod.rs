@@ -4,6 +4,7 @@ pub use health::*;
 pub use mango_account::*;
 pub use mint_info::*;
 pub use oracle::*;
+pub use orderbook::*;
 pub use perp_market::*;
 pub use serum3_market::*;
 
@@ -13,5 +14,6 @@ mod health;
 mod mango_account;
 mod mint_info;
 mod oracle;
+pub mod orderbook;
 mod perp_market;
 mod serum3_market;

@@ -14,6 +14,7 @@ use crate::state::*;
 // MangoAccount size and health compute needs.
 const MAX_INDEXED_POSITIONS: usize = 16;
 const MAX_SERUM_OPEN_ORDERS: usize = 8;
+const MAX_PERP_OPEN_ORDERS: usize = 8;
 
 #[zero_copy]
 pub struct TokenAccount {

@@ -1076,8 +1076,10 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
 
 pub struct CreatePerpMarketInstruction<'keypair> {
     pub group: Pubkey,
-    pub mint: Pubkey,
     pub admin: &'keypair Keypair,
+    pub oracle: Pubkey,
+    pub asks: Pubkey,
+    pub bids: Pubkey,
     pub payer: &'keypair Keypair,
     pub perp_market_index: PerpMarketIndex,
     pub base_token_index: TokenIndex,
@@ -1102,12 +1104,6 @@ impl<'keypair> ClientInstruction for CreatePerpMarketInstruction<'keypair> {
             base_lot_size: self.base_lot_size,
         };
 
-        let oracle = Pubkey::find_program_address(
-            &[b"StubOracle".as_ref(), self.mint.as_ref()],
-            &program_id,
-        )
-        .0;
-
         let perp_market = Pubkey::find_program_address(
             &[
                 self.group.as_ref(),
@@ -1117,34 +1113,14 @@ impl<'keypair> ClientInstruction for CreatePerpMarketInstruction<'keypair> {
             &program_id,
         )
         .0;
-        let asks = Pubkey::find_program_address(
-            &[self.group.as_ref(), b"Asks".as_ref(), perp_market.as_ref()],
-            &program_id,
-        )
-        .0;
-        let bids = Pubkey::find_program_address(
-            &[self.group.as_ref(), b"Bids".as_ref(), perp_market.as_ref()],
-            &program_id,
-        )
-        .0;
-        let event_queue = Pubkey::find_program_address(
-            &[
-                self.group.as_ref(),
-                b"EventQueue".as_ref(),
-                perp_market.as_ref(),
-            ],
-            &program_id,
-        )
-        .0;
 
         let accounts = Self::Accounts {
             group: self.group,
             admin: self.admin.pubkey(),
-            oracle,
+            oracle: self.oracle,
             perp_market,
-            asks,
-            bids,
-            event_queue,
+            asks: self.asks,
+            bids: self.bids,
             payer: self.payer.pubkey(),
             system_program: System::id(),
         };
@@ -1155,5 +1131,53 @@ impl<'keypair> ClientInstruction for CreatePerpMarketInstruction<'keypair> {
 
     fn signers(&self) -> Vec<&Keypair> {
         vec![self.admin, self.payer]
+    }
+}
+
+pub struct PlacePerpOrderInstruction<'keypair> {
+    pub group: Pubkey,
+    pub account: Pubkey,
+    pub perp_market: Pubkey,
+    pub asks: Pubkey,
+    pub bids: Pubkey,
+    pub oracle: Pubkey,
+    pub owner: &'keypair Keypair,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for PlacePerpOrderInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::PlacePerpOrder;
+    type Instruction = mango_v4::instruction::PlacePerpOrder;
+    async fn to_instruction(
+        &self,
+        _loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            side: Side::Bid,
+            price: 1,
+            max_base_quantity: 1,
+            max_quote_quantity: 1,
+            client_order_id: 0,
+            order_type: OrderType::Limit,
+            reduce_only: false,
+            expiry_timestamp: 0,
+            limit: 1,
+        };
+        let accounts = Self::Accounts {
+            group: self.group,
+            account: self.account,
+            perp_market: self.perp_market,
+            asks: self.asks,
+            bids: self.bids,
+            oracle: self.oracle,
+            owner: self.owner.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.owner]
     }
 }

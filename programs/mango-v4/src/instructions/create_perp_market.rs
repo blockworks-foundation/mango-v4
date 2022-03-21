@@ -22,30 +22,13 @@ pub struct CreatePerpMarket<'info> {
         space = 8 + std::mem::size_of::<PerpMarket>(),
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
-    #[account(
-        init,
-        seeds = [group.key().as_ref(), b"Asks".as_ref(), perp_market.key().as_ref()],
-        bump,
-        payer = payer,
-        space = 8 + std::mem::size_of::<Book>(),
-    )]
-    pub asks: AccountLoader<'info, crate::state::Book>,
-    #[account(
-        init,
-        seeds = [group.key().as_ref(), b"Bids".as_ref(), perp_market.key().as_ref()],
-        bump,
-        payer = payer,
-        space = 8 + std::mem::size_of::<Book>(),
-    )]
-    pub bids: AccountLoader<'info, Book>,
-    #[account(
-        init,
-        seeds = [group.key().as_ref(), b"EventQueue".as_ref(), perp_market.key().as_ref()],
-        bump,
-        payer = payer,
-        space = 8 + std::mem::size_of::<EventQueue>(),
-    )]
-    pub event_queue: AccountLoader<'info, crate::state::EventQueue>,
+
+    /// Accounts are initialised by client,
+    /// anchor discriminator is set first when ix exits,
+    #[account(zero)]
+    pub bids: AccountLoader<'info, BookSide>,
+    #[account(zero)]
+    pub asks: AccountLoader<'info, BookSide>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -60,11 +43,6 @@ pub fn create_perp_market(
     quote_token_index: TokenIndex,
     quote_lot_size: i64,
     base_lot_size: i64,
-    // todo
-    // base token index (optional)
-    // quote token index
-    // oracle
-    // perp market index
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_init()?;
     *perp_market = PerpMarket {
@@ -72,31 +50,20 @@ pub fn create_perp_market(
         oracle: ctx.accounts.oracle.key(),
         bids: ctx.accounts.bids.key(),
         asks: ctx.accounts.asks.key(),
-        event_queue: ctx.accounts.event_queue.key(),
         quote_lot_size: quote_lot_size,
         base_lot_size: base_lot_size,
-        // long_funding,
-        // short_funding,
-        // last_updated,
-        // open_interest,
         seq_num: 0,
-        // fees_accrued,
-        // liquidity_mining_info,
-        // mngo_vault: ctx.accounts.mngo_vault.key(),
-        bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
         perp_market_index,
         base_token_index: base_token_index_opt.ok_or(TokenIndex::MAX).unwrap(),
         quote_token_index,
+        bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
     };
 
-    let mut asks = ctx.accounts.asks.load_init()?;
-    *asks = Book {};
-
     let mut bids = ctx.accounts.bids.load_init()?;
-    *bids = Book {};
+    bids.book_side_type = BookSideType::Bids;
 
-    let mut event_queue = ctx.accounts.event_queue.load_init()?;
-    *event_queue = EventQueue {};
+    let mut asks = ctx.accounts.asks.load_init()?;
+    asks.book_side_type = BookSideType::Asks;
 
     Ok(())
 }

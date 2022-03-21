@@ -83,6 +83,23 @@ impl SolanaCookie {
             .newest()
     }
 
+    pub async fn create_account<T>(&self, owner: &Pubkey) -> Pubkey {
+        let key = Keypair::new();
+        let len = 8 + std::mem::size_of::<T>();
+        let rent = self.rent.minimum_balance(len);
+        let create_account_instr = solana_sdk::system_instruction::create_account(
+            &self.context.borrow().payer.pubkey(),
+            &key.pubkey(),
+            rent,
+            len as u64,
+            &owner,
+        );
+        self.process_transaction(&[create_account_instr], Some(&[&key]))
+            .await
+            .unwrap();
+        key.pubkey()
+    }
+
     #[allow(dead_code)]
     pub async fn create_token_account(&self, owner: &Pubkey, mint: Pubkey) -> Pubkey {
         let keypair = Keypair::new();
@@ -145,6 +162,16 @@ impl SolanaCookie {
 
     #[allow(dead_code)]
     pub async fn get_account_opt<T: AccountDeserialize>(&self, address: Pubkey) -> Option<T> {
+        let account = self
+            .context
+            .borrow_mut()
+            .banks_client
+            .get_account(address)
+            .await
+            .unwrap()
+            .unwrap();
+        println!("{:#?}", account.owner);
+
         let data = self.get_account_data(address).await?;
         let mut data_slice: &[u8] = &data;
         AccountDeserialize::try_deserialize(&mut data_slice).ok()
