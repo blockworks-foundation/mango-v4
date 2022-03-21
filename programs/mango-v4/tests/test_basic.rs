@@ -19,7 +19,7 @@ async fn test_basic() -> Result<(), TransportError> {
     let admin = &Keypair::new();
     let owner = &context.users[0].key;
     let payer = &context.users[1].key;
-    let mint0 = &context.mints[0];
+    let mints = &context.mints[0..1];
     let payer_mint0_account = context.users[1].token_accounts[0];
     let dust_threshold = 0.01;
 
@@ -27,10 +27,15 @@ async fn test_basic() -> Result<(), TransportError> {
     // SETUP: Create a group, account, register a token (mint0)
     //
 
-    let group = send_tx(solana, CreateGroupInstruction { admin, payer })
-        .await
-        .unwrap()
-        .group;
+    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints,
+    }
+    .create(solana)
+    .await;
+    let bank = tokens[0].bank;
+    let vault = tokens[0].vault;
 
     let account = send_tx(
         solana,
@@ -44,51 +49,6 @@ async fn test_basic() -> Result<(), TransportError> {
     .await
     .unwrap()
     .account;
-
-    let create_stub_oracle_accounts = send_tx(
-        solana,
-        CreateStubOracle {
-            mint: mint0.pubkey,
-            payer,
-        },
-    )
-    .await
-    .unwrap();
-    let _oracle = create_stub_oracle_accounts.oracle;
-
-    send_tx(
-        solana,
-        SetStubOracle {
-            mint: mint0.pubkey,
-            payer,
-            price: "1.0",
-        },
-    )
-    .await
-    .unwrap();
-
-    let address_lookup_table = solana.create_address_lookup_table(admin, payer).await;
-
-    let register_token_accounts = send_tx(
-        solana,
-        RegisterTokenInstruction {
-            token_index: 0,
-            decimals: mint0.decimals,
-            maint_asset_weight: 0.9,
-            init_asset_weight: 0.8,
-            maint_liab_weight: 1.1,
-            init_liab_weight: 1.2,
-            group,
-            admin,
-            mint: mint0.pubkey,
-            address_lookup_table,
-            payer,
-        },
-    )
-    .await
-    .unwrap();
-    let bank = register_token_accounts.bank;
-    let vault = register_token_accounts.vault;
 
     //
     // TEST: Deposit funds

@@ -1,10 +1,8 @@
 #![cfg(feature = "test-bpf")]
 
-use solana_program::pubkey::Pubkey;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, transport::TransportError};
 
-use mango_v4::state::*;
 use program_test::*;
 
 mod program_test;
@@ -25,10 +23,13 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     // SETUP: Create a group and an account
     //
 
-    let group = send_tx(solana, CreateGroupInstruction { admin, payer })
-        .await
-        .unwrap()
-        .group;
+    let mango_setup::GroupWithTokens { group, .. } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints,
+    }
+    .create(solana)
+    .await;
 
     let account = send_tx(
         solana,
@@ -42,59 +43,6 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     .await
     .unwrap()
     .account;
-
-    //
-    // SETUP: Register mints (and make oracles for them)
-    //
-
-    let register_mint = |index: TokenIndex, mint: MintCookie, address_lookup_table: Pubkey| async move {
-        let create_stub_oracle_accounts = send_tx(
-            solana,
-            CreateStubOracle {
-                mint: mint.pubkey,
-                payer,
-            },
-        )
-        .await
-        .unwrap();
-        let oracle = create_stub_oracle_accounts.oracle;
-        send_tx(
-            solana,
-            SetStubOracle {
-                mint: mint.pubkey,
-                payer,
-                price: "1.0",
-            },
-        )
-        .await
-        .unwrap();
-        let register_token_accounts = send_tx(
-            solana,
-            RegisterTokenInstruction {
-                token_index: index,
-                decimals: mint.decimals,
-                maint_asset_weight: 0.9,
-                init_asset_weight: 0.8,
-                maint_liab_weight: 1.1,
-                init_liab_weight: 1.2,
-                group,
-                admin,
-                mint: mint.pubkey,
-                address_lookup_table,
-                payer,
-            },
-        )
-        .await
-        .unwrap();
-        let bank = register_token_accounts.bank;
-
-        (oracle, bank)
-    };
-
-    let address_lookup_table = solana.create_address_lookup_table(admin, payer).await;
-    for mint in mints {
-        register_mint(mint.index as u16, mint.clone(), address_lookup_table).await;
-    }
 
     //
     // TEST: Deposit user funds for all the mints
@@ -138,10 +86,13 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     // SETUP: Create a group and an account
     //
 
-    let group = send_tx(solana, CreateGroupInstruction { admin, payer })
-        .await
-        .unwrap()
-        .group;
+    let mango_setup::GroupWithTokens { group, .. } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints,
+    }
+    .create(solana)
+    .await;
 
     let account = send_tx(
         solana,
@@ -155,59 +106,6 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     .await
     .unwrap()
     .account;
-
-    //
-    // SETUP: Register mints (and make oracles for them)
-    //
-
-    let register_mint = |index: TokenIndex, mint: MintCookie, address_lookup_table: Pubkey| async move {
-        let create_stub_oracle_accounts = send_tx(
-            solana,
-            CreateStubOracle {
-                mint: mint.pubkey,
-                payer,
-            },
-        )
-        .await
-        .unwrap();
-        let oracle = create_stub_oracle_accounts.oracle;
-        send_tx(
-            solana,
-            SetStubOracle {
-                mint: mint.pubkey,
-                payer,
-                price: "1.0",
-            },
-        )
-        .await
-        .unwrap();
-        let register_token_accounts = send_tx(
-            solana,
-            RegisterTokenInstruction {
-                token_index: index,
-                decimals: mint.decimals,
-                maint_asset_weight: 0.9,
-                init_asset_weight: 0.8,
-                maint_liab_weight: 1.1,
-                init_liab_weight: 1.2,
-                group,
-                admin,
-                mint: mint.pubkey,
-                address_lookup_table,
-                payer,
-            },
-        )
-        .await
-        .unwrap();
-        let bank = register_token_accounts.bank;
-
-        (oracle, bank)
-    };
-
-    let address_lookup_table = solana.create_address_lookup_table(admin, payer).await;
-    for mint in mints {
-        register_mint(mint.index as u16, mint.clone(), address_lookup_table).await;
-    }
 
     //
     // SETUP: Create serum markets and register them

@@ -18,9 +18,7 @@ async fn test_position_lifetime() -> Result<()> {
     let admin = &Keypair::new();
     let owner = &context.users[0].key;
     let payer = &context.users[1].key;
-    let mint0 = &context.mints[0];
-    let mint1 = &context.mints[1];
-    let mint2 = &context.mints[2];
+    let mints = &context.mints[0..3];
 
     let payer_mint_accounts = &context.users[1].token_accounts[0..=2];
 
@@ -28,10 +26,13 @@ async fn test_position_lifetime() -> Result<()> {
     // SETUP: Create a group and accounts
     //
 
-    let group = send_tx(solana, CreateGroupInstruction { admin, payer })
-        .await
-        .unwrap()
-        .group;
+    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints,
+    }
+    .create(solana)
+    .await;
 
     let account = send_tx(
         solana,
@@ -58,59 +59,6 @@ async fn test_position_lifetime() -> Result<()> {
     .await
     .unwrap()
     .account;
-
-    //
-    // SETUP: Register three mints (and make oracles for them)
-    //
-
-    let address_lookup_table = solana.create_address_lookup_table(admin, payer).await;
-
-    let register_mint = |index: TokenIndex, mint: MintCookie| async move {
-        let create_stub_oracle_accounts = send_tx(
-            solana,
-            CreateStubOracle {
-                mint: mint.pubkey,
-                payer,
-            },
-        )
-        .await
-        .unwrap();
-        let oracle = create_stub_oracle_accounts.oracle;
-        send_tx(
-            solana,
-            SetStubOracle {
-                mint: mint.pubkey,
-                payer,
-                price: "1.0",
-            },
-        )
-        .await
-        .unwrap();
-        let register_token_accounts = send_tx(
-            solana,
-            RegisterTokenInstruction {
-                token_index: index,
-                decimals: mint.decimals,
-                maint_asset_weight: 0.9,
-                init_asset_weight: 0.8,
-                maint_liab_weight: 1.1,
-                init_liab_weight: 1.2,
-                group,
-                admin,
-                mint: mint.pubkey,
-                address_lookup_table,
-                payer,
-            },
-        )
-        .await
-        .unwrap();
-        let bank = register_token_accounts.bank;
-
-        (oracle, bank)
-    };
-    register_mint(0, mint0.clone()).await;
-    let (_oracle1, bank1) = register_mint(1, mint1.clone()).await;
-    register_mint(2, mint2.clone()).await;
 
     //
     // SETUP: Put some tokens into the funding account to allow borrowing
@@ -218,7 +166,7 @@ async fn test_position_lifetime() -> Result<()> {
         .await
         .unwrap();
         assert_eq!(
-            account_position(solana, account, bank1).await,
+            account_position(solana, account, tokens[1].bank).await,
             -(borrow_amount as i64)
         );
 

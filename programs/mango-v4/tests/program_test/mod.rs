@@ -18,6 +18,7 @@ pub use utils::*;
 
 pub mod cookies;
 pub mod mango_client;
+pub mod mango_setup;
 pub mod serum;
 pub mod solana;
 pub mod utils;
