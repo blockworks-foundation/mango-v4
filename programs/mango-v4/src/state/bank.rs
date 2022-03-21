@@ -51,7 +51,7 @@ impl Bank {
 
         if native_position.is_negative() {
             let new_native_position = cm!(native_position + native_amount);
-            if new_native_position.is_negative() {
+            if !new_native_position.is_positive() {
                 // pay back borrows only, leaving a negative position
                 let indexed_change = cm!(native_amount / self.borrow_index + I80F48::DELTA);
                 self.indexed_total_borrows = cm!(self.indexed_total_borrows - indexed_change);
@@ -130,5 +130,106 @@ impl Bank {
         } else {
             self.withdraw(position, (-native_amount) as u64)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bytemuck::Zeroable;
+
+    use super::*;
+
+    #[test]
+    pub fn change() -> Result<()> {
+        let epsilon = I80F48::from_bits(1);
+        let cases = [
+            (-10.1, 1),
+            (-10.1, 10),
+            (-10.1, 11),
+            (-10.1, 50),
+            (-2.0, 2),
+            (-2.0, 3),
+            (-0.1, 1),
+            (0.0, 1),
+            (0.1, 1),
+            (10.1, -1),
+            (10.1, -9),
+            (10.1, -10),
+            (10.1, -11),
+            (1.0, -1),
+            (0.1, -1),
+            (0.0, -1),
+            (-0.1, -1),
+            (-1.1, -10),
+        ];
+
+        for is_in_use in [false, true] {
+            for (start, change) in cases {
+                println!(
+                    "testing: in use: {}, start: {}, change: {}",
+                    is_in_use, start, change
+                );
+
+                //
+                // SETUP
+                //
+
+                let mut bank = Bank::zeroed();
+                bank.deposit_index = I80F48::from_num(100.0);
+                bank.borrow_index = I80F48::from_num(10.0);
+                let indexed = |v: I80F48, b: &Bank| {
+                    if v > 0 {
+                        v / b.deposit_index
+                    } else {
+                        v / b.borrow_index
+                    }
+                };
+
+                let mut account = TokenAccount {
+                    indexed_value: I80F48::ZERO,
+                    token_index: 0,
+                    in_use_count: if is_in_use { 1 } else { 0 },
+                };
+
+                account.indexed_value = indexed(I80F48::from_num(start), &bank);
+                if start >= 0.0 {
+                    bank.indexed_total_deposits = account.indexed_value;
+                } else {
+                    bank.indexed_total_borrows = -account.indexed_value;
+                }
+
+                // get the rounded start value
+                let start_native = account.native(&bank);
+
+                //
+                // TEST
+                //
+
+                let is_active = bank.change(&mut account, change)?;
+
+                let mut expected_native = start_native + I80F48::from(change);
+                if expected_native >= 0.0 && expected_native < 1.0 && !is_in_use {
+                    assert!(!is_active);
+                    assert_eq!(bank.dust, expected_native);
+                    expected_native = I80F48::ZERO;
+                } else {
+                    assert!(is_active);
+                    assert_eq!(bank.dust, I80F48::ZERO);
+                }
+                let expected_indexed = indexed(expected_native, &bank);
+
+                // at most one epsilon error in the resulting indexed value
+                assert!((account.indexed_value - expected_indexed).abs() <= epsilon);
+
+                if account.indexed_value.is_positive() {
+                    assert_eq!(bank.indexed_total_deposits, account.indexed_value);
+                    assert_eq!(bank.indexed_total_borrows, I80F48::ZERO);
+                } else {
+                    assert_eq!(bank.indexed_total_deposits, I80F48::ZERO);
+                    assert_eq!(bank.indexed_total_borrows, -account.indexed_value);
+                }
+            }
+        }
+        Ok(())
     }
 }
