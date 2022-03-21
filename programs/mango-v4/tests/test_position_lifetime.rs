@@ -12,7 +12,7 @@ mod program_test;
 // Check opening and closing positions
 #[tokio::test]
 async fn test_position_lifetime() -> Result<()> {
-    let context = TestContext::new(None, None, None, None).await;
+    let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
     let admin = &Keypair::new();

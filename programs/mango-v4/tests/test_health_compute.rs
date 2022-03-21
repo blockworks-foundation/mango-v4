@@ -10,7 +10,7 @@ mod program_test;
 // Try to reach compute limits in health checks by having many different tokens in an account
 #[tokio::test]
 async fn test_health_compute_tokens() -> Result<(), TransportError> {
-    let context = TestContext::new(Option::None, Option::None, Option::None, Option::None).await;
+    let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
     let admin = &Keypair::new();
@@ -73,7 +73,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
 // Try to reach compute limits in health checks by having many serum markets in an account
 #[tokio::test]
 async fn test_health_compute_serum() -> Result<(), TransportError> {
-    let context = TestContext::new(Option::None, Option::None, Option::None, Option::None).await;
+    let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
     let admin = &Keypair::new();

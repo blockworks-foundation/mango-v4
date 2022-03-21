@@ -13,7 +13,7 @@ mod program_test;
 // that they work in principle. It should be split up / renamed.
 #[tokio::test]
 async fn test_basic() -> Result<(), TransportError> {
-    let context = TestContext::new(Option::None, Option::None, Option::None, Option::None).await;
+    let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
     let admin = &Keypair::new();

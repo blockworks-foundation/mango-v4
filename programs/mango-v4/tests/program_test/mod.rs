@@ -1,4 +1,7 @@
+#![allow(dead_code)]
+
 use std::cell::RefCell;
+use std::str::FromStr;
 use std::{sync::Arc, sync::RwLock};
 
 use log::*;
@@ -73,29 +76,22 @@ impl Log for LoggerWrapper {
     fn flush(&self) {}
 }
 
-pub struct TestContext {
-    pub solana: Arc<SolanaCookie>,
-    pub mints: Vec<MintCookie>,
-    pub users: Vec<UserCookie>,
-    pub quote_index: usize,
-    pub serum: Arc<SerumCookie>,
+pub struct MarginTradeCookie {
+    pub program: Pubkey,
+    pub token_account: Keypair,
+    pub token_account_owner: Pubkey,
+    pub token_account_bump: u8,
 }
 
-impl TestContext {
-    pub async fn new(
-        test_opt: Option<ProgramTest>,
-        margin_trade_program_id: Option<&Pubkey>,
-        margin_trade_token_account: Option<&Keypair>,
-        mtta_owner: Option<&Pubkey>,
-    ) -> Self {
-        let mut test = if test_opt.is_some() {
-            test_opt.unwrap()
-        } else {
-            ProgramTest::new("mango_v4", mango_v4::id(), processor!(mango_v4::entry))
-        };
+pub struct TestContextBuilder {
+    test: ProgramTest,
+    program_log_capture: Arc<RwLock<Vec<String>>>,
+    mint0: Pubkey,
+}
 
-        let serum_program_id = anchor_spl::dex::id();
-        test.add_program("serum_dex", serum_program_id, None);
+impl TestContextBuilder {
+    pub fn new() -> Self {
+        let mut test = ProgramTest::new("mango_v4", mango_v4::id(), processor!(mango_v4::entry));
 
         // We need to intercept logs to capture program log output
         let log_filter = "solana_rbpf=trace,\
@@ -115,9 +111,18 @@ impl TestContext {
         // intentionally set to half the limit, to catch potential problems early
         test.set_compute_max_units(100000);
 
-        // Setup the environment
+        Self {
+            test,
+            program_log_capture,
+            mint0: Pubkey::new_unique(),
+        }
+    }
 
-        // Mints
+    pub fn test(&mut self) -> &mut ProgramTest {
+        &mut self.test
+    }
+
+    pub fn create_mints(&mut self) -> Vec<MintCookie> {
         let mut mints: Vec<MintCookie> = vec![
             MintCookie {
                 index: 0,
@@ -125,7 +130,7 @@ impl TestContext {
                 unit: 10u64.pow(6) as f64,
                 base_lot: 100 as f64,
                 quote_lot: 10 as f64,
-                pubkey: Pubkey::default(),
+                pubkey: self.mint0,
                 authority: Keypair::new(),
             }, // symbol: "MNGO".to_string()
         ];
@@ -150,7 +155,7 @@ impl TestContext {
             }
             mints[mint_index].pubkey = mint_pk;
 
-            test.add_packable_account(
+            self.test.add_packable_account(
                 mint_pk,
                 u32::MAX as u64,
                 &Mint {
@@ -162,36 +167,16 @@ impl TestContext {
                 &spl_token::id(),
             );
         }
-        let quote_index = mints.len() - 1;
 
-        // margin trade
-        if margin_trade_program_id.is_some() {
-            test.add_program(
-                "margin_trade",
-                *margin_trade_program_id.unwrap(),
-                std::option::Option::None,
-            );
-            test.add_packable_account(
-                margin_trade_token_account.unwrap().pubkey(),
-                u32::MAX as u64,
-                &Account {
-                    mint: mints[0].pubkey,
-                    owner: *mtta_owner.unwrap(),
-                    amount: 0,
-                    state: AccountState::Initialized,
-                    is_native: COption::None,
-                    ..Account::default()
-                },
-                &spl_token::id(),
-            );
-        }
+        mints
+    }
 
-        // Users
+    pub fn create_users(&mut self, mints: &[MintCookie]) -> Vec<UserCookie> {
         let num_users = 4;
         let mut users = Vec::new();
         for _ in 0..num_users {
             let user_key = Keypair::new();
-            test.add_account(
+            self.test.add_account(
                 user_key.pubkey(),
                 solana_sdk::account::Account::new(
                     u32::MAX as u64,
@@ -205,7 +190,7 @@ impl TestContext {
             let mut token_accounts = Vec::new();
             for mint_index in 0..mints.len() {
                 let token_key = Pubkey::new_unique();
-                test.add_packable_account(
+                self.test.add_packable_account(
                     token_key,
                     u32::MAX as u64,
                     &spl_token::state::Account {
@@ -226,14 +211,51 @@ impl TestContext {
             });
         }
 
-        let mut context = test.start_with_context().await;
-        let rent = context.banks_client.get_rent().await.unwrap();
+        users
+    }
 
-        let solana = Arc::new(SolanaCookie {
-            context: RefCell::new(context),
-            rent,
-            program_log: program_log_capture.clone(),
-        });
+    pub fn add_serum_program(&mut self) -> Pubkey {
+        let serum_program_id = anchor_spl::dex::id();
+        self.test.add_program("serum_dex", serum_program_id, None);
+        serum_program_id
+    }
+
+    pub fn add_margin_trade_program(&mut self) -> MarginTradeCookie {
+        let program = Pubkey::from_str("J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix").unwrap();
+        let token_account = Keypair::new();
+        let (token_account_owner, token_account_bump) =
+            Pubkey::find_program_address(&[b"MarginTrade"], &program);
+
+        self.test
+            .add_program("margin_trade", program, std::option::Option::None);
+        self.test.add_packable_account(
+            token_account.pubkey(),
+            u32::MAX as u64,
+            &Account {
+                mint: self.mint0,
+                owner: token_account_owner,
+                amount: 0,
+                state: AccountState::Initialized,
+                is_native: COption::None,
+                ..Account::default()
+            },
+            &spl_token::id(),
+        );
+
+        MarginTradeCookie {
+            program,
+            token_account,
+            token_account_owner,
+            token_account_bump,
+        }
+    }
+
+    pub async fn start_default(mut self) -> TestContext {
+        let mints = self.create_mints();
+        let users = self.create_users(&mints);
+        let serum_program_id = self.add_serum_program();
+
+        let solana = self.start().await;
 
         let serum = Arc::new(SerumCookie {
             solana: solana.clone(),
@@ -244,8 +266,33 @@ impl TestContext {
             solana: solana.clone(),
             mints,
             users,
-            quote_index,
             serum,
         }
+    }
+
+    pub async fn start(self) -> Arc<SolanaCookie> {
+        let mut context = self.test.start_with_context().await;
+        let rent = context.banks_client.get_rent().await.unwrap();
+
+        let solana = Arc::new(SolanaCookie {
+            context: RefCell::new(context),
+            rent,
+            program_log: self.program_log_capture.clone(),
+        });
+
+        solana
+    }
+}
+
+pub struct TestContext {
+    pub solana: Arc<SolanaCookie>,
+    pub mints: Vec<MintCookie>,
+    pub users: Vec<UserCookie>,
+    pub serum: Arc<SerumCookie>,
+}
+
+impl TestContext {
+    pub async fn new() -> Self {
+        TestContextBuilder::new().start_default().await
     }
 }

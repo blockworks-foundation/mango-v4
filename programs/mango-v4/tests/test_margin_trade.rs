@@ -2,11 +2,9 @@
 
 use anchor_lang::InstructionData;
 use fixed::types::I80F48;
-use solana_program::pubkey::Pubkey;
 use solana_program_test::*;
 use solana_sdk::signature::Signer;
 use solana_sdk::{signature::Keypair, transport::TransportError};
-use std::str::FromStr;
 
 use mango_v4::state::*;
 use program_test::*;
@@ -17,18 +15,9 @@ mod program_test;
 // that they work in principle. It should be split up / renamed.
 #[tokio::test]
 async fn test_margin_trade() -> Result<(), TransportError> {
-    let margin_trade_program_id =
-        Pubkey::from_str("J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix").unwrap();
-    let margin_trade_token_account = Keypair::new();
-    let (mtta_owner, mtta_bump_seeds) =
-        Pubkey::find_program_address(&[b"MarginTrade"], &margin_trade_program_id);
-    let context = TestContext::new(
-        Option::None,
-        Some(&margin_trade_program_id),
-        Some(&margin_trade_token_account),
-        Some(&mtta_owner),
-    )
-    .await;
+    let mut builder = TestContextBuilder::new();
+    let margin_trade = builder.add_margin_trade_program();
+    let context = builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = &Keypair::new();
@@ -117,14 +106,14 @@ async fn test_margin_trade() -> Result<(), TransportError> {
                 account,
                 owner,
                 mango_token_vault: vault,
-                margin_trade_program_id,
-                deposit_account: margin_trade_token_account.pubkey(),
-                deposit_account_owner: mtta_owner,
+                margin_trade_program_id: margin_trade.program,
+                deposit_account: margin_trade.token_account.pubkey(),
+                deposit_account_owner: margin_trade.token_account_owner,
                 margin_trade_program_ix_cpi_data: {
                     let ix = margin_trade::instruction::MarginTrade {
                         amount_from: 2,
                         amount_to: 1,
-                        deposit_account_owner_bump_seeds: mtta_bump_seeds,
+                        deposit_account_owner_bump_seeds: margin_trade.token_account_bump,
                     };
                     ix.data()
                 },
@@ -139,7 +128,7 @@ async fn test_margin_trade() -> Result<(), TransportError> {
     );
     assert_eq!(
         solana
-            .token_account_balance(margin_trade_token_account.pubkey())
+            .token_account_balance(margin_trade.token_account.pubkey())
             .await,
         withdraw_amount - deposit_amount
     );

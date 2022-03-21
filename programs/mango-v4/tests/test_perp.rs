@@ -9,7 +9,7 @@ mod program_test;
 
 #[tokio::test]
 async fn test_perp() -> Result<(), TransportError> {
-    let context = TestContext::new(Option::None, Option::None, Option::None, Option::None).await;
+    let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
     let admin = &Keypair::new();
