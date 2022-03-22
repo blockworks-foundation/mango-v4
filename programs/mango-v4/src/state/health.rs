@@ -3,6 +3,7 @@ use fixed::types::I80F48;
 use std::cell::Ref;
 
 use crate::error::MangoError;
+use crate::serum3_cpi;
 use crate::state::{oracle_price, Bank, MangoAccount};
 use crate::util;
 use crate::util::checked_math as cm;
@@ -83,21 +84,6 @@ fn pair_health(
     Ok(cm!(health1 + health2))
 }
 
-fn strip_dex_padding<'a>(acc: &'a AccountInfo) -> Result<Ref<'a, [u8]>> {
-    require!(acc.data_len() >= 12, MangoError::SomeError);
-    let unpadded_data: Ref<[u8]> = Ref::map(acc.try_borrow_data()?, |data| {
-        let data_len = data.len() - 12;
-        let (_, rest) = data.split_at(5);
-        let (mid, _) = rest.split_at(data_len);
-        mid
-    });
-    Ok(unpadded_data)
-}
-
-pub fn load_open_orders<'a>(acc: &'a AccountInfo) -> Result<Ref<'a, serum_dex::state::OpenOrders>> {
-    Ok(Ref::map(strip_dex_padding(acc)?, bytemuck::from_bytes))
-}
-
 fn compute_health_detail(
     account: &MangoAccount,
     banks: &[AccountInfo],
@@ -167,7 +153,7 @@ fn compute_health_detail(
             (&mut r[0], &mut l[quote_index])
         };
 
-        let oo = load_open_orders(oo_ai)?;
+        let oo = serum3_cpi::load_open_orders(oo_ai)?;
 
         // add the amounts that are freely settleable
         let base_free = I80F48::from_num(oo.native_coin_free);
