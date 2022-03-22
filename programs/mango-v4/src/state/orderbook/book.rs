@@ -17,6 +17,7 @@ use super::{
     order_type::{OrderType, Side},
     queue::{EventQueue, FillEvent, OutEvent},
 };
+use crate::util::checked_math as cm;
 
 pub const CENTIBPS_PER_UNIT: I80F48 = I80F48!(1_000_000);
 // todo move to a constants module or something
@@ -438,12 +439,12 @@ impl<'a> Book<'a> {
                 .min(max_match_by_quote);
             let done = match_quantity == max_match_by_quote || match_quantity == rem_base_quantity;
 
-            let match_quote = match_quantity * best_ask_price;
-            rem_base_quantity -= match_quantity;
-            rem_quote_quantity -= match_quote;
+            let match_quote = cm!(match_quantity * best_ask_price);
+            rem_base_quantity = cm!(rem_base_quantity - match_quantity);
+            rem_quote_quantity = cm!(rem_quote_quantity - match_quote);
             // mango_account.perp_accounts[market_index].add_taker_trade(match_quantity, -match_quote);
 
-            let new_best_ask_quantity = best_ask.quantity - match_quantity;
+            let new_best_ask_quantity = cm!(best_ask.quantity - match_quantity);
             let maker_out = new_best_ask_quantity == 0;
             if maker_out {
                 ask_deletes.push(best_ask.key);
@@ -495,7 +496,7 @@ impl<'a> Book<'a> {
                 break;
             }
         }
-        let total_quote_taken = max_quote_quantity - rem_quote_quantity;
+        let total_quote_taken = cm!(max_quote_quantity - rem_quote_quantity);
 
         // Apply changes to matched asks (handles invalidate on delete!)
         for (handle, new_quantity) in ask_changes {
