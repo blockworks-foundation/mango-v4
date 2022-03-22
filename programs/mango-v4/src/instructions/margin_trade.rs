@@ -141,9 +141,9 @@ fn get_pre_cpi_amounts(ctx: &Context<MarginTrade>, cpi_ais: &Vec<AccountInfo>) -
 
 fn adjust_for_post_cpi_amounts(
     ctx: &Context<MarginTrade>,
-    cpi_ais: &Vec<AccountInfo>,
+    cpi_ais: &[AccountInfo],
     pre_cpi_amounts: Vec<u64>,
-    banks: &mut Vec<AccountInfo>,
+    banks: &mut [AccountInfo],
     account: &mut MangoAccount,
 ) -> Result<()> {
     let token_accounts_iter = cpi_ais

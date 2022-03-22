@@ -1153,13 +1153,11 @@ impl<'keypair> ClientInstruction for PlacePerpOrderInstruction<'keypair> {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            side: Side::Bid,
             price: 1,
             max_base_quantity: 1,
             max_quote_quantity: 1,
             client_order_id: 0,
             order_type: OrderType::Limit,
-            reduce_only: false,
             expiry_timestamp: 0,
             limit: 1,
         };

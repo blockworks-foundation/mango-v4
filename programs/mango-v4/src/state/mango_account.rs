@@ -14,7 +14,7 @@ use crate::state::*;
 // MangoAccount size and health compute needs.
 const MAX_INDEXED_POSITIONS: usize = 16;
 const MAX_SERUM_OPEN_ORDERS: usize = 8;
-const MAX_PERP_OPEN_ORDERS: usize = 8;
+// const MAX_PERP_OPEN_ORDERS: usize = 8;
 
 #[zero_copy]
 pub struct TokenAccount {
@@ -95,7 +95,7 @@ impl TokenAccountMap {
             if let Some(i) = pos {
                 self.values[i] = TokenAccount {
                     indexed_value: I80F48::ZERO,
-                    token_index: token_index,
+                    token_index,
                     in_use_count: 0,
                 };
             }
