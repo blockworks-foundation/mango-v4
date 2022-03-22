@@ -1,5 +1,5 @@
 use crate::error::MangoError;
-use crate::state::{compute_health, Bank, Group, MangoAccount};
+use crate::state::{compute_health_from_fixed_accounts, Bank, Group, MangoAccount};
 use crate::{group_seeds, Mango};
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
@@ -94,7 +94,7 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     }
 
     // compute pre cpi health
-    let pre_cpi_health = compute_health(&account, health_ais)?;
+    let pre_cpi_health = compute_health_from_fixed_accounts(&account, health_ais)?;
     require!(pre_cpi_health > 0, MangoError::HealthMustBePositive);
     msg!("pre_cpi_health {:?}", pre_cpi_health);
 
@@ -118,7 +118,7 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     // compute post cpi health
     // todo: this is not working, the health is computed on old bank state and not taking into account
     // withdraws done in adjust_for_post_cpi_token_amounts
-    let post_cpi_health = compute_health(&account, health_ais)?;
+    let post_cpi_health = compute_health_from_fixed_accounts(&account, health_ais)?;
     require!(post_cpi_health > 0, MangoError::HealthMustBePositive);
     msg!("post_cpi_health {:?}", post_cpi_health);
 

@@ -70,7 +70,7 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     // TODO: This will be used to disable is_bankrupt or being_liquidated
     //       when health recovers sufficiently
     //
-    let health = compute_health(&account, &ctx.remaining_accounts)?;
+    let health = compute_health_from_fixed_accounts(&account, ctx.remaining_accounts)?;
     msg!("health: {}", health);
 
     //
