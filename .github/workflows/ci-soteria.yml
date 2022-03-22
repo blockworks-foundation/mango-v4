@@ -4,7 +4,7 @@ on:
   push:
     branches: master
   pull_request:
-
+  workflow_dispatch: #pick branch to manually run on
 env:
   CARGO_TERM_COLOR: always
   SOLANA_VERSION: "1.9.5"
