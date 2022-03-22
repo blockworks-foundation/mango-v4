@@ -164,7 +164,7 @@ pub mod mango_v4 {
             client_order_id,
             order_type,
             // reduce_only,
-            // expiry_timestamp,
+            expiry_timestamp,
             limit,
         )
     }
