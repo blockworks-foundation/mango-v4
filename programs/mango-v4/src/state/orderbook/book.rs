@@ -4,19 +4,18 @@ use crate::{
     error::MangoError,
     state::{
         orderbook::{bookside::BookSide, nodes::LeafNode},
-        MangoAccount, PerpMarket,
+        PerpMarket,
     },
 };
 use anchor_lang::prelude::*;
-use bytemuck::cast;
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
 use super::{
     nodes::NodeHandle,
     order_type::{OrderType, Side},
-    queue::{EventQueue, FillEvent, OutEvent},
 };
+use crate::util::checked_math as cm;
 
 pub const CENTIBPS_PER_UNIT: I80F48 = I80F48!(1_000_000);
 // todo move to a constants module or something
@@ -191,146 +190,146 @@ impl<'a> Book<'a> {
 
     /// Iterate over the book and return
     /// return changes to (taker_base, taker_quote, bids_quantity, asks_quantity)
-    pub fn sim_new_bid(
-        &self,
-        market: &PerpMarket,
-        // info: &PerpMarketInfo,
-        oracle_price: I80F48,
-        price: i64,
-        max_base_quantity: i64, // guaranteed to be greater than zero due to initial check
-        max_quote_quantity: i64, // guaranteed to be greater than zero due to initial check
-        order_type: OrderType,
-        now_ts: u64,
-    ) -> std::result::Result<(i64, i64, i64, i64), Error> {
-        let (mut taker_base, mut taker_quote, mut bids_quantity, asks_quantity) = (0, 0, 0i64, 0);
+    // pub fn sim_new_bid(
+    //     &self,
+    //     market: &PerpMarket,
+    //     // info: &PerpMarketInfo,
+    //     oracle_price: I80F48,
+    //     price: i64,
+    //     max_base_quantity: i64, // guaranteed to be greater than zero due to initial check
+    //     max_quote_quantity: i64, // guaranteed to be greater than zero due to initial check
+    //     order_type: OrderType,
+    //     now_ts: u64,
+    // ) -> std::result::Result<(i64, i64, i64, i64), Error> {
+    //     let (mut taker_base, mut taker_quote, mut bids_quantity, asks_quantity) = (0, 0, 0i64, 0);
 
-        let (post_only, mut post_allowed, price) = match order_type {
-            OrderType::Limit => (false, true, price),
-            OrderType::ImmediateOrCancel => (false, false, price),
-            OrderType::PostOnly => (true, true, price),
-            OrderType::Market => (false, false, i64::MAX),
-            OrderType::PostOnlySlide => {
-                let price = if let Some(best_ask_price) = self.get_best_ask_price(now_ts) {
-                    price.min(best_ask_price.checked_sub(1).ok_or(MangoError::SomeError)?)
-                // math_err
-                } else {
-                    price
-                };
-                (true, true, price)
-            }
-        };
-        // if post_allowed {
-        //     // price limit check computed lazily to save CU on average
-        //     let native_price = market.lot_to_native_price(price);
-        //     if native_price.checked_div(oracle_price).unwrap() > info.maint_liab_weight {
-        //         msg!("Posting on book disallowed due to price limits");
-        //         post_allowed = false;
-        //     }
-        // }
+    //     let (post_only, mut post_allowed, price) = match order_type {
+    //         OrderType::Limit => (false, true, price),
+    //         OrderType::ImmediateOrCancel => (false, false, price),
+    //         OrderType::PostOnly => (true, true, price),
+    //         OrderType::Market => (false, false, i64::MAX),
+    //         OrderType::PostOnlySlide => {
+    //             let price = if let Some(best_ask_price) = self.get_best_ask_price(now_ts) {
+    //                 price.min(best_ask_price.checked_sub(1).ok_or(MangoError::SomeError)?)
+    //             // math_err
+    //             } else {
+    //                 price
+    //             };
+    //             (true, true, price)
+    //         }
+    //     };
+    //     // if post_allowed {
+    //     //     // price limit check computed lazily to save CU on average
+    //     //     let native_price = market.lot_to_native_price(price);
+    //     //     if native_price.checked_div(oracle_price).unwrap() > info.maint_liab_weight {
+    //     //         msg!("Posting on book disallowed due to price limits");
+    //     //         post_allowed = false;
+    //     //     }
+    //     // }
 
-        let mut rem_base_quantity = max_base_quantity; // base lots (aka contracts)
-        let mut rem_quote_quantity = max_quote_quantity;
+    //     let mut rem_base_quantity = max_base_quantity; // base lots (aka contracts)
+    //     let mut rem_quote_quantity = max_quote_quantity;
 
-        for (_, best_ask) in self.asks.iter_valid(now_ts) {
-            let best_ask_price = best_ask.price();
-            if price < best_ask_price {
-                break;
-            } else if post_only {
-                return Ok((taker_base, taker_quote, bids_quantity, asks_quantity));
-            }
+    //     for (_, best_ask) in self.asks.iter_valid(now_ts) {
+    //         let best_ask_price = best_ask.price();
+    //         if price < best_ask_price {
+    //             break;
+    //         } else if post_only {
+    //             return Ok((taker_base, taker_quote, bids_quantity, asks_quantity));
+    //         }
 
-            let max_match_by_quote = rem_quote_quantity / best_ask_price;
-            let match_quantity = rem_base_quantity
-                .min(best_ask.quantity)
-                .min(max_match_by_quote);
+    //         let max_match_by_quote = rem_quote_quantity / best_ask_price;
+    //         let match_quantity = rem_base_quantity
+    //             .min(best_ask.quantity)
+    //             .min(max_match_by_quote);
 
-            let match_quote = match_quantity * best_ask_price;
-            rem_base_quantity -= match_quantity;
-            rem_quote_quantity -= match_quote;
+    //         let match_quote = match_quantity * best_ask_price;
+    //         rem_base_quantity -= match_quantity;
+    //         rem_quote_quantity -= match_quote;
 
-            taker_base += match_quantity;
-            taker_quote -= match_quote;
-            if match_quantity == max_match_by_quote || rem_base_quantity == 0 {
-                break;
-            }
-        }
-        let book_base_quantity = rem_base_quantity.min(rem_quote_quantity / price);
-        if post_allowed && book_base_quantity > 0 {
-            bids_quantity = bids_quantity.checked_add(book_base_quantity).unwrap();
-        }
-        Ok((taker_base, taker_quote, bids_quantity, asks_quantity))
-    }
+    //         taker_base += match_quantity;
+    //         taker_quote -= match_quote;
+    //         if match_quantity == max_match_by_quote || rem_base_quantity == 0 {
+    //             break;
+    //         }
+    //     }
+    //     let book_base_quantity = rem_base_quantity.min(rem_quote_quantity / price);
+    //     if post_allowed && book_base_quantity > 0 {
+    //         bids_quantity = bids_quantity.checked_add(book_base_quantity).unwrap();
+    //     }
+    //     Ok((taker_base, taker_quote, bids_quantity, asks_quantity))
+    // }
 
-    pub fn sim_new_ask(
-        &self,
-        market: &PerpMarket,
-        // info: &PerpMarketInfo,
-        oracle_price: I80F48,
-        price: i64,
-        max_base_quantity: i64, // guaranteed to be greater than zero due to initial check
-        max_quote_quantity: i64, // guaranteed to be greater than zero due to initial check
-        order_type: OrderType,
-        now_ts: u64,
-    ) -> std::result::Result<(i64, i64, i64, i64), Error> {
-        let (mut taker_base, mut taker_quote, bids_quantity, mut asks_quantity) = (0, 0, 0, 0i64);
+    // pub fn sim_new_ask(
+    //     &self,
+    //     market: &PerpMarket,
+    //     // info: &PerpMarketInfo,
+    //     oracle_price: I80F48,
+    //     price: i64,
+    //     max_base_quantity: i64, // guaranteed to be greater than zero due to initial check
+    //     max_quote_quantity: i64, // guaranteed to be greater than zero due to initial check
+    //     order_type: OrderType,
+    //     now_ts: u64,
+    // ) -> std::result::Result<(i64, i64, i64, i64), Error> {
+    //     let (mut taker_base, mut taker_quote, bids_quantity, mut asks_quantity) = (0, 0, 0, 0i64);
 
-        let (post_only, mut post_allowed, price) = match order_type {
-            OrderType::Limit => (false, true, price),
-            OrderType::ImmediateOrCancel => (false, false, price),
-            OrderType::PostOnly => (true, true, price),
-            OrderType::Market => (false, false, 1),
-            OrderType::PostOnlySlide => {
-                let price = if let Some(best_bid_price) = self.get_best_bid_price(now_ts) {
-                    price.max(best_bid_price.checked_add(1).ok_or(MangoError::SomeError)?)
-                // todo math_err
-                } else {
-                    price
-                };
-                (true, true, price)
-            }
-        };
-        // if post_allowed {
-        //     // price limit check computed lazily to save CU on average
-        //     let native_price = market.lot_to_native_price(price);
-        //     if native_price.checked_div(oracle_price).unwrap() < info.maint_asset_weight {
-        //         msg!("Posting on book disallowed due to price limits");
-        //         post_allowed = false;
-        //     }
-        // }
+    //     let (post_only, mut post_allowed, price) = match order_type {
+    //         OrderType::Limit => (false, true, price),
+    //         OrderType::ImmediateOrCancel => (false, false, price),
+    //         OrderType::PostOnly => (true, true, price),
+    //         OrderType::Market => (false, false, 1),
+    //         OrderType::PostOnlySlide => {
+    //             let price = if let Some(best_bid_price) = self.get_best_bid_price(now_ts) {
+    //                 price.max(best_bid_price.checked_add(1).ok_or(MangoError::SomeError)?)
+    //             // todo math_err
+    //             } else {
+    //                 price
+    //             };
+    //             (true, true, price)
+    //         }
+    //     };
+    //     // if post_allowed {
+    //     //     // price limit check computed lazily to save CU on average
+    //     //     let native_price = market.lot_to_native_price(price);
+    //     //     if native_price.checked_div(oracle_price).unwrap() < info.maint_asset_weight {
+    //     //         msg!("Posting on book disallowed due to price limits");
+    //     //         post_allowed = false;
+    //     //     }
+    //     // }
 
-        let mut rem_base_quantity = max_base_quantity; // base lots (aka contracts)
-        let mut rem_quote_quantity = max_quote_quantity;
+    //     let mut rem_base_quantity = max_base_quantity; // base lots (aka contracts)
+    //     let mut rem_quote_quantity = max_quote_quantity;
 
-        for (_, best_bid) in self.bids.iter_valid(now_ts) {
-            let best_bid_price = best_bid.price();
-            if price > best_bid_price {
-                break;
-            } else if post_only {
-                return Ok((taker_base, taker_quote, bids_quantity, asks_quantity));
-            }
+    //     for (_, best_bid) in self.bids.iter_valid(now_ts) {
+    //         let best_bid_price = best_bid.price();
+    //         if price > best_bid_price {
+    //             break;
+    //         } else if post_only {
+    //             return Ok((taker_base, taker_quote, bids_quantity, asks_quantity));
+    //         }
 
-            let max_match_by_quote = rem_quote_quantity / best_bid_price;
-            let match_quantity = rem_base_quantity
-                .min(best_bid.quantity)
-                .min(max_match_by_quote);
+    //         let max_match_by_quote = rem_quote_quantity / best_bid_price;
+    //         let match_quantity = rem_base_quantity
+    //             .min(best_bid.quantity)
+    //             .min(max_match_by_quote);
 
-            let match_quote = match_quantity * best_bid_price;
-            rem_base_quantity -= match_quantity;
-            rem_quote_quantity -= match_quote;
+    //         let match_quote = match_quantity * best_bid_price;
+    //         rem_base_quantity -= match_quantity;
+    //         rem_quote_quantity -= match_quote;
 
-            taker_base -= match_quantity;
-            taker_quote += match_quote;
-            if match_quantity == max_match_by_quote || rem_base_quantity == 0 {
-                break;
-            }
-        }
+    //         taker_base -= match_quantity;
+    //         taker_quote += match_quote;
+    //         if match_quantity == max_match_by_quote || rem_base_quantity == 0 {
+    //             break;
+    //         }
+    //     }
 
-        let book_base_quantity = rem_base_quantity.min(rem_quote_quantity / price);
-        if post_allowed && book_base_quantity > 0 {
-            asks_quantity = asks_quantity.checked_add(book_base_quantity).unwrap();
-        }
-        Ok((taker_base, taker_quote, bids_quantity, asks_quantity))
-    }
+    //     let book_base_quantity = rem_base_quantity.min(rem_quote_quantity / price);
+    //     if post_allowed && book_base_quantity > 0 {
+    //         asks_quantity = asks_quantity.checked_add(book_base_quantity).unwrap();
+    //     }
+    //     Ok((taker_base, taker_quote, bids_quantity, asks_quantity))
+    // }
 
     // todo: can new_bid and new_ask be elegantly folded into one method?
     #[inline(never)]
@@ -342,8 +341,8 @@ impl<'a> Book<'a> {
         // mango_cache: &MangoCache,
         // event_queue: &mut EventQueue,
         market: &mut PerpMarket,
-        oracle_price: I80F48,
-        mango_account: &mut MangoAccount,
+        // oracle_price: I80F48,
+        // mango_account: &mut MangoAccount,
         mango_account_pk: &Pubkey,
         // market_index: usize,
         price: i64,
@@ -438,12 +437,12 @@ impl<'a> Book<'a> {
                 .min(max_match_by_quote);
             let done = match_quantity == max_match_by_quote || match_quantity == rem_base_quantity;
 
-            let match_quote = match_quantity * best_ask_price;
-            rem_base_quantity -= match_quantity;
-            rem_quote_quantity -= match_quote;
+            let match_quote = cm!(match_quantity * best_ask_price);
+            rem_base_quantity = cm!(rem_base_quantity - match_quantity);
+            rem_quote_quantity = cm!(rem_quote_quantity - match_quote);
             // mango_account.perp_accounts[market_index].add_taker_trade(match_quantity, -match_quote);
 
-            let new_best_ask_quantity = best_ask.quantity - match_quantity;
+            let new_best_ask_quantity = cm!(best_ask.quantity - match_quantity);
             let maker_out = new_best_ask_quantity == 0;
             if maker_out {
                 ask_deletes.push(best_ask.key);
@@ -495,7 +494,7 @@ impl<'a> Book<'a> {
                 break;
             }
         }
-        let total_quote_taken = max_quote_quantity - rem_quote_quantity;
+        // let total_quote_taken = cm!(max_quote_quantity - rem_quote_quantity);
 
         // Apply changes to matched asks (handles invalidate on delete!)
         for (handle, new_quantity) in ask_changes {
@@ -514,17 +513,17 @@ impl<'a> Book<'a> {
         let book_base_quantity = rem_base_quantity.min(rem_quote_quantity / price);
         if post_allowed && book_base_quantity > 0 {
             // Drop an expired order if possible
-            if let Some(expired_bid) = self.bids.remove_one_expired(now_ts) {
-                // let event = OutEvent::new(
-                //     Side::Bid,
-                //     expired_bid.owner_slot,
-                //     now_ts,
-                //     event_queue.header.seq_num,
-                //     expired_bid.owner,
-                //     expired_bid.quantity,
-                // );
-                // event_queue.push_back(cast(event)).unwrap();
-            }
+            // if let Some(expired_bid) = self.bids.remove_one_expired(now_ts) {
+            //     let event = OutEvent::new(
+            //         Side::Bid,
+            //         expired_bid.owner_slot,
+            //         now_ts,
+            //         event_queue.header.seq_num,
+            //         expired_bid.owner,
+            //         expired_bid.quantity,
+            //     );
+            //     event_queue.push_back(cast(event)).unwrap();
+            // }
 
             if self.bids.is_full() {
                 // If this bid is higher than lowest bid, boot that bid and insert this one
@@ -599,271 +598,271 @@ impl<'a> Book<'a> {
         Ok(())
     }
 
-    #[inline(never)]
-    pub fn new_ask(
-        &mut self,
-        program_id: &Pubkey,
-        // mango_group: &MangoGroup,
-        mango_group_pk: &Pubkey,
-        // mango_cache: &MangoCache,
-        event_queue: &mut EventQueue,
-        market: &mut PerpMarket,
-        oracle_price: I80F48,
-        mango_account: &mut MangoAccount,
-        mango_account_pk: &Pubkey,
-        market_index: usize,
-        price: i64,
-        max_base_quantity: i64, // guaranteed to be greater than zero due to initial check
-        max_quote_quantity: i64, // guaranteed to be greater than zero due to initial check
-        order_type: OrderType,
-        time_in_force: u8,
-        client_order_id: u64,
-        now_ts: u64,
-        referrer_mango_account_ai: Option<&AccountInfo>,
-        mut limit: u8, // max number of FillEvents allowed; guaranteed to be greater than 0
-    ) -> Result<()> {
-        let (post_only, mut post_allowed, price) = match order_type {
-            OrderType::Limit => (false, true, price),
-            OrderType::ImmediateOrCancel => (false, false, price),
-            OrderType::PostOnly => (true, true, price),
-            OrderType::Market => (false, false, 1),
-            OrderType::PostOnlySlide => {
-                let price = if let Some(best_bid_price) = self.get_best_bid_price(now_ts) {
-                    price.max(best_bid_price.checked_add(1).ok_or(MangoError::SomeError)?)
-                // math_err
-                } else {
-                    price
-                };
-                (true, true, price)
-            }
-        };
+    // #[inline(never)]
+    // pub fn new_ask(
+    //     &mut self,
+    //     program_id: &Pubkey,
+    //     // mango_group: &MangoGroup,
+    //     mango_group_pk: &Pubkey,
+    //     // mango_cache: &MangoCache,
+    //     event_queue: &mut EventQueue,
+    //     market: &mut PerpMarket,
+    //     oracle_price: I80F48,
+    //     mango_account: &mut MangoAccount,
+    //     mango_account_pk: &Pubkey,
+    //     market_index: usize,
+    //     price: i64,
+    //     max_base_quantity: i64, // guaranteed to be greater than zero due to initial check
+    //     max_quote_quantity: i64, // guaranteed to be greater than zero due to initial check
+    //     order_type: OrderType,
+    //     time_in_force: u8,
+    //     client_order_id: u64,
+    //     now_ts: u64,
+    //     referrer_mango_account_ai: Option<&AccountInfo>,
+    //     mut limit: u8, // max number of FillEvents allowed; guaranteed to be greater than 0
+    // ) -> Result<()> {
+    //     let (post_only, mut post_allowed, price) = match order_type {
+    //         OrderType::Limit => (false, true, price),
+    //         OrderType::ImmediateOrCancel => (false, false, price),
+    //         OrderType::PostOnly => (true, true, price),
+    //         OrderType::Market => (false, false, 1),
+    //         OrderType::PostOnlySlide => {
+    //             let price = if let Some(best_bid_price) = self.get_best_bid_price(now_ts) {
+    //                 price.max(best_bid_price.checked_add(1).ok_or(MangoError::SomeError)?)
+    //             // math_err
+    //             } else {
+    //                 price
+    //             };
+    //             (true, true, price)
+    //         }
+    //     };
 
-        // let info = &mango_group.perp_markets[market_index];
-        // if post_allowed {
-        //     // price limit check computed lazily to save CU on average
-        //     let native_price = market.lot_to_native_price(price);
-        //     if native_price.checked_div(oracle_price).unwrap() < info.maint_asset_weight {
-        //         msg!("Posting on book disallowed due to price limits");
-        //         post_allowed = false;
-        //     }
-        // }
+    //     // let info = &mango_group.perp_markets[market_index];
+    //     // if post_allowed {
+    //     //     // price limit check computed lazily to save CU on average
+    //     //     let native_price = market.lot_to_native_price(price);
+    //     //     if native_price.checked_div(oracle_price).unwrap() < info.maint_asset_weight {
+    //     //         msg!("Posting on book disallowed due to price limits");
+    //     //         post_allowed = false;
+    //     //     }
+    //     // }
 
-        // referral fee related variables
-        // let mut ref_fee_rate = None;
-        // let mut referrer_mango_account_opt = None;
+    //     // referral fee related variables
+    //     // let mut ref_fee_rate = None;
+    //     // let mut referrer_mango_account_opt = None;
 
-        // generate new order id
-        let order_id = market.gen_order_id(Side::Ask, price);
+    //     // generate new order id
+    //     let order_id = market.gen_order_id(Side::Ask, price);
 
-        // Iterate through book and match against this new ask
-        //
-        // Any changes to matching bids are collected in bid_changes
-        // and then applied after this loop.
-        let mut rem_base_quantity = max_base_quantity; // base lots (aka contracts)
-        let mut rem_quote_quantity = max_quote_quantity;
-        let mut bid_changes: Vec<(NodeHandle, i64)> = vec![];
-        let mut bid_deletes: Vec<i128> = vec![];
-        let mut number_of_dropped_expired_orders = 0;
-        for (best_bid_h, best_bid) in self.bids.iter_all_including_invalid() {
-            if !best_bid.is_valid(now_ts) {
-                // Remove the order from the book unless we've done that enough
-                if number_of_dropped_expired_orders < DROP_EXPIRED_ORDER_LIMIT {
-                    number_of_dropped_expired_orders += 1;
-                    let event = OutEvent::new(
-                        Side::Bid,
-                        best_bid.owner_slot,
-                        now_ts,
-                        event_queue.header.seq_num,
-                        best_bid.owner,
-                        best_bid.quantity,
-                    );
-                    event_queue.push_back(cast(event)).unwrap();
-                    bid_deletes.push(best_bid.key);
-                }
-                continue;
-            }
+    //     // Iterate through book and match against this new ask
+    //     //
+    //     // Any changes to matching bids are collected in bid_changes
+    //     // and then applied after this loop.
+    //     let mut rem_base_quantity = max_base_quantity; // base lots (aka contracts)
+    //     let mut rem_quote_quantity = max_quote_quantity;
+    //     let mut bid_changes: Vec<(NodeHandle, i64)> = vec![];
+    //     let mut bid_deletes: Vec<i128> = vec![];
+    //     let mut number_of_dropped_expired_orders = 0;
+    //     for (best_bid_h, best_bid) in self.bids.iter_all_including_invalid() {
+    //         if !best_bid.is_valid(now_ts) {
+    //             // Remove the order from the book unless we've done that enough
+    //             if number_of_dropped_expired_orders < DROP_EXPIRED_ORDER_LIMIT {
+    //                 number_of_dropped_expired_orders += 1;
+    //                 let event = OutEvent::new(
+    //                     Side::Bid,
+    //                     best_bid.owner_slot,
+    //                     now_ts,
+    //                     event_queue.header.seq_num,
+    //                     best_bid.owner,
+    //                     best_bid.quantity,
+    //                 );
+    //                 event_queue.push_back(cast(event)).unwrap();
+    //                 bid_deletes.push(best_bid.key);
+    //             }
+    //             continue;
+    //         }
 
-            let best_bid_price = best_bid.price();
+    //         let best_bid_price = best_bid.price();
 
-            if price > best_bid_price {
-                break;
-            } else if post_only {
-                msg!("Order could not be placed due to PostOnly");
-                post_allowed = false;
-                break; // return silently to not fail other instructions in tx
-            } else if limit == 0 {
-                msg!("Order matching limit reached");
-                post_allowed = false;
-                break;
-            }
+    //         if price > best_bid_price {
+    //             break;
+    //         } else if post_only {
+    //             msg!("Order could not be placed due to PostOnly");
+    //             post_allowed = false;
+    //             break; // return silently to not fail other instructions in tx
+    //         } else if limit == 0 {
+    //             msg!("Order matching limit reached");
+    //             post_allowed = false;
+    //             break;
+    //         }
 
-            let max_match_by_quote = rem_quote_quantity / best_bid_price;
-            let match_quantity = rem_base_quantity
-                .min(best_bid.quantity)
-                .min(max_match_by_quote);
-            let done = match_quantity == max_match_by_quote || match_quantity == rem_base_quantity;
+    //         let max_match_by_quote = rem_quote_quantity / best_bid_price;
+    //         let match_quantity = rem_base_quantity
+    //             .min(best_bid.quantity)
+    //             .min(max_match_by_quote);
+    //         let done = match_quantity == max_match_by_quote || match_quantity == rem_base_quantity;
 
-            let match_quote = match_quantity * best_bid_price;
-            rem_base_quantity -= match_quantity;
-            rem_quote_quantity -= match_quote;
-            // mango_account.perp_accounts[market_index].add_taker_trade(-match_quantity, match_quote);
+    //         let match_quote = match_quantity * best_bid_price;
+    //         rem_base_quantity -= match_quantity;
+    //         rem_quote_quantity -= match_quote;
+    //         // mango_account.perp_accounts[market_index].add_taker_trade(-match_quantity, match_quote);
 
-            let new_best_bid_quantity = best_bid.quantity - match_quantity;
-            let maker_out = new_best_bid_quantity == 0;
-            if maker_out {
-                bid_deletes.push(best_bid.key);
-            } else {
-                bid_changes.push((best_bid_h, new_best_bid_quantity));
-            }
+    //         let new_best_bid_quantity = best_bid.quantity - match_quantity;
+    //         let maker_out = new_best_bid_quantity == 0;
+    //         if maker_out {
+    //             bid_deletes.push(best_bid.key);
+    //         } else {
+    //             bid_changes.push((best_bid_h, new_best_bid_quantity));
+    //         }
 
-            // todo
-            // if ref_fee_rate is none, determine it
-            // if ref_valid, then pay into referrer, else pay to perp market
-            // if ref_fee_rate.is_none() {
-            //     let (a, b) = determine_ref_vars(
-            //         program_id,
-            //         mango_group,
-            //         mango_group_pk,
-            //         mango_cache,
-            //         mango_account,
-            //         referrer_mango_account_ai,
-            //         now_ts,
-            //     )?;
-            //     ref_fee_rate = Some(a);
-            //     referrer_mango_account_opt = b;
-            // }
+    //         // todo
+    //         // if ref_fee_rate is none, determine it
+    //         // if ref_valid, then pay into referrer, else pay to perp market
+    //         // if ref_fee_rate.is_none() {
+    //         //     let (a, b) = determine_ref_vars(
+    //         //         program_id,
+    //         //         mango_group,
+    //         //         mango_group_pk,
+    //         //         mango_cache,
+    //         //         mango_account,
+    //         //         referrer_mango_account_ai,
+    //         //         now_ts,
+    //         //     )?;
+    //         //     ref_fee_rate = Some(a);
+    //         //     referrer_mango_account_opt = b;
+    //         // }
 
-            // let fill = FillEvent::new(
-            //     Side::Ask,
-            //     best_bid.owner_slot,
-            //     maker_out,
-            //     now_ts,
-            //     event_queue.header.seq_num,
-            //     best_bid.owner,
-            //     best_bid.key,
-            //     best_bid.client_order_id,
-            //     info.maker_fee,
-            //     best_bid.best_initial,
-            //     best_bid.timestamp,
-            //     *mango_account_pk,
-            //     order_id,
-            //     client_order_id,
-            //     info.taker_fee + ref_fee_rate.unwrap(),
-            //     best_bid_price,
-            //     match_quantity,
-            //     best_bid.version,
-            // );
+    //         // let fill = FillEvent::new(
+    //         //     Side::Ask,
+    //         //     best_bid.owner_slot,
+    //         //     maker_out,
+    //         //     now_ts,
+    //         //     event_queue.header.seq_num,
+    //         //     best_bid.owner,
+    //         //     best_bid.key,
+    //         //     best_bid.client_order_id,
+    //         //     info.maker_fee,
+    //         //     best_bid.best_initial,
+    //         //     best_bid.timestamp,
+    //         //     *mango_account_pk,
+    //         //     order_id,
+    //         //     client_order_id,
+    //         //     info.taker_fee + ref_fee_rate.unwrap(),
+    //         //     best_bid_price,
+    //         //     match_quantity,
+    //         //     best_bid.version,
+    //         // );
 
-            // event_queue.push_back(cast(fill)).unwrap();
-            limit -= 1;
+    //         // event_queue.push_back(cast(fill)).unwrap();
+    //         limit -= 1;
 
-            if done {
-                break;
-            }
-        }
-        let total_quote_taken = max_quote_quantity - rem_quote_quantity;
+    //         if done {
+    //             break;
+    //         }
+    //     }
+    //     let total_quote_taken = max_quote_quantity - rem_quote_quantity;
 
-        // Apply changes to matched bids (handles invalidate on delete!)
-        for (handle, new_quantity) in bid_changes {
-            self.bids
-                .get_mut(handle)
-                .unwrap()
-                .as_leaf_mut()
-                .unwrap()
-                .quantity = new_quantity;
-        }
-        for key in bid_deletes {
-            let _removed_leaf = self.bids.remove_by_key(key).unwrap();
-        }
+    //     // Apply changes to matched bids (handles invalidate on delete!)
+    //     for (handle, new_quantity) in bid_changes {
+    //         self.bids
+    //             .get_mut(handle)
+    //             .unwrap()
+    //             .as_leaf_mut()
+    //             .unwrap()
+    //             .quantity = new_quantity;
+    //     }
+    //     for key in bid_deletes {
+    //         let _removed_leaf = self.bids.remove_by_key(key).unwrap();
+    //     }
 
-        // If there are still quantity unmatched, place on the book
-        let book_base_quantity = rem_base_quantity.min(rem_quote_quantity / price);
-        if book_base_quantity > 0 && post_allowed {
-            // Drop an expired order if possible
-            if let Some(expired_ask) = self.asks.remove_one_expired(now_ts) {
-                let event = OutEvent::new(
-                    Side::Ask,
-                    expired_ask.owner_slot,
-                    now_ts,
-                    event_queue.header.seq_num,
-                    expired_ask.owner,
-                    expired_ask.quantity,
-                );
-                event_queue.push_back(cast(event)).unwrap();
-            }
+    //     // If there are still quantity unmatched, place on the book
+    //     let book_base_quantity = rem_base_quantity.min(rem_quote_quantity / price);
+    //     if book_base_quantity > 0 && post_allowed {
+    //         // Drop an expired order if possible
+    //         if let Some(expired_ask) = self.asks.remove_one_expired(now_ts) {
+    //             let event = OutEvent::new(
+    //                 Side::Ask,
+    //                 expired_ask.owner_slot,
+    //                 now_ts,
+    //                 event_queue.header.seq_num,
+    //                 expired_ask.owner,
+    //                 expired_ask.quantity,
+    //             );
+    //             event_queue.push_back(cast(event)).unwrap();
+    //         }
 
-            if self.asks.is_full() {
-                // If this asks is lower than highest ask, boot that ask and insert this one
-                let max_ask = self.asks.remove_max().unwrap();
-                require!(price < max_ask.price(), MangoError::SomeError); // OutOfSpace
-                let event = OutEvent::new(
-                    Side::Ask,
-                    max_ask.owner_slot,
-                    now_ts,
-                    event_queue.header.seq_num,
-                    max_ask.owner,
-                    max_ask.quantity,
-                );
-                event_queue.push_back(cast(event)).unwrap();
-            }
+    //         if self.asks.is_full() {
+    //             // If this asks is lower than highest ask, boot that ask and insert this one
+    //             let max_ask = self.asks.remove_max().unwrap();
+    //             require!(price < max_ask.price(), MangoError::SomeError); // OutOfSpace
+    //             let event = OutEvent::new(
+    //                 Side::Ask,
+    //                 max_ask.owner_slot,
+    //                 now_ts,
+    //                 event_queue.header.seq_num,
+    //                 max_ask.owner,
+    //                 max_ask.quantity,
+    //             );
+    //             event_queue.push_back(cast(event)).unwrap();
+    //         }
 
-            // let best_initial = if market.meta_data.version == 0 {
-            //     match self.get_best_ask_price(now_ts) {
-            //         None => price,
-            //         Some(p) => p,
-            //     }
-            // } else {
-            //     let max_depth: i64 = market.liquidity_mining_info.max_depth_bps.to_num();
-            //     self.get_asks_size_below(price, max_depth, now_ts)
-            // };
+    //         // let best_initial = if market.meta_data.version == 0 {
+    //         //     match self.get_best_ask_price(now_ts) {
+    //         //         None => price,
+    //         //         Some(p) => p,
+    //         //     }
+    //         // } else {
+    //         //     let max_depth: i64 = market.liquidity_mining_info.max_depth_bps.to_num();
+    //         //     self.get_asks_size_below(price, max_depth, now_ts)
+    //         // };
 
-            // let owner_slot = mango_account
-            //     .next_order_slot()
-            //     .ok_or(MangoError::SomeError)?; // TooManyOpenOrders
-            let new_ask = LeafNode::new(
-                1, // todo market.meta_data.version,
-                0, // todo owner_slot as u8,
-                order_id,
-                *mango_account_pk,
-                book_base_quantity,
-                client_order_id,
-                now_ts,
-                0, // todo best_initial,
-                order_type,
-                time_in_force,
-            );
-            let _result = self.asks.insert_leaf(&new_ask)?;
+    //         // let owner_slot = mango_account
+    //         //     .next_order_slot()
+    //         //     .ok_or(MangoError::SomeError)?; // TooManyOpenOrders
+    //         let new_ask = LeafNode::new(
+    //             1, // todo market.meta_data.version,
+    //             0, // todo owner_slot as u8,
+    //             order_id,
+    //             *mango_account_pk,
+    //             book_base_quantity,
+    //             client_order_id,
+    //             now_ts,
+    //             0, // todo best_initial,
+    //             order_type,
+    //             time_in_force,
+    //         );
+    //         let _result = self.asks.insert_leaf(&new_ask)?;
 
-            // TODO OPT remove if PlacePerpOrder needs more compute
-            msg!(
-                "ask on book order_id={} quantity={} price={}",
-                order_id,
-                book_base_quantity,
-                price
-            );
+    //         // TODO OPT remove if PlacePerpOrder needs more compute
+    //         msg!(
+    //             "ask on book order_id={} quantity={} price={}",
+    //             order_id,
+    //             book_base_quantity,
+    //             price
+    //         );
 
-            // mango_account.add_order(market_index, Side::Ask, &new_ask)?;
-        }
+    //         // mango_account.add_order(market_index, Side::Ask, &new_ask)?;
+    //     }
 
-        // if there were matched taker quote apply ref fees
-        // we know ref_fee_rate is not None if total_quote_taken > 0
-        // if total_quote_taken > 0 {
-        //     apply_fees(
-        //         market,
-        //         info,
-        //         mango_account,
-        //         mango_account_pk,
-        //         market_index,
-        //         referrer_mango_account_opt,
-        //         referrer_mango_account_ai,
-        //         total_quote_taken,
-        //         ref_fee_rate.unwrap(),
-        //         // &mango_cache.perp_market_cache[market_index],
-        //     );
-        // }
+    //     // if there were matched taker quote apply ref fees
+    //     // we know ref_fee_rate is not None if total_quote_taken > 0
+    //     // if total_quote_taken > 0 {
+    //     //     apply_fees(
+    //     //         market,
+    //     //         info,
+    //     //         mango_account,
+    //     //         mango_account_pk,
+    //     //         market_index,
+    //     //         referrer_mango_account_opt,
+    //     //         referrer_mango_account_ai,
+    //     //         total_quote_taken,
+    //     //         ref_fee_rate.unwrap(),
+    //     //         // &mango_cache.perp_market_cache[market_index],
+    //     //     );
+    //     // }
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     // pub fn cancel_order(&mut self, order_id: i128, side: Side) -> Result<()> {
     //     match side {

@@ -16,7 +16,7 @@ pub struct CreatePerpMarket<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"PerpMarket".as_ref(), &perp_market_index.to_le_bytes().as_ref()],
+        seeds = [group.key().as_ref(), b"PerpMarket".as_ref(), perp_market_index.to_le_bytes().as_ref()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<PerpMarket>(),
@@ -50,8 +50,8 @@ pub fn create_perp_market(
         oracle: ctx.accounts.oracle.key(),
         bids: ctx.accounts.bids.key(),
         asks: ctx.accounts.asks.key(),
-        quote_lot_size: quote_lot_size,
-        base_lot_size: base_lot_size,
+        quote_lot_size,
+        base_lot_size,
         seq_num: 0,
         perp_market_index,
         base_token_index: base_token_index_opt.ok_or(TokenIndex::MAX).unwrap(),

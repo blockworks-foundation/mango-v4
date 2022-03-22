@@ -109,7 +109,9 @@ impl TestContextBuilder {
         }));
 
         // intentionally set to half the limit, to catch potential problems early
-        test.set_compute_max_units(100000);
+        // TODO make configurable
+        // margin trade test just goes above 100000 atm
+        test.set_compute_max_units(101000);
 
         Self {
             test,

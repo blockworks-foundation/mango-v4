@@ -1,7 +1,5 @@
 use mango_macro::Pod;
 
-use super::datatype::DataType;
-
 #[derive(Copy, Clone, Pod, Default)]
 #[repr(C)]
 /// Stores meta information about the `Account` on chain

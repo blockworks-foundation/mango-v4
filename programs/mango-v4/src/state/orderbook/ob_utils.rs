@@ -1,9 +1,7 @@
 use anchor_lang::prelude::Error;
-use bytemuck::{bytes_of, cast_slice_mut, from_bytes_mut, Contiguous, Pod};
+use bytemuck::{cast_slice_mut, from_bytes_mut, Pod};
 
 use solana_program::account_info::AccountInfo;
-use solana_program::program_error::ProgramError;
-use solana_program::pubkey::Pubkey;
 use std::cell::RefMut;
 use std::mem::size_of;
 

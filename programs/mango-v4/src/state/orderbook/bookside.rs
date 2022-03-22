@@ -1,4 +1,3 @@
-use bytemuck::Zeroable;
 use std::cell::RefMut;
 
 use anchor_lang::prelude::*;
@@ -14,8 +13,6 @@ use crate::state::orderbook::nodes::{
     AnyNode, FreeNode, InnerNode, LeafNode, NodeHandle, NodeRef, NodeTag,
 };
 use crate::util::LoadZeroCopy;
-
-use super::Book;
 
 pub const MAX_BOOK_NODES: usize = 1024;
 
