@@ -1045,6 +1045,10 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
         )
         .unwrap();
 
+        let health_check_metas =
+            derive_health_check_remaining_account_metas(&account_loader, &account, None, false)
+                .await;
+
         let accounts = Self::Accounts {
             group: account.group,
             account: self.account,
@@ -1065,7 +1069,9 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
             token_program: Token::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+
         (accounts, instruction)
     }
 

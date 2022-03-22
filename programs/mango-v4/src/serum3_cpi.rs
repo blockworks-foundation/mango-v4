@@ -9,10 +9,11 @@ use std::mem::size_of;
 use crate::error::*;
 use crate::state::*;
 
+/// Serum padding is "serum" + data + "padding"
 fn strip_dex_padding<'a>(acc: &'a AccountInfo) -> Result<Ref<'a, [u8]>> {
     require!(acc.data_len() >= 12, MangoError::SomeError);
     Ok(Ref::map(acc.try_borrow_data()?, |data| {
-        &data[5..data.len() - 12]
+        &data[5..data.len() - 7]
     }))
 }
 
@@ -20,7 +21,7 @@ fn strip_dex_padding_mut<'a>(acc: &'a AccountInfo) -> Result<RefMut<'a, [u8]>> {
     require!(acc.data_len() >= 12, MangoError::SomeError);
     Ok(RefMut::map(acc.try_borrow_mut_data()?, |data| {
         let len = data.len();
-        &mut data[5..len - 12]
+        &mut data[5..len - 7]
     }))
 }
 
@@ -314,7 +315,6 @@ impl<'a> CancelOrder<'a> {
         let mut cancels = vec![];
         {
             let open_orders = load_open_orders(&self.open_orders)?;
-
             let market = load_market_state(&self.market, self.program.key)?;
             let bids = load_bids_mut(&market, &self.bids)?;
             let asks = load_asks_mut(&market, &self.asks)?;
