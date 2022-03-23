@@ -1,25 +1,152 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
+use serum_dex::state::OpenOrders;
 use std::cell::Ref;
 
 use crate::error::MangoError;
 use crate::serum3_cpi;
-use crate::state::{oracle_price, Bank, MangoAccount};
-use crate::util;
+use crate::state::{oracle_price, Bank, MangoAccount, TokenIndex};
 use crate::util::checked_math as cm;
 use crate::util::LoadZeroCopy;
 
-pub fn compute_health(account: &MangoAccount, ais: &[AccountInfo]) -> Result<I80F48> {
+/// This trait abstracts how to find accounts needed for the health computation.
+///
+/// There are different ways they are retrieved from remainingAccounts, based
+/// on the instruction:
+/// - FixedOrderAccountRetriever requires the remainingAccounts to be in a well
+///   defined order and is the fastest. It's used where possible.
+/// - ScanningAccountRetriever does a linear scan for each account it needs.
+///   It needs more compute, but works when a union of bank/oracle/market accounts
+///   are passed because health needs to be computed for different baskets in
+///   one instruction (such as for liquidation instructions).
+trait AccountRetriever<'a, 'b> {
+    fn bank_and_oracle(
+        &self,
+        group: &Pubkey,
+        account_index: usize,
+        token_index: TokenIndex,
+    ) -> Result<(Ref<'a, Bank>, &'a AccountInfo<'b>)>;
+
+    fn serum_oo(&self, account_index: usize, key: &Pubkey) -> Result<Ref<'a, OpenOrders>>;
+}
+
+/// Assumes the account infos needed for the health computation follow a strict order.
+///
+/// 1. n_banks Bank account, in the order of account.token_account_map.iter_active()
+/// 2. n_banks oracle accounts, one for each bank in the same order
+/// 3. serum3 OpenOrders accounts, in the order of account.serum3_account_map.iter_active()
+struct FixedOrderAccountRetriever<'a, 'b> {
+    ais: &'a [AccountInfo<'b>],
+    n_banks: usize,
+}
+
+impl<'a, 'b> AccountRetriever<'a, 'b> for FixedOrderAccountRetriever<'a, 'b> {
+    fn bank_and_oracle(
+        &self,
+        group: &Pubkey,
+        account_index: usize,
+        token_index: TokenIndex,
+    ) -> Result<(Ref<'a, Bank>, &'a AccountInfo<'b>)> {
+        let bank = self.ais[account_index].load::<Bank>()?;
+        require!(&bank.group == group, MangoError::SomeError);
+        require!(bank.token_index == token_index, MangoError::SomeError);
+        let oracle = &self.ais[self.n_banks + account_index];
+        require!(&bank.oracle == oracle.key, MangoError::SomeError);
+        Ok((bank, oracle))
+    }
+
+    fn serum_oo(&self, account_index: usize, key: &Pubkey) -> Result<Ref<'a, OpenOrders>> {
+        let ai = &self.ais[2 * self.n_banks + account_index];
+        require!(key == ai.key, MangoError::SomeError);
+        serum3_cpi::load_open_orders(ai)
+    }
+}
+
+/// Takes a list of account infos containing
+/// - an unknown number of Banks in any order, followed by
+/// - the same number of oracles in the same order as the banks, followed by
+/// - an unknown number of serum3 OpenOrders accounts
+/// and retrieves accounts needed for the health computation by doing a linear
+/// scan for each request.
+struct ScanningAccountRetriever<'a, 'b> {
+    ais: &'a [AccountInfo<'b>],
+    banks: Vec<Ref<'a, Bank>>,
+}
+
+impl<'a, 'b> ScanningAccountRetriever<'a, 'b> {
+    fn new(ais: &'a [AccountInfo<'b>]) -> Result<Self> {
+        let mut banks = vec![];
+        for ai in ais.iter() {
+            match ai.load::<Bank>() {
+                Ok(bank) => banks.push(bank),
+                Err(Error::AnchorError(error))
+                    if error.error_code_number
+                        == ErrorCode::AccountDiscriminatorMismatch as u32 =>
+                {
+                    break;
+                }
+                Err(error) => return Err(error),
+            };
+        }
+        Ok(Self { ais, banks })
+    }
+
+    fn n_banks(&self) -> usize {
+        self.banks.len()
+    }
+}
+
+impl<'a, 'b> AccountRetriever<'a, 'b> for ScanningAccountRetriever<'a, 'b> {
+    fn bank_and_oracle(
+        &self,
+        group: &Pubkey,
+        _account_index: usize,
+        token_index: TokenIndex,
+    ) -> Result<(Ref<'a, Bank>, &'a AccountInfo<'b>)> {
+        let (i, bank) = self
+            .banks
+            .iter()
+            .enumerate()
+            .find(|(_, b)| b.token_index == token_index)
+            .unwrap();
+        require!(&bank.group == group, MangoError::SomeError);
+        let oracle = &self.ais[self.n_banks() + i];
+        require!(&bank.oracle == oracle.key, MangoError::SomeError);
+        Ok((Ref::clone(bank), oracle))
+    }
+
+    fn serum_oo(&self, _account_index: usize, key: &Pubkey) -> Result<Ref<'a, OpenOrders>> {
+        let oo = self.ais[2 * self.n_banks()..]
+            .iter()
+            .find(|ai| ai.key == key)
+            .unwrap();
+        serum3_cpi::load_open_orders(oo)
+    }
+}
+
+pub fn compute_health_from_fixed_accounts<'a, 'b>(
+    account: &MangoAccount,
+    ais: &'a [AccountInfo<'b>],
+) -> Result<I80F48> {
     let active_token_len = account.token_account_map.iter_active().count();
     let active_serum_len = account.serum3_account_map.iter_active().count();
     let expected_ais = active_token_len * 2 // banks + oracles
         + active_serum_len; // open_orders
     require!(ais.len() == expected_ais, MangoError::SomeError);
-    let banks = &ais[0..active_token_len];
-    let oracles = &ais[active_token_len..active_token_len * 2];
-    let serum_oos = &ais[active_token_len * 2..];
 
-    compute_health_detail(account, banks, oracles, serum_oos)
+    let retriever = FixedOrderAccountRetriever {
+        ais,
+        n_banks: active_token_len,
+    };
+    compute_health_detail(account, retriever)
+}
+
+pub fn compute_health_by_scanning_accounts<'a, 'b>(
+    account: &MangoAccount,
+    ais: &'a [AccountInfo<'b>],
+) -> Result<I80F48> {
+    let retriever = ScanningAccountRetriever::new(ais)?;
+    compute_health_detail(account, retriever)
 }
 
 struct TokenInfo<'a> {
@@ -84,57 +211,34 @@ fn pair_health(
     Ok(cm!(health1 + health2))
 }
 
-fn compute_health_detail(
+fn compute_health_detail<'a, 'b: 'a>(
     account: &MangoAccount,
-    banks: &[AccountInfo],
-    oracles: &[AccountInfo],
-    serum_oos: &[AccountInfo],
+    retriever: impl AccountRetriever<'a, 'b>,
 ) -> Result<I80F48> {
-    // collect the bank and oracle data once
-    let mut token_infos = util::zip!(banks.iter(), oracles.iter())
-        .map(|(bank_ai, oracle_ai)| {
-            let bank = bank_ai.load::<Bank>()?;
-            require!(bank.group == account.group, MangoError::SomeError);
-            require!(bank.oracle == oracle_ai.key(), MangoError::UnexpectedOracle);
-            let oracle_price = oracle_price(oracle_ai)?;
-            Ok(TokenInfo {
-                bank,
-                oracle_price,
-                balance: I80F48::ZERO,
-                price_asset_cache: I80F48::ZERO,
-                price_liab_cache: I80F48::ZERO,
-                price_inv_cache: I80F48::ZERO,
-            })
-        })
-        .collect::<Result<Vec<_>>>()?;
-
     // token contribution from token accounts
-    for (position, token_info) in util::zip!(
-        account.token_account_map.iter_active(),
-        token_infos.iter_mut()
-    ) {
-        let bank = &token_info.bank;
-        // This assumes banks are passed in order
-        require!(
-            bank.token_index == position.token_index,
-            MangoError::SomeError
-        );
+    let mut token_infos = vec![];
+    for (i, position) in account.token_account_map.iter_active().enumerate() {
+        let (bank, oracle_ai) =
+            retriever.bank_and_oracle(&account.group, i, position.token_index)?;
+        let oracle_price = oracle_price(oracle_ai)?;
 
         // converts the token value to the basis token value for health computations
         // TODO: health basis token == USDC?
-        let native = position.native(bank);
-        token_info.balance = cm!(token_info.balance + native);
+        let native = position.native(&bank);
+
+        token_infos.push(TokenInfo {
+            bank,
+            oracle_price,
+            balance: native,
+            price_asset_cache: I80F48::ZERO,
+            price_liab_cache: I80F48::ZERO,
+            price_inv_cache: I80F48::ZERO,
+        });
     }
 
     // token contribution from serum accounts
-    for (serum_account, oo_ai) in
-        util::zip!(account.serum3_account_map.iter_active(), serum_oos.iter())
-    {
-        // This assumes serum open orders are passed in order
-        require!(
-            &serum_account.open_orders == oo_ai.key,
-            MangoError::SomeError
-        );
+    for (i, serum_account) in account.serum3_account_map.iter_active().enumerate() {
+        let oo = retriever.serum_oo(i, &serum_account.open_orders)?;
 
         // find the TokenInfos for the market's base and quote tokens
         let base_index = token_infos
@@ -152,8 +256,6 @@ fn compute_health_detail(
             let (l, r) = token_infos.split_at_mut(base_index);
             (&mut r[0], &mut l[quote_index])
         };
-
-        let oo = serum3_cpi::load_open_orders(oo_ai)?;
 
         // add the amounts that are freely settleable
         let base_free = I80F48::from_num(oo.native_coin_free);

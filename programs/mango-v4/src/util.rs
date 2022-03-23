@@ -12,6 +12,7 @@ macro_rules! zip {
             zip!($($y), +))
     )
 }
+#[allow(unused_imports)]
 pub(crate) use zip;
 
 #[macro_export]
