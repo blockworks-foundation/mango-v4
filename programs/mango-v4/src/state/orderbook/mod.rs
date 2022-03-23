@@ -6,7 +6,6 @@ pub use metadata::*;
 pub use nodes::*;
 pub use ob_utils::*;
 pub use order_type::*;
-pub use order_type::*;
 pub use queue::*;
 
 pub mod book;

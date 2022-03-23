@@ -6,9 +6,6 @@ use crate::state::TokenIndex;
 pub type PerpMarketIndex = u16;
 
 #[account(zero_copy)]
-pub struct EventQueue {}
-
-#[account(zero_copy)]
 pub struct PerpMarket {
     pub group: Pubkey,
 
@@ -17,8 +14,7 @@ pub struct PerpMarket {
     pub bids: Pubkey,
     pub asks: Pubkey,
 
-    /// Event queue of TODO
-    /// pub event_queue: Pubkey,
+    pub event_queue: Pubkey,
 
     /// Number of quote native that reresents min tick
     /// e.g. when base lot size is 100, and quote lot size is 10, then tick i.e. price increment is 10/100 i.e. 0.1

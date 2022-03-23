@@ -4,10 +4,11 @@ use crate::{
     error::MangoError,
     state::{
         orderbook::{bookside::BookSide, nodes::LeafNode},
-        PerpMarket,
+        EventQueue, OutEvent, PerpMarket,
     },
 };
 use anchor_lang::prelude::*;
+use bytemuck::cast;
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
@@ -339,7 +340,7 @@ impl<'a> Book<'a> {
         // mango_group: &MangoGroup,
         // mango_group_pk: &Pubkey,
         // mango_cache: &MangoCache,
-        // event_queue: &mut EventQueue,
+        event_queue: &mut EventQueue,
         market: &mut PerpMarket,
         // oracle_price: I80F48,
         // mango_account: &mut MangoAccount,
@@ -403,16 +404,16 @@ impl<'a> Book<'a> {
                 // Remove the order from the book unless we've done that enough
                 if number_of_dropped_expired_orders < DROP_EXPIRED_ORDER_LIMIT {
                     number_of_dropped_expired_orders += 1;
-                    // let event = OutEvent::new(
-                    //     Side::Ask,
-                    //     best_ask.owner_slot,
-                    //     now_ts,
-                    //     event_queue.header.seq_num,
-                    //     best_ask.owner,
-                    //     best_ask.quantity,
-                    // );
-                    // event_queue.push_back(cast(event)).unwrap();
-                    // ask_deletes.push(best_ask.key);
+                    let event = OutEvent::new(
+                        Side::Ask,
+                        best_ask.owner_slot,
+                        now_ts,
+                        event_queue.header.seq_num,
+                        best_ask.owner,
+                        best_ask.quantity,
+                    );
+                    event_queue.push_back(cast(event)).unwrap();
+                    ask_deletes.push(best_ask.key);
                 }
                 continue;
             }
