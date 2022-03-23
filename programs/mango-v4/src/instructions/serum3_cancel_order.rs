@@ -33,12 +33,12 @@ impl BorshDeserialize for CancelOrderInstructionData {
             .try_into()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::UnexpectedEof, e))?;
         *buf = &buf[20..];
-        Ok(Self::unpack(data).ok_or_else(|| {
+        Self::unpack(data).ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 error!(MangoError::SomeError),
             )
-        })?)
+        })
     }
 }
 
@@ -112,7 +112,7 @@ pub fn serum3_cancel_order(
     //
     // Cancel
     //
-    cpi_cancel_order(&ctx.accounts, order)?;
+    cpi_cancel_order(ctx.accounts, order)?;
 
     Ok(())
 }

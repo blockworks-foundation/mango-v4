@@ -143,6 +143,7 @@ pub mod mango_v4 {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn place_perp_order(
         ctx: Context<PlacePerpOrder>,
         price: i64,

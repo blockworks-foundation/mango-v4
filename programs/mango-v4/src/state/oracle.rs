@@ -34,7 +34,7 @@ pub fn oracle_price(acc_info: &AccountInfo) -> Result<I80F48> {
     Ok(match oracle_type {
         OracleType::Stub => acc_info.load::<StubOracle>()?.price,
         OracleType::Pyth => {
-            let price_struct = pyth_client::load_price(&data).unwrap();
+            let price_struct = pyth_client::load_price(data).unwrap();
             I80F48::from_num(price_struct.agg.price)
         }
     })

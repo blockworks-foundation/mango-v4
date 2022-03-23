@@ -101,7 +101,7 @@ pub fn serum3_liq_force_cancel_orders(
     // TODO: do the correct health / being_liquidated check
     {
         let account = ctx.accounts.account.load()?;
-        let health = compute_health(&account, &ctx.remaining_accounts)?;
+        let health = compute_health(&account, ctx.remaining_accounts)?;
         msg!("health: {}", health);
         require!(health < 0, MangoError::SomeError);
     }
@@ -115,8 +115,8 @@ pub fn serum3_liq_force_cancel_orders(
     //
     // Cancel all and settle
     //
-    cpi_cancel_all_orders(&ctx.accounts, limit)?;
-    cpi_settle_funds(&ctx.accounts)?;
+    cpi_cancel_all_orders(ctx.accounts, limit)?;
+    cpi_settle_funds(ctx.accounts)?;
 
     //
     // After-settle tracking

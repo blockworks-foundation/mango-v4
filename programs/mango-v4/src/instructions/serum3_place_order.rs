@@ -69,12 +69,12 @@ impl BorshDeserialize for NewOrderInstructionData {
             .try_into()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::UnexpectedEof, e))?;
         *buf = &buf[46..];
-        Ok(Self::unpack(data).ok_or_else(|| {
+        Self::unpack(data).ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 error!(MangoError::SomeError),
             )
-        })?)
+        })
     }
 }
 
@@ -203,8 +203,8 @@ pub fn serum3_place_order(
     // Apply the order to serum. Also immediately settle, in case the order
     // matched against an existing other order.
     //
-    cpi_place_order(&ctx.accounts, order)?;
-    cpi_settle_funds(&ctx.accounts)?;
+    cpi_place_order(ctx.accounts, order)?;
+    cpi_settle_funds(ctx.accounts)?;
 
     //
     // After-order tracking
@@ -234,7 +234,7 @@ pub fn serum3_place_order(
     // Health check
     //
     let account = ctx.accounts.account.load()?;
-    let health = compute_health(&account, &ctx.remaining_accounts)?;
+    let health = compute_health(&account, ctx.remaining_accounts)?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::SomeError);
 

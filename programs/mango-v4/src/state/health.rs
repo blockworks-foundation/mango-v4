@@ -122,7 +122,7 @@ fn compute_health_detail(
 
         // converts the token value to the basis token value for health computations
         // TODO: health basis token == USDC?
-        let native = position.native(&bank);
+        let native = position.native(bank);
         token_info.balance = cm!(token_info.balance + native);
     }
 

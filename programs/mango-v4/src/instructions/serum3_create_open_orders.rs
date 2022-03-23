@@ -47,7 +47,7 @@ pub struct Serum3CreateOpenOrders<'info> {
 }
 
 pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result<()> {
-    cpi_init_open_orders(&ctx.accounts)?;
+    cpi_init_open_orders(ctx.accounts)?;
 
     let serum_market = ctx.accounts.serum_market.load()?;
     let mut account = ctx.accounts.account.load_mut()?;

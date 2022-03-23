@@ -32,9 +32,9 @@ pub fn remove_slop_mut<T: bytemuck::Pod>(bytes: &mut [u8]) -> &mut [T] {
     bytemuck::cast_slice_mut(&mut bytes[..new_len])
 }
 
-fn strip_data_header_mut<'a, H: bytemuck::Pod, D: bytemuck::Pod>(
-    orig_data: RefMut<'a, [u8]>,
-) -> Result<(RefMut<'a, H>, RefMut<'a, [D]>)> {
+fn strip_data_header_mut<H: bytemuck::Pod, D: bytemuck::Pod>(
+    orig_data: RefMut<[u8]>,
+) -> Result<(RefMut<H>, RefMut<[D]>)> {
     Ok(RefMut::map_split(orig_data, |data| {
         let (header_bytes, inner_bytes) = data.split_at_mut(size_of::<H>());
         let header = bytemuck::try_from_bytes_mut(header_bytes).unwrap();
@@ -72,7 +72,7 @@ pub fn load_bids_mut<'a>(
     bids: &'a AccountInfo,
 ) -> Result<RefMut<'a, serum_dex::critbit::Slab>> {
     require!(
-        &bids.key.to_aligned_bytes() == &identity(sm.bids),
+        bids.key.to_aligned_bytes() == identity(sm.bids),
         MangoError::SomeError
     );
     let orig_data = strip_dex_padding_mut(bids)?;
@@ -91,7 +91,7 @@ pub fn load_asks_mut<'a>(
     asks: &'a AccountInfo,
 ) -> Result<RefMut<'a, serum_dex::critbit::Slab>> {
     require!(
-        &asks.key.to_aligned_bytes() == &identity(sm.asks),
+        asks.key.to_aligned_bytes() == identity(sm.asks),
         MangoError::SomeError
     );
     let orig_data = strip_dex_padding_mut(asks)?;

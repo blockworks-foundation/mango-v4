@@ -333,6 +333,7 @@ impl<'a> Book<'a> {
 
     // todo: can new_bid and new_ask be elegantly folded into one method?
     #[inline(never)]
+    #[allow(clippy::too_many_arguments)]
     pub fn new_bid(
         &mut self,
         // program_id: &Pubkey,

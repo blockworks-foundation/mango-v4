@@ -48,7 +48,7 @@ pub fn place_perp_order(
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
     let bids = &ctx.accounts.bids.to_account_info();
     let asks = &ctx.accounts.asks.to_account_info();
-    let mut book = Book::load_checked(&bids, &asks, &perp_market)?;
+    let mut book = Book::load_checked(bids, asks, &perp_market)?;
 
     // let oracle_price = oracle_price(&ctx.accounts.oracle.to_account_info())?;
 

@@ -61,6 +61,12 @@ pub struct TokenAccountMap {
     pub values: [TokenAccount; MAX_INDEXED_POSITIONS],
 }
 
+impl Default for TokenAccountMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TokenAccountMap {
     pub fn new() -> Self {
         Self {
@@ -161,6 +167,12 @@ impl Default for Serum3Account {
 #[zero_copy]
 pub struct Serum3AccountMap {
     pub values: [Serum3Account; MAX_SERUM_OPEN_ORDERS],
+}
+
+impl Default for Serum3AccountMap {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Serum3AccountMap {
