@@ -208,7 +208,7 @@ impl<'a> EventQueue<'a> {
             MangoError::SomeError
         ); //MangoErrorCode::AccountNotRentExempt
 
-        let mut state = Self::load_mut(account)?;
+        let state = Self::load_mut(account)?;
         require!(account.owner == program_id, MangoError::SomeError); // MangoErrorCode::InvalidOwner
 
         // require!(
@@ -409,7 +409,7 @@ pub struct LiquidateEvent {
     pub liquidation_fee: I80F48, // liq fee for this earned for this market
     padding1: [u8; EVENT_SIZE - 128],
 }
-// unsafe impl TriviallyTransmutable for LiquidateEvent {}
+
 impl LiquidateEvent {
     pub fn new(
         timestamp: u64,

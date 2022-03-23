@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::error::MangoError;
-use crate::{mango_v4, state::*};
+use crate::state::*;
 
 #[derive(Accounts)]
 #[instruction(perp_market_index: PerpMarketIndex)]
