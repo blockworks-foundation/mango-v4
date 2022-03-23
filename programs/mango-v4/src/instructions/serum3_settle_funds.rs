@@ -107,7 +107,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     //
     // Settle
     //
-    cpi_settle_funds(&ctx.accounts)?;
+    cpi_settle_funds(ctx.accounts)?;
 
     //
     // After-order tracking

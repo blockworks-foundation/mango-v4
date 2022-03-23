@@ -115,8 +115,8 @@ pub fn serum3_liq_force_cancel_orders(
     //
     // Cancel all and settle
     //
-    cpi_cancel_all_orders(&ctx.accounts, limit)?;
-    cpi_settle_funds(&ctx.accounts)?;
+    cpi_cancel_all_orders(ctx.accounts, limit)?;
+    cpi_settle_funds(ctx.accounts)?;
 
     //
     // After-settle tracking

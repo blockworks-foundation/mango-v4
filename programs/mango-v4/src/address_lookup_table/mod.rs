@@ -22,10 +22,7 @@ pub fn addresses(table: &[u8]) -> &[Pubkey] {
 }
 
 pub fn contains(table: &[u8], pubkey: &Pubkey) -> bool {
-    addresses(table)
-        .iter()
-        .find(|&addr| addr == pubkey)
-        .is_some()
+    addresses(table).iter().any(|&addr| addr == *pubkey)
 }
 
 pub fn extend<'info>(

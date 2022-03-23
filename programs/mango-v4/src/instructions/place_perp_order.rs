@@ -49,7 +49,7 @@ pub fn place_perp_order(
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
     let bids = &ctx.accounts.bids.to_account_info();
     let asks = &ctx.accounts.asks.to_account_info();
-    let mut book = Book::load_checked(&bids, &asks, &perp_market)?;
+    let mut book = Book::load_checked(bids, asks, &perp_market)?;
 
     let event_queue_ai = &ctx.accounts.event_queue.to_account_info();
     let mut event_queue =

@@ -103,8 +103,7 @@ pub fn register_token(
 
     let alt_previous_size =
         address_lookup_table::addresses(&ctx.accounts.address_lookup_table.try_borrow_data()?)
-            .iter()
-            .count();
+            .len();
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {
         mint: ctx.accounts.mint.key(),

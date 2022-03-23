@@ -108,7 +108,9 @@ pub struct LeafNode {
 fn key_to_price(key: i128) -> i64 {
     (key >> 64) as i64
 }
+
 impl LeafNode {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         version: u8,
         owner_slot: u8,

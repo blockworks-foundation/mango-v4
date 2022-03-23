@@ -125,7 +125,7 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     Ok(())
 }
 
-fn get_pre_cpi_amounts(ctx: &Context<MarginTrade>, cpi_ais: &Vec<AccountInfo>) -> Vec<u64> {
+fn get_pre_cpi_amounts(ctx: &Context<MarginTrade>, cpi_ais: &[AccountInfo]) -> Vec<u64> {
     let mut amounts = vec![];
     for token_account in cpi_ais
         .iter()
@@ -168,16 +168,16 @@ fn adjust_for_post_cpi_amounts(
             let bank_loader = AccountLoader::<'_, Bank>::try_from(bank_ai)?;
             let mut bank = bank_loader.load_mut()?;
 
-            let mut position = account
+            let position = account
                 .token_account_map
                 .get_mut_or_create(bank.token_index)?
                 .0;
 
             // user has either withdrawn or deposited
             if *pre_cpi_amount > vault.amount {
-                bank.withdraw(&mut position, pre_cpi_amount - vault.amount)?;
+                bank.withdraw(position, pre_cpi_amount - vault.amount)?;
             } else {
-                bank.deposit(&mut position, vault.amount - pre_cpi_amount)?;
+                bank.deposit(position, vault.amount - pre_cpi_amount)?;
             }
         }
     }

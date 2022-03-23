@@ -74,9 +74,7 @@ impl<'a> Iterator for BookSideIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         // if next leaf is None just return it
-        if self.next_leaf.is_none() {
-            return None;
-        }
+        self.next_leaf?;
 
         // start popping from stack and get the other child
         let current_leaf = self.next_leaf;
