@@ -1,6 +1,6 @@
 #![cfg(feature = "test-bpf")]
 
-use mango_v4::state::BookSide;
+use mango_v4::state::*;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, transport::TransportError};
 
@@ -82,6 +82,7 @@ async fn test_perp() -> Result<(), TransportError> {
         perp_market,
         asks,
         bids,
+        event_queue,
         ..
     } = send_tx(
         solana,
@@ -90,12 +91,20 @@ async fn test_perp() -> Result<(), TransportError> {
             oracle: tokens[0].oracle,
             asks: context
                 .solana
-                .create_account::<BookSide>(&mango_v4::id())
+                .create_account_for_type::<BookSide>(&mango_v4::id())
                 .await,
             bids: context
                 .solana
-                .create_account::<BookSide>(&mango_v4::id())
+                .create_account_for_type::<BookSide>(&mango_v4::id())
                 .await,
+            event_queue: {
+                let len = std::mem::size_of::<queue::EventQueue>()
+                    + std::mem::size_of::<AnyEvent>() * MAX_NUM_EVENTS;
+                context
+                    .solana
+                    .create_account_from_len(&mango_v4::id(), len)
+                    .await
+            },
             admin,
             payer,
             perp_market_index: 0,
@@ -117,6 +126,7 @@ async fn test_perp() -> Result<(), TransportError> {
             perp_market,
             asks,
             bids,
+            event_queue,
             oracle: tokens[0].oracle,
             owner,
         },

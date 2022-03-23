@@ -1086,6 +1086,7 @@ pub struct CreatePerpMarketInstruction<'keypair> {
     pub oracle: Pubkey,
     pub asks: Pubkey,
     pub bids: Pubkey,
+    pub event_queue: Pubkey,
     pub payer: &'keypair Keypair,
     pub perp_market_index: PerpMarketIndex,
     pub base_token_index: TokenIndex,
@@ -1127,6 +1128,7 @@ impl<'keypair> ClientInstruction for CreatePerpMarketInstruction<'keypair> {
             perp_market,
             asks: self.asks,
             bids: self.bids,
+            event_queue: self.event_queue,
             payer: self.payer.pubkey(),
             system_program: System::id(),
         };
@@ -1146,6 +1148,7 @@ pub struct PlacePerpOrderInstruction<'keypair> {
     pub perp_market: Pubkey,
     pub asks: Pubkey,
     pub bids: Pubkey,
+    pub event_queue: Pubkey,
     pub oracle: Pubkey,
     pub owner: &'keypair Keypair,
 }
@@ -1173,6 +1176,7 @@ impl<'keypair> ClientInstruction for PlacePerpOrderInstruction<'keypair> {
             perp_market: self.perp_market,
             asks: self.asks,
             bids: self.bids,
+            event_queue: self.event_queue,
             oracle: self.oracle,
             owner: self.owner.pubkey(),
         };

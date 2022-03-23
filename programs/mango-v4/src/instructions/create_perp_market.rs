@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::error::MangoError;
-use crate::state::*;
+use crate::{mango_v4, state::*};
 
 #[derive(Accounts)]
 #[instruction(perp_market_index: PerpMarketIndex)]
@@ -30,6 +30,8 @@ pub struct CreatePerpMarket<'info> {
     #[account(zero)]
     pub asks: AccountLoader<'info, BookSide>,
 
+    pub event_queue: UncheckedAccount<'info>,
+
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -50,6 +52,7 @@ pub fn create_perp_market(
         oracle: ctx.accounts.oracle.key(),
         bids: ctx.accounts.bids.key(),
         asks: ctx.accounts.asks.key(),
+        event_queue: ctx.accounts.event_queue.key(),
         quote_lot_size,
         base_lot_size,
         seq_num: 0,
@@ -64,6 +67,8 @@ pub fn create_perp_market(
 
     let mut asks = ctx.accounts.asks.load_init()?;
     asks.book_side_type = BookSideType::Asks;
+
+    // TODO: discriminator on event queue
 
     Ok(())
 }

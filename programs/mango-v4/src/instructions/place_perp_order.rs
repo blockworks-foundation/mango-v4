@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::state::{Book, BookSide, Group, MangoAccount, OrderType, PerpMarket};
+use crate::state::{Book, BookSide, EventQueue, Group, MangoAccount, OrderType, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PlacePerpOrder<'info> {
@@ -25,6 +25,7 @@ pub struct PlacePerpOrder<'info> {
     pub asks: AccountLoader<'info, BookSide>,
     #[account(mut)]
     pub bids: AccountLoader<'info, BookSide>,
+    pub event_queue: UncheckedAccount<'info>,
     pub oracle: UncheckedAccount<'info>,
 
     pub owner: Signer<'info>,
@@ -50,6 +51,10 @@ pub fn place_perp_order(
     let asks = &ctx.accounts.asks.to_account_info();
     let mut book = Book::load_checked(&bids, &asks, &perp_market)?;
 
+    let event_queue_ai = &ctx.accounts.event_queue.to_account_info();
+    let mut event_queue =
+        EventQueue::load_mut_checked(event_queue_ai, ctx.program_id, &perp_market)?;
+
     // let oracle_price = oracle_price(&ctx.accounts.oracle.to_account_info())?;
 
     let now_ts = Clock::get()?.unix_timestamp as u64;
@@ -70,6 +75,7 @@ pub fn place_perp_order(
     // TODO reduce_only based on event queue
 
     book.new_bid(
+        &mut event_queue,
         &mut perp_market,
         // oracle_price,
         // &mut account,

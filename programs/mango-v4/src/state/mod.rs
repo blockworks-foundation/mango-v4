@@ -14,6 +14,6 @@ mod health;
 mod mango_account;
 mod mint_info;
 mod oracle;
-pub mod orderbook;
+mod orderbook;
 mod perp_market;
 mod serum3_market;
