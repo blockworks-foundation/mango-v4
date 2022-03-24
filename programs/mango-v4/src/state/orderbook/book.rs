@@ -36,8 +36,8 @@ impl<'a> Book<'a> {
         asks_ai: &'a AccountInfo,
         perp_market: &PerpMarket,
     ) -> std::result::Result<Self, Error> {
-        require!(bids_ai.key == &perp_market.bids, MangoError::SomeError); // MangoErrorCode::InvalidAccount
-        require!(asks_ai.key == &perp_market.asks, MangoError::SomeError); //    MangoErrorCode::InvalidAccount
+        require!(bids_ai.key == &perp_market.bids, MangoError::SomeError);
+        require!(asks_ai.key == &perp_market.asks, MangoError::SomeError);
         Ok(Self {
             bids: BookSide::load_mut_checked(bids_ai, perp_market)?,
             asks: BookSide::load_mut_checked(asks_ai, perp_market)?,
