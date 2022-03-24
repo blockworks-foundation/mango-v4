@@ -3,7 +3,6 @@ use fixed::types::I80F48;
 
 use crate::error::MangoError;
 use crate::state::*;
-use crate::util::get_leverage_weights;
 
 #[derive(Accounts)]
 #[instruction(perp_market_index: PerpMarketIndex)]
@@ -48,17 +47,14 @@ pub fn create_perp_market(
     quote_token_index: TokenIndex,
     quote_lot_size: i64,
     base_lot_size: i64,
-    maint_leverage: f32,
-    init_leverage: f32,
+    maint_asset_weight: f32,
+    init_asset_weight: f32,
+    maint_liab_weight: f32,
+    init_liab_weight: f32,
     liquidation_fee: f32,
     maker_fee: f32,
     taker_fee: f32,
 ) -> Result<()> {
-    let (maint_asset_weight, maint_liab_weight) =
-        get_leverage_weights(I80F48::from_num(maint_leverage));
-    let (init_asset_weight, init_liab_weight) =
-        get_leverage_weights(I80F48::from_num(init_leverage));
-
     let mut perp_market = ctx.accounts.perp_market.load_init()?;
     *perp_market = PerpMarket {
         group: ctx.accounts.group.key(),

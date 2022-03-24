@@ -108,14 +108,15 @@ async fn test_perp() -> Result<(), TransportError> {
             perp_market_index: 0,
             base_token_index: tokens[0].index,
             quote_token_index: tokens[1].index,
-            // e.g. BTC mango-v3 mainnet.1
             quote_lot_size: 10,
             base_lot_size: 100,
-            maint_leverage: 0.975,
-            init_leverage: 0.95,
+            init_asset_weight: 0.95,
+            maint_asset_weight: 0.975,
+            init_liab_weight: 1.05,
+            maint_liab_weight: 1.025,
             liquidation_fee: 0.012,
             maker_fee: 0.0002,
-            taker_fee: 0.0004,
+            taker_fee: 0.000,
         },
     )
     .await
