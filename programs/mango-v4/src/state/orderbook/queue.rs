@@ -4,33 +4,32 @@ use std::mem::size_of;
 use crate::error::MangoError;
 use crate::state::PerpMarket;
 use anchor_lang::prelude::*;
-use fixed::types::I80F48;
-use num_enum::{IntoPrimitive, TryFromPrimitive};
+use bytemuck::{cast_slice_mut, from_bytes_mut};
 use solana_program::account_info::AccountInfo;
 use solana_program::pubkey::Pubkey;
 use solana_program::sysvar::rent::Rent;
-use static_assertions::const_assert_eq;
 
-// use mango_logs::FillLog;
 use mango_macro::Pod;
 
 use super::metadata::MetaData;
-use super::ob_utils::strip_header_mut;
-use super::order_type::Side;
-// use safe_transmute::{self, trivial::TriviallyTransmutable};
-
-// use crate::error::{check_assert, MangoErrorCode, MangoResult, SourceFileId};
-// use crate::matching::Side;
-// use crate::state::{DataType, MetaData, PerpMarket};
-// use crate::utils::strip_header_mut;
-
-// Don't want event queue to become single threaded if it's logging liquidations
-// Most common scenario will be liqors depositing USDC and withdrawing some other token
-// So tying it to token deposited is not wise
-// also can't tie it to token withdrawn because during bull market, liqs will be depositing all base tokens and withdrawing quote
-//
 
 pub const MAX_NUM_EVENTS: usize = 512;
+
+#[inline]
+pub fn remove_slop_mut<T: bytemuck::Pod>(bytes: &mut [u8]) -> &mut [T] {
+    let slop = bytes.len() % size_of::<T>();
+    let new_len = bytes.len() - slop;
+    cast_slice_mut(&mut bytes[..new_len])
+}
+
+pub fn strip_header_mut<'a, H: bytemuck::Pod, D: bytemuck::Pod>(
+    account: &'a AccountInfo,
+) -> std::result::Result<(RefMut<'a, H>, RefMut<'a, [D]>), Error> {
+    Ok(RefMut::map_split(account.try_borrow_mut_data()?, |data| {
+        let (header_bytes, inner_bytes) = data.split_at_mut(size_of::<H>());
+        (from_bytes_mut(header_bytes), remove_slop_mut(inner_bytes))
+    }))
+}
 
 pub trait QueueHeader: bytemuck::Pod {
     type Item: bytemuck::Pod + Copy;
@@ -189,11 +188,11 @@ impl<'a> EventQueue<'a> {
         program_id: &Pubkey,
         perp_market: &PerpMarket,
     ) -> Result<Self> {
-        require!(account.owner == program_id, MangoError::SomeError); // InvalidOwner
+        require!(account.owner == program_id, MangoError::SomeError);
         require!(
             &perp_market.event_queue == account.key,
             MangoError::SomeError
-        ); //InvalidAccount
+        );
         Self::load_mut(account)
     }
 
@@ -206,10 +205,10 @@ impl<'a> EventQueue<'a> {
         require!(
             rent.is_exempt(account.lamports(), account.data_len()),
             MangoError::SomeError
-        ); //MangoErrorCode::AccountNotRentExempt
+        );
 
         let state = Self::load_mut(account)?;
-        require!(account.owner == program_id, MangoError::SomeError); // MangoErrorCode::InvalidOwner
+        require!(account.owner == program_id, MangoError::SomeError);
 
         // require!(
         //     !state.header.meta_data.is_initialized,
@@ -221,14 +220,6 @@ impl<'a> EventQueue<'a> {
     }
 }
 
-#[derive(Copy, Clone, IntoPrimitive, TryFromPrimitive, Eq, PartialEq)]
-#[repr(u8)]
-pub enum EventType {
-    Fill,
-    Out,
-    Liquidate,
-}
-
 const EVENT_SIZE: usize = 200;
 #[derive(Copy, Clone, Debug, Pod)]
 #[repr(C)]
@@ -236,204 +227,3 @@ pub struct AnyEvent {
     pub event_type: u8,
     pub padding: [u8; EVENT_SIZE - 1],
 }
-// unsafe impl TriviallyTransmutable for AnyEvent {}
-
-#[derive(Copy, Clone, Debug, Pod)]
-#[repr(C)]
-pub struct FillEvent {
-    pub event_type: u8,
-    pub taker_side: Side, // side from the taker's POV
-    pub maker_slot: u8,
-    pub maker_out: bool, // true if maker order quantity == 0
-    pub version: u8,
-    pub market_fees_applied: bool,
-    pub padding: [u8; 2],
-    pub timestamp: u64,
-    pub seq_num: usize, // note: usize same as u64
-
-    pub maker: Pubkey,
-    pub maker_order_id: i128,
-    pub maker_client_order_id: u64,
-    pub maker_fee: I80F48,
-
-    // The best bid/ask at the time the maker order was placed. Used for liquidity incentives
-    pub best_initial: i64,
-
-    // Timestamp of when the maker order was placed; copied over from the LeafNode
-    pub maker_timestamp: u64,
-
-    pub taker: Pubkey,
-    pub taker_order_id: i128,
-    pub taker_client_order_id: u64,
-    pub taker_fee: I80F48,
-
-    pub price: i64,
-    pub quantity: i64, // number of quote lots
-}
-// unsafe impl TriviallyTransmutable for FillEvent {}
-
-impl FillEvent {
-    pub fn new(
-        taker_side: Side,
-        maker_slot: u8,
-        maker_out: bool,
-        timestamp: u64,
-        seq_num: usize,
-        maker: Pubkey,
-        maker_order_id: i128,
-        maker_client_order_id: u64,
-        maker_fee: I80F48,
-        best_initial: i64,
-        maker_timestamp: u64,
-
-        taker: Pubkey,
-        taker_order_id: i128,
-        taker_client_order_id: u64,
-        taker_fee: I80F48,
-        price: i64,
-        quantity: i64,
-        version: u8,
-    ) -> FillEvent {
-        Self {
-            event_type: EventType::Fill as u8,
-            taker_side,
-            maker_slot,
-            maker_out,
-            version,
-            market_fees_applied: true, // Since mango v3.3.5, market fees are adjusted at matching time
-            padding: [0u8; 2],
-            timestamp,
-            seq_num,
-            maker,
-            maker_order_id,
-            maker_client_order_id,
-            maker_fee,
-            best_initial,
-            maker_timestamp,
-            taker,
-            taker_order_id,
-            taker_client_order_id,
-            taker_fee,
-            price,
-            quantity,
-        }
-    }
-
-    pub fn base_quote_change(&self, side: Side) -> (i64, i64) {
-        match side {
-            Side::Bid => (
-                self.quantity,
-                -self.price.checked_mul(self.quantity).unwrap(),
-            ),
-            Side::Ask => (
-                -self.quantity,
-                self.price.checked_mul(self.quantity).unwrap(),
-            ),
-        }
-    }
-
-    // pub fn to_fill_log(&self, mango_group: Pubkey, market_index: usize) -> FillLog {
-    //     FillLog {
-    //         mango_group,
-    //         market_index: market_index as u64,
-    //         taker_side: self.taker_side as u8,
-    //         maker_slot: self.maker_slot,
-    //         maker_out: self.maker_out,
-    //         timestamp: self.timestamp,
-    //         seq_num: self.seq_num as u64,
-    //         maker: self.maker,
-    //         maker_order_id: self.maker_order_id,
-    //         maker_client_order_id: self.maker_client_order_id,
-    //         maker_fee: self.maker_fee.to_bits(),
-    //         best_initial: self.best_initial,
-    //         maker_timestamp: self.maker_timestamp,
-    //         taker: self.taker,
-    //         taker_order_id: self.taker_order_id,
-    //         taker_client_order_id: self.taker_client_order_id,
-    //         taker_fee: self.taker_fee.to_bits(),
-    //         price: self.price,
-    //         quantity: self.quantity,
-    //     }
-    // }
-}
-
-#[derive(Copy, Clone, Debug, Pod)]
-#[repr(C)]
-pub struct OutEvent {
-    pub event_type: u8,
-    pub side: Side,
-    pub slot: u8,
-    padding0: [u8; 5],
-    pub timestamp: u64,
-    pub seq_num: usize,
-    pub owner: Pubkey,
-    pub quantity: i64,
-    padding1: [u8; EVENT_SIZE - 64],
-}
-// unsafe impl TriviallyTransmutable for OutEvent {}
-impl OutEvent {
-    pub fn new(
-        side: Side,
-        slot: u8,
-        timestamp: u64,
-        seq_num: usize,
-        owner: Pubkey,
-        quantity: i64,
-    ) -> Self {
-        Self {
-            event_type: EventType::Out.into(),
-            side,
-            slot,
-            padding0: [0; 5],
-            timestamp,
-            seq_num,
-            owner,
-            quantity,
-            padding1: [0; EVENT_SIZE - 64],
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug, Pod)]
-#[repr(C)]
-/// Liquidation for the PerpMarket this EventQueue is for
-pub struct LiquidateEvent {
-    pub event_type: u8,
-    padding0: [u8; 7],
-    pub timestamp: u64,
-    pub seq_num: usize,
-    pub liqee: Pubkey,
-    pub liqor: Pubkey,
-    pub price: I80F48,           // oracle price at the time of liquidation
-    pub quantity: i64,           // number of contracts that were moved from liqee to liqor
-    pub liquidation_fee: I80F48, // liq fee for this earned for this market
-    padding1: [u8; EVENT_SIZE - 128],
-}
-
-impl LiquidateEvent {
-    pub fn new(
-        timestamp: u64,
-        seq_num: usize,
-        liqee: Pubkey,
-        liqor: Pubkey,
-        price: I80F48,
-        quantity: i64,
-        liquidation_fee: I80F48,
-    ) -> Self {
-        Self {
-            event_type: EventType::Liquidate.into(),
-            padding0: [0u8; 7],
-            timestamp,
-            seq_num,
-            liqee,
-            liqor,
-            price,
-            quantity,
-            liquidation_fee,
-            padding1: [0u8; EVENT_SIZE - 128],
-        }
-    }
-}
-const_assert_eq!(size_of::<AnyEvent>(), size_of::<FillEvent>());
-const_assert_eq!(size_of::<AnyEvent>(), size_of::<OutEvent>());
-const_assert_eq!(size_of::<AnyEvent>(), size_of::<LiquidateEvent>());

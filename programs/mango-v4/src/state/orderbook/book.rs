@@ -4,7 +4,7 @@ use crate::{
     error::MangoError,
     state::{
         orderbook::{bookside::BookSide, nodes::LeafNode},
-        EventQueue, OutEvent, PerpMarket,
+        EventQueue, PerpMarket,
     },
 };
 use anchor_lang::prelude::*;
@@ -405,15 +405,15 @@ impl<'a> Book<'a> {
                 // Remove the order from the book unless we've done that enough
                 if number_of_dropped_expired_orders < DROP_EXPIRED_ORDER_LIMIT {
                     number_of_dropped_expired_orders += 1;
-                    let event = OutEvent::new(
-                        Side::Ask,
-                        best_ask.owner_slot,
-                        now_ts,
-                        event_queue.header.seq_num,
-                        best_ask.owner,
-                        best_ask.quantity,
-                    );
-                    event_queue.push_back(cast(event)).unwrap();
+                    // let event = OutEvent::new(
+                    //     Side::Ask,
+                    //     best_ask.owner_slot,
+                    //     now_ts,
+                    //     event_queue.header.seq_num,
+                    //     best_ask.owner,
+                    //     best_ask.quantity,
+                    // );
+                    // event_queue.push_back(cast(event)).unwrap();
                     ask_deletes.push(best_ask.key);
                 }
                 continue;
