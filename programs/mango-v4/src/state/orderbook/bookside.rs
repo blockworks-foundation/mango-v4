@@ -1,18 +1,14 @@
-use std::cell::RefMut;
-
 use anchor_lang::prelude::*;
 use bytemuck::{cast, cast_mut, cast_ref};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::state::orderbook::bookside_iterator::BookSideIter;
-use crate::state::PerpMarket;
 
 use crate::error::MangoError;
 use crate::state::orderbook::nodes::{
     AnyNode, FreeNode, InnerNode, LeafNode, NodeHandle, NodeRef, NodeTag,
 };
-use crate::util::LoadZeroCopy;
 
 pub const MAX_BOOK_NODES: usize = 1024;
 
@@ -62,39 +58,6 @@ impl BookSide {
     pub fn iter_all_including_invalid(&self) -> BookSideIter {
         BookSideIter::new(self, 0)
     }
-
-    pub fn load_mut_checked<'a>(
-        account: &'a AccountInfo,
-        perp_market: &PerpMarket,
-    ) -> Result<RefMut<'a, Self>> {
-        let state = account.load_mut::<BookSide>()?;
-
-        match state.book_side_type {
-            BookSideType::Bids => require!(account.key == &perp_market.bids, MangoError::SomeError),
-            BookSideType::Asks => require!(account.key == &perp_market.asks, MangoError::SomeError),
-        }
-
-        Ok(state)
-    }
-    //
-    // pub fn load_and_init<'a>(
-    //     account: &'a AccountInfo,
-    //     program_id: &Pubkey,
-    //     data_type: DataType,
-    //     rent: &Rent,
-    // ) -> MangoResult<RefMut<'a, Self>> {
-    //     // NOTE: require this first so we can borrow account later
-    //     require!(
-    //         rent.is_exempt(account.lamports(), account.data_len()),
-    //         MangoErrorCode::AccountNotRentExempt
-    //     )?;
-    //
-    //     let mut state = Self::load_mut(account)?;
-    //     require!(account.owner == program_id, MangoError::SomeError)?; // todo invalid owner
-    //     require!(!state.meta_data.is_initialized, MangoError::SomeError)?; // todo
-    //     state.meta_data = MetaData::new(data_type, 0, true);
-    //     Ok(state)
-    // }
 
     pub fn get_mut(&mut self, key: NodeHandle) -> Option<&mut AnyNode> {
         let node = &mut self.nodes[key as usize];

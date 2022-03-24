@@ -6,6 +6,7 @@ use crate::{
         orderbook::{bookside::BookSide, nodes::LeafNode},
         EventQueue, PerpMarket,
     },
+    util::LoadZeroCopy,
 };
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
@@ -31,7 +32,7 @@ pub struct Book<'a> {
 }
 
 impl<'a> Book<'a> {
-    pub fn load_checked(
+    pub fn load_mut(
         bids_ai: &'a AccountInfo,
         asks_ai: &'a AccountInfo,
         perp_market: &PerpMarket,
@@ -39,8 +40,8 @@ impl<'a> Book<'a> {
         require!(bids_ai.key == &perp_market.bids, MangoError::SomeError);
         require!(asks_ai.key == &perp_market.asks, MangoError::SomeError);
         Ok(Self {
-            bids: BookSide::load_mut_checked(bids_ai, perp_market)?,
-            asks: BookSide::load_mut_checked(asks_ai, perp_market)?,
+            bids: bids_ai.load_mut::<BookSide>()?,
+            asks: asks_ai.load_mut::<BookSide>()?,
         })
     }
 
