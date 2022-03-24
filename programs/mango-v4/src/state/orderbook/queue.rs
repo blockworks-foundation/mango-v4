@@ -202,6 +202,7 @@ pub struct FillEvent {
 }
 
 impl FillEvent {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         taker_side: Side,
         maker_slot: u8,
