@@ -130,7 +130,7 @@ impl<'a> Book<'a> {
         // mango_cache: &MangoCache,
         _event_queue: &mut EventQueue,
         market: &mut PerpMarket,
-        // oracle_price: I80F48,
+        oracle_price: I80F48,
         // mango_account: &mut MangoAccount,
         mango_account_pk: &Pubkey,
         // market_index: usize,
@@ -161,15 +161,15 @@ impl<'a> Book<'a> {
                 (true, true, price)
             }
         };
-        // let info = &mango_group.perp_markets[market_index];
-        // if post_allowed {
-        //     // price limit check computed lazily to save CU on average
-        //     let native_price = market.lot_to_native_price(price);
-        //     if native_price.checked_div(oracle_price).unwrap() > info.maint_liab_weight {
-        //         msg!("Posting on book disallowed due to price limits");
-        //         post_allowed = false;
-        //     }
-        // }
+
+        if post_allowed {
+            // price limit check computed lazily to save CU on average
+            let native_price = market.lot_to_native_price(price);
+            if native_price.checked_div(oracle_price).unwrap() > market.maint_liab_weight {
+                msg!("Posting on book disallowed due to price limits");
+                post_allowed = false;
+            }
+        }
 
         // referral fee related variables
         // let mut ref_fee_rate = None;

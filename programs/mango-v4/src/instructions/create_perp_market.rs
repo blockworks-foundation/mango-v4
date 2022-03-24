@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
+use fixed::types::I80F48;
 
 use crate::error::MangoError;
 use crate::state::*;
+use crate::util::get_leverage_weights;
 
 #[derive(Accounts)]
 #[instruction(perp_market_index: PerpMarketIndex)]
@@ -38,6 +40,7 @@ pub struct CreatePerpMarket<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_perp_market(
     ctx: Context<CreatePerpMarket>,
     perp_market_index: PerpMarketIndex,
@@ -45,7 +48,17 @@ pub fn create_perp_market(
     quote_token_index: TokenIndex,
     quote_lot_size: i64,
     base_lot_size: i64,
+    maint_leverage: f32,
+    init_leverage: f32,
+    liquidation_fee: f32,
+    maker_fee: f32,
+    taker_fee: f32,
 ) -> Result<()> {
+    let (maint_asset_weight, maint_liab_weight) =
+        get_leverage_weights(I80F48::from_num(maint_leverage));
+    let (init_asset_weight, init_liab_weight) =
+        get_leverage_weights(I80F48::from_num(init_leverage));
+
     let mut perp_market = ctx.accounts.perp_market.load_init()?;
     *perp_market = PerpMarket {
         group: ctx.accounts.group.key(),
@@ -55,11 +68,18 @@ pub fn create_perp_market(
         event_queue: ctx.accounts.event_queue.key(),
         quote_lot_size,
         base_lot_size,
+        maint_asset_weight: I80F48::from_num(maint_asset_weight),
+        init_asset_weight: I80F48::from_num(init_asset_weight),
+        maint_liab_weight: I80F48::from_num(maint_liab_weight),
+        init_liab_weight: I80F48::from_num(init_liab_weight),
+        liquidation_fee: I80F48::from_num(liquidation_fee),
+        maker_fee: I80F48::from_num(maker_fee),
+        taker_fee: I80F48::from_num(taker_fee),
         seq_num: 0,
+        bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
         perp_market_index,
         base_token_index: base_token_index_opt.ok_or(TokenIndex::MAX).unwrap(),
         quote_token_index,
-        bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
     };
 
     let mut bids = ctx.accounts.bids.load_init()?;

@@ -1093,6 +1093,11 @@ pub struct CreatePerpMarketInstruction<'keypair> {
     pub quote_token_index: TokenIndex,
     pub quote_lot_size: i64,
     pub base_lot_size: i64,
+    pub maint_leverage: f32,
+    pub init_leverage: f32,
+    pub liquidation_fee: f32,
+    pub maker_fee: f32,
+    pub taker_fee: f32,
 }
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for CreatePerpMarketInstruction<'keypair> {
@@ -1109,6 +1114,11 @@ impl<'keypair> ClientInstruction for CreatePerpMarketInstruction<'keypair> {
             quote_token_index: self.quote_token_index,
             quote_lot_size: self.quote_lot_size,
             base_lot_size: self.base_lot_size,
+            maint_leverage: self.maint_leverage,
+            init_leverage: self.init_leverage,
+            liquidation_fee: self.liquidation_fee,
+            maker_fee: self.maker_fee,
+            taker_fee: self.taker_fee,
         };
 
         let perp_market = Pubkey::find_program_address(

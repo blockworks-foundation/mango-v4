@@ -125,6 +125,7 @@ pub mod mango_v4 {
     /// Perps
     ///
 
+    #[allow(clippy::too_many_arguments)]
     pub fn create_perp_market(
         ctx: Context<CreatePerpMarket>,
         perp_market_index: PerpMarketIndex,
@@ -132,6 +133,11 @@ pub mod mango_v4 {
         quote_token_index: TokenIndex,
         quote_lot_size: i64,
         base_lot_size: i64,
+        maint_leverage: f32,
+        init_leverage: f32,
+        liquidation_fee: f32,
+        maker_fee: f32,
+        taker_fee: f32,
     ) -> Result<()> {
         instructions::create_perp_market(
             ctx,
@@ -140,6 +146,11 @@ pub mod mango_v4 {
             quote_token_index,
             quote_lot_size,
             base_lot_size,
+            maint_leverage,
+            init_leverage,
+            liquidation_fee,
+            maker_fee,
+            taker_fee,
         )
     }
 

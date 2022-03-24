@@ -88,6 +88,7 @@ async fn test_perp() -> Result<(), TransportError> {
         solana,
         CreatePerpMarketInstruction {
             group,
+            admin,
             oracle: tokens[0].oracle,
             asks: context
                 .solana
@@ -103,7 +104,6 @@ async fn test_perp() -> Result<(), TransportError> {
                     .create_account_for_type::<EventQueue>(&mango_v4::id())
                     .await
             },
-            admin,
             payer,
             perp_market_index: 0,
             base_token_index: tokens[0].index,
@@ -111,6 +111,11 @@ async fn test_perp() -> Result<(), TransportError> {
             // e.g. BTC mango-v3 mainnet.1
             quote_lot_size: 10,
             base_lot_size: 100,
+            maint_leverage: 0.975,
+            init_leverage: 0.95,
+            liquidation_fee: 0.012,
+            maker_fee: 0.0002,
+            taker_fee: 0.0004,
         },
     )
     .await

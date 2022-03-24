@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::ZeroCopy;
 use arrayref::array_ref;
+use fixed::types::I80F48;
 use std::cell::RefMut;
 use std::{cell::Ref, mem};
 
@@ -97,4 +98,12 @@ impl<'info> LoadZeroCopy for AccountInfo<'info> {
             bytemuck::from_bytes(&data[8..mem::size_of::<T>() + 8])
         }))
     }
+}
+
+// Returns asset_weight and liab_weight
+pub fn get_leverage_weights(leverage: I80F48) -> (I80F48, I80F48) {
+    (
+        (leverage - I80F48::ONE).checked_div(leverage).unwrap(),
+        (leverage + I80F48::ONE).checked_div(leverage).unwrap(),
+    )
 }

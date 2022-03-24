@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use fixed::types::I80F48;
 
 use crate::state::orderbook::order_type::Side;
 use crate::state::TokenIndex;
@@ -24,6 +25,15 @@ pub struct PerpMarket {
     /// e.g. if base decimals for underlying asset are 6, base lot size is 100, and base position is 10000, then
     /// UI position is 1
     pub base_lot_size: i64,
+
+    // TODO docs
+    pub maint_asset_weight: I80F48,
+    pub init_asset_weight: I80F48,
+    pub maint_liab_weight: I80F48,
+    pub init_liab_weight: I80F48,
+    pub liquidation_fee: I80F48,
+    pub maker_fee: I80F48,
+    pub taker_fee: I80F48,
 
     /// pub long_funding: I80F48,
     /// pub short_funding: I80F48,
@@ -62,5 +72,14 @@ impl PerpMarket {
             Side::Bid => upper | (!self.seq_num as i128),
             Side::Ask => upper | (self.seq_num as i128),
         }
+    }
+
+    /// Convert from the price stored on the book to the price used in value calculations
+    pub fn lot_to_native_price(&self, price: i64) -> I80F48 {
+        I80F48::from_num(price)
+            .checked_mul(I80F48::from_num(self.quote_lot_size))
+            .unwrap()
+            .checked_div(I80F48::from_num(self.base_lot_size))
+            .unwrap()
     }
 }

@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
 
-use crate::state::{Book, EventQueueHeader, Group, MangoAccount, OrderType, PerpMarket, Queue};
+use crate::state::{
+    oracle_price, Book, EventQueueHeader, Group, MangoAccount, OrderType, PerpMarket, Queue,
+};
 
 #[derive(Accounts)]
 pub struct PlacePerpOrder<'info> {
@@ -55,7 +57,7 @@ pub fn place_perp_order(
 
     let mut event_queue = ctx.accounts.event_queue.load_mut()?;
 
-    // let oracle_price = oracle_price(&ctx.accounts.oracle.to_account_info())?;
+    let oracle_price = oracle_price(&ctx.accounts.oracle.to_account_info())?;
 
     let now_ts = Clock::get()?.unix_timestamp as u64;
     let time_in_force = if expiry_timestamp != 0 {
@@ -77,7 +79,7 @@ pub fn place_perp_order(
     book.new_bid(
         &mut event_queue,
         &mut perp_market,
-        // oracle_price,
+        oracle_price,
         // &mut account,
         &mango_account_pk,
         // market_index: usize,
