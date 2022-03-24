@@ -9,12 +9,14 @@ use crate::{
     util::LoadZeroCopy,
 };
 use anchor_lang::prelude::*;
+use bytemuck::cast;
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
 use super::{
     nodes::NodeHandle,
     order_type::{OrderType, Side},
+    FillEvent, OutEvent,
 };
 use crate::util::checked_math as cm;
 
@@ -128,7 +130,7 @@ impl<'a> Book<'a> {
         // mango_group: &MangoGroup,
         // mango_group_pk: &Pubkey,
         // mango_cache: &MangoCache,
-        _event_queue: &mut EventQueue,
+        event_queue: &mut EventQueue,
         market: &mut PerpMarket,
         oracle_price: I80F48,
         // mango_account: &mut MangoAccount,
@@ -192,15 +194,15 @@ impl<'a> Book<'a> {
                 // Remove the order from the book unless we've done that enough
                 if number_of_dropped_expired_orders < DROP_EXPIRED_ORDER_LIMIT {
                     number_of_dropped_expired_orders += 1;
-                    // let event = OutEvent::new(
-                    //     Side::Ask,
-                    //     best_ask.owner_slot,
-                    //     now_ts,
-                    //     event_queue.header.seq_num,
-                    //     best_ask.owner,
-                    //     best_ask.quantity,
-                    // );
-                    // event_queue.push_back(cast(event)).unwrap();
+                    let event = OutEvent::new(
+                        Side::Ask,
+                        best_ask.owner_slot,
+                        now_ts,
+                        event_queue.header.seq_num,
+                        best_ask.owner,
+                        best_ask.quantity,
+                    );
+                    event_queue.push_back(cast(event)).unwrap();
                     ask_deletes.push(best_ask.key);
                 }
                 continue;
@@ -256,27 +258,27 @@ impl<'a> Book<'a> {
             //     referrer_mango_account_opt = b;
             // }
 
-            // let fill = FillEvent::new(
-            //     Side::Bid,
-            //     best_ask.owner_slot,
-            //     maker_out,
-            //     now_ts,
-            //     event_queue.header.seq_num,
-            //     best_ask.owner,
-            //     best_ask.key,
-            //     best_ask.client_order_id,
-            //     info.maker_fee,
-            //     best_ask.best_initial,
-            //     best_ask.timestamp,
-            //     *mango_account_pk,
-            //     order_id,
-            //     client_order_id,
-            //     info.taker_fee + ref_fee_rate.unwrap(),
-            //     best_ask_price,
-            //     match_quantity,
-            //     best_ask.version,
-            // );
-            // event_queue.push_back(cast(fill)).unwrap();
+            let fill = FillEvent::new(
+                Side::Bid,
+                best_ask.owner_slot,
+                maker_out,
+                now_ts,
+                event_queue.header.seq_num,
+                best_ask.owner,
+                best_ask.key,
+                best_ask.client_order_id,
+                market.maker_fee,
+                best_ask.best_initial,
+                best_ask.timestamp,
+                *mango_account_pk,
+                order_id,
+                client_order_id,
+                market.taker_fee, // + ref_fee_rate.unwrap(),
+                best_ask_price,
+                match_quantity,
+                best_ask.version,
+            );
+            event_queue.push_back(cast(fill)).unwrap();
             limit -= 1;
 
             if done {
@@ -302,31 +304,32 @@ impl<'a> Book<'a> {
         let book_base_quantity = rem_base_quantity.min(rem_quote_quantity / price);
         if post_allowed && book_base_quantity > 0 {
             // Drop an expired order if possible
-            // if let Some(expired_bid) = self.bids.remove_one_expired(now_ts) {
-            //     let event = OutEvent::new(
-            //         Side::Bid,
-            //         expired_bid.owner_slot,
-            //         now_ts,
-            //         event_queue.header.seq_num,
-            //         expired_bid.owner,
-            //         expired_bid.quantity,
-            //     );
-            //     event_queue.push_back(cast(event)).unwrap();
-            // }
+            if let Some(expired_bid) = self.bids.remove_one_expired(now_ts) {
+                let event = OutEvent::new(
+                    Side::Bid,
+                    expired_bid.owner_slot,
+                    now_ts,
+                    event_queue.header.seq_num,
+                    expired_bid.owner,
+                    expired_bid.quantity,
+                );
+                event_queue.push_back(cast(event)).unwrap();
+            }
 
             if self.bids.is_full() {
                 // If this bid is higher than lowest bid, boot that bid and insert this one
                 let min_bid = self.bids.remove_min().unwrap();
-                require!(price > min_bid.price(), MangoError::SomeError); // MangoErrorCode::OutOfSpace
-                                                                          // let event = OutEvent::new(
-                                                                          //     Side::Bid,
-                                                                          //     min_bid.owner_slot,
-                                                                          //     now_ts,
-                                                                          //     event_queue.header.seq_num,
-                                                                          //     min_bid.owner,
-                                                                          //     min_bid.quantity,
-                                                                          // );
-                                                                          // event_queue.push_back(cast(event)).unwrap();
+                // MangoErrorCode::OutOfSpace
+                require!(price > min_bid.price(), MangoError::SomeError);
+                let event = OutEvent::new(
+                    Side::Bid,
+                    min_bid.owner_slot,
+                    now_ts,
+                    event_queue.header.seq_num,
+                    min_bid.owner,
+                    min_bid.quantity,
+                );
+                event_queue.push_back(cast(event)).unwrap();
             }
 
             // iterate through book on the bid side
