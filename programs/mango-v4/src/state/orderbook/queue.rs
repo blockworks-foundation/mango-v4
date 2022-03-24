@@ -1,35 +1,8 @@
-use std::cell::RefMut;
-use std::mem::size_of;
-
 use crate::error::MangoError;
-use crate::state::PerpMarket;
 use anchor_lang::prelude::*;
-use bytemuck::{cast_slice_mut, from_bytes_mut};
-use solana_program::account_info::AccountInfo;
-use solana_program::pubkey::Pubkey;
-use solana_program::sysvar::rent::Rent;
-
 use mango_macro::Pod;
 
-use super::metadata::MetaData;
-
 pub const MAX_NUM_EVENTS: usize = 512;
-
-#[inline]
-pub fn remove_slop_mut<T: bytemuck::Pod>(bytes: &mut [u8]) -> &mut [T] {
-    let slop = bytes.len() % size_of::<T>();
-    let new_len = bytes.len() - slop;
-    cast_slice_mut(&mut bytes[..new_len])
-}
-
-pub fn strip_header_mut<'a, H: bytemuck::Pod, D: bytemuck::Pod>(
-    account: &'a AccountInfo,
-) -> std::result::Result<(RefMut<'a, H>, RefMut<'a, [D]>), Error> {
-    Ok(RefMut::map_split(account.try_borrow_mut_data()?, |data| {
-        let (header_bytes, inner_bytes) = data.split_at_mut(size_of::<H>());
-        (from_bytes_mut(header_bytes), remove_slop_mut(inner_bytes))
-    }))
-}
 
 pub trait QueueHeader: bytemuck::Pod {
     type Item: bytemuck::Pod + Copy;
@@ -43,23 +16,19 @@ pub trait QueueHeader: bytemuck::Pod {
     fn decr_event_id(&mut self, n: usize);
 }
 
-pub struct Queue<'a, H: QueueHeader> {
-    pub header: RefMut<'a, H>,
-    pub buf: RefMut<'a, [H::Item]>,
+#[account(zero_copy)]
+pub struct Queue<H: QueueHeader> {
+    pub header: H,
+    pub buf: [H::Item; MAX_NUM_EVENTS],
 }
 
-impl<'a, H: QueueHeader> Queue<'a, H> {
-    pub fn new(header: RefMut<'a, H>, buf: RefMut<'a, [H::Item]>) -> Self {
-        Self { header, buf }
-    }
-
-    pub fn load_mut(account: &'a AccountInfo) -> Result<Self> {
-        let (header, buf) = strip_header_mut::<H, H::Item>(account)?;
-        Ok(Self { header, buf })
-    }
-
+impl<'a, H: QueueHeader> Queue<H> {
     pub fn len(&self) -> usize {
         self.header.count()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     pub fn full(&self) -> bool {
@@ -98,10 +67,9 @@ impl<'a, H: QueueHeader> Queue<'a, H> {
         Some(&mut self.buf[self.header.head()])
     }
 
-    pub fn pop_front(&mut self) -> std::result::Result<H::Item, ()> {
-        if self.empty() {
-            return Err(());
-        }
+    pub fn pop_front(&mut self) -> Result<H::Item> {
+        require!(!self.empty(), MangoError::SomeError);
+
         let value = self.buf[self.header.head()];
 
         let count = self.header.count();
@@ -129,13 +97,13 @@ impl<'a, H: QueueHeader> Queue<'a, H> {
     }
 }
 
-struct QueueIterator<'a, 'b, H: QueueHeader> {
-    queue: &'b Queue<'a, H>,
+struct QueueIterator<'a, H: QueueHeader> {
+    queue: &'a Queue<H>,
     index: usize,
 }
 
-impl<'a, 'b, H: QueueHeader> Iterator for QueueIterator<'a, 'b, H> {
-    type Item = &'b H::Item;
+impl<'a, H: QueueHeader> Iterator for QueueIterator<'a, H> {
+    type Item = &'a H::Item;
     fn next(&mut self) -> Option<Self::Item> {
         if self.index == self.queue.len() {
             None
@@ -150,12 +118,10 @@ impl<'a, 'b, H: QueueHeader> Iterator for QueueIterator<'a, 'b, H> {
 
 #[account(zero_copy)]
 pub struct EventQueueHeader {
-    pub meta_data: MetaData,
     head: usize,
     count: usize,
     pub seq_num: usize,
 }
-// unsafe impl TriviallyTransmutable for EventQueueHeader {}
 
 impl QueueHeader for EventQueueHeader {
     type Item = AnyEvent;
@@ -180,45 +146,7 @@ impl QueueHeader for EventQueueHeader {
     }
 }
 
-pub type EventQueue<'a> = Queue<'a, EventQueueHeader>;
-
-impl<'a> EventQueue<'a> {
-    pub fn load_mut_checked(
-        account: &'a AccountInfo,
-        program_id: &Pubkey,
-        perp_market: &PerpMarket,
-    ) -> Result<Self> {
-        require!(account.owner == program_id, MangoError::SomeError);
-        require!(
-            &perp_market.event_queue == account.key,
-            MangoError::SomeError
-        );
-        Self::load_mut(account)
-    }
-
-    pub fn load_and_init(
-        account: &'a AccountInfo,
-        program_id: &Pubkey,
-        rent: &Rent,
-    ) -> Result<Self> {
-        // NOTE: check this first so we can borrow account later
-        require!(
-            rent.is_exempt(account.lamports(), account.data_len()),
-            MangoError::SomeError
-        );
-
-        let state = Self::load_mut(account)?;
-        require!(account.owner == program_id, MangoError::SomeError);
-
-        // require!(
-        //     !state.header.meta_data.is_initialized,
-        //     MangoError::SomeError
-        // );
-        // state.header.meta_data = MetaData::new(DataType::EventQueue, 0, true);
-
-        Ok(state)
-    }
-}
+pub type EventQueue = Queue<EventQueueHeader>;
 
 const EVENT_SIZE: usize = 200;
 #[derive(Copy, Clone, Debug, Pod)]

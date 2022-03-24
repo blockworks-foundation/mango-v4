@@ -29,8 +29,8 @@ pub struct CreatePerpMarket<'info> {
     pub bids: AccountLoader<'info, BookSide>,
     #[account(zero)]
     pub asks: AccountLoader<'info, BookSide>,
-
-    pub event_queue: UncheckedAccount<'info>,
+    #[account(zero)]
+    pub event_queue: AccountLoader<'info, EventQueue>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -67,8 +67,6 @@ pub fn create_perp_market(
 
     let mut asks = ctx.accounts.asks.load_init()?;
     asks.book_side_type = BookSideType::Asks;
-
-    // TODO: discriminator on event queue
 
     Ok(())
 }

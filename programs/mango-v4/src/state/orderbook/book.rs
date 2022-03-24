@@ -8,7 +8,6 @@ use crate::{
     },
 };
 use anchor_lang::prelude::*;
-use bytemuck::cast;
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
@@ -341,7 +340,7 @@ impl<'a> Book<'a> {
         // mango_group: &MangoGroup,
         // mango_group_pk: &Pubkey,
         // mango_cache: &MangoCache,
-        event_queue: &mut EventQueue,
+        _event_queue: &mut EventQueue,
         market: &mut PerpMarket,
         // oracle_price: I80F48,
         // mango_account: &mut MangoAccount,

@@ -98,11 +98,9 @@ async fn test_perp() -> Result<(), TransportError> {
                 .create_account_for_type::<BookSide>(&mango_v4::id())
                 .await,
             event_queue: {
-                let len = std::mem::size_of::<queue::EventQueue>()
-                    + std::mem::size_of::<AnyEvent>() * MAX_NUM_EVENTS;
                 context
                     .solana
-                    .create_account_from_len(&mango_v4::id(), len)
+                    .create_account_for_type::<EventQueue>(&mango_v4::id())
                     .await
             },
             admin,
