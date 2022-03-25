@@ -111,6 +111,7 @@ impl BookSide {
     }
 
     #[cfg(test)]
+    #[allow(dead_code)]
     fn to_price_quantity_vec(&self, reverse: bool) -> Vec<(i64, i64)> {
         let mut pqs = vec![];
         let mut current: NodeHandle = match self.root() {
