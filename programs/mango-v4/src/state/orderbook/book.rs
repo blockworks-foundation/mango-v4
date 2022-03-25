@@ -11,7 +11,6 @@ use crate::{
 use anchor_lang::prelude::*;
 use bytemuck::cast;
 use fixed::types::I80F48;
-use fixed_macro::types::I80F48;
 
 use super::{
     nodes::NodeHandle,
@@ -19,10 +18,6 @@ use super::{
     FillEvent, OutEvent,
 };
 use crate::util::checked_math as cm;
-
-pub const CENTIBPS_PER_UNIT: I80F48 = I80F48!(1_000_000);
-// todo move to a constants module or something
-pub const MAX_PERP_OPEN_ORDERS: usize = 64;
 
 /// Drop at most this many expired orders from a BookSide when trying to match orders.
 /// This exists as a guard against excessive compute use.
@@ -47,12 +42,12 @@ impl<'a> Book<'a> {
         })
     }
 
-    /// returns best valid bid
+    /// Returns best valid bid
     pub fn get_best_bid_price(&self, now_ts: u64) -> Option<i64> {
         Some(self.bids.iter_valid(now_ts).next()?.1.price())
     }
 
-    /// returns best valid ask
+    /// Returns best valid ask
     pub fn get_best_ask_price(&self, now_ts: u64) -> Option<i64> {
         Some(self.asks.iter_valid(now_ts).next()?.1.price())
     }
@@ -121,15 +116,10 @@ impl<'a> Book<'a> {
         s.min(max_depth)
     }
 
-    // todo: can new_bid and new_ask be elegantly folded into one method?
     #[inline(never)]
     #[allow(clippy::too_many_arguments)]
     pub fn new_bid(
         &mut self,
-        // program_id: &Pubkey,
-        // mango_group: &MangoGroup,
-        // mango_group_pk: &Pubkey,
-        // mango_cache: &MangoCache,
         event_queue: &mut EventQueue,
         market: &mut PerpMarket,
         oracle_price: I80F48,
@@ -144,8 +134,6 @@ impl<'a> Book<'a> {
         now_ts: u64,
         mut limit: u8, // max number of FillEvents allowed; guaranteed to be greater than 0
     ) -> std::result::Result<(), Error> {
-        // TODO proper error handling
-        // TODO handle the case where we run out of compute (right now just fails)
         let (post_only, mut post_allowed, price) = match order_type {
             OrderType::Limit => (false, true, price),
             OrderType::ImmediateOrCancel => (false, false, price),
@@ -174,7 +162,7 @@ impl<'a> Book<'a> {
         // generate new order id
         let order_id = market.gen_order_id(Side::Bid, price);
 
-        // Iterate through book and match against this new bid
+        // Iterate through book and match against this new bid.
         //
         // Any changes to matching asks are collected in ask_changes
         // and then applied after this loop.
