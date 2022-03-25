@@ -120,8 +120,8 @@ impl<'a> Book<'a> {
     #[allow(clippy::too_many_arguments)]
     pub fn new_bid(
         &mut self,
-        event_queue: &mut EventQueue,
         market: &mut PerpMarket,
+        event_queue: &mut EventQueue,
         oracle_price: I80F48,
         mango_account: &mut MangoAccount,
         mango_account_pk: &Pubkey,
@@ -178,7 +178,6 @@ impl<'a> Book<'a> {
                     number_of_dropped_expired_orders += 1;
                     let event = OutEvent::new(
                         Side::Ask,
-                        best_ask.owner_slot,
                         now_ts,
                         event_queue.header.seq_num,
                         best_ask.owner,
@@ -225,7 +224,6 @@ impl<'a> Book<'a> {
 
             let fill = FillEvent::new(
                 Side::Bid,
-                best_ask.owner_slot,
                 maker_out,
                 now_ts,
                 event_queue.header.seq_num,
@@ -233,7 +231,6 @@ impl<'a> Book<'a> {
                 best_ask.key,
                 best_ask.client_order_id,
                 market.maker_fee,
-                best_ask.best_initial,
                 best_ask.timestamp,
                 *mango_account_pk,
                 order_id,
@@ -241,7 +238,6 @@ impl<'a> Book<'a> {
                 market.taker_fee,
                 best_ask_price,
                 match_quantity,
-                best_ask.version,
             );
             event_queue.push_back(cast(fill)).unwrap();
             limit -= 1;
@@ -272,7 +268,6 @@ impl<'a> Book<'a> {
             if let Some(expired_bid) = self.bids.remove_one_expired(now_ts) {
                 let event = OutEvent::new(
                     Side::Bid,
-                    expired_bid.owner_slot,
                     now_ts,
                     event_queue.header.seq_num,
                     expired_bid.owner,
@@ -288,7 +283,6 @@ impl<'a> Book<'a> {
                 require!(price > min_bid.price(), MangoError::SomeError);
                 let event = OutEvent::new(
                     Side::Bid,
-                    min_bid.owner_slot,
                     now_ts,
                     event_queue.header.seq_num,
                     min_bid.owner,
@@ -297,29 +291,12 @@ impl<'a> Book<'a> {
                 event_queue.push_back(cast(event)).unwrap();
             }
 
-            // iterate through book on the bid side
-            // let best_initial = if market.meta_data.version == 0 {
-            //     match self.get_best_bid_price(now_ts) {
-            //         None => price,
-            //         Some(p) => p,
-            //     }
-            // } else {
-            //     let max_depth: i64 = market.liquidity_mining_info.max_depth_bps.to_num();
-            //     self.get_bids_size_above(price, max_depth, now_ts)
-            // };
-
-            // let owner_slot = mango_account
-            //     .next_order_slot()
-            //     .ok_or(MangoError::SomeError)?; // TooManyOpenOrders
             let new_bid = LeafNode::new(
-                1, // todo market.meta_data.version,
-                0, // todo owner_slot as u8,
                 order_id,
                 *mango_account_pk,
                 book_base_quantity,
                 client_order_id,
                 now_ts,
-                0, // todo best_initial,
                 order_type,
                 time_in_force,
             );

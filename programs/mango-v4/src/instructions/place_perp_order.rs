@@ -77,8 +77,8 @@ pub fn place_perp_order(
     // TODO reduce_only based on event queue
 
     book.new_bid(
-        &mut event_queue,
         &mut perp_market,
+        &mut event_queue,
         oracle_price,
         &mut account,
         &mango_account_pk,
