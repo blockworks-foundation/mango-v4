@@ -78,6 +78,13 @@ impl TokenAccountMap {
         }
     }
 
+    pub fn get(&self, token_index: TokenIndex) -> Result<&TokenAccount> {
+        self.values
+            .iter()
+            .find(|p| p.is_active_for_token(token_index))
+            .ok_or_else(|| error!(MangoError::SomeError)) // TODO: not found error
+    }
+
     pub fn get_mut(&mut self, token_index: TokenIndex) -> Result<&mut TokenAccount> {
         self.values
             .iter_mut()

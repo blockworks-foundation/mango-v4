@@ -19,7 +19,7 @@ use crate::util::LoadZeroCopy;
 ///   It needs more compute, but works when a union of bank/oracle/market accounts
 ///   are passed because health needs to be computed for different baskets in
 ///   one instruction (such as for liquidation instructions).
-trait AccountRetriever<'a, 'b> {
+pub trait AccountRetriever<'a, 'b> {
     fn bank_and_oracle(
         &self,
         group: &Pubkey,
@@ -35,7 +35,7 @@ trait AccountRetriever<'a, 'b> {
 /// 1. n_banks Bank account, in the order of account.token_account_map.iter_active()
 /// 2. n_banks oracle accounts, one for each bank in the same order
 /// 3. serum3 OpenOrders accounts, in the order of account.serum3_account_map.iter_active()
-struct FixedOrderAccountRetriever<'a, 'b> {
+pub struct FixedOrderAccountRetriever<'a, 'b> {
     ais: &'a [AccountInfo<'b>],
     n_banks: usize,
 }
@@ -68,13 +68,13 @@ impl<'a, 'b> AccountRetriever<'a, 'b> for FixedOrderAccountRetriever<'a, 'b> {
 /// - an unknown number of serum3 OpenOrders accounts
 /// and retrieves accounts needed for the health computation by doing a linear
 /// scan for each request.
-struct ScanningAccountRetriever<'a, 'b> {
+pub struct ScanningAccountRetriever<'a, 'b> {
     ais: &'a [AccountInfo<'b>],
     banks: Vec<Ref<'a, Bank>>,
 }
 
 impl<'a, 'b> ScanningAccountRetriever<'a, 'b> {
-    fn new(ais: &'a [AccountInfo<'b>]) -> Result<Self> {
+    pub fn new(ais: &'a [AccountInfo<'b>]) -> Result<Self> {
         let mut banks = vec![];
         for ai in ais.iter() {
             match ai.load::<Bank>() {
