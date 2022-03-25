@@ -4,7 +4,7 @@ use crate::{
     error::MangoError,
     state::{
         orderbook::{bookside::BookSide, nodes::LeafNode},
-        EventQueue, PerpMarket,
+        EventQueue, MangoAccount, PerpMarket,
     },
     util::LoadZeroCopy,
 };
@@ -133,9 +133,8 @@ impl<'a> Book<'a> {
         event_queue: &mut EventQueue,
         market: &mut PerpMarket,
         oracle_price: I80F48,
-        // mango_account: &mut MangoAccount,
+        mango_account: &mut MangoAccount,
         mango_account_pk: &Pubkey,
-        // market_index: usize,
         price: i64,
         max_base_quantity: i64, // guaranteed to be greater than zero due to initial check
         max_quote_quantity: i64, // guaranteed to be greater than zero due to initial check
@@ -143,7 +142,6 @@ impl<'a> Book<'a> {
         time_in_force: u8,
         client_order_id: u64,
         now_ts: u64,
-        // referrer_mango_account_ai: Option<&AccountInfo>,
         mut limit: u8, // max number of FillEvents allowed; guaranteed to be greater than 0
     ) -> std::result::Result<(), Error> {
         // TODO proper error handling
@@ -172,10 +170,6 @@ impl<'a> Book<'a> {
                 post_allowed = false;
             }
         }
-
-        // referral fee related variables
-        // let mut ref_fee_rate = None;
-        // let mut referrer_mango_account_opt = None;
 
         // generate new order id
         let order_id = market.gen_order_id(Side::Bid, price);
@@ -241,23 +235,6 @@ impl<'a> Book<'a> {
                 ask_changes.push((best_ask_h, new_best_ask_quantity));
             }
 
-            // todo
-            // if ref_fee_rate is none, determine it
-            // if ref_valid, then pay into referrer, else pay to perp market
-            // if ref_fee_rate.is_none() {
-            //     let (a, b) = determine_ref_vars(
-            //         program_id,
-            //         mango_group,
-            //         mango_group_pk,
-            //         mango_cache,
-            //         mango_account,
-            //         referrer_mango_account_ai,
-            //         now_ts,
-            //     )?;
-            //     ref_fee_rate = Some(a);
-            //     referrer_mango_account_opt = b;
-            // }
-
             let fill = FillEvent::new(
                 Side::Bid,
                 best_ask.owner_slot,
@@ -273,7 +250,7 @@ impl<'a> Book<'a> {
                 *mango_account_pk,
                 order_id,
                 client_order_id,
-                market.taker_fee, // + ref_fee_rate.unwrap(),
+                market.taker_fee,
                 best_ask_price,
                 match_quantity,
                 best_ask.version,
@@ -285,7 +262,7 @@ impl<'a> Book<'a> {
                 break;
             }
         }
-        // let total_quote_taken = cm!(max_quote_quantity - rem_quote_quantity);
+        let total_quote_taken = cm!(max_quote_quantity - rem_quote_quantity);
 
         // Apply changes to matched asks (handles invalidate on delete!)
         for (handle, new_quantity) in ask_changes {
@@ -372,21 +349,41 @@ impl<'a> Book<'a> {
 
         // if there were matched taker quote apply ref fees
         // we know ref_fee_rate is not None if total_quote_taken > 0
-        // if total_quote_taken > 0 {
-        //     apply_fees(
-        //         market,
-        //         info,
-        //         mango_account,
-        //         mango_account_pk,
-        //         market_index,
-        //         referrer_mango_account_opt,
-        //         referrer_mango_account_ai,
-        //         total_quote_taken,
-        //         ref_fee_rate.unwrap(),
-        //         // &mango_cache.perp_market_cache[market_index],
-        //     );
-        // }
+        if total_quote_taken > 0 {
+            apply_fees(market, mango_account, total_quote_taken)?;
+        }
 
         Ok(())
     }
+}
+
+/// Apply taker fees to the taker account and update the markets' fees_accrued for
+/// both the maker and taker fees.
+fn apply_fees(
+    market: &mut PerpMarket,
+    mango_account: &mut MangoAccount,
+    total_quote_taken: i64,
+) -> Result<()> {
+    let taker_quote_native = I80F48::from_num(
+        market
+            .quote_lot_size
+            .checked_mul(total_quote_taken)
+            .unwrap(),
+    );
+
+    // Track maker fees immediately: they can be negative and applying them later
+    // risks that fees_accrued is settled to 0 before they apply. It going negative
+    // breaks assumptions.
+    // The maker fees apply to the maker's account only when the fill event is consumed.
+    let maker_fees = taker_quote_native * market.maker_fee;
+
+    let taker_fees = taker_quote_native * market.taker_fee;
+    let perp_account = mango_account
+        .perp_account_map
+        .get_mut_or_create(market.perp_market_index)?
+        .0;
+    perp_account.quote_position -= taker_fees;
+    market.fees_accrued += taker_fees + maker_fees;
+
+    Ok(())
 }

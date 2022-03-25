@@ -27,12 +27,14 @@ pub struct CreateAccount<'info> {
 
 pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()> {
     let mut account = ctx.accounts.account.load_init()?;
+    // TODO: dont init on stack
     *account = MangoAccount {
         group: ctx.accounts.group.key(),
         owner: ctx.accounts.owner.key(),
         delegate: Pubkey::default(),
         token_account_map: TokenAccountMap::new(),
         serum3_account_map: Serum3AccountMap::new(),
+        perp_account_map: PerpAccountMap::new(),
         being_liquidated: false,
         is_bankrupt: false,
         account_num,

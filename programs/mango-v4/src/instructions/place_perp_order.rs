@@ -47,7 +47,7 @@ pub fn place_perp_order(
     expiry_timestamp: u64,
     limit: u8,
 ) -> Result<()> {
-    // let mut account = ctx.accounts.account.load_mut()?;
+    let mut account = ctx.accounts.account.load_mut()?;
     let mango_account_pk = ctx.accounts.account.key();
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
@@ -80,9 +80,8 @@ pub fn place_perp_order(
         &mut event_queue,
         &mut perp_market,
         oracle_price,
-        // &mut account,
+        &mut account,
         &mango_account_pk,
-        // market_index: usize,
         price,
         max_base_quantity,
         max_quote_quantity,

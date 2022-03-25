@@ -45,7 +45,7 @@ pub struct PerpMarket {
     pub seq_num: u64,
 
     /// Fees accrued in native quote currency
-    /// pub fees_accrued: I80F48,
+    pub fees_accrued: I80F48,
 
     /// Liquidity mining metadata
     /// pub liquidity_mining_info: LiquidityMiningInfo,

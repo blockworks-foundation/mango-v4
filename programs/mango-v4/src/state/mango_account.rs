@@ -14,7 +14,7 @@ use crate::state::*;
 // MangoAccount size and health compute needs.
 const MAX_INDEXED_POSITIONS: usize = 16;
 const MAX_SERUM_OPEN_ORDERS: usize = 8;
-// const MAX_PERP_OPEN_ORDERS: usize = 8;
+const MAX_PERP_OPEN_ORDERS: usize = 8;
 
 #[zero_copy]
 pub struct TokenAccount {
@@ -212,6 +212,126 @@ impl Serum3AccountMap {
     }
 }
 
+#[zero_copy]
+pub struct PerpAccount {
+    pub market_index: PerpMarketIndex,
+
+    /// Active position size, measured in base lots
+    pub base_position: i64,
+    /// Active position in quote (conversation rate is that of the time the order was settled)
+    /// measured in native quote
+    pub quote_position: I80F48,
+
+    /// Already settled funding
+    // pub long_settled_funding: I80F48,
+    // pub short_settled_funding: I80F48,
+
+    // Contracts/quote in open orders
+    /// total contracts in sell orders
+    pub bids_quantity: i64,
+    /// total quote currency in buy orders
+    pub asks_quantity: i64,
+
+    /// Liquidity mining rewards
+    // pub mngo_accrued: u64,
+
+    /// Amount that's on EventQueue waiting to be processed
+    pub taker_base: i64,
+    pub taker_quote: i64,
+}
+
+impl Default for PerpAccount {
+    fn default() -> Self {
+        Self {
+            market_index: PerpMarketIndex::MAX,
+            base_position: 0,
+            quote_position: I80F48::ZERO,
+            bids_quantity: 0,
+            asks_quantity: 0,
+            taker_base: 0,
+            taker_quote: 0,
+        }
+    }
+}
+
+impl PerpAccount {
+    /// Add taker trade after it has been matched but before it has been process on EventQueue
+    pub fn add_taker_trade(&mut self, base_change: i64, quote_change: i64) {
+        // TODO make checked? estimate chances of overflow here
+        self.taker_base += base_change;
+        self.taker_quote += quote_change;
+    }
+    /// Remove taker trade after it has been processed on EventQueue
+    pub fn remove_taker_trade(&mut self, base_change: i64, quote_change: i64) {
+        self.taker_base -= base_change;
+        self.taker_quote -= quote_change;
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.market_index != PerpMarketIndex::MAX
+    }
+
+    pub fn is_active_for_market(&self, market_index: PerpMarketIndex) -> bool {
+        self.market_index == market_index
+    }
+}
+
+#[zero_copy]
+pub struct PerpAccountMap {
+    pub values: [PerpAccount; MAX_PERP_OPEN_ORDERS],
+}
+
+impl PerpAccountMap {
+    pub fn new() -> Self {
+        Self {
+            values: [PerpAccount::default(); MAX_PERP_OPEN_ORDERS],
+        }
+    }
+
+    pub fn get_mut_or_create(
+        &mut self,
+        perp_market_index: PerpMarketIndex,
+    ) -> Result<(&mut PerpAccount, usize)> {
+        let mut pos = self
+            .values
+            .iter()
+            .position(|p| p.is_active_for_market(perp_market_index));
+        if pos.is_none() {
+            pos = self.values.iter().position(|p| !p.is_active());
+            if let Some(i) = pos {
+                self.values[i] = PerpAccount {
+                    ..Default::default()
+                };
+            }
+        }
+        if let Some(i) = pos {
+            Ok((&mut self.values[i], i))
+        } else {
+            err!(MangoError::SomeError) // TODO: No free space
+        }
+    }
+
+    pub fn deactivate(&mut self, index: usize) {
+        self.values[index].market_index = PerpMarketIndex::MAX;
+    }
+
+    pub fn iter_active(&self) -> impl Iterator<Item = &PerpAccount> {
+        self.values.iter().filter(|p| p.is_active())
+    }
+
+    pub fn find(&self, market_index: PerpMarketIndex) -> Option<&PerpAccount> {
+        self.values
+            .iter()
+            .find(|p| p.is_active_for_market(market_index))
+    }
+}
+
+impl Default for PerpAccountMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[account(zero_copy)]
 pub struct MangoAccount {
     pub group: Pubkey,
@@ -227,6 +347,8 @@ pub struct MangoAccount {
     // Maps serum_market_index -> open orders for each serum market
     // that is active on this MangoAccount.
     pub serum3_account_map: Serum3AccountMap,
+
+    pub perp_account_map: PerpAccountMap,
 
     /// This account cannot open new positions or borrow until `init_health >= 0`
     pub being_liquidated: bool, // TODO: for strict Pod compat, these should be u8, not bool
