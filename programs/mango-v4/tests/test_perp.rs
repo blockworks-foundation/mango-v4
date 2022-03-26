@@ -133,6 +133,28 @@ async fn test_perp() -> Result<(), TransportError> {
             event_queue,
             oracle: tokens[0].oracle,
             owner,
+            side: Side::Bid,
+            price: 1,
+            quantity: 1,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        PlacePerpOrderInstruction {
+            group,
+            account,
+            perp_market,
+            asks,
+            bids,
+            event_queue,
+            oracle: tokens[0].oracle,
+            owner,
+            side: Side::Ask,
+            price: 1,
+            quantity: 1,
         },
     )
     .await
