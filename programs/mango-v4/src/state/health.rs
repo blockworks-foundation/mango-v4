@@ -1,7 +1,8 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 use serum_dex::state::OpenOrders;
-use std::cell::Ref;
+use std::cell::{Ref, RefMut};
+use std::collections::HashMap;
 
 use crate::error::MangoError;
 use crate::serum3_cpi;
@@ -70,15 +71,18 @@ impl<'a, 'b> AccountRetriever<'a, 'b> for FixedOrderAccountRetriever<'a, 'b> {
 /// scan for each request.
 pub struct ScanningAccountRetriever<'a, 'b> {
     ais: &'a [AccountInfo<'b>],
-    banks: Vec<Ref<'a, Bank>>,
+    token_index_map: HashMap<TokenIndex, usize>,
 }
 
 impl<'a, 'b> ScanningAccountRetriever<'a, 'b> {
-    pub fn new(ais: &'a [AccountInfo<'b>]) -> Result<Self> {
-        let mut banks = vec![];
-        for ai in ais.iter() {
+    pub fn new(ais: &'a [AccountInfo<'b>], group: &Pubkey) -> Result<Self> {
+        let mut token_index_map = HashMap::with_capacity(ais.len() / 2);
+        for (i, ai) in ais.iter().enumerate() {
             match ai.load::<Bank>() {
-                Ok(bank) => banks.push(bank),
+                Ok(bank) => {
+                    require!(&bank.group == group, MangoError::SomeError);
+                    token_index_map.insert(bank.token_index, i);
+                }
                 Err(Error::AnchorError(error))
                     if error.error_code_number
                         == ErrorCode::AccountDiscriminatorMismatch as u32 =>
@@ -88,31 +92,48 @@ impl<'a, 'b> ScanningAccountRetriever<'a, 'b> {
                 Err(error) => return Err(error),
             };
         }
-        Ok(Self { ais, banks })
+        Ok(Self {
+            ais,
+            token_index_map,
+        })
     }
 
     fn n_banks(&self) -> usize {
-        self.banks.len()
+        self.token_index_map.len()
+    }
+
+    #[inline]
+    fn bank_index(&self, token_index: TokenIndex) -> Result<usize> {
+        Ok(*self
+            .token_index_map
+            .get(&token_index)
+            .ok_or_else(|| error!(MangoError::SomeError))?)
+    }
+
+    pub fn bank_mut_and_oracle(
+        &self,
+        token_index: TokenIndex,
+    ) -> Result<(RefMut<'a, Bank>, &'a AccountInfo<'b>)> {
+        let index = self.bank_index(token_index)?;
+        let bank = self.ais[index].load_mut_fully_unchecked::<Bank>()?;
+        let oracle = &self.ais[self.n_banks() + index];
+        require!(&bank.oracle == oracle.key, MangoError::SomeError);
+        Ok((bank, oracle))
     }
 }
 
 impl<'a, 'b> AccountRetriever<'a, 'b> for ScanningAccountRetriever<'a, 'b> {
     fn bank_and_oracle(
         &self,
-        group: &Pubkey,
+        _group: &Pubkey,
         _account_index: usize,
         token_index: TokenIndex,
     ) -> Result<(Ref<'a, Bank>, &'a AccountInfo<'b>)> {
-        let (i, bank) = self
-            .banks
-            .iter()
-            .enumerate()
-            .find(|(_, b)| b.token_index == token_index)
-            .unwrap();
-        require!(&bank.group == group, MangoError::SomeError);
-        let oracle = &self.ais[self.n_banks() + i];
+        let index = self.bank_index(token_index)?;
+        let bank = self.ais[index].load_fully_unchecked::<Bank>()?;
+        let oracle = &self.ais[self.n_banks() + index];
         require!(&bank.oracle == oracle.key, MangoError::SomeError);
-        Ok((Ref::clone(bank), oracle))
+        Ok((bank, oracle))
     }
 
     fn serum_oo(&self, _account_index: usize, key: &Pubkey) -> Result<Ref<'a, OpenOrders>> {
@@ -138,14 +159,13 @@ pub fn compute_health_from_fixed_accounts<'a, 'b>(
         ais,
         n_banks: active_token_len,
     };
-    compute_health_detail(account, retriever)
+    compute_health_detail(account, &retriever)
 }
 
-pub fn compute_health_by_scanning_accounts<'a, 'b>(
+pub fn compute_health<'a, 'b: 'a>(
     account: &MangoAccount,
-    ais: &'a [AccountInfo<'b>],
+    retriever: &impl AccountRetriever<'a, 'b>,
 ) -> Result<I80F48> {
-    let retriever = ScanningAccountRetriever::new(ais)?;
     compute_health_detail(account, retriever)
 }
 
@@ -213,7 +233,7 @@ fn pair_health(
 
 fn compute_health_detail<'a, 'b: 'a>(
     account: &MangoAccount,
-    retriever: impl AccountRetriever<'a, 'b>,
+    retriever: &impl AccountRetriever<'a, 'b>,
 ) -> Result<I80F48> {
     // token contribution from token accounts
     let mut token_infos = vec![];

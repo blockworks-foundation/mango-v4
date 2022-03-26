@@ -3,6 +3,7 @@ use crate::state::{compute_health_from_fixed_accounts, Bank, Group, MangoAccount
 use crate::{group_seeds, Mango};
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
+use fixed::types::I80F48;
 use solana_program::instruction::Instruction;
 
 #[derive(Accounts)]
@@ -174,11 +175,10 @@ fn adjust_for_post_cpi_amounts(
                 .0;
 
             // user has either withdrawn or deposited
-            if *pre_cpi_amount > vault.amount {
-                bank.withdraw(position, pre_cpi_amount - vault.amount)?;
-            } else {
-                bank.deposit(position, vault.amount - pre_cpi_amount)?;
-            }
+            bank.change(
+                position,
+                I80F48::from(vault.amount) - I80F48::from(*pre_cpi_amount),
+            )?;
         }
     }
     Ok(())

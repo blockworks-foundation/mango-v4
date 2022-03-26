@@ -387,6 +387,7 @@ pub struct RegisterTokenInstruction<'keypair> {
     pub init_asset_weight: f32,
     pub maint_liab_weight: f32,
     pub init_liab_weight: f32,
+    pub liquidation_fee: f32,
 
     pub group: Pubkey,
     pub admin: &'keypair Keypair,
@@ -409,6 +410,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
             init_asset_weight: self.init_asset_weight,
             maint_liab_weight: self.maint_liab_weight,
             init_liab_weight: self.init_liab_weight,
+            liquidation_fee: self.liquidation_fee,
         };
 
         let bank = Pubkey::find_program_address(

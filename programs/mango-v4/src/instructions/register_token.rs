@@ -80,6 +80,7 @@ pub fn register_token(
     init_asset_weight: f32,
     maint_liab_weight: f32,
     init_liab_weight: f32,
+    liquidation_fee: f32,
 ) -> Result<()> {
     // TODO: Error if mint is already configured (techincally, init of vault will fail)
 
@@ -97,6 +98,7 @@ pub fn register_token(
         init_asset_weight: I80F48::from_num(init_asset_weight),
         maint_liab_weight: I80F48::from_num(maint_liab_weight),
         init_liab_weight: I80F48::from_num(init_liab_weight),
+        liquidation_fee: I80F48::from_num(liquidation_fee),
         dust: I80F48::ZERO,
         token_index,
     };

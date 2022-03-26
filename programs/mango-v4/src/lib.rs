@@ -39,6 +39,7 @@ pub mod mango_v4 {
         init_asset_weight: f32,
         maint_liab_weight: f32,
         init_liab_weight: f32,
+        liquidation_fee: f32,
     ) -> Result<()> {
         instructions::register_token(
             ctx,
@@ -47,6 +48,7 @@ pub mod mango_v4 {
             init_asset_weight,
             maint_liab_weight,
             init_liab_weight,
+            liquidation_fee,
         )
     }
 

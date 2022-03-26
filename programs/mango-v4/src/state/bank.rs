@@ -32,6 +32,9 @@ pub struct Bank {
     pub maint_liab_weight: I80F48,
     pub init_liab_weight: I80F48,
 
+    // a fraction of the price, like 0.05 for a 5% fee
+    pub liquidation_fee: I80F48,
+
     // Collection of all fractions-of-native-tokens that got rounded away
     pub dust: I80F48,
 
@@ -45,8 +48,14 @@ impl Bank {
     }
 
     /// Returns whether the position is active
-    pub fn deposit(&mut self, position: &mut TokenAccount, native_amount: u64) -> Result<bool> {
-        let mut native_amount = I80F48::from_num(native_amount);
+    ///
+    /// native_amount must be >= 0
+    /// fractional deposits can be relevant during liquidation, for example
+    pub fn deposit(
+        &mut self,
+        position: &mut TokenAccount,
+        mut native_amount: I80F48,
+    ) -> Result<bool> {
         let native_position = position.native(self);
 
         if native_position.is_negative() {
@@ -85,8 +94,14 @@ impl Bank {
     }
 
     /// Returns whether the position is active
-    pub fn withdraw(&mut self, position: &mut TokenAccount, native_amount: u64) -> Result<bool> {
-        let mut native_amount = I80F48::from_num(native_amount);
+    ///
+    /// native_amount must be >= 0
+    /// fractional withdraws can be relevant during liquidation, for example
+    pub fn withdraw(
+        &mut self,
+        position: &mut TokenAccount,
+        mut native_amount: I80F48,
+    ) -> Result<bool> {
         let native_position = position.native(self);
 
         if native_position.is_positive() {
@@ -124,11 +139,11 @@ impl Bank {
         Ok(true)
     }
 
-    pub fn change(&mut self, position: &mut TokenAccount, native_amount: i64) -> Result<bool> {
+    pub fn change(&mut self, position: &mut TokenAccount, native_amount: I80F48) -> Result<bool> {
         if native_amount >= 0 {
-            self.deposit(position, native_amount as u64)
+            self.deposit(position, native_amount)
         } else {
-            self.withdraw(position, (-native_amount) as u64)
+            self.withdraw(position, -native_amount)
         }
     }
 }
@@ -205,9 +220,10 @@ mod tests {
                 // TEST
                 //
 
+                let change = I80F48::from(change);
                 let is_active = bank.change(&mut account, change)?;
 
-                let mut expected_native = start_native + I80F48::from(change);
+                let mut expected_native = start_native + change;
                 if expected_native >= 0.0 && expected_native < 1.0 && !is_in_use {
                     assert!(!is_active);
                     assert_eq!(bank.dust, expected_native);

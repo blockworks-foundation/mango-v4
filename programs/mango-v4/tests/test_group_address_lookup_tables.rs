@@ -82,6 +82,7 @@ async fn test_group_address_lookup_tables() -> Result<()> {
                 init_asset_weight: 0.8,
                 maint_liab_weight: 1.1,
                 init_liab_weight: 1.2,
+                liquidation_fee: 0.0,
                 group,
                 admin,
                 mint: mint.pubkey,

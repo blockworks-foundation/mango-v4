@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
+use fixed::types::I80F48;
 
 use crate::error::*;
 use crate::state::*;
@@ -123,13 +124,16 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
 
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let base_position = account.token_account_map.get_mut(base_bank.token_index)?;
-        base_bank.change(base_position, (after_base_vault - before_base_vault) as i64)?;
+        base_bank.change(
+            base_position,
+            I80F48::from(after_base_vault) - I80F48::from(before_base_vault),
+        )?;
 
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
         let quote_position = account.token_account_map.get_mut(quote_bank.token_index)?;
         quote_bank.change(
             quote_position,
-            (after_quote_vault - before_quote_vault) as i64,
+            I80F48::from(after_quote_vault) - I80F48::from(before_quote_vault),
         )?;
     }
 

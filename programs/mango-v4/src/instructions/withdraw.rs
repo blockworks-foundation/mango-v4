@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
+use fixed::types::I80F48;
 
 use crate::error::*;
 use crate::state::*;
@@ -84,7 +85,7 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
         );
 
         // Update the bank and position
-        let position_is_active = bank.withdraw(position, amount)?;
+        let position_is_active = bank.withdraw(position, I80F48::from(amount))?;
 
         // Transfer the actual tokens
         let group_seeds = group_seeds!(group);

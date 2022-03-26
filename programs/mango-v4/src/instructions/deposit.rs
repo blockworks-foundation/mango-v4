@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
+use fixed::types::I80F48;
 
 use crate::state::*;
 
@@ -59,7 +60,7 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     // Update the bank and position
     let position_is_active = {
         let mut bank = ctx.accounts.bank.load_mut()?;
-        bank.deposit(position, amount)?
+        bank.deposit(position, I80F48::from(amount))?
     };
 
     // Transfer the actual tokens

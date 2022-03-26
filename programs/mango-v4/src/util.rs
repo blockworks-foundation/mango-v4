@@ -33,11 +33,11 @@ pub trait LoadZeroCopy {
     /// Same as load(), but mut
     fn load_mut<T: ZeroCopy + Owner>(&self) -> Result<RefMut<T>>;
 
-    /// Same as load(), but doesn't check the discriminator.
-    fn load_unchecked<T: ZeroCopy + Owner>(&self) -> Result<Ref<T>>;
+    /// Same as load(), but doesn't check the discriminator or owner.
+    fn load_fully_unchecked<T: ZeroCopy + Owner>(&self) -> Result<Ref<T>>;
 
-    /// Same as load_unchecked(), but mut
-    fn load_unchecked_mut<T: ZeroCopy + Owner>(&self) -> Result<RefMut<T>>;
+    /// Same as load_fully_unchecked(), but mut
+    fn load_mut_fully_unchecked<T: ZeroCopy + Owner>(&self) -> Result<RefMut<T>>;
 }
 
 impl<'info> LoadZeroCopy for AccountInfo<'info> {
@@ -75,25 +75,15 @@ impl<'info> LoadZeroCopy for AccountInfo<'info> {
         }))
     }
 
-    fn load_unchecked_mut<T: ZeroCopy + Owner>(&self) -> Result<RefMut<T>> {
-        if self.owner != &T::owner() {
-            return Err(ErrorCode::AccountOwnedByWrongProgram.into());
-        }
-
+    fn load_mut_fully_unchecked<T: ZeroCopy + Owner>(&self) -> Result<RefMut<T>> {
         let data = self.try_borrow_mut_data()?;
-
         Ok(RefMut::map(data, |data| {
             bytemuck::from_bytes_mut(&mut data[8..mem::size_of::<T>() + 8])
         }))
     }
 
-    fn load_unchecked<T: ZeroCopy + Owner>(&self) -> Result<Ref<T>> {
-        if self.owner != &T::owner() {
-            return Err(ErrorCode::AccountOwnedByWrongProgram.into());
-        }
-
+    fn load_fully_unchecked<T: ZeroCopy + Owner>(&self) -> Result<Ref<T>> {
         let data = self.try_borrow_data()?;
-
         Ok(Ref::map(data, |data| {
             bytemuck::from_bytes(&data[8..mem::size_of::<T>() + 8])
         }))
