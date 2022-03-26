@@ -212,19 +212,26 @@ pub mod mango_v4 {
         let large_number = I80F48::from_str("777472127991.999999999999996").unwrap();
         let half = I80F48::MAX / 2;
         let max = I80F48::MAX;
-        sol_log_compute_units(); // 92608
+        sol_log_compute_units(); // 92610
 
         let _ = checked_math!(half + half); // 0
-        sol_log_compute_units(); // 92507
+        sol_log_compute_units(); // 92509
 
         let _ = checked_math!(max - max); // 0
-        sol_log_compute_units(); // 92406
+        sol_log_compute_units(); // 92408
 
-        let _ = checked_math!(large_number * large_number); // 73
-        sol_log_compute_units(); // 92226
+        let _ = checked_math!(large_number * large_number); // 77
+        sol_log_compute_units(); // 92230
 
-        let _ = checked_math!(max / max); // 0
-        sol_log_compute_units(); // 92125
+        // /
+        let _ = checked_math!(I80F48::ZERO / max); // 839
+        sol_log_compute_units(); // 91290
+
+        let _ = checked_math!(half / max); // 3438
+        sol_log_compute_units(); // 87751
+
+        let _ = checked_math!(max / max); // 3457
+        sol_log_compute_units(); // 84193
 
         Ok(())
     }
