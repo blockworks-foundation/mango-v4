@@ -22,6 +22,8 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 #[program]
 pub mod mango_v4 {
 
+    use std::str::FromStr;
+
     use solana_program::{log::sol_log_compute_units, program_memory::sol_memcmp};
 
     use super::*;
@@ -189,23 +191,40 @@ pub mod mango_v4 {
     ///
     pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
         // 101000
-        sol_log_compute_units(); // 100384
+        sol_log_compute_units(); // 100422
 
-        sol_log_compute_units(); // 100283 -> 101
+        sol_log_compute_units(); // 100321 -> 101
 
         msg!("msg!"); // 100079+101 -> 203
-        sol_log_compute_units(); // 100079
+        sol_log_compute_units(); // 100117
 
         let pk1 = Pubkey::default(); // 10
-        sol_log_compute_units(); // 99968
+        sol_log_compute_units(); // 100006
         let pk2 = Pubkey::default(); // 10
-        sol_log_compute_units(); // 99857
+        sol_log_compute_units(); // 99895
 
-        let _ = pk1 == pk2; // 55
-        sol_log_compute_units(); // 99701
+        let _ = pk1 == pk2; // 56
+        sol_log_compute_units(); // 99739
 
-        let _ = sol_memcmp(&pk1.to_bytes(), &pk2.to_bytes(), 32); // 67
-        sol_log_compute_units(); // 99536
+        let _ = sol_memcmp(&pk1.to_bytes(), &pk2.to_bytes(), 32); // 64
+        sol_log_compute_units(); // 99574
+
+        let large_number = I80F48::from_str("777472127991.999999999999996").unwrap();
+        let half = I80F48::MAX / 2;
+        let max = I80F48::MAX;
+        sol_log_compute_units(); // 92608
+
+        let _ = checked_math!(half + half); // 0
+        sol_log_compute_units(); // 92507
+
+        let _ = checked_math!(max - max); // 0
+        sol_log_compute_units(); // 92406
+
+        let _ = checked_math!(large_number * large_number); // 73
+        sol_log_compute_units(); // 92226
+
+        let _ = checked_math!(max / max); // 0
+        sol_log_compute_units(); // 92125
 
         Ok(())
     }
