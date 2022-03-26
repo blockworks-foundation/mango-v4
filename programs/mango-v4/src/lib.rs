@@ -15,7 +15,7 @@ pub mod instructions;
 mod serum3_cpi;
 pub mod state;
 
-use state::{OrderType, PerpMarketIndex, Serum3MarketIndex, TokenIndex};
+use state::{OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex};
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -165,6 +165,7 @@ pub mod mango_v4 {
     #[allow(clippy::too_many_arguments)]
     pub fn place_perp_order(
         ctx: Context<PlacePerpOrder>,
+        side: Side,
         price: i64,
         max_base_quantity: i64,
         max_quote_quantity: i64,
@@ -175,6 +176,7 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::place_perp_order(
             ctx,
+            side,
             price,
             max_base_quantity,
             max_quote_quantity,

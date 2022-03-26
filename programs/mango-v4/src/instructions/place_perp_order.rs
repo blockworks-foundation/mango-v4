@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::state::{
-    oracle_price, Book, EventQueueHeader, Group, MangoAccount, OrderType, PerpMarket, Queue,
+    oracle_price, Book, EventQueueHeader, Group, MangoAccount, OrderType, PerpMarket, Queue, Side,
 };
 
 #[derive(Accounts)]
@@ -39,6 +39,7 @@ pub struct PlacePerpOrder<'info> {
 #[allow(clippy::too_many_arguments)]
 pub fn place_perp_order(
     ctx: Context<PlacePerpOrder>,
+    side: Side,
     price: i64,
     max_base_quantity: i64,
     max_quote_quantity: i64,
@@ -47,7 +48,7 @@ pub fn place_perp_order(
     expiry_timestamp: u64,
     limit: u8,
 ) -> Result<()> {
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut mango_account = ctx.accounts.account.load_mut()?;
     let mango_account_pk = ctx.accounts.account.key();
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
@@ -76,11 +77,12 @@ pub fn place_perp_order(
 
     // TODO reduce_only based on event queue
 
-    book.new_bid(
+    book.new_order(
+        side,
         &mut perp_market,
         &mut event_queue,
         oracle_price,
-        &mut account,
+        &mut mango_account,
         &mango_account_pk,
         price,
         max_base_quantity,
