@@ -10,3 +10,5 @@ node_modules
 
 programs/margin-trade/src/lib-expanded.rs
 programs/mango-v4/src/lib-expanded.rs
+
+.vscode

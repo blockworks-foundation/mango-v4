@@ -1203,3 +1203,24 @@ impl<'keypair> ClientInstruction for PlacePerpOrderInstruction<'keypair> {
         vec![self.owner]
     }
 }
+pub struct BenchmarkInstruction {}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for BenchmarkInstruction {
+    type Accounts = mango_v4::accounts::Benchmark;
+    type Instruction = mango_v4::instruction::Benchmark;
+    async fn to_instruction(
+        &self,
+        _loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+        let accounts = Self::Accounts {};
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![]
+    }
+}

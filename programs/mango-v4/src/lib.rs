@@ -22,6 +22,8 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 #[program]
 pub mod mango_v4 {
 
+    use solana_program::{log::sol_log_compute_units, program_memory::sol_memcmp};
+
     use super::*;
 
     pub fn create_group(ctx: Context<CreateGroup>) -> Result<()> {
@@ -180,6 +182,33 @@ pub mod mango_v4 {
             limit,
         )
     }
+
+    ///
+    /// benchmark
+    ///
+    ///
+    pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
+        // 101000
+        sol_log_compute_units(); // 100384
+
+        sol_log_compute_units(); // 100283 -> 101
+
+        msg!("msg!"); // 100079+101 -> 203
+        sol_log_compute_units(); // 100079
+
+        let pk1 = Pubkey::default(); // 10
+        sol_log_compute_units(); // 99968
+        let pk2 = Pubkey::default(); // 10
+        sol_log_compute_units(); // 99857
+
+        let _ = pk1 == pk2; // 55
+        sol_log_compute_units(); // 99701
+
+        let _ = sol_memcmp(&pk1.to_bytes(), &pk2.to_bytes(), 32); // 67
+        sol_log_compute_units(); // 99536
+
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -190,3 +219,6 @@ impl anchor_lang::Id for Mango {
         ID
     }
 }
+
+#[derive(Accounts)]
+pub struct Benchmark {}
