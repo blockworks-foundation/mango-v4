@@ -32,7 +32,9 @@ pub struct Bank {
     pub maint_liab_weight: I80F48,
     pub init_liab_weight: I80F48,
 
-    // a fraction of the price, like 0.05 for a 5% fee
+    // a fraction of the price, like 0.05 for a 5% fee during liquidation
+    //
+    // Liquidation always involves two tokens, and the sum of the two configured fees is used.
     pub liquidation_fee: I80F48,
 
     // Collection of all fractions-of-native-tokens that got rounded away

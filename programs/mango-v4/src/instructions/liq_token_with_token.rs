@@ -4,7 +4,7 @@ use std::cmp::min;
 
 use crate::error::*;
 use crate::state::*;
-use crate::state::{oracle_price, AccountRetriever, ScanningAccountRetriever};
+use crate::state::{oracle_price, ScanningAccountRetriever};
 use crate::util::checked_math as cm;
 
 #[derive(Accounts)]
@@ -78,10 +78,8 @@ pub fn liq_token_with_token(
             .native(&liab_bank);
         require!(liqee_liab_native.is_negative(), MangoError::SomeError);
 
-        // these factors get divided into the price, making asset worth less
-        // and liab worth more
-        let asset_fee = I80F48::ONE + asset_bank.liquidation_fee;
-        let liab_fee = I80F48::ONE - liab_bank.liquidation_fee;
+        let fee_factor = I80F48::ONE + asset_bank.liquidation_fee + liab_bank.liquidation_fee;
+        let liab_price_adjusted = liab_price * fee_factor;
 
         let init_asset_weight = asset_bank.init_asset_weight;
         let init_liab_weight = liab_bank.init_liab_weight;
@@ -91,18 +89,18 @@ pub fn liq_token_with_token(
         // That means: what is x (unit: native liab tokens) such that
         //   init_health + x * ilw * lp - y * iaw * ap = 0
         // where
-        //   ilw = init_liab_weight, lp = liab_price, lf = liab_fee
-        //   iap = init_asset_weight, ap = asset_price, af = asset_fee
+        //   ilw = init_liab_weight, lp = liab_price
+        //   iap = init_asset_weight, ap = asset_price
+        //   ff = fee_factor, lpa = lp * ff
         // and the asset cost of getting x native units of liab is:
-        //   y = x * (lp / lf) / (ap / af)      (native asset tokens)
+        //   y = x * lp / ap * ff = x * lpa / ap   (native asset tokens)
         //
-        // Result: x = -init_health / (lp * (ilw - iaw * af / lf))
+        // Result: x = -init_health / (lp * ilw - iaw * lpa)
         let liab_needed = cm!(-init_health
-            / (liab_price * (init_liab_weight - init_asset_weight * asset_fee / liab_fee)));
+            / (liab_price * init_liab_weight - init_asset_weight * liab_price_adjusted));
 
         // How much liab can we get at most for the asset balance?
-        let liab_possible =
-            cm!(liqee_assets_native * asset_price * liab_fee / (liab_price * asset_fee));
+        let liab_possible = cm!(liqee_assets_native * asset_price / liab_price_adjusted);
 
         // The amount of liab native tokens we will transfer
         let liab_transfer = min(
@@ -111,7 +109,7 @@ pub fn liq_token_with_token(
         );
 
         // The amount of asset native tokens we will give up for them
-        let asset_transfer = cm!(liab_transfer * asset_price * liab_fee / (liab_price * asset_fee));
+        let asset_transfer = cm!(liab_transfer * asset_price / liab_price_adjusted);
 
         // Apply the balance changes to the liqor and liqee accounts
         liab_bank.deposit(
@@ -140,7 +138,11 @@ pub fn liq_token_with_token(
     }
 
     // TODO: Check liqor's health
-    // TODO: Check liqee's health again
+    let maint_health = compute_health(&liqor, &account_retriever)?;
+    msg!("health: {}", maint_health);
+    require!(maint_health > 0, MangoError::SomeError);
+
+    // TODO: Check liqee's health again: bankrupt? no longer being_liquidated?
 
     // TOOD: this must deactivate token accounts if the deposit/withdraw calls above call for it
 
