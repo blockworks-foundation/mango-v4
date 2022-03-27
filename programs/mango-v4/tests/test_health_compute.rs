@@ -65,7 +65,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     }
 
     // TODO: actual explicit CU comparisons.
-    // On 2022-3-17 the final deposit costs 51010 CU and each new token increases it by roughly 2500 CU
+    // On 2022-3-27 the final deposit costs 43100 CU and each new token increases it by roughly 1800 CU
 
     Ok(())
 }
@@ -169,7 +169,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     }
 
     // TODO: actual explicit CU comparisons.
-    // On 2022-3-18 the final deposit costs 70592 CU and each new market increases it by roughly 6000 CU
+    // On 2022-3-27 the final deposit costs 59100 CU and each new market increases it by roughly 5000 CU
 
     Ok(())
 }

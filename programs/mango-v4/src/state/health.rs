@@ -172,62 +172,27 @@ pub fn compute_health<'a, 'b: 'a>(
 struct TokenInfo<'a> {
     bank: Ref<'a, Bank>,
     oracle_price: I80F48, // native/native
-    // in native tokens, summing token deposits/borrows and serum open orders
+    // in health-reference-token native units
     balance: I80F48,
-
-    // optimization to avoid computing these multiplications multiple times
-    price_liab_cache: I80F48,
-    price_asset_cache: I80F48,
-    price_inv_cache: I80F48,
-}
-
-impl<'a> TokenInfo<'a> {
-    #[inline(always)]
-    fn price_liab(&mut self) -> I80F48 {
-        if self.price_liab_cache.is_zero() {
-            self.price_liab_cache = self.oracle_price * self.bank.init_liab_weight;
-        }
-        self.price_liab_cache
-    }
-
-    #[inline(always)]
-    fn price_asset(&mut self) -> I80F48 {
-        if self.price_asset_cache.is_zero() {
-            self.price_asset_cache = self.oracle_price * self.bank.init_asset_weight;
-        }
-        self.price_asset_cache
-    }
-
-    #[inline(always)]
-    fn price_inv(&mut self) -> I80F48 {
-        if self.price_inv_cache.is_zero() {
-            self.price_inv_cache = I80F48::ONE / self.oracle_price;
-        }
-        self.price_inv_cache
-    }
 }
 
 /// Compute health contribution for a given balance
 /// wart: independent of the balance stored in TokenInfo
+/// balance is in health-reference-token native units
 #[inline(always)]
 fn health_contribution(info: &mut TokenInfo, balance: I80F48) -> Result<I80F48> {
     Ok(if balance.is_negative() {
-        cm!(balance * info.price_liab())
+        cm!(balance * info.bank.init_liab_weight)
     } else {
-        cm!(balance * info.price_asset())
+        cm!(balance * info.bank.init_asset_weight)
     })
 }
 
 /// Compute health contribution of two tokens - pure convenience
 #[inline(always)]
-fn pair_health(
-    info1: &mut TokenInfo,
-    balance1: I80F48,
-    info2: &mut TokenInfo,
-    balance2: I80F48,
-) -> Result<I80F48> {
+fn pair_health(info1: &mut TokenInfo, balance1: I80F48, info2: &mut TokenInfo) -> Result<I80F48> {
     let health1 = health_contribution(info1, balance1)?;
-    let health2 = health_contribution(info2, balance2)?;
+    let health2 = health_contribution(info2, info2.balance)?;
     Ok(cm!(health1 + health2))
 }
 
@@ -249,10 +214,7 @@ fn compute_health_detail<'a, 'b: 'a>(
         token_infos.push(TokenInfo {
             bank,
             oracle_price,
-            balance: native,
-            price_asset_cache: I80F48::ZERO,
-            price_liab_cache: I80F48::ZERO,
-            price_inv_cache: I80F48::ZERO,
+            balance: cm!(native * oracle_price),
         });
     }
 
@@ -280,22 +242,20 @@ fn compute_health_detail<'a, 'b: 'a>(
         // add the amounts that are freely settleable
         let base_free = I80F48::from_num(oo.native_coin_free);
         let quote_free = I80F48::from_num(cm!(oo.native_pc_free + oo.referrer_rebates_accrued));
-        base_info.balance = cm!(base_info.balance + base_free);
-        quote_info.balance = cm!(quote_info.balance + quote_free);
+        base_info.balance = cm!(base_info.balance + base_free * base_info.oracle_price);
+        quote_info.balance = cm!(quote_info.balance + quote_free * quote_info.oracle_price);
 
         // for the amounts that are reserved for orders, compute the worst case for health
         // by checking if everything-is-base or everything-is-quote produces worse
         // outcomes
         let reserved_base = I80F48::from_num(cm!(oo.native_coin_total - oo.native_coin_free));
         let reserved_quote = I80F48::from_num(cm!(oo.native_pc_total - oo.native_pc_free));
-        let all_in_base = cm!(base_info.balance
-            + reserved_base
-            + reserved_quote * quote_info.oracle_price * base_info.price_inv());
-        let all_in_quote = cm!(quote_info.balance
-            + reserved_quote
-            + reserved_base * base_info.oracle_price * quote_info.price_inv());
-        if pair_health(base_info, all_in_base, quote_info, quote_info.balance)?
-            < pair_health(base_info, base_info.balance, quote_info, all_in_quote)?
+        let reserved_balance =
+            cm!(reserved_base * base_info.oracle_price + reserved_quote * quote_info.oracle_price);
+        let all_in_base = cm!(base_info.balance + reserved_balance);
+        let all_in_quote = cm!(quote_info.balance + reserved_balance);
+        if pair_health(base_info, all_in_base, quote_info)?
+            < pair_health(quote_info, all_in_quote, base_info)?
         {
             base_info.balance = all_in_base;
         } else {
