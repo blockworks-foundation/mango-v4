@@ -39,7 +39,8 @@ pub struct PerpMarket {
     /// pub short_funding: I80F48,
     /// pub funding_last_updated: u64,
 
-    /// pub open_interest: u64,
+    ///
+    pub open_interest: i64,
 
     /// Total number of orders seen
     pub seq_num: u64,

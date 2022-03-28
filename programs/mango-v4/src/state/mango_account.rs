@@ -14,7 +14,9 @@ use crate::state::*;
 // MangoAccount size and health compute needs.
 const MAX_INDEXED_POSITIONS: usize = 16;
 const MAX_SERUM_OPEN_ORDERS: usize = 8;
-const MAX_PERP_OPEN_ORDERS: usize = 8;
+pub const MAX_PERP_OPEN_ORDERS: usize = 8;
+
+pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 
 #[zero_copy]
 pub struct TokenAccount {
@@ -274,6 +276,13 @@ impl PerpAccount {
     pub fn is_active_for_market(&self, market_index: PerpMarketIndex) -> bool {
         self.market_index == market_index
     }
+
+    /// This assumes settle_funding was already called
+    pub fn change_base_position(&mut self, perp_market: &mut PerpMarket, base_change: i64) {
+        let start = self.base_position;
+        self.base_position += base_change;
+        perp_market.open_interest += self.base_position.abs() - start.abs();
+    }
 }
 
 #[zero_copy]
@@ -285,6 +294,7 @@ impl PerpAccountMap {
     pub fn new() -> Self {
         Self {
             values: [PerpAccount::default(); MAX_PERP_OPEN_ORDERS],
+            ..Default::default()
         }
     }
 
@@ -349,6 +359,10 @@ pub struct MangoAccount {
     pub serum3_account_map: Serum3AccountMap,
 
     pub perp_account_map: PerpAccountMap,
+    pub order_market: [PerpMarketIndex; MAX_PERP_OPEN_ORDERS],
+    pub order_side: [Side; MAX_PERP_OPEN_ORDERS],
+    pub orders: [i128; MAX_PERP_OPEN_ORDERS],
+    pub client_order_ids: [u64; MAX_PERP_OPEN_ORDERS],
 
     /// This account cannot open new positions or borrow until `init_health >= 0`
     pub being_liquidated: bool, // TODO: for strict Pod compat, these should be u8, not bool
@@ -363,6 +377,142 @@ pub struct MangoAccount {
     pub reserved: [u8; 5],
 }
 // TODO: static assert the size and alignment
+
+impl MangoAccount {
+    pub fn next_order_slot(&self) -> Option<usize> {
+        self.order_market.iter().position(|&i| i == FREE_ORDER_SLOT)
+    }
+
+    pub fn add_order(
+        &mut self,
+        perp_market_index: PerpMarketIndex,
+        side: Side,
+        order: &LeafNode,
+    ) -> Result<()> {
+        let mut perp_account = self
+            .perp_account_map
+            .get_mut_or_create(perp_market_index)
+            .unwrap()
+            .0;
+        match side {
+            Side::Bid => {
+                perp_account.bids_quantity = perp_account
+                    .bids_quantity
+                    .checked_add(order.quantity)
+                    .unwrap();
+            }
+            Side::Ask => {
+                perp_account.asks_quantity = perp_account
+                    .asks_quantity
+                    .checked_add(order.quantity)
+                    .unwrap();
+            }
+        };
+        let slot = order.owner_slot as usize;
+        self.order_market[slot] = perp_market_index;
+        self.order_side[slot] = side;
+        self.orders[slot] = order.key;
+        self.client_order_ids[slot] = order.client_order_id;
+        Ok(())
+    }
+
+    pub fn remove_order(&mut self, slot: usize, quantity: i64) -> Result<()> {
+        require!(
+            self.order_market[slot] != FREE_ORDER_SLOT,
+            MangoError::SomeError
+        );
+        let perp_market_index = self.order_market[slot];
+        let perp_account = self
+            .perp_account_map
+            .get_mut_or_create(perp_market_index)
+            .unwrap()
+            .0;
+
+        // accounting
+        match self.order_side[slot] {
+            Side::Bid => {
+                perp_account.bids_quantity -= quantity;
+            }
+            Side::Ask => {
+                perp_account.asks_quantity -= quantity;
+            }
+        }
+
+        // release space
+        self.order_market[slot] = FREE_ORDER_SLOT;
+
+        // TODO OPT - remove these; unnecessary
+        self.order_side[slot] = Side::Bid;
+        self.orders[slot] = 0i128;
+        self.client_order_ids[slot] = 0u64;
+        Ok(())
+    }
+
+    pub fn execute_maker(
+        &mut self,
+        perp_market_index: PerpMarketIndex,
+        perp_market: &mut PerpMarket,
+        fill: &FillEvent,
+    ) -> Result<()> {
+        let pa = self
+            .perp_account_map
+            .get_mut_or_create(perp_market_index)
+            .unwrap()
+            .0;
+        // pa.settle_funding(cache);
+
+        let side = invert_side(fill.taker_side);
+        let (base_change, quote_change) = fill.base_quote_change(side);
+        pa.change_base_position(perp_market, base_change);
+        let quote = I80F48::from_num(
+            perp_market
+                .quote_lot_size
+                .checked_mul(quote_change)
+                .unwrap(),
+        );
+        let fees = quote.abs() * fill.maker_fee;
+        if !fill.market_fees_applied {
+            perp_market.fees_accrued += fees;
+        }
+        pa.quote_position = pa.quote_position.checked_add(quote - fees).unwrap();
+
+        if fill.maker_out {
+            self.remove_order(fill.maker_slot as usize, base_change.abs())
+        } else {
+            match side {
+                Side::Bid => {
+                    pa.bids_quantity -= base_change.abs();
+                }
+                Side::Ask => {
+                    pa.asks_quantity -= base_change.abs();
+                }
+            }
+            Ok(())
+        }
+    }
+
+    pub fn execute_taker(
+        &mut self,
+        perp_market_index: PerpMarketIndex,
+        perp_market: &mut PerpMarket,
+        fill: &FillEvent,
+    ) -> Result<()> {
+        let pa = self
+            .perp_account_map
+            .get_mut_or_create(perp_market_index)
+            .unwrap()
+            .0;
+        let (base_change, quote_change) = fill.base_quote_change(fill.taker_side);
+        pa.remove_taker_trade(base_change, quote_change);
+        pa.change_base_position(perp_market, base_change);
+        let quote = I80F48::from_num(perp_market.quote_lot_size * quote_change);
+
+        // fees are assessed at time of trade; no need to assess fees here
+
+        pa.quote_position += quote;
+        Ok(())
+    }
+}
 
 #[macro_export]
 macro_rules! account_seeds {

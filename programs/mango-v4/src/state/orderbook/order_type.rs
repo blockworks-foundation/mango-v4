@@ -53,3 +53,11 @@ pub enum Side {
     Bid = 0,
     Ask = 1,
 }
+
+pub fn invert_side(side: Side) -> Side {
+    if side == Side::Bid {
+        Side::Ask
+    } else {
+        Side::Bid
+    }
+}

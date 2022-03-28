@@ -20,6 +20,7 @@ pub struct PlacePerpOrder<'info> {
         has_one = group,
         has_one = bids,
         has_one = asks,
+        has_one = event_queue,
         has_one = oracle,
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,

@@ -81,6 +81,7 @@ impl InnerNode {
 #[repr(C)]
 pub struct LeafNode {
     pub tag: u32,
+    pub owner_slot: u8,
     pub order_type: OrderType, // this was added for TradingView move order
 
     /// Time in seconds after `timestamp` at which the order expires.
@@ -108,6 +109,7 @@ fn key_to_price(key: i128) -> i64 {
 impl LeafNode {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        owner_slot: u8,
         key: i128,
         owner: Pubkey,
         quantity: i64,
@@ -118,6 +120,7 @@ impl LeafNode {
     ) -> Self {
         Self {
             tag: NodeTag::LeafNode.into(),
+            owner_slot,
             order_type,
             time_in_force,
             key,

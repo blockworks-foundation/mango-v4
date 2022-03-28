@@ -187,12 +187,17 @@ pub mod mango_v4 {
         )
     }
 
+    pub fn consume_events(ctx: Context<ConsumeEvents>, limit: usize) -> Result<()> {
+        instructions::consume_events(ctx, limit)
+    }
+
     ///
     /// benchmark
     ///
     ///
     pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
         // 101000
+        // 477
         sol_log_compute_units(); // 100422
 
         sol_log_compute_units(); // 100321 -> 101
