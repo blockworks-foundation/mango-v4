@@ -43,12 +43,11 @@ pub fn liq_token_with_token(
     //
     // Health computation
     //
-    let init_health = compute_health(&liqee, &account_retriever)?;
-    msg!("health: {}", init_health);
+    let mut liqee_health_cache = health_cache_for_liqee(&liqee, &account_retriever)?;
+    let init_health = liqee_health_cache.health(HealthType::Init)?;
+    msg!("pre liqee health: {}", init_health);
     // TODO: actual check involving being_liquidated and maint_health
     require!(init_health < 0, MangoError::SomeError);
-
-    // TODO: Should we fail if liqee still has open spot orders? mango-v3 is ok with that.
 
     //
     // Transfer some liab_token from liqor to liqee and
@@ -135,14 +134,21 @@ pub fn liq_token_with_token(
             liqee.token_account_map.get_mut(asset_token_index)?,
             asset_transfer,
         )?;
+
+        // Update the health cache
+        liqee_health_cache.adjust_token_balance(liab_token_index, liab_transfer)?;
+        liqee_health_cache.adjust_token_balance(asset_token_index, -asset_transfer)?;
     }
 
-    // TODO: Check liqor's health
-    let maint_health = compute_health(&liqor, &account_retriever)?;
-    msg!("health: {}", maint_health);
-    require!(maint_health > 0, MangoError::SomeError);
-
     // TODO: Check liqee's health again: bankrupt? no longer being_liquidated?
+    let maint_health = liqee_health_cache.health(HealthType::Maint)?;
+    let init_health = liqee_health_cache.health(HealthType::Init)?;
+    msg!("post liqee health: {} {}", maint_health, init_health);
+
+    // TODO: Check liqor's health
+    let liqor_health = compute_health(&liqor, HealthType::Init, &account_retriever)?;
+    msg!("post liqor health: {}", liqor_health);
+    require!(liqor_health > 0, MangoError::SomeError);
 
     // TOOD: this must deactivate token accounts if the deposit/withdraw calls above call for it
 

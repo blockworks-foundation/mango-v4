@@ -145,8 +145,18 @@ impl<'a, 'b> AccountRetriever<'a, 'b> for ScanningAccountRetriever<'a, 'b> {
     }
 }
 
+#[derive(PartialEq, Copy, Clone)]
+pub enum HealthType {
+    Init,
+    Maint,
+}
+
+/// Computes health for a mango account given a set of account infos
+///
+/// These account infos must fit the fixed layout defined by FixedOrderAccountRetriever.
 pub fn compute_health_from_fixed_accounts<'a, 'b>(
     account: &MangoAccount,
+    health_type: HealthType,
     ais: &'a [AccountInfo<'b>],
 ) -> Result<I80F48> {
     let active_token_len = account.token_account_map.iter_active().count();
@@ -159,47 +169,127 @@ pub fn compute_health_from_fixed_accounts<'a, 'b>(
         ais,
         n_banks: active_token_len,
     };
-    compute_health_detail(account, &retriever)
+    compute_health_detail(account, &retriever, health_type, true)?.health(health_type)
 }
 
+/// Compute health with an arbitrary AccountRetriever
 pub fn compute_health<'a, 'b: 'a>(
     account: &MangoAccount,
+    health_type: HealthType,
     retriever: &impl AccountRetriever<'a, 'b>,
 ) -> Result<I80F48> {
-    compute_health_detail(account, retriever)
+    compute_health_detail(account, retriever, health_type, true)?.health(health_type)
 }
 
-struct TokenInfo<'a> {
-    bank: Ref<'a, Bank>,
+/// Compute health for a liqee.
+///
+/// This has the advantage of returning a HealthCache, allowing for health
+/// to be recomputed after token balance changes due to liquidation.
+///
+/// However, this only works if the serum3 open orders accounts have been
+/// fully settled (like via serum3_liq_force_cancel_orders).
+pub fn health_cache_for_liqee<'a, 'b: 'a>(
+    account: &MangoAccount,
+    retriever: &impl AccountRetriever<'a, 'b>,
+) -> Result<HealthCache> {
+    compute_health_detail(account, retriever, HealthType::Init, false)
+}
+
+struct TokenInfo {
+    token_index: TokenIndex,
+    maint_asset_weight: I80F48,
+    init_asset_weight: I80F48,
+    maint_liab_weight: I80F48,
+    init_liab_weight: I80F48,
     oracle_price: I80F48, // native/native
     // in health-reference-token native units
     balance: I80F48,
+}
+
+impl TokenInfo {
+    #[inline(always)]
+    fn asset_weight(&self, health_type: HealthType) -> I80F48 {
+        match health_type {
+            HealthType::Init => self.init_asset_weight,
+            HealthType::Maint => self.maint_asset_weight,
+        }
+    }
+
+    #[inline(always)]
+    fn liab_weight(&self, health_type: HealthType) -> I80F48 {
+        match health_type {
+            HealthType::Init => self.init_liab_weight,
+            HealthType::Maint => self.maint_liab_weight,
+        }
+    }
+}
+
+pub struct HealthCache {
+    token_infos: Vec<TokenInfo>,
+}
+
+impl HealthCache {
+    pub fn health(&self, health_type: HealthType) -> Result<I80F48> {
+        let mut health = I80F48::ZERO;
+        for token_info in self.token_infos.iter() {
+            let contrib = health_contribution(health_type, token_info, token_info.balance)?;
+            health = cm!(health + contrib);
+        }
+        Ok(health)
+    }
+
+    pub fn adjust_token_balance(&mut self, token_index: TokenIndex, change: I80F48) -> Result<()> {
+        let mut entry = self
+            .token_infos
+            .iter_mut()
+            .find(|t| t.token_index == token_index)
+            .ok_or_else(|| error!(MangoError::SomeError))?;
+        entry.balance = cm!(entry.balance + change);
+        Ok(())
+    }
 }
 
 /// Compute health contribution for a given balance
 /// wart: independent of the balance stored in TokenInfo
 /// balance is in health-reference-token native units
 #[inline(always)]
-fn health_contribution(info: &mut TokenInfo, balance: I80F48) -> Result<I80F48> {
-    Ok(if balance.is_negative() {
-        cm!(balance * info.bank.init_liab_weight)
+fn health_contribution(
+    health_type: HealthType,
+    info: &TokenInfo,
+    balance: I80F48,
+) -> Result<I80F48> {
+    let weight = if balance.is_negative() {
+        info.liab_weight(health_type)
     } else {
-        cm!(balance * info.bank.init_asset_weight)
-    })
+        info.asset_weight(health_type)
+    };
+    Ok(cm!(balance * weight))
 }
 
 /// Compute health contribution of two tokens - pure convenience
 #[inline(always)]
-fn pair_health(info1: &mut TokenInfo, balance1: I80F48, info2: &mut TokenInfo) -> Result<I80F48> {
-    let health1 = health_contribution(info1, balance1)?;
-    let health2 = health_contribution(info2, info2.balance)?;
+fn pair_health(
+    health_type: HealthType,
+    info1: &TokenInfo,
+    balance1: I80F48,
+    info2: &TokenInfo,
+) -> Result<I80F48> {
+    let health1 = health_contribution(health_type, info1, balance1)?;
+    let health2 = health_contribution(health_type, info2, info2.balance)?;
     Ok(cm!(health1 + health2))
 }
 
+/// The HealthInfo returned from this function is specialized for the health_type
+/// unless called with allow_serum3=false.
+///
+/// The reason is that the health type used can affect the way funds reserved for
+/// orders get distributed to the token balances.
 fn compute_health_detail<'a, 'b: 'a>(
     account: &MangoAccount,
     retriever: &impl AccountRetriever<'a, 'b>,
-) -> Result<I80F48> {
+    health_type: HealthType,
+    allow_serum3: bool,
+) -> Result<HealthCache> {
     // token contribution from token accounts
     let mut token_infos = vec![];
     for (i, position) in account.token_account_map.iter_active().enumerate() {
@@ -212,7 +302,11 @@ fn compute_health_detail<'a, 'b: 'a>(
         let native = position.native(&bank);
 
         token_infos.push(TokenInfo {
-            bank,
+            token_index: bank.token_index,
+            maint_asset_weight: bank.maint_asset_weight,
+            init_asset_weight: bank.init_asset_weight,
+            maint_liab_weight: bank.maint_liab_weight,
+            init_liab_weight: bank.init_liab_weight,
             oracle_price,
             balance: cm!(native * oracle_price),
         });
@@ -221,15 +315,24 @@ fn compute_health_detail<'a, 'b: 'a>(
     // token contribution from serum accounts
     for (i, serum_account) in account.serum3_account_map.iter_active().enumerate() {
         let oo = retriever.serum_oo(i, &serum_account.open_orders)?;
+        if !allow_serum3 {
+            require!(
+                oo.native_coin_total == 0
+                    && oo.native_pc_total == 0
+                    && oo.referrer_rebates_accrued == 0,
+                MangoError::SomeError
+            );
+            continue;
+        }
 
         // find the TokenInfos for the market's base and quote tokens
         let base_index = token_infos
             .iter()
-            .position(|ti| ti.bank.token_index == serum_account.base_token_index)
+            .position(|ti| ti.token_index == serum_account.base_token_index)
             .ok_or_else(|| error!(MangoError::SomeError))?;
         let quote_index = token_infos
             .iter()
-            .position(|ti| ti.bank.token_index == serum_account.quote_token_index)
+            .position(|ti| ti.token_index == serum_account.quote_token_index)
             .ok_or_else(|| error!(MangoError::SomeError))?;
         let (base_info, quote_info) = if base_index < quote_index {
             let (l, r) = token_infos.split_at_mut(quote_index);
@@ -254,8 +357,8 @@ fn compute_health_detail<'a, 'b: 'a>(
             cm!(reserved_base * base_info.oracle_price + reserved_quote * quote_info.oracle_price);
         let all_in_base = cm!(base_info.balance + reserved_balance);
         let all_in_quote = cm!(quote_info.balance + reserved_balance);
-        if pair_health(base_info, all_in_base, quote_info)?
-            < pair_health(quote_info, all_in_quote, base_info)?
+        if pair_health(health_type, base_info, all_in_base, quote_info)?
+            < pair_health(health_type, quote_info, all_in_quote, base_info)?
         {
             base_info.balance = all_in_base;
         } else {
@@ -263,12 +366,5 @@ fn compute_health_detail<'a, 'b: 'a>(
         }
     }
 
-    // convert the token balance to health
-    let mut health = I80F48::ZERO;
-    for token_info in token_infos.iter_mut() {
-        let contrib = health_contribution(token_info, token_info.balance)?;
-        health = cm!(health + contrib);
-    }
-
-    Ok(health)
+    Ok(HealthCache { token_infos })
 }

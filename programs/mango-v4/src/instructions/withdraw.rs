@@ -100,7 +100,8 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
     //
     // Health check
     //
-    let health = compute_health_from_fixed_accounts(&account, &ctx.remaining_accounts)?;
+    let health =
+        compute_health_from_fixed_accounts(&account, HealthType::Init, &ctx.remaining_accounts)?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::SomeError);
 

@@ -102,7 +102,11 @@ pub fn serum3_liq_force_cancel_orders(
     // TODO: do the correct health / being_liquidated check
     {
         let account = ctx.accounts.account.load()?;
-        let health = compute_health_from_fixed_accounts(&account, ctx.remaining_accounts)?;
+        let health = compute_health_from_fixed_accounts(
+            &account,
+            HealthType::Maint,
+            ctx.remaining_accounts,
+        )?;
         msg!("health: {}", health);
         require!(health < 0, MangoError::SomeError);
     }
