@@ -127,6 +127,20 @@ pub mod mango_v4 {
         instructions::serum3_liq_force_cancel_orders(ctx, limit)
     }
 
+    pub fn liq_token_with_token(
+        ctx: Context<LiqTokenWithToken>,
+        asset_token_index: TokenIndex,
+        liab_token_index: TokenIndex,
+        max_liab_transfer: I80F48,
+    ) -> Result<()> {
+        instructions::liq_token_with_token(
+            ctx,
+            asset_token_index,
+            liab_token_index,
+            max_liab_transfer,
+        )
+    }
+
     ///
     /// Perps
     ///

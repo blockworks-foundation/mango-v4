@@ -14,9 +14,9 @@ pub struct LiqTokenWithToken<'info> {
     #[account(
         mut,
         has_one = group,
-        constraint = liqor.load()?.owner == liqor_owner.key(),
     )]
     pub liqor: AccountLoader<'info, MangoAccount>,
+    #[account(address = liqor.load()?.owner)]
     pub liqor_owner: Signer<'info>,
 
     #[account(
@@ -40,14 +40,20 @@ pub fn liq_token_with_token(
     let mut liqor = ctx.accounts.liqor.load_mut()?;
     let mut liqee = ctx.accounts.liqee.load_mut()?;
 
-    //
-    // Health computation
-    //
+    // Initial liqee health check
     let mut liqee_health_cache = health_cache_for_liqee(&liqee, &account_retriever)?;
     let init_health = liqee_health_cache.health(HealthType::Init)?;
-    msg!("pre liqee health: {}", init_health);
-    // TODO: actual check involving being_liquidated and maint_health
-    require!(init_health < 0, MangoError::SomeError);
+    if liqee.being_liquidated {
+        if init_health > I80F48::ZERO {
+            liqee.being_liquidated = false;
+            msg!("Liqee init_health above zero");
+            return Ok(());
+        }
+    } else {
+        let maint_health = liqee_health_cache.health(HealthType::Maint)?;
+        require!(maint_health < I80F48::ZERO, MangoError::SomeError);
+        liqee.being_liquidated = true;
+    }
 
     //
     // Transfer some liab_token from liqor to liqee and
@@ -108,7 +114,7 @@ pub fn liq_token_with_token(
         );
 
         // The amount of asset native tokens we will give up for them
-        let asset_transfer = cm!(liab_transfer * asset_price / liab_price_adjusted);
+        let asset_transfer = cm!(liab_transfer * liab_price_adjusted / asset_price);
 
         // Apply the balance changes to the liqor and liqee accounts
         liab_bank.deposit(
@@ -138,17 +144,29 @@ pub fn liq_token_with_token(
         // Update the health cache
         liqee_health_cache.adjust_token_balance(liab_token_index, liab_transfer)?;
         liqee_health_cache.adjust_token_balance(asset_token_index, -asset_transfer)?;
+
+        msg!(
+            "liquidated {} liab for {} asset",
+            liab_transfer,
+            asset_transfer
+        );
     }
 
-    // TODO: Check liqee's health again: bankrupt? no longer being_liquidated?
+    // Check liqee health again
     let maint_health = liqee_health_cache.health(HealthType::Maint)?;
-    let init_health = liqee_health_cache.health(HealthType::Init)?;
-    msg!("post liqee health: {} {}", maint_health, init_health);
+    if maint_health < I80F48::ZERO {
+        // TODO: bankruptcy check?
+    } else {
+        let init_health = liqee_health_cache.health(HealthType::Init)?;
 
-    // TODO: Check liqor's health
+        // this is equivalent to one native USDC or 1e-6 USDC
+        // This is used as threshold to flip flag instead of 0 because of dust issues
+        liqee.being_liquidated = init_health < -I80F48::ONE;
+    }
+
+    // Check liqor's health
     let liqor_health = compute_health(&liqor, HealthType::Init, &account_retriever)?;
-    msg!("post liqor health: {}", liqor_health);
-    require!(liqor_health > 0, MangoError::SomeError);
+    require!(liqor_health >= 0, MangoError::HealthMustBePositive);
 
     // TOOD: this must deactivate token accounts if the deposit/withdraw calls above call for it
 

@@ -1,8 +1,10 @@
 #![cfg(feature = "test-bpf")]
 
+use fixed::types::I80F48;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, transport::TransportError};
 
+use mango_v4::state::*;
 use program_test::*;
 
 mod program_test;
@@ -204,6 +206,174 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = &Keypair::new();
+    let owner = &context.users[0].key;
+    let payer = &context.users[1].key;
+    let mints = &context.mints[0..2];
+    let payer_mint_accounts = &context.users[1].token_accounts[0..2];
+
+    //
+    // SETUP: Create a group and an account to fill the vaults
+    //
+
+    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints,
+    }
+    .create(solana)
+    .await;
+    let base_token = &tokens[0];
+    let quote_token = &tokens[1];
+
+    // deposit some funds, to the vaults aren't empty
+    let vault_account = send_tx(
+        solana,
+        CreateAccountInstruction {
+            account_num: 2,
+            group,
+            owner,
+            payer,
+        },
+    )
+    .await
+    .unwrap()
+    .account;
+    for &token_account in payer_mint_accounts {
+        send_tx(
+            solana,
+            DepositInstruction {
+                amount: 10000,
+                account: vault_account,
+                token_account,
+                token_authority: payer,
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    //
+    // SETUP: Make an account and deposit some quote, borrow some base
+    //
+    let account = send_tx(
+        solana,
+        CreateAccountInstruction {
+            account_num: 0,
+            group,
+            owner,
+            payer,
+        },
+    )
+    .await
+    .unwrap()
+    .account;
+
+    let deposit_amount = 1000;
+    send_tx(
+        solana,
+        DepositInstruction {
+            amount: deposit_amount,
+            account,
+            token_account: payer_mint_accounts[1],
+            token_authority: payer,
+        },
+    )
+    .await
+    .unwrap();
+
+    let withdraw_amount = 400;
+    send_tx(
+        solana,
+        WithdrawInstruction {
+            amount: withdraw_amount,
+            allow_borrow: true,
+            account,
+            owner,
+            token_account: payer_mint_accounts[0],
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: Change the oracle to make health go negative, then liquidate
+    //
+    send_tx(
+        solana,
+        SetStubOracle {
+            mint: base_token.mint.pubkey,
+            payer,
+            price: "2.0",
+        },
+    )
+    .await
+    .unwrap();
+
+    // first limited liq
+    send_tx(
+        solana,
+        LiqTokenWithTokenInstruction {
+            liqee: account,
+            liqor: vault_account,
+            liqor_owner: owner,
+            asset_token_index: quote_token.index,
+            liab_token_index: base_token.index,
+            max_liab_transfer: I80F48::from_num(10.0),
+        },
+    )
+    .await
+    .unwrap();
+
+    // the asset cost for 10 liab is 10 * 2 * 1.04 = 20.8
+    assert_eq!(
+        account_position(solana, account, base_token.bank).await,
+        -400 + 10
+    );
+    assert_eq!(
+        account_position(solana, account, quote_token.bank).await,
+        1000 - 21
+    );
+    let liqee: MangoAccount = solana.get_account(account).await;
+    assert!(liqee.being_liquidated);
+
+    // remaining liq
+    send_tx(
+        solana,
+        LiqTokenWithTokenInstruction {
+            liqee: account,
+            liqor: vault_account,
+            liqor_owner: owner,
+            asset_token_index: quote_token.index,
+            liab_token_index: base_token.index,
+            max_liab_transfer: I80F48::from_num(10000.0),
+        },
+    )
+    .await
+    .unwrap();
+
+    // health before liquidation was 1000 * 0.6 - 400 * 1.4 = -520
+    // liab needed 520 / (1.4*2 - 0.6*2*(1 + 0.02 + 0.02)) = 335.0515
+    // asset cost = 335 * 2 * 1.04 = 696.8
+    assert_eq!(
+        account_position(solana, account, base_token.bank).await,
+        -400 + 335
+    );
+    assert_eq!(
+        account_position(solana, account, quote_token.bank).await,
+        1000 - 697
+    );
+    let liqee: MangoAccount = solana.get_account(account).await;
+    assert!(!liqee.being_liquidated);
 
     Ok(())
 }

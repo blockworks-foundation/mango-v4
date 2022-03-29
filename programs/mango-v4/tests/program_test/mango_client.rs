@@ -4,6 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::{self, SysvarId};
 use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
+use itertools::Itertools;
 use solana_program::instruction::Instruction;
 use solana_sdk::instruction;
 use solana_sdk::signature::{Keypair, Signer};
@@ -145,6 +146,62 @@ async fn derive_health_check_remaining_account_metas(
         .map(|&pubkey| AccountMeta {
             pubkey,
             is_writable: writable_banks,
+            is_signer: false,
+        })
+        .chain(oracles.iter().map(|&pubkey| AccountMeta {
+            pubkey,
+            is_writable: false,
+            is_signer: false,
+        }))
+        .chain(serum_oos.map(|pubkey| AccountMeta {
+            pubkey,
+            is_writable: false,
+            is_signer: false,
+        }))
+        .collect()
+}
+
+async fn derive_liquidation_remaining_account_metas(
+    account_loader: &impl ClientAccountLoader,
+    liqee: &MangoAccount,
+    liqor: &MangoAccount,
+    asset_token_index: TokenIndex,
+    liab_token_index: TokenIndex,
+) -> Vec<AccountMeta> {
+    let mut banks = vec![];
+    let mut oracles = vec![];
+    let token_indexes = liqee
+        .token_account_map
+        .iter_active()
+        .chain(liqor.token_account_map.iter_active())
+        .map(|ta| ta.token_index)
+        .unique();
+    for token_index in token_indexes {
+        let mint_info = get_mint_info_by_token_index(account_loader, liqee, token_index).await;
+        let lookup_table = account_loader
+            .load_bytes(&mint_info.address_lookup_table)
+            .await
+            .unwrap();
+        let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
+        let writable_bank = token_index == asset_token_index || token_index == liab_token_index;
+        banks.push((
+            addresses[mint_info.address_lookup_table_bank_index as usize],
+            writable_bank,
+        ));
+        oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
+    }
+
+    let serum_oos = liqee
+        .serum3_account_map
+        .iter_active()
+        .chain(liqor.serum3_account_map.iter_active())
+        .map(|&s| s.open_orders);
+
+    banks
+        .iter()
+        .map(|(pubkey, is_writable)| AccountMeta {
+            pubkey: *pubkey,
+            is_writable: *is_writable,
             is_signer: false,
         })
         .chain(oracles.iter().map(|&pubkey| AccountMeta {
@@ -1079,6 +1136,59 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
 
     fn signers(&self) -> Vec<&Keypair> {
         vec![]
+    }
+}
+
+pub struct LiqTokenWithTokenInstruction<'keypair> {
+    pub liqee: Pubkey,
+    pub liqor: Pubkey,
+    pub liqor_owner: &'keypair Keypair,
+
+    pub asset_token_index: TokenIndex,
+    pub liab_token_index: TokenIndex,
+    pub max_liab_transfer: I80F48,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for LiqTokenWithTokenInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::LiqTokenWithToken;
+    type Instruction = mango_v4::instruction::LiqTokenWithToken;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            asset_token_index: self.asset_token_index,
+            liab_token_index: self.liab_token_index,
+            max_liab_transfer: self.max_liab_transfer,
+        };
+
+        let liqee: MangoAccount = account_loader.load(&self.liqee).await.unwrap();
+        let liqor: MangoAccount = account_loader.load(&self.liqor).await.unwrap();
+        let health_check_metas = derive_liquidation_remaining_account_metas(
+            &account_loader,
+            &liqee,
+            &liqor,
+            self.asset_token_index,
+            self.liab_token_index,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: liqee.group,
+            liqee: self.liqee,
+            liqor: self.liqor,
+            liqor_owner: self.liqor_owner.pubkey(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.liqor_owner]
     }
 }
 

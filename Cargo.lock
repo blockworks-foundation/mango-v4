@@ -1566,6 +1566,7 @@ dependencies = [
  "env_logger",
  "fixed",
  "fixed-macro",
+ "itertools 0.10.3",
  "log",
  "mango-macro",
  "margin-trade",

@@ -244,7 +244,7 @@ impl HealthCache {
             .iter_mut()
             .find(|t| t.token_index == token_index)
             .ok_or_else(|| error!(MangoError::SomeError))?;
-        entry.balance = cm!(entry.balance + change);
+        entry.balance = cm!(entry.balance + change * entry.oracle_price);
         Ok(())
     }
 }
