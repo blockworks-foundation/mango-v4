@@ -134,38 +134,27 @@ impl<'a> Book<'a> {
         now_ts: u64,
         limit: u8,
     ) -> std::result::Result<(), Error> {
-        match side {
-            Side::Bid => self.new_bid(
-                perp_market,
-                event_queue,
-                oracle_price,
-                mango_account,
-                mango_account_pk,
-                price,
-                max_base_quantity,
-                max_quote_quantity,
-                order_type,
-                time_in_force,
-                client_order_id,
-                now_ts,
-                limit,
-            ),
-            Side::Ask => self.new_bid(
-                perp_market,
-                event_queue,
-                oracle_price,
-                mango_account,
-                mango_account_pk,
-                price,
-                max_base_quantity,
-                max_quote_quantity,
-                order_type,
-                time_in_force,
-                client_order_id,
-                now_ts,
-                limit,
-            ),
-        }
+        let f = match side {
+            Side::Bid => Book::new_bid,
+            Side::Ask => Book::new_ask,
+        };
+
+        f(
+            self,
+            perp_market,
+            event_queue,
+            oracle_price,
+            mango_account,
+            mango_account_pk,
+            price,
+            max_base_quantity,
+            max_quote_quantity,
+            order_type,
+            time_in_force,
+            client_order_id,
+            now_ts,
+            limit,
+        )
     }
 
     #[inline(never)]
@@ -230,6 +219,7 @@ impl<'a> Book<'a> {
                     number_of_dropped_expired_orders += 1;
                     let event = OutEvent::new(
                         Side::Ask,
+                        best_ask.owner_slot,
                         now_ts,
                         event_queue.header.seq_num,
                         best_ask.owner,
@@ -277,6 +267,7 @@ impl<'a> Book<'a> {
             let fill = FillEvent::new(
                 Side::Bid,
                 maker_out,
+                best_ask.owner_slot,
                 now_ts,
                 event_queue.header.seq_num,
                 best_ask.owner,
@@ -320,6 +311,7 @@ impl<'a> Book<'a> {
             if let Some(expired_bid) = self.bids.remove_one_expired(now_ts) {
                 let event = OutEvent::new(
                     Side::Bid,
+                    expired_bid.owner_slot,
                     now_ts,
                     event_queue.header.seq_num,
                     expired_bid.owner,
@@ -335,6 +327,7 @@ impl<'a> Book<'a> {
                 require!(price > min_bid.price(), MangoError::SomeError);
                 let event = OutEvent::new(
                     Side::Bid,
+                    min_bid.owner_slot,
                     now_ts,
                     event_queue.header.seq_num,
                     min_bid.owner,
@@ -343,7 +336,11 @@ impl<'a> Book<'a> {
                 event_queue.push_back(cast(event)).unwrap();
             }
 
+            let owner_slot = mango_account
+                .next_order_slot()
+                .ok_or(error!(MangoError::SomeError))?;
             let new_bid = LeafNode::new(
+                owner_slot as u8,
                 order_id,
                 *mango_account_pk,
                 book_base_quantity,
@@ -434,6 +431,7 @@ impl<'a> Book<'a> {
                     number_of_dropped_expired_orders += 1;
                     let event = OutEvent::new(
                         Side::Bid,
+                        best_bid.owner_slot,
                         now_ts,
                         event_queue.header.seq_num,
                         best_bid.owner,
@@ -481,6 +479,7 @@ impl<'a> Book<'a> {
             let fill = FillEvent::new(
                 Side::Ask,
                 maker_out,
+                best_bid.owner_slot,
                 now_ts,
                 event_queue.header.seq_num,
                 best_bid.owner,
@@ -525,6 +524,7 @@ impl<'a> Book<'a> {
             if let Some(expired_ask) = self.asks.remove_one_expired(now_ts) {
                 let event = OutEvent::new(
                     Side::Ask,
+                    expired_ask.owner_slot,
                     now_ts,
                     event_queue.header.seq_num,
                     expired_ask.owner,
@@ -539,6 +539,7 @@ impl<'a> Book<'a> {
                 require!(price < max_ask.price(), MangoError::SomeError);
                 let event = OutEvent::new(
                     Side::Ask,
+                    max_ask.owner_slot,
                     now_ts,
                     event_queue.header.seq_num,
                     max_ask.owner,
@@ -547,7 +548,11 @@ impl<'a> Book<'a> {
                 event_queue.push_back(cast(event)).unwrap();
             }
 
+            let owner_slot = mango_account
+                .next_order_slot()
+                .ok_or(error!(MangoError::SomeError))?;
             let new_ask = LeafNode::new(
+                owner_slot as u8,
                 order_id,
                 *mango_account_pk,
                 book_base_quantity,

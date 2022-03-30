@@ -71,6 +71,7 @@ pub fn create_perp_market(
         liquidation_fee: I80F48::from_num(liquidation_fee),
         maker_fee: I80F48::from_num(maker_fee),
         taker_fee: I80F48::from_num(taker_fee),
+        open_interest: 0,
         seq_num: 0,
         fees_accrued: I80F48::ZERO,
         bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,

@@ -174,6 +174,7 @@ pub struct FillEvent {
     pub event_type: u8,
     pub taker_side: Side, // side from the taker's POV
     pub maker_out: bool,  // true if maker order quantity == 0
+    pub maker_slot: u8,
     pub market_fees_applied: bool,
     pub padding: [u8; 2],
     pub timestamp: u64,
@@ -201,6 +202,7 @@ impl FillEvent {
     pub fn new(
         taker_side: Side,
         maker_out: bool,
+        maker_slot: u8,
         timestamp: u64,
         seq_num: usize,
         maker: Pubkey,
@@ -220,6 +222,7 @@ impl FillEvent {
             event_type: EventType::Fill as u8,
             taker_side,
             maker_out,
+            maker_slot,
             market_fees_applied: true, // Since mango v3.3.5, market fees are adjusted at matching time
             padding: [0u8; 2],
             timestamp,
@@ -257,6 +260,7 @@ impl FillEvent {
 pub struct OutEvent {
     pub event_type: u8,
     pub side: Side,
+    pub owner_slot: u8,
     padding0: [u8; 5],
     pub timestamp: u64,
     pub seq_num: usize,
@@ -266,10 +270,18 @@ pub struct OutEvent {
 }
 
 impl OutEvent {
-    pub fn new(side: Side, timestamp: u64, seq_num: usize, owner: Pubkey, quantity: i64) -> Self {
+    pub fn new(
+        side: Side,
+        owner_slot: u8,
+        timestamp: u64,
+        seq_num: usize,
+        owner: Pubkey,
+        quantity: i64,
+    ) -> Self {
         Self {
             event_type: EventType::Out.into(),
             side,
+            owner_slot,
             padding0: [0; 5],
             timestamp,
             seq_num,

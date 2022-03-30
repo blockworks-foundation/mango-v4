@@ -1,4 +1,5 @@
 pub use self::margin_trade::*;
+pub use consume_events::*;
 pub use create_account::*;
 pub use create_group::*;
 pub use create_perp_market::*;
@@ -16,6 +17,7 @@ pub use serum3_settle_funds::*;
 pub use set_stub_oracle::*;
 pub use withdraw::*;
 
+mod consume_events;
 mod create_account;
 mod create_group;
 mod create_perp_market;
