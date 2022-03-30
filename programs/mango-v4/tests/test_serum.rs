@@ -96,8 +96,8 @@ async fn test_serum() -> Result<(), TransportError> {
             serum_program: context.serum.program_id,
             serum_market_external: serum_market_cookie.market,
             market_index: 0,
-            base_token_index: base_token.index,
-            quote_token_index: quote_token.index,
+            base_bank: base_token.bank,
+            quote_bank: quote_token.bank,
             payer,
         },
     )

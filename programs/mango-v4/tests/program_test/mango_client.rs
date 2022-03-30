@@ -697,9 +697,10 @@ pub struct Serum3RegisterMarketInstruction<'keypair> {
     pub serum_program: Pubkey,
     pub serum_market_external: Pubkey,
 
+    pub base_bank: Pubkey,
+    pub quote_bank: Pubkey,
+
     pub market_index: Serum3MarketIndex,
-    pub base_token_index: TokenIndex,
-    pub quote_token_index: TokenIndex,
 }
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for Serum3RegisterMarketInstruction<'keypair> {
@@ -712,8 +713,6 @@ impl<'keypair> ClientInstruction for Serum3RegisterMarketInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             market_index: self.market_index,
-            base_token_index: self.base_token_index,
-            quote_token_index: self.quote_token_index,
         };
 
         let serum_market = Pubkey::find_program_address(
@@ -732,6 +731,8 @@ impl<'keypair> ClientInstruction for Serum3RegisterMarketInstruction<'keypair> {
             serum_program: self.serum_program,
             serum_market_external: self.serum_market_external,
             serum_market,
+            base_bank: self.base_bank,
+            quote_bank: self.quote_bank,
             payer: self.payer.pubkey(),
             system_program: System::id(),
         };

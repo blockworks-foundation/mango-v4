@@ -92,10 +92,8 @@ pub mod mango_v4 {
     pub fn serum3_register_market(
         ctx: Context<Serum3RegisterMarket>,
         market_index: Serum3MarketIndex,
-        base_token_index: TokenIndex,
-        quote_token_index: TokenIndex,
     ) -> Result<()> {
-        instructions::serum3_register_market(ctx, market_index, base_token_index, quote_token_index)
+        instructions::serum3_register_market(ctx, market_index)
     }
 
     pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result<()> {

@@ -86,7 +86,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     // SETUP: Create a group and an account
     //
 
-    let mango_setup::GroupWithTokens { group, .. } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -110,14 +110,20 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     //
     // SETUP: Create serum markets and register them
     //
-    let quote_mint = &mints[0];
+    let quote_token = &tokens[0];
     let mut serum_market_cookies = vec![];
-    for mint in mints[1..].iter() {
-        serum_market_cookies.push(context.serum.list_spot_market(mint, quote_mint).await);
+    for token in tokens[1..].iter() {
+        serum_market_cookies.push((
+            token,
+            context
+                .serum
+                .list_spot_market(&token.mint, &quote_token.mint)
+                .await,
+        ));
     }
 
     let mut serum_markets = vec![];
-    for s in serum_market_cookies {
+    for (base_token, spot) in serum_market_cookies {
         serum_markets.push(
             send_tx(
                 solana,
@@ -125,10 +131,10 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
                     group,
                     admin,
                     serum_program: context.serum.program_id,
-                    serum_market_external: s.market,
-                    market_index: s.coin_mint.index as u16,
-                    base_token_index: s.coin_mint.index as u16,
-                    quote_token_index: s.pc_mint.index as u16,
+                    serum_market_external: spot.market,
+                    market_index: spot.coin_mint.index as u16,
+                    base_bank: base_token.bank,
+                    quote_bank: quote_token.bank,
                     payer,
                 },
             )

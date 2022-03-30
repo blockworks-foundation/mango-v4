@@ -5,7 +5,6 @@ use crate::state::*;
 
 #[derive(Accounts)]
 pub struct Serum3CreateOpenOrders<'info> {
-    // TODO: do we even need the group?
     pub group: AccountLoader<'info, Group>,
 
     #[account(
@@ -21,8 +20,6 @@ pub struct Serum3CreateOpenOrders<'info> {
         has_one = serum_market_external,
     )]
     pub serum_market: AccountLoader<'info, Serum3Market>,
-
-    // TODO: limit?
     pub serum_program: UncheckedAccount<'info>,
     pub serum_market_external: UncheckedAccount<'info>,
 

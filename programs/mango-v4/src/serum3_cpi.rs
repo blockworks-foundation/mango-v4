@@ -109,6 +109,10 @@ pub fn load_open_orders<'a>(acc: &'a AccountInfo) -> Result<Ref<'a, serum_dex::s
     Ok(Ref::map(strip_dex_padding(acc)?, bytemuck::from_bytes))
 }
 
+pub fn pubkey_from_u64_array(d: [u64; 4]) -> Pubkey {
+    Pubkey::new(bytemuck::cast_slice(&d as &[_]))
+}
+
 pub struct InitOpenOrders<'info> {
     pub program: AccountInfo<'info>,
     pub market: AccountInfo<'info>,

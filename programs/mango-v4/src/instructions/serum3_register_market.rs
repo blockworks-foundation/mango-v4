@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::error::MangoError;
+use crate::serum3_cpi::{load_market_state, pubkey_from_u64_array};
 use crate::state::*;
 
 #[derive(Accounts)]
@@ -26,6 +27,11 @@ pub struct Serum3RegisterMarket<'info> {
     )]
     pub serum_market: AccountLoader<'info, Serum3Market>,
 
+    #[account(has_one = group)]
+    pub quote_bank: AccountLoader<'info, Bank>,
+    #[account(has_one = group)]
+    pub base_bank: AccountLoader<'info, Bank>,
+
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -36,11 +42,23 @@ pub struct Serum3RegisterMarket<'info> {
 pub fn serum3_register_market(
     ctx: Context<Serum3RegisterMarket>,
     market_index: Serum3MarketIndex,
-    base_token_index: TokenIndex,
-    quote_token_index: TokenIndex,
 ) -> Result<()> {
     // TODO: must guard against accidentally using the same market_index twice!
-    // TODO: verify that base_token_index and quote_token_index are correct!
+
+    let base_bank = ctx.accounts.base_bank.load()?;
+    let quote_bank = ctx.accounts.quote_bank.load()?;
+    let market_external = load_market_state(
+        &ctx.accounts.serum_market_external,
+        &ctx.accounts.serum_program.key(),
+    )?;
+    require!(
+        pubkey_from_u64_array(market_external.pc_mint) == quote_bank.mint,
+        MangoError::SomeError
+    );
+    require!(
+        pubkey_from_u64_array(market_external.coin_mint) == base_bank.mint,
+        MangoError::SomeError
+    );
 
     let mut serum_market = ctx.accounts.serum_market.load_init()?;
     *serum_market = Serum3Market {
@@ -48,8 +66,8 @@ pub fn serum3_register_market(
         serum_program: ctx.accounts.serum_program.key(),
         serum_market_external: ctx.accounts.serum_market_external.key(),
         market_index,
-        base_token_index,
-        quote_token_index,
+        base_token_index: base_bank.token_index,
+        quote_token_index: quote_bank.token_index,
         bump: *ctx.bumps.get("serum_market").ok_or(MangoError::SomeError)?,
     };
 
