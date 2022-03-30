@@ -301,7 +301,6 @@ impl PerpAccountMap {
     pub fn new() -> Self {
         Self {
             values: [PerpAccount::default(); MAX_PERP_OPEN_ORDERS],
-            ..Default::default()
         }
     }
 
