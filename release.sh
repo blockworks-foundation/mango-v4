@@ -22,7 +22,7 @@ yarn clean && yarn build && cp package.json ./dist/
 # # update on chain program and IDL, atm used for testing/developing
 # anchor deploy --provider.cluster devnet --provider.wallet ${PROVIDER_WALLET}
 # anchor idl upgrade --provider.cluster devnet --provider.wallet ${PROVIDER_WALLET}\
-#  --filepath target/idl/voter_stake_registry.json Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS
+#  --filepath target/idl/voter_stake_registry.json m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD
 
 
 # # publish the npm package

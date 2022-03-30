@@ -195,6 +195,10 @@ export type MangoV4 = {
         {
           "name": "initLiabWeight",
           "type": "f32"
+        },
+        {
+          "name": "liquidationFee",
+          "type": "f32"
         }
       ]
     },
@@ -500,6 +504,16 @@ export type MangoV4 = {
           }
         },
         {
+          "name": "quoteBank",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "baseBank",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -515,18 +529,6 @@ export type MangoV4 = {
           "name": "marketIndex",
           "type": {
             "defined": "Serum3MarketIndex"
-          }
-        },
-        {
-          "name": "baseTokenIndex",
-          "type": {
-            "defined": "TokenIndex"
-          }
-        },
-        {
-          "name": "quoteTokenIndex",
-          "type": {
-            "defined": "TokenIndex"
           }
         }
       ]
@@ -955,6 +957,51 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "liqTokenWithToken",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "assetTokenIndex",
+          "type": {
+            "defined": "TokenIndex"
+          }
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": {
+            "defined": "TokenIndex"
+          }
+        },
+        {
+          "name": "maxLiabTransfer",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
+    },
+    {
       "name": "createPerpMarket",
       "accounts": [
         {
@@ -1010,7 +1057,7 @@ export type MangoV4 = {
         },
         {
           "name": "eventQueue",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -1052,6 +1099,34 @@ export type MangoV4 = {
         {
           "name": "baseLotSize",
           "type": "i64"
+        },
+        {
+          "name": "maintAssetWeight",
+          "type": "f32"
+        },
+        {
+          "name": "initAssetWeight",
+          "type": "f32"
+        },
+        {
+          "name": "maintLiabWeight",
+          "type": "f32"
+        },
+        {
+          "name": "initLiabWeight",
+          "type": "f32"
+        },
+        {
+          "name": "liquidationFee",
+          "type": "f32"
+        },
+        {
+          "name": "makerFee",
+          "type": "f32"
+        },
+        {
+          "name": "takerFee",
+          "type": "f32"
         }
       ]
     },
@@ -1085,7 +1160,7 @@ export type MangoV4 = {
         },
         {
           "name": "eventQueue",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -1100,6 +1175,12 @@ export type MangoV4 = {
         }
       ],
       "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "Side"
+          }
+        },
         {
           "name": "price",
           "type": "i64"
@@ -1131,6 +1212,39 @@ export type MangoV4 = {
           "type": "u8"
         }
       ]
+    },
+    {
+      "name": "consumeEvents",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "eventQueue",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "limit",
+          "type": {
+            "defined": "usize"
+          }
+        }
+      ]
+    },
+    {
+      "name": "benchmark",
+      "accounts": [],
+      "args": []
     }
   ],
   "accounts": [
@@ -1199,6 +1313,12 @@ export type MangoV4 = {
           },
           {
             "name": "initLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "liquidationFee",
             "type": {
               "defined": "I80F48"
             }
@@ -1316,6 +1436,52 @@ export type MangoV4 = {
             "name": "serum3AccountMap",
             "type": {
               "defined": "Serum3AccountMap"
+            }
+          },
+          {
+            "name": "perpAccountMap",
+            "type": {
+              "defined": "PerpAccountMap"
+            }
+          },
+          {
+            "name": "orderMarket",
+            "type": {
+              "array": [
+                {
+                  "defined": "PerpMarketIndex"
+                },
+                8
+              ]
+            }
+          },
+          {
+            "name": "orderSide",
+            "type": {
+              "array": [
+                {
+                  "defined": "Side"
+                },
+                8
+              ]
+            }
+          },
+          {
+            "name": "orders",
+            "type": {
+              "array": [
+                "i128",
+                8
+              ]
+            }
+          },
+          {
+            "name": "clientOrderIds",
+            "type": {
+              "array": [
+                "u64",
+                8
+              ]
             }
           },
           {
@@ -1440,8 +1606,60 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "maintAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maintLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "liquidationFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "makerFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "takerFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "openInterest",
+            "type": "i64"
+          },
+          {
             "name": "seqNum",
             "type": "u64"
+          },
+          {
+            "name": "feesAccrued",
+            "type": {
+              "defined": "I80F48"
+            }
           },
           {
             "name": "bump",
@@ -1469,16 +1687,35 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "eventQueueHeader",
+      "name": "queue",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "metaData",
+            "name": "header",
             "type": {
-              "defined": "MetaData"
+              "defined": "H"
             }
           },
+          {
+            "name": "buf",
+            "type": {
+              "array": [
+                {
+                  "defined": "H::Item"
+                },
+                512
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "eventQueueHeader",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
             "name": "head",
             "type": {
@@ -1637,6 +1874,65 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "PerpAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketIndex",
+            "type": {
+              "defined": "PerpMarketIndex"
+            }
+          },
+          {
+            "name": "basePosition",
+            "type": "i64"
+          },
+          {
+            "name": "quotePosition",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "bidsQuantity",
+            "type": "i64"
+          },
+          {
+            "name": "asksQuantity",
+            "type": "i64"
+          },
+          {
+            "name": "takerBase",
+            "type": "i64"
+          },
+          {
+            "name": "takerQuote",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PerpAccountMap",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "values",
+            "type": {
+              "array": [
+                {
+                  "defined": "PerpAccount"
+                },
+                8
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "BookSideType",
       "type": {
         "kind": "enum",
@@ -1651,45 +1947,15 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "DataType",
+      "name": "HealthType",
       "type": {
         "kind": "enum",
         "variants": [
           {
-            "name": "MangoGroup"
+            "name": "Init"
           },
           {
-            "name": "MangoAccount"
-          },
-          {
-            "name": "RootBank"
-          },
-          {
-            "name": "NodeBank"
-          },
-          {
-            "name": "PerpMarket"
-          },
-          {
-            "name": "Bids"
-          },
-          {
-            "name": "Asks"
-          },
-          {
-            "name": "MangoCache"
-          },
-          {
-            "name": "EventQueue"
-          },
-          {
-            "name": "AdvancedOrders"
-          },
-          {
-            "name": "ReferrerMemory"
-          },
-          {
-            "name": "ReferrerIdRecord"
+            "name": "Maint"
           }
         ]
       }
@@ -1907,6 +2173,11 @@ export type MangoV4 = {
       "code": 6005,
       "name": "HealthMustBePositive",
       "msg": ""
+    },
+    {
+      "code": 6006,
+      "name": "IsBankrupt",
+      "msg": "The account is bankrupt"
     }
   ]
 };
@@ -2108,6 +2379,10 @@ export const IDL: MangoV4 = {
         {
           "name": "initLiabWeight",
           "type": "f32"
+        },
+        {
+          "name": "liquidationFee",
+          "type": "f32"
         }
       ]
     },
@@ -2413,6 +2688,16 @@ export const IDL: MangoV4 = {
           }
         },
         {
+          "name": "quoteBank",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "baseBank",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -2428,18 +2713,6 @@ export const IDL: MangoV4 = {
           "name": "marketIndex",
           "type": {
             "defined": "Serum3MarketIndex"
-          }
-        },
-        {
-          "name": "baseTokenIndex",
-          "type": {
-            "defined": "TokenIndex"
-          }
-        },
-        {
-          "name": "quoteTokenIndex",
-          "type": {
-            "defined": "TokenIndex"
           }
         }
       ]
@@ -2868,6 +3141,51 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "liqTokenWithToken",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "assetTokenIndex",
+          "type": {
+            "defined": "TokenIndex"
+          }
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": {
+            "defined": "TokenIndex"
+          }
+        },
+        {
+          "name": "maxLiabTransfer",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
+    },
+    {
       "name": "createPerpMarket",
       "accounts": [
         {
@@ -2923,7 +3241,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "eventQueue",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -2965,6 +3283,34 @@ export const IDL: MangoV4 = {
         {
           "name": "baseLotSize",
           "type": "i64"
+        },
+        {
+          "name": "maintAssetWeight",
+          "type": "f32"
+        },
+        {
+          "name": "initAssetWeight",
+          "type": "f32"
+        },
+        {
+          "name": "maintLiabWeight",
+          "type": "f32"
+        },
+        {
+          "name": "initLiabWeight",
+          "type": "f32"
+        },
+        {
+          "name": "liquidationFee",
+          "type": "f32"
+        },
+        {
+          "name": "makerFee",
+          "type": "f32"
+        },
+        {
+          "name": "takerFee",
+          "type": "f32"
         }
       ]
     },
@@ -2998,7 +3344,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "eventQueue",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -3013,6 +3359,12 @@ export const IDL: MangoV4 = {
         }
       ],
       "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "Side"
+          }
+        },
         {
           "name": "price",
           "type": "i64"
@@ -3044,6 +3396,39 @@ export const IDL: MangoV4 = {
           "type": "u8"
         }
       ]
+    },
+    {
+      "name": "consumeEvents",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "eventQueue",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "limit",
+          "type": {
+            "defined": "usize"
+          }
+        }
+      ]
+    },
+    {
+      "name": "benchmark",
+      "accounts": [],
+      "args": []
     }
   ],
   "accounts": [
@@ -3112,6 +3497,12 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "initLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "liquidationFee",
             "type": {
               "defined": "I80F48"
             }
@@ -3229,6 +3620,52 @@ export const IDL: MangoV4 = {
             "name": "serum3AccountMap",
             "type": {
               "defined": "Serum3AccountMap"
+            }
+          },
+          {
+            "name": "perpAccountMap",
+            "type": {
+              "defined": "PerpAccountMap"
+            }
+          },
+          {
+            "name": "orderMarket",
+            "type": {
+              "array": [
+                {
+                  "defined": "PerpMarketIndex"
+                },
+                8
+              ]
+            }
+          },
+          {
+            "name": "orderSide",
+            "type": {
+              "array": [
+                {
+                  "defined": "Side"
+                },
+                8
+              ]
+            }
+          },
+          {
+            "name": "orders",
+            "type": {
+              "array": [
+                "i128",
+                8
+              ]
+            }
+          },
+          {
+            "name": "clientOrderIds",
+            "type": {
+              "array": [
+                "u64",
+                8
+              ]
             }
           },
           {
@@ -3353,8 +3790,60 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "maintAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maintLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "liquidationFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "makerFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "takerFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "openInterest",
+            "type": "i64"
+          },
+          {
             "name": "seqNum",
             "type": "u64"
+          },
+          {
+            "name": "feesAccrued",
+            "type": {
+              "defined": "I80F48"
+            }
           },
           {
             "name": "bump",
@@ -3382,16 +3871,35 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "eventQueueHeader",
+      "name": "queue",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "metaData",
+            "name": "header",
             "type": {
-              "defined": "MetaData"
+              "defined": "H"
             }
           },
+          {
+            "name": "buf",
+            "type": {
+              "array": [
+                {
+                  "defined": "H::Item"
+                },
+                512
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "eventQueueHeader",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
             "name": "head",
             "type": {
@@ -3550,6 +4058,65 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "PerpAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "marketIndex",
+            "type": {
+              "defined": "PerpMarketIndex"
+            }
+          },
+          {
+            "name": "basePosition",
+            "type": "i64"
+          },
+          {
+            "name": "quotePosition",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "bidsQuantity",
+            "type": "i64"
+          },
+          {
+            "name": "asksQuantity",
+            "type": "i64"
+          },
+          {
+            "name": "takerBase",
+            "type": "i64"
+          },
+          {
+            "name": "takerQuote",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PerpAccountMap",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "values",
+            "type": {
+              "array": [
+                {
+                  "defined": "PerpAccount"
+                },
+                8
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "BookSideType",
       "type": {
         "kind": "enum",
@@ -3564,45 +4131,15 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "DataType",
+      "name": "HealthType",
       "type": {
         "kind": "enum",
         "variants": [
           {
-            "name": "MangoGroup"
+            "name": "Init"
           },
           {
-            "name": "MangoAccount"
-          },
-          {
-            "name": "RootBank"
-          },
-          {
-            "name": "NodeBank"
-          },
-          {
-            "name": "PerpMarket"
-          },
-          {
-            "name": "Bids"
-          },
-          {
-            "name": "Asks"
-          },
-          {
-            "name": "MangoCache"
-          },
-          {
-            "name": "EventQueue"
-          },
-          {
-            "name": "AdvancedOrders"
-          },
-          {
-            "name": "ReferrerMemory"
-          },
-          {
-            "name": "ReferrerIdRecord"
+            "name": "Maint"
           }
         ]
       }
@@ -3820,6 +4357,11 @@ export const IDL: MangoV4 = {
       "code": 6005,
       "name": "HealthMustBePositive",
       "msg": ""
+    },
+    {
+      "code": 6006,
+      "name": "IsBankrupt",
+      "msg": "The account is bankrupt"
     }
   ]
 };

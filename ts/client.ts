@@ -3,14 +3,11 @@ import { PublicKey } from '@solana/web3.js';
 import { MangoV4, IDL } from './mango_v4';
 
 export const MANGO_V4_ID = new PublicKey(
-  'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS',
+  'm43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD',
 );
 
 export class MangoClient {
-  constructor(
-    public program: Program<MangoV4>,
-    public devnet?: boolean,
-  ) {}
+  constructor(public program: Program<MangoV4>, public devnet?: boolean) {}
 
   static async connect(
     provider: Provider,
@@ -21,11 +18,7 @@ export class MangoClient {
     const idl = IDL;
 
     return new MangoClient(
-      new Program<MangoV4>(
-        idl as MangoV4,
-        MANGO_V4_ID,
-        provider,
-      ),
+      new Program<MangoV4>(idl as MangoV4, MANGO_V4_ID, provider),
       devnet,
     );
   }

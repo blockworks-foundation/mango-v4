@@ -17,7 +17,7 @@ pub mod state;
 
 use state::{OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex};
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
 
 #[program]
 pub mod mango_v4 {
