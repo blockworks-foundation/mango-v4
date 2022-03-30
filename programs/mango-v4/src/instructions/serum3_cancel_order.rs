@@ -95,6 +95,8 @@ pub fn serum3_cancel_order(
     //
     {
         let account = ctx.accounts.account.load()?;
+        require!(!account.is_bankrupt, MangoError::IsBankrupt);
+
         let serum_market = ctx.accounts.serum_market.load()?;
 
         // Validate open_orders

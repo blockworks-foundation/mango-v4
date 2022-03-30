@@ -38,7 +38,10 @@ pub fn liq_token_with_token(
     let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)?;
 
     let mut liqor = ctx.accounts.liqor.load_mut()?;
+    require!(!liqor.is_bankrupt, MangoError::IsBankrupt);
+
     let mut liqee = ctx.accounts.liqee.load_mut()?;
+    require!(!liqee.is_bankrupt, MangoError::IsBankrupt);
 
     // Initial liqee health check
     let mut liqee_health_cache = health_cache_for_liqee(&liqee, &account_retriever)?;

@@ -58,6 +58,8 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;
+    require!(!account.is_bankrupt, MangoError::IsBankrupt);
+
     let (position, position_index) = account.token_account_map.get_mut_or_create(token_index)?;
 
     // The bank will also be passed in remainingAccounts. Use an explicit scope
@@ -103,7 +105,7 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
     let health =
         compute_health_from_fixed_accounts(&account, HealthType::Init, &ctx.remaining_accounts)?;
     msg!("health: {}", health);
-    require!(health >= 0, MangoError::SomeError);
+    require!(health >= 0, MangoError::HealthMustBePositive);
 
     //
     // Deactivate the position only after the health check because the user passed in

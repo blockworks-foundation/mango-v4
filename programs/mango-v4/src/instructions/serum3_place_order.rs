@@ -157,6 +157,7 @@ pub fn serum3_place_order(
     //
     {
         let account = ctx.accounts.account.load()?;
+        require!(!account.is_bankrupt, MangoError::IsBankrupt);
         let serum_market = ctx.accounts.serum_market.load()?;
 
         // Validate open_orders
@@ -241,7 +242,7 @@ pub fn serum3_place_order(
     let health =
         compute_health_from_fixed_accounts(&account, HealthType::Init, &ctx.remaining_accounts)?;
     msg!("health: {}", health);
-    require!(health >= 0, MangoError::SomeError);
+    require!(health >= 0, MangoError::HealthMustBePositive);
 
     Ok(())
 }

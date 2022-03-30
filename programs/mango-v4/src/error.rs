@@ -16,4 +16,6 @@ pub enum MangoError {
     InvalidMarginTradeTargetCpiProgram,
     #[msg("")]
     HealthMustBePositive,
+    #[msg("The account is bankrupt")]
+    IsBankrupt,
 }

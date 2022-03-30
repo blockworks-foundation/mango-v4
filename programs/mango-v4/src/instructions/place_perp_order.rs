@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+use crate::error::*;
 use crate::state::{
     oracle_price, Book, EventQueueHeader, Group, MangoAccount, OrderType, PerpMarket, Queue, Side,
 };
@@ -49,6 +50,7 @@ pub fn place_perp_order(
     limit: u8,
 ) -> Result<()> {
     let mut mango_account = ctx.accounts.account.load_mut()?;
+    require!(!mango_account.is_bankrupt, MangoError::IsBankrupt);
     let mango_account_pk = ctx.accounts.account.key();
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;

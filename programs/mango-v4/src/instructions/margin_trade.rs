@@ -27,6 +27,7 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
     let mut account = ctx.accounts.account.load_mut()?;
+    require!(!account.is_bankrupt, MangoError::IsBankrupt);
 
     // remaining_accounts layout is expected as follows
     // * banks_len number of banks

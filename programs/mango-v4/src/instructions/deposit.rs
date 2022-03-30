@@ -4,6 +4,7 @@ use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 use fixed::types::I80F48;
 
+use crate::error::*;
 use crate::state::*;
 
 #[derive(Accounts)]
@@ -55,6 +56,8 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;
+    require!(!account.is_bankrupt, MangoError::IsBankrupt);
+
     let (position, position_index) = account.token_account_map.get_mut_or_create(token_index)?;
 
     // Update the bank and position
