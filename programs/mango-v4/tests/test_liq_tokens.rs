@@ -218,8 +218,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     let admin = &Keypair::new();
     let owner = &context.users[0].key;
     let payer = &context.users[1].key;
-    let mints = &context.mints[0..2];
-    let payer_mint_accounts = &context.users[1].token_accounts[0..2];
+    let mints = &context.mints[0..4];
+    let payer_mint_accounts = &context.users[1].token_accounts[0..4];
 
     //
     // SETUP: Create a group and an account to fill the vaults
@@ -232,8 +232,10 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     }
     .create(solana)
     .await;
-    let base_token = &tokens[0];
-    let quote_token = &tokens[1];
+    let borrow_token1 = &tokens[0];
+    let borrow_token2 = &tokens[1];
+    let collateral_token1 = &tokens[2];
+    let collateral_token2 = &tokens[3];
 
     // deposit some funds, to the vaults aren't empty
     let vault_account = send_tx(
@@ -252,7 +254,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         send_tx(
             solana,
             DepositInstruction {
-                amount: 10000,
+                amount: 100000,
                 account: vault_account,
                 token_account,
                 token_authority: payer,
@@ -263,7 +265,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     }
 
     //
-    // SETUP: Make an account and deposit some quote, borrow some base
+    // SETUP: Make an account with some collateral and some borrows
     //
     let account = send_tx(
         solana,
@@ -278,24 +280,37 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     .unwrap()
     .account;
 
-    let deposit_amount = 1000;
+    let deposit1_amount = 1000;
+    let deposit2_amount = 20;
     send_tx(
         solana,
         DepositInstruction {
-            amount: deposit_amount,
+            amount: deposit1_amount,
             account,
-            token_account: payer_mint_accounts[1],
+            token_account: payer_mint_accounts[2],
+            token_authority: payer,
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        DepositInstruction {
+            amount: deposit2_amount,
+            account,
+            token_account: payer_mint_accounts[3],
             token_authority: payer,
         },
     )
     .await
     .unwrap();
 
-    let withdraw_amount = 400;
+    let borrow1_amount = 350;
+    let borrow2_amount = 50;
     send_tx(
         solana,
         WithdrawInstruction {
-            amount: withdraw_amount,
+            amount: borrow1_amount,
             allow_borrow: true,
             account,
             owner,
@@ -304,14 +319,26 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+    send_tx(
+        solana,
+        WithdrawInstruction {
+            amount: borrow2_amount,
+            allow_borrow: true,
+            account,
+            owner,
+            token_account: payer_mint_accounts[1],
+        },
+    )
+    .await
+    .unwrap();
 
     //
-    // TEST: Change the oracle to make health go negative, then liquidate
+    // SETUP: Change the oracle to make health go negative
     //
     send_tx(
         solana,
         SetStubOracle {
-            mint: base_token.mint.pubkey,
+            mint: borrow_token1.mint.pubkey,
             payer,
             price: "2.0",
         },
@@ -319,58 +346,122 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    // first limited liq
+    //
+    // TEST: liquidate borrow2 against too little collateral2
+    //
+
     send_tx(
         solana,
         LiqTokenWithTokenInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
-            asset_token_index: quote_token.index,
-            liab_token_index: base_token.index,
-            max_liab_transfer: I80F48::from_num(10.0),
-        },
-    )
-    .await
-    .unwrap();
-
-    // the asset cost for 10 liab is 10 * 2 * 1.04 = 20.8
-    assert_eq!(
-        account_position(solana, account, base_token.bank).await,
-        -400 + 10
-    );
-    assert_eq!(
-        account_position(solana, account, quote_token.bank).await,
-        1000 - 21
-    );
-    let liqee: MangoAccount = solana.get_account(account).await;
-    assert!(liqee.being_liquidated);
-
-    // remaining liq
-    send_tx(
-        solana,
-        LiqTokenWithTokenInstruction {
-            liqee: account,
-            liqor: vault_account,
-            liqor_owner: owner,
-            asset_token_index: quote_token.index,
-            liab_token_index: base_token.index,
+            asset_token_index: collateral_token2.index,
+            liab_token_index: borrow_token2.index,
             max_liab_transfer: I80F48::from_num(10000.0),
         },
     )
     .await
     .unwrap();
 
-    // health before liquidation was 1000 * 0.6 - 400 * 1.4 = -520
-    // liab needed 520 / (1.4*2 - 0.6*2*(1 + 0.02 + 0.02)) = 335.0515
-    // asset cost = 335 * 2 * 1.04 = 696.8
+    // the we only have 20 collateral2, and can trade them for 20 / 1.04 = 19.2 borrow2
     assert_eq!(
-        account_position(solana, account, base_token.bank).await,
-        -400 + 335
+        account_position(solana, account, borrow_token2.bank).await,
+        -50 + 19
     );
     assert_eq!(
-        account_position(solana, account, quote_token.bank).await,
-        1000 - 697
+        account_position(solana, account, collateral_token2.bank).await,
+        0
+    );
+    let liqee: MangoAccount = solana.get_account(account).await;
+    assert!(liqee.being_liquidated);
+
+    //
+    // TEST: liquidate the remaining borrow2 against collateral1,
+    // bringing the borrow2 balance to 0 but keeping account health negative
+    //
+    send_tx(
+        solana,
+        LiqTokenWithTokenInstruction {
+            liqee: account,
+            liqor: vault_account,
+            liqor_owner: owner,
+            asset_token_index: collateral_token1.index,
+            liab_token_index: borrow_token2.index,
+            max_liab_transfer: I80F48::from_num(10000.0),
+        },
+    )
+    .await
+    .unwrap();
+
+    // the asset cost for 50-19=31 borrow2 is 31 * 1.04 = 32.24
+    assert_eq!(
+        account_position(solana, account, borrow_token2.bank).await,
+        0
+    );
+    assert_eq!(
+        account_position(solana, account, collateral_token1.bank).await,
+        1000 - 32
+    );
+    let liqee: MangoAccount = solana.get_account(account).await;
+    assert!(liqee.being_liquidated);
+
+    //
+    // TEST: liquidate borrow1 with collateral1, but place a limit
+    //
+    send_tx(
+        solana,
+        LiqTokenWithTokenInstruction {
+            liqee: account,
+            liqor: vault_account,
+            liqor_owner: owner,
+            asset_token_index: collateral_token1.index,
+            liab_token_index: borrow_token1.index,
+            max_liab_transfer: I80F48::from_num(10.0),
+        },
+    )
+    .await
+    .unwrap();
+
+    // the asset cost for 10 borrow1 is 10 * 2 * 1.04 = 20.8
+    assert_eq!(
+        account_position(solana, account, borrow_token1.bank).await,
+        -350 + 10
+    );
+    assert_eq!(
+        account_position(solana, account, collateral_token1.bank).await,
+        1000 - 32 - 21
+    );
+    let liqee: MangoAccount = solana.get_account(account).await;
+    assert!(liqee.being_liquidated);
+
+    //
+    // TEST: liquidate borrow1 with collateral1, making the account healthy again
+    //
+    send_tx(
+        solana,
+        LiqTokenWithTokenInstruction {
+            liqee: account,
+            liqor: vault_account,
+            liqor_owner: owner,
+            asset_token_index: collateral_token1.index,
+            liab_token_index: borrow_token1.index,
+            max_liab_transfer: I80F48::from_num(10000.0),
+        },
+    )
+    .await
+    .unwrap();
+
+    // health after borrow2 liquidation was (1000-32) * 0.6 - 350 * 2 * 1.4 = -399.2
+    // borrow1 needed 399.2 / (1.4*2 - 0.6*2*1.04) = 257.2
+    // asset cost = 257.2 * 2 * 1.04 = 535
+    assert_eq!(
+        account_position(solana, account, borrow_token1.bank).await,
+        -350 + 257
+    );
+    assert_eq!(
+        account_position(solana, account, collateral_token1.bank).await,
+        1000 - 32 - 535
     );
     let liqee: MangoAccount = solana.get_account(account).await;
     assert!(!liqee.being_liquidated);
