@@ -83,6 +83,7 @@ pub fn liq_token_with_token(
             .native(&liab_bank);
         require!(liqee_liab_native.is_negative(), MangoError::SomeError);
 
+        // TODO why sum of both tokens liquidation fees? Add comment
         let fee_factor = I80F48::ONE + asset_bank.liquidation_fee + liab_bank.liquidation_fee;
         let liab_price_adjusted = liab_price * fee_factor;
 

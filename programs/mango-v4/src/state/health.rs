@@ -145,6 +145,12 @@ impl<'a, 'b> AccountRetriever<'a, 'b> for ScanningAccountRetriever<'a, 'b> {
     }
 }
 
+/// There are two types of health, initial health used for opening new positions and maintenance
+/// health used for liquidations. They are both calculated as a weighted sum of the assets
+/// minus the liabilities but the maint. health uses slightly larger weights for assets and
+/// slightly smaller weights for the liabilities. Zero is used as the bright line for both
+/// i.e. if your init health falls below zero, you cannot open new positions and if your maint. health
+/// falls below zero you will be liquidated.
 #[derive(PartialEq, Copy, Clone)]
 pub enum HealthType {
     Init,
@@ -367,4 +373,34 @@ fn compute_health_detail<'a, 'b: 'a>(
     }
 
     Ok(HealthCache { token_infos })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use fixed::types::I80F48;
+
+    #[test]
+    fn test_precision() {
+        // I80F48 can only represent until 1/2^48
+        assert_ne!(
+            I80F48::from_num(1_u128) / I80F48::from_num(2_u128.pow(48)),
+            0
+        );
+        assert_eq!(
+            I80F48::from_num(1_u128) / I80F48::from_num(2_u128.pow(49)),
+            0
+        );
+
+        // I80F48 can only represent until 14 decimal points
+        assert_ne!(
+            I80F48::from_str(format!("0.{}1", "0".repeat(13)).as_str()).unwrap(),
+            0
+        );
+        assert_eq!(
+            I80F48::from_str(format!("0.{}1", "0".repeat(14)).as_str()).unwrap(),
+            0
+        );
+    }
 }
