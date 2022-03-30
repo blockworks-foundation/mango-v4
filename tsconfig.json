@@ -13,6 +13,7 @@
     "outDir": "dist",
     "resolveJsonModule": true,
     "sourceMap": true,
+    "strictNullChecks": true,
     "target": "es6"
   },
   "include": ["./ts/**/*"],
