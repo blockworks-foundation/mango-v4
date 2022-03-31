@@ -697,6 +697,38 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
     }
 }
 
+pub struct CloseAccountInstruction<'keypair> {
+    pub account: Pubkey,
+    pub owner: &'keypair Keypair,
+    pub sol_destination: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for CloseAccountInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::CloseAccount;
+    type Instruction = mango_v4::instruction::CloseAccount;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        let accounts = Self::Accounts {
+            owner: self.owner.pubkey(),
+            account: self.account,
+            sol_destination: self.sol_destination,
+            token_program: Token::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.owner]
+    }
+}
+
 pub struct Serum3RegisterMarketInstruction<'keypair> {
     pub group: Pubkey,
     pub admin: &'keypair Keypair,

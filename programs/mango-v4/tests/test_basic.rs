@@ -2,7 +2,7 @@
 
 use fixed::types::I80F48;
 use solana_program_test::*;
-use solana_sdk::{signature::Keypair, transport::TransportError};
+use solana_sdk::{signature::Keypair, signature::Signer, transport::TransportError};
 
 use mango_v4::state::*;
 use program_test::*;
@@ -120,6 +120,21 @@ async fn test_basic() -> Result<(), TransportError> {
                 < dust_threshold
         );
     }
+
+    //
+    // TEST: Close account
+    // TODO: This just checks execution, preconditions etc need to be tested!
+    //
+    send_tx(
+        solana,
+        CloseAccountInstruction {
+            account,
+            owner,
+            sol_destination: payer.pubkey(),
+        },
+    )
+    .await
+    .unwrap();
 
     Ok(())
 }
