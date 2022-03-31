@@ -5,7 +5,8 @@ use anchor_spl::token::TokenAccount;
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
-use crate::address_lookup_table;
+// TODO: ALTs are unavailable
+//use crate::address_lookup_table;
 use crate::state::*;
 
 const INDEX_START: I80F48 = I80F48!(1_000_000);
@@ -59,15 +60,17 @@ pub struct RegisterToken<'info> {
     // externally and the admin is responsible for placing banks/oracles into
     // sensible address lookup tables.
     // constraint: must be created, have the admin authority and have free space
-    #[account(mut)]
-    pub address_lookup_table: UncheckedAccount<'info>, // TODO: wrapper?
-
+    // TODO: ALTs are unavailable
+    //#[account(mut)]
+    //pub address_lookup_table: UncheckedAccount<'info>, // TODO: wrapper?
     #[account(mut)]
     pub payer: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
-    pub address_lookup_table_program: UncheckedAccount<'info>, // TODO: force address?
+
+    // TODO: ALTs are unavailable
+    //pub address_lookup_table_program: UncheckedAccount<'info>, // TODO: force address?
     pub rent: Sysvar<'info, Rent>,
 }
 
@@ -82,7 +85,7 @@ pub fn register_token(
     init_liab_weight: f32,
     liquidation_fee: f32,
 ) -> Result<()> {
-    // TODO: Error if mint is already configured (techincally, init of vault will fail)
+    // TODO: Error if mint is already configured (technically, init of vault will fail)
 
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
@@ -103,9 +106,12 @@ pub fn register_token(
         token_index,
     };
 
-    let alt_previous_size =
-        address_lookup_table::addresses(&ctx.accounts.address_lookup_table.try_borrow_data()?)
-            .len();
+    // TODO: ALTs are unavailable
+    // let alt_previous_size =
+    //     address_lookup_table::addresses(&ctx.accounts.address_lookup_table.try_borrow_data()?)
+    //         .len();
+    let address_lookup_table = Pubkey::default();
+    let alt_previous_size = 0;
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {
         mint: ctx.accounts.mint.key(),
@@ -113,11 +119,13 @@ pub fn register_token(
         oracle: ctx.accounts.oracle.key(),
         bank: ctx.accounts.bank.key(),
         token_index,
-        address_lookup_table: ctx.accounts.address_lookup_table.key(),
+        address_lookup_table: address_lookup_table,
         address_lookup_table_bank_index: alt_previous_size as u8,
         address_lookup_table_oracle_index: alt_previous_size as u8 + 1,
     };
 
+    // TODO: ALTs are unavailable
+    /*
     address_lookup_table::extend(
         ctx.accounts.address_lookup_table.to_account_info(),
         // TODO: is using the admin as ALT authority a good idea?
@@ -126,6 +134,7 @@ pub fn register_token(
         &[],
         vec![ctx.accounts.bank.key(), ctx.accounts.oracle.key()],
     )?;
+    */
 
     Ok(())
 }

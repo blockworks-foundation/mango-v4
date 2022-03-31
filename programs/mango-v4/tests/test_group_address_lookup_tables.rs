@@ -1,4 +1,5 @@
-#![cfg(feature = "test-bpf")]
+// TODO: ALTs are unavailable
+#![cfg(all(feature = "test-bpf", feature = "disabled-alt-test"))]
 
 use anchor_lang::prelude::*;
 use solana_program_test::*;

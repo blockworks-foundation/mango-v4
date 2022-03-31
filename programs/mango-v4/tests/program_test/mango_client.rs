@@ -112,13 +112,16 @@ async fn derive_health_check_remaining_account_metas(
     for position in account.token_account_map.iter_active() {
         let mint_info =
             get_mint_info_by_token_index(account_loader, account, position.token_index).await;
-        let lookup_table = account_loader
-            .load_bytes(&mint_info.address_lookup_table)
-            .await
-            .unwrap();
-        let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
-        banks.push(addresses[mint_info.address_lookup_table_bank_index as usize]);
-        oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
+        // TODO: ALTs are unavailable
+        // let lookup_table = account_loader
+        //     .load_bytes(&mint_info.address_lookup_table)
+        //     .await
+        //     .unwrap();
+        // let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
+        // banks.push(addresses[mint_info.address_lookup_table_bank_index as usize]);
+        // oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
+        banks.push(mint_info.bank);
+        oracles.push(mint_info.oracle);
     }
     if let Some(affected_bank) = affected_bank {
         if banks.iter().find(|&&v| v == affected_bank).is_none() {
@@ -178,17 +181,20 @@ async fn derive_liquidation_remaining_account_metas(
         .unique();
     for token_index in token_indexes {
         let mint_info = get_mint_info_by_token_index(account_loader, liqee, token_index).await;
-        let lookup_table = account_loader
-            .load_bytes(&mint_info.address_lookup_table)
-            .await
-            .unwrap();
-        let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
         let writable_bank = token_index == asset_token_index || token_index == liab_token_index;
-        banks.push((
-            addresses[mint_info.address_lookup_table_bank_index as usize],
-            writable_bank,
-        ));
-        oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
+        // TODO: ALTs are unavailable
+        // let lookup_table = account_loader
+        //     .load_bytes(&mint_info.address_lookup_table)
+        //     .await
+        //     .unwrap();
+        // let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
+        // banks.push((
+        //     addresses[mint_info.address_lookup_table_bank_index as usize],
+        //     writable_bank,
+        // ));
+        // oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
+        banks.push((mint_info.bank, writable_bank));
+        oracles.push(mint_info.oracle);
     }
 
     let serum_oos = liqee
@@ -511,11 +517,13 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
             vault,
             mint_info,
             oracle,
-            address_lookup_table: self.address_lookup_table,
+            // TODO: ALTs are unavailable
+            //address_lookup_table: self.address_lookup_table,
             payer: self.payer.pubkey(),
             token_program: Token::id(),
             system_program: System::id(),
-            address_lookup_table_program: mango_v4::address_lookup_table::id(),
+            // TODO: ALTs are unavailable
+            //address_lookup_table_program: mango_v4::address_lookup_table::id(),
             rent: sysvar::rent::Rent::id(),
         };
 
