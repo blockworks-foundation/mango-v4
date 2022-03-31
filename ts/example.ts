@@ -1,4 +1,4 @@
-import { Provider, Wallet, web3 } from '@project-serum/anchor';
+import { Provider, Wallet, web3, BN } from '@project-serum/anchor';
 import { bs58 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { TOKEN_PROGRAM_ID } from '@project-serum/anchor/dist/cjs/utils/token';
 import { Connection, Keypair, SystemProgram } from '@solana/web3.js';
@@ -80,12 +80,18 @@ async function main() {
   // check if token is already registered, iff not, then register
   //
   // mngo devnet mint
-  const mint = new web3.PublicKey(
+  const mngoDevnetMint = new web3.PublicKey(
     'Bb9bsTQa1bGEtQ5KagGkvSHyuLqDWumFUcRqFusFNJWC',
   );
+  const btcDevnetMint = new web3.PublicKey(
+    '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU',
+  );
   // mngo devnet oracle
-  const mngoOracle = new web3.PublicKey(
+  const mngoDevnetOracle = new web3.PublicKey(
     '8k7F9Xb36oFJsjpCKpsXvg4cgBRoZtwNTc3EzG5Ttd2o',
+  );
+  const btcDevnetOracle = new web3.PublicKey(
+    'HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J',
   );
   let bank;
   gpa = await client.program.account.bank.all([
@@ -97,7 +103,7 @@ async function main() {
     },
     {
       memcmp: {
-        bytes: bs58.encode(mint.toBuffer()),
+        bytes: bs58.encode(btcDevnetMint.toBuffer()),
         offset: 40,
       },
     },
@@ -106,12 +112,12 @@ async function main() {
     bank = gpa[0];
   } else {
     await client.program.methods
-      .registerToken(0, 0.8, 0.6, 1.2, 1.4, 0.02)
+      .registerToken(1, 0.8, 0.6, 1.2, 1.4, 0.02)
       .accounts({
         group: group.publicKey,
         admin: admin.publicKey,
-        mint,
-        oracle: mngoOracle,
+        mint: btcDevnetMint,
+        oracle: btcDevnetOracle,
         payer: payer.publicKey,
         token_program: TOKEN_PROGRAM_ID,
         system_program: SystemProgram.programId,
@@ -129,7 +135,7 @@ async function main() {
       },
       {
         memcmp: {
-          bytes: bs58.encode(mint.toBuffer()),
+          bytes: bs58.encode(btcDevnetMint.toBuffer()),
           offset: 40,
         },
       },
@@ -137,59 +143,138 @@ async function main() {
     bank = gpa[0];
   }
   console.log(`Bank address: ${bank.publicKey.toBase58()}`);
-  // console.log(bank);
+  // console.log(bank.account.vault);
 
   //
   // mango account
   //
 
   let mangoAccount;
-  gpa = await client.program.account.mangoAccount.all([
-    {
-      memcmp: {
-        bytes: bs58.encode(group.publicKey.toBuffer()),
-        offset: 8,
-      },
-    },
-    {
-      memcmp: {
-        bytes: bs58.encode(admin.publicKey.toBuffer()),
-        offset: 40,
-      },
-    },
-  ]);
-  if (gpa.length > 0) {
-    mangoAccount = gpa[0];
-  } else {
-    await client.program.methods
-      .createAccount(0)
-      .accounts({
-        group: group.publicKey,
-        owner: admin.publicKey,
-        payer: payer.publicKey,
-        system_program: SystemProgram.programId,
-      })
-      .signers([admin, payer])
-      .rpc();
+  // gpa = await client.program.account.mangoAccount.all([
+  //   {
+  //     memcmp: {
+  //       bytes: bs58.encode(group.publicKey.toBuffer()),
+  //       offset: 8,
+  //     },
+  //   },
+  //   {
+  //     memcmp: {
+  //       bytes: bs58.encode(admin.publicKey.toBuffer()),
+  //       offset: 40,
+  //     },
+  //   },
+  // ]);
+  // if (gpa.length > 0) {
+  //   mangoAccount = gpa[0];
+  // } else {
 
-    gpa = await client.program.account.mangoAccount.all([
-      {
-        memcmp: {
-          bytes: bs58.encode(group.publicKey.toBuffer()),
-          offset: 8,
-        },
-      },
-      {
-        memcmp: {
-          bytes: bs58.encode(admin.publicKey.toBuffer()),
-          offset: 40,
-        },
-      },
-    ]);
-    mangoAccount = gpa[0];
+  // await client.program.methods
+  //   .createAccount(11)
+  //   .accounts({
+  //     group: group.publicKey,
+  //     owner: admin.publicKey,
+  //     payer: payer.publicKey,
+  //     system_program: SystemProgram.programId,
+  //   })
+  //   .signers([admin, payer])
+  //   .rpc();
+
+  //   gpa = await client.program.account.mangoAccount.all([
+  //     {
+  //       memcmp: {
+  //         bytes: bs58.encode(group.publicKey.toBuffer()),
+  //         offset: 8,
+  //       },
+  //     },
+  //     {
+  //       memcmp: {
+  //         bytes: bs58.encode(admin.publicKey.toBuffer()),
+  //         offset: 40,
+  //       },
+  //     },
+  //   ]);
+  //   mangoAccount = gpa[0];
+  // }
+
+  let mangoAccountPk = new web3.PublicKey(
+    'CtdYxnaWZPgD5BuchHmo2fKecJbVberhqBRbrspsw9gc',
+  );
+  mangoAccount = await client.program.account.mangoAccount.fetch(
+    mangoAccountPk,
+  );
+  console.log(`Mango account address: ${mangoAccountPk.toBase58()}`);
+  // console.log(mangoAccount);
+
+  //
+  // deposit
+  //
+  let mngoTokenAccount = new web3.PublicKey(
+    'EnaCw8ZooD1sFbqz2J3w8XAZmtp5sAvVx1RxKM2pMVLh',
+  );
+  let btcTokenAccount = new web3.PublicKey(
+    'DS2vYFVtQbbJDowCG4NEM9KGQ8TJpxKo5efBQj96eCPS',
+  );
+
+  await client.program.methods
+    .deposit(new BN(0))
+    .accounts({
+      group: group.publicKey,
+      account: mangoAccountPk,
+      bank: bank.publicKey,
+      vault: bank.account.vault,
+      tokenAccount: btcTokenAccount,
+      tokenAuthority: admin.publicKey,
+      token_program: TOKEN_PROGRAM_ID,
+    })
+    .remainingAccounts([
+      { pubkey: bank.publicKey, isWritable: false, isSigner: false },
+      { pubkey: btcDevnetOracle, isWritable: false, isSigner: false },
+    ])
+    .signers([admin])
+    .rpc();
+
+  mangoAccount = await client.program.account.mangoAccount.fetch(
+    mangoAccountPk,
+  );
+  for (const tokenAccount of mangoAccount.tokenAccountMap.values) {
+    if (tokenAccount.tokenIndex !== 65535) {
+      console.log(
+        `${
+          tokenAccount.tokenIndex
+        } - ${tokenAccount.indexedValue.val.toNumber()}`,
+      );
+    }
   }
-  console.log(`Mango account address: ${mangoAccount.publicKey.toBase58()}`);
-  console.log(mangoAccount);
+
+  await client.program.methods
+    .withdraw(new BN(1000), false)
+    .accounts({
+      group: group.publicKey,
+      account: mangoAccountPk,
+      owner: admin.publicKey,
+      bank: bank.publicKey,
+      vault: bank.account.vault,
+      tokenAccount: btcTokenAccount,
+      token_program: TOKEN_PROGRAM_ID,
+    })
+    .remainingAccounts([
+      { pubkey: bank.publicKey, isWritable: false, isSigner: false },
+      { pubkey: btcDevnetOracle, isWritable: false, isSigner: false },
+    ])
+    .signers([admin])
+    .rpc();
+  mangoAccount = await client.program.account.mangoAccount.fetch(
+    mangoAccountPk,
+  );
+  for (const tokenAccount of mangoAccount.tokenAccountMap.values) {
+    if (tokenAccount.tokenIndex !== 65535) {
+      console.log(
+        `${
+          tokenAccount.tokenIndex
+        } - ${tokenAccount.indexedValue.val.toNumber()}`,
+      );
+    }
+  }
 }
 
 main();
