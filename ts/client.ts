@@ -18,35 +18,31 @@ export class MangoClient {
     let idl = IDL;
 
     // TODO: remove
-    // Temporarily patch missing types, so we can do new Program(...) below.
-    MangoClient.addDummyType(idl, 'usize');
-    MangoClient.addDummyType(idl, 'AnyNode');
-    MangoClient.addDummyType(idl, 'EventQueueHeader');
-    MangoClient.addDummyType(idl, 'AnyEvent');
-    MangoClient.addDummyType(idl, 'instructions::NewOrderInstructionData');
-    MangoClient.addDummyType(idl, 'instructions::CancelOrderInstructionData');
-    MangoClient.addDummyType(idl, 'H');
-    MangoClient.addDummyType(idl, 'H::Item');
-    MangoClient.addDummyType(idl, 'NodeHandle');
+    // Temporarily add missing (dummy) type definitions, so we can do new Program(...) below
+    // without anchor throwing errors. These types come from part of the code we don't yet care about
+    // in the client.
+    function addDummyType(idl: MangoV4, typeName: string) {
+      (idl.types as any).push({
+        name: typeName,
+        type: {
+          kind: 'struct',
+          fields: [],
+        },
+      });
+    }
+    addDummyType(idl, 'usize');
+    addDummyType(idl, 'AnyNode');
+    addDummyType(idl, 'EventQueueHeader');
+    addDummyType(idl, 'AnyEvent');
+    addDummyType(idl, 'instructions::NewOrderInstructionData');
+    addDummyType(idl, 'instructions::CancelOrderInstructionData');
+    addDummyType(idl, 'H');
+    addDummyType(idl, 'H::Item');
+    addDummyType(idl, 'NodeHandle');
 
     return new MangoClient(
       new Program<MangoV4>(idl as MangoV4, MANGO_V4_ID, provider),
       devnet,
     );
-  }
-
-  private static addDummyType(idl: MangoV4, typeName: string) {
-    (idl.types as any).push({
-      name: typeName,
-      type: {
-        kind: 'struct',
-        fields: [
-          {
-            name: 'val',
-            type: 'u64',
-          },
-        ],
-      },
-    });
   }
 }
