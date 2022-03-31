@@ -14,11 +14,25 @@ async function main() {
     options,
   );
 
-  const privateKeyPath = os.homedir() + '/.config/solana/dev.json';
-  const owner = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(privateKeyPath, 'utf-8'))),
+  const admin = Keypair.fromSecretKey(
+    Buffer.from(
+      JSON.parse(
+        fs.readFileSync(os.homedir() + '/.config/solana/dev.json', 'utf-8'),
+      ),
+    ),
   );
-  const wallet = new Wallet(owner);
+  const wallet = new Wallet(admin);
+
+  const payer = Keypair.fromSecretKey(
+    Buffer.from(
+      JSON.parse(
+        fs.readFileSync(
+          os.homedir() + '/.config/solana/mango-devnet.json',
+          'utf-8',
+        ),
+      ),
+    ),
+  );
 
   const provider = new Provider(connection, wallet, options);
   const client = await MangoClient.connect(provider, true);
@@ -27,7 +41,7 @@ async function main() {
   let gpa = await client.program.account.group.all([
     {
       memcmp: {
-        bytes: bs58.encode(owner.publicKey.toBuffer()),
+        bytes: bs58.encode(admin.publicKey.toBuffer()),
         offset: 8,
       },
     },
@@ -38,17 +52,17 @@ async function main() {
     await client.program.methods
       .createGroup()
       .accounts({
-        admin: owner.publicKey,
-        payer: owner.publicKey,
+        admin: admin.publicKey,
+        payer: admin.publicKey,
         system_program: SystemProgram.programId,
       })
-      .signers([owner])
+      .signers([admin])
       .rpc();
 
     gpa = await client.program.account.group.all([
       {
         memcmp: {
-          bytes: bs58.encode(owner.publicKey.toBuffer()),
+          bytes: bs58.encode(admin.publicKey.toBuffer()),
           offset: 8,
         },
       },
@@ -67,35 +81,20 @@ async function main() {
   const mngoOracle = new web3.PublicKey(
     '8k7F9Xb36oFJsjpCKpsXvg4cgBRoZtwNTc3EzG5Ttd2o',
   );
-  // some random address atm
-  const address_lookup_table = new web3.PublicKey(
-    '8k7F9Xb36oFJsjpCKpsXvg4cgBRoZtwNTc3EzG5Ttd2o',
-  );
-  const address_lookup_table_program = new web3.PublicKey(
-    'AddressLookupTab1e1111111111111111111111111',
-  );
+
   await client.program.methods
-    .registerToken(
-      TokenIndex.fromValue(new BN(0)) as any,
-      0.8,
-      0.6,
-      1.2,
-      1.4,
-      0.02,
-    )
+    .registerToken(0, 0.8, 0.6, 1.2, 1.4, 0.02)
     .accounts({
       group: group.publicKey,
-      admin: owner.publicKey,
+      admin: admin.publicKey,
       mint,
       oracle: mngoOracle,
-      address_lookup_table,
-      payer: owner.publicKey,
+      payer: payer.publicKey,
       token_program: TOKEN_PROGRAM_ID,
       system_program: SystemProgram.programId,
-      address_lookup_table_program,
       rent: web3.SYSVAR_RENT_PUBKEY,
     })
-    .signers([owner])
+    .signers([admin, payer])
     .rpc();
 
   gpa = await client.program.account.bank.all([
