@@ -38,24 +38,24 @@ pub fn liq_token_with_token(
     let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)?;
 
     let mut liqor = ctx.accounts.liqor.load_mut()?;
-    require!(!liqor.is_bankrupt, MangoError::IsBankrupt);
+    require!(liqor.is_bankrupt == 0, MangoError::IsBankrupt);
 
     let mut liqee = ctx.accounts.liqee.load_mut()?;
-    require!(!liqee.is_bankrupt, MangoError::IsBankrupt);
+    require!(liqee.is_bankrupt == 0, MangoError::IsBankrupt);
 
     // Initial liqee health check
     let mut liqee_health_cache = health_cache_for_liqee(&liqee, &account_retriever)?;
     let init_health = liqee_health_cache.health(HealthType::Init)?;
-    if liqee.being_liquidated {
+    if liqee.being_liquidated != 0 {
         if init_health > I80F48::ZERO {
-            liqee.being_liquidated = false;
+            liqee.being_liquidated = 0;
             msg!("Liqee init_health above zero");
             return Ok(());
         }
     } else {
         let maint_health = liqee_health_cache.health(HealthType::Maint)?;
         require!(maint_health < I80F48::ZERO, MangoError::SomeError);
-        liqee.being_liquidated = true;
+        liqee.being_liquidated = 1;
     }
 
     //
@@ -165,7 +165,7 @@ pub fn liq_token_with_token(
 
         // this is equivalent to one native USDC or 1e-6 USDC
         // This is used as threshold to flip flag instead of 0 because of dust issues
-        liqee.being_liquidated = init_health < -I80F48::ONE;
+        liqee.being_liquidated = if init_health < -I80F48::ONE { 1 } else { 0 };
     }
 
     // Check liqor's health

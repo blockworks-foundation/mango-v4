@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
+use static_assertions::const_assert_eq;
+use std::mem::size_of;
 
 use crate::error::*;
 use crate::state::*;
@@ -33,8 +35,11 @@ pub struct TokenAccount {
 
     /// incremented when a market requires this position to stay alive
     pub in_use_count: u8,
+
+    pub reserved: [u8; 5],
 }
-// TODO: static assert the size and alignment
+const_assert_eq!(size_of::<TokenAccount>(), 24);
+const_assert_eq!(size_of::<TokenAccount>() % 8, 0);
 
 impl TokenAccount {
     pub fn is_active(&self) -> bool {
@@ -76,6 +81,7 @@ impl TokenAccountMap {
                 indexed_value: I80F48::ZERO,
                 token_index: TokenIndex::MAX,
                 in_use_count: 0,
+                reserved: [0; 5],
             }; MAX_INDEXED_POSITIONS],
         }
     }
@@ -112,6 +118,7 @@ impl TokenAccountMap {
                     indexed_value: I80F48::ZERO,
                     token_index,
                     in_use_count: 0,
+                    reserved: [0; 5],
                 };
             }
         }
@@ -149,8 +156,11 @@ pub struct Serum3Account {
     /// uses and look up the correct oracles.
     pub base_token_index: TokenIndex,
     pub quote_token_index: TokenIndex,
+
+    pub reserved: [u8; 2],
 }
-// TODO: static assert the size and alignment
+const_assert_eq!(size_of::<Serum3Account>(), 40);
+const_assert_eq!(size_of::<Serum3Account>() % 8, 0);
 
 impl Serum3Account {
     pub fn is_active(&self) -> bool {
@@ -169,6 +179,7 @@ impl Default for Serum3Account {
             market_index: Serum3MarketIndex::MAX,
             base_token_index: TokenIndex::MAX,
             quote_token_index: TokenIndex::MAX,
+            reserved: [0; 2],
         }
     }
 }
@@ -224,6 +235,7 @@ impl Serum3AccountMap {
 #[zero_copy]
 pub struct PerpAccount {
     pub market_index: PerpMarketIndex,
+    pub reserved: [u8; 6],
 
     /// Active position size, measured in base lots
     pub base_position: i64,
@@ -248,6 +260,8 @@ pub struct PerpAccount {
     pub taker_base: i64,
     pub taker_quote: i64,
 }
+const_assert_eq!(size_of::<PerpAccount>(), 8 + 8 * 5 + 16);
+const_assert_eq!(size_of::<PerpAccount>() % 8, 0);
 
 impl Default for PerpAccount {
     fn default() -> Self {
@@ -259,6 +273,7 @@ impl Default for PerpAccount {
             asks_quantity: 0,
             taker_base: 0,
             taker_quote: 0,
+            reserved: [0; 6],
         }
     }
 }
@@ -371,18 +386,28 @@ pub struct MangoAccount {
     pub client_order_ids: [u64; MAX_PERP_OPEN_ORDERS],
 
     /// This account cannot open new positions or borrow until `init_health >= 0`
-    pub being_liquidated: bool, // TODO: for strict Pod compat, these should be u8, not bool
+    pub being_liquidated: u8,
 
     /// This account cannot do anything except go through `resolve_bankruptcy`
-    pub is_bankrupt: bool,
+    pub is_bankrupt: u8,
 
     pub account_num: u8,
     pub bump: u8,
 
     // pub info: [u8; INFO_LEN], // TODO: Info could be in a separate PDA?
-    pub reserved: [u8; 5],
+    pub reserved: [u8; 4],
 }
-// TODO: static assert the size and alignment
+const_assert_eq!(
+    size_of::<MangoAccount>(),
+    3 * 32
+        + MAX_INDEXED_POSITIONS * size_of::<TokenAccount>()
+        + MAX_SERUM_OPEN_ORDERS * size_of::<Serum3Account>()
+        + MAX_PERP_OPEN_ORDERS * size_of::<PerpAccount>()
+        + MAX_PERP_OPEN_ORDERS * (2 + 1 + 16 + 8)
+        + 4
+        + 4
+);
+const_assert_eq!(size_of::<MangoAccount>() % 8, 0);
 
 impl MangoAccount {
     pub fn next_order_slot(&self) -> Option<usize> {

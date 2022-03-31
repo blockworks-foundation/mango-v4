@@ -206,6 +206,7 @@ mod tests {
                     indexed_value: I80F48::ZERO,
                     token_index: 0,
                     in_use_count: if is_in_use { 1 } else { 0 },
+                    reserved: [0; 5],
                 };
 
                 account.indexed_value = indexed(I80F48::from_num(start), &bank);

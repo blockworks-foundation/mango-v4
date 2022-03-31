@@ -374,7 +374,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         0
     );
     let liqee: MangoAccount = solana.get_account(account).await;
-    assert!(liqee.being_liquidated);
+    assert_eq!(liqee.being_liquidated, 1);
 
     //
     // TEST: liquidate the remaining borrow2 against collateral1,
@@ -404,7 +404,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         1000 - 32
     );
     let liqee: MangoAccount = solana.get_account(account).await;
-    assert!(liqee.being_liquidated);
+    assert_eq!(liqee.being_liquidated, 1);
 
     //
     // TEST: liquidate borrow1 with collateral1, but place a limit
@@ -433,7 +433,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         1000 - 32 - 21
     );
     let liqee: MangoAccount = solana.get_account(account).await;
-    assert!(liqee.being_liquidated);
+    assert_eq!(liqee.being_liquidated, 1);
 
     //
     // TEST: liquidate borrow1 with collateral1, making the account healthy again
@@ -464,7 +464,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         1000 - 32 - 535
     );
     let liqee: MangoAccount = solana.get_account(account).await;
-    assert!(!liqee.being_liquidated);
+    assert_eq!(liqee.being_liquidated, 0);
 
     Ok(())
 }

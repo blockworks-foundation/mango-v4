@@ -58,7 +58,7 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;
-    require!(!account.is_bankrupt, MangoError::IsBankrupt);
+    require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
 
     let (position, position_index) = account.token_account_map.get_mut_or_create(token_index)?;
 

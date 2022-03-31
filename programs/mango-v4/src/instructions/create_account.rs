@@ -39,11 +39,11 @@ pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()
         order_side: [Side::Bid; MAX_PERP_OPEN_ORDERS],
         orders: [i128::MAX; MAX_PERP_OPEN_ORDERS],
         client_order_ids: [u64::MAX; MAX_PERP_OPEN_ORDERS],
-        being_liquidated: false,
-        is_bankrupt: false,
+        being_liquidated: 0,
+        is_bankrupt: 0,
         account_num,
         bump: *ctx.bumps.get("account").ok_or(MangoError::SomeError)?,
-        reserved: [0; 5],
+        reserved: [0; 4],
     };
 
     Ok(())
