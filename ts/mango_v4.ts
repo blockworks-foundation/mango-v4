@@ -143,11 +143,6 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "addressLookupTable",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -159,11 +154,6 @@ export type MangoV4 = {
         },
         {
           "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "addressLookupTableProgram",
           "isMut": false,
           "isSigner": false
         },
@@ -2375,11 +2365,6 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "addressLookupTable",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -2391,11 +2376,6 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "addressLookupTableProgram",
           "isMut": false,
           "isSigner": false
         },
