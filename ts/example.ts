@@ -37,6 +37,9 @@ async function main() {
   const provider = new Provider(connection, wallet, options);
   const client = await MangoClient.connect(provider, true);
 
+  //
+  // check if group exists, iff not, then create
+  //
   let group;
   let gpa = await client.program.account.group.all([
     {
@@ -73,6 +76,9 @@ async function main() {
   }
   console.log(`Group address: ${group.publicKey.toBase58()}`);
 
+  //
+  // check if token is already registered, iff not, then register
+  //
   // mngo devnet mint
   const mint = new web3.PublicKey(
     'Bb9bsTQa1bGEtQ5KagGkvSHyuLqDWumFUcRqFusFNJWC',
@@ -81,22 +87,7 @@ async function main() {
   const mngoOracle = new web3.PublicKey(
     '8k7F9Xb36oFJsjpCKpsXvg4cgBRoZtwNTc3EzG5Ttd2o',
   );
-
-  await client.program.methods
-    .registerToken(0, 0.8, 0.6, 1.2, 1.4, 0.02)
-    .accounts({
-      group: group.publicKey,
-      admin: admin.publicKey,
-      mint,
-      oracle: mngoOracle,
-      payer: payer.publicKey,
-      token_program: TOKEN_PROGRAM_ID,
-      system_program: SystemProgram.programId,
-      rent: web3.SYSVAR_RENT_PUBKEY,
-    })
-    .signers([admin, payer])
-    .rpc();
-
+  let bank;
   gpa = await client.program.account.bank.all([
     {
       memcmp: {
@@ -111,9 +102,41 @@ async function main() {
       },
     },
   ]);
-  console.log(gpa);
-  // const bank = gpa[0];
-  // console.log(bank.publicKey.toBase58());
+  if (gpa.length > 0) {
+    bank = gpa[0];
+  } else {
+    await client.program.methods
+      .registerToken(0, 0.8, 0.6, 1.2, 1.4, 0.02)
+      .accounts({
+        group: group.publicKey,
+        admin: admin.publicKey,
+        mint,
+        oracle: mngoOracle,
+        payer: payer.publicKey,
+        token_program: TOKEN_PROGRAM_ID,
+        system_program: SystemProgram.programId,
+        rent: web3.SYSVAR_RENT_PUBKEY,
+      })
+      .signers([admin, payer])
+      .rpc();
+
+    gpa = await client.program.account.bank.all([
+      {
+        memcmp: {
+          bytes: bs58.encode(group.publicKey.toBuffer()),
+          offset: 8,
+        },
+      },
+      {
+        memcmp: {
+          bytes: bs58.encode(mint.toBuffer()),
+          offset: 40,
+        },
+      },
+    ]);
+    bank = gpa[0];
+  }
+  console.log(`Bank address: ${bank.publicKey.toBase58()}`);
 }
 
 main();
