@@ -511,9 +511,7 @@ export type MangoV4 = {
       args: [
         {
           name: 'marketIndex';
-          type: {
-            defined: 'Serum3MarketIndex';
-          };
+          type: 'u16';
         },
       ];
     },
@@ -1017,9 +1015,7 @@ export type MangoV4 = {
               },
               {
                 kind: 'arg';
-                type: {
-                  defined: 'PerpMarketIndex';
-                };
+                type: 'u16';
                 path: 'perp_market_index';
               },
             ];
@@ -1054,9 +1050,7 @@ export type MangoV4 = {
       args: [
         {
           name: 'perpMarketIndex';
-          type: {
-            defined: 'PerpMarketIndex';
-          };
+          type: 'u16';
         },
         {
           name: 'baseTokenIndexOpt';
@@ -1421,12 +1415,7 @@ export type MangoV4 = {
           {
             name: 'orderMarket';
             type: {
-              array: [
-                {
-                  defined: 'PerpMarketIndex';
-                },
-                8,
-              ];
+              array: ['u16', 8];
             };
           },
           {
@@ -1630,9 +1619,7 @@ export type MangoV4 = {
           },
           {
             name: 'perpMarketIndex';
-            type: {
-              defined: 'PerpMarketIndex';
-            };
+            type: 'u16';
           },
           {
             name: 'baseTokenIndex';
@@ -1715,9 +1702,7 @@ export type MangoV4 = {
           },
           {
             name: 'marketIndex';
-            type: {
-              defined: 'Serum3MarketIndex';
-            };
+            type: 'u16';
           },
           {
             name: 'baseTokenIndex';
@@ -1788,9 +1773,7 @@ export type MangoV4 = {
           },
           {
             name: 'marketIndex';
-            type: {
-              defined: 'Serum3MarketIndex';
-            };
+            type: 'u16';
           },
           {
             name: 'baseTokenIndex';
@@ -1829,9 +1812,7 @@ export type MangoV4 = {
         fields: [
           {
             name: 'marketIndex';
-            type: {
-              defined: 'PerpMarketIndex';
-            };
+            type: 'u16';
           },
           {
             name: 'basePosition';
@@ -2692,9 +2673,7 @@ export const IDL: MangoV4 = {
       args: [
         {
           name: 'marketIndex',
-          type: {
-            defined: 'Serum3MarketIndex',
-          },
+          type: 'u16',
         },
       ],
     },
@@ -3198,9 +3177,7 @@ export const IDL: MangoV4 = {
               },
               {
                 kind: 'arg',
-                type: {
-                  defined: 'PerpMarketIndex',
-                },
+                type: 'u16',
                 path: 'perp_market_index',
               },
             ],
@@ -3235,9 +3212,7 @@ export const IDL: MangoV4 = {
       args: [
         {
           name: 'perpMarketIndex',
-          type: {
-            defined: 'PerpMarketIndex',
-          },
+          type: 'u16',
         },
         {
           name: 'baseTokenIndexOpt',
@@ -3602,12 +3577,7 @@ export const IDL: MangoV4 = {
           {
             name: 'orderMarket',
             type: {
-              array: [
-                {
-                  defined: 'PerpMarketIndex',
-                },
-                8,
-              ],
+              array: ['u16', 8],
             },
           },
           {
@@ -3811,9 +3781,7 @@ export const IDL: MangoV4 = {
           },
           {
             name: 'perpMarketIndex',
-            type: {
-              defined: 'PerpMarketIndex',
-            },
+            type: 'u16',
           },
           {
             name: 'baseTokenIndex',
@@ -3896,9 +3864,7 @@ export const IDL: MangoV4 = {
           },
           {
             name: 'marketIndex',
-            type: {
-              defined: 'Serum3MarketIndex',
-            },
+            type: 'u16',
           },
           {
             name: 'baseTokenIndex',
@@ -3969,9 +3935,7 @@ export const IDL: MangoV4 = {
           },
           {
             name: 'marketIndex',
-            type: {
-              defined: 'Serum3MarketIndex',
-            },
+            type: 'u16',
           },
           {
             name: 'baseTokenIndex',
@@ -4010,9 +3974,7 @@ export const IDL: MangoV4 = {
         fields: [
           {
             name: 'marketIndex',
-            type: {
-              defined: 'PerpMarketIndex',
-            },
+            type: 'u16',
           },
           {
             name: 'basePosition',
