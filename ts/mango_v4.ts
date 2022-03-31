@@ -1443,11 +1443,11 @@ export type MangoV4 = {
           },
           {
             name: 'beingLiquidated';
-            type: 'bool';
+            type: 'u8';
           },
           {
             name: 'isBankrupt';
-            type: 'bool';
+            type: 'u8';
           },
           {
             name: 'accountNum';
@@ -3605,11 +3605,11 @@ export const IDL: MangoV4 = {
           },
           {
             name: 'beingLiquidated',
-            type: 'bool',
+            type: 'u8',
           },
           {
             name: 'isBankrupt',
-            type: 'bool',
+            type: 'u8',
           },
           {
             name: 'accountNum',

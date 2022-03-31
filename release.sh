@@ -4,6 +4,7 @@ set -euo pipefail
 
 # build program, TODO try removing --skip-lint
 anchor build --skip-lint
+./idl-fixup.sh
 
 # update types in ts client package
 cp -v ./target/types/mango_v4.ts ./ts/mango_v4.ts

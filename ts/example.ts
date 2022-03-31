@@ -75,6 +75,7 @@ async function main() {
     }
   }
   console.log(`Group address: ${group.publicKey.toBase58()}`);
+  // console.log(group);
 
   //
   // check if token is already registered, iff not, then register
@@ -137,6 +138,59 @@ async function main() {
     bank = gpa[0];
   }
   console.log(`Bank address: ${bank.publicKey.toBase58()}`);
+  // console.log(bank);
+
+  //
+  // mango account
+  //
+
+  let mangoAccount;
+  gpa = await client.program.account.mangoAccount.all([
+    {
+      memcmp: {
+        bytes: bs58.encode(group.publicKey.toBuffer()),
+        offset: 8,
+      },
+    },
+    {
+      memcmp: {
+        bytes: bs58.encode(admin.publicKey.toBuffer()),
+        offset: 40,
+      },
+    },
+  ]);
+  if (gpa.length > 0) {
+    mangoAccount = gpa[0];
+  } else {
+    await client.program.methods
+      .createAccount(0)
+      .accounts({
+        group: group.publicKey,
+        owner: admin.publicKey,
+        payer: payer.publicKey,
+        system_program: SystemProgram.programId,
+      })
+      .signers([admin, payer])
+      .rpc();
+
+    gpa = await client.program.account.mangoAccount.all([
+      {
+        memcmp: {
+          bytes: bs58.encode(group.publicKey.toBuffer()),
+          offset: 8,
+        },
+      },
+      {
+        memcmp: {
+          bytes: bs58.encode(admin.publicKey.toBuffer()),
+          offset: 40,
+        },
+      },
+    ]);
+    mangoAccount = gpa[0];
+  }
+  console.log(`Mango account address: ${mangoAccount.publicKey.toBase58()}`);
+  console.log(mangoAccount);
 }
 
 main();
