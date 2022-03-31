@@ -1,11 +1,10 @@
-import { BN, Provider, Wallet, web3 } from '@project-serum/anchor';
-import { Connection, Keypair, SystemProgram } from '@solana/web3.js';
-import { MangoClient } from './client';
-import os from 'os';
-import fs from 'fs';
+import { Provider, Wallet, web3 } from '@project-serum/anchor';
 import { bs58 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { TOKEN_PROGRAM_ID } from '@project-serum/anchor/dist/cjs/utils/token';
-import { TokenIndex } from './types';
+import { Connection, Keypair, SystemProgram } from '@solana/web3.js';
+import fs from 'fs';
+import os from 'os';
+import { MangoClient } from './client';
 
 async function main() {
   const options = Provider.defaultOptions();
