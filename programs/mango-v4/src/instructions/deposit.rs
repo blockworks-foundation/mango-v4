@@ -52,6 +52,8 @@ impl<'info> Deposit<'info> {
 //       That would save a lot of computation that needs to go into finding the
 //       right index for the mint.
 pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+    require!(amount > 0, MangoError::SomeError);
+
     let token_index = ctx.accounts.bank.load()?.token_index;
 
     // Get the account's position for that token index

@@ -53,6 +53,8 @@ impl<'info> Withdraw<'info> {
 //       That would save a lot of computation that needs to go into finding the
 //       right index for the mint.
 pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
+    require!(amount > 0, MangoError::SomeError);
+
     let group = ctx.accounts.group.load()?;
     let token_index = ctx.accounts.bank.load()?.token_index;
 
