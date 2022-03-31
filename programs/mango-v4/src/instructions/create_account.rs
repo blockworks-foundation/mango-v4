@@ -43,7 +43,7 @@ pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()
         is_bankrupt: 0,
         account_num,
         bump: *ctx.bumps.get("account").ok_or(MangoError::SomeError)?,
-        reserved: [0; 4],
+        reserved: Default::default(),
     };
 
     Ok(())

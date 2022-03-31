@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use static_assertions::const_assert_eq;
+use std::mem::size_of;
 
 use crate::state::*;
 
@@ -15,8 +17,10 @@ pub struct Serum3Market {
     pub quote_token_index: TokenIndex,
 
     pub bump: u8,
+    pub reserved: [u8; 1],
 }
-// TODO: static assert the size and alignment
+const_assert_eq!(size_of::<Serum3Market>(), 32 * 3 + 3 * 2 + 1 + 1);
+const_assert_eq!(size_of::<Serum3Market>() % 8, 0);
 
 #[macro_export]
 macro_rules! serum_market_seeds {

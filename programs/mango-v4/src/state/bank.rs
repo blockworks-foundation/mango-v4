@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
+use static_assertions::const_assert_eq;
+use std::mem::size_of;
 
 use super::{TokenAccount, TokenIndex};
 use crate::util::checked_math as cm;
@@ -42,7 +44,11 @@ pub struct Bank {
 
     // Index into TokenInfo on the group
     pub token_index: TokenIndex,
+
+    pub reserved: [u8; 6],
 }
+const_assert_eq!(size_of::<Bank>(), 32 * 4 + 16 * 10 + 2 + 6);
+const_assert_eq!(size_of::<Bank>() % 8, 0);
 
 impl Bank {
     pub fn native_total_deposits(&self) -> I80F48 {
@@ -206,7 +212,7 @@ mod tests {
                     indexed_value: I80F48::ZERO,
                     token_index: 0,
                     in_use_count: if is_in_use { 1 } else { 0 },
-                    reserved: [0; 5],
+                    reserved: Default::default(),
                 };
 
                 account.indexed_value = indexed(I80F48::from_num(start), &bank);

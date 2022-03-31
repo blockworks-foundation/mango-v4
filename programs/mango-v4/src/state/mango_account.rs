@@ -81,7 +81,7 @@ impl TokenAccountMap {
                 indexed_value: I80F48::ZERO,
                 token_index: TokenIndex::MAX,
                 in_use_count: 0,
-                reserved: [0; 5],
+                reserved: Default::default(),
             }; MAX_INDEXED_POSITIONS],
         }
     }
@@ -118,7 +118,7 @@ impl TokenAccountMap {
                     indexed_value: I80F48::ZERO,
                     token_index,
                     in_use_count: 0,
-                    reserved: [0; 5],
+                    reserved: Default::default(),
                 };
             }
         }
@@ -179,7 +179,7 @@ impl Default for Serum3Account {
             market_index: Serum3MarketIndex::MAX,
             base_token_index: TokenIndex::MAX,
             quote_token_index: TokenIndex::MAX,
-            reserved: [0; 2],
+            reserved: Default::default(),
         }
     }
 }
@@ -273,7 +273,7 @@ impl Default for PerpAccount {
             asks_quantity: 0,
             taker_base: 0,
             taker_quote: 0,
-            reserved: [0; 6],
+            reserved: Default::default(),
         }
     }
 }

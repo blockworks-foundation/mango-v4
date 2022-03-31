@@ -1,4 +1,6 @@
 use anchor_lang::prelude::*;
+use static_assertions::const_assert_eq;
+use std::mem::size_of;
 
 use super::TokenIndex;
 
@@ -13,10 +15,15 @@ pub struct MintInfo {
     pub bank: Pubkey,
     pub vault: Pubkey,
     pub oracle: Pubkey,
+    pub address_lookup_table: Pubkey,
+
     pub token_index: TokenIndex,
 
     // describe what address map relevant accounts are found on
-    pub address_lookup_table: Pubkey,
     pub address_lookup_table_bank_index: u8,
     pub address_lookup_table_oracle_index: u8,
+
+    pub reserved: [u8; 4],
 }
+const_assert_eq!(size_of::<MintInfo>(), 5 * 32 + 2 + 2 + 4);
+const_assert_eq!(size_of::<MintInfo>() % 8, 0);
