@@ -1,14 +1,18 @@
-.anchor
 .DS_Store
+
+.anchor
+test-ledger
 target
+
 **/*.rs.bk
+
 dist
 node_modules
-
+yarn-error.log
 
 .idea
+.vscode
 
 programs/margin-trade/src/lib-expanded.rs
 programs/mango-v4/src/lib-expanded.rs
 
-.vscode

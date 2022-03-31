@@ -1933,6 +1933,54 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "TokenIndex",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "val",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Serum3MarketIndex",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "val",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PerpMarketIndex",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "val",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "I80F48",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "val",
+            "type": "i128"
+          }
+        ]
+      }
+    },
+    {
       "name": "BookSideType",
       "type": {
         "kind": "enum",
@@ -4112,6 +4160,54 @@ export const IDL: MangoV4 = {
                 8
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenIndex",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "val",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Serum3MarketIndex",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "val",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PerpMarketIndex",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "val",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "I80F48",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "val",
+            "type": "i128"
           }
         ]
       }

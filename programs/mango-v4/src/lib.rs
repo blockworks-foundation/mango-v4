@@ -14,6 +14,7 @@ pub mod error;
 pub mod instructions;
 mod serum3_cpi;
 pub mod state;
+pub mod types;
 
 use state::{OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex};
 
