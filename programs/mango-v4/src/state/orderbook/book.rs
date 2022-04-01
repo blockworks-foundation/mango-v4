@@ -335,7 +335,7 @@ impl<'a> Book<'a> {
 
             let owner_slot = mango_account
                 .next_order_slot()
-                .ok_or(error!(MangoError::SomeError))?;
+                .ok_or_else(|| error!(MangoError::SomeError))?;
             let new_order = LeafNode::new(
                 owner_slot as u8,
                 order_id,

@@ -120,7 +120,7 @@ pub fn register_token(
         oracle: ctx.accounts.oracle.key(),
         bank: ctx.accounts.bank.key(),
         token_index,
-        address_lookup_table: address_lookup_table,
+        address_lookup_table,
         address_lookup_table_bank_index: alt_previous_size as u8,
         address_lookup_table_oracle_index: alt_previous_size as u8 + 1,
         reserved: Default::default(),
