@@ -1319,8 +1319,9 @@ pub struct PerpPlaceOrderInstruction<'keypair> {
     pub oracle: Pubkey,
     pub owner: &'keypair Keypair,
     pub side: Side,
-    pub price: i64,
-    pub quantity: i64,
+    pub price_lots: i64,
+    pub max_base_lots: i64,
+    pub max_quote_lots: i64,
 }
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for PerpPlaceOrderInstruction<'keypair> {
@@ -1333,9 +1334,9 @@ impl<'keypair> ClientInstruction for PerpPlaceOrderInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             side: self.side,
-            price: self.price,
-            max_base_quantity: self.quantity,
-            max_quote_quantity: i64::MAX,
+            price_lots: self.price_lots,
+            max_base_lots: self.max_base_lots,
+            max_quote_lots: self.max_quote_lots,
             client_order_id: u64::MAX,
             order_type: OrderType::Limit,
             expiry_timestamp: 0,

@@ -239,27 +239,26 @@ pub struct PerpAccount {
     pub reserved: [u8; 6],
 
     /// Active position size, measured in base lots
-    pub base_position: i64,
+    pub base_position_lots: i64,
     /// Active position in quote (conversation rate is that of the time the order was settled)
     /// measured in native quote
-    pub quote_position: I80F48,
+    pub quote_position_native: I80F48,
 
     /// Already settled funding
     // pub long_settled_funding: I80F48,
     // pub short_settled_funding: I80F48,
 
-    // Contracts/quote in open orders
-    /// total contracts in sell orders
-    pub bids_quantity: i64,
-    /// total quote currency in buy orders
-    pub asks_quantity: i64,
+    /// Base lots in bids
+    pub bids_base_lots: i64,
+    /// Base lots in asks
+    pub asks_base_lots: i64,
 
     /// Liquidity mining rewards
     // pub mngo_accrued: u64,
 
     /// Amount that's on EventQueue waiting to be processed
-    pub taker_base: i64,
-    pub taker_quote: i64,
+    pub taker_base_lots: i64,
+    pub taker_quote_lots: i64,
 }
 const_assert_eq!(size_of::<PerpAccount>(), 8 + 8 * 5 + 16);
 const_assert_eq!(size_of::<PerpAccount>() % 8, 0);
@@ -268,12 +267,12 @@ impl Default for PerpAccount {
     fn default() -> Self {
         Self {
             market_index: PerpMarketIndex::MAX,
-            base_position: 0,
-            quote_position: I80F48::ZERO,
-            bids_quantity: 0,
-            asks_quantity: 0,
-            taker_base: 0,
-            taker_quote: 0,
+            base_position_lots: 0,
+            quote_position_native: I80F48::ZERO,
+            bids_base_lots: 0,
+            asks_base_lots: 0,
+            taker_base_lots: 0,
+            taker_quote_lots: 0,
             reserved: Default::default(),
         }
     }
@@ -283,13 +282,13 @@ impl PerpAccount {
     /// Add taker trade after it has been matched but before it has been process on EventQueue
     pub fn add_taker_trade(&mut self, base_change: i64, quote_change: i64) {
         // TODO make checked? estimate chances of overflow here
-        self.taker_base += base_change;
-        self.taker_quote += quote_change;
+        self.taker_base_lots += base_change;
+        self.taker_quote_lots += quote_change;
     }
     /// Remove taker trade after it has been processed on EventQueue
     pub fn remove_taker_trade(&mut self, base_change: i64, quote_change: i64) {
-        self.taker_base -= base_change;
-        self.taker_quote -= quote_change;
+        self.taker_base_lots -= base_change;
+        self.taker_quote_lots -= quote_change;
     }
 
     pub fn is_active(&self) -> bool {
@@ -302,9 +301,9 @@ impl PerpAccount {
 
     /// This assumes settle_funding was already called
     pub fn change_base_position(&mut self, perp_market: &mut PerpMarket, base_change: i64) {
-        let start = self.base_position;
-        self.base_position += base_change;
-        perp_market.open_interest += self.base_position.abs() - start.abs();
+        let start = self.base_position_lots;
+        self.base_position_lots += base_change;
+        perp_market.open_interest += self.base_position_lots.abs() - start.abs();
     }
 }
 
@@ -385,14 +384,14 @@ impl PerpData {
         let mut perp_account = self.get_account_mut_or_create(perp_market_index).unwrap().0;
         match side {
             Side::Bid => {
-                perp_account.bids_quantity = perp_account
-                    .bids_quantity
+                perp_account.bids_base_lots = perp_account
+                    .bids_base_lots
                     .checked_add(order.quantity)
                     .unwrap();
             }
             Side::Ask => {
-                perp_account.asks_quantity = perp_account
-                    .asks_quantity
+                perp_account.asks_base_lots = perp_account
+                    .asks_base_lots
                     .checked_add(order.quantity)
                     .unwrap();
             }
@@ -417,10 +416,10 @@ impl PerpData {
         // accounting
         match order_side {
             Side::Bid => {
-                perp_account.bids_quantity -= quantity;
+                perp_account.bids_base_lots -= quantity;
             }
             Side::Ask => {
-                perp_account.asks_quantity -= quantity;
+                perp_account.asks_base_lots -= quantity;
             }
         }
 
@@ -456,17 +455,17 @@ impl PerpData {
         if !fill.market_fees_applied {
             perp_market.fees_accrued += fees;
         }
-        pa.quote_position = pa.quote_position.checked_add(quote - fees).unwrap();
+        pa.quote_position_native = pa.quote_position_native.checked_add(quote - fees).unwrap();
 
         if fill.maker_out {
             self.remove_order(fill.maker_slot as usize, base_change.abs())
         } else {
             match side {
                 Side::Bid => {
-                    pa.bids_quantity -= base_change.abs();
+                    pa.bids_base_lots -= base_change.abs();
                 }
                 Side::Ask => {
-                    pa.asks_quantity -= base_change.abs();
+                    pa.asks_base_lots -= base_change.abs();
                 }
             }
             Ok(())
@@ -487,7 +486,7 @@ impl PerpData {
 
         // fees are assessed at time of trade; no need to assess fees here
 
-        pa.quote_position += quote;
+        pa.quote_position_native += quote;
         Ok(())
     }
 }

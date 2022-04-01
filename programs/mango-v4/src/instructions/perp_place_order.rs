@@ -42,12 +42,38 @@ pub struct PerpPlaceOrder<'info> {
 pub fn perp_place_order(
     ctx: Context<PerpPlaceOrder>,
     side: Side,
-    price: i64,
-    max_base_quantity: i64,
-    max_quote_quantity: i64,
+
+    // Price in quote lots per base lots.
+    //
+    // Effect is based on order type, it's usually
+    // - fill orders on the book up to this price or
+    // - place an order on the book at this price.
+    //
+    // Ignored for Market orders and potentially adjusted for PostOnlySlide orders.
+    price_lots: i64,
+
+    // Max base lots to buy/sell.
+    max_base_lots: i64,
+
+    // Max quote lots to pay/receive (not taking fees into account).
+    max_quote_lots: i64,
+
+    // Arbitrary user-controlled order id.
     client_order_id: u64,
+
     order_type: OrderType,
+
+    // Timestamp of when order expires
+    //
+    // Send 0 if you want the order to never expire.
+    // Timestamps in the past mean the instruction is skipped.
+    // Timestamps in the future are reduced to now + 255s.
     expiry_timestamp: u64,
+
+    // Maximum number of orders from the book to fill.
+    //
+    // Use this to limit compute used during order matching.
+    // When the limit is reached, processing stops and the instruction succeeds.
     limit: u8,
 ) -> Result<()> {
     let mut mango_account = ctx.accounts.account.load_mut()?;
@@ -87,9 +113,9 @@ pub fn perp_place_order(
         oracle_price,
         &mut mango_account,
         &mango_account_pk,
-        price,
-        max_base_quantity,
-        max_quote_quantity,
+        price_lots,
+        max_base_lots,
+        max_quote_lots,
         order_type,
         time_in_force,
         client_order_id,

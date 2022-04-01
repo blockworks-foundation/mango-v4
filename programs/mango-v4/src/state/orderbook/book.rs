@@ -156,9 +156,9 @@ impl<'a> Book<'a> {
         oracle_price: I80F48,
         mango_account: &mut MangoAccount,
         mango_account_pk: &Pubkey,
-        price: i64,
-        max_base_quantity: i64,
-        max_quote_quantity: i64,
+        price_lots: i64,
+        max_base_lots: i64,
+        max_quote_lots: i64,
         order_type: OrderType,
         time_in_force: u8,
         client_order_id: u64,
@@ -167,17 +167,17 @@ impl<'a> Book<'a> {
     ) -> std::result::Result<(), Error> {
         let other_side = side.invert_side();
         let market = perp_market;
-        let (post_only, mut post_allowed, price) = match order_type {
-            OrderType::Limit => (false, true, price),
-            OrderType::ImmediateOrCancel => (false, false, price),
-            OrderType::PostOnly => (true, true, price),
+        let (post_only, mut post_allowed, price_lots) = match order_type {
+            OrderType::Limit => (false, true, price_lots),
+            OrderType::ImmediateOrCancel => (false, false, price_lots),
+            OrderType::PostOnly => (true, true, price_lots),
             OrderType::Market => (false, false, market_order_limit_for_side(side)),
             OrderType::PostOnlySlide => {
                 let price = if let Some(best_other_price) = self.get_best_price(now_ts, other_side)
                 {
-                    post_only_slide_limit(side, best_other_price, price)
+                    post_only_slide_limit(side, best_other_price, price_lots)
                 } else {
-                    price
+                    price_lots
                 };
                 (true, true, price)
             }
@@ -185,7 +185,7 @@ impl<'a> Book<'a> {
 
         if post_allowed {
             // price limit check computed lazily to save CU on average
-            let native_price = market.lot_to_native_price(price);
+            let native_price = market.lot_to_native_price(price_lots);
             if !market.inside_price_limit(side, native_price, oracle_price) {
                 msg!("Posting on book disallowed due to price limits");
                 post_allowed = false;
@@ -193,14 +193,14 @@ impl<'a> Book<'a> {
         }
 
         // generate new order id
-        let order_id = market.gen_order_id(side, price);
+        let order_id = market.gen_order_id(side, price_lots);
 
         // Iterate through book and match against this new order.
         //
         // Any changes to matching orders on the other side of the book are collected in
         // matched_changes/matched_deletes and then applied after this loop.
-        let mut rem_base_quantity = max_base_quantity; // base lots (aka contracts)
-        let mut rem_quote_quantity = max_quote_quantity;
+        let mut remaining_base_lots = max_base_lots;
+        let mut remaining_quote_lots = max_quote_lots;
         let mut matched_order_changes: Vec<(NodeHandle, i64)> = vec![];
         let mut matched_order_deletes: Vec<i128> = vec![];
         let mut number_of_dropped_expired_orders = 0;
@@ -226,7 +226,7 @@ impl<'a> Book<'a> {
 
             let best_opposing_price = best_opposing.price();
 
-            if !side.is_price_within_limit(best_opposing_price, price) {
+            if !side.is_price_within_limit(best_opposing_price, price_lots) {
                 break;
             } else if post_only {
                 msg!("Order could not be placed due to PostOnly");
@@ -238,18 +238,20 @@ impl<'a> Book<'a> {
                 break;
             }
 
-            let max_match_by_quote = rem_quote_quantity / best_opposing_price;
-            let match_quantity = rem_base_quantity
+            let max_match_by_quote = remaining_quote_lots / best_opposing_price;
+            let match_base_lots = remaining_base_lots
                 .min(best_opposing.quantity)
                 .min(max_match_by_quote);
-            let done = match_quantity == max_match_by_quote || match_quantity == rem_base_quantity;
+            let done =
+                match_base_lots == max_match_by_quote || match_base_lots == remaining_base_lots;
 
-            let match_quote = cm!(match_quantity * best_opposing_price);
-            rem_base_quantity = cm!(rem_base_quantity - match_quantity);
-            rem_quote_quantity = cm!(rem_quote_quantity - match_quote);
-            // mango_account.perp_accounts[market_index].add_taker_trade(match_quantity, -match_quote);
+            let match_quote_lots = cm!(match_base_lots * best_opposing_price);
+            remaining_base_lots = cm!(remaining_base_lots - match_base_lots);
+            remaining_quote_lots = cm!(remaining_quote_lots - match_quote_lots);
+            // TODO: record the taker trade in the right mango_account.perp.accounts[..]
+            //mango_account.perp_accounts[market_index].add_taker_trade(match_quantity, -match_quote);
 
-            let new_best_opposing_quantity = cm!(best_opposing.quantity - match_quantity);
+            let new_best_opposing_quantity = cm!(best_opposing.quantity - match_base_lots);
             let maker_out = new_best_opposing_quantity == 0;
             if maker_out {
                 matched_order_deletes.push(best_opposing.key);
@@ -273,7 +275,7 @@ impl<'a> Book<'a> {
                 client_order_id,
                 market.taker_fee,
                 best_opposing_price,
-                match_quantity,
+                match_base_lots,
             );
             event_queue.push_back(cast(fill)).unwrap();
             limit -= 1;
@@ -282,7 +284,7 @@ impl<'a> Book<'a> {
                 break;
             }
         }
-        let total_quote_taken = cm!(max_quote_quantity - rem_quote_quantity);
+        let total_quote_lots_taken = cm!(max_quote_lots - remaining_quote_lots);
 
         // Apply changes to matched asks (handles invalidate on delete!)
         for (handle, new_quantity) in matched_order_changes {
@@ -298,7 +300,7 @@ impl<'a> Book<'a> {
         }
 
         // If there are still quantity unmatched, place on the book
-        let book_base_quantity = rem_base_quantity.min(rem_quote_quantity / price);
+        let book_base_quantity = remaining_base_lots.min(remaining_quote_lots / price_lots);
         if post_allowed && book_base_quantity > 0 {
             // Drop an expired order if possible
             let bookside = self.get_bookside(side);
@@ -319,7 +321,7 @@ impl<'a> Book<'a> {
                 let worst_order = bookside.remove_worst().unwrap();
                 // MangoErrorCode::OutOfSpace
                 require!(
-                    side.is_price_better(price, worst_order.price()),
+                    side.is_price_better(price_lots, worst_order.price()),
                     MangoError::SomeError
                 );
                 let event = OutEvent::new(
@@ -358,15 +360,15 @@ impl<'a> Book<'a> {
                 },
                 order_id,
                 book_base_quantity,
-                price
+                price_lots
             );
             // mango_account.add_order(market_index, Side::Bid, &new_bid)?;
         }
 
         // if there were matched taker quote apply ref fees
         // we know ref_fee_rate is not None if total_quote_taken > 0
-        if total_quote_taken > 0 {
-            apply_fees(market, mango_account, total_quote_taken)?;
+        if total_quote_lots_taken > 0 {
+            apply_fees(market, mango_account, total_quote_lots_taken)?;
         }
 
         Ok(())
@@ -398,7 +400,7 @@ fn apply_fees(
         .perp
         .get_account_mut_or_create(market.perp_market_index)?
         .0;
-    perp_account.quote_position -= taker_fees;
+    perp_account.quote_position_native -= taker_fees;
     market.fees_accrued += taker_fees + maker_fees;
 
     Ok(())

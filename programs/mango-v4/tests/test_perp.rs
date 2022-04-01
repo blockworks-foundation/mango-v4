@@ -134,8 +134,9 @@ async fn test_perp() -> Result<(), TransportError> {
             oracle: tokens[0].oracle,
             owner,
             side: Side::Bid,
-            price: 1,
-            quantity: 1,
+            price_lots: 1,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
         },
     )
     .await
@@ -153,8 +154,9 @@ async fn test_perp() -> Result<(), TransportError> {
             oracle: tokens[0].oracle,
             owner,
             side: Side::Ask,
-            price: 1,
-            quantity: 1,
+            price_lots: 1,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
         },
     )
     .await
