@@ -1,4 +1,6 @@
 import { BN, ProgramAccount } from '@project-serum/anchor';
+import { TransactionInstruction } from '@solana/web3.js';
+import { Transaction } from '@solana/web3.js';
 import { Keypair, PublicKey, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
 import * as bs58 from 'bs58';
 import { MangoClient } from './client';
@@ -13,14 +15,26 @@ export async function createGroup(
   adminPk: PublicKey,
   payer: Keypair,
 ): Promise<void> {
-  await client.program.methods
+  const tx = new Transaction();
+  const signers = [payer];
+  const ix = await createGroupIx(client, adminPk, payer);
+  tx.add(ix);
+  await client.program.provider.send(tx, signers);
+}
+
+export async function createGroupIx(
+  client: MangoClient,
+  adminPk: PublicKey,
+  payer: Keypair,
+): Promise<TransactionInstruction> {
+  return await client.program.methods
     .createGroup()
     .accounts({
       admin: adminPk,
       payer: payer.publicKey,
     })
     .signers([payer])
-    .rpc();
+    .instruction();
 }
 
 export async function getGroupForAdmin(
@@ -49,7 +63,29 @@ export async function registerToken(
   oraclePk: PublicKey,
   payer: Keypair,
 ): Promise<void> {
-  await client.program.methods
+  const tx = new Transaction();
+  const signers = [payer];
+  const ix = await registerTokenIx(
+    client,
+    groupPk,
+    adminPk,
+    mintPk,
+    oraclePk,
+    payer,
+  );
+  tx.add(ix);
+  await client.program.provider.send(tx, signers);
+}
+
+export async function registerTokenIx(
+  client: MangoClient,
+  groupPk: PublicKey,
+  adminPk: PublicKey,
+  mintPk: PublicKey,
+  oraclePk: PublicKey,
+  payer: Keypair,
+): Promise<TransactionInstruction> {
+  return await client.program.methods
     .registerToken(1, 0.8, 0.6, 1.2, 1.4, 0.02)
     .accounts({
       group: groupPk,
@@ -60,7 +96,7 @@ export async function registerToken(
       rent: SYSVAR_RENT_PUBKEY,
     })
     .signers([payer])
-    .rpc();
+    .instruction();
 }
 
 export async function getBank(
@@ -134,7 +170,20 @@ export async function createMangoAccount(
   ownerPk: PublicKey,
   payer: Keypair,
 ): Promise<void> {
-  await client.program.methods
+  const tx = new Transaction();
+  const signers = [payer];
+  const ix = await createMangoAccountIx(client, groupPk, ownerPk, payer);
+  tx.add(ix);
+  await client.program.provider.send(tx, signers);
+}
+
+export async function createMangoAccountIx(
+  client: MangoClient,
+  groupPk: PublicKey,
+  ownerPk: PublicKey,
+  payer: Keypair,
+): Promise<TransactionInstruction> {
+  return await client.program.methods
     .createAccount(11)
     .accounts({
       group: groupPk,
@@ -142,7 +191,7 @@ export async function createMangoAccount(
       payer: payer.publicKey,
     })
     .signers([payer])
-    .rpc();
+    .instruction();
 }
 
 export async function getMangoAccount(
