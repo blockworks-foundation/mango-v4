@@ -18,6 +18,9 @@ import {
 } from './instructions';
 
 async function main() {
+  //
+  // Setup
+  //
   const options = Provider.defaultOptions();
   const connection = new Connection(
     'https://mango.devnet.rpcpool.com',
@@ -159,7 +162,7 @@ async function main() {
     )} Deposits for bank ${freshBank.tokenIndex}`,
   );
 
-  // close
+  // close mango account
   await closeMangoAccount(client, account.publicKey, admin.publicKey);
   accounts = await getMangoAccountsForGroupAndOwner(
     client,
