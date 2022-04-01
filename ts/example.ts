@@ -28,12 +28,7 @@ async function main() {
   );
 
   const admin = Keypair.fromSecretKey(
-    Buffer.from(
-      JSON.parse(
-        // 6pkqDeYxxnysUEvyhvXx1JWzWNoKQFSB95hYTxvHj4R3
-        fs.readFileSync(process.env.KEYPAIR!, 'utf-8'),
-      ),
-    ),
+    Buffer.from(JSON.parse(fs.readFileSync(process.env.KEYPAIR!, 'utf-8'))),
   );
   const adminWallet = new Wallet(admin);
 
