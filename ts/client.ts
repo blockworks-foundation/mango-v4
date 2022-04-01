@@ -13,11 +13,12 @@ export class MangoClient {
     provider: Provider,
     devnet?: boolean,
   ): Promise<MangoClient> {
+    // TODO: use IDL on chain or in repository? decide...
     // Alternatively we could fetch IDL from chain.
     // const idl = await Program.fetchIdl(MANGO_V4_ID, provider);
     let idl = IDL;
 
-    // TODO: remove
+    // TODO: remove...
     // Temporarily add missing (dummy) type definitions, so we can do new Program(...) below
     // without anchor throwing errors. These types come from part of the code we don't yet care about
     // in the client.

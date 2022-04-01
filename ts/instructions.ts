@@ -1,0 +1,255 @@
+import { BN, ProgramAccount } from '@project-serum/anchor';
+import { Keypair, PublicKey, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
+import * as bs58 from 'bs58';
+import { MangoClient } from './client';
+import { Bank, Group, MangoAccount } from './types';
+
+//
+// group
+//
+
+export async function createGroup(
+  client: MangoClient,
+  adminPk: PublicKey,
+  payer: Keypair,
+): Promise<void> {
+  await client.program.methods
+    .createGroup()
+    .accounts({
+      admin: adminPk,
+      payer: payer.publicKey,
+    })
+    .signers([payer])
+    .rpc();
+}
+
+export async function getGroupForAdmin(
+  client: MangoClient,
+  adminPk: PublicKey,
+): Promise<ProgramAccount<Group>[]> {
+  return (await client.program.account.group.all([
+    {
+      memcmp: {
+        bytes: bs58.encode(adminPk.toBuffer()),
+        offset: 8,
+      },
+    },
+  ])) as ProgramAccount<Group>[];
+}
+
+//
+// token / bank
+//
+
+export async function registerToken(
+  client: MangoClient,
+  groupPk: PublicKey,
+  adminPk: PublicKey,
+  mintPk: PublicKey,
+  oraclePk: PublicKey,
+  payer: Keypair,
+): Promise<void> {
+  await client.program.methods
+    .registerToken(1, 0.8, 0.6, 1.2, 1.4, 0.02)
+    .accounts({
+      group: groupPk,
+      admin: adminPk,
+      mint: mintPk,
+      oracle: oraclePk,
+      payer: payer.publicKey,
+      rent: SYSVAR_RENT_PUBKEY,
+    })
+    .signers([payer])
+    .rpc();
+}
+
+export async function getBank(
+  client: MangoClient,
+  address: PublicKey,
+): Promise<Bank> {
+  return Bank.from(address, await client.program.account.bank.fetch(address));
+}
+
+export async function getBanksForGroup(
+  client: MangoClient,
+  groupPk: PublicKey,
+): Promise<Bank[]> {
+  return (
+    await client.program.account.bank.all([
+      {
+        memcmp: {
+          bytes: bs58.encode(groupPk.toBuffer()),
+          offset: 8,
+        },
+      },
+    ])
+  ).map((tuple) => Bank.from(tuple.publicKey, tuple.account));
+}
+
+export async function getBankForGroupAndMint(
+  client: MangoClient,
+  groupPk: PublicKey,
+  mintPk: PublicKey,
+): Promise<Bank[]> {
+  return (
+    await client.program.account.bank.all([
+      {
+        memcmp: {
+          bytes: bs58.encode(groupPk.toBuffer()),
+          offset: 8,
+        },
+      },
+      {
+        memcmp: {
+          bytes: bs58.encode(mintPk.toBuffer()),
+          offset: 40,
+        },
+      },
+    ])
+  ).map((tuple) => Bank.from(tuple.publicKey, tuple.account));
+}
+
+//
+// mango account
+//
+
+export async function closeMangoAccount(
+  client: MangoClient,
+  accountPk: PublicKey,
+  ownerPk: PublicKey,
+) {
+  await client.program.methods
+    .closeAccount()
+    .accounts({
+      account: accountPk,
+      owner: ownerPk,
+      solDestination: ownerPk,
+    })
+    .rpc();
+}
+
+export async function createMangoAccount(
+  client: MangoClient,
+  groupPk: PublicKey,
+  ownerPk: PublicKey,
+  payer: Keypair,
+): Promise<void> {
+  await client.program.methods
+    .createAccount(11)
+    .accounts({
+      group: groupPk,
+      owner: ownerPk,
+      payer: payer.publicKey,
+    })
+    .signers([payer])
+    .rpc();
+}
+
+export async function getMangoAccount(
+  client: MangoClient,
+  address: PublicKey,
+): Promise<MangoAccount> {
+  return MangoAccount.from(
+    address,
+    await client.program.account.mangoAccount.fetch(address),
+  );
+}
+export async function getMangoAccountsForGroup(
+  client: MangoClient,
+  groupPk: PublicKey,
+): Promise<MangoAccount[]> {
+  return (
+    await client.program.account.mangoAccount.all([
+      {
+        memcmp: {
+          bytes: bs58.encode(groupPk.toBuffer()),
+          offset: 8,
+        },
+      },
+    ])
+  ).map((pa) => MangoAccount.from(pa.publicKey, pa.account));
+}
+
+export async function getMangoAccountsForGroupAndOwner(
+  client: MangoClient,
+  groupPk: PublicKey,
+  ownerPk: PublicKey,
+): Promise<MangoAccount[]> {
+  return (
+    await client.program.account.mangoAccount.all([
+      {
+        memcmp: {
+          bytes: bs58.encode(groupPk.toBuffer()),
+          offset: 8,
+        },
+      },
+      {
+        memcmp: {
+          bytes: bs58.encode(ownerPk.toBuffer()),
+          offset: 40,
+        },
+      },
+    ])
+  ).map((pa) => MangoAccount.from(pa.publicKey, pa.account));
+}
+
+//
+// deposit & withdraw
+//
+
+export async function deposit(
+  client: MangoClient,
+  groupPk: PublicKey,
+  mangoAccountPk: PublicKey,
+  bankPk: PublicKey,
+  vaultPk: PublicKey,
+  tokenAccountPk: PublicKey,
+  oraclePk: PublicKey,
+  ownerPk: PublicKey,
+  amount: number,
+): Promise<void> {
+  await client.program.methods
+    .deposit(new BN(amount))
+    .accounts({
+      group: groupPk,
+      account: mangoAccountPk,
+      bank: bankPk,
+      vault: vaultPk,
+      tokenAccount: tokenAccountPk,
+      tokenAuthority: ownerPk,
+    })
+    .remainingAccounts([
+      { pubkey: bankPk, isWritable: false, isSigner: false },
+      { pubkey: oraclePk, isWritable: false, isSigner: false },
+    ])
+    .rpc();
+}
+
+export async function withdraw(
+  client: MangoClient,
+  groupPk: PublicKey,
+  mangoAccountPk: PublicKey,
+  bankPk: PublicKey,
+  vaultPk: PublicKey,
+  tokenAccountPk: PublicKey,
+  oraclePk: PublicKey,
+  ownerPk: PublicKey,
+  amount: number,
+  allowBorrow: boolean,
+): Promise<void> {
+  await client.program.methods
+    .withdraw(new BN(amount), allowBorrow)
+    .accounts({
+      group: groupPk,
+      account: mangoAccountPk,
+      bank: bankPk,
+      vault: vaultPk,
+      tokenAccount: tokenAccountPk,
+      tokenAuthority: ownerPk,
+    })
+    .remainingAccounts([
+      { pubkey: bankPk, isWritable: false, isSigner: false },
+      { pubkey: oraclePk, isWritable: false, isSigner: false },
+    ])
+    .rpc();
+}
