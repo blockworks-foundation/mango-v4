@@ -84,6 +84,13 @@ impl BookSide {
         self.remove_by_key(self.get(self.find_max()?)?.key()?)
     }
 
+    pub fn remove_worst(&mut self) -> Option<LeafNode> {
+        match self.book_side_type {
+            BookSideType::Bids => self.remove_min(),
+            BookSideType::Asks => self.remove_max(),
+        }
+    }
+
     /// Remove the order with the lowest expiry timestamp, if that's < now_ts.
     pub fn remove_one_expired(&mut self, now_ts: u64) -> Option<LeafNode> {
         let (expired_h, expires_at) = self.find_earliest_expiry()?;

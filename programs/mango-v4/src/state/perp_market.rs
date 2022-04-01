@@ -3,6 +3,7 @@ use fixed::types::I80F48;
 
 use crate::state::orderbook::order_type::Side;
 use crate::state::TokenIndex;
+use crate::util::checked_math as cm;
 
 pub type PerpMarketIndex = u16;
 
@@ -82,5 +83,18 @@ impl PerpMarket {
             .unwrap()
             .checked_div(I80F48::from_num(self.base_lot_size))
             .unwrap()
+    }
+
+    /// Is `native_price` an acceptable order for the `side` of this market, given `oracle_price`?
+    pub fn inside_price_limit(
+        &self,
+        side: Side,
+        native_price: I80F48,
+        oracle_price: I80F48,
+    ) -> bool {
+        match side {
+            Side::Bid => native_price <= cm!(self.maint_liab_weight * oracle_price),
+            Side::Ask => native_price >= cm!(self.maint_asset_weight * oracle_price),
+        }
     }
 }
