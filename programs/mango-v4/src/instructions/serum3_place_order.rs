@@ -240,7 +240,7 @@ pub fn serum3_place_order(
     //
     let account = ctx.accounts.account.load()?;
     let health =
-        compute_health_from_fixed_accounts(&account, HealthType::Init, &ctx.remaining_accounts)?;
+        compute_health_from_fixed_accounts(&account, HealthType::Init, ctx.remaining_accounts)?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
 

@@ -160,10 +160,10 @@ pub enum HealthType {
 /// Computes health for a mango account given a set of account infos
 ///
 /// These account infos must fit the fixed layout defined by FixedOrderAccountRetriever.
-pub fn compute_health_from_fixed_accounts<'a, 'b>(
+pub fn compute_health_from_fixed_accounts(
     account: &MangoAccount,
     health_type: HealthType,
-    ais: &'a [AccountInfo<'b>],
+    ais: &[AccountInfo],
 ) -> Result<I80F48> {
     let active_token_len = account.token_account_map.iter_active().count();
     let active_serum_len = account.serum3_account_map.iter_active().count();
