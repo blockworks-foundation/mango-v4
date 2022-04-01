@@ -3,6 +3,8 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 use mango_macro::Pod;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use static_assertions::const_assert_eq;
+use std::mem::size_of;
 
 use super::Side;
 
@@ -176,7 +178,7 @@ pub struct FillEvent {
     pub maker_out: bool,  // true if maker order quantity == 0
     pub maker_slot: u8,
     pub market_fees_applied: bool,
-    pub padding: [u8; 2],
+    pub padding: [u8; 3],
     pub timestamp: u64,
     pub seq_num: usize, // note: usize same as u64
 
@@ -195,7 +197,9 @@ pub struct FillEvent {
 
     pub price: i64,
     pub quantity: i64, // number of quote lots
+    pub reserved: [u8; 8],
 }
+const_assert_eq!(size_of::<FillEvent>(), EVENT_SIZE);
 
 impl FillEvent {
     #[allow(clippy::too_many_arguments)]
@@ -224,7 +228,7 @@ impl FillEvent {
             maker_out,
             maker_slot,
             market_fees_applied: true, // Since mango v3.3.5, market fees are adjusted at matching time
-            padding: [0u8; 2],
+            padding: Default::default(),
             timestamp,
             seq_num,
             maker,
@@ -238,6 +242,7 @@ impl FillEvent {
             taker_fee,
             price,
             quantity,
+            reserved: Default::default(),
         }
     }
 
@@ -268,6 +273,7 @@ pub struct OutEvent {
     pub quantity: i64,
     padding1: [u8; EVENT_SIZE - 64],
 }
+const_assert_eq!(size_of::<OutEvent>(), EVENT_SIZE);
 
 impl OutEvent {
     pub fn new(

@@ -14,8 +14,9 @@ use crate::state::*;
 // we could probably support 1 token (quote currency) + 15 active perp markets at the same time
 // It's a tradeoff between allowing users to trade on many markets with one account,
 // MangoAccount size and health compute needs.
-const MAX_INDEXED_POSITIONS: usize = 16;
-const MAX_SERUM_OPEN_ORDERS: usize = 8;
+const MAX_TOKEN_ACCOUNTS: usize = 16;
+const MAX_SERUM3_ACCOUNTS: usize = 8;
+const MAX_PERP_ACCOUNTS: usize = 8;
 pub const MAX_PERP_OPEN_ORDERS: usize = 8;
 
 pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
@@ -65,7 +66,7 @@ impl TokenAccount {
 
 #[zero_copy]
 pub struct TokenAccountMap {
-    pub values: [TokenAccount; MAX_INDEXED_POSITIONS],
+    pub values: [TokenAccount; MAX_TOKEN_ACCOUNTS],
 }
 
 impl Default for TokenAccountMap {
@@ -82,7 +83,7 @@ impl TokenAccountMap {
                 token_index: TokenIndex::MAX,
                 in_use_count: 0,
                 reserved: Default::default(),
-            }; MAX_INDEXED_POSITIONS],
+            }; MAX_TOKEN_ACCOUNTS],
         }
     }
 
@@ -186,7 +187,7 @@ impl Default for Serum3Account {
 
 #[zero_copy]
 pub struct Serum3AccountMap {
-    pub values: [Serum3Account; MAX_SERUM_OPEN_ORDERS],
+    pub values: [Serum3Account; MAX_SERUM3_ACCOUNTS],
 }
 
 impl Default for Serum3AccountMap {
@@ -198,7 +199,7 @@ impl Default for Serum3AccountMap {
 impl Serum3AccountMap {
     pub fn new() -> Self {
         Self {
-            values: [Serum3Account::default(); MAX_SERUM_OPEN_ORDERS],
+            values: [Serum3Account::default(); MAX_SERUM3_ACCOUNTS],
         }
     }
 
@@ -308,108 +309,69 @@ impl PerpAccount {
 }
 
 #[zero_copy]
-pub struct PerpAccountMap {
-    pub values: [PerpAccount; MAX_PERP_OPEN_ORDERS],
-}
+pub struct PerpData {
+    pub accounts: [PerpAccount; MAX_PERP_ACCOUNTS],
 
-impl PerpAccountMap {
+    // TODO: possibly it's more convenient to store a single list of PerpOpenOrder structs?
+    pub order_market: [PerpMarketIndex; MAX_PERP_OPEN_ORDERS],
+    pub order_side: [Side; MAX_PERP_OPEN_ORDERS], // TODO: storing enums isn't POD
+    pub order_id: [i128; MAX_PERP_OPEN_ORDERS],
+    pub order_client_id: [u64; MAX_PERP_OPEN_ORDERS],
+}
+const_assert_eq!(
+    size_of::<PerpData>(),
+    MAX_PERP_ACCOUNTS * size_of::<PerpAccount>() + MAX_PERP_OPEN_ORDERS * (2 + 1 + 16 + 8)
+);
+const_assert_eq!(size_of::<PerpData>() % 8, 0);
+
+impl PerpData {
     pub fn new() -> Self {
         Self {
-            values: [PerpAccount::default(); MAX_PERP_OPEN_ORDERS],
+            accounts: [PerpAccount::default(); MAX_PERP_ACCOUNTS],
+            order_market: [FREE_ORDER_SLOT; MAX_PERP_OPEN_ORDERS],
+            order_side: [Side::Bid; MAX_PERP_OPEN_ORDERS],
+            order_id: [0; MAX_PERP_OPEN_ORDERS],
+            order_client_id: [0; MAX_PERP_OPEN_ORDERS],
         }
     }
 
-    pub fn get_mut_or_create(
+    pub fn get_account_mut_or_create(
         &mut self,
         perp_market_index: PerpMarketIndex,
     ) -> Result<(&mut PerpAccount, usize)> {
         let mut pos = self
-            .values
+            .accounts
             .iter()
             .position(|p| p.is_active_for_market(perp_market_index));
         if pos.is_none() {
-            pos = self.values.iter().position(|p| !p.is_active());
+            pos = self.accounts.iter().position(|p| !p.is_active());
             if let Some(i) = pos {
-                self.values[i] = PerpAccount {
+                self.accounts[i] = PerpAccount {
                     ..Default::default()
                 };
             }
         }
         if let Some(i) = pos {
-            Ok((&mut self.values[i], i))
+            Ok((&mut self.accounts[i], i))
         } else {
             err!(MangoError::SomeError) // TODO: No free space
         }
     }
 
-    pub fn deactivate(&mut self, index: usize) {
-        self.values[index].market_index = PerpMarketIndex::MAX;
+    pub fn deactivate_account(&mut self, index: usize) {
+        self.accounts[index].market_index = PerpMarketIndex::MAX;
     }
 
-    pub fn iter_active(&self) -> impl Iterator<Item = &PerpAccount> {
-        self.values.iter().filter(|p| p.is_active())
+    pub fn iter_active_accounts(&self) -> impl Iterator<Item = &PerpAccount> {
+        self.accounts.iter().filter(|p| p.is_active())
     }
 
-    pub fn find(&self, market_index: PerpMarketIndex) -> Option<&PerpAccount> {
-        self.values
+    pub fn find_account(&self, market_index: PerpMarketIndex) -> Option<&PerpAccount> {
+        self.accounts
             .iter()
             .find(|p| p.is_active_for_market(market_index))
     }
-}
 
-impl Default for PerpAccountMap {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[account(zero_copy)]
-pub struct MangoAccount {
-    pub group: Pubkey,
-    pub owner: Pubkey,
-
-    // Alternative authority/signer of transactions for a mango account
-    pub delegate: Pubkey,
-
-    // Maps token_index -> deposit/borrow account for each token
-    // that is active on this MangoAccount.
-    pub token_account_map: TokenAccountMap,
-
-    // Maps serum_market_index -> open orders for each serum market
-    // that is active on this MangoAccount.
-    pub serum3_account_map: Serum3AccountMap,
-
-    pub perp_account_map: PerpAccountMap,
-    pub order_market: [PerpMarketIndex; MAX_PERP_OPEN_ORDERS],
-    pub order_side: [Side; MAX_PERP_OPEN_ORDERS],
-    pub orders: [i128; MAX_PERP_OPEN_ORDERS],
-    pub client_order_ids: [u64; MAX_PERP_OPEN_ORDERS],
-
-    /// This account cannot open new positions or borrow until `init_health >= 0`
-    pub being_liquidated: u8,
-
-    /// This account cannot do anything except go through `resolve_bankruptcy`
-    pub is_bankrupt: u8,
-
-    pub account_num: u8,
-    pub bump: u8,
-
-    // pub info: [u8; INFO_LEN], // TODO: Info could be in a separate PDA?
-    pub reserved: [u8; 4],
-}
-const_assert_eq!(
-    size_of::<MangoAccount>(),
-    3 * 32
-        + MAX_INDEXED_POSITIONS * size_of::<TokenAccount>()
-        + MAX_SERUM_OPEN_ORDERS * size_of::<Serum3Account>()
-        + MAX_PERP_OPEN_ORDERS * size_of::<PerpAccount>()
-        + MAX_PERP_OPEN_ORDERS * (2 + 1 + 16 + 8)
-        + 4
-        + 4
-);
-const_assert_eq!(size_of::<MangoAccount>() % 8, 0);
-
-impl MangoAccount {
     pub fn next_order_slot(&self) -> Option<usize> {
         self.order_market.iter().position(|&i| i == FREE_ORDER_SLOT)
     }
@@ -420,11 +382,7 @@ impl MangoAccount {
         side: Side,
         order: &LeafNode,
     ) -> Result<()> {
-        let mut perp_account = self
-            .perp_account_map
-            .get_mut_or_create(perp_market_index)
-            .unwrap()
-            .0;
+        let mut perp_account = self.get_account_mut_or_create(perp_market_index).unwrap().0;
         match side {
             Side::Bid => {
                 perp_account.bids_quantity = perp_account
@@ -442,8 +400,8 @@ impl MangoAccount {
         let slot = order.owner_slot as usize;
         self.order_market[slot] = perp_market_index;
         self.order_side[slot] = side;
-        self.orders[slot] = order.key;
-        self.client_order_ids[slot] = order.client_order_id;
+        self.order_id[slot] = order.key;
+        self.order_client_id[slot] = order.client_order_id;
         Ok(())
     }
 
@@ -452,15 +410,12 @@ impl MangoAccount {
             self.order_market[slot] != FREE_ORDER_SLOT,
             MangoError::SomeError
         );
+        let order_side = self.order_side[slot];
         let perp_market_index = self.order_market[slot];
-        let perp_account = self
-            .perp_account_map
-            .get_mut_or_create(perp_market_index)
-            .unwrap()
-            .0;
+        let perp_account = self.get_account_mut_or_create(perp_market_index).unwrap().0;
 
         // accounting
-        match self.order_side[slot] {
+        match order_side {
             Side::Bid => {
                 perp_account.bids_quantity -= quantity;
             }
@@ -474,8 +429,8 @@ impl MangoAccount {
 
         // TODO OPT - remove these; unnecessary
         self.order_side[slot] = Side::Bid;
-        self.orders[slot] = 0i128;
-        self.client_order_ids[slot] = 0u64;
+        self.order_id[slot] = 0i128;
+        self.order_client_id[slot] = 0u64;
         Ok(())
     }
 
@@ -485,11 +440,7 @@ impl MangoAccount {
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
     ) -> Result<()> {
-        let pa = self
-            .perp_account_map
-            .get_mut_or_create(perp_market_index)
-            .unwrap()
-            .0;
+        let pa = self.get_account_mut_or_create(perp_market_index).unwrap().0;
         // pa.settle_funding(cache);
 
         let side = fill.taker_side.invert_side();
@@ -528,11 +479,7 @@ impl MangoAccount {
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
     ) -> Result<()> {
-        let pa = self
-            .perp_account_map
-            .get_mut_or_create(perp_market_index)
-            .unwrap()
-            .0;
+        let pa = self.get_account_mut_or_create(perp_market_index).unwrap().0;
         let (base_change, quote_change) = fill.base_quote_change(fill.taker_side);
         pa.remove_taker_trade(base_change, quote_change);
         pa.change_base_position(perp_market, base_change);
@@ -544,6 +491,53 @@ impl MangoAccount {
         Ok(())
     }
 }
+
+impl Default for PerpData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[account(zero_copy)]
+pub struct MangoAccount {
+    pub group: Pubkey,
+    pub owner: Pubkey,
+
+    // Alternative authority/signer of transactions for a mango account
+    pub delegate: Pubkey,
+
+    // Maps token_index -> deposit/borrow account for each token
+    // that is active on this MangoAccount.
+    pub token_account_map: TokenAccountMap,
+
+    // Maps serum_market_index -> open orders for each serum market
+    // that is active on this MangoAccount.
+    pub serum3_account_map: Serum3AccountMap,
+
+    pub perp: PerpData,
+
+    /// This account cannot open new positions or borrow until `init_health >= 0`
+    pub being_liquidated: u8,
+
+    /// This account cannot do anything except go through `resolve_bankruptcy`
+    pub is_bankrupt: u8,
+
+    pub account_num: u8,
+    pub bump: u8,
+
+    // pub info: [u8; INFO_LEN], // TODO: Info could be in a separate PDA?
+    pub reserved: [u8; 4],
+}
+const_assert_eq!(
+    size_of::<MangoAccount>(),
+    3 * 32
+        + MAX_TOKEN_ACCOUNTS * size_of::<TokenAccount>()
+        + MAX_SERUM3_ACCOUNTS * size_of::<Serum3Account>()
+        + size_of::<PerpData>()
+        + 4
+        + 4
+);
+const_assert_eq!(size_of::<MangoAccount>() % 8, 0);
 
 #[macro_export]
 macro_rules! account_seeds {

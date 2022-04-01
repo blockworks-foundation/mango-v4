@@ -334,6 +334,7 @@ impl<'a> Book<'a> {
             }
 
             let owner_slot = mango_account
+                .perp
                 .next_order_slot()
                 .ok_or_else(|| error!(MangoError::SomeError))?;
             let new_order = LeafNode::new(
@@ -394,8 +395,8 @@ fn apply_fees(
 
     let taker_fees = taker_quote_native * market.taker_fee;
     let perp_account = mango_account
-        .perp_account_map
-        .get_mut_or_create(market.perp_market_index)?
+        .perp
+        .get_account_mut_or_create(market.perp_market_index)?
         .0;
     perp_account.quote_position -= taker_fees;
     market.fees_accrued += taker_fees + maker_fees;

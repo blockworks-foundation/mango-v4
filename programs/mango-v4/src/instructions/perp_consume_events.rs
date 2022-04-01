@@ -50,8 +50,10 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         Some(account_info) => account_info.load_mut::<MangoAccount>()?,
                     };
 
-                    ma.execute_maker(perp_market.perp_market_index, &mut perp_market, fill)?;
-                    ma.execute_taker(perp_market.perp_market_index, &mut perp_market, fill)?;
+                    ma.perp
+                        .execute_maker(perp_market.perp_market_index, &mut perp_market, fill)?;
+                    ma.perp
+                        .execute_taker(perp_market.perp_market_index, &mut perp_market, fill)?;
                 } else {
                     let mut maker = match mango_account_ais.iter().find(|ai| ai.key == &fill.maker)
                     {
@@ -70,8 +72,16 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         Some(account_info) => account_info.load_mut::<MangoAccount>()?,
                     };
 
-                    maker.execute_maker(perp_market.perp_market_index, &mut perp_market, fill)?;
-                    taker.execute_taker(perp_market.perp_market_index, &mut perp_market, fill)?;
+                    maker.perp.execute_maker(
+                        perp_market.perp_market_index,
+                        &mut perp_market,
+                        fill,
+                    )?;
+                    taker.perp.execute_taker(
+                        perp_market.perp_market_index,
+                        &mut perp_market,
+                        fill,
+                    )?;
                 }
             }
             EventType::Out => {
@@ -85,7 +95,8 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     Some(account_info) => account_info.load_mut::<MangoAccount>()?,
                 };
 
-                ma.remove_order(out.owner_slot as usize, out.quantity)?;
+                ma.perp
+                    .remove_order(out.owner_slot as usize, out.quantity)?;
             }
             EventType::Liquidate => {
                 // This is purely for record keeping. Can be removed if program logs are superior

@@ -1,5 +1,4 @@
-// TODO: Test disabled since it fails
-#![cfg(all(feature = "test-bpf", feature = "disabled-perp-test"))]
+#![cfg(all(feature = "test-bpf"))]
 
 use mango_v4::state::*;
 use solana_program_test::*;
