@@ -28,7 +28,7 @@ async function main() {
     Buffer.from(
       JSON.parse(
         // 6pkqDeYxxnysUEvyhvXx1JWzWNoKQFSB95hYTxvHj4R3
-        fs.readFileSync(os.homedir() + '/.config/solana/dev2.json', 'utf-8'),
+        fs.readFileSync(process.env.KEYPAIR!, 'utf-8'),
       ),
     ),
   );
@@ -36,12 +36,7 @@ async function main() {
 
   const payer = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(
-        fs.readFileSync(
-          os.homedir() + '/.config/solana/mango-devnet.json',
-          'utf-8',
-        ),
-      ),
+      JSON.parse(fs.readFileSync(process.env.PAYER_KEYPAIR!, 'utf-8')),
     ),
   );
 

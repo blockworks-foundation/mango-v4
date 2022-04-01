@@ -1342,6 +1342,61 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "bookSide",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bookSideType",
+            "type": {
+              "defined": "BookSideType"
+            }
+          },
+          {
+            "name": "bumpIndex",
+            "type": {
+              "defined": "usize"
+            }
+          },
+          {
+            "name": "freeListLen",
+            "type": {
+              "defined": "usize"
+            }
+          },
+          {
+            "name": "freeListHead",
+            "type": {
+              "defined": "NodeHandle"
+            }
+          },
+          {
+            "name": "rootNode",
+            "type": {
+              "defined": "NodeHandle"
+            }
+          },
+          {
+            "name": "leafCount",
+            "type": {
+              "defined": "usize"
+            }
+          },
+          {
+            "name": "nodes",
+            "type": {
+              "array": [
+                {
+                  "defined": "AnyNode"
+                },
+                1024
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "group",
       "type": {
         "kind": "struct",
@@ -1535,112 +1590,6 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "bookSide",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "bookSideType",
-            "type": {
-              "defined": "BookSideType"
-            }
-          },
-          {
-            "name": "bumpIndex",
-            "type": {
-              "defined": "usize"
-            }
-          },
-          {
-            "name": "freeListLen",
-            "type": {
-              "defined": "usize"
-            }
-          },
-          {
-            "name": "freeListHead",
-            "type": {
-              "defined": "NodeHandle"
-            }
-          },
-          {
-            "name": "rootNode",
-            "type": {
-              "defined": "NodeHandle"
-            }
-          },
-          {
-            "name": "leafCount",
-            "type": {
-              "defined": "usize"
-            }
-          },
-          {
-            "name": "nodes",
-            "type": {
-              "array": [
-                {
-                  "defined": "AnyNode"
-                },
-                1024
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "queue",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "header",
-            "type": {
-              "defined": "H"
-            }
-          },
-          {
-            "name": "buf",
-            "type": {
-              "array": [
-                {
-                  "defined": "H::Item"
-                },
-                512
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "eventQueueHeader",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "head",
-            "type": {
-              "defined": "usize"
-            }
-          },
-          {
-            "name": "count",
-            "type": {
-              "defined": "usize"
-            }
-          },
-          {
-            "name": "seqNum",
-            "type": {
-              "defined": "usize"
-            }
-          }
-        ]
-      }
-    },
-    {
       "name": "perpMarket",
       "type": {
         "kind": "struct",
@@ -1744,6 +1693,57 @@ export type MangoV4 = {
           {
             "name": "quoteTokenIndex",
             "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "queue",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "header",
+            "type": {
+              "defined": "H"
+            }
+          },
+          {
+            "name": "buf",
+            "type": {
+              "array": [
+                {
+                  "defined": "H::Item"
+                },
+                512
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "eventQueueHeader",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "head",
+            "type": {
+              "defined": "usize"
+            }
+          },
+          {
+            "name": "count",
+            "type": {
+              "defined": "usize"
+            }
+          },
+          {
+            "name": "seqNum",
+            "type": {
+              "defined": "usize"
+            }
           }
         ]
       }
@@ -2012,44 +2012,15 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "ProgramInstruction",
+      "name": "BookSideType",
       "type": {
         "kind": "enum",
         "variants": [
           {
-            "name": "CreateLookupTable",
-            "fields": [
-              {
-                "name": "recent_slot",
-                "type": {
-                  "defined": "Slot"
-                }
-              },
-              {
-                "name": "bump_seed",
-                "type": "u8"
-              }
-            ]
+            "name": "Bids"
           },
           {
-            "name": "FreezeLookupTable"
-          },
-          {
-            "name": "ExtendLookupTable",
-            "fields": [
-              {
-                "name": "new_addresses",
-                "type": {
-                  "vec": "publicKey"
-                }
-              }
-            ]
-          },
-          {
-            "name": "DeactivateLookupTable"
-          },
-          {
-            "name": "CloseLookupTable"
+            "name": "Asks"
           }
         ]
       }
@@ -2064,34 +2035,6 @@ export type MangoV4 = {
           },
           {
             "name": "Maint"
-          }
-        ]
-      }
-    },
-    {
-      "name": "OracleType",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Stub"
-          },
-          {
-            "name": "Pyth"
-          }
-        ]
-      }
-    },
-    {
-      "name": "BookSideType",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Bids"
-          },
-          {
-            "name": "Asks"
           }
         ]
       }
@@ -2168,6 +2111,20 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "OracleType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Stub"
+          },
+          {
+            "name": "Pyth"
+          }
+        ]
+      }
+    },
+    {
       "name": "OrderType",
       "type": {
         "kind": "enum",
@@ -2217,6 +2174,49 @@ export type MangoV4 = {
           },
           {
             "name": "Liquidate"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramInstruction",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "CreateLookupTable",
+            "fields": [
+              {
+                "name": "recent_slot",
+                "type": {
+                  "defined": "Slot"
+                }
+              },
+              {
+                "name": "bump_seed",
+                "type": "u8"
+              }
+            ]
+          },
+          {
+            "name": "FreezeLookupTable"
+          },
+          {
+            "name": "ExtendLookupTable",
+            "fields": [
+              {
+                "name": "new_addresses",
+                "type": {
+                  "vec": "publicKey"
+                }
+              }
+            ]
+          },
+          {
+            "name": "DeactivateLookupTable"
+          },
+          {
+            "name": "CloseLookupTable"
           }
         ]
       }
@@ -3605,6 +3605,61 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "bookSide",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bookSideType",
+            "type": {
+              "defined": "BookSideType"
+            }
+          },
+          {
+            "name": "bumpIndex",
+            "type": {
+              "defined": "usize"
+            }
+          },
+          {
+            "name": "freeListLen",
+            "type": {
+              "defined": "usize"
+            }
+          },
+          {
+            "name": "freeListHead",
+            "type": {
+              "defined": "NodeHandle"
+            }
+          },
+          {
+            "name": "rootNode",
+            "type": {
+              "defined": "NodeHandle"
+            }
+          },
+          {
+            "name": "leafCount",
+            "type": {
+              "defined": "usize"
+            }
+          },
+          {
+            "name": "nodes",
+            "type": {
+              "array": [
+                {
+                  "defined": "AnyNode"
+                },
+                1024
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "group",
       "type": {
         "kind": "struct",
@@ -3798,112 +3853,6 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "bookSide",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "bookSideType",
-            "type": {
-              "defined": "BookSideType"
-            }
-          },
-          {
-            "name": "bumpIndex",
-            "type": {
-              "defined": "usize"
-            }
-          },
-          {
-            "name": "freeListLen",
-            "type": {
-              "defined": "usize"
-            }
-          },
-          {
-            "name": "freeListHead",
-            "type": {
-              "defined": "NodeHandle"
-            }
-          },
-          {
-            "name": "rootNode",
-            "type": {
-              "defined": "NodeHandle"
-            }
-          },
-          {
-            "name": "leafCount",
-            "type": {
-              "defined": "usize"
-            }
-          },
-          {
-            "name": "nodes",
-            "type": {
-              "array": [
-                {
-                  "defined": "AnyNode"
-                },
-                1024
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "queue",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "header",
-            "type": {
-              "defined": "H"
-            }
-          },
-          {
-            "name": "buf",
-            "type": {
-              "array": [
-                {
-                  "defined": "H::Item"
-                },
-                512
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "eventQueueHeader",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "head",
-            "type": {
-              "defined": "usize"
-            }
-          },
-          {
-            "name": "count",
-            "type": {
-              "defined": "usize"
-            }
-          },
-          {
-            "name": "seqNum",
-            "type": {
-              "defined": "usize"
-            }
-          }
-        ]
-      }
-    },
-    {
       "name": "perpMarket",
       "type": {
         "kind": "struct",
@@ -4007,6 +3956,57 @@ export const IDL: MangoV4 = {
           {
             "name": "quoteTokenIndex",
             "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "queue",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "header",
+            "type": {
+              "defined": "H"
+            }
+          },
+          {
+            "name": "buf",
+            "type": {
+              "array": [
+                {
+                  "defined": "H::Item"
+                },
+                512
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "eventQueueHeader",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "head",
+            "type": {
+              "defined": "usize"
+            }
+          },
+          {
+            "name": "count",
+            "type": {
+              "defined": "usize"
+            }
+          },
+          {
+            "name": "seqNum",
+            "type": {
+              "defined": "usize"
+            }
           }
         ]
       }
@@ -4275,44 +4275,15 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "ProgramInstruction",
+      "name": "BookSideType",
       "type": {
         "kind": "enum",
         "variants": [
           {
-            "name": "CreateLookupTable",
-            "fields": [
-              {
-                "name": "recent_slot",
-                "type": {
-                  "defined": "Slot"
-                }
-              },
-              {
-                "name": "bump_seed",
-                "type": "u8"
-              }
-            ]
+            "name": "Bids"
           },
           {
-            "name": "FreezeLookupTable"
-          },
-          {
-            "name": "ExtendLookupTable",
-            "fields": [
-              {
-                "name": "new_addresses",
-                "type": {
-                  "vec": "publicKey"
-                }
-              }
-            ]
-          },
-          {
-            "name": "DeactivateLookupTable"
-          },
-          {
-            "name": "CloseLookupTable"
+            "name": "Asks"
           }
         ]
       }
@@ -4327,34 +4298,6 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Maint"
-          }
-        ]
-      }
-    },
-    {
-      "name": "OracleType",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Stub"
-          },
-          {
-            "name": "Pyth"
-          }
-        ]
-      }
-    },
-    {
-      "name": "BookSideType",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Bids"
-          },
-          {
-            "name": "Asks"
           }
         ]
       }
@@ -4431,6 +4374,20 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "OracleType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Stub"
+          },
+          {
+            "name": "Pyth"
+          }
+        ]
+      }
+    },
+    {
       "name": "OrderType",
       "type": {
         "kind": "enum",
@@ -4480,6 +4437,49 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Liquidate"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramInstruction",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "CreateLookupTable",
+            "fields": [
+              {
+                "name": "recent_slot",
+                "type": {
+                  "defined": "Slot"
+                }
+              },
+              {
+                "name": "bump_seed",
+                "type": "u8"
+              }
+            ]
+          },
+          {
+            "name": "FreezeLookupTable"
+          },
+          {
+            "name": "ExtendLookupTable",
+            "fields": [
+              {
+                "name": "new_addresses",
+                "type": {
+                  "vec": "publicKey"
+                }
+              }
+            ]
+          },
+          {
+            "name": "DeactivateLookupTable"
+          },
+          {
+            "name": "CloseLookupTable"
           }
         ]
       }
