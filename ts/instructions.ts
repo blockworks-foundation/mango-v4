@@ -154,14 +154,25 @@ export async function closeMangoAccount(
   accountPk: PublicKey,
   ownerPk: PublicKey,
 ) {
-  await client.program.methods
+  const tx = new Transaction();
+  const ix = await closeMangoAccountIx(client, accountPk, ownerPk);
+  tx.add(ix);
+  await client.program.provider.send(tx);
+}
+
+export async function closeMangoAccountIx(
+  client: MangoClient,
+  accountPk: PublicKey,
+  ownerPk: PublicKey,
+): Promise<TransactionInstruction> {
+  return await client.program.methods
     .closeAccount()
     .accounts({
       account: accountPk,
       owner: ownerPk,
       solDestination: ownerPk,
     })
-    .rpc();
+    .instruction();
 }
 
 export async function createMangoAccount(
@@ -257,7 +268,34 @@ export async function deposit(
   ownerPk: PublicKey,
   amount: number,
 ): Promise<void> {
-  await client.program.methods
+  const tx = new Transaction();
+  const ix = await depositIx(
+    client,
+    groupPk,
+    mangoAccountPk,
+    bankPk,
+    vaultPk,
+    tokenAccountPk,
+    oraclePk,
+    ownerPk,
+    amount,
+  );
+  tx.add(ix);
+  await client.program.provider.send(tx);
+}
+
+export async function depositIx(
+  client: MangoClient,
+  groupPk: PublicKey,
+  mangoAccountPk: PublicKey,
+  bankPk: PublicKey,
+  vaultPk: PublicKey,
+  tokenAccountPk: PublicKey,
+  oraclePk: PublicKey,
+  ownerPk: PublicKey,
+  amount: number,
+): Promise<TransactionInstruction> {
+  return await client.program.methods
     .deposit(new BN(amount))
     .accounts({
       group: groupPk,
@@ -271,7 +309,7 @@ export async function deposit(
       { pubkey: bankPk, isWritable: false, isSigner: false },
       { pubkey: oraclePk, isWritable: false, isSigner: false },
     ])
-    .rpc();
+    .instruction();
 }
 
 export async function withdraw(
@@ -286,7 +324,36 @@ export async function withdraw(
   amount: number,
   allowBorrow: boolean,
 ): Promise<void> {
-  await client.program.methods
+  const tx = new Transaction();
+  const ix = await withdrawIx(
+    client,
+    groupPk,
+    mangoAccountPk,
+    bankPk,
+    vaultPk,
+    tokenAccountPk,
+    oraclePk,
+    ownerPk,
+    amount,
+    allowBorrow,
+  );
+  tx.add(ix);
+  await client.program.provider.send(tx);
+}
+
+export async function withdrawIx(
+  client: MangoClient,
+  groupPk: PublicKey,
+  mangoAccountPk: PublicKey,
+  bankPk: PublicKey,
+  vaultPk: PublicKey,
+  tokenAccountPk: PublicKey,
+  oraclePk: PublicKey,
+  ownerPk: PublicKey,
+  amount: number,
+  allowBorrow: boolean,
+): Promise<TransactionInstruction> {
+  return await client.program.methods
     .withdraw(new BN(amount), allowBorrow)
     .accounts({
       group: groupPk,
@@ -300,5 +367,5 @@ export async function withdraw(
       { pubkey: bankPk, isWritable: false, isSigner: false },
       { pubkey: oraclePk, isWritable: false, isSigner: false },
     ])
-    .rpc();
+    .instruction();
 }
