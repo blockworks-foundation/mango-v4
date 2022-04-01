@@ -1233,7 +1233,7 @@ impl<'keypair> ClientInstruction for LiqTokenWithTokenInstruction<'keypair> {
     }
 }
 
-pub struct CreatePerpMarketInstruction<'keypair> {
+pub struct PerpCreateMarketInstruction<'keypair> {
     pub group: Pubkey,
     pub admin: &'keypair Keypair,
     pub oracle: Pubkey,
@@ -1255,9 +1255,9 @@ pub struct CreatePerpMarketInstruction<'keypair> {
     pub taker_fee: f32,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for CreatePerpMarketInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::CreatePerpMarket;
-    type Instruction = mango_v4::instruction::CreatePerpMarket;
+impl<'keypair> ClientInstruction for PerpCreateMarketInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::PerpCreateMarket;
+    type Instruction = mango_v4::instruction::PerpCreateMarket;
     async fn to_instruction(
         &self,
         _loader: impl ClientAccountLoader + 'async_trait,
@@ -1309,7 +1309,7 @@ impl<'keypair> ClientInstruction for CreatePerpMarketInstruction<'keypair> {
     }
 }
 
-pub struct PlacePerpOrderInstruction<'keypair> {
+pub struct PerpPlaceOrderInstruction<'keypair> {
     pub group: Pubkey,
     pub account: Pubkey,
     pub perp_market: Pubkey,
@@ -1323,9 +1323,9 @@ pub struct PlacePerpOrderInstruction<'keypair> {
     pub quantity: i64,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for PlacePerpOrderInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::PlacePerpOrder;
-    type Instruction = mango_v4::instruction::PlacePerpOrder;
+impl<'keypair> ClientInstruction for PerpPlaceOrderInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::PerpPlaceOrder;
+    type Instruction = mango_v4::instruction::PerpPlaceOrder;
     async fn to_instruction(
         &self,
         _loader: impl ClientAccountLoader + 'async_trait,

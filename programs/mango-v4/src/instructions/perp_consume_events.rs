@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
-pub struct ConsumeEvents<'info> {
+pub struct PerpConsumeEvents<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
@@ -23,7 +23,7 @@ pub struct ConsumeEvents<'info> {
     pub event_queue: AccountLoader<'info, Queue<EventQueueHeader>>,
 }
 
-pub fn consume_events(ctx: Context<ConsumeEvents>, limit: usize) -> Result<()> {
+pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Result<()> {
     let limit = std::cmp::min(limit, 8);
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;

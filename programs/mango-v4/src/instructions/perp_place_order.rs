@@ -6,7 +6,7 @@ use crate::state::{
 };
 
 #[derive(Accounts)]
-pub struct PlacePerpOrder<'info> {
+pub struct PerpPlaceOrder<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
@@ -39,8 +39,8 @@ pub struct PlacePerpOrder<'info> {
 
 // TODO
 #[allow(clippy::too_many_arguments)]
-pub fn place_perp_order(
-    ctx: Context<PlacePerpOrder>,
+pub fn perp_place_order(
+    ctx: Context<PerpPlaceOrder>,
     side: Side,
     price: i64,
     max_base_quantity: i64,

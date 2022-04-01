@@ -20,7 +20,7 @@ solana --url https://mango.devnet.rpcpool.com program deploy --program-id $PROGR
     -k $WALLET_WITH_FUNDS target/deploy/mango_v4.so
 
 # publish idl
-anchor idl init --provider.cluster https://mango.devnet.rpcpool.com --provider.wallet $WALLET_WITH_FUNDS \
+anchor idl upgrade --provider.cluster https://mango.devnet.rpcpool.com --provider.wallet $WALLET_WITH_FUNDS \
     --filepath target/idl/mango_v4.json $PROGRAM_ID
 
 # build npm package

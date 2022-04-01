@@ -6,7 +6,7 @@ use crate::state::*;
 
 #[derive(Accounts)]
 #[instruction(perp_market_index: PerpMarketIndex)]
-pub struct CreatePerpMarket<'info> {
+pub struct PerpCreateMarket<'info> {
     #[account(
         has_one = admin,
     )]
@@ -40,8 +40,8 @@ pub struct CreatePerpMarket<'info> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn create_perp_market(
-    ctx: Context<CreatePerpMarket>,
+pub fn perp_create_market(
+    ctx: Context<PerpCreateMarket>,
     perp_market_index: PerpMarketIndex,
     base_token_index_opt: Option<TokenIndex>,
     quote_token_index: TokenIndex,

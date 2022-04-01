@@ -79,7 +79,7 @@ async fn test_perp() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let mango_v4::accounts::CreatePerpMarket {
+    let mango_v4::accounts::PerpCreateMarket {
         perp_market,
         asks,
         bids,
@@ -87,7 +87,7 @@ async fn test_perp() -> Result<(), TransportError> {
         ..
     } = send_tx(
         solana,
-        CreatePerpMarketInstruction {
+        PerpCreateMarketInstruction {
             group,
             admin,
             oracle: tokens[0].oracle,
@@ -125,7 +125,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        PlacePerpOrderInstruction {
+        PerpPlaceOrderInstruction {
             group,
             account,
             perp_market,
@@ -144,7 +144,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        PlacePerpOrderInstruction {
+        PerpPlaceOrderInstruction {
             group,
             account,
             perp_market,

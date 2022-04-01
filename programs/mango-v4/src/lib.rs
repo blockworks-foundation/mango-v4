@@ -149,8 +149,8 @@ pub mod mango_v4 {
     ///
 
     #[allow(clippy::too_many_arguments)]
-    pub fn create_perp_market(
-        ctx: Context<CreatePerpMarket>,
+    pub fn perp_create_market(
+        ctx: Context<PerpCreateMarket>,
         perp_market_index: PerpMarketIndex,
         base_token_index_opt: Option<TokenIndex>,
         quote_token_index: TokenIndex,
@@ -164,7 +164,7 @@ pub mod mango_v4 {
         maker_fee: f32,
         taker_fee: f32,
     ) -> Result<()> {
-        instructions::create_perp_market(
+        instructions::perp_create_market(
             ctx,
             perp_market_index,
             base_token_index_opt,
@@ -182,8 +182,8 @@ pub mod mango_v4 {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn place_perp_order(
-        ctx: Context<PlacePerpOrder>,
+    pub fn perp_place_order(
+        ctx: Context<PerpPlaceOrder>,
         side: Side,
         price: i64,
         max_base_quantity: i64,
@@ -193,7 +193,7 @@ pub mod mango_v4 {
         expiry_timestamp: u64,
         limit: u8,
     ) -> Result<()> {
-        instructions::place_perp_order(
+        instructions::perp_place_order(
             ctx,
             side,
             price,
@@ -206,8 +206,8 @@ pub mod mango_v4 {
         )
     }
 
-    pub fn consume_events(ctx: Context<ConsumeEvents>, limit: usize) -> Result<()> {
-        instructions::consume_events(ctx, limit)
+    pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Result<()> {
+        instructions::perp_consume_events(ctx, limit)
     }
 
     ///
