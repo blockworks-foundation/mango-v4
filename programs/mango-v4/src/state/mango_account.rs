@@ -492,7 +492,7 @@ impl MangoAccount {
             .0;
         // pa.settle_funding(cache);
 
-        let side = invert_side(fill.taker_side);
+        let side = fill.taker_side.invert_side();
         let (base_change, quote_change) = fill.base_quote_change(side);
         pa.change_base_position(perp_market, base_change);
         let quote = I80F48::from_num(

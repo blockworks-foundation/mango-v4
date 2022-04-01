@@ -54,10 +54,11 @@ pub enum Side {
     Ask = 1,
 }
 
-pub fn invert_side(side: Side) -> Side {
-    if side == Side::Bid {
-        Side::Ask
-    } else {
-        Side::Bid
+impl Side {
+    pub fn invert_side(self: &Side) -> Side {
+        match self {
+            Side::Bid => Side::Ask,
+            Side::Ask => Side::Bid,
+        }
     }
 }
