@@ -5,6 +5,7 @@ use anchor_lang::solana_program::sysvar::{self, SysvarId};
 use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
+use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use solana_program::instruction::Instruction;
 use solana_sdk::instruction;
 use solana_sdk::signature::{Keypair, Signer};
@@ -838,12 +839,12 @@ impl<'keypair> ClientInstruction for Serum3CreateOpenOrdersInstruction<'keypair>
 }
 
 pub struct Serum3PlaceOrderInstruction<'keypair> {
-    pub side: u8,
+    pub side: Serum3Side,
     pub limit_price: u64,
     pub max_base_qty: u64,
     pub max_native_quote_qty_including_fees: u64,
-    pub self_trade_behavior: u8,
-    pub order_type: u8,
+    pub self_trade_behavior: Serum3SelfTradeBehavior,
+    pub order_type: Serum3OrderType,
     pub client_order_id: u64,
     pub limit: u16,
 
@@ -862,21 +863,14 @@ impl<'keypair> ClientInstruction for Serum3PlaceOrderInstruction<'keypair> {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            order: mango_v4::instructions::NewOrderInstructionData(
-                serum_dex::instruction::NewOrderInstructionV3 {
-                    side: self.side.try_into().unwrap(),
-                    limit_price: self.limit_price.try_into().unwrap(),
-                    max_coin_qty: self.max_base_qty.try_into().unwrap(),
-                    max_native_pc_qty_including_fees: self
-                        .max_native_quote_qty_including_fees
-                        .try_into()
-                        .unwrap(),
-                    self_trade_behavior: self.self_trade_behavior.try_into().unwrap(),
-                    order_type: self.order_type.try_into().unwrap(),
-                    client_order_id: self.client_order_id,
-                    limit: self.limit,
-                },
-            ),
+            side: self.side,
+            limit_price: self.limit_price,
+            max_base_qty: self.max_base_qty,
+            max_native_quote_qty_including_fees: self.max_native_quote_qty_including_fees,
+            self_trade_behavior: self.self_trade_behavior,
+            order_type: self.order_type,
+            client_order_id: self.client_order_id,
+            limit: self.limit,
         };
 
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
@@ -952,7 +946,7 @@ impl<'keypair> ClientInstruction for Serum3PlaceOrderInstruction<'keypair> {
 }
 
 pub struct Serum3CancelOrderInstruction<'keypair> {
-    pub side: u8,
+    pub side: Serum3Side,
     pub order_id: u128,
 
     pub account: Pubkey,
@@ -970,12 +964,8 @@ impl<'keypair> ClientInstruction for Serum3CancelOrderInstruction<'keypair> {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            order: mango_v4::instructions::CancelOrderInstructionData(
-                serum_dex::instruction::CancelOrderInstructionV2 {
-                    side: self.side.try_into().unwrap(),
-                    order_id: self.order_id,
-                },
-            ),
+            side: self.side,
+            order_id: self.order_id,
         };
 
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();

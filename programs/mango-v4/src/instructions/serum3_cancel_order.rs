@@ -1,54 +1,10 @@
 use anchor_lang::prelude::*;
-use arrayref::array_refs;
-use borsh::{BorshDeserialize, BorshSerialize};
-use num_enum::TryFromPrimitive;
-use std::io::Write;
-
-use serum_dex::matching::Side;
+use serum_dex::instruction::CancelOrderInstructionV2;
 
 use crate::error::*;
 use crate::state::*;
 
-/// Unfortunately CancelOrderInstructionV2 isn't borsh serializable.
-///
-/// Make a newtype and implement the traits for it.
-pub struct CancelOrderInstructionData(pub serum_dex::instruction::CancelOrderInstructionV2);
-
-impl CancelOrderInstructionData {
-    // Copy of CancelOrderInstructionV2::unpack(), which we wish were public!
-    fn unpack(data: &[u8; 20]) -> Option<Self> {
-        let (&side_arr, &oid_arr) = array_refs![data, 4, 16];
-        let side = Side::try_from_primitive(u32::from_le_bytes(side_arr).try_into().ok()?).ok()?;
-        let order_id = u128::from_le_bytes(oid_arr);
-        Some(Self(serum_dex::instruction::CancelOrderInstructionV2 {
-            side,
-            order_id,
-        }))
-    }
-}
-
-impl BorshDeserialize for CancelOrderInstructionData {
-    fn deserialize(buf: &mut &[u8]) -> std::result::Result<Self, std::io::Error> {
-        let data: &[u8; 20] = buf[0..20]
-            .try_into()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::UnexpectedEof, e))?;
-        *buf = &buf[20..];
-        Self::unpack(data).ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                error!(MangoError::SomeError),
-            )
-        })
-    }
-}
-
-impl BorshSerialize for CancelOrderInstructionData {
-    fn serialize<W: Write>(&self, writer: &mut W) -> std::result::Result<(), std::io::Error> {
-        // serum_dex uses bincode::serialize() internally, see MarketInstruction::pack()
-        writer.write_all(&bincode::serialize(&self.0).unwrap())?;
-        Ok(())
-    }
-}
+use super::Serum3Side;
 
 #[derive(Accounts)]
 pub struct Serum3CancelOrder<'info> {
@@ -88,7 +44,8 @@ pub struct Serum3CancelOrder<'info> {
 
 pub fn serum3_cancel_order(
     ctx: Context<Serum3CancelOrder>,
-    order: CancelOrderInstructionData,
+    side: Serum3Side,
+    order_id: u128,
 ) -> Result<()> {
     //
     // Validation
@@ -114,12 +71,16 @@ pub fn serum3_cancel_order(
     //
     // Cancel
     //
+    let order = serum_dex::instruction::CancelOrderInstructionV2 {
+        side: u8::try_from(side)?.try_into().unwrap(),
+        order_id,
+    };
     cpi_cancel_order(ctx.accounts, order)?;
 
     Ok(())
 }
 
-fn cpi_cancel_order(ctx: &Serum3CancelOrder, order: CancelOrderInstructionData) -> Result<()> {
+fn cpi_cancel_order(ctx: &Serum3CancelOrder, order: CancelOrderInstructionV2) -> Result<()> {
     use crate::serum3_cpi;
     let group = ctx.group.load()?;
     serum3_cpi::CancelOrder {
@@ -132,5 +93,5 @@ fn cpi_cancel_order(ctx: &Serum3CancelOrder, order: CancelOrderInstructionData) 
         open_orders: ctx.open_orders.to_account_info(),
         open_orders_authority: ctx.group.to_account_info(),
     }
-    .cancel_one(&group, order.0)
+    .cancel_one(&group, order)
 }

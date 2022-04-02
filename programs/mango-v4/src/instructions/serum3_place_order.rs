@@ -1,90 +1,37 @@
+use crate::error::MangoError;
+use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
-use arrayref::array_refs;
-use borsh::{BorshDeserialize, BorshSerialize};
 use fixed::types::I80F48;
+use num_enum::IntoPrimitive;
 use num_enum::TryFromPrimitive;
+use serum_dex::instruction::NewOrderInstructionV3;
 use serum_dex::matching::Side;
-use std::io::Write;
-use std::num::NonZeroU64;
 
-use crate::error::*;
-use crate::state::*;
+/// Copy paste a bunch of enums so that we could AnchorSerialize & AnchorDeserialize them
 
-/// Unfortunately NewOrderInstructionV3 isn't borsh serializable.
-///
-/// Make a newtype and implement the traits for it.
-pub struct NewOrderInstructionData(pub serum_dex::instruction::NewOrderInstructionV3);
-
-impl NewOrderInstructionData {
-    // Copy of NewOrderInstructionV3::unpack(), which we wish were public!
-    fn unpack(data: &[u8; 46]) -> Option<Self> {
-        let (
-            &side_arr,
-            &price_arr,
-            &max_coin_qty_arr,
-            &max_native_pc_qty_arr,
-            &self_trade_behavior_arr,
-            &otype_arr,
-            &client_order_id_bytes,
-            &limit_arr,
-        ) = array_refs![data, 4, 8, 8, 8, 4, 4, 8, 2];
-
-        let side = serum_dex::matching::Side::try_from_primitive(
-            u32::from_le_bytes(side_arr).try_into().ok()?,
-        )
-        .ok()?;
-        let limit_price = NonZeroU64::new(u64::from_le_bytes(price_arr))?;
-        let max_coin_qty = NonZeroU64::new(u64::from_le_bytes(max_coin_qty_arr))?;
-        let max_native_pc_qty_including_fees =
-            NonZeroU64::new(u64::from_le_bytes(max_native_pc_qty_arr))?;
-        let self_trade_behavior = serum_dex::instruction::SelfTradeBehavior::try_from_primitive(
-            u32::from_le_bytes(self_trade_behavior_arr)
-                .try_into()
-                .ok()?,
-        )
-        .ok()?;
-        let order_type = serum_dex::matching::OrderType::try_from_primitive(
-            u32::from_le_bytes(otype_arr).try_into().ok()?,
-        )
-        .ok()?;
-        let client_order_id = u64::from_le_bytes(client_order_id_bytes);
-        let limit = u16::from_le_bytes(limit_arr);
-
-        Some(Self(serum_dex::instruction::NewOrderInstructionV3 {
-            side,
-            limit_price,
-            max_coin_qty,
-            max_native_pc_qty_including_fees,
-            self_trade_behavior,
-            order_type,
-            client_order_id,
-            limit,
-        }))
-    }
+#[derive(Clone, Copy, TryFromPrimitive, IntoPrimitive, AnchorSerialize, AnchorDeserialize)]
+#[repr(u8)]
+pub enum Serum3SelfTradeBehavior {
+    DecrementTake = 0,
+    CancelProvide = 1,
+    AbortTransaction = 2,
 }
 
-impl BorshDeserialize for NewOrderInstructionData {
-    fn deserialize(buf: &mut &[u8]) -> std::result::Result<Self, std::io::Error> {
-        let data: &[u8; 46] = buf[0..46]
-            .try_into()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::UnexpectedEof, e))?;
-        *buf = &buf[46..];
-        Self::unpack(data).ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                error!(MangoError::SomeError),
-            )
-        })
-    }
-}
+#[derive(Clone, Copy, TryFromPrimitive, IntoPrimitive, AnchorSerialize, AnchorDeserialize)]
+#[repr(u8)]
 
-impl BorshSerialize for NewOrderInstructionData {
-    fn serialize<W: Write>(&self, writer: &mut W) -> std::result::Result<(), std::io::Error> {
-        // serum_dex uses bincode::serialize() internally, see MarketInstruction::pack()
-        writer.write_all(&bincode::serialize(&self.0).unwrap())?;
-        Ok(())
-    }
+pub enum Serum3OrderType {
+    Limit = 0,
+    ImmediateOrCancel = 1,
+    PostOnly = 2,
+}
+#[derive(Clone, Copy, TryFromPrimitive, IntoPrimitive, AnchorSerialize, AnchorDeserialize)]
+#[repr(u8)]
+
+pub enum Serum3Side {
+    Bid = 0,
+    Ask = 1,
 }
 
 #[derive(Accounts)]
@@ -148,9 +95,17 @@ pub struct Serum3PlaceOrder<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn serum3_place_order(
     ctx: Context<Serum3PlaceOrder>,
-    order: NewOrderInstructionData,
+    side: Serum3Side,
+    limit_price: u64,
+    max_base_qty: u64,
+    max_native_quote_qty_including_fees: u64,
+    self_trade_behavior: Serum3SelfTradeBehavior,
+    order_type: Serum3OrderType,
+    client_order_id: u64,
+    limit: u16,
 ) -> Result<()> {
     //
     // Validation
@@ -205,6 +160,16 @@ pub fn serum3_place_order(
     // Apply the order to serum. Also immediately settle, in case the order
     // matched against an existing other order.
     //
+    let order = serum_dex::instruction::NewOrderInstructionV3 {
+        side: u8::try_from(side)?.try_into().unwrap(),
+        limit_price: limit_price.try_into().unwrap(),
+        max_coin_qty: max_base_qty.try_into().unwrap(),
+        max_native_pc_qty_including_fees: max_native_quote_qty_including_fees.try_into().unwrap(),
+        self_trade_behavior: (self_trade_behavior as u8).try_into().unwrap(),
+        order_type: (order_type as u8).try_into().unwrap(),
+        client_order_id,
+        limit,
+    };
     cpi_place_order(ctx.accounts, order)?;
     cpi_settle_funds(ctx.accounts)?;
 
@@ -247,10 +212,10 @@ pub fn serum3_place_order(
     Ok(())
 }
 
-fn cpi_place_order(ctx: &Serum3PlaceOrder, order: NewOrderInstructionData) -> Result<()> {
+fn cpi_place_order(ctx: &Serum3PlaceOrder, order: NewOrderInstructionV3) -> Result<()> {
     use crate::serum3_cpi;
 
-    let order_payer_token_account = match order.0.side {
+    let order_payer_token_account = match order.side {
         Side::Bid => &ctx.quote_vault,
         Side::Ask => &ctx.base_vault,
     };
@@ -271,7 +236,7 @@ fn cpi_place_order(ctx: &Serum3PlaceOrder, order: NewOrderInstructionData) -> Re
         order_payer_token_account: order_payer_token_account.to_account_info(),
         user_authority: ctx.group.to_account_info(),
     }
-    .call(&group, order.0)
+    .call(&group, order)
 }
 
 fn cpi_settle_funds(ctx: &Serum3PlaceOrder) -> Result<()> {

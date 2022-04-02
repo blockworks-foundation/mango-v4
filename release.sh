@@ -15,13 +15,18 @@ anchor build --skip-lint
 # update types in ts client package
 cp -v ./target/types/mango_v4.ts ./ts/mango_v4.ts
 
-# publish program
-solana --url https://mango.devnet.rpcpool.com program deploy --program-id $PROGRAM_ID  \
-    -k $WALLET_WITH_FUNDS target/deploy/mango_v4.so
+if [[ -z "${NO_DEPLOY}" ]]; then
+    # publish program
+    solana --url https://mango.devnet.rpcpool.com program deploy --program-id $PROGRAM_ID  \
+        -k $WALLET_WITH_FUNDS target/deploy/mango_v4.so
 
-# publish idl
-anchor idl upgrade --provider.cluster https://mango.devnet.rpcpool.com --provider.wallet $WALLET_WITH_FUNDS \
-    --filepath target/idl/mango_v4.json $PROGRAM_ID
+    # publish idl
+    anchor idl upgrade --provider.cluster https://mango.devnet.rpcpool.com --provider.wallet $WALLET_WITH_FUNDS \
+        --filepath target/idl/mango_v4.json $PROGRAM_ID
+else
+    echo "Skipping deployment..."
+fi
+
 
 # build npm package
 # yarn clean && yarn build && cp package.json ./dist/

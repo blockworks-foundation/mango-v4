@@ -90,11 +90,7 @@ export class MangoAccount {
       delegate: PublicKey;
       tokenAccountMap: unknown;
       serum3AccountMap: Object;
-      perpAccountMap: Object;
-      orderMarket: number[];
-      orderSide: unknown;
-      orders: BN[];
-      clientOrderIds: BN[];
+      perp: unknown;
       beingLiquidated: number;
       isBankrupt: number;
       accountNum: number;
@@ -109,11 +105,7 @@ export class MangoAccount {
       obj.delegate,
       obj.tokenAccountMap as { values: TokenAccountDto[] },
       obj.serum3AccountMap,
-      obj.perpAccountMap,
-      obj.orderMarket,
-      obj.orderSide,
-      obj.orders,
-      obj.clientOrderIds,
+      obj.perp,
       obj.beingLiquidated,
       obj.isBankrupt,
       obj.accountNum,
@@ -129,11 +121,7 @@ export class MangoAccount {
     delegate: PublicKey,
     tokenAccountMap: { values: TokenAccountDto[] },
     serum3AccountMap: Object,
-    perpAccountMap: Object,
-    orderMarket: number[],
-    orderSide: unknown,
-    orders: BN[],
-    clientOrderIds: BN[],
+    perp: unknown,
     beingLiquidated: number,
     isBankrupt: number,
     accountNum: number,

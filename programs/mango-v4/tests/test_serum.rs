@@ -3,7 +3,10 @@
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, transport::TransportError};
 
-use mango_v4::state::*;
+use mango_v4::{
+    instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side},
+    state::*,
+};
 use program_test::*;
 
 mod program_test;
@@ -137,12 +140,12 @@ async fn test_serum() -> Result<(), TransportError> {
     send_tx(
         solana,
         Serum3PlaceOrderInstruction {
-            side: 0,         // TODO: Bid
+            side: Serum3Side::Bid,
             limit_price: 10, // in quote_lot (10) per base lot (100)
             max_base_qty: 1, // in base lot (100)
             max_native_quote_qty_including_fees: 100,
-            self_trade_behavior: 0,
-            order_type: 0, // TODO: Limit
+            self_trade_behavior: Serum3SelfTradeBehavior::DecrementTake,
+            order_type: Serum3OrderType::Limit,
             client_order_id: 0,
             limit: 10,
             account,
@@ -172,7 +175,7 @@ async fn test_serum() -> Result<(), TransportError> {
     send_tx(
         solana,
         Serum3CancelOrderInstruction {
-            side: 0,
+            side: Serum3Side::Bid,
             order_id,
             account,
             owner,
