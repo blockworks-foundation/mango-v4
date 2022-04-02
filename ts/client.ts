@@ -35,8 +35,6 @@ export class MangoClient {
     addDummyType(idl, 'AnyNode');
     addDummyType(idl, 'EventQueueHeader');
     addDummyType(idl, 'AnyEvent');
-    addDummyType(idl, 'instructions::NewOrderInstructionData');
-    addDummyType(idl, 'instructions::CancelOrderInstructionData');
     addDummyType(idl, 'H');
     addDummyType(idl, 'H::Item');
     addDummyType(idl, 'NodeHandle');

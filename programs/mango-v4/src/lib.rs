@@ -105,18 +105,37 @@ pub mod mango_v4 {
         instructions::serum3_create_open_orders(ctx)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn serum3_place_order(
         ctx: Context<Serum3PlaceOrder>,
-        order: instructions::NewOrderInstructionData,
+        side: Serum3Side,
+        limit_price: u64,
+        max_base_qty: u64,
+        max_native_quote_qty_including_fees: u64,
+        self_trade_behavior: Serum3SelfTradeBehavior,
+        order_type: Serum3OrderType,
+        client_order_id: u64,
+        limit: u16,
     ) -> Result<()> {
-        instructions::serum3_place_order(ctx, order)
+        instructions::serum3_place_order(
+            ctx,
+            side,
+            limit_price,
+            max_base_qty,
+            max_native_quote_qty_including_fees,
+            self_trade_behavior,
+            order_type,
+            client_order_id,
+            limit,
+        )
     }
 
     pub fn serum3_cancel_order(
         ctx: Context<Serum3CancelOrder>,
-        order: instructions::CancelOrderInstructionData,
+        side: Serum3Side,
+        order_id: u128,
     ) -> Result<()> {
-        instructions::serum3_cancel_order(ctx, order)
+        instructions::serum3_cancel_order(ctx, side, order_id)
     }
 
     pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {

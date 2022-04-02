@@ -717,10 +717,42 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "order",
+          "name": "side",
           "type": {
-            "defined": "instructions::NewOrderInstructionData"
+            "defined": "Serum3Side"
           }
+        },
+        {
+          "name": "limitPrice",
+          "type": "u64"
+        },
+        {
+          "name": "maxBaseQty",
+          "type": "u64"
+        },
+        {
+          "name": "maxNativeQuoteQtyIncludingFees",
+          "type": "u64"
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "Serum3SelfTradeBehavior"
+          }
+        },
+        {
+          "name": "orderType",
+          "type": {
+            "defined": "Serum3OrderType"
+          }
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        },
+        {
+          "name": "limit",
+          "type": "u16"
         }
       ]
     },
@@ -780,10 +812,14 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "order",
+          "name": "side",
           "type": {
-            "defined": "instructions::CancelOrderInstructionData"
+            "defined": "Serum3Side"
           }
+        },
+        {
+          "name": "orderId",
+          "type": "u128"
         }
       ]
     },
@@ -1178,15 +1214,15 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "price",
+          "name": "priceLots",
           "type": "i64"
         },
         {
-          "name": "maxBaseQuantity",
+          "name": "maxBaseLots",
           "type": "i64"
         },
         {
-          "name": "maxQuoteQuantity",
+          "name": "maxQuoteLots",
           "type": "i64"
         },
         {
@@ -1451,47 +1487,9 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "perpAccountMap",
+            "name": "perp",
             "type": {
-              "defined": "PerpAccountMap"
-            }
-          },
-          {
-            "name": "orderMarket",
-            "type": {
-              "array": [
-                "u16",
-                8
-              ]
-            }
-          },
-          {
-            "name": "orderSide",
-            "type": {
-              "array": [
-                {
-                  "defined": "Side"
-                },
-                8
-              ]
-            }
-          },
-          {
-            "name": "orders",
-            "type": {
-              "array": [
-                "i128",
-                8
-              ]
-            }
-          },
-          {
-            "name": "clientOrderIds",
-            "type": {
-              "array": [
-                "u64",
-                8
-              ]
+              "defined": "PerpData"
             }
           },
           {
@@ -1916,46 +1914,84 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "basePosition",
+            "name": "basePositionLots",
             "type": "i64"
           },
           {
-            "name": "quotePosition",
+            "name": "quotePositionNative",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "bidsQuantity",
+            "name": "bidsBaseLots",
             "type": "i64"
           },
           {
-            "name": "asksQuantity",
+            "name": "asksBaseLots",
             "type": "i64"
           },
           {
-            "name": "takerBase",
+            "name": "takerBaseLots",
             "type": "i64"
           },
           {
-            "name": "takerQuote",
+            "name": "takerQuoteLots",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "PerpAccountMap",
+      "name": "PerpData",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "values",
+            "name": "accounts",
             "type": {
               "array": [
                 {
                   "defined": "PerpAccount"
                 },
+                8
+              ]
+            }
+          },
+          {
+            "name": "orderMarket",
+            "type": {
+              "array": [
+                "u16",
+                8
+              ]
+            }
+          },
+          {
+            "name": "orderSide",
+            "type": {
+              "array": [
+                {
+                  "defined": "Side"
+                },
+                8
+              ]
+            }
+          },
+          {
+            "name": "orderId",
+            "type": {
+              "array": [
+                "i128",
+                8
+              ]
+            }
+          },
+          {
+            "name": "orderClientId",
+            "type": {
+              "array": [
+                "u64",
                 8
               ]
             }
@@ -2174,6 +2210,54 @@ export type MangoV4 = {
           },
           {
             "name": "Liquidate"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Serum3SelfTradeBehavior",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "DecrementTake"
+          },
+          {
+            "name": "CancelProvide"
+          },
+          {
+            "name": "AbortTransaction"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Serum3OrderType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Limit"
+          },
+          {
+            "name": "ImmediateOrCancel"
+          },
+          {
+            "name": "PostOnly"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Serum3Side",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Bid"
+          },
+          {
+            "name": "Ask"
           }
         ]
       }
@@ -2980,10 +3064,42 @@ export const IDL: MangoV4 = {
       ],
       "args": [
         {
-          "name": "order",
+          "name": "side",
           "type": {
-            "defined": "instructions::NewOrderInstructionData"
+            "defined": "Serum3Side"
           }
+        },
+        {
+          "name": "limitPrice",
+          "type": "u64"
+        },
+        {
+          "name": "maxBaseQty",
+          "type": "u64"
+        },
+        {
+          "name": "maxNativeQuoteQtyIncludingFees",
+          "type": "u64"
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "Serum3SelfTradeBehavior"
+          }
+        },
+        {
+          "name": "orderType",
+          "type": {
+            "defined": "Serum3OrderType"
+          }
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        },
+        {
+          "name": "limit",
+          "type": "u16"
         }
       ]
     },
@@ -3043,10 +3159,14 @@ export const IDL: MangoV4 = {
       ],
       "args": [
         {
-          "name": "order",
+          "name": "side",
           "type": {
-            "defined": "instructions::CancelOrderInstructionData"
+            "defined": "Serum3Side"
           }
+        },
+        {
+          "name": "orderId",
+          "type": "u128"
         }
       ]
     },
@@ -3441,15 +3561,15 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "price",
+          "name": "priceLots",
           "type": "i64"
         },
         {
-          "name": "maxBaseQuantity",
+          "name": "maxBaseLots",
           "type": "i64"
         },
         {
-          "name": "maxQuoteQuantity",
+          "name": "maxQuoteLots",
           "type": "i64"
         },
         {
@@ -3714,47 +3834,9 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "perpAccountMap",
+            "name": "perp",
             "type": {
-              "defined": "PerpAccountMap"
-            }
-          },
-          {
-            "name": "orderMarket",
-            "type": {
-              "array": [
-                "u16",
-                8
-              ]
-            }
-          },
-          {
-            "name": "orderSide",
-            "type": {
-              "array": [
-                {
-                  "defined": "Side"
-                },
-                8
-              ]
-            }
-          },
-          {
-            "name": "orders",
-            "type": {
-              "array": [
-                "i128",
-                8
-              ]
-            }
-          },
-          {
-            "name": "clientOrderIds",
-            "type": {
-              "array": [
-                "u64",
-                8
-              ]
+              "defined": "PerpData"
             }
           },
           {
@@ -4179,46 +4261,84 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "basePosition",
+            "name": "basePositionLots",
             "type": "i64"
           },
           {
-            "name": "quotePosition",
+            "name": "quotePositionNative",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "bidsQuantity",
+            "name": "bidsBaseLots",
             "type": "i64"
           },
           {
-            "name": "asksQuantity",
+            "name": "asksBaseLots",
             "type": "i64"
           },
           {
-            "name": "takerBase",
+            "name": "takerBaseLots",
             "type": "i64"
           },
           {
-            "name": "takerQuote",
+            "name": "takerQuoteLots",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "PerpAccountMap",
+      "name": "PerpData",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "values",
+            "name": "accounts",
             "type": {
               "array": [
                 {
                   "defined": "PerpAccount"
                 },
+                8
+              ]
+            }
+          },
+          {
+            "name": "orderMarket",
+            "type": {
+              "array": [
+                "u16",
+                8
+              ]
+            }
+          },
+          {
+            "name": "orderSide",
+            "type": {
+              "array": [
+                {
+                  "defined": "Side"
+                },
+                8
+              ]
+            }
+          },
+          {
+            "name": "orderId",
+            "type": {
+              "array": [
+                "i128",
+                8
+              ]
+            }
+          },
+          {
+            "name": "orderClientId",
+            "type": {
+              "array": [
+                "u64",
                 8
               ]
             }
@@ -4437,6 +4557,54 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Liquidate"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Serum3SelfTradeBehavior",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "DecrementTake"
+          },
+          {
+            "name": "CancelProvide"
+          },
+          {
+            "name": "AbortTransaction"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Serum3OrderType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Limit"
+          },
+          {
+            "name": "ImmediateOrCancel"
+          },
+          {
+            "name": "PostOnly"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Serum3Side",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Bid"
+          },
+          {
+            "name": "Ask"
           }
         ]
       }

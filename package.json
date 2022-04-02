@@ -8,9 +8,10 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "type-check": "tsc --pretty --noEmit",
+    "example": "ts-node ts/example.ts",
     "format": "prettier --check .",
-    "lint": "eslint . --ext ts --ext tsx --ext js --quiet"
+    "lint": "eslint . --ext ts --ext tsx --ext js --quiet",
+    "type-check": "tsc --pretty --noEmit"
   },
   "author": {
     "name": "Blockworks Foundation",
