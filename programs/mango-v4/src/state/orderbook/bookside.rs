@@ -434,3 +434,350 @@ impl BookSide {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::order_type::{OrderType, Side};
+    use super::*;
+    use bytemuck::Zeroable;
+
+    fn new_bookside(book_side_type: BookSideType) -> BookSide {
+        BookSide {
+            book_side_type,
+            bump_index: 0,
+            free_list_len: 0,
+            free_list_head: 0,
+            root_node: 0,
+            leaf_count: 0,
+            nodes: [AnyNode::zeroed(); MAX_BOOK_NODES],
+        }
+    }
+
+    fn verify_bookside(bookside: &BookSide) {
+        verify_bookside_invariant(bookside);
+        verify_bookside_iteration(bookside);
+        verify_bookside_expiry(bookside);
+    }
+
+    // check that BookSide binary tree key invariant holds
+    fn verify_bookside_invariant(bookside: &BookSide) {
+        let r = match bookside.root() {
+            Some(h) => h,
+            None => return,
+        };
+
+        fn recursive_check(bookside: &BookSide, h: NodeHandle) {
+            match bookside.get(h).unwrap().case().unwrap() {
+                NodeRef::Inner(&inner) => {
+                    let left = bookside.get(inner.children[0]).unwrap().key().unwrap();
+                    let right = bookside.get(inner.children[1]).unwrap().key().unwrap();
+
+                    // the left and right keys share the InnerNode's prefix
+                    assert!((inner.key ^ left).leading_zeros() >= inner.prefix_len);
+                    assert!((inner.key ^ right).leading_zeros() >= inner.prefix_len);
+
+                    // the left and right node key have the critbit unset and set respectively
+                    let crit_bit_mask: i128 = 1i128 << (127 - inner.prefix_len);
+                    assert!(left & crit_bit_mask == 0);
+                    assert!(right & crit_bit_mask != 0);
+
+                    recursive_check(bookside, inner.children[0]);
+                    recursive_check(bookside, inner.children[1]);
+                }
+                _ => {}
+            }
+        }
+        recursive_check(bookside, r);
+    }
+
+    // check that iteration of bookside has the right order and misses no leaves
+    fn verify_bookside_iteration(bookside: &BookSide) {
+        let mut total = 0;
+        let ascending = bookside.book_side_type == BookSideType::Asks;
+        let mut last_key = if ascending { 0 } else { i128::MAX };
+        for (_, node) in bookside.iter_all_including_invalid() {
+            let key = node.key;
+            if ascending {
+                assert!(key >= last_key);
+            } else {
+                assert!(key <= last_key);
+            }
+            last_key = key;
+            total += 1;
+        }
+        assert_eq!(bookside.leaf_count, total);
+    }
+
+    // check that BookSide::child_expiry invariant holds
+    fn verify_bookside_expiry(bookside: &BookSide) {
+        let r = match bookside.root() {
+            Some(h) => h,
+            None => return,
+        };
+
+        fn recursive_check(bookside: &BookSide, h: NodeHandle) {
+            match bookside.get(h).unwrap().case().unwrap() {
+                NodeRef::Inner(&inner) => {
+                    let left = bookside.get(inner.children[0]).unwrap().earliest_expiry();
+                    let right = bookside.get(inner.children[1]).unwrap().earliest_expiry();
+
+                    // child_expiry must hold the expiry of the children
+                    assert_eq!(inner.child_earliest_expiry[0], left);
+                    assert_eq!(inner.child_earliest_expiry[1], right);
+
+                    recursive_check(bookside, inner.children[0]);
+                    recursive_check(bookside, inner.children[1]);
+                }
+                _ => {}
+            }
+        }
+        recursive_check(bookside, r);
+    }
+
+    #[test]
+    fn bookside_expiry_manual() {
+        let mut bids = new_bookside(BookSideType::Bids);
+        let new_expiring_leaf = |key: i128, expiry: u64| {
+            LeafNode::new(
+                0,
+                key,
+                Pubkey::default(),
+                0,
+                0,
+                expiry - 1,
+                OrderType::Limit,
+                1,
+            )
+        };
+
+        assert!(bids.find_earliest_expiry().is_none());
+
+        bids.insert_leaf(&new_expiring_leaf(0, 5000)).unwrap();
+        assert_eq!(bids.find_earliest_expiry().unwrap(), (bids.root_node, 5000));
+        verify_bookside(&bids);
+
+        let (new4000_h, _) = bids.insert_leaf(&new_expiring_leaf(1, 4000)).unwrap();
+        assert_eq!(bids.find_earliest_expiry().unwrap(), (new4000_h, 4000));
+        verify_bookside(&bids);
+
+        let (_new4500_h, _) = bids.insert_leaf(&new_expiring_leaf(2, 4500)).unwrap();
+        assert_eq!(bids.find_earliest_expiry().unwrap(), (new4000_h, 4000));
+        verify_bookside(&bids);
+
+        let (new3500_h, _) = bids.insert_leaf(&new_expiring_leaf(3, 3500)).unwrap();
+        assert_eq!(bids.find_earliest_expiry().unwrap(), (new3500_h, 3500));
+        verify_bookside(&bids);
+        // the first two levels of the tree are innernodes, with 0;1 on one side and 2;3 on the other
+        assert_eq!(
+            bids.get_mut(bids.root_node)
+                .unwrap()
+                .as_inner_mut()
+                .unwrap()
+                .child_earliest_expiry,
+            [4000, 3500]
+        );
+
+        bids.remove_by_key(3).unwrap();
+        verify_bookside(&bids);
+        assert_eq!(
+            bids.get_mut(bids.root_node)
+                .unwrap()
+                .as_inner_mut()
+                .unwrap()
+                .child_earliest_expiry,
+            [4000, 4500]
+        );
+        assert_eq!(bids.find_earliest_expiry().unwrap().1, 4000);
+
+        bids.remove_by_key(0).unwrap();
+        verify_bookside(&bids);
+        assert_eq!(
+            bids.get_mut(bids.root_node)
+                .unwrap()
+                .as_inner_mut()
+                .unwrap()
+                .child_earliest_expiry,
+            [4000, 4500]
+        );
+        assert_eq!(bids.find_earliest_expiry().unwrap().1, 4000);
+
+        bids.remove_by_key(1).unwrap();
+        verify_bookside(&bids);
+        assert_eq!(bids.find_earliest_expiry().unwrap().1, 4500);
+
+        bids.remove_by_key(2).unwrap();
+        verify_bookside(&bids);
+        assert!(bids.find_earliest_expiry().is_none());
+    }
+
+    #[test]
+    fn bookside_expiry_random() {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        let mut bids = new_bookside(BookSideType::Bids);
+        let new_expiring_leaf = |key: i128, expiry: u64| {
+            LeafNode::new(
+                0,
+                key,
+                Pubkey::default(),
+                0,
+                0,
+                expiry - 1,
+                OrderType::Limit,
+                1,
+            )
+        };
+
+        // add 200 random leaves
+        let mut keys = vec![];
+        for _ in 0..200 {
+            let key: i128 = rng.gen_range(0..10000); // overlap in key bits
+            if keys.contains(&key) {
+                continue;
+            }
+            let expiry = rng.gen_range(1..200); // give good chance of duplicate expiry times
+            keys.push(key);
+            bids.insert_leaf(&new_expiring_leaf(key, expiry)).unwrap();
+            verify_bookside(&bids);
+        }
+
+        // remove 50 at random
+        for _ in 0..50 {
+            if keys.len() == 0 {
+                break;
+            }
+            let k = keys[rng.gen_range(0..keys.len())];
+            bids.remove_by_key(k).unwrap();
+            keys.retain(|v| *v != k);
+            verify_bookside(&bids);
+        }
+    }
+
+    fn bookside_contains_key(bookside: &BookSide, key: i128) -> bool {
+        for (_, leaf) in bookside.iter_all_including_invalid() {
+            if leaf.key == key {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn bookside_contains_price(bookside: &BookSide, price: i64) -> bool {
+        for (_, leaf) in bookside.iter_all_including_invalid() {
+            if leaf.price() == price {
+                return true;
+            }
+        }
+        false
+    }
+
+    #[test]
+    fn book_bids_full() {
+        use super::super::book::Book;
+        use super::super::queue::EventQueue;
+        use crate::state::{MangoAccountPerps, PerpMarket};
+        use fixed::types::I80F48;
+        use std::cell::RefCell;
+
+        let bids = RefCell::new(new_bookside(BookSideType::Bids));
+        let asks = RefCell::new(new_bookside(BookSideType::Asks));
+        let mut book = Book {
+            bids: bids.borrow_mut(),
+            asks: asks.borrow_mut(),
+        };
+
+        let mut event_queue = EventQueue::zeroed();
+
+        let oracle_price = I80F48::from_num(5000.0);
+
+        let mut perp_market = PerpMarket::zeroed();
+        perp_market.quote_lot_size = 1;
+        perp_market.base_lot_size = 1;
+        perp_market.maint_asset_weight = I80F48::ONE;
+        perp_market.maint_liab_weight = I80F48::ONE;
+        perp_market.init_asset_weight = I80F48::ONE;
+        perp_market.init_liab_weight = I80F48::ONE;
+
+        let mut new_order =
+            |book: &mut Book, event_queue: &mut EventQueue, side, price, now_ts| -> i128 {
+                let mut account_perps = MangoAccountPerps::new();
+
+                let quantity = 1;
+                let tif = 100;
+
+                book.new_order(
+                    side,
+                    &mut perp_market,
+                    event_queue,
+                    oracle_price,
+                    &mut account_perps,
+                    &Pubkey::default(),
+                    price,
+                    quantity,
+                    i64::MAX,
+                    OrderType::Limit,
+                    tif,
+                    0,
+                    now_ts,
+                    u8::MAX,
+                )
+                .unwrap();
+                account_perps.order_id[0]
+            };
+
+        // insert bids until book side is full
+        for i in 1..10 {
+            new_order(
+                &mut book,
+                &mut event_queue,
+                Side::Bid,
+                1000 + i as i64,
+                1000000 + i as u64,
+            );
+        }
+        for i in 10..1000 {
+            new_order(
+                &mut book,
+                &mut event_queue,
+                Side::Bid,
+                1000 + i as i64,
+                1000011 as u64,
+            );
+            if book.bids.is_full() {
+                break;
+            }
+        }
+        assert!(book.bids.is_full());
+        assert_eq!(book.bids.get_min().unwrap().price(), 1001);
+        assert_eq!(
+            book.bids.get_max().unwrap().price(),
+            (1000 + book.bids.leaf_count) as i64
+        );
+
+        // add another bid at a higher price before expiry, replacing the lowest-price one (1001)
+        new_order(&mut book, &mut event_queue, Side::Bid, 1005, 1000000 - 1);
+        assert_eq!(book.bids.get_min().unwrap().price(), 1002);
+        assert_eq!(event_queue.len(), 1);
+
+        // adding another bid after expiry removes the soonest-expiring order (1005)
+        new_order(&mut book, &mut event_queue, Side::Bid, 999, 2000000);
+        assert_eq!(book.bids.get_min().unwrap().price(), 999);
+        assert!(!bookside_contains_key(&book.bids, 1005));
+        assert_eq!(event_queue.len(), 2);
+
+        // adding an ask will wipe up to three expired bids at the top of the book
+        let bids_max = book.bids.get_max().unwrap().price();
+        let bids_count = book.bids.leaf_count;
+        new_order(&mut book, &mut event_queue, Side::Ask, 6000, 1500000);
+        assert_eq!(book.bids.leaf_count, bids_count - 5);
+        assert_eq!(book.asks.leaf_count, 1);
+        assert_eq!(event_queue.len(), 2 + 5);
+        assert!(!bookside_contains_price(&book.bids, bids_max));
+        assert!(!bookside_contains_price(&book.bids, bids_max - 1));
+        assert!(!bookside_contains_price(&book.bids, bids_max - 2));
+        assert!(!bookside_contains_price(&book.bids, bids_max - 3));
+        assert!(!bookside_contains_price(&book.bids, bids_max - 4));
+        assert!(bookside_contains_price(&book.bids, bids_max - 5));
+    }
+}

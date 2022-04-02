@@ -1572,6 +1572,7 @@ dependencies = [
  "margin-trade",
  "num_enum",
  "pyth-client",
+ "rand 0.8.5",
  "serde",
  "serum_dex",
  "solana-logger",

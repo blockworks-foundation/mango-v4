@@ -111,7 +111,7 @@ pub fn perp_place_order(
         &mut perp_market,
         &mut event_queue,
         oracle_price,
-        &mut mango_account,
+        &mut mango_account.perps,
         &mango_account_pk,
         price_lots,
         max_base_lots,

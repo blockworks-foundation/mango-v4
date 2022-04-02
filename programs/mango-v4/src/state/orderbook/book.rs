@@ -4,7 +4,7 @@ use crate::{
     error::MangoError,
     state::{
         orderbook::{bookside::BookSide, nodes::LeafNode},
-        EventQueue, MangoAccount, PerpMarket,
+        EventQueue, MangoAccountPerps, PerpMarket,
     },
     util::LoadZeroCopy,
 };
@@ -154,7 +154,7 @@ impl<'a> Book<'a> {
         perp_market: &mut PerpMarket,
         event_queue: &mut EventQueue,
         oracle_price: I80F48,
-        mango_account: &mut MangoAccount,
+        mango_account_perps: &mut MangoAccountPerps,
         mango_account_pk: &Pubkey,
         price_lots: i64,
         max_base_lots: i64,
@@ -335,8 +335,7 @@ impl<'a> Book<'a> {
                 event_queue.push_back(cast(event)).unwrap();
             }
 
-            let owner_slot = mango_account
-                .perps
+            let owner_slot = mango_account_perps
                 .next_order_slot()
                 .ok_or_else(|| error!(MangoError::SomeError))?;
             let new_order = LeafNode::new(
@@ -368,7 +367,7 @@ impl<'a> Book<'a> {
         // if there were matched taker quote apply ref fees
         // we know ref_fee_rate is not None if total_quote_taken > 0
         if total_quote_lots_taken > 0 {
-            apply_fees(market, mango_account, total_quote_lots_taken)?;
+            apply_fees(market, mango_account_perps, total_quote_lots_taken)?;
         }
 
         Ok(())
@@ -379,7 +378,7 @@ impl<'a> Book<'a> {
 /// both the maker and taker fees.
 fn apply_fees(
     market: &mut PerpMarket,
-    mango_account: &mut MangoAccount,
+    mango_account_perps: &mut MangoAccountPerps,
     total_quote_taken: i64,
 ) -> Result<()> {
     let taker_quote_native = I80F48::from_num(
@@ -396,8 +395,7 @@ fn apply_fees(
     let maker_fees = taker_quote_native * market.maker_fee;
 
     let taker_fees = taker_quote_native * market.taker_fee;
-    let perp_account = mango_account
-        .perps
+    let perp_account = mango_account_perps
         .get_account_mut_or_create(market.perp_market_index)?
         .0;
     perp_account.quote_position_native -= taker_fees;
