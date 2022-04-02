@@ -88,9 +88,9 @@ export class MangoAccount {
       group: PublicKey;
       owner: PublicKey;
       delegate: PublicKey;
-      tokenAccountMap: unknown;
-      serum3AccountMap: Object;
-      perp: unknown;
+      tokens: unknown;
+      serum3: Object;
+      perps: unknown;
       beingLiquidated: number;
       isBankrupt: number;
       accountNum: number;
@@ -103,9 +103,9 @@ export class MangoAccount {
       obj.group,
       obj.owner,
       obj.delegate,
-      obj.tokenAccountMap as { values: TokenAccountDto[] },
-      obj.serum3AccountMap,
-      obj.perp,
+      obj.tokens as { values: TokenAccountDto[] },
+      obj.serum3,
+      obj.perps,
       obj.beingLiquidated,
       obj.isBankrupt,
       obj.accountNum,
@@ -119,18 +119,16 @@ export class MangoAccount {
     group: PublicKey,
     owner: PublicKey,
     delegate: PublicKey,
-    tokenAccountMap: { values: TokenAccountDto[] },
-    serum3AccountMap: Object,
-    perp: unknown,
+    tokens: { values: TokenAccountDto[] },
+    serum3: Object,
+    perps: unknown,
     beingLiquidated: number,
     isBankrupt: number,
     accountNum: number,
     bump: number,
     reserved: number[],
   ) {
-    this.tokenAccountMap = tokenAccountMap.values.map((dto) =>
-      TokenAccount.from(dto),
-    );
+    this.tokenAccountMap = tokens.values.map((dto) => TokenAccount.from(dto));
   }
 
   find(tokenIndex: number): TokenAccount | undefined {

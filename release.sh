@@ -29,6 +29,7 @@ fi
 
 
 # build npm package
+tsc
 # yarn clean && yarn build && cp package.json ./dist/
 
 # publish the npm package

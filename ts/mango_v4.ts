@@ -1475,21 +1475,21 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "tokenAccountMap",
+            "name": "tokens",
             "type": {
-              "defined": "TokenAccountMap"
+              "defined": "MangoAccountTokens"
             }
           },
           {
-            "name": "serum3AccountMap",
+            "name": "serum3",
             "type": {
-              "defined": "Serum3AccountMap"
+              "defined": "MangoAccountSerum3"
             }
           },
           {
-            "name": "perp",
+            "name": "perps",
             "type": {
-              "defined": "PerpData"
+              "defined": "MangoAccountPerps"
             }
           },
           {
@@ -1825,7 +1825,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "TokenAccountMap",
+      "name": "MangoAccountTokens",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1877,7 +1877,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "Serum3AccountMap",
+      "name": "MangoAccountSerum3",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1943,7 +1943,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "PerpData",
+      "name": "MangoAccountPerps",
       "type": {
         "kind": "struct",
         "fields": [
@@ -3822,21 +3822,21 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "tokenAccountMap",
+            "name": "tokens",
             "type": {
-              "defined": "TokenAccountMap"
+              "defined": "MangoAccountTokens"
             }
           },
           {
-            "name": "serum3AccountMap",
+            "name": "serum3",
             "type": {
-              "defined": "Serum3AccountMap"
+              "defined": "MangoAccountSerum3"
             }
           },
           {
-            "name": "perp",
+            "name": "perps",
             "type": {
-              "defined": "PerpData"
+              "defined": "MangoAccountPerps"
             }
           },
           {
@@ -4172,7 +4172,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "TokenAccountMap",
+      "name": "MangoAccountTokens",
       "type": {
         "kind": "struct",
         "fields": [
@@ -4224,7 +4224,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "Serum3AccountMap",
+      "name": "MangoAccountSerum3",
       "type": {
         "kind": "struct",
         "fields": [
@@ -4290,7 +4290,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "PerpData",
+      "name": "MangoAccountPerps",
       "type": {
         "kind": "struct",
         "fields": [
