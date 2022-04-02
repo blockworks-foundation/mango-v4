@@ -438,6 +438,15 @@ export async function getSerum3MarketForBaseAndQuote(
   baseTokenIndex: number,
   quoteTokenIndex: number,
 ): Promise<Object[]> {
+  const bbuf = Buffer.alloc(2);
+  bbuf.writeUInt16LE(baseTokenIndex);
+
+  const qbuf = Buffer.alloc(2);
+  qbuf.writeUInt16LE(quoteTokenIndex);
+
+  const bumpfbuf = Buffer.alloc(1);
+  bumpfbuf.writeUInt8(255);
+
   return await client.program.account.serum3Market.all([
     {
       memcmp: {
@@ -445,18 +454,18 @@ export async function getSerum3MarketForBaseAndQuote(
         offset: 8,
       },
     },
-    // {
-    //   memcmp: {
-    //     bytes: bs58.encode(borsh.u16(new BN(baseTokenIndex))),
-    //     offset: 106,
-    //   },
-    // },
-    // {
-    //   memcmp: {
-    //     bytes: bs58.encode(borsh.u16(new BN(baseTokenIndex))),
-    //     offset: 107,
-    //   },
-    // },
+    {
+      memcmp: {
+        bytes: bs58.encode(bbuf),
+        offset: 106,
+      },
+    },
+    {
+      memcmp: {
+        bytes: bs58.encode(qbuf),
+        offset: 108,
+      },
+    },
   ]);
 
   //.map((tuple) => Serum.from(tuple.publicKey, tuple.account));

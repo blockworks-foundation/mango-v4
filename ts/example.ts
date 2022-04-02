@@ -67,7 +67,7 @@ async function main() {
     ),
   );
   const adminWallet = new Wallet(admin);
-  console.log(`admin ${adminWallet.publicKey.toBase58()}`);
+  console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
   const adminProvider = new Provider(connection, adminWallet, options);
   const adminClient = await MangoClient.connect(adminProvider, true);
 
@@ -76,7 +76,7 @@ async function main() {
       JSON.parse(fs.readFileSync(process.env.PAYER_KEYPAIR!, 'utf-8')),
     ),
   );
-  console.log(`payer ${payer.publicKey.toBase58()}`);
+  console.log(`Payer ${payer.publicKey.toBase58()}`);
   //
   // Find existing or create a new group
   //
@@ -179,7 +179,7 @@ async function main() {
   const userWallet = new Wallet(user);
   const userProvider = new Provider(connection, userWallet, options);
   const userClient = await MangoClient.connect(userProvider, true);
-  console.log(`user ${userWallet.publicKey.toBase58()}`);
+  console.log(`User ${userWallet.publicKey.toBase58()}`);
 
   //
   // Create mango account
