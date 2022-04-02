@@ -502,7 +502,11 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
         )
         .0;
         let oracle = Pubkey::find_program_address(
-            &[b"StubOracle".as_ref(), self.mint.as_ref()],
+            &[
+                self.group.as_ref(),
+                b"StubOracle".as_ref(),
+                self.mint.as_ref(),
+            ],
             &program_id,
         )
         .0;
