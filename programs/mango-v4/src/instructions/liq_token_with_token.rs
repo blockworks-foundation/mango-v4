@@ -75,15 +75,12 @@ pub fn liq_token_with_token(
         let liab_price = oracle_price(liab_oracle)?;
 
         let liqee_assets_native = liqee
-            .token_account_map
+            .tokens
             .get(asset_bank.token_index)?
             .native(&asset_bank);
         require!(liqee_assets_native.is_positive(), MangoError::SomeError);
 
-        let liqee_liab_native = liqee
-            .token_account_map
-            .get(liab_bank.token_index)?
-            .native(&liab_bank);
+        let liqee_liab_native = liqee.tokens.get(liab_bank.token_index)?.native(&liab_bank);
         require!(liqee_liab_native.is_negative(), MangoError::SomeError);
 
         // TODO why sum of both tokens liquidation fees? Add comment
@@ -121,29 +118,17 @@ pub fn liq_token_with_token(
         let asset_transfer = cm!(liab_transfer * liab_price_adjusted / asset_price);
 
         // Apply the balance changes to the liqor and liqee accounts
-        liab_bank.deposit(
-            liqee.token_account_map.get_mut(liab_token_index)?,
-            liab_transfer,
-        )?;
+        liab_bank.deposit(liqee.tokens.get_mut(liab_token_index)?, liab_transfer)?;
         liab_bank.withdraw(
-            liqor
-                .token_account_map
-                .get_mut_or_create(liab_token_index)?
-                .0,
+            liqor.tokens.get_mut_or_create(liab_token_index)?.0,
             liab_transfer,
         )?;
 
         asset_bank.deposit(
-            liqor
-                .token_account_map
-                .get_mut_or_create(asset_token_index)?
-                .0,
+            liqor.tokens.get_mut_or_create(asset_token_index)?.0,
             asset_transfer,
         )?;
-        asset_bank.withdraw(
-            liqee.token_account_map.get_mut(asset_token_index)?,
-            asset_transfer,
-        )?;
+        asset_bank.withdraw(liqee.tokens.get_mut(asset_token_index)?, asset_transfer)?;
 
         // Update the health cache
         liqee_health_cache.adjust_token_balance(liab_token_index, liab_transfer)?;

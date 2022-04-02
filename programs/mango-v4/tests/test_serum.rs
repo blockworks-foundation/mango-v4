@@ -127,7 +127,7 @@ async fn test_serum() -> Result<(), TransportError> {
     let account_data: MangoAccount = solana.get_account(account).await;
     assert_eq!(
         account_data
-            .serum3_account_map
+            .serum3
             .iter_active()
             .map(|v| (v.open_orders, v.market_index))
             .collect::<Vec<_>>(),

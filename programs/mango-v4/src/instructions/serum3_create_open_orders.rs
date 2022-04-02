@@ -50,9 +50,7 @@ pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result
     let serum_market = ctx.accounts.serum_market.load()?;
     let mut account = ctx.accounts.account.load_mut()?;
     require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
-    let serum_account = account
-        .serum3_account_map
-        .create(serum_market.market_index)?;
+    let serum_account = account.serum3.create(serum_market.market_index)?;
     serum_account.open_orders = ctx.accounts.open_orders.key();
     serum_account.base_token_index = serum_market.base_token_index;
     serum_account.quote_token_index = serum_market.quote_token_index;
@@ -61,11 +59,11 @@ pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result
     // stay permanently blocked. Otherwise users may end up in situations where
     // they can't settle a market because they don't have free token_account_map!
     let (quote_position, _) = account
-        .token_account_map
+        .tokens
         .get_mut_or_create(serum_market.quote_token_index)?;
     quote_position.in_use_count += 1;
     let (base_position, _) = account
-        .token_account_map
+        .tokens
         .get_mut_or_create(serum_market.base_token_index)?;
     base_position.in_use_count += 1;
 

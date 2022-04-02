@@ -165,8 +165,8 @@ pub fn compute_health_from_fixed_accounts(
     health_type: HealthType,
     ais: &[AccountInfo],
 ) -> Result<I80F48> {
-    let active_token_len = account.token_account_map.iter_active().count();
-    let active_serum_len = account.serum3_account_map.iter_active().count();
+    let active_token_len = account.tokens.iter_active().count();
+    let active_serum_len = account.serum3.iter_active().count();
     let expected_ais = active_token_len * 2 // banks + oracles
         + active_serum_len; // open_orders
     require!(ais.len() == expected_ais, MangoError::SomeError);
@@ -298,7 +298,7 @@ fn compute_health_detail<'a, 'b: 'a>(
 ) -> Result<HealthCache> {
     // token contribution from token accounts
     let mut token_infos = vec![];
-    for (i, position) in account.token_account_map.iter_active().enumerate() {
+    for (i, position) in account.tokens.iter_active().enumerate() {
         let (bank, oracle_ai) =
             retriever.bank_and_oracle(&account.group, i, position.token_index)?;
         let oracle_price = oracle_price(oracle_ai)?;
@@ -319,7 +319,7 @@ fn compute_health_detail<'a, 'b: 'a>(
     }
 
     // token contribution from serum accounts
-    for (i, serum_account) in account.serum3_account_map.iter_active().enumerate() {
+    for (i, serum_account) in account.serum3.iter_active().enumerate() {
         let oo = retriever.serum_oo(i, &serum_account.open_orders)?;
         if !allow_serum3 {
             require!(

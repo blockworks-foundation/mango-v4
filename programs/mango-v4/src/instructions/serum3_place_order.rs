@@ -118,7 +118,7 @@ pub fn serum3_place_order(
         // Validate open_orders
         require!(
             account
-                .serum3_account_map
+                .serum3
                 .find(serum_market.market_index)
                 .ok_or_else(|| error!(MangoError::SomeError))?
                 .open_orders
@@ -189,14 +189,14 @@ pub fn serum3_place_order(
         let mut account = ctx.accounts.account.load_mut()?;
 
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
-        let base_position = account.token_account_map.get_mut(base_bank.token_index)?;
+        let base_position = account.tokens.get_mut(base_bank.token_index)?;
         base_bank.change(
             base_position,
             I80F48::from(after_base_vault) - I80F48::from(before_base_vault),
         )?;
 
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-        let quote_position = account.token_account_map.get_mut(quote_bank.token_index)?;
+        let quote_position = account.tokens.get_mut(quote_bank.token_index)?;
         quote_bank.change(
             quote_position,
             I80F48::from(after_quote_vault) - I80F48::from(before_quote_vault),

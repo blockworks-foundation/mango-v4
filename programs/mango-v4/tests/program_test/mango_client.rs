@@ -110,7 +110,7 @@ async fn derive_health_check_remaining_account_metas(
     // figure out all the banks/oracles that need to be passed for the health check
     let mut banks = vec![];
     let mut oracles = vec![];
-    for position in account.token_account_map.iter_active() {
+    for position in account.tokens.iter_active() {
         let mint_info =
             get_mint_info_by_token_index(account_loader, account, position.token_index).await;
         // TODO: ALTs are unavailable
@@ -129,7 +129,7 @@ async fn derive_health_check_remaining_account_metas(
             // If there is not yet an active position for the token, we need to pass
             // the bank/oracle for health check anyway.
             let new_position = account
-                .token_account_map
+                .tokens
                 .values
                 .iter()
                 .position(|p| !p.is_active())
@@ -140,10 +140,7 @@ async fn derive_health_check_remaining_account_metas(
         }
     }
 
-    let serum_oos = account
-        .serum3_account_map
-        .iter_active()
-        .map(|&s| s.open_orders);
+    let serum_oos = account.serum3.iter_active().map(|&s| s.open_orders);
 
     banks
         .iter()
@@ -175,9 +172,9 @@ async fn derive_liquidation_remaining_account_metas(
     let mut banks = vec![];
     let mut oracles = vec![];
     let token_indexes = liqee
-        .token_account_map
+        .tokens
         .iter_active()
-        .chain(liqor.token_account_map.iter_active())
+        .chain(liqor.tokens.iter_active())
         .map(|ta| ta.token_index)
         .unique();
     for token_index in token_indexes {
@@ -199,9 +196,9 @@ async fn derive_liquidation_remaining_account_metas(
     }
 
     let serum_oos = liqee
-        .serum3_account_map
+        .serum3
         .iter_active()
-        .chain(liqor.serum3_account_map.iter_active())
+        .chain(liqor.serum3.iter_active())
         .map(|&s| s.open_orders);
 
     banks
@@ -232,7 +229,7 @@ pub async fn account_position(solana: &SolanaCookie, account: Pubkey, bank: Pubk
     let account_data: MangoAccount = solana.get_account(account).await;
     let bank_data: Bank = solana.get_account(bank).await;
     let native = account_data
-        .token_account_map
+        .tokens
         .find(bank_data.token_index)
         .unwrap()
         .native(&bank_data);
@@ -266,7 +263,7 @@ impl<'keypair> ClientInstruction for MarginTradeInstruction<'keypair> {
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
 
         let instruction = Self::Instruction {
-            banks_len: account.token_account_map.iter_active().count(),
+            banks_len: account.tokens.iter_active().count(),
             cpi_data: self.margin_trade_program_ix_cpi_data.clone(),
         };
 
@@ -876,7 +873,7 @@ impl<'keypair> ClientInstruction for Serum3PlaceOrderInstruction<'keypair> {
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum3_account_map
+            .serum3
             .find(serum_market.market_index)
             .unwrap()
             .open_orders;
@@ -971,7 +968,7 @@ impl<'keypair> ClientInstruction for Serum3CancelOrderInstruction<'keypair> {
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum3_account_map
+            .serum3
             .find(serum_market.market_index)
             .unwrap()
             .open_orders;
@@ -1030,7 +1027,7 @@ impl<'keypair> ClientInstruction for Serum3SettleFundsInstruction<'keypair> {
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum3_account_map
+            .serum3
             .find(serum_market.market_index)
             .unwrap()
             .open_orders;
@@ -1104,7 +1101,7 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum3_account_map
+            .serum3
             .find(serum_market.market_index)
             .unwrap()
             .open_orders;

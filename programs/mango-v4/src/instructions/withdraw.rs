@@ -62,7 +62,7 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
     let mut account = ctx.accounts.account.load_mut()?;
     require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
 
-    let (position, position_index) = account.token_account_map.get_mut_or_create(token_index)?;
+    let (position, position_index) = account.tokens.get_mut_or_create(token_index)?;
 
     // The bank will also be passed in remainingAccounts. Use an explicit scope
     // to drop the &mut before we borrow it immutably again later.
@@ -115,7 +115,7 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
     // deactivated.
     //
     if !position_is_active {
-        account.token_account_map.deactivate(position_index);
+        account.tokens.deactivate(position_index);
     }
 
     Ok(())

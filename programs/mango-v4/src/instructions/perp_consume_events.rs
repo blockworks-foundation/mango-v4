@@ -50,10 +50,16 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         Some(account_info) => account_info.load_mut::<MangoAccount>()?,
                     };
 
-                    ma.perp
-                        .execute_maker(perp_market.perp_market_index, &mut perp_market, fill)?;
-                    ma.perp
-                        .execute_taker(perp_market.perp_market_index, &mut perp_market, fill)?;
+                    ma.perps.execute_maker(
+                        perp_market.perp_market_index,
+                        &mut perp_market,
+                        fill,
+                    )?;
+                    ma.perps.execute_taker(
+                        perp_market.perp_market_index,
+                        &mut perp_market,
+                        fill,
+                    )?;
                 } else {
                     let mut maker = match mango_account_ais.iter().find(|ai| ai.key == &fill.maker)
                     {
@@ -72,12 +78,12 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         Some(account_info) => account_info.load_mut::<MangoAccount>()?,
                     };
 
-                    maker.perp.execute_maker(
+                    maker.perps.execute_maker(
                         perp_market.perp_market_index,
                         &mut perp_market,
                         fill,
                     )?;
-                    taker.perp.execute_taker(
+                    taker.perps.execute_taker(
                         perp_market.perp_market_index,
                         &mut perp_market,
                         fill,
@@ -95,7 +101,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     Some(account_info) => account_info.load_mut::<MangoAccount>()?,
                 };
 
-                ma.perp
+                ma.perps
                     .remove_order(out.owner_slot as usize, out.quantity)?;
             }
             EventType::Liquidate => {

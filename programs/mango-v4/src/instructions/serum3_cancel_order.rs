@@ -59,7 +59,7 @@ pub fn serum3_cancel_order(
         // Validate open_orders
         require!(
             account
-                .serum3_account_map
+                .serum3
                 .find(serum_market.market_index)
                 .ok_or_else(|| error!(MangoError::SomeError))?
                 .open_orders

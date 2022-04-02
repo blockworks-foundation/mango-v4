@@ -65,17 +65,22 @@ impl TokenAccount {
 }
 
 #[zero_copy]
-pub struct TokenAccountMap {
+pub struct MangoAccountTokens {
     pub values: [TokenAccount; MAX_TOKEN_ACCOUNTS],
 }
+const_assert_eq!(
+    size_of::<MangoAccountTokens>(),
+    MAX_TOKEN_ACCOUNTS * size_of::<TokenAccount>()
+);
+const_assert_eq!(size_of::<MangoAccountTokens>() % 8, 0);
 
-impl Default for TokenAccountMap {
+impl Default for MangoAccountTokens {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl TokenAccountMap {
+impl MangoAccountTokens {
     pub fn new() -> Self {
         Self {
             values: [TokenAccount {
@@ -186,17 +191,22 @@ impl Default for Serum3Account {
 }
 
 #[zero_copy]
-pub struct Serum3AccountMap {
+pub struct MangoAccountSerum3 {
     pub values: [Serum3Account; MAX_SERUM3_ACCOUNTS],
 }
+const_assert_eq!(
+    size_of::<MangoAccountSerum3>(),
+    MAX_SERUM3_ACCOUNTS * size_of::<Serum3Account>()
+);
+const_assert_eq!(size_of::<MangoAccountSerum3>() % 8, 0);
 
-impl Default for Serum3AccountMap {
+impl Default for MangoAccountSerum3 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Serum3AccountMap {
+impl MangoAccountSerum3 {
     pub fn new() -> Self {
         Self {
             values: [Serum3Account::default(); MAX_SERUM3_ACCOUNTS],
@@ -308,7 +318,7 @@ impl PerpAccount {
 }
 
 #[zero_copy]
-pub struct PerpData {
+pub struct MangoAccountPerps {
     pub accounts: [PerpAccount; MAX_PERP_ACCOUNTS],
 
     // TODO: possibly it's more convenient to store a single list of PerpOpenOrder structs?
@@ -318,12 +328,12 @@ pub struct PerpData {
     pub order_client_id: [u64; MAX_PERP_OPEN_ORDERS],
 }
 const_assert_eq!(
-    size_of::<PerpData>(),
+    size_of::<MangoAccountPerps>(),
     MAX_PERP_ACCOUNTS * size_of::<PerpAccount>() + MAX_PERP_OPEN_ORDERS * (2 + 1 + 16 + 8)
 );
-const_assert_eq!(size_of::<PerpData>() % 8, 0);
+const_assert_eq!(size_of::<MangoAccountPerps>() % 8, 0);
 
-impl PerpData {
+impl MangoAccountPerps {
     pub fn new() -> Self {
         Self {
             accounts: [PerpAccount::default(); MAX_PERP_ACCOUNTS],
@@ -491,7 +501,7 @@ impl PerpData {
     }
 }
 
-impl Default for PerpData {
+impl Default for MangoAccountPerps {
     fn default() -> Self {
         Self::new()
     }
@@ -507,13 +517,13 @@ pub struct MangoAccount {
 
     // Maps token_index -> deposit/borrow account for each token
     // that is active on this MangoAccount.
-    pub token_account_map: TokenAccountMap,
+    pub tokens: MangoAccountTokens,
 
     // Maps serum_market_index -> open orders for each serum market
     // that is active on this MangoAccount.
-    pub serum3_account_map: Serum3AccountMap,
+    pub serum3: MangoAccountSerum3,
 
-    pub perp: PerpData,
+    pub perps: MangoAccountPerps,
 
     /// This account cannot open new positions or borrow until `init_health >= 0`
     pub being_liquidated: u8,
@@ -530,9 +540,9 @@ pub struct MangoAccount {
 const_assert_eq!(
     size_of::<MangoAccount>(),
     3 * 32
-        + MAX_TOKEN_ACCOUNTS * size_of::<TokenAccount>()
-        + MAX_SERUM3_ACCOUNTS * size_of::<Serum3Account>()
-        + size_of::<PerpData>()
+        + size_of::<MangoAccountTokens>()
+        + size_of::<MangoAccountSerum3>()
+        + size_of::<MangoAccountPerps>()
         + 4
         + 4
 );
