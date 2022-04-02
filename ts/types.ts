@@ -80,7 +80,7 @@ export class Bank {
 }
 
 export class MangoAccount {
-  public tokenAccountMap: TokenAccount[];
+  public tokens: TokenAccount[];
 
   static from(
     publicKey: PublicKey,
@@ -128,11 +128,11 @@ export class MangoAccount {
     bump: number,
     reserved: number[],
   ) {
-    this.tokenAccountMap = tokens.values.map((dto) => TokenAccount.from(dto));
+    this.tokens = tokens.values.map((dto) => TokenAccount.from(dto));
   }
 
   find(tokenIndex: number): TokenAccount | undefined {
-    return this.tokenAccountMap.find((ta) => ta.tokenIndex == tokenIndex);
+    return this.tokens.find((ta) => ta.tokenIndex == tokenIndex);
   }
 
   getNativeDeposit(bank: Bank): I80F48 {
