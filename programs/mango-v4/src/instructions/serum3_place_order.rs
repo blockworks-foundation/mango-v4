@@ -161,7 +161,7 @@ pub fn serum3_place_order(
     // matched against an existing other order.
     //
     let order = serum_dex::instruction::NewOrderInstructionV3 {
-        side: u8::try_from(side)?.try_into().unwrap(),
+        side: (side as u8).try_into().unwrap(),
         limit_price: limit_price.try_into().unwrap(),
         max_coin_qty: max_base_qty.try_into().unwrap(),
         max_native_pc_qty_including_fees: max_native_quote_qty_including_fees.try_into().unwrap(),

@@ -72,7 +72,7 @@ pub fn serum3_cancel_order(
     // Cancel
     //
     let order = serum_dex::instruction::CancelOrderInstructionV2 {
-        side: u8::try_from(side)?.try_into().unwrap(),
+        side: (side as u8).try_into().unwrap(),
         order_id,
     };
     cpi_cancel_order(ctx.accounts, order)?;
