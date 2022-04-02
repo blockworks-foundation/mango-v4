@@ -23,6 +23,9 @@ export class MangoClient {
     // without anchor throwing errors. These types come from part of the code we don't yet care about
     // in the client.
     function addDummyType(idl: MangoV4, typeName: string) {
+      if (idl.types.find((type) => type.name === typeName)) {
+        return;
+      }
       (idl.types as any).push({
         name: typeName,
         type: {

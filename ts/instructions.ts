@@ -5,6 +5,7 @@ import { Keypair, PublicKey, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
 import * as bs58 from 'bs58';
 import { MangoClient } from './client';
 import { Bank, Group, MangoAccount } from './types';
+import { debugAccountMetas } from './utils';
 
 //
 // group
@@ -62,6 +63,7 @@ export async function registerToken(
   mintPk: PublicKey,
   oraclePk: PublicKey,
   payer: Keypair,
+  tokenIndex: number,
 ): Promise<void> {
   const tx = new Transaction();
   const signers = [payer];
@@ -72,6 +74,7 @@ export async function registerToken(
     mintPk,
     oraclePk,
     payer,
+    tokenIndex,
   );
   tx.add(ix);
   await client.program.provider.send(tx, signers);
@@ -84,9 +87,10 @@ export async function registerTokenIx(
   mintPk: PublicKey,
   oraclePk: PublicKey,
   payer: Keypair,
+  tokenIndex: number,
 ): Promise<TransactionInstruction> {
   return await client.program.methods
-    .registerToken(1, 0.8, 0.6, 1.2, 1.4, 0.02)
+    .registerToken(tokenIndex, 0.8, 0.6, 1.2, 1.4, 0.02)
     .accounts({
       group: groupPk,
       admin: adminPk,
@@ -369,3 +373,36 @@ export async function withdrawIx(
     ])
     .instruction();
 }
+
+//
+// Serum3 instructions
+//
+
+// export async function serum3_register_market(
+//   client: MangoClient,
+//   groupPk: PublicKey,
+//   adminPk: PublicKey,
+//   serumProgramPk: PublicKey,
+//   serumMarketExternalPk: PublicKey,
+//   quoteBankPk: PublicKey,
+//   baseBankPk: PublicKey,
+//   ownerPk: PublicKey,
+//   amount: number,
+//   allowBorrow: boolean,
+// ): Promise<TransactionInstruction> {
+//   return await client.program.methods
+//     .withdraw(new BN(amount), allowBorrow)
+//     .accounts({
+//       group: groupPk,
+//       account: mangoAccountPk,
+//       bank: bankPk,
+//       vault: vaultPk,
+//       tokenAccount: tokenAccountPk,
+//       tokenAuthority: ownerPk,
+//     })
+//     .remainingAccounts([
+//       { pubkey: bankPk, isWritable: false, isSigner: false },
+//       { pubkey: oraclePk, isWritable: false, isSigner: false },
+//     ])
+//     .instruction();
+// }
