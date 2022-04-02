@@ -4,13 +4,11 @@ import * as spl from '@solana/spl-token';
 import fs from 'fs';
 import { MangoClient } from './client';
 import {
-  closeMangoAccount,
   createGroup,
   createMangoAccount,
   deposit,
   getBank,
   getBankForGroupAndMint,
-  getBanksForGroup,
   getGroupForAdmin,
   getMangoAccount,
   getMangoAccountsForGroupAndOwner,

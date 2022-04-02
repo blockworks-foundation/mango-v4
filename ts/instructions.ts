@@ -1,15 +1,15 @@
-import { BN, ProgramAccount } from '@project-serum/anchor';
-import { TransactionInstruction } from '@solana/web3.js';
-import { Transaction } from '@solana/web3.js';
-import { Keypair, PublicKey, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
+import { BN } from '@project-serum/anchor';
+import {
+  Keypair,
+  PublicKey,
+  SYSVAR_RENT_PUBKEY,
+  Transaction,
+  TransactionInstruction,
+} from '@solana/web3.js';
 import * as bs58 from 'bs58';
-import { Key } from 'readline';
 import { MangoClient } from './client';
 import { Bank, Group, MangoAccount, Serum3Market } from './types';
-import { debugAccountMetas } from './utils';
-import * as borsh from '@project-serum/borsh';
 import { I80F48 } from './I80F48';
-import { stat } from 'fs';
 
 //
 // group

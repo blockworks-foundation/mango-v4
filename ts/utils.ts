@@ -1,5 +1,4 @@
 import { AccountMeta } from '@solana/web3.js';
-import { PublicKey } from '@solana/web3.js';
 
 export function debugAccountMetas(ams: AccountMeta[]) {
   for (const am of ams) {
