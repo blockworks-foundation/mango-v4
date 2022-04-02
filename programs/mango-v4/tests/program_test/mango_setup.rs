@@ -45,7 +45,9 @@ impl<'a> GroupWithTokensConfig<'a> {
             let create_stub_oracle_accounts = send_tx(
                 solana,
                 CreateStubOracle {
+                    group,
                     mint: mint.pubkey,
+                    admin,
                     payer,
                 },
             )
@@ -55,6 +57,8 @@ impl<'a> GroupWithTokensConfig<'a> {
             send_tx(
                 solana,
                 SetStubOracle {
+                    group,
+                    admin,
                     mint: mint.pubkey,
                     payer,
                     price: "1.0",

@@ -536,6 +536,8 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
 
 pub struct SetStubOracle<'keypair> {
     pub mint: Pubkey,
+    pub group: Pubkey,
+    pub admin: &'keypair Keypair,
     pub payer: &'keypair Keypair,
     pub price: &'static str,
 }
@@ -554,24 +556,35 @@ impl<'keypair> ClientInstruction for SetStubOracle<'keypair> {
         };
 
         let oracle = Pubkey::find_program_address(
-            &[b"StubOracle".as_ref(), self.mint.as_ref()],
+            &[
+                self.group.as_ref(),
+                b"StubOracle".as_ref(),
+                self.mint.as_ref(),
+            ],
             &program_id,
         )
         .0;
 
-        let accounts = Self::Accounts { oracle };
+        let accounts = Self::Accounts {
+            oracle,
+            group: self.group,
+            admin: self.admin.pubkey(),
+            payer: self.payer.pubkey(),
+        };
 
         let instruction = make_instruction(program_id, &accounts, instruction);
         (accounts, instruction)
     }
 
     fn signers(&self) -> Vec<&Keypair> {
-        vec![]
+        vec![self.payer, self.admin]
     }
 }
 
 pub struct CreateStubOracle<'keypair> {
+    pub group: Pubkey,
     pub mint: Pubkey,
+    pub admin: &'keypair Keypair,
     pub payer: &'keypair Keypair,
 }
 #[async_trait::async_trait(?Send)]
@@ -589,14 +602,20 @@ impl<'keypair> ClientInstruction for CreateStubOracle<'keypair> {
         };
 
         let oracle = Pubkey::find_program_address(
-            &[b"StubOracle".as_ref(), self.mint.as_ref()],
+            &[
+                self.group.as_ref(),
+                b"StubOracle".as_ref(),
+                self.mint.as_ref(),
+            ],
             &program_id,
         )
         .0;
 
         let accounts = Self::Accounts {
+            group: self.group,
             oracle,
             token_mint: self.mint,
+            admin: self.admin.pubkey(),
             payer: self.payer.pubkey(),
             system_program: System::id(),
         };
@@ -606,7 +625,7 @@ impl<'keypair> ClientInstruction for CreateStubOracle<'keypair> {
     }
 
     fn signers(&self) -> Vec<&Keypair> {
-        vec![self.payer]
+        vec![self.payer, self.admin]
     }
 }
 

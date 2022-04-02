@@ -1,6 +1,9 @@
+use std::mem::size_of;
+
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 use fixed::types::I80F48;
+use static_assertions::const_assert_eq;
 
 use crate::error::MangoError;
 use crate::util::LoadZeroCopy;
@@ -13,9 +16,13 @@ pub enum OracleType {
 
 #[account(zero_copy)]
 pub struct StubOracle {
+    pub group: Pubkey,
     pub price: I80F48,
     pub last_updated: i64,
+    pub reserved: [u8; 8],
 }
+const_assert_eq!(size_of::<StubOracle>(), 32 + 16 + 8 + 8);
+const_assert_eq!(size_of::<StubOracle>() % 8, 0);
 
 pub fn determine_oracle_type(data: &[u8]) -> Result<OracleType> {
     if u32::from_le_bytes(data[0..4].try_into().unwrap()) == pyth_client::MAGIC {

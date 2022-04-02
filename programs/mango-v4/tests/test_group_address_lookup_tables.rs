@@ -67,6 +67,8 @@ async fn test_group_address_lookup_tables() -> Result<()> {
         send_tx(
             solana,
             SetStubOracle {
+                group,
+                admin,
                 mint: mint.pubkey,
                 payer,
                 price: "1.0",

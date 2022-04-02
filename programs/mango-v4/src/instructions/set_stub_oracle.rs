@@ -5,8 +5,21 @@ use crate::state::*;
 
 #[derive(Accounts)]
 pub struct SetStubOracle<'info> {
-    #[account(mut)]
+    #[account(
+        has_one = admin,
+    )]
+    pub group: AccountLoader<'info, Group>,
+
+    pub admin: Signer<'info>,
+
+    #[account(
+        mut,
+        has_one = group
+    )]
     pub oracle: AccountLoader<'info, StubOracle>,
+
+    #[account(mut)]
+    pub payer: Signer<'info>,
 }
 
 // TODO: add admin requirement for changing price
