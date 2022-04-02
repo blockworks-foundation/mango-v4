@@ -22,24 +22,6 @@ import {
 import { findOrCreate } from './utils';
 import { Bank, Group, MangoAccount, Serum3Market } from './types';
 
-async function registerBank(
-  client: MangoClient,
-  group: any,
-  admin: Keypair,
-  mint: PublicKey,
-  oracle: PublicKey,
-  payer: Keypair,
-  tokenIndex: number,
-): Promise<Bank> {
-  return await findOrCreate<Bank>(
-    'group',
-    getBankForGroupAndMint,
-    [client, group.publicKey, mint],
-    registerToken,
-    [client, group.publicKey, admin.publicKey, mint, oracle, payer, tokenIndex],
-  );
-}
-
 async function main() {
   //
   // Setup
