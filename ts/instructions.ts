@@ -8,6 +8,8 @@ import { MangoClient } from './client';
 import { Bank, Group, MangoAccount, Serum3Market } from './types';
 import { debugAccountMetas } from './utils';
 import * as borsh from '@project-serum/borsh';
+import { I80F48 } from './I80F48';
+import { stat } from 'fs';
 
 //
 // group
@@ -43,15 +45,17 @@ export async function createGroupIx(
 export async function getGroupForAdmin(
   client: MangoClient,
   adminPk: PublicKey,
-): Promise<ProgramAccount<Group>[]> {
-  return (await client.program.account.group.all([
-    {
-      memcmp: {
-        bytes: adminPk.toBase58(),
-        offset: 8,
+): Promise<Group[]> {
+  return (
+    await client.program.account.group.all([
+      {
+        memcmp: {
+          bytes: adminPk.toBase58(),
+          offset: 8,
+        },
       },
-    },
-  ])) as ProgramAccount<Group>[];
+    ])
+  ).map((tuple) => Group.from(tuple.publicKey, tuple.account));
 }
 
 //
@@ -469,4 +473,40 @@ export async function getSerum3MarketForBaseAndQuote(
       },
     ])
   ).map((tuple) => Serum3Market.from(tuple.publicKey, tuple.account));
+}
+
+//
+// Oracle
+//
+
+export async function createStubOracle(
+  client: MangoClient,
+  tokenMintPk: PublicKey,
+  payer: Keypair,
+  staticPrice: number,
+): Promise<void> {
+  return await client.program.methods
+    .createStubOracle({ val: I80F48.fromNumber(staticPrice).getData() })
+    .accounts({
+      tokenMint: tokenMintPk,
+      payer: payer.publicKey,
+    })
+    .signers([payer])
+    .rpc();
+}
+
+export async function setStubOracle(
+  client: MangoClient,
+  tokenMintPk: PublicKey,
+  payer: Keypair,
+  staticPrice: number,
+): Promise<void> {
+  return await client.program.methods
+    .setStubOracle({ val: I80F48.fromNumber(staticPrice).getData() })
+    .accounts({
+      tokenMint: tokenMintPk,
+      payer: payer.publicKey,
+    })
+    .signers([payer])
+    .rpc();
 }

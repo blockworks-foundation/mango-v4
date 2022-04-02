@@ -19,6 +19,8 @@ import {
   serum3RegisterMarket,
   withdraw,
 } from './instructions';
+import { findOrCreate } from './utils';
+import { Bank, Group, MangoAccount, Serum3Market } from './types';
 
 async function registerBank(
   client: MangoClient,
@@ -28,27 +30,14 @@ async function registerBank(
   oracle: PublicKey,
   payer: Keypair,
   tokenIndex: number,
-) {
-  let banks = await getBankForGroupAndMint(client, group.publicKey, mint);
-  let bank;
-  if (banks.length > 0) {
-    bank = banks[0];
-    console.log(`Found bank ${bank.publicKey.toBase58()}`);
-  } else {
-    await registerToken(
-      client,
-      group.publicKey,
-      admin.publicKey,
-      mint,
-      oracle,
-      payer,
-      tokenIndex,
-    );
-    banks = await getBankForGroupAndMint(client, group.publicKey, mint);
-    bank = banks[0];
-    console.log(`Registered token ${bank.publicKey.toBase58()}`);
-  }
-  return bank;
+): Promise<Bank> {
+  return await findOrCreate<Bank>(
+    'group',
+    getBankForGroupAndMint,
+    [client, group.publicKey, mint],
+    registerToken,
+    [client, group.publicKey, admin.publicKey, mint, oracle, payer, tokenIndex],
+  );
 }
 
 async function main() {
@@ -80,20 +69,17 @@ async function main() {
   //
   // Find existing or create a new group
   //
-  let groups = await getGroupForAdmin(adminClient, admin.publicKey);
-  let group;
-  if (groups.length > 0) {
-    group = groups[0];
-    console.log(`Found group ${group.publicKey.toBase58()}`);
-  } else {
-    await createGroup(adminClient, admin.publicKey, payer);
-    let groups = await getGroupForAdmin(adminClient, admin.publicKey);
-    group = groups[0];
-    console.log(`Created group ${group.publicKey.toBase58()}`);
-  }
+  const group: Group = await findOrCreate(
+    'group',
+    getGroupForAdmin,
+    [adminClient, admin.publicKey],
+    createGroup,
+    [adminClient, admin.publicKey, payer],
+  );
+  console.log(`Group ${group.publicKey}`);
 
   //
-  // Find existing or register a new token
+  // Find existing or register new tokens
   //
   // TODO: replace with 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU,
   // see https://developers.circle.com/docs/usdc-on-testnet#usdc-on-solana-testnet
@@ -110,43 +96,55 @@ async function main() {
   const btcDevnetOracle = new PublicKey(
     'HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J',
   );
-  let btcBank = await registerBank(
-    adminClient,
-    group,
-    admin,
-    btcDevnetMint,
-    btcDevnetOracle,
-    payer,
-    0,
-  );
-  let usdcBank = await registerBank(
-    adminClient,
-    group,
-    admin,
-    usdcDevnetMint,
-    usdtDevnetOracle,
-    payer,
-    1,
-  );
 
+  const btcBank = await findOrCreate<Bank>(
+    'bank',
+    getBankForGroupAndMint,
+    [adminClient, group.publicKey, btcDevnetMint],
+    registerToken,
+    [
+      adminClient,
+      group.publicKey,
+      admin.publicKey,
+      btcDevnetMint,
+      btcDevnetOracle,
+      payer,
+      0,
+    ],
+  );
+  console.log(`BtcBank ${btcBank.publicKey}`);
+  const usdcBank = await findOrCreate<Bank>(
+    'bank',
+    getBankForGroupAndMint,
+    [adminClient, group.publicKey, usdcDevnetMint],
+    registerToken,
+    [
+      adminClient,
+      group.publicKey,
+      admin.publicKey,
+      usdcDevnetMint,
+      usdtDevnetOracle,
+      payer,
+      0,
+    ],
+  );
+  console.log(`UsdcBank ${usdcBank.publicKey}`);
+
+  //
+  // Find existing or register a new serum market
+  //
   const serumProgramId = new web3.PublicKey(
     'DESVgJVGajEgKGXhb6XmqDHGz3VjdgP7rEVESBgxmroY',
   );
   const serumMarketExternalPk = new web3.PublicKey(
     'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB',
   );
-  let markets = await getSerum3MarketForBaseAndQuote(
-    adminClient,
-    group.publicKey,
-    btcBank.tokenIndex,
-    usdcBank.tokenIndex,
-  );
-  let market;
-  if (markets.length > 0) {
-    market = markets[0];
-    console.log(`Found market ${market.publicKey.toBase58()}`);
-  } else {
-    await serum3RegisterMarket(
+  const serum3Market = await findOrCreate<Serum3Market>(
+    'serum3Market',
+    getSerum3MarketForBaseAndQuote,
+    [adminClient, group.publicKey, btcBank.tokenIndex, usdcBank.tokenIndex],
+    serum3RegisterMarket,
+    [
       adminClient,
       group.publicKey,
       admin.publicKey,
@@ -156,16 +154,9 @@ async function main() {
       btcBank.publicKey,
       payer,
       0,
-    );
-    markets = await getSerum3MarketForBaseAndQuote(
-      adminClient,
-      group.publicKey,
-      btcBank.tokenIndex,
-      usdcBank.tokenIndex,
-    );
-    market = markets[0];
-    console.log(`Found market ${market.publicKey.toBase58()}`);
-  }
+    ],
+  );
+  console.log(`Serum3Market ${serum3Market.publicKey}`);
 
   //
   // User operations
@@ -184,30 +175,14 @@ async function main() {
   //
   // Create mango account
   //
-  let accounts = await getMangoAccountsForGroupAndOwner(
-    userClient,
-    group.publicKey,
-    user.publicKey,
+  const mangoAccount = await findOrCreate<MangoAccount>(
+    'mangoAccount',
+    getMangoAccountsForGroupAndOwner,
+    [userClient, group.publicKey, user.publicKey],
+    createMangoAccount,
+    [userClient, group.publicKey, user.publicKey, payer],
   );
-  let account;
-  if (accounts.length > 0) {
-    account = accounts[0];
-    console.log(`Found mango account ${account.publicKey.toBase58()}`);
-  } else {
-    await createMangoAccount(
-      userClient,
-      group.publicKey,
-      user.publicKey,
-      payer,
-    );
-    accounts = await getMangoAccountsForGroupAndOwner(
-      userClient,
-      group.publicKey,
-      user.publicKey,
-    );
-    account = accounts[0];
-    console.log(`Created mango account ${account.publicKey.toBase58()}`);
-  }
+  console.log(`MangoAccount ${serum3Market.publicKey}`);
 
   // deposit
   console.log(`Depositing...1000`);
@@ -218,7 +193,7 @@ async function main() {
   await deposit(
     userClient,
     group.publicKey,
-    account.publicKey,
+    mangoAccount.publicKey,
     btcBank.publicKey,
     btcBank.vault,
     btcTokenAccount,
@@ -232,7 +207,7 @@ async function main() {
   await withdraw(
     userClient,
     group.publicKey,
-    account.publicKey,
+    mangoAccount.publicKey,
     btcBank.publicKey,
     btcBank.vault,
     btcTokenAccount,
@@ -246,7 +221,10 @@ async function main() {
   const freshBank = await getBank(userClient, btcBank.publicKey);
   console.log(freshBank.toString());
 
-  const freshAccount = await getMangoAccount(userClient, account.publicKey);
+  const freshAccount = await getMangoAccount(
+    userClient,
+    mangoAccount.publicKey,
+  );
   console.log(
     `Mango account  ${freshAccount.getNativeDeposit(
       freshBank,

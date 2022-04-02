@@ -9,6 +9,7 @@ pub struct SetStubOracle<'info> {
     pub oracle: AccountLoader<'info, StubOracle>,
 }
 
+// TODO: add admin requirement for changing price
 pub fn set_stub_oracle(ctx: Context<SetStubOracle>, price: I80F48) -> Result<()> {
     let mut oracle = ctx.accounts.oracle.load_mut()?;
     oracle.price = price;

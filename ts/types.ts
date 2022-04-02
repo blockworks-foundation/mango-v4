@@ -3,7 +3,10 @@ import BN from 'bn.js';
 import { I80F48 } from './I80F48';
 
 export class Group {
-  constructor(admin: PublicKey, bump: number) {}
+  static from(publicKey: PublicKey, obj: { admin: PublicKey }): Group {
+    return new Group(publicKey, obj.admin);
+  }
+  constructor(public publicKey: PublicKey, public admin: PublicKey) {}
 }
 
 export class Bank {
