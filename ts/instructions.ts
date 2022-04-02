@@ -3,9 +3,11 @@ import { TransactionInstruction } from '@solana/web3.js';
 import { Transaction } from '@solana/web3.js';
 import { Keypair, PublicKey, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
 import * as bs58 from 'bs58';
+import { Key } from 'readline';
 import { MangoClient } from './client';
 import { Bank, Group, MangoAccount } from './types';
 import { debugAccountMetas } from './utils';
+import * as borsh from '@project-serum/borsh';
 
 //
 // group
@@ -378,31 +380,84 @@ export async function withdrawIx(
 // Serum3 instructions
 //
 
-// export async function serum3_register_market(
-//   client: MangoClient,
-//   groupPk: PublicKey,
-//   adminPk: PublicKey,
-//   serumProgramPk: PublicKey,
-//   serumMarketExternalPk: PublicKey,
-//   quoteBankPk: PublicKey,
-//   baseBankPk: PublicKey,
-//   ownerPk: PublicKey,
-//   amount: number,
-//   allowBorrow: boolean,
-// ): Promise<TransactionInstruction> {
-//   return await client.program.methods
-//     .withdraw(new BN(amount), allowBorrow)
-//     .accounts({
-//       group: groupPk,
-//       account: mangoAccountPk,
-//       bank: bankPk,
-//       vault: vaultPk,
-//       tokenAccount: tokenAccountPk,
-//       tokenAuthority: ownerPk,
-//     })
-//     .remainingAccounts([
-//       { pubkey: bankPk, isWritable: false, isSigner: false },
-//       { pubkey: oraclePk, isWritable: false, isSigner: false },
-//     ])
-//     .instruction();
-// }
+export async function serum3RegisterMarket(
+  client: MangoClient,
+  groupPk: PublicKey,
+  adminPk: PublicKey,
+  serumProgramPk: PublicKey,
+  serumMarketExternalPk: PublicKey,
+  quoteBankPk: PublicKey,
+  baseBankPk: PublicKey,
+  payer: Keypair,
+  marketIndex: number,
+): Promise<void> {
+  const tx = new Transaction();
+  const ix = await serum3RegisterMarketIx(
+    client,
+    groupPk,
+    adminPk,
+    serumProgramPk,
+    serumMarketExternalPk,
+    quoteBankPk,
+    baseBankPk,
+    payer,
+    marketIndex,
+  );
+  tx.add(ix);
+  await client.program.provider.send(tx, [payer]);
+}
+
+export async function serum3RegisterMarketIx(
+  client: MangoClient,
+  groupPk: PublicKey,
+  adminPk: PublicKey,
+  serumProgramPk: PublicKey,
+  serumMarketExternalPk: PublicKey,
+  quoteBankPk: PublicKey,
+  baseBankPk: PublicKey,
+  payer: Keypair,
+  marketIndex: number,
+): Promise<TransactionInstruction> {
+  return await client.program.methods
+    .serum3RegisterMarket(marketIndex)
+    .accounts({
+      group: groupPk,
+      admin: adminPk,
+      serumProgram: serumProgramPk,
+      serumMarketExternal: serumMarketExternalPk,
+      quoteBank: quoteBankPk,
+      baseBank: baseBankPk,
+      payer: payer.publicKey,
+    })
+    .instruction();
+}
+
+export async function getSerum3MarketForBaseAndQuote(
+  client: MangoClient,
+  groupPk: PublicKey,
+  baseTokenIndex: number,
+  quoteTokenIndex: number,
+): Promise<Object[]> {
+  return await client.program.account.serum3Market.all([
+    {
+      memcmp: {
+        bytes: bs58.encode(groupPk.toBuffer()),
+        offset: 8,
+      },
+    },
+    // {
+    //   memcmp: {
+    //     bytes: bs58.encode(borsh.u16(new BN(baseTokenIndex))),
+    //     offset: 106,
+    //   },
+    // },
+    // {
+    //   memcmp: {
+    //     bytes: bs58.encode(borsh.u16(new BN(baseTokenIndex))),
+    //     offset: 107,
+    //   },
+    // },
+  ]);
+
+  //.map((tuple) => Serum.from(tuple.publicKey, tuple.account));
+}

@@ -1,4 +1,4 @@
-import { Provider, Wallet } from '@project-serum/anchor';
+import { Provider, Wallet, web3 } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import * as spl from '@solana/spl-token';
 import fs from 'fs';
@@ -14,7 +14,9 @@ import {
   getGroupForAdmin,
   getMangoAccount,
   getMangoAccountsForGroupAndOwner,
+  getSerum3MarketForBaseAndQuote,
   registerToken,
+  serum3RegisterMarket,
   withdraw,
 } from './instructions';
 
@@ -127,6 +129,44 @@ async function main() {
     1,
   );
 
+  const serumProgramId = new web3.PublicKey(
+    'DESVgJVGajEgKGXhb6XmqDHGz3VjdgP7rEVESBgxmroY',
+  );
+  const serumMarketExternalPk = new web3.PublicKey(
+    'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB',
+  );
+  let markets = await getSerum3MarketForBaseAndQuote(
+    adminClient,
+    group.publicKey,
+    btcBank.tokenIndex,
+    usdcBank.tokenIndex,
+  );
+  let market;
+  if (markets.length > 0) {
+    market = markets[0];
+    console.log(`Found market ${market.publicKey.toBase58()}`);
+  } else {
+    await serum3RegisterMarket(
+      adminClient,
+      group.publicKey,
+      admin.publicKey,
+      serumProgramId,
+      serumMarketExternalPk,
+      usdcBank.publicKey,
+      btcBank.publicKey,
+      payer,
+      0,
+    );
+    markets = await getSerum3MarketForBaseAndQuote(
+      adminClient,
+      group.publicKey,
+      btcBank.tokenIndex,
+      usdcBank.tokenIndex,
+    );
+    market = markets[0];
+    console.log(`Found market ${market.publicKey.toBase58()}`);
+  }
+
   //
   // User operations
   //
@@ -213,16 +253,17 @@ async function main() {
     )} Deposits for bank ${freshBank.tokenIndex}`,
   );
 
-  // close mango account
-  await closeMangoAccount(userClient, account.publicKey, user.publicKey);
-  accounts = await getMangoAccountsForGroupAndOwner(
-    userClient,
-    group.publicKey,
-    user.publicKey,
-  );
-  if (accounts.length === 0) {
-    console.log(`Closed account ${account.publicKey}`);
-  }
+  // close mango account, note: close doesnt settle/withdraw for user atm,
+  // only use when you want to free up a mango account address for testing on not-mainnet
+  // await closeMangoAccount(userClient, account.publicKey, user.publicKey);
+  // accounts = await getMangoAccountsForGroupAndOwner(
+  //   userClient,
+  //   group.publicKey,
+  //   user.publicKey,
+  // );
+  // if (accounts.length === 0) {
+  //   console.log(`Closed account ${account.publicKey}`);
+  // }
 
   process.exit(0);
 }
