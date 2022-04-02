@@ -1,5 +1,6 @@
 import { Provider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import * as spl from '@solana/spl-token';
 import fs from 'fs';
 import { MangoClient } from './client';
 import {
@@ -170,14 +171,17 @@ async function main() {
 
   // deposit
   console.log(`Depositing...1000`);
+  const btcTokenAccount = await spl.getAssociatedTokenAddress(
+    btcDevnetMint,
+    user.publicKey,
+  );
   await deposit(
     userClient,
     group.publicKey,
     account.publicKey,
     btcBank.publicKey,
     btcBank.vault,
-    // BTC token account
-    new PublicKey('DS2vYFVtQbbJDowCG4NEM9KGQ8TJpxKo5efBQj96eCPS'),
+    btcTokenAccount,
     btcDevnetOracle,
     user.publicKey,
     1000,
@@ -191,8 +195,7 @@ async function main() {
     account.publicKey,
     btcBank.publicKey,
     btcBank.vault,
-    // BTC token account
-    new PublicKey('DS2vYFVtQbbJDowCG4NEM9KGQ8TJpxKo5efBQj96eCPS'),
+    btcTokenAccount,
     btcDevnetOracle,
     user.publicKey,
     500,
