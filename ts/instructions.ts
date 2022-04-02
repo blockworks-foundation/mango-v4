@@ -47,7 +47,7 @@ export async function getGroupForAdmin(
   return (await client.program.account.group.all([
     {
       memcmp: {
-        bytes: bs58.encode(adminPk.toBuffer()),
+        bytes: adminPk.toBase58(),
         offset: 8,
       },
     },
@@ -120,7 +120,7 @@ export async function getBanksForGroup(
     await client.program.account.bank.all([
       {
         memcmp: {
-          bytes: bs58.encode(groupPk.toBuffer()),
+          bytes: groupPk.toBase58(),
           offset: 8,
         },
       },
@@ -137,13 +137,13 @@ export async function getBankForGroupAndMint(
     await client.program.account.bank.all([
       {
         memcmp: {
-          bytes: bs58.encode(groupPk.toBuffer()),
+          bytes: groupPk.toBase58(),
           offset: 8,
         },
       },
       {
         memcmp: {
-          bytes: bs58.encode(mintPk.toBuffer()),
+          bytes: mintPk.toBase58(),
           offset: 40,
         },
       },
@@ -228,7 +228,7 @@ export async function getMangoAccountsForGroup(
     await client.program.account.mangoAccount.all([
       {
         memcmp: {
-          bytes: bs58.encode(groupPk.toBuffer()),
+          bytes: groupPk.toBase58(),
           offset: 8,
         },
       },
@@ -245,13 +245,13 @@ export async function getMangoAccountsForGroupAndOwner(
     await client.program.account.mangoAccount.all([
       {
         memcmp: {
-          bytes: bs58.encode(groupPk.toBuffer()),
+          bytes: groupPk.toBase58(),
           offset: 8,
         },
       },
       {
         memcmp: {
-          bytes: bs58.encode(ownerPk.toBuffer()),
+          bytes: ownerPk.toBase58(),
           offset: 40,
         },
       },
@@ -441,7 +441,7 @@ export async function getSerum3MarketForBaseAndQuote(
   return await client.program.account.serum3Market.all([
     {
       memcmp: {
-        bytes: bs58.encode(groupPk.toBuffer()),
+        bytes: groupPk.toBase58(),
         offset: 8,
       },
     },
