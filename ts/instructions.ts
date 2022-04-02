@@ -5,7 +5,7 @@ import { Keypair, PublicKey, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
 import * as bs58 from 'bs58';
 import { Key } from 'readline';
 import { MangoClient } from './client';
-import { Bank, Group, MangoAccount } from './types';
+import { Bank, Group, MangoAccount, Serum3Market } from './types';
 import { debugAccountMetas } from './utils';
 import * as borsh from '@project-serum/borsh';
 
@@ -437,7 +437,7 @@ export async function getSerum3MarketForBaseAndQuote(
   groupPk: PublicKey,
   baseTokenIndex: number,
   quoteTokenIndex: number,
-): Promise<Object[]> {
+): Promise<Serum3Market[]> {
   const bbuf = Buffer.alloc(2);
   bbuf.writeUInt16LE(baseTokenIndex);
 
@@ -447,26 +447,26 @@ export async function getSerum3MarketForBaseAndQuote(
   const bumpfbuf = Buffer.alloc(1);
   bumpfbuf.writeUInt8(255);
 
-  return await client.program.account.serum3Market.all([
-    {
-      memcmp: {
-        bytes: groupPk.toBase58(),
-        offset: 8,
+  return (
+    await client.program.account.serum3Market.all([
+      {
+        memcmp: {
+          bytes: groupPk.toBase58(),
+          offset: 8,
+        },
       },
-    },
-    {
-      memcmp: {
-        bytes: bs58.encode(bbuf),
-        offset: 106,
+      {
+        memcmp: {
+          bytes: bs58.encode(bbuf),
+          offset: 106,
+        },
       },
-    },
-    {
-      memcmp: {
-        bytes: bs58.encode(qbuf),
-        offset: 108,
+      {
+        memcmp: {
+          bytes: bs58.encode(qbuf),
+          offset: 108,
+        },
       },
-    },
-  ]);
-
-  //.map((tuple) => Serum.from(tuple.publicKey, tuple.account));
+    ])
+  ).map((tuple) => Serum3Market.from(tuple.publicKey, tuple.account));
 }
