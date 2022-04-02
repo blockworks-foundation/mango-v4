@@ -501,6 +501,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
             &program_id,
         )
         .0;
+        // TODO: remove copy pasta of pda derivation, use reference
         let oracle = Pubkey::find_program_address(
             &[b"StubOracle".as_ref(), self.mint.as_ref()],
             &program_id,
@@ -552,7 +553,7 @@ impl<'keypair> ClientInstruction for SetStubOracle<'keypair> {
         let instruction = Self::Instruction {
             price: I80F48::from_str(self.price).unwrap(),
         };
-
+        // TODO: remove copy pasta of pda derivation, use reference
         let oracle = Pubkey::find_program_address(
             &[b"StubOracle".as_ref(), self.mint.as_ref()],
             &program_id,
