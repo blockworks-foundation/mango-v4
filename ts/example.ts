@@ -20,7 +20,10 @@ import {
   withdraw,
 } from './instructions';
 import { findOrCreate } from './utils';
-import { Bank, Group, MangoAccount, Serum3Market } from './types';
+import { Bank } from './types/bank';
+import { MangoAccount } from './types/mangoAccount';
+import { Group } from './types/group';
+import { Serum3Market } from './types/serum3';
 
 async function main() {
   //

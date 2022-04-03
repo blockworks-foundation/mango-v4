@@ -1,4 +1,11 @@
 export * from './client';
 export * from './instructions';
-export * from './types';
-export * from './I80F48';
+export * from './types/types';
+export * from './types/I80F48';
+export { Bank } from './types/bank';
+export { MangoAccount } from './types/mangoAccount';
+export { Group } from './types/group';
+export { TokenAccountDto } from './types/mangoAccount';
+export { TokenAccount } from './types/mangoAccount';
+export { Serum3Market } from './types/serum3';
+export { StubOracle } from './types/oracle';

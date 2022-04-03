@@ -1,6 +1,9 @@
 import BN from 'bn.js';
 import Big from 'big.js';
-import { I80F48Dto } from './types';
+
+export class I80F48Dto {
+  constructor(public val: BN) {}
+}
 
 // TODO - this whole class is inefficient; consider optimizing
 export class I80F48 {

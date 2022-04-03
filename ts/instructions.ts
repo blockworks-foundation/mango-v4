@@ -8,8 +8,12 @@ import {
 } from '@solana/web3.js';
 import * as bs58 from 'bs58';
 import { MangoClient } from './client';
-import { Bank, Group, MangoAccount, Serum3Market, StubOracle } from './types';
-import { I80F48 } from './I80F48';
+import { I80F48 } from './types/I80F48';
+import { Bank } from './types/bank';
+import { MangoAccount } from './types/mangoAccount';
+import { Group } from './types/group';
+import { Serum3Market } from './types/serum3';
+import { StubOracle } from './types/oracle';
 
 //
 // group
@@ -383,6 +387,40 @@ export async function withdrawIx(
 //
 // Serum3 instructions
 //
+
+// export async function serum3PlaceOrder(
+//   client: MangoClient,
+//   side: Serum3Side,
+//   limitPrice: number,
+//   maxBaseQty: number,
+//   maxNativeQuoteQtyIncludingFees: number,
+//   selfTradeBehavior: Serum3SelfTradeBehavior,
+//   orderType: Serum3OrderType,
+//   clientOrderId: number,
+//   limit: number,
+// ): Promise<void> {
+//   return await client.program.methods
+//     .serum3PlaceOrder(
+//       side,
+//       limitPrice,
+//       maxBaseQty,
+//       maxNativeQuoteQtyIncludingFees,
+//       selfTradeBehavior,
+//       orderType,
+//       clientOrderId,
+//       limit,
+//     )
+//     .accounts({
+//       group: groupPk,
+//       admin: adminPk,
+//       serumProgram: serumProgramPk,
+//       serumMarketExternal: serumMarketExternalPk,
+//       quoteBank: quoteBankPk,
+//       baseBank: baseBankPk,
+//       payer: payer.publicKey,
+//     })
+//     .rpc();
+// }
 
 export async function serum3RegisterMarket(
   client: MangoClient,
