@@ -1609,6 +1609,10 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "mint",
+            "type": "publicKey"
+          },
+          {
             "name": "price",
             "type": {
               "defined": "I80F48"
@@ -3996,6 +4000,10 @@ export const IDL: MangoV4 = {
         "fields": [
           {
             "name": "group",
+            "type": "publicKey"
+          },
+          {
+            "name": "mint",
             "type": "publicKey"
           },
           {

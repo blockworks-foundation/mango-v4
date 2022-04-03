@@ -8,7 +8,7 @@ import {
 } from '@solana/web3.js';
 import * as bs58 from 'bs58';
 import { MangoClient } from './client';
-import { Bank, Group, MangoAccount, Serum3Market } from './types';
+import { Bank, Group, MangoAccount, Serum3Market, StubOracle } from './types';
 import { I80F48 } from './I80F48';
 
 //
@@ -481,6 +481,8 @@ export async function getSerum3MarketForBaseAndQuote(
 
 export async function createStubOracle(
   client: MangoClient,
+  groupPk: PublicKey,
+  adminPk: PublicKey,
   tokenMintPk: PublicKey,
   payer: Keypair,
   staticPrice: number,
@@ -488,6 +490,8 @@ export async function createStubOracle(
   return await client.program.methods
     .createStubOracle({ val: I80F48.fromNumber(staticPrice).getData() })
     .accounts({
+      group: groupPk,
+      admin: adminPk,
       tokenMint: tokenMintPk,
       payer: payer.publicKey,
     })
@@ -497,13 +501,17 @@ export async function createStubOracle(
 
 export async function setStubOracle(
   client: MangoClient,
+  groupPk: PublicKey,
+  adminPk: PublicKey,
   tokenMintPk: PublicKey,
   payer: Keypair,
   staticPrice: number,
 ): Promise<void> {
   return await client.program.methods
-    .setStubOracle({ val: I80F48.fromNumber(staticPrice).getData() })
+    .setStubOracle({ val: new BN(staticPrice) })
     .accounts({
+      group: groupPk,
+      admin: adminPk,
       tokenMint: tokenMintPk,
       payer: payer.publicKey,
     })
@@ -511,24 +519,25 @@ export async function setStubOracle(
     .rpc();
 }
 
-export async function getStubOracleForMint(
+export async function getStubOracleForGroupAndMint(
   client: MangoClient,
+  groupPk: PublicKey,
   mintPk: PublicKey,
-): Promise<MangoAccount[]> {
+): Promise<StubOracle[]> {
   return (
-    await client.program.account.mangoAccount.all([
+    await client.program.account.stubOracle.all([
       {
         memcmp: {
-          bytes: group.toBase58(),
+          bytes: groupPk.toBase58(),
           offset: 8,
         },
       },
       {
         memcmp: {
-          bytes: ownerPk.toBase58(),
+          bytes: mintPk.toBase58(),
           offset: 40,
         },
       },
     ])
-  ).map((pa) => MangoAccount.from(pa.publicKey, pa.account));
+  ).map((pa) => StubOracle.from(pa.publicKey, pa.account));
 }

@@ -6,6 +6,7 @@ import { MangoClient } from './client';
 import {
   createGroup,
   createMangoAccount,
+  createStubOracle,
   deposit,
   getBank,
   getBankForGroupAndMint,
@@ -13,6 +14,7 @@ import {
   getMangoAccount,
   getMangoAccountsForGroupAndOwner,
   getSerum3MarketForBaseAndQuote,
+  getStubOracleForGroupAndMint,
   registerToken,
   serum3RegisterMarket,
   withdraw,
@@ -59,21 +61,18 @@ async function main() {
   console.log(`Group ${group.publicKey}`);
 
   //
-  // Find existing or register new tokens
+  // Find existing or register new oracles
   //
-  // TODO: replace with 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU,
-  // see https://developers.circle.com/docs/usdc-on-testnet#usdc-on-solana-testnet
   const usdcDevnetMint = new PublicKey(
     '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN',
   );
   const usdcDevnetStubOracle = await findOrCreate(
     'stubOracle',
-    getGroupForAdmin,
-    [adminClient, admin.publicKey],
-    createGroup,
-    [adminClient, admin.publicKey, payer],
+    getStubOracleForGroupAndMint,
+    [adminClient, group.publicKey, usdcDevnetMint],
+    createStubOracle,
+    [adminClient, group.publicKey, admin.publicKey, usdcDevnetMint, payer, 1],
   );
-  console.log(`Group ${group.publicKey}`);
   const btcDevnetMint = new PublicKey(
     '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU',
   );
@@ -81,6 +80,11 @@ async function main() {
     'HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J',
   );
 
+  //
+  // Find existing or register new tokens
+  //
+  // TODO: replace with 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU,
+  // see https://developers.circle.com/docs/usdc-on-testnet#usdc-on-solana-testnet
   const btcBank = await findOrCreate<Bank>(
     'bank',
     getBankForGroupAndMint,
