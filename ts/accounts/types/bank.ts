@@ -8,6 +8,8 @@ import {
 } from '@solana/web3.js';
 import { MangoClient } from '../../client';
 import { debugAccountMetas } from '../../utils';
+import bs58 from 'bs58';
+import { BorshAccountsCoder } from '@project-serum/anchor';
 
 export class Bank {
   public depositIndex: I80F48;
@@ -173,4 +175,52 @@ export async function getBankForGroupAndMint(
       },
     ])
   ).map((tuple) => Bank.from(tuple.publicKey, tuple.account));
+}
+
+export class MintInfo {
+  static from(
+    publicKey: PublicKey,
+    obj: {
+      mint: PublicKey;
+      bank: PublicKey;
+      vault: PublicKey;
+      oracle: PublicKey;
+      addressLookupTable: PublicKey;
+      tokenIndex: Number;
+      addressLookupTableBankIndex: Number;
+      addressLookupTableOracleIndex: Number;
+      reserved: unknown;
+    },
+  ) {
+    return new MintInfo(publicKey, obj.mint, obj.bank, obj.vault, obj.oracle);
+  }
+
+  constructor(
+    public publicKey: PublicKey,
+    mint: PublicKey,
+    bank: PublicKey,
+    vault: PublicKey,
+    oracle: PublicKey,
+  ) {}
+}
+
+export async function getMintInfoForTokenIndex(
+  client: MangoClient,
+  tokenIndex: number,
+): Promise<MintInfo[]> {
+  const tokenIndexBuf = Buffer.alloc(2);
+  tokenIndexBuf.writeUInt16LE(tokenIndex);
+  return (
+    await client.program.account.mintInfo.all([
+      {
+        memcmp: {
+          bytes: bs58.encode(tokenIndexBuf),
+          offset: 168,
+        },
+      },
+    ])
+  ).map((tuple) => {
+    console.log(tuple);
+    return MintInfo.from(tuple.publicKey, tuple.account);
+  });
 }

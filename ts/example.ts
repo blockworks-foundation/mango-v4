@@ -8,6 +8,7 @@ import {
   Bank,
   getBank,
   getBankForGroupAndMint,
+  getMintInfoForTokenIndex,
   registerToken,
 } from './accounts/types/bank';
 import {
@@ -221,6 +222,7 @@ async function main() {
     btcDevnetMint,
     user.publicKey,
   );
+
   const healthRemainingAccounts = [
     usdcBank.publicKey,
     btcBank.publicKey,
