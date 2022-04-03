@@ -115,12 +115,13 @@ pub fn register_token(
     let alt_previous_size = 0;
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {
+        group: ctx.accounts.group.key(),
         mint: ctx.accounts.mint.key(),
+        bank: ctx.accounts.bank.key(),
         vault: ctx.accounts.vault.key(),
         oracle: ctx.accounts.oracle.key(),
-        bank: ctx.accounts.bank.key(),
-        token_index,
         address_lookup_table,
+        token_index,
         address_lookup_table_bank_index: alt_previous_size as u8,
         address_lookup_table_oracle_index: alt_previous_size as u8 + 1,
         reserved: Default::default(),

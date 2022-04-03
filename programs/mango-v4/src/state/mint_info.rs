@@ -11,6 +11,7 @@ use super::TokenIndex;
 #[account(zero_copy)]
 pub struct MintInfo {
     // TODO: none of these pubkeys are needed, remove?
+    pub group: Pubkey,
     pub mint: Pubkey,
     pub bank: Pubkey,
     pub vault: Pubkey,
@@ -25,5 +26,5 @@ pub struct MintInfo {
 
     pub reserved: [u8; 4],
 }
-const_assert_eq!(size_of::<MintInfo>(), 5 * 32 + 2 + 2 + 4);
+const_assert_eq!(size_of::<MintInfo>(), 6 * 32 + 2 + 2 + 4);
 const_assert_eq!(size_of::<MintInfo>() % 8, 0);
