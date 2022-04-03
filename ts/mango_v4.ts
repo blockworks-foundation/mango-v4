@@ -276,11 +276,21 @@ export type MangoV4 = {
       "name": "createStubOracle",
       "accounts": [
         {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "oracle",
           "isMut": true,
           "isSigner": false,
           "pda": {
             "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
               {
                 "kind": "const",
                 "type": "string",
@@ -294,6 +304,11 @@ export type MangoV4 = {
               }
             ]
           }
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
         },
         {
           "name": "tokenMint",
@@ -324,9 +339,24 @@ export type MangoV4 = {
       "name": "setStubOracle",
       "accounts": [
         {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "oracle",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
         }
       ],
       "args": [
@@ -1575,6 +1605,10 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
             "name": "price",
             "type": {
               "defined": "I80F48"
@@ -1583,6 +1617,15 @@ export type MangoV4 = {
           {
             "name": "lastUpdated",
             "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
           }
         ]
       }
@@ -2623,11 +2666,21 @@ export const IDL: MangoV4 = {
       "name": "createStubOracle",
       "accounts": [
         {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "oracle",
           "isMut": true,
           "isSigner": false,
           "pda": {
             "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
               {
                 "kind": "const",
                 "type": "string",
@@ -2641,6 +2694,11 @@ export const IDL: MangoV4 = {
               }
             ]
           }
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
         },
         {
           "name": "tokenMint",
@@ -2671,9 +2729,24 @@ export const IDL: MangoV4 = {
       "name": "setStubOracle",
       "accounts": [
         {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "oracle",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
         }
       ],
       "args": [
@@ -3922,6 +3995,10 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
             "name": "price",
             "type": {
               "defined": "I80F48"
@@ -3930,6 +4007,15 @@ export const IDL: MangoV4 = {
           {
             "name": "lastUpdated",
             "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
           }
         ]
       }
