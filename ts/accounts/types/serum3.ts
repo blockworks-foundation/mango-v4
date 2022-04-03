@@ -6,6 +6,7 @@ import {
 } from '@solana/web3.js';
 import { MangoClient } from '../../client';
 import * as bs58 from 'bs58';
+import BN from 'bn.js';
 
 export class Serum3Market {
   static from(
@@ -134,36 +135,107 @@ export async function getSerum3MarketForBaseAndQuote(
   ).map((tuple) => Serum3Market.from(tuple.publicKey, tuple.account));
 }
 
-// export async function serum3PlaceOrder(
-//   client: MangoClient,
-//   side: Serum3Side,
-//   limitPrice: number,
-//   maxBaseQty: number,
-//   maxNativeQuoteQtyIncludingFees: number,
-//   selfTradeBehavior: Serum3SelfTradeBehavior,
-//   orderType: Serum3OrderType,
-//   clientOrderId: number,
-//   limit: number,
-// ): Promise<void> {
-//   return await client.program.methods
-//     .serum3PlaceOrder(
-//       side,
-//       limitPrice,
-//       maxBaseQty,
-//       maxNativeQuoteQtyIncludingFees,
-//       selfTradeBehavior,
-//       orderType,
-//       clientOrderId,
-//       limit,
-//     )
-//     .accounts({
-//       group: groupPk,
-//       admin: adminPk,
-//       serumProgram: serumProgramPk,
-//       serumMarketExternal: serumMarketExternalPk,
-//       quoteBank: quoteBankPk,
-//       baseBank: baseBankPk,
-//       payer: payer.publicKey,
-//     })
-//     .rpc();
-// }
+export enum Serum3SelfTradeBehavior {
+  DecrementTake = 0,
+  CancelProvide = 1,
+  AbortTransaction = 2,
+}
+
+export enum Serum3OrderType {
+  Limit = 0,
+  ImmediateOrCancel = 1,
+  PostOnly = 2,
+}
+
+export enum Serum3Side {
+  Bid = 0,
+  Ask = 1,
+}
+
+export async function serum3CreateOpenOrders(
+  client: MangoClient,
+  groupPk: PublicKey,
+  accountPk: PublicKey,
+  serumMarketPk: PublicKey,
+  serumProgramPk: PublicKey,
+  serumMarketExternalPk: PublicKey,
+  ownerPk: PublicKey,
+  payer: Keypair,
+): Promise<void> {
+  return await client.program.methods
+    .serum3CreateOpenOrders()
+    .accounts({
+      group: groupPk,
+      account: accountPk,
+      serumMarket: serumMarketPk,
+      serumProgram: serumProgramPk,
+      serumMarketExternal: serumMarketExternalPk,
+      owner: ownerPk,
+      payer: payer.publicKey,
+    })
+    .signers([payer])
+    .rpc();
+}
+
+export async function serum3PlaceOrder(
+  client: MangoClient,
+  groupPk: PublicKey,
+  accountPk: PublicKey,
+  ownerPk: PublicKey,
+  openOrdersPk: PublicKey,
+  serumMarketPk: PublicKey,
+  serumProgramPk: PublicKey,
+  serumMarketExternalPk: PublicKey,
+  marketBidsPk: PublicKey,
+  marketAsksPk: PublicKey,
+  marketEventQueuePk: PublicKey,
+  marketRequestQueuePk: PublicKey,
+  marketBaseVaultPk: PublicKey,
+  marketQuoteVaultPk: PublicKey,
+  marketVaultSignerPk: PublicKey,
+  quoteBankPk: PublicKey,
+  quoteVaultPk: PublicKey,
+  baseBankPk: PublicKey,
+  baseVaultPk: PublicKey,
+  side: Serum3Side,
+  limitPrice: number,
+  maxBaseQty: number,
+  maxNativeQuoteQtyIncludingFees: number,
+  selfTradeBehavior: Serum3SelfTradeBehavior,
+  orderType: Serum3OrderType,
+  clientOrderId: number,
+  limit: number,
+): Promise<void> {
+  return await client.program.methods
+    .serum3PlaceOrder(
+      side,
+      new BN(limitPrice),
+      new BN(maxBaseQty),
+      new BN(maxNativeQuoteQtyIncludingFees),
+      selfTradeBehavior,
+      orderType,
+      new BN(clientOrderId),
+      limit,
+    )
+    .accounts({
+      group: groupPk,
+      account: accountPk,
+      owner: ownerPk,
+      openOrders: openOrdersPk,
+      serumMarket: serumMarketPk,
+      serumProgram: serumProgramPk,
+      serumMarketExternal: serumMarketExternalPk,
+      marketBids: marketBidsPk,
+      marketAsks: marketAsksPk,
+      marketEventQueue: marketEventQueuePk,
+      marketRequestQueue: marketRequestQueuePk,
+      marketBaseVault: marketBaseVaultPk,
+      marketQuoteVault: marketQuoteVaultPk,
+      marketVaultSigner: marketVaultSignerPk,
+      quoteBank: quoteBankPk,
+      quoteVault: quoteVaultPk,
+      baseBank: baseBankPk,
+      baseVault: baseVaultPk,
+    })
+    .rpc();
+}

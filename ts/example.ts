@@ -21,6 +21,7 @@ import {
 import { createGroup, getGroupForAdmin, Group } from './accounts/types/group';
 import {
   getSerum3MarketForBaseAndQuote,
+  serum3CreateOpenOrders,
   Serum3Market,
   serum3RegisterMarket,
 } from './accounts/types/serum3';
@@ -126,34 +127,6 @@ async function main() {
   console.log(`UsdcBank ${usdcBank.publicKey}`);
 
   //
-  // Find existing or register a new serum market
-  //
-  const serumProgramId = new web3.PublicKey(
-    'DESVgJVGajEgKGXhb6XmqDHGz3VjdgP7rEVESBgxmroY',
-  );
-  const serumMarketExternalPk = new web3.PublicKey(
-    'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB',
-  );
-  const serum3Market = await findOrCreate<Serum3Market>(
-    'serum3Market',
-    getSerum3MarketForBaseAndQuote,
-    [adminClient, group.publicKey, btcBank.tokenIndex, usdcBank.tokenIndex],
-    serum3RegisterMarket,
-    [
-      adminClient,
-      group.publicKey,
-      admin.publicKey,
-      serumProgramId,
-      serumMarketExternalPk,
-      usdcBank.publicKey,
-      btcBank.publicKey,
-      payer,
-      0,
-    ],
-  );
-  console.log(`Serum3Market ${serum3Market.publicKey}`);
-
-  //
   // User operations
   //
 
@@ -177,7 +150,7 @@ async function main() {
     createMangoAccount,
     [userClient, group.publicKey, user.publicKey, payer],
   );
-  console.log(`MangoAccount ${serum3Market.publicKey}`);
+  console.log(`MangoAccount ${mangoAccount.publicKey}`);
 
   // deposit
   console.log(`Depositing...1000`);
@@ -237,6 +210,49 @@ async function main() {
   // if (accounts.length === 0) {
   //   console.log(`Closed account ${account.publicKey}`);
   // }
+
+  //
+  // Find existing or register a new serum3 market
+  //
+  const serumProgramId = new web3.PublicKey(
+    'DESVgJVGajEgKGXhb6XmqDHGz3VjdgP7rEVESBgxmroY',
+  );
+  const serumMarketExternalPk = new web3.PublicKey(
+    'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB',
+  );
+  const serum3Market = await findOrCreate<Serum3Market>(
+    'serum3Market',
+    getSerum3MarketForBaseAndQuote,
+    [adminClient, group.publicKey, btcBank.tokenIndex, usdcBank.tokenIndex],
+    serum3RegisterMarket,
+    [
+      adminClient,
+      group.publicKey,
+      admin.publicKey,
+      serumProgramId,
+      serumMarketExternalPk,
+      usdcBank.publicKey,
+      btcBank.publicKey,
+      payer,
+      0,
+    ],
+  );
+  console.log(`Serum3Market ${serum3Market.publicKey}`);
+
+  //
+  // Place serum3 order
+  //
+  console.log('Creating serum3 open orders account...');
+  await serum3CreateOpenOrders(
+    userClient,
+    group.publicKey,
+    mangoAccount.publicKey,
+    serum3Market.publicKey,
+    serumProgramId,
+    serumMarketExternalPk,
+    user.publicKey,
+    payer,
+  );
 
   process.exit(0);
 }

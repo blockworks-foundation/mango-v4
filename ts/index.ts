@@ -1,6 +1,4 @@
 export * from './client';
-export * from './instructions';
-export * from './accounts/types/types';
 export * from './accounts/types/I80F48';
 export { Bank } from './accounts/types/bank';
 export { MangoAccount } from './accounts/types/mangoAccount';
