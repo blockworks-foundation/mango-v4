@@ -51,13 +51,13 @@ impl<'a, 'b> AccountRetriever<'a, 'b> for FixedOrderAccountRetriever<'a, 'b> {
         let bank = self.ais[account_index].load::<Bank>()?;
         require!(&bank.group == group, MangoError::SomeError);
         require!(bank.token_index == token_index, MangoError::SomeError);
-        let oracle = &self.ais[self.n_banks + account_index];
+        let oracle = &self.ais[cm!(self.n_banks + account_index)];
         require!(&bank.oracle == oracle.key, MangoError::SomeError);
         Ok((bank, oracle))
     }
 
     fn serum_oo(&self, account_index: usize, key: &Pubkey) -> Result<Ref<'a, OpenOrders>> {
-        let ai = &self.ais[2 * self.n_banks + account_index];
+        let ai = &self.ais[cm!(2 * self.n_banks + account_index)];
         require!(key == ai.key, MangoError::SomeError);
         serum3_cpi::load_open_orders(ai)
     }
