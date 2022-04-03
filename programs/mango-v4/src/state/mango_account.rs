@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use checked_math as cm;
 use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
@@ -297,8 +298,8 @@ impl PerpAccount {
     }
     /// Remove taker trade after it has been processed on EventQueue
     pub fn remove_taker_trade(&mut self, base_change: i64, quote_change: i64) {
-        self.taker_base_lots -= base_change;
-        self.taker_quote_lots -= quote_change;
+        self.taker_base_lots = cm!(self.taker_base_lots - base_change);
+        self.taker_quote_lots = cm!(self.taker_quote_lots - quote_change);
     }
 
     pub fn is_active(&self) -> bool {
@@ -426,10 +427,10 @@ impl MangoAccountPerps {
         // accounting
         match order_side {
             Side::Bid => {
-                perp_account.bids_base_lots -= quantity;
+                perp_account.bids_base_lots = cm!(perp_account.bids_base_lots - quantity);
             }
             Side::Ask => {
-                perp_account.asks_base_lots -= quantity;
+                perp_account.asks_base_lots = cm!(perp_account.asks_base_lots - quantity);
             }
         }
 
@@ -472,10 +473,10 @@ impl MangoAccountPerps {
         } else {
             match side {
                 Side::Bid => {
-                    pa.bids_base_lots -= base_change.abs();
+                    pa.bids_base_lots = cm!(pa.bids_base_lots - base_change.abs());
                 }
                 Side::Ask => {
-                    pa.asks_base_lots -= base_change.abs();
+                    pa.asks_base_lots = cm!(pa.asks_base_lots - base_change.abs());
                 }
             }
             Ok(())

@@ -116,7 +116,7 @@ impl<'a, 'b> ScanningAccountRetriever<'a, 'b> {
     ) -> Result<(RefMut<'a, Bank>, &'a AccountInfo<'b>)> {
         let index = self.bank_index(token_index)?;
         let bank = self.ais[index].load_mut_fully_unchecked::<Bank>()?;
-        let oracle = &self.ais[self.n_banks() + index];
+        let oracle = &self.ais[cm!(self.n_banks() + index)];
         require!(&bank.oracle == oracle.key, MangoError::SomeError);
         Ok((bank, oracle))
     }
@@ -131,7 +131,7 @@ impl<'a, 'b> AccountRetriever<'a, 'b> for ScanningAccountRetriever<'a, 'b> {
     ) -> Result<(Ref<'a, Bank>, &'a AccountInfo<'b>)> {
         let index = self.bank_index(token_index)?;
         let bank = self.ais[index].load_fully_unchecked::<Bank>()?;
-        let oracle = &self.ais[self.n_banks() + index];
+        let oracle = &self.ais[cm!(self.n_banks() + index)];
         require!(&bank.oracle == oracle.key, MangoError::SomeError);
         Ok((bank, oracle))
     }
