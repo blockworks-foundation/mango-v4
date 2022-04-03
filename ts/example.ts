@@ -31,6 +31,7 @@ import {
   getStubOracleForGroupAndMint,
   StubOracle,
 } from './accounts/types/oracle';
+import { assert } from 'console';
 
 async function main() {
   //
@@ -223,13 +224,44 @@ async function main() {
     user.publicKey,
   );
 
-  const healthRemainingAccounts = [
-    usdcBank.publicKey,
-    btcBank.publicKey,
-    usdcDevnetStubOracle.publicKey,
-    btcDevnetOracle,
-    mangoAccount.serum3[0].openOrders,
-  ];
+  // Aggregate all PKs of users active assets, banks, oracles and serum OOs
+  const healthRemainingAccounts: PublicKey[] = [];
+  {
+    const mintInfos = await Promise.all(
+      mangoAccount.tokens
+        .filter((token) => token.tokenIndex !== 65535)
+        .map(async (token) =>
+          getMintInfoForTokenIndex(
+            userClient,
+            group.publicKey,
+            token.tokenIndex,
+          ),
+        ),
+    );
+    // banks
+    healthRemainingAccounts.push(
+      ...mintInfos.flatMap((mintinfos) => {
+        return mintinfos.flatMap((mintinfo) => {
+          return mintinfo.bank;
+        });
+      }),
+    );
+    // oracles
+    healthRemainingAccounts.push(
+      ...mintInfos.flatMap((mintinfos) => {
+        return mintinfos.flatMap((mintinfo) => {
+          return mintinfo.oracle;
+        });
+      }),
+    );
+    // serum OOs
+    healthRemainingAccounts.push(
+      ...mangoAccount.serum3
+        .filter((serum3Account) => serum3Account.marketIndex !== 65535)
+        .map((serum3Account) => serum3Account.openOrders),
+    );
+  }
+
   await deposit(
     userClient,
     group.publicKey,

@@ -9,7 +9,8 @@ import {
 import { MangoClient } from '../../client';
 import { debugAccountMetas } from '../../utils';
 import bs58 from 'bs58';
-import { BorshAccountsCoder } from '@project-serum/anchor';
+import { BorshAccountsCoder, ProgramAccount } from '@project-serum/anchor';
+import { group } from 'console';
 
 export class Bank {
   public depositIndex: I80F48;
@@ -197,15 +198,16 @@ export class MintInfo {
 
   constructor(
     public publicKey: PublicKey,
-    mint: PublicKey,
-    bank: PublicKey,
-    vault: PublicKey,
-    oracle: PublicKey,
+    public mint: PublicKey,
+    public bank: PublicKey,
+    public vault: PublicKey,
+    public oracle: PublicKey,
   ) {}
 }
 
 export async function getMintInfoForTokenIndex(
   client: MangoClient,
+  groupPk: PublicKey,
   tokenIndex: number,
 ): Promise<MintInfo[]> {
   const tokenIndexBuf = Buffer.alloc(2);
@@ -214,13 +216,18 @@ export async function getMintInfoForTokenIndex(
     await client.program.account.mintInfo.all([
       {
         memcmp: {
+          bytes: groupPk.toBase58(),
+          offset: 8,
+        },
+      },
+      {
+        memcmp: {
           bytes: bs58.encode(tokenIndexBuf),
-          offset: 168,
+          offset: 200,
         },
       },
     ])
   ).map((tuple) => {
-    console.log(tuple);
     return MintInfo.from(tuple.publicKey, tuple.account);
   });
 }

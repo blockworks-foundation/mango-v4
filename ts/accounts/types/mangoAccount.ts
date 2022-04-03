@@ -105,6 +105,7 @@ export class TokenAccountDto {
 }
 
 export class Serum3Account {
+  static Serum3MarketIndexUnset = 65535;
   static from(dto: Serum3AccountDto) {
     return new Serum3Account(
       dto.openOrders,
