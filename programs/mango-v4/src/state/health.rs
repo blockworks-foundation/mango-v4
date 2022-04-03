@@ -57,7 +57,7 @@ impl<'a, 'b> AccountRetriever<'a, 'b> for FixedOrderAccountRetriever<'a, 'b> {
     }
 
     fn serum_oo(&self, account_index: usize, key: &Pubkey) -> Result<Ref<'a, OpenOrders>> {
-        let ai = &self.ais[cm!((2 as usize) * self.n_banks + account_index)];
+        let ai = &self.ais[cm!(2usize * self.n_banks + account_index)];
         require!(key == ai.key, MangoError::SomeError);
         serum3_cpi::load_open_orders(ai)
     }
