@@ -7,6 +7,7 @@ import {
   TransactionInstruction,
 } from '@solana/web3.js';
 import { MangoClient } from '../../client';
+import { debugAccountMetas } from '../../utils';
 
 export class Bank {
   public depositIndex: I80F48;
@@ -57,7 +58,7 @@ export class Bank {
     group: PublicKey,
     mint: PublicKey,
     public vault: PublicKey,
-    oracle: PublicKey,
+    public oracle: PublicKey,
     depositIndex: I80F48Dto,
     borrowIndex: I80F48Dto,
     indexedTotalDeposits: I80F48Dto,

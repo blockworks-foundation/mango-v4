@@ -8,9 +8,11 @@ import { Bank } from './bank';
 import { I80F48, I80F48Dto } from './I80F48';
 import { MangoClient } from '../../client';
 import { BN } from '@project-serum/anchor';
+import { AccountMeta } from '@solana/web3.js';
 
 export class MangoAccount {
   public tokens: TokenAccount[];
+  public serum3: Serum3Account[];
 
   static from(
     publicKey: PublicKey,
@@ -34,7 +36,7 @@ export class MangoAccount {
       obj.owner,
       obj.delegate,
       obj.tokens as { values: TokenAccountDto[] },
-      obj.serum3,
+      obj.serum3 as { values: Serum3AccountDto[] },
       obj.perps,
       obj.beingLiquidated,
       obj.isBankrupt,
@@ -50,7 +52,7 @@ export class MangoAccount {
     owner: PublicKey,
     delegate: PublicKey,
     tokens: { values: TokenAccountDto[] },
-    serum3: Object,
+    serum3: { values: Serum3AccountDto[] },
     perps: unknown,
     beingLiquidated: number,
     isBankrupt: number,
@@ -59,19 +61,20 @@ export class MangoAccount {
     reserved: number[],
   ) {
     this.tokens = tokens.values.map((dto) => TokenAccount.from(dto));
+    this.serum3 = serum3.values.map((dto) => Serum3Account.from(dto));
   }
 
-  find(tokenIndex: number): TokenAccount | undefined {
+  findToken(tokenIndex: number): TokenAccount | undefined {
     return this.tokens.find((ta) => ta.tokenIndex == tokenIndex);
   }
 
   getNativeDeposit(bank: Bank): I80F48 {
-    const ta = this.find(bank.tokenIndex);
+    const ta = this.findToken(bank.tokenIndex);
     return bank.depositIndex.mul(ta?.indexedValue!);
   }
 
   getNativeBorrow(bank: Bank): I80F48 {
-    const ta = this.find(bank.tokenIndex);
+    const ta = this.findToken(bank.tokenIndex);
     return bank.borrowIndex.mul(ta?.indexedValue!);
   }
 }
@@ -97,6 +100,34 @@ export class TokenAccountDto {
     public indexedValue: I80F48Dto,
     public tokenIndex: number,
     public inUseCount: number,
+    public reserved: number[],
+  ) {}
+}
+
+export class Serum3Account {
+  static from(dto: Serum3AccountDto) {
+    return new Serum3Account(
+      dto.openOrders,
+      dto.marketIndex,
+      dto.baseTokenIndex,
+      dto.quoteTokenIndex,
+    );
+  }
+
+  constructor(
+    public openOrders: PublicKey,
+    public marketIndex: number,
+    public baseTokenIndex: number,
+    public quoteTokenIndex: number,
+  ) {}
+}
+
+export class Serum3AccountDto {
+  constructor(
+    public openOrders: PublicKey,
+    public marketIndex: number,
+    public baseTokenIndex: number,
+    public quoteTokenIndex: number,
     public reserved: number[],
   ) {}
 }
@@ -203,7 +234,9 @@ export async function getMangoAccountsForGroupAndOwner(
         },
       },
     ])
-  ).map((pa) => MangoAccount.from(pa.publicKey, pa.account));
+  ).map((pa) => {
+    return MangoAccount.from(pa.publicKey, pa.account);
+  });
 }
 
 export async function deposit(
@@ -213,8 +246,8 @@ export async function deposit(
   bankPk: PublicKey,
   vaultPk: PublicKey,
   tokenAccountPk: PublicKey,
-  oraclePk: PublicKey,
   ownerPk: PublicKey,
+  healthRemainingAccounts: PublicKey[],
   amount: number,
 ): Promise<void> {
   const tx = new Transaction();
@@ -225,8 +258,8 @@ export async function deposit(
     bankPk,
     vaultPk,
     tokenAccountPk,
-    oraclePk,
     ownerPk,
+    healthRemainingAccounts,
     amount,
   );
   tx.add(ix);
@@ -240,8 +273,8 @@ export async function depositIx(
   bankPk: PublicKey,
   vaultPk: PublicKey,
   tokenAccountPk: PublicKey,
-  oraclePk: PublicKey,
   ownerPk: PublicKey,
+  healthRemainingAccounts: PublicKey[],
   amount: number,
 ): Promise<TransactionInstruction> {
   return await client.program.methods
@@ -254,10 +287,12 @@ export async function depositIx(
       tokenAccount: tokenAccountPk,
       tokenAuthority: ownerPk,
     })
-    .remainingAccounts([
-      { pubkey: bankPk, isWritable: false, isSigner: false },
-      { pubkey: oraclePk, isWritable: false, isSigner: false },
-    ])
+    .remainingAccounts(
+      healthRemainingAccounts.map(
+        (pk) =>
+          ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+      ),
+    )
     .instruction();
 }
 
@@ -268,8 +303,8 @@ export async function withdraw(
   bankPk: PublicKey,
   vaultPk: PublicKey,
   tokenAccountPk: PublicKey,
-  oraclePk: PublicKey,
   ownerPk: PublicKey,
+  healthRemainingAccounts: PublicKey[],
   amount: number,
   allowBorrow: boolean,
 ): Promise<void> {
@@ -281,8 +316,8 @@ export async function withdraw(
     bankPk,
     vaultPk,
     tokenAccountPk,
-    oraclePk,
     ownerPk,
+    healthRemainingAccounts,
     amount,
     allowBorrow,
   );
@@ -297,8 +332,8 @@ export async function withdrawIx(
   bankPk: PublicKey,
   vaultPk: PublicKey,
   tokenAccountPk: PublicKey,
-  oraclePk: PublicKey,
   ownerPk: PublicKey,
+  healthRemainingAccounts: PublicKey[],
   amount: number,
   allowBorrow: boolean,
 ): Promise<TransactionInstruction> {
@@ -312,9 +347,11 @@ export async function withdrawIx(
       tokenAccount: tokenAccountPk,
       tokenAuthority: ownerPk,
     })
-    .remainingAccounts([
-      { pubkey: bankPk, isWritable: false, isSigner: false },
-      { pubkey: oraclePk, isWritable: false, isSigner: false },
-    ])
+    .remainingAccounts(
+      healthRemainingAccounts.map(
+        (pk) =>
+          ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+      ),
+    )
     .instruction();
 }

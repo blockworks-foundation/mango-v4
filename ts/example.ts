@@ -28,6 +28,7 @@ import {
 import {
   createStubOracle,
   getStubOracleForGroupAndMint,
+  StubOracle,
 } from './accounts/types/oracle';
 
 async function main() {
@@ -74,12 +75,15 @@ async function main() {
   const usdcDevnetMint = new PublicKey(
     '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN',
   );
-  const usdcDevnetStubOracle = await findOrCreate(
+  const usdcDevnetStubOracle = await findOrCreate<StubOracle>(
     'stubOracle',
     getStubOracleForGroupAndMint,
     [adminClient, group.publicKey, usdcDevnetMint],
     createStubOracle,
     [adminClient, group.publicKey, admin.publicKey, usdcDevnetMint, payer, 1],
+  );
+  console.log(
+    `usdcDevnetStubOracle ${usdcDevnetStubOracle.publicKey.toBase58()}`,
   );
   const btcDevnetMint = new PublicKey(
     '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU',
@@ -119,9 +123,9 @@ async function main() {
       group.publicKey,
       admin.publicKey,
       usdcDevnetMint,
-      usdcDevnetStubOracle,
+      usdcDevnetStubOracle.publicKey,
       payer,
-      0,
+      1,
     ],
   );
   console.log(`UsdcBank ${usdcBank.publicKey}`);
@@ -151,53 +155,6 @@ async function main() {
     [userClient, group.publicKey, user.publicKey, payer],
   );
   console.log(`MangoAccount ${mangoAccount.publicKey}`);
-
-  // deposit
-  console.log(`Depositing...1000`);
-  const btcTokenAccount = await spl.getAssociatedTokenAddress(
-    btcDevnetMint,
-    user.publicKey,
-  );
-  await deposit(
-    userClient,
-    group.publicKey,
-    mangoAccount.publicKey,
-    btcBank.publicKey,
-    btcBank.vault,
-    btcTokenAccount,
-    btcDevnetOracle,
-    user.publicKey,
-    1000,
-  );
-
-  // withdraw
-  console.log(`Witdrawing...500`);
-  await withdraw(
-    userClient,
-    group.publicKey,
-    mangoAccount.publicKey,
-    btcBank.publicKey,
-    btcBank.vault,
-    btcTokenAccount,
-    btcDevnetOracle,
-    user.publicKey,
-    500,
-    false,
-  );
-
-  // log
-  const freshBank = await getBank(userClient, btcBank.publicKey);
-  console.log(freshBank.toString());
-
-  const freshAccount = await getMangoAccount(
-    userClient,
-    mangoAccount.publicKey,
-  );
-  console.log(
-    `Mango account  ${freshAccount.getNativeDeposit(
-      freshBank,
-    )} Deposits for bank ${freshBank.tokenIndex}`,
-  );
 
   // close mango account, note: close doesnt settle/withdraw for user atm,
   // only use when you want to free up a mango account address for testing on not-mainnet
@@ -240,19 +197,77 @@ async function main() {
   console.log(`Serum3Market ${serum3Market.publicKey}`);
 
   //
-  // Place serum3 order
+  // Serum3 OO
   //
-  console.log('Creating serum3 open orders account...');
-  await serum3CreateOpenOrders(
+  if (mangoAccount.serum3[0].marketIndex == 65535) {
+    console.log('Creating serum3 open orders account...');
+    await serum3CreateOpenOrders(
+      userClient,
+      group.publicKey,
+      mangoAccount.publicKey,
+      serum3Market.publicKey,
+      serumProgramId,
+      serumMarketExternalPk,
+      user.publicKey,
+      payer,
+    );
+  }
+
+  //
+  // Deposit & withdraw
+  //
+  console.log(`Depositing...1000`);
+  const btcTokenAccount = await spl.getAssociatedTokenAddress(
+    btcDevnetMint,
+    user.publicKey,
+  );
+  const healthRemainingAccounts = [
+    usdcBank.publicKey,
+    btcBank.publicKey,
+    usdcDevnetStubOracle.publicKey,
+    btcDevnetOracle,
+    mangoAccount.serum3[0].openOrders,
+  ];
+  await deposit(
     userClient,
     group.publicKey,
     mangoAccount.publicKey,
-    serum3Market.publicKey,
-    serumProgramId,
-    serumMarketExternalPk,
+    btcBank.publicKey,
+    btcBank.vault,
+    btcTokenAccount,
     user.publicKey,
-    payer,
+    healthRemainingAccounts,
+    1000,
   );
+
+  console.log(`Witdrawing...500`);
+  await withdraw(
+    userClient,
+    group.publicKey,
+    mangoAccount.publicKey,
+    btcBank.publicKey,
+    btcBank.vault,
+    btcTokenAccount,
+    user.publicKey,
+    healthRemainingAccounts,
+    500,
+    false,
+  );
+
+  // log
+  const freshBank = await getBank(userClient, btcBank.publicKey);
+  console.log(freshBank.toString());
+
+  let freshAccount = await getMangoAccount(userClient, mangoAccount.publicKey);
+  console.log(
+    `Mango account  ${freshAccount.getNativeDeposit(
+      freshBank,
+    )} Deposits for bank ${freshBank.tokenIndex}`,
+  );
+
+  //
+  // Place serum3 order
+  //
 
   process.exit(0);
 }
