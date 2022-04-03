@@ -7,13 +7,20 @@ use crate::state::*;
 #[derive(Accounts)]
 pub struct CreateStubOracle<'info> {
     #[account(
+        has_one = admin,
+    )]
+    pub group: AccountLoader<'info, Group>,
+
+    #[account(
         init,
-        seeds = [b"StubOracle".as_ref(), token_mint.key().as_ref()],
+        seeds = [group.key().as_ref(), b"StubOracle".as_ref(), token_mint.key().as_ref()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<StubOracle>(),
     )]
     pub oracle: AccountLoader<'info, StubOracle>,
+
+    pub admin: Signer<'info>,
 
     pub token_mint: Account<'info, Mint>,
 
@@ -25,6 +32,7 @@ pub struct CreateStubOracle<'info> {
 
 pub fn create_stub_oracle(ctx: Context<CreateStubOracle>, price: I80F48) -> Result<()> {
     let mut oracle = ctx.accounts.oracle.load_init()?;
+    oracle.group = ctx.accounts.group.key();
     oracle.price = price;
     oracle.last_updated = Clock::get()?.unix_timestamp;
 

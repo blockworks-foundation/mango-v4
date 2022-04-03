@@ -66,10 +66,14 @@ async function main() {
   const usdcDevnetMint = new PublicKey(
     '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN',
   );
-  // TODO: replace with a usdc devnet oracle
-  const usdtDevnetOracle = new PublicKey(
-    '38xoQ4oeJCBrcVvca2cGk7iV1dAfrmTR1kmhSCJQ8Jto',
+  const usdcDevnetStubOracle = await findOrCreate(
+    'stubOracle',
+    getGroupForAdmin,
+    [adminClient, admin.publicKey],
+    createGroup,
+    [adminClient, admin.publicKey, payer],
   );
+  console.log(`Group ${group.publicKey}`);
   const btcDevnetMint = new PublicKey(
     '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU',
   );
@@ -103,7 +107,7 @@ async function main() {
       group.publicKey,
       admin.publicKey,
       usdcDevnetMint,
-      usdtDevnetOracle,
+      usdcDevnetStubOracle,
       payer,
       0,
     ],

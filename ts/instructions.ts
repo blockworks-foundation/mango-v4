@@ -510,3 +510,25 @@ export async function setStubOracle(
     .signers([payer])
     .rpc();
 }
+
+export async function getStubOracleForMint(
+  client: MangoClient,
+  mintPk: PublicKey,
+): Promise<MangoAccount[]> {
+  return (
+    await client.program.account.mangoAccount.all([
+      {
+        memcmp: {
+          bytes: groupPk.toBase58(),
+          offset: 8,
+        },
+      },
+      {
+        memcmp: {
+          bytes: ownerPk.toBase58(),
+          offset: 40,
+        },
+      },
+    ])
+  ).map((pa) => MangoAccount.from(pa.publicKey, pa.account));
+}
