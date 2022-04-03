@@ -164,7 +164,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
             admin,
             mint: base_token.mint.pubkey,
             payer,
-            price: "1.0",
+            price: "10.0",
         },
     )
     .await
@@ -347,7 +347,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
             admin,
             mint: borrow_token1.mint.pubkey,
             payer,
-            price: "1.0",
+            price: "2.0",
         },
     )
     .await
