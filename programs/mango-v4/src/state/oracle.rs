@@ -17,11 +17,12 @@ pub enum OracleType {
 #[account(zero_copy)]
 pub struct StubOracle {
     pub group: Pubkey,
+    pub mint: Pubkey,
     pub price: I80F48,
     pub last_updated: i64,
     pub reserved: [u8; 8],
 }
-const_assert_eq!(size_of::<StubOracle>(), 32 + 16 + 8 + 8);
+const_assert_eq!(size_of::<StubOracle>(), 32 + 32 + 16 + 8 + 8);
 const_assert_eq!(size_of::<StubOracle>() % 8, 0);
 
 pub fn determine_oracle_type(data: &[u8]) -> Result<OracleType> {

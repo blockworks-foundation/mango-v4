@@ -519,7 +519,7 @@ export async function getStubOracleForMint(
     await client.program.account.mangoAccount.all([
       {
         memcmp: {
-          bytes: groupPk.toBase58(),
+          bytes: group.toBase58(),
           offset: 8,
         },
       },

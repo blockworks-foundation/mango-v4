@@ -33,6 +33,7 @@ pub struct CreateStubOracle<'info> {
 pub fn create_stub_oracle(ctx: Context<CreateStubOracle>, price: I80F48) -> Result<()> {
     let mut oracle = ctx.accounts.oracle.load_init()?;
     oracle.group = ctx.accounts.group.key();
+    oracle.mint = ctx.accounts.token_mint.key();
     oracle.price = price;
     oracle.last_updated = Clock::get()?.unix_timestamp;
 
