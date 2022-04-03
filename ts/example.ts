@@ -3,27 +3,31 @@ import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import * as spl from '@solana/spl-token';
 import fs from 'fs';
 import { MangoClient } from './client';
+import { findOrCreate } from './utils';
 import {
-  createGroup,
-  createMangoAccount,
-  createStubOracle,
-  deposit,
+  Bank,
   getBank,
   getBankForGroupAndMint,
-  getGroupForAdmin,
+  registerToken,
+} from './accounts/types/bank';
+import {
+  createMangoAccount,
+  deposit,
   getMangoAccount,
   getMangoAccountsForGroupAndOwner,
-  getSerum3MarketForBaseAndQuote,
-  getStubOracleForGroupAndMint,
-  registerToken,
-  serum3RegisterMarket,
+  MangoAccount,
   withdraw,
-} from './instructions';
-import { findOrCreate } from './utils';
-import { Bank } from './types/bank';
-import { MangoAccount } from './types/mangoAccount';
-import { Group } from './types/group';
-import { Serum3Market } from './types/serum3';
+} from './accounts/types/mangoAccount';
+import { createGroup, getGroupForAdmin, Group } from './accounts/types/group';
+import {
+  getSerum3MarketForBaseAndQuote,
+  Serum3Market,
+  serum3RegisterMarket,
+} from './accounts/types/serum3';
+import {
+  createStubOracle,
+  getStubOracleForGroupAndMint,
+} from './accounts/types/oracle';
 
 async function main() {
   //
