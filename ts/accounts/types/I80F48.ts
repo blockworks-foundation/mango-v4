@@ -1,5 +1,5 @@
-import BN from 'bn.js';
 import Big from 'big.js';
+import BN from 'bn.js';
 
 export class I80F48Dto {
   constructor(public val: BN) {}

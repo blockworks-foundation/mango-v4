@@ -1,14 +1,14 @@
+import { BN } from '@project-serum/anchor';
 import {
+  AccountMeta,
   Keypair,
   PublicKey,
   Transaction,
   TransactionInstruction,
 } from '@solana/web3.js';
+import { MangoClient } from '../../client';
 import { Bank } from './bank';
 import { I80F48, I80F48Dto } from './I80F48';
-import { MangoClient } from '../../client';
-import { BN } from '@project-serum/anchor';
-import { AccountMeta } from '@solana/web3.js';
 
 export class MangoAccount {
   public tokens: TokenAccount[];

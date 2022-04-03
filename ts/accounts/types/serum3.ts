@@ -4,9 +4,9 @@ import {
   Transaction,
   TransactionInstruction,
 } from '@solana/web3.js';
-import { MangoClient } from '../../client';
-import * as bs58 from 'bs58';
 import BN from 'bn.js';
+import * as bs58 from 'bs58';
+import { MangoClient } from '../../client';
 
 export class Serum3Market {
   static from(

@@ -1,34 +1,44 @@
-export * from './client';
+export {
+  Bank,
+  getBank,
+  getBankForGroupAndMint,
+  getBanksForGroup,
+  registerToken,
+  registerTokenIx,
+} from './accounts/types/bank';
+export {
+  createGroup,
+  createGroupIx,
+  getGroupForAdmin,
+  Group,
+} from './accounts/types/group';
 export * from './accounts/types/I80F48';
-export { Bank } from './accounts/types/bank';
-export { MangoAccount } from './accounts/types/mangoAccount';
-export { Group } from './accounts/types/group';
-export { TokenAccountDto } from './accounts/types/mangoAccount';
-export { TokenAccount } from './accounts/types/mangoAccount';
-export { Serum3Market } from './accounts/types/serum3';
-export { StubOracle } from './accounts/types/oracle';
-export { getGroupForAdmin } from './accounts/types/group';
-export { createGroupIx } from './accounts/types/group';
-export { createGroup } from './accounts/types/group';
-export { registerTokenIx } from './accounts/types/bank';
-export { registerToken } from './accounts/types/bank';
-export { getBankForGroupAndMint } from './accounts/types/bank';
-export { getBanksForGroup } from './accounts/types/bank';
-export { getBank } from './accounts/types/bank';
-export { getMangoAccountsForGroupAndOwner } from './accounts/types/mangoAccount';
-export { getMangoAccountsForGroup } from './accounts/types/mangoAccount';
-export { getMangoAccount } from './accounts/types/mangoAccount';
-export { createMangoAccountIx } from './accounts/types/mangoAccount';
-export { createMangoAccount } from './accounts/types/mangoAccount';
-export { closeMangoAccountIx } from './accounts/types/mangoAccount';
-export { closeMangoAccount } from './accounts/types/mangoAccount';
-export { withdrawIx } from './accounts/types/mangoAccount';
-export { withdraw } from './accounts/types/mangoAccount';
-export { depositIx } from './accounts/types/mangoAccount';
-export { deposit } from './accounts/types/mangoAccount';
-export { getSerum3MarketForBaseAndQuote } from './accounts/types/serum3';
-export { serum3RegisterMarketIx } from './accounts/types/serum3';
-export { serum3RegisterMarket } from './accounts/types/serum3';
-export { getStubOracleForGroupAndMint } from './accounts/types/oracle';
-export { setStubOracle } from './accounts/types/oracle';
-export { createStubOracle } from './accounts/types/oracle';
+export {
+  closeMangoAccount,
+  closeMangoAccountIx,
+  createMangoAccount,
+  createMangoAccountIx,
+  deposit,
+  depositIx,
+  getMangoAccount,
+  getMangoAccountsForGroup,
+  getMangoAccountsForGroupAndOwner,
+  MangoAccount,
+  TokenAccount,
+  TokenAccountDto,
+  withdraw,
+  withdrawIx,
+} from './accounts/types/mangoAccount';
+export {
+  createStubOracle,
+  getStubOracleForGroupAndMint,
+  setStubOracle,
+  StubOracle,
+} from './accounts/types/oracle';
+export {
+  getSerum3MarketForBaseAndQuote,
+  Serum3Market,
+  serum3RegisterMarket,
+  serum3RegisterMarketIx,
+} from './accounts/types/serum3';
+export * from './client';

@@ -1,4 +1,3 @@
-import { I80F48, I80F48Dto } from './I80F48';
 import {
   Keypair,
   PublicKey,
@@ -6,11 +5,9 @@ import {
   Transaction,
   TransactionInstruction,
 } from '@solana/web3.js';
-import { MangoClient } from '../../client';
-import { debugAccountMetas } from '../../utils';
 import bs58 from 'bs58';
-import { BorshAccountsCoder, ProgramAccount } from '@project-serum/anchor';
-import { group } from 'console';
+import { MangoClient } from '../../client';
+import { I80F48, I80F48Dto } from './I80F48';
 
 export class Bank {
   public depositIndex: I80F48;

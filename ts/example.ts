@@ -1,9 +1,7 @@
 import { Provider, Wallet, web3 } from '@project-serum/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import * as spl from '@solana/spl-token';
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
-import { MangoClient } from './client';
-import { findOrCreate } from './utils';
 import {
   Bank,
   getBank,
@@ -11,6 +9,7 @@ import {
   getMintInfoForTokenIndex,
   registerToken,
 } from './accounts/types/bank';
+import { createGroup, getGroupForAdmin, Group } from './accounts/types/group';
 import {
   createMangoAccount,
   deposit,
@@ -19,19 +18,19 @@ import {
   MangoAccount,
   withdraw,
 } from './accounts/types/mangoAccount';
-import { createGroup, getGroupForAdmin, Group } from './accounts/types/group';
+import {
+  createStubOracle,
+  getStubOracleForGroupAndMint,
+  StubOracle,
+} from './accounts/types/oracle';
 import {
   getSerum3MarketForBaseAndQuote,
   serum3CreateOpenOrders,
   Serum3Market,
   serum3RegisterMarket,
 } from './accounts/types/serum3';
-import {
-  createStubOracle,
-  getStubOracleForGroupAndMint,
-  StubOracle,
-} from './accounts/types/oracle';
-import { assert } from 'console';
+import { MangoClient } from './client';
+import { findOrCreate } from './utils';
 
 async function main() {
   //
