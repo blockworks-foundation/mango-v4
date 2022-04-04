@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 use serum_dex::state::OpenOrders;
 use std::cell::{Ref, RefMut};
+use std::cmp::min;
 use std::collections::HashMap;
 
 use crate::error::MangoError;
@@ -347,6 +348,28 @@ fn health_contribution(
     Ok(cm!(balance * weight))
 }
 
+/// Weigh a perp base balance (in lots) with the appropriate health weight
+#[inline(always)]
+fn health_weighted_perp_base_lots(
+    health_type: HealthType,
+    market: &PerpMarket,
+    lots: i64,
+) -> Result<I80F48> {
+    let weight = if lots.is_negative() {
+        match health_type {
+            HealthType::Init => market.init_liab_weight,
+            HealthType::Maint => market.maint_liab_weight,
+        }
+    } else {
+        match health_type {
+            HealthType::Init => market.init_asset_weight,
+            HealthType::Maint => market.maint_asset_weight,
+        }
+    };
+    let lots = I80F48::from(lots);
+    Ok(cm!(weight * lots))
+}
+
 /// Compute health contribution of two tokens - pure convenience
 #[inline(always)]
 fn pair_health(
@@ -449,7 +472,71 @@ fn compute_health_detail<'a, 'b: 'a>(
 
     // health contribution from perp accounts
     for (i, perp_account) in account.perps.iter_active_accounts().enumerate() {
-        let _perp_market = retriever.perp_market(&account.group, i, perp_account.market_index)?;
+        let perp_market = retriever.perp_market(&account.group, i, perp_account.market_index)?;
+
+        // find the TokenInfos for the market's base and quote tokens
+        let base_index = token_infos
+            .iter()
+            .position(|ti| ti.token_index == perp_market.base_token_index)
+            .ok_or_else(|| error!(MangoError::SomeError))?;
+        let base_info = &token_infos[base_index];
+
+        let base_lots = cm!(perp_account.base_position_lots + perp_account.taker_base_lots);
+        let taker_quote = I80F48::from(cm!(
+            perp_account.taker_quote_lots * perp_market.quote_lot_size
+        ));
+        let quote = cm!(perp_account.quote_position_native + taker_quote);
+
+        // Two scenarios:
+        // 1. The price goes low and all bids execute, converting to base.
+        //    The health for this case is:
+        //        (weighted(base_lots + bids) - bids) * base_lots * price + quote
+        // 2. The price goes high and all asks execute, converting to quote.
+        //    The health for this case is:
+        //        (weighted(base_lots - asks) + asks) * base_lots * price + quote
+        //
+        // Comparing these makes it clear we need to pick the worse subfactor
+        //    weighted(base_lots + bids) - bids
+        // or
+        //    weighted(base_lots - asks) + asks
+        let weighted_base_lots_bids = health_weighted_perp_base_lots(
+            health_type,
+            &perp_market,
+            cm!(base_lots + perp_account.bids_base_lots),
+        )?;
+        let bids_base_lots = I80F48::from(perp_account.bids_base_lots);
+        let scenario1 = cm!(weighted_base_lots_bids - bids_base_lots);
+        let weighted_base_lots_asks = health_weighted_perp_base_lots(
+            health_type,
+            &perp_market,
+            cm!(base_lots - perp_account.asks_base_lots),
+        )?;
+        let asks_base_lots = I80F48::from(perp_account.asks_base_lots);
+        let scenario2 = cm!(weighted_base_lots_asks + asks_base_lots);
+        let worse_scenario = min(scenario1, scenario2);
+        let base_lot_size = I80F48::from(perp_market.base_lot_size);
+        let _health = cm!(worse_scenario * base_lot_size * base_info.oracle_price + quote);
+
+        // The above choice between scenario1 and 2 depends on the asset_weight and
+        // liab weight. Thus it needs to be redone for init and maint health.
+        //
+        // The condition for the choice to be the same is:
+        //     (1 - init_asset_weight) / (init_liab_weight - 1)
+        //  == (1 - maint_asset_weight) / (maint_liab_weight - 1)
+        //
+        // Which can be derived by noticing that health for both scenarios is
+        //    weighted(x) + y - x
+        // and that the only interesting case is
+        //     asks_net = base_lots - asks < 0 and
+        //     bids_net = base_lots + bids > 0.
+        // Then
+        //       health_bids_scenario < health_asks_scenario
+        //   iff (asset_weight - 1) * bids_net < (liab_weight - 1) * asks_net
+        //   iff (1 - asset_weightt) / (liab_weight - 1) bids_net > abs(asks_net)
+
+        // Probably the resolution here is to go to v3's assumption that there's an x
+        // such that asset_weight = 1-x and liab_weight = 1+x.
+        // This is ok as long as perp markets are strictly isolated.
     }
 
     Ok(HealthCache { token_infos })

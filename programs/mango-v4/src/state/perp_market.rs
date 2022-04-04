@@ -27,11 +27,14 @@ pub struct PerpMarket {
     /// UI position is 1
     pub base_lot_size: i64,
 
-    // TODO docs
+    // These weights apply to the base asset, the quote token is always assumed to be
+    // the health-reference token and have 1 for price and weights
     pub maint_asset_weight: I80F48,
     pub init_asset_weight: I80F48,
     pub maint_liab_weight: I80F48,
     pub init_liab_weight: I80F48,
+
+    // TODO docs
     pub liquidation_fee: I80F48,
     pub maker_fee: I80F48,
     pub taker_fee: I80F48,
@@ -61,6 +64,8 @@ pub struct PerpMarket {
     /// Lookup indices
     pub perp_market_index: PerpMarketIndex,
     pub base_token_index: TokenIndex,
+
+    /// Cannot be chosen freely, must be the health-reference token, same for all PerpMarkets
     pub quote_token_index: TokenIndex,
 }
 
