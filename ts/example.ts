@@ -1,4 +1,5 @@
 import { Provider, Wallet, web3 } from '@project-serum/anchor';
+import { Market } from '@project-serum/serum';
 import * as spl from '@solana/spl-token';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
@@ -27,7 +28,11 @@ import {
   getSerum3MarketForBaseAndQuote,
   serum3CreateOpenOrders,
   Serum3Market,
+  Serum3OrderType,
+  serum3PlaceOrder,
   serum3RegisterMarket,
+  Serum3SelfTradeBehavior,
+  Serum3Side,
 } from './accounts/types/serum3';
 import { MangoClient } from './client';
 import { findOrCreate } from './utils';
@@ -301,6 +306,55 @@ async function main() {
   //
   // Place serum3 order
   //
+  const serum3MarketExternal = await Market.load(
+    userClient.program.provider.connection,
+    serumMarketExternalPk,
+    { commitment: userClient.program.provider.connection.commitment },
+    serumProgramId,
+  );
+  const serum3MarketExternalVaultSigner = await PublicKey.createProgramAddress(
+    [
+      serumMarketExternalPk.toBuffer(),
+      serum3MarketExternal.decoded.vaultSignerNonce.toArrayLike(
+        Buffer,
+        'le',
+        8,
+      ),
+    ],
+    serumProgramId,
+  );
+
+  console.log('Placing serum3 order...');
+  await serum3PlaceOrder(
+    userClient,
+    group.publicKey,
+    mangoAccount.publicKey,
+    user.publicKey,
+    mangoAccount.serum3[0].openOrders,
+    serum3Market.publicKey,
+    serumProgramId,
+    serumMarketExternalPk,
+    serum3MarketExternal.bidsAddress,
+    serum3MarketExternal.asksAddress,
+    serum3MarketExternal.decoded.eventQueue,
+    serum3MarketExternal.decoded.requestQueue,
+    serum3MarketExternal.decoded.baseVault,
+    serum3MarketExternal.decoded.quoteVault,
+    serum3MarketExternalVaultSigner,
+    usdcBank.publicKey,
+    usdcBank.vault,
+    btcBank.publicKey,
+    btcBank.vault,
+    healthRemainingAccounts,
+    Serum3Side.bid,
+    400000,
+    1,
+    1000000,
+    Serum3SelfTradeBehavior.decrementTake,
+    Serum3OrderType.limit,
+    0,
+    10,
+  );
 
   process.exit(0);
 }

@@ -1,4 +1,5 @@
 import {
+  AccountMeta,
   Keypair,
   PublicKey,
   Transaction,
@@ -136,20 +137,20 @@ export async function getSerum3MarketForBaseAndQuote(
 }
 
 export enum Serum3SelfTradeBehavior {
-  DecrementTake = 0,
-  CancelProvide = 1,
-  AbortTransaction = 2,
+  decrementTake = 0,
+  cancelProvide = 1,
+  abortTransaction = 2,
 }
 
 export enum Serum3OrderType {
-  Limit = 0,
-  ImmediateOrCancel = 1,
-  PostOnly = 2,
+  limit = 0,
+  immediateOrCancel = 1,
+  postOnly = 2,
 }
 
 export enum Serum3Side {
-  Bid = 0,
-  Ask = 1,
+  bid = 0,
+  ask = 1,
 }
 
 export async function serum3CreateOpenOrders(
@@ -197,6 +198,7 @@ export async function serum3PlaceOrder(
   quoteVaultPk: PublicKey,
   baseBankPk: PublicKey,
   baseVaultPk: PublicKey,
+  healthRemainingAccounts: PublicKey[],
   side: Serum3Side,
   limitPrice: number,
   maxBaseQty: number,
@@ -208,12 +210,15 @@ export async function serum3PlaceOrder(
 ): Promise<void> {
   return await client.program.methods
     .serum3PlaceOrder(
-      side,
+      // TODO: replace with actual side
+      { ask: {} },
       new BN(limitPrice),
       new BN(maxBaseQty),
       new BN(maxNativeQuoteQtyIncludingFees),
-      selfTradeBehavior,
-      orderType,
+      // TODO: replace with actual selfTradeBehavior
+      { decrementTake: {} },
+      // TODO: replace with actual orderType
+      { limit: {} },
       new BN(clientOrderId),
       limit,
     )
@@ -237,5 +242,12 @@ export async function serum3PlaceOrder(
       baseBank: baseBankPk,
       baseVault: baseVaultPk,
     })
+    .remainingAccounts(
+      healthRemainingAccounts.map(
+        (pk) =>
+          ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+      ),
+    )
+
     .rpc();
 }
