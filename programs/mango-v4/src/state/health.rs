@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use crate::error::MangoError;
 use crate::serum3_cpi;
-use crate::state::{oracle_price, Bank, MangoAccount, TokenIndex};
+use crate::state::{oracle_price, Bank, MangoAccount, PerpMarket, PerpMarketIndex, TokenIndex};
 use crate::util::checked_math as cm;
 use crate::util::LoadZeroCopy;
 
@@ -29,16 +29,26 @@ pub trait AccountRetriever<'a, 'b> {
     ) -> Result<(Ref<'a, Bank>, &'a AccountInfo<'b>)>;
 
     fn serum_oo(&self, account_index: usize, key: &Pubkey) -> Result<Ref<'a, OpenOrders>>;
+
+    fn perp_market(
+        &self,
+        group: &Pubkey,
+        account_index: usize,
+        perp_market_index: PerpMarketIndex,
+    ) -> Result<Ref<'a, PerpMarket>>;
 }
 
 /// Assumes the account infos needed for the health computation follow a strict order.
 ///
-/// 1. n_banks Bank account, in the order of account.token_account_map.iter_active()
+/// 1. n_banks Bank account, in the order of account.tokens.iter_active()
 /// 2. n_banks oracle accounts, one for each bank in the same order
-/// 3. serum3 OpenOrders accounts, in the order of account.serum3_account_map.iter_active()
+/// 3. PerpMarket accounts, in the order of account.perps.iter_active_accounts()
+/// 4. serum3 OpenOrders accounts, in the order of account.serum3.iter_active()
 pub struct FixedOrderAccountRetriever<'a, 'b> {
     ais: &'a [AccountInfo<'b>],
     n_banks: usize,
+    begin_perp: usize,
+    begin_serum3: usize,
 }
 
 impl<'a, 'b> AccountRetriever<'a, 'b> for FixedOrderAccountRetriever<'a, 'b> {
@@ -56,8 +66,24 @@ impl<'a, 'b> AccountRetriever<'a, 'b> for FixedOrderAccountRetriever<'a, 'b> {
         Ok((bank, oracle))
     }
 
+    fn perp_market(
+        &self,
+        group: &Pubkey,
+        account_index: usize,
+        perp_market_index: PerpMarketIndex,
+    ) -> Result<Ref<'a, PerpMarket>> {
+        let ai = &self.ais[cm!(self.begin_perp + account_index)];
+        let market = ai.load::<PerpMarket>()?;
+        require!(&market.group == group, MangoError::SomeError);
+        require!(
+            market.perp_market_index == perp_market_index,
+            MangoError::SomeError
+        );
+        Ok(market)
+    }
+
     fn serum_oo(&self, account_index: usize, key: &Pubkey) -> Result<Ref<'a, OpenOrders>> {
-        let ai = &self.ais[cm!(2usize * self.n_banks + account_index)];
+        let ai = &self.ais[cm!(self.begin_serum3 + account_index)];
         require!(key == ai.key, MangoError::SomeError);
         serum3_cpi::load_open_orders(ai)
     }
@@ -66,12 +92,14 @@ impl<'a, 'b> AccountRetriever<'a, 'b> for FixedOrderAccountRetriever<'a, 'b> {
 /// Takes a list of account infos containing
 /// - an unknown number of Banks in any order, followed by
 /// - the same number of oracles in the same order as the banks, followed by
+/// - an unknown number of PerpMarket accounts
 /// - an unknown number of serum3 OpenOrders accounts
 /// and retrieves accounts needed for the health computation by doing a linear
 /// scan for each request.
 pub struct ScanningAccountRetriever<'a, 'b> {
     ais: &'a [AccountInfo<'b>],
     token_index_map: HashMap<TokenIndex, usize>,
+    perp_index_map: HashMap<PerpMarketIndex, usize>,
 }
 
 impl<'a, 'b> ScanningAccountRetriever<'a, 'b> {
@@ -92,9 +120,30 @@ impl<'a, 'b> ScanningAccountRetriever<'a, 'b> {
                 Err(error) => return Err(error),
             };
         }
+
+        // skip all banks and oracles
+        let skip = token_index_map.len() * 2;
+        let mut perp_index_map = HashMap::with_capacity(ais.len() - skip);
+        for (i, ai) in ais[skip..].iter().enumerate() {
+            match ai.load::<PerpMarket>() {
+                Ok(perp_market) => {
+                    require!(&perp_market.group == group, MangoError::SomeError);
+                    perp_index_map.insert(perp_market.perp_market_index, skip + i);
+                }
+                Err(Error::AnchorError(error))
+                    if error.error_code_number
+                        == ErrorCode::AccountDiscriminatorMismatch as u32 =>
+                {
+                    break;
+                }
+                Err(error) => return Err(error),
+            };
+        }
+
         Ok(Self {
             ais,
             token_index_map,
+            perp_index_map,
         })
     }
 
@@ -102,11 +151,23 @@ impl<'a, 'b> ScanningAccountRetriever<'a, 'b> {
         self.token_index_map.len()
     }
 
+    fn begin_serum3(&self) -> usize {
+        2 * self.token_index_map.len() + self.perp_index_map.len()
+    }
+
     #[inline]
     fn bank_index(&self, token_index: TokenIndex) -> Result<usize> {
         Ok(*self
             .token_index_map
             .get(&token_index)
+            .ok_or_else(|| error!(MangoError::SomeError))?)
+    }
+
+    #[inline]
+    fn perp_market_index(&self, perp_market_index: PerpMarketIndex) -> Result<usize> {
+        Ok(*self
+            .perp_index_map
+            .get(&perp_market_index)
             .ok_or_else(|| error!(MangoError::SomeError))?)
     }
 
@@ -136,8 +197,18 @@ impl<'a, 'b> AccountRetriever<'a, 'b> for ScanningAccountRetriever<'a, 'b> {
         Ok((bank, oracle))
     }
 
+    fn perp_market(
+        &self,
+        _group: &Pubkey,
+        _account_index: usize,
+        perp_market_index: PerpMarketIndex,
+    ) -> Result<Ref<'a, PerpMarket>> {
+        let index = self.perp_market_index(perp_market_index)?;
+        self.ais[index].load_fully_unchecked::<PerpMarket>()
+    }
+
     fn serum_oo(&self, _account_index: usize, key: &Pubkey) -> Result<Ref<'a, OpenOrders>> {
-        let oo = self.ais[2 * self.n_banks()..]
+        let oo = self.ais[self.begin_serum3()..]
             .iter()
             .find(|ai| ai.key == key)
             .unwrap();
@@ -166,14 +237,18 @@ pub fn compute_health_from_fixed_accounts(
     ais: &[AccountInfo],
 ) -> Result<I80F48> {
     let active_token_len = account.tokens.iter_active().count();
-    let active_serum_len = account.serum3.iter_active().count();
-    let expected_ais = active_token_len * 2 // banks + oracles
-        + active_serum_len; // open_orders
+    let active_serum3_len = account.serum3.iter_active().count();
+    let active_perp_len = account.perps.iter_active_accounts().count();
+    let expected_ais = cm!(active_token_len * 2 // banks + oracles
+        + active_serum3_len // open_orders
+        + active_perp_len); // PerpMarkets
     require!(ais.len() == expected_ais, MangoError::SomeError);
 
     let retriever = FixedOrderAccountRetriever {
         ais,
         n_banks: active_token_len,
+        begin_serum3: cm!(active_token_len * 2),
+        begin_perp: cm!(active_token_len * 2 + active_serum3_len),
     };
     compute_health_detail(account, &retriever, health_type, true)?.health(health_type)
 }
@@ -370,6 +445,11 @@ fn compute_health_detail<'a, 'b: 'a>(
         } else {
             quote_info.balance = all_in_quote;
         }
+    }
+
+    // health contribution from perp accounts
+    for (i, perp_account) in account.perps.iter_active_accounts().enumerate() {
+        let _perp_market = retriever.perp_market(&account.group, i, perp_account.market_index)?;
     }
 
     Ok(HealthCache { token_infos })
