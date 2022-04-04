@@ -298,7 +298,7 @@ async function main() {
 
   let freshAccount = await getMangoAccount(userClient, mangoAccount.publicKey);
   console.log(
-    `Mango account  ${freshAccount.getNativeDeposit(
+    `-  Mango account  ${freshAccount.getNativeDeposit(
       freshBank,
     )} Deposits for bank ${freshBank.tokenIndex}`,
   );
@@ -324,6 +324,7 @@ async function main() {
     ],
     serumProgramId,
   );
+  const clientOrderId = Date.now();
   await serum3PlaceOrder(
     userClient,
     group.publicKey,
@@ -346,14 +347,23 @@ async function main() {
     btcBank.vault,
     healthRemainingAccounts,
     Serum3Side.bid,
-    400000,
+    40000,
     1,
     1000000,
     Serum3SelfTradeBehavior.decrementTake,
     Serum3OrderType.limit,
-    0,
+    clientOrderId,
     10,
   );
+
+  const ordersForOwner = await serum3MarketExternal.loadOrdersForOwner(
+    userClient.program.provider.connection,
+    group.publicKey,
+  );
+  const orderJustPlaced = ordersForOwner.filter(
+    (order) => order.clientId?.toNumber() === clientOrderId,
+  )[0];
+  console.log(`- Serum3 order orderId ${orderJustPlaced.orderId}`);
 
   process.exit(0);
 }
