@@ -136,23 +136,6 @@ export async function getSerum3MarketForBaseAndQuote(
   ).map((tuple) => Serum3Market.from(tuple.publicKey, tuple.account));
 }
 
-export enum Serum3SelfTradeBehavior {
-  decrementTake = 0,
-  cancelProvide = 1,
-  abortTransaction = 2,
-}
-
-export enum Serum3OrderType {
-  limit = 0,
-  immediateOrCancel = 1,
-  postOnly = 2,
-}
-
-export enum Serum3Side {
-  bid = 0,
-  ask = 1,
-}
-
 export async function serum3CreateOpenOrders(
   client: MangoClient,
   groupPk: PublicKey,
@@ -176,6 +159,22 @@ export async function serum3CreateOpenOrders(
     })
     .signers([payer])
     .rpc();
+}
+export class Serum3SelfTradeBehavior {
+  static decrementTake = { decrementTake: {} };
+  static cancelProvide = { cancelProvide: {} };
+  static abortTransaction = { abortTransaction: {} };
+}
+
+export class Serum3OrderType {
+  static limit = { limit: {} };
+  static immediateOrCancel = { immediateOrCancel: {} };
+  static postOnly = { postOnly: {} };
+}
+
+export class Serum3Side {
+  static bid = { bid: {} };
+  static ask = { ask: {} };
 }
 
 export async function serum3PlaceOrder(
@@ -210,15 +209,12 @@ export async function serum3PlaceOrder(
 ): Promise<void> {
   return await client.program.methods
     .serum3PlaceOrder(
-      // TODO: replace with actual side
-      { ask: {} },
+      side,
       new BN(limitPrice),
       new BN(maxBaseQty),
       new BN(maxNativeQuoteQtyIncludingFees),
-      // TODO: replace with actual selfTradeBehavior
-      { decrementTake: {} },
-      // TODO: replace with actual orderType
-      { limit: {} },
+      selfTradeBehavior,
+      orderType,
       new BN(clientOrderId),
       limit,
     )
