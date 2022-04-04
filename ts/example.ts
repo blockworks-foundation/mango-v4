@@ -306,6 +306,7 @@ async function main() {
   //
   // Place serum3 order
   //
+  console.log('Placing serum3 order...');
   const serum3MarketExternal = await Market.load(
     userClient.program.provider.connection,
     serumMarketExternalPk,
@@ -323,8 +324,6 @@ async function main() {
     ],
     serumProgramId,
   );
-
-  console.log('Placing serum3 order...');
   await serum3PlaceOrder(
     userClient,
     group.publicKey,
