@@ -291,10 +291,17 @@ impl Default for PerpAccount {
 
 impl PerpAccount {
     /// Add taker trade after it has been matched but before it has been process on EventQueue
-    pub fn add_taker_trade(&mut self, base_change: i64, quote_change: i64) {
-        // TODO make checked? estimate chances of overflow here
-        self.taker_base_lots += base_change;
-        self.taker_quote_lots += quote_change;
+    pub fn add_taker_trade(&mut self, side: Side, base_lots: i64, quote_lots: i64) {
+        match side {
+            Side::Bid => {
+                self.taker_base_lots = cm!(self.taker_base_lots + base_lots);
+                self.taker_quote_lots = cm!(self.taker_quote_lots - quote_lots);
+            }
+            Side::Ask => {
+                self.taker_base_lots = cm!(self.taker_base_lots - base_lots);
+                self.taker_quote_lots = cm!(self.taker_quote_lots + quote_lots);
+            }
+        }
     }
     /// Remove taker trade after it has been processed on EventQueue
     pub fn remove_taker_trade(&mut self, base_change: i64, quote_change: i64) {
@@ -357,6 +364,7 @@ impl MangoAccountPerps {
             pos = self.accounts.iter().position(|p| !p.is_active());
             if let Some(i) = pos {
                 self.accounts[i] = PerpAccount {
+                    market_index: perp_market_index,
                     ..Default::default()
                 };
             }
@@ -395,16 +403,10 @@ impl MangoAccountPerps {
         let mut perp_account = self.get_account_mut_or_create(perp_market_index).unwrap().0;
         match side {
             Side::Bid => {
-                perp_account.bids_base_lots = perp_account
-                    .bids_base_lots
-                    .checked_add(order.quantity)
-                    .unwrap();
+                perp_account.bids_base_lots = cm!(perp_account.bids_base_lots + order.quantity);
             }
             Side::Ask => {
-                perp_account.asks_base_lots = perp_account
-                    .asks_base_lots
-                    .checked_add(order.quantity)
-                    .unwrap();
+                perp_account.asks_base_lots = cm!(perp_account.asks_base_lots + order.quantity);
             }
         };
         let slot = order.owner_slot as usize;

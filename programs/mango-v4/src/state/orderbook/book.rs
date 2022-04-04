@@ -248,8 +248,6 @@ impl<'a> Book<'a> {
             let match_quote_lots = cm!(match_base_lots * best_opposing_price);
             remaining_base_lots = cm!(remaining_base_lots - match_base_lots);
             remaining_quote_lots = cm!(remaining_quote_lots - match_quote_lots);
-            // TODO: record the taker trade in the right mango_account.perp.accounts[..]
-            //mango_account.perp_accounts[market_index].add_taker_trade(match_quantity, -match_quote);
 
             let new_best_opposing_quantity = cm!(best_opposing.quantity - match_base_lots);
             let maker_out = new_best_opposing_quantity == 0;
@@ -258,6 +256,13 @@ impl<'a> Book<'a> {
             } else {
                 matched_order_changes.push((best_opposing_h, new_best_opposing_quantity));
             }
+
+            // Record the taker trade in the account already, even though it will only be
+            // realized when the fill event gets executed
+            let perp_account = mango_account_perps
+                .get_account_mut_or_create(market.perp_market_index)?
+                .0;
+            perp_account.add_taker_trade(side, match_base_lots, match_quote_lots);
 
             let fill = FillEvent::new(
                 side,
@@ -361,7 +366,8 @@ impl<'a> Book<'a> {
                 book_base_quantity,
                 price_lots
             );
-            // mango_account.add_order(market_index, Side::Bid, &new_bid)?;
+
+            mango_account_perps.add_order(market.perp_market_index, side, &new_order)?;
         }
 
         // if there were matched taker quote apply ref fees
