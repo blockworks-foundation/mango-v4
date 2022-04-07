@@ -129,7 +129,7 @@ impl<'a, 'b> ScanningAccountRetriever<'a, 'b> {
             match ai.load::<PerpMarket>() {
                 Ok(perp_market) => {
                     require!(&perp_market.group == group, MangoError::SomeError);
-                    perp_index_map.insert(perp_market.perp_market_index, skip + i);
+                    perp_index_map.insert(perp_market.perp_market_index, cm!(skip + i));
                 }
                 Err(Error::AnchorError(error))
                     if error.error_code_number
