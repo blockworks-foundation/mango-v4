@@ -5,7 +5,7 @@ import { MangoAccount } from './accounts/types/mangoAccount';
 import { MangoClient } from './client';
 
 //
-// An example based on high level api i.e. the client
+// An example for users based on high level api i.e. the client
 //
 async function main() {
   const options = Provider.defaultOptions();

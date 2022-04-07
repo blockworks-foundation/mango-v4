@@ -3,6 +3,9 @@ import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from './client';
 
+//
+// An example for admins based on high level api i.e. the client
+//
 async function main() {
   const options = Provider.defaultOptions();
   const connection = new Connection(
