@@ -7,12 +7,9 @@ export const MANGO_V4_ID = new PublicKey(
 );
 
 export class MangoClient {
-  constructor(public program: Program<MangoV4>, public devnet?: boolean) {}
+  constructor(public program: Program<MangoV4>) {}
 
-  static async connect(
-    provider: Provider,
-    devnet?: boolean,
-  ): Promise<MangoClient> {
+  static async connect(provider: Provider): Promise<MangoClient> {
     // TODO: use IDL on chain or in repository? decide...
     // Alternatively we could fetch IDL from chain.
     // const idl = await Program.fetchIdl(MANGO_V4_ID, provider);
@@ -44,7 +41,6 @@ export class MangoClient {
 
     return new MangoClient(
       new Program<MangoV4>(idl as MangoV4, MANGO_V4_ID, provider),
-      devnet,
     );
   }
 }

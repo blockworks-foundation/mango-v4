@@ -55,7 +55,7 @@ async function main() {
   const adminWallet = new Wallet(admin);
   console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
   const adminProvider = new Provider(connection, adminWallet, options);
-  const adminClient = await MangoClient.connect(adminProvider, true);
+  const adminClient = await MangoClient.connect(adminProvider);
 
   const payer = Keypair.fromSecretKey(
     Buffer.from(
@@ -63,6 +63,7 @@ async function main() {
     ),
   );
   console.log(`Payer ${payer.publicKey.toBase58()}`);
+
   //
   // Find existing or create a new group
   //
@@ -147,7 +148,7 @@ async function main() {
   );
   const userWallet = new Wallet(user);
   const userProvider = new Provider(connection, userWallet, options);
-  const userClient = await MangoClient.connect(userProvider, true);
+  const userClient = await MangoClient.connect(userProvider);
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
   //
@@ -324,7 +325,17 @@ async function main() {
     ],
     serumProgramId,
   );
-  const clientOrderId = Date.now();
+  let ordersForOwner = await serum3MarketExternal.loadOrdersForOwner(
+    userClient.program.provider.connection,
+    group.publicKey,
+  );
+  for (const order of ordersForOwner) {
+    console.log(
+      `- Existing serum3 order orderId ${order.orderId}, side ${order.side}, price ${order.price}, size ${order.size}`,
+    );
+  }
+
+  let clientOrderId = Date.now();
   await serum3PlaceOrder(
     userClient,
     group.publicKey,
@@ -356,14 +367,68 @@ async function main() {
     10,
   );
 
-  const ordersForOwner = await serum3MarketExternal.loadOrdersForOwner(
+  ordersForOwner = await serum3MarketExternal.loadOrdersForOwner(
     userClient.program.provider.connection,
     group.publicKey,
   );
-  const orderJustPlaced = ordersForOwner.filter(
+  let orderJustPlaced = ordersForOwner.filter(
     (order) => order.clientId?.toNumber() === clientOrderId,
   )[0];
-  console.log(`- Serum3 order orderId ${orderJustPlaced.orderId}`);
+  console.log(
+    `- New Serum3 order orderId ${orderJustPlaced.orderId}, side ${orderJustPlaced.side}, price ${orderJustPlaced.price}, size ${orderJustPlaced.size}`,
+  );
+
+  clientOrderId = Date.now();
+  await serum3PlaceOrder(
+    userClient,
+    group.publicKey,
+    mangoAccount.publicKey,
+    user.publicKey,
+    mangoAccount.serum3[0].openOrders,
+    serum3Market.publicKey,
+    serumProgramId,
+    serumMarketExternalPk,
+    serum3MarketExternal.bidsAddress,
+    serum3MarketExternal.asksAddress,
+    serum3MarketExternal.decoded.eventQueue,
+    serum3MarketExternal.decoded.requestQueue,
+    serum3MarketExternal.decoded.baseVault,
+    serum3MarketExternal.decoded.quoteVault,
+    serum3MarketExternalVaultSigner,
+    usdcBank.publicKey,
+    usdcBank.vault,
+    btcBank.publicKey,
+    btcBank.vault,
+    healthRemainingAccounts,
+    Serum3Side.ask,
+    40000,
+    6,
+    1000000,
+    Serum3SelfTradeBehavior.decrementTake,
+    Serum3OrderType.limit,
+    clientOrderId,
+    10,
+  );
+  ordersForOwner = await serum3MarketExternal.loadOrdersForOwner(
+    userClient.program.provider.connection,
+    group.publicKey,
+  );
+  orderJustPlaced = ordersForOwner.filter(
+    (order) => order.clientId?.toNumber() === clientOrderId,
+  )[0];
+  console.log(
+    `- New Serum3 order orderId ${orderJustPlaced.orderId}, side ${orderJustPlaced.side}, price ${orderJustPlaced.price}, size ${orderJustPlaced.size}`,
+  );
+
+  ordersForOwner = await serum3MarketExternal.loadOrdersForOwner(
+    userClient.program.provider.connection,
+    group.publicKey,
+  );
+  for (const order of ordersForOwner) {
+    console.log(
+      `- serum3 order orderId ${order.orderId}, side ${orderJustPlaced.side}, price ${order.price}, size ${order.size}`,
+    );
+  }
 
   process.exit(0);
 }
