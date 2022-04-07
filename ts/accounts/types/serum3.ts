@@ -3,6 +3,7 @@ import {
   PublicKey,
   Transaction,
   TransactionInstruction,
+  TransactionSignature,
 } from '@solana/web3.js';
 import BN from 'bn.js';
 import * as bs58 from 'bs58';
@@ -53,7 +54,7 @@ export async function serum3RegisterMarket(
   quoteBankPk: PublicKey,
   baseBankPk: PublicKey,
   marketIndex: number,
-): Promise<void> {
+): Promise<TransactionSignature> {
   const tx = new Transaction();
   const ix = await serum3RegisterMarketIx(
     client,
@@ -66,7 +67,7 @@ export async function serum3RegisterMarket(
     marketIndex,
   );
   tx.add(ix);
-  await client.program.provider.send(tx);
+  return await client.program.provider.send(tx);
 }
 
 export async function serum3RegisterMarketIx(

@@ -1,6 +1,7 @@
 import { Provider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
+import { MangoAccount } from './accounts/types/mangoAccount';
 import { MangoClient } from './client';
 
 //
@@ -26,7 +27,24 @@ async function main() {
   const group = await client.getGroup(
     new PublicKey('6ACH752p6FsdLzuociVkmDwc3wJW8pcCoxZKfXJKfKcD'),
   );
-  console.log(group);
+  console.log(`Group ${group.publicKey}`);
+
+  const banks = await client.getBanksForGroup(group);
+  for (const bank of banks) {
+    console.log(`Bank ${bank.tokenIndex} ${bank.publicKey}`);
+  }
+
+  let mangoAccounts: MangoAccount[] = [];
+  let mangoAccount: MangoAccount;
+  mangoAccounts = await client.getMangoAccount(group, user.publicKey);
+  if (mangoAccounts.length === 0) {
+    await client.createMangoAccount(group, user.publicKey, 0);
+    mangoAccounts = await client.getMangoAccount(group, user.publicKey);
+  }
+  mangoAccount = mangoAccounts[0];
+  console.log(`MangoAccount ${mangoAccount.publicKey}`);
+
+  process.exit(0);
 }
 
 main();

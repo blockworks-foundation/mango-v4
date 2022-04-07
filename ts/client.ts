@@ -1,6 +1,12 @@
 import { Program, Provider } from '@project-serum/anchor';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, TransactionSignature } from '@solana/web3.js';
+import { Bank, getBanksForGroup } from './accounts/types/bank';
 import { getGroupForAdmin, Group } from './accounts/types/group';
+import {
+  createMangoAccount,
+  getMangoAccountsForGroupAndOwner,
+  MangoAccount,
+} from './accounts/types/mangoAccount';
 import { IDL, MangoV4 } from './mango_v4';
 
 export const MANGO_V4_ID = new PublicKey(
@@ -49,9 +55,42 @@ export class MangoClient {
     );
   }
 
-  public getGroup(adminPk: PublicKey): Promise<Group> {
-    return getGroupForAdmin(this, adminPk);
+  public async getGroup(adminPk: PublicKey): Promise<Group> {
+    return await getGroupForAdmin(this, adminPk);
   }
 
-  
+  public async getBanksForGroup(group: Group): Promise<Bank[]> {
+    return await getBanksForGroup(this, group.publicKey);
+  }
+
+  public async createMangoAccount(
+    group: Group,
+    ownerPk: PublicKey,
+    accountNumber: number,
+  ): Promise<TransactionSignature> {
+    return createMangoAccount(this, group.publicKey, ownerPk, accountNumber);
+  }
+
+  public async getMangoAccount(
+    group: Group,
+    ownerPk: PublicKey,
+  ): Promise<MangoAccount[]> {
+    return await getMangoAccountsForGroupAndOwner(
+      this,
+      group.publicKey,
+      ownerPk,
+    );
+  }
+
+  // public async deposit(group: Group, mangoAccount: MangoAccount, bank: Bank) {
+  //   return await deposit(
+  //     this,
+  //     group.publicKey,
+  //     mangoAccount.publicKey,
+  //     bank.publicKey,
+  //     bank.vault,
+  //     tokenAccountPk,
+  //     ownerPk,
+  //   );
+  // }
 }

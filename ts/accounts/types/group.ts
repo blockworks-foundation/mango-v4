@@ -2,6 +2,7 @@ import {
   PublicKey,
   Transaction,
   TransactionInstruction,
+  TransactionSignature,
 } from '@solana/web3.js';
 import { assert } from 'console';
 import { MangoClient } from '../../client';
@@ -17,11 +18,11 @@ export class Group {
 export async function createGroup(
   client: MangoClient,
   adminPk: PublicKey,
-): Promise<void> {
+): Promise<TransactionSignature> {
   const tx = new Transaction();
   const ix = await createGroupIx(client, adminPk);
   tx.add(ix);
-  await client.program.provider.send(tx);
+  return await client.program.provider.send(tx);
 }
 
 export async function createGroupIx(

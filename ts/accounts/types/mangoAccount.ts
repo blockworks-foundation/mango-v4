@@ -1,10 +1,10 @@
 import { BN } from '@project-serum/anchor';
 import {
   AccountMeta,
-  Keypair,
   PublicKey,
   Transaction,
   TransactionInstruction,
+  TransactionSignature,
 } from '@solana/web3.js';
 import { MangoClient } from '../../client';
 import { Bank } from './bank';
@@ -137,24 +137,31 @@ export async function createMangoAccount(
   client: MangoClient,
   groupPk: PublicKey,
   ownerPk: PublicKey,
-): Promise<void> {
+  accountNumber: number,
+): Promise<TransactionSignature> {
   const tx = new Transaction();
-  const ix = await createMangoAccountIx(client, groupPk, ownerPk);
+  const ix = await createMangoAccountIx(
+    client,
+    groupPk,
+    ownerPk,
+    accountNumber,
+  );
   tx.add(ix);
-  await client.program.provider.send(tx);
+  return await client.program.provider.send(tx);
 }
 
 export async function createMangoAccountIx(
   client: MangoClient,
   groupPk: PublicKey,
   ownerPk: PublicKey,
+  accountNumber: number,
 ): Promise<TransactionInstruction> {
   return await client.program.methods
-    .createAccount(11)
+    .createAccount(accountNumber)
     .accounts({
       group: groupPk,
       owner: ownerPk,
-      payer: ownerPk
+      payer: ownerPk,
     })
     .signers()
     .instruction();
@@ -164,11 +171,11 @@ export async function closeMangoAccount(
   client: MangoClient,
   accountPk: PublicKey,
   ownerPk: PublicKey,
-) {
+): Promise<TransactionSignature> {
   const tx = new Transaction();
   const ix = await closeMangoAccountIx(client, accountPk, ownerPk);
   tx.add(ix);
-  await client.program.provider.send(tx);
+  return await client.program.provider.send(tx);
 }
 
 export async function closeMangoAccountIx(
@@ -247,7 +254,7 @@ export async function deposit(
   ownerPk: PublicKey,
   healthRemainingAccounts: PublicKey[],
   amount: number,
-): Promise<void> {
+): Promise<TransactionSignature> {
   const tx = new Transaction();
   const ix = await depositIx(
     client,
@@ -261,7 +268,7 @@ export async function deposit(
     amount,
   );
   tx.add(ix);
-  await client.program.provider.send(tx);
+  return await client.program.provider.send(tx);
 }
 
 export async function depositIx(
@@ -305,7 +312,7 @@ export async function withdraw(
   healthRemainingAccounts: PublicKey[],
   amount: number,
   allowBorrow: boolean,
-): Promise<void> {
+): Promise<TransactionSignature> {
   const tx = new Transaction();
   const ix = await withdrawIx(
     client,
@@ -320,7 +327,7 @@ export async function withdraw(
     allowBorrow,
   );
   tx.add(ix);
-  await client.program.provider.send(tx);
+  return await client.program.provider.send(tx);
 }
 
 export async function withdrawIx(

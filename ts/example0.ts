@@ -162,7 +162,7 @@ async function main() {
     getMangoAccountsForGroupAndOwner,
     [userClient, group.publicKey, user.publicKey],
     createMangoAccount,
-    [userClient, group.publicKey, user.publicKey],
+    [userClient, group.publicKey, user.publicKey, 0],
   );
   console.log(`MangoAccount ${mangoAccount.publicKey}`);
 

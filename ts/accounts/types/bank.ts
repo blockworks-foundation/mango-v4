@@ -3,6 +3,7 @@ import {
   SYSVAR_RENT_PUBKEY,
   Transaction,
   TransactionInstruction,
+  TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { MangoClient } from '../../client';
@@ -88,7 +89,7 @@ export async function registerToken(
   mintPk: PublicKey,
   oraclePk: PublicKey,
   tokenIndex: number,
-): Promise<void> {
+): Promise<TransactionSignature> {
   const tx = new Transaction();
   const ix = await registerTokenIx(
     client,
@@ -99,7 +100,7 @@ export async function registerToken(
     tokenIndex,
   );
   tx.add(ix);
-  await client.program.provider.send(tx);
+  return await client.program.provider.send(tx);
 }
 
 export async function registerTokenIx(
