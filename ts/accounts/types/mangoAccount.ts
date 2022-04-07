@@ -137,29 +137,26 @@ export async function createMangoAccount(
   client: MangoClient,
   groupPk: PublicKey,
   ownerPk: PublicKey,
-  payer: Keypair,
 ): Promise<void> {
   const tx = new Transaction();
-  const signers = [payer];
-  const ix = await createMangoAccountIx(client, groupPk, ownerPk, payer);
+  const ix = await createMangoAccountIx(client, groupPk, ownerPk);
   tx.add(ix);
-  await client.program.provider.send(tx, signers);
+  await client.program.provider.send(tx);
 }
 
 export async function createMangoAccountIx(
   client: MangoClient,
   groupPk: PublicKey,
   ownerPk: PublicKey,
-  payer: Keypair,
 ): Promise<TransactionInstruction> {
   return await client.program.methods
     .createAccount(11)
     .accounts({
       group: groupPk,
       owner: ownerPk,
-      payer: payer.publicKey,
+      payer: ownerPk
     })
-    .signers([payer])
+    .signers()
     .instruction();
 }
 

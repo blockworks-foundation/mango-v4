@@ -43,7 +43,6 @@ export async function createStubOracle(
   groupPk: PublicKey,
   adminPk: PublicKey,
   tokenMintPk: PublicKey,
-  payer: Keypair,
   staticPrice: number,
 ): Promise<void> {
   return await client.program.methods
@@ -52,9 +51,8 @@ export async function createStubOracle(
       group: groupPk,
       admin: adminPk,
       tokenMint: tokenMintPk,
-      payer: payer.publicKey,
+      payer: adminPk
     })
-    .signers([payer])
     .rpc();
 }
 
@@ -63,7 +61,6 @@ export async function setStubOracle(
   groupPk: PublicKey,
   adminPk: PublicKey,
   tokenMintPk: PublicKey,
-  payer: Keypair,
   staticPrice: number,
 ): Promise<void> {
   return await client.program.methods
@@ -72,9 +69,8 @@ export async function setStubOracle(
       group: groupPk,
       admin: adminPk,
       tokenMint: tokenMintPk,
-      payer: payer.publicKey,
+      payer: adminPk
     })
-    .signers([payer])
     .rpc();
 }
 

@@ -1,6 +1,5 @@
 import {
   AccountMeta,
-  Keypair,
   PublicKey,
   Transaction,
   TransactionInstruction,
@@ -53,7 +52,6 @@ export async function serum3RegisterMarket(
   serumMarketExternalPk: PublicKey,
   quoteBankPk: PublicKey,
   baseBankPk: PublicKey,
-  payer: Keypair,
   marketIndex: number,
 ): Promise<void> {
   const tx = new Transaction();
@@ -65,11 +63,10 @@ export async function serum3RegisterMarket(
     serumMarketExternalPk,
     quoteBankPk,
     baseBankPk,
-    payer,
     marketIndex,
   );
   tx.add(ix);
-  await client.program.provider.send(tx, [payer]);
+  await client.program.provider.send(tx);
 }
 
 export async function serum3RegisterMarketIx(
@@ -80,7 +77,6 @@ export async function serum3RegisterMarketIx(
   serumMarketExternalPk: PublicKey,
   quoteBankPk: PublicKey,
   baseBankPk: PublicKey,
-  payer: Keypair,
   marketIndex: number,
 ): Promise<TransactionInstruction> {
   return await client.program.methods
@@ -92,7 +88,7 @@ export async function serum3RegisterMarketIx(
       serumMarketExternal: serumMarketExternalPk,
       quoteBank: quoteBankPk,
       baseBank: baseBankPk,
-      payer: payer.publicKey,
+      payer: adminPk,
     })
     .instruction();
 }
@@ -144,7 +140,6 @@ export async function serum3CreateOpenOrders(
   serumProgramPk: PublicKey,
   serumMarketExternalPk: PublicKey,
   ownerPk: PublicKey,
-  payer: Keypair,
 ): Promise<void> {
   return await client.program.methods
     .serum3CreateOpenOrders()
@@ -155,9 +150,8 @@ export async function serum3CreateOpenOrders(
       serumProgram: serumProgramPk,
       serumMarketExternal: serumMarketExternalPk,
       owner: ownerPk,
-      payer: payer.publicKey,
+      payer: ownerPk,
     })
-    .signers([payer])
     .rpc();
 }
 export class Serum3SelfTradeBehavior {

@@ -57,12 +57,12 @@ async function main() {
   const adminProvider = new Provider(connection, adminWallet, options);
   const adminClient = await MangoClient.connect(adminProvider, true);
 
-  const payer = Keypair.fromSecretKey(
-    Buffer.from(
-      JSON.parse(fs.readFileSync(process.env.PAYER_KEYPAIR!, 'utf-8')),
-    ),
-  );
-  console.log(`Payer ${payer.publicKey.toBase58()}`);
+  // const payer = Keypair.fromSecretKey(
+  //   Buffer.from(
+  //     JSON.parse(fs.readFileSync(process.env.PAYER_KEYPAIR!, 'utf-8')),
+  //   ),
+  // );
+  // console.log(`Payer ${payer.publicKey.toBase58()}`);
   //
   // Find existing or create a new group
   //
@@ -71,7 +71,7 @@ async function main() {
     getGroupForAdmin,
     [adminClient, admin.publicKey],
     createGroup,
-    [adminClient, admin.publicKey, payer],
+    [adminClient, admin.publicKey],
   );
   console.log(`Group ${group.publicKey}`);
 
@@ -86,7 +86,7 @@ async function main() {
     getStubOracleForGroupAndMint,
     [adminClient, group.publicKey, usdcDevnetMint],
     createStubOracle,
-    [adminClient, group.publicKey, admin.publicKey, usdcDevnetMint, payer, 1],
+    [adminClient, group.publicKey, admin.publicKey, usdcDevnetMint, 1],
   );
   console.log(
     `usdcDevnetStubOracle ${usdcDevnetStubOracle.publicKey.toBase58()}`,
@@ -114,7 +114,7 @@ async function main() {
       admin.publicKey,
       btcDevnetMint,
       btcDevnetOracle,
-      payer,
+
       0,
     ],
   );
@@ -130,7 +130,7 @@ async function main() {
       admin.publicKey,
       usdcDevnetMint,
       usdcDevnetStubOracle.publicKey,
-      payer,
+
       1,
     ],
   );
@@ -158,7 +158,7 @@ async function main() {
     getMangoAccountsForGroupAndOwner,
     [userClient, group.publicKey, user.publicKey],
     createMangoAccount,
-    [userClient, group.publicKey, user.publicKey, payer],
+    [userClient, group.publicKey, user.publicKey],
   );
   console.log(`MangoAccount ${mangoAccount.publicKey}`);
 
@@ -196,7 +196,6 @@ async function main() {
       serumMarketExternalPk,
       usdcBank.publicKey,
       btcBank.publicKey,
-      payer,
       0,
     ],
   );
@@ -215,7 +214,6 @@ async function main() {
       serumProgramId,
       serumMarketExternalPk,
       user.publicKey,
-      payer,
     );
   }
 

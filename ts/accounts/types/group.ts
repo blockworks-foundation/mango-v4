@@ -1,5 +1,4 @@
 import {
-  Keypair,
   PublicKey,
   Transaction,
   TransactionInstruction,
@@ -17,27 +16,23 @@ export class Group {
 export async function createGroup(
   client: MangoClient,
   adminPk: PublicKey,
-  payer: Keypair,
 ): Promise<void> {
   const tx = new Transaction();
-  const signers = [payer];
-  const ix = await createGroupIx(client, adminPk, payer);
+  const ix = await createGroupIx(client, adminPk);
   tx.add(ix);
-  await client.program.provider.send(tx, signers);
+  await client.program.provider.send(tx);
 }
 
 export async function createGroupIx(
   client: MangoClient,
   adminPk: PublicKey,
-  payer: Keypair,
 ): Promise<TransactionInstruction> {
   return await client.program.methods
     .createGroup()
     .accounts({
       admin: adminPk,
-      payer: payer.publicKey,
+      payer: adminPk,
     })
-    .signers([payer])
     .instruction();
 }
 

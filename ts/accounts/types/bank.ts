@@ -1,5 +1,4 @@
 import {
-  Keypair,
   PublicKey,
   SYSVAR_RENT_PUBKEY,
   Transaction,
@@ -88,22 +87,19 @@ export async function registerToken(
   adminPk: PublicKey,
   mintPk: PublicKey,
   oraclePk: PublicKey,
-  payer: Keypair,
   tokenIndex: number,
 ): Promise<void> {
   const tx = new Transaction();
-  const signers = [payer];
   const ix = await registerTokenIx(
     client,
     groupPk,
     adminPk,
     mintPk,
     oraclePk,
-    payer,
     tokenIndex,
   );
   tx.add(ix);
-  await client.program.provider.send(tx, signers);
+  await client.program.provider.send(tx);
 }
 
 export async function registerTokenIx(
@@ -112,7 +108,6 @@ export async function registerTokenIx(
   adminPk: PublicKey,
   mintPk: PublicKey,
   oraclePk: PublicKey,
-  payer: Keypair,
   tokenIndex: number,
 ): Promise<TransactionInstruction> {
   return await client.program.methods
@@ -122,10 +117,9 @@ export async function registerTokenIx(
       admin: adminPk,
       mint: mintPk,
       oracle: oraclePk,
-      payer: payer.publicKey,
+      payer: adminPk,
       rent: SYSVAR_RENT_PUBKEY,
     })
-    .signers([payer])
     .instruction();
 }
 
