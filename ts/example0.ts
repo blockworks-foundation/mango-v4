@@ -38,6 +38,10 @@ import { MangoClient } from './client';
 import { findOrCreate } from './utils';
 
 //
+// Deprecated, see other examples
+//
+
+//
 // An example which uses low level global methods
 //
 
