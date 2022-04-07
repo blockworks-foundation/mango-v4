@@ -82,6 +82,9 @@ export class Bank {
   }
 }
 
+/**
+ * @deprecated
+ */
 export async function registerToken(
   client: MangoClient,
   groupPk: PublicKey,
@@ -103,6 +106,9 @@ export async function registerToken(
   return await client.program.provider.send(tx);
 }
 
+/**
+ * @deprecated
+ */
 export async function registerTokenIx(
   client: MangoClient,
   groupPk: PublicKey,
@@ -124,6 +130,9 @@ export async function registerTokenIx(
     .instruction();
 }
 
+/**
+ * @deprecated
+ */
 export async function getBank(
   client: MangoClient,
   address: PublicKey,
@@ -131,6 +140,9 @@ export async function getBank(
   return Bank.from(address, await client.program.account.bank.fetch(address));
 }
 
+/**
+ * @deprecated
+ */
 export async function getBanksForGroup(
   client: MangoClient,
   groupPk: PublicKey,

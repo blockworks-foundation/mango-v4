@@ -54,7 +54,7 @@ async function main() {
       group,
       usdcDevnetMint,
       usdcDevnetOracle.publicKey,
-      0,
+      1,
     );
   } catch (error) {}
 

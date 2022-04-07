@@ -150,6 +150,10 @@ export async function createMangoAccount(
   return await client.program.provider.send(tx);
 }
 
+/**
+ *
+ * @deprecated
+ */
 export async function createMangoAccountIx(
   client: MangoClient,
   groupPk: PublicKey,
@@ -219,6 +223,9 @@ export async function getMangoAccountsForGroup(
   ).map((pa) => MangoAccount.from(pa.publicKey, pa.account));
 }
 
+/**
+ * @deprecated
+ */
 export async function getMangoAccountsForGroupAndOwner(
   client: MangoClient,
   groupPk: PublicKey,
@@ -244,6 +251,9 @@ export async function getMangoAccountsForGroupAndOwner(
   });
 }
 
+/**
+ * @deprecated
+ */
 export async function deposit(
   client: MangoClient,
   groupPk: PublicKey,
@@ -271,6 +281,9 @@ export async function deposit(
   return await client.program.provider.send(tx);
 }
 
+/**
+ * @deprecated
+ */
 export async function depositIx(
   client: MangoClient,
   groupPk: PublicKey,
@@ -301,6 +314,9 @@ export async function depositIx(
     .instruction();
 }
 
+/**
+ * @deprecated
+ */
 export async function withdraw(
   client: MangoClient,
   groupPk: PublicKey,
@@ -330,6 +346,9 @@ export async function withdraw(
   return await client.program.provider.send(tx);
 }
 
+/**
+ * @deprecated
+ */
 export async function withdrawIx(
   client: MangoClient,
   groupPk: PublicKey,

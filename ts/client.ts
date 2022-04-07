@@ -1,26 +1,16 @@
-import { Program, Provider } from '@project-serum/anchor';
+import { BN, Program, Provider } from '@project-serum/anchor';
 import * as spl from '@solana/spl-token';
-import { PublicKey, TransactionSignature } from '@solana/web3.js';
 import {
-  Bank,
-  getBanksForGroup,
-  getMintInfoForTokenIndex,
-  registerToken,
-} from './accounts/types/bank';
-import { createGroup, getGroupForAdmin, Group } from './accounts/types/group';
-import {
-  createMangoAccount,
-  deposit,
-  getMangoAccountsForGroupAndOwner,
-  MangoAccount,
-  withdraw,
-} from './accounts/types/mangoAccount';
-import {
-  createStubOracle,
-  getStubOracleForGroupAndMint,
-  setStubOracle,
-  StubOracle,
-} from './accounts/types/oracle';
+  AccountMeta,
+  PublicKey,
+  SYSVAR_RENT_PUBKEY,
+  TransactionSignature,
+} from '@solana/web3.js';
+import { Bank, getMintInfoForTokenIndex } from './accounts/types/bank';
+import { Group } from './accounts/types/group';
+import { I80F48 } from './accounts/types/I80F48';
+import { MangoAccount } from './accounts/types/mangoAccount';
+import { StubOracle } from './accounts/types/oracle';
 import { IDL, MangoV4 } from './mango_v4';
 
 export const MANGO_V4_ID = new PublicKey(
@@ -34,12 +24,29 @@ export class MangoClient {
 
   // Group
 
-  public async createGroup() {
-    return await createGroup(this, this.program.provider.wallet.publicKey);
+  public async createGroup(): Promise<TransactionSignature> {
+    const adminPk = this.program.provider.wallet.publicKey;
+    return await this.program.methods
+      .createGroup()
+      .accounts({
+        admin: adminPk,
+        payer: adminPk,
+      })
+      .rpc();
   }
 
   public async getGroup(adminPk: PublicKey): Promise<Group> {
-    return await getGroupForAdmin(this, adminPk);
+    const groups = (
+      await this.program.account.group.all([
+        {
+          memcmp: {
+            bytes: adminPk.toBase58(),
+            offset: 8,
+          },
+        },
+      ])
+    ).map((tuple) => Group.from(tuple.publicKey, tuple.account));
+    return groups[0];
   }
 
   // Tokens/Banks
@@ -50,18 +57,37 @@ export class MangoClient {
     oraclePk: PublicKey,
     tokenIndex: number,
   ): Promise<TransactionSignature> {
-    return await registerToken(
-      this,
-      group.publicKey,
-      this.program.provider.wallet.publicKey,
-      mintPk,
-      oraclePk,
-      tokenIndex,
-    );
+    return await this.program.methods
+      .registerToken(
+        tokenIndex,
+        0.8,
+        0.6,
+        1.2,
+        1.4,
+        0.02 /*TODO expose as args*/,
+      )
+      .accounts({
+        group: group.publicKey,
+        admin: this.program.provider.wallet.publicKey,
+        mint: mintPk,
+        oracle: oraclePk,
+        payer: this.program.provider.wallet.publicKey,
+        rent: SYSVAR_RENT_PUBKEY,
+      })
+      .rpc();
   }
 
   public async getBanksForGroup(group: Group): Promise<Bank[]> {
-    return await getBanksForGroup(this, group.publicKey);
+    return (
+      await this.program.account.bank.all([
+        {
+          memcmp: {
+            bytes: group.publicKey.toBase58(),
+            offset: 8,
+          },
+        },
+      ])
+    ).map((tuple) => Bank.from(tuple.publicKey, tuple.account));
   }
 
   // Stub Oracle
@@ -71,13 +97,15 @@ export class MangoClient {
     mintPk: PublicKey,
     price: number,
   ): Promise<TransactionSignature> {
-    return await createStubOracle(
-      this,
-      group.publicKey,
-      this.program.provider.wallet.publicKey,
-      mintPk,
-      price,
-    );
+    return await this.program.methods
+      .createStubOracle({ val: I80F48.fromNumber(price).getData() })
+      .accounts({
+        group: group.publicKey,
+        admin: this.program.provider.wallet.publicKey,
+        tokenMint: mintPk,
+        payer: this.program.provider.wallet.publicKey,
+      })
+      .rpc();
   }
 
   public async setStubOracle(
@@ -85,20 +113,38 @@ export class MangoClient {
     mintPk: PublicKey,
     price: number,
   ): Promise<TransactionSignature> {
-    return await setStubOracle(
-      this,
-      group.publicKey,
-      this.program.provider.wallet.publicKey,
-      mintPk,
-      price,
-    );
+    return await this.program.methods
+      .setStubOracle({ val: I80F48.fromNumber(price).getData() })
+      .accounts({
+        group: group.publicKey,
+        admin: this.program.provider.wallet.publicKey,
+        tokenMint: mintPk,
+        payer: this.program.provider.wallet.publicKey,
+      })
+      .rpc();
   }
 
   public async getStubOracle(
     group: Group,
     mintPk: PublicKey,
   ): Promise<StubOracle> {
-    return await getStubOracleForGroupAndMint(this, group.publicKey, mintPk);
+    const stubOracles = (
+      await this.program.account.stubOracle.all([
+        {
+          memcmp: {
+            bytes: group.publicKey.toBase58(),
+            offset: 8,
+          },
+        },
+        {
+          memcmp: {
+            bytes: mintPk.toBase58(),
+            offset: 40,
+          },
+        },
+      ])
+    ).map((pa) => StubOracle.from(pa.publicKey, pa.account));
+    return stubOracles[0];
   }
 
   // MangoAccount
@@ -107,23 +153,38 @@ export class MangoClient {
     group: Group,
     accountNumber: number,
   ): Promise<TransactionSignature> {
-    return createMangoAccount(
-      this,
-      group.publicKey,
-      this.program.provider.wallet.publicKey,
-      accountNumber,
-    );
+    return await this.program.methods
+      .createAccount(accountNumber)
+      .accounts({
+        group: group.publicKey,
+        owner: this.program.provider.wallet.publicKey,
+        payer: this.program.provider.wallet.publicKey,
+      })
+      .rpc();
   }
 
   public async getMangoAccount(
     group: Group,
     ownerPk: PublicKey,
   ): Promise<MangoAccount[]> {
-    return await getMangoAccountsForGroupAndOwner(
-      this,
-      group.publicKey,
-      ownerPk,
-    );
+    return (
+      await this.program.account.mangoAccount.all([
+        {
+          memcmp: {
+            bytes: group.publicKey.toBase58(),
+            offset: 8,
+          },
+        },
+        {
+          memcmp: {
+            bytes: ownerPk.toBase58(),
+            offset: 40,
+          },
+        },
+      ])
+    ).map((pa) => {
+      return MangoAccount.from(pa.publicKey, pa.account);
+    });
   }
 
   public async deposit(
@@ -140,17 +201,23 @@ export class MangoClient {
     const healthRemainingAccounts: PublicKey[] =
       await this.buildHealthRemainingAccounts(group, mangoAccount, bank);
 
-    return await deposit(
-      this,
-      group.publicKey,
-      mangoAccount.publicKey,
-      bank.publicKey,
-      bank.vault,
-      tokenAccountPk,
-      mangoAccount.owner,
-      healthRemainingAccounts,
-      amount,
-    );
+    return await this.program.methods
+      .deposit(new BN(amount))
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        bank: bank.publicKey,
+        vault: bank.vault,
+        tokenAccount: tokenAccountPk,
+        tokenAuthority: this.program.provider.wallet.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .rpc();
   }
 
   public async withdraw(
@@ -168,18 +235,23 @@ export class MangoClient {
     const healthRemainingAccounts: PublicKey[] =
       await this.buildHealthRemainingAccounts(group, mangoAccount, bank);
 
-    return await withdraw(
-      this,
-      group.publicKey,
-      mangoAccount.publicKey,
-      bank.publicKey,
-      bank.vault,
-      tokenAccountPk,
-      mangoAccount.owner,
-      healthRemainingAccounts,
-      amount,
-      allowBorrow,
-    );
+    return await this.program.methods
+      .withdraw(new BN(amount), allowBorrow)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        bank: bank.publicKey,
+        vault: bank.vault,
+        tokenAccount: tokenAccountPk,
+        tokenAuthority: this.program.provider.wallet.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .rpc();
   }
 
   /// static

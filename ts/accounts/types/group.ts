@@ -14,6 +14,9 @@ export class Group {
   constructor(public publicKey: PublicKey, public admin: PublicKey) {}
 }
 
+/**
+ * @deprecated
+ */
 export async function createGroup(
   client: MangoClient,
   adminPk: PublicKey,
@@ -24,6 +27,9 @@ export async function createGroup(
   return await client.program.provider.send(tx);
 }
 
+/**
+ * @deprecated
+ */
 export async function createGroupIx(
   client: MangoClient,
   adminPk: PublicKey,
@@ -37,6 +43,9 @@ export async function createGroupIx(
     .instruction();
 }
 
+/**
+ * @deprecated
+ */
 export async function getGroupForAdmin(
   client: MangoClient,
   adminPk: PublicKey,

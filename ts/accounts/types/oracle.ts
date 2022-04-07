@@ -38,6 +38,9 @@ export class StubOracle {
   }
 }
 
+/**
+ * @deprecated
+ */
 export async function createStubOracle(
   client: MangoClient,
   groupPk: PublicKey,
@@ -56,6 +59,9 @@ export async function createStubOracle(
     .rpc();
 }
 
+/**
+ * @deprecated
+ */
 export async function setStubOracle(
   client: MangoClient,
   groupPk: PublicKey,
@@ -74,6 +80,9 @@ export async function setStubOracle(
     .rpc();
 }
 
+/**
+ * @deprecated
+ */
 export async function getStubOracleForGroupAndMint(
   client: MangoClient,
   groupPk: PublicKey,
