@@ -64,6 +64,8 @@ export class MangoClient {
     return await getBanksForGroup(this, group.publicKey);
   }
 
+  // Stub Oracle
+
   public async createStubOracle(
     group: Group,
     mintPk: PublicKey,
