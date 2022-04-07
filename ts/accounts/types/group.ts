@@ -3,6 +3,7 @@ import {
   Transaction,
   TransactionInstruction,
 } from '@solana/web3.js';
+import { assert } from 'console';
 import { MangoClient } from '../../client';
 
 export class Group {
@@ -39,8 +40,8 @@ export async function createGroupIx(
 export async function getGroupForAdmin(
   client: MangoClient,
   adminPk: PublicKey,
-): Promise<Group[]> {
-  return (
+): Promise<Group> {
+  const groups = (
     await client.program.account.group.all([
       {
         memcmp: {
@@ -50,4 +51,8 @@ export async function getGroupForAdmin(
       },
     ])
   ).map((tuple) => Group.from(tuple.publicKey, tuple.account));
+
+  assert(groups.length == 1);
+
+  return groups[0];
 }

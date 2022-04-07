@@ -1,5 +1,6 @@
 import { Program, Provider } from '@project-serum/anchor';
 import { PublicKey } from '@solana/web3.js';
+import { getGroupForAdmin, Group } from './accounts/types/group';
 import { IDL, MangoV4 } from './mango_v4';
 
 export const MANGO_V4_ID = new PublicKey(
@@ -47,4 +48,10 @@ export class MangoClient {
       devnet,
     );
   }
+
+  public getGroup(adminPk: PublicKey): Promise<Group> {
+    return getGroupForAdmin(this, adminPk);
+  }
+
+  
 }

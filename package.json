@@ -8,7 +8,8 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "example": "ts-node ts/example.ts",
+    "example0": "ts-node ts/example0.ts",
+    "example1": "ts-node ts/example1.ts",
     "format": "prettier --check .",
     "lint": "eslint . --ext ts --ext tsx --ext js --quiet",
     "type-check": "tsc --pretty --noEmit"
