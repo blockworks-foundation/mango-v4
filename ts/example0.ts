@@ -37,6 +37,10 @@ import {
 import { MangoClient } from './client';
 import { findOrCreate } from './utils';
 
+//
+// An example which uses low level global methods
+//
+
 async function main() {
   //
   // Setup
