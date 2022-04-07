@@ -4,7 +4,6 @@ import {
   TransactionInstruction,
   TransactionSignature,
 } from '@solana/web3.js';
-import { assert } from 'console';
 import { MangoClient } from '../../client';
 
 export class Group {
@@ -52,8 +51,5 @@ export async function getGroupForAdmin(
       },
     ])
   ).map((tuple) => Group.from(tuple.publicKey, tuple.account));
-
-  assert(groups.length == 1);
-
   return groups[0];
 }
