@@ -280,7 +280,7 @@ async function main() {
     1000,
   );
 
-  console.log(`Witdrawing...500`);
+  console.log(`Withdrawing...500`);
   await withdraw(
     userClient,
     group.publicKey,

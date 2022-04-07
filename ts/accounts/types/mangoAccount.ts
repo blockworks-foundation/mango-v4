@@ -48,9 +48,9 @@ export class MangoAccount {
 
   constructor(
     public publicKey: PublicKey,
-    group: PublicKey,
-    owner: PublicKey,
-    delegate: PublicKey,
+    public group: PublicKey,
+    public owner: PublicKey,
+    public delegate: PublicKey,
     tokens: { values: TokenAccountDto[] },
     serum3: { values: Serum3AccountDto[] },
     perps: unknown,

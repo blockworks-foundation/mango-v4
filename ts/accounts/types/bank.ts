@@ -55,8 +55,8 @@ export class Bank {
 
   constructor(
     public publicKey: PublicKey,
-    group: PublicKey,
-    mint: PublicKey,
+    public group: PublicKey,
+    public mint: PublicKey,
     public vault: PublicKey,
     public oracle: PublicKey,
     depositIndex: I80F48Dto,

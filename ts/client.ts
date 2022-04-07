@@ -1,11 +1,18 @@
 import { Program, Provider } from '@project-serum/anchor';
+import * as spl from '@solana/spl-token';
 import { PublicKey, TransactionSignature } from '@solana/web3.js';
-import { Bank, getBanksForGroup } from './accounts/types/bank';
+import {
+  Bank,
+  getBanksForGroup,
+  getMintInfoForTokenIndex,
+} from './accounts/types/bank';
 import { getGroupForAdmin, Group } from './accounts/types/group';
 import {
   createMangoAccount,
+  deposit,
   getMangoAccountsForGroupAndOwner,
   MangoAccount,
+  withdraw,
 } from './accounts/types/mangoAccount';
 import { IDL, MangoV4 } from './mango_v4';
 
@@ -15,6 +22,93 @@ export const MANGO_V4_ID = new PublicKey(
 
 export class MangoClient {
   constructor(public program: Program<MangoV4>, public devnet?: boolean) {}
+
+  /// public
+
+  public async getGroup(adminPk: PublicKey): Promise<Group> {
+    return await getGroupForAdmin(this, adminPk);
+  }
+
+  public async getBanksForGroup(group: Group): Promise<Bank[]> {
+    return await getBanksForGroup(this, group.publicKey);
+  }
+
+  public async createMangoAccount(
+    group: Group,
+    ownerPk: PublicKey,
+    accountNumber: number,
+  ): Promise<TransactionSignature> {
+    return createMangoAccount(this, group.publicKey, ownerPk, accountNumber);
+  }
+
+  public async getMangoAccount(
+    group: Group,
+    ownerPk: PublicKey,
+  ): Promise<MangoAccount[]> {
+    return await getMangoAccountsForGroupAndOwner(
+      this,
+      group.publicKey,
+      ownerPk,
+    );
+  }
+
+  public async deposit(
+    group: Group,
+    mangoAccount: MangoAccount,
+    bank: Bank,
+    amount: number,
+  ) {
+    const tokenAccountPk = await spl.getAssociatedTokenAddress(
+      bank.mint,
+      mangoAccount.owner,
+    );
+
+    const healthRemainingAccounts: PublicKey[] =
+      await this.buildHealthRemainingAccounts(group, mangoAccount, bank);
+
+    return await deposit(
+      this,
+      group.publicKey,
+      mangoAccount.publicKey,
+      bank.publicKey,
+      bank.vault,
+      tokenAccountPk,
+      mangoAccount.owner,
+      healthRemainingAccounts,
+      amount,
+    );
+  }
+
+  public async withdraw(
+    group: Group,
+    mangoAccount: MangoAccount,
+    bank: Bank,
+    amount: number,
+    allowBorrow: boolean,
+  ) {
+    const tokenAccountPk = await spl.getAssociatedTokenAddress(
+      bank.mint,
+      mangoAccount.owner,
+    );
+
+    const healthRemainingAccounts: PublicKey[] =
+      await this.buildHealthRemainingAccounts(group, mangoAccount, bank);
+
+    return await withdraw(
+      this,
+      group.publicKey,
+      mangoAccount.publicKey,
+      bank.publicKey,
+      bank.vault,
+      tokenAccountPk,
+      mangoAccount.owner,
+      healthRemainingAccounts,
+      amount,
+      allowBorrow,
+    );
+  }
+
+  /// static
 
   static async connect(
     provider: Provider,
@@ -55,42 +149,45 @@ export class MangoClient {
     );
   }
 
-  public async getGroup(adminPk: PublicKey): Promise<Group> {
-    return await getGroupForAdmin(this, adminPk);
-  }
+  /// private
 
-  public async getBanksForGroup(group: Group): Promise<Bank[]> {
-    return await getBanksForGroup(this, group.publicKey);
-  }
-
-  public async createMangoAccount(
+  private async buildHealthRemainingAccounts(
     group: Group,
-    ownerPk: PublicKey,
-    accountNumber: number,
-  ): Promise<TransactionSignature> {
-    return createMangoAccount(this, group.publicKey, ownerPk, accountNumber);
-  }
+    mangoAccount: MangoAccount,
+    bank: Bank,
+  ) {
+    const healthRemainingAccounts: PublicKey[] = [];
+    {
+      const tokenIndices = mangoAccount.tokens
+        .filter((token) => token.tokenIndex !== 65535)
+        .map((token) => token.tokenIndex);
+      tokenIndices.push(bank.tokenIndex);
 
-  public async getMangoAccount(
-    group: Group,
-    ownerPk: PublicKey,
-  ): Promise<MangoAccount[]> {
-    return await getMangoAccountsForGroupAndOwner(
-      this,
-      group.publicKey,
-      ownerPk,
-    );
+      const mintInfos = await Promise.all(
+        [...new Set(tokenIndices)].map(async (tokenIndex) =>
+          getMintInfoForTokenIndex(this, group.publicKey, tokenIndex),
+        ),
+      );
+      healthRemainingAccounts.push(
+        ...mintInfos.flatMap((mintinfos) => {
+          return mintinfos.flatMap((mintinfo) => {
+            return mintinfo.bank;
+          });
+        }),
+      );
+      healthRemainingAccounts.push(
+        ...mintInfos.flatMap((mintinfos) => {
+          return mintinfos.flatMap((mintinfo) => {
+            return mintinfo.oracle;
+          });
+        }),
+      );
+      healthRemainingAccounts.push(
+        ...mangoAccount.serum3
+          .filter((serum3Account) => serum3Account.marketIndex !== 65535)
+          .map((serum3Account) => serum3Account.openOrders),
+      );
+    }
+    return healthRemainingAccounts;
   }
-
-  // public async deposit(group: Group, mangoAccount: MangoAccount, bank: Bank) {
-  //   return await deposit(
-  //     this,
-  //     group.publicKey,
-  //     mangoAccount.publicKey,
-  //     bank.publicKey,
-  //     bank.vault,
-  //     tokenAccountPk,
-  //     ownerPk,
-  //   );
-  // }
 }

@@ -44,7 +44,11 @@ async function main() {
   mangoAccount = mangoAccounts[0];
   console.log(`MangoAccount ${mangoAccount.publicKey}`);
 
-  process.exit(0);
+  console.log(`Depositing...1000`);
+  await client.deposit(group, mangoAccount, banks[0], 1000);
+
+  console.log(`Withdrawing...500`);
+  await client.withdraw(group, mangoAccount, banks[0], 500, false);
 }
 
 main();
