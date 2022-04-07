@@ -5,8 +5,9 @@ import {
   Bank,
   getBanksForGroup,
   getMintInfoForTokenIndex,
+  registerToken,
 } from './accounts/types/bank';
-import { getGroupForAdmin, Group } from './accounts/types/group';
+import { createGroup, getGroupForAdmin, Group } from './accounts/types/group';
 import {
   createMangoAccount,
   deposit,
@@ -14,6 +15,12 @@ import {
   MangoAccount,
   withdraw,
 } from './accounts/types/mangoAccount';
+import {
+  createStubOracle,
+  getStubOracleForGroupAndMint,
+  setStubOracle,
+  StubOracle,
+} from './accounts/types/oracle';
 import { IDL, MangoV4 } from './mango_v4';
 
 export const MANGO_V4_ID = new PublicKey(
@@ -25,20 +32,85 @@ export class MangoClient {
 
   /// public
 
+  // Group
+
+  public async createGroup() {
+    return await createGroup(this, this.program.provider.wallet.publicKey);
+  }
+
   public async getGroup(adminPk: PublicKey): Promise<Group> {
     return await getGroupForAdmin(this, adminPk);
+  }
+
+  // Tokens/Banks
+
+  public async registerToken(
+    group: Group,
+    mintPk: PublicKey,
+    oraclePk: PublicKey,
+    tokenIndex: number,
+  ): Promise<TransactionSignature> {
+    return await registerToken(
+      this,
+      group.publicKey,
+      this.program.provider.wallet.publicKey,
+      mintPk,
+      oraclePk,
+      tokenIndex,
+    );
   }
 
   public async getBanksForGroup(group: Group): Promise<Bank[]> {
     return await getBanksForGroup(this, group.publicKey);
   }
 
+  public async createStubOracle(
+    group: Group,
+    mintPk: PublicKey,
+    price: number,
+  ): Promise<TransactionSignature> {
+    return await createStubOracle(
+      this,
+      group.publicKey,
+      this.program.provider.wallet.publicKey,
+      mintPk,
+      price,
+    );
+  }
+
+  public async setStubOracle(
+    group: Group,
+    mintPk: PublicKey,
+    price: number,
+  ): Promise<TransactionSignature> {
+    return await setStubOracle(
+      this,
+      group.publicKey,
+      this.program.provider.wallet.publicKey,
+      mintPk,
+      price,
+    );
+  }
+
+  public async getStubOracle(
+    group: Group,
+    mintPk: PublicKey,
+  ): Promise<StubOracle> {
+    return await getStubOracleForGroupAndMint(this, group.publicKey, mintPk);
+  }
+
+  // MangoAccount
+
   public async createMangoAccount(
     group: Group,
-    ownerPk: PublicKey,
     accountNumber: number,
   ): Promise<TransactionSignature> {
-    return createMangoAccount(this, group.publicKey, ownerPk, accountNumber);
+    return createMangoAccount(
+      this,
+      group.publicKey,
+      this.program.provider.wallet.publicKey,
+      accountNumber,
+    );
   }
 
   public async getMangoAccount(

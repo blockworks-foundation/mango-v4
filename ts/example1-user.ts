@@ -38,7 +38,7 @@ async function main() {
   let mangoAccount: MangoAccount;
   mangoAccounts = await client.getMangoAccount(group, user.publicKey);
   if (mangoAccounts.length === 0) {
-    await client.createMangoAccount(group, user.publicKey, 0);
+    await client.createMangoAccount(group, 0);
     mangoAccounts = await client.getMangoAccount(group, user.publicKey);
   }
   mangoAccount = mangoAccounts[0];

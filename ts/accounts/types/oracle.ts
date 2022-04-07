@@ -1,7 +1,7 @@
-import { I80F48, I80F48Dto } from './I80F48';
-import { Keypair, PublicKey } from '@solana/web3.js';
+import { PublicKey, TransactionSignature } from '@solana/web3.js';
 import BN from 'bn.js';
 import { MangoClient } from '../../client';
+import { I80F48, I80F48Dto } from './I80F48';
 
 export class StubOracle {
   public price: I80F48;
@@ -44,14 +44,14 @@ export async function createStubOracle(
   adminPk: PublicKey,
   tokenMintPk: PublicKey,
   staticPrice: number,
-): Promise<void> {
+): Promise<TransactionSignature> {
   return await client.program.methods
     .createStubOracle({ val: I80F48.fromNumber(staticPrice).getData() })
     .accounts({
       group: groupPk,
       admin: adminPk,
       tokenMint: tokenMintPk,
-      payer: adminPk
+      payer: adminPk,
     })
     .rpc();
 }
@@ -62,14 +62,14 @@ export async function setStubOracle(
   adminPk: PublicKey,
   tokenMintPk: PublicKey,
   staticPrice: number,
-): Promise<void> {
+): Promise<TransactionSignature> {
   return await client.program.methods
     .setStubOracle({ val: new BN(staticPrice) })
     .accounts({
       group: groupPk,
       admin: adminPk,
       tokenMint: tokenMintPk,
-      payer: adminPk
+      payer: adminPk,
     })
     .rpc();
 }
@@ -78,8 +78,8 @@ export async function getStubOracleForGroupAndMint(
   client: MangoClient,
   groupPk: PublicKey,
   mintPk: PublicKey,
-): Promise<StubOracle[]> {
-  return (
+): Promise<StubOracle> {
+  const stubOracles = (
     await client.program.account.stubOracle.all([
       {
         memcmp: {
@@ -95,4 +95,5 @@ export async function getStubOracleForGroupAndMint(
       },
     ])
   ).map((pa) => StubOracle.from(pa.publicKey, pa.account));
+  return stubOracles[0];
 }
