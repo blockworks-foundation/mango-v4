@@ -37,14 +37,14 @@ async function main() {
   console.log(`Group ${group.publicKey}`);
 
   // register token 0
-  const btcDevnetMint = new PublicKey(DEVNET_MINTS['BTC']);
-  const btcDevnetOracle = new PublicKey(DEVNET_ORACLES['BTC']);
+  const btcDevnetMint = new PublicKey(DEVNET_MINTS.get('BTC')!);
+  const btcDevnetOracle = new PublicKey(DEVNET_ORACLES.get('BTC')!);
   try {
     await client.registerToken(group, btcDevnetMint, btcDevnetOracle, 0);
   } catch (error) {}
 
   // stub oracle + register token 1
-  const usdcDevnetMint = new PublicKey(DEVNET_MINTS['USDC']);
+  const usdcDevnetMint = new PublicKey(DEVNET_MINTS.get('BTC')!);
   try {
     await client.createStubOracle(group, usdcDevnetMint, 1.0);
   } catch (error) {}
@@ -68,7 +68,7 @@ async function main() {
 
   // register serum market
   const serumMarketExternalPk = new PublicKey(
-    DEVNET_SERUM3_MARKETS['BTC/USDC'],
+    DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
   );
   try {
   } catch (error) {

@@ -1,12 +1,5 @@
-import {
-  AccountMeta,
-  PublicKey,
-  Transaction,
-  TransactionInstruction,
-  TransactionSignature,
-} from '@solana/web3.js';
+import { AccountMeta, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
-import * as bs58 from 'bs58';
 import { MangoClient } from '../../client';
 
 export class Serum3Market {
@@ -43,97 +36,6 @@ export class Serum3Market {
     public baseTokenIndex: number,
     public quoteTokenIndex: number,
   ) {}
-}
-
-/** @deprecated */
-export async function serum3RegisterMarket(
-  client: MangoClient,
-  groupPk: PublicKey,
-  adminPk: PublicKey,
-  serumProgramPk: PublicKey,
-  serumMarketExternalPk: PublicKey,
-  quoteBankPk: PublicKey,
-  baseBankPk: PublicKey,
-  marketIndex: number,
-): Promise<TransactionSignature> {
-  const tx = new Transaction();
-  const ix = await serum3RegisterMarketIx(
-    client,
-    groupPk,
-    adminPk,
-    serumProgramPk,
-    serumMarketExternalPk,
-    quoteBankPk,
-    baseBankPk,
-    marketIndex,
-  );
-  tx.add(ix);
-  return await client.program.provider.send(tx);
-}
-
-/** @deprecated */
-export async function serum3RegisterMarketIx(
-  client: MangoClient,
-  groupPk: PublicKey,
-  adminPk: PublicKey,
-  serumProgramPk: PublicKey,
-  serumMarketExternalPk: PublicKey,
-  quoteBankPk: PublicKey,
-  baseBankPk: PublicKey,
-  marketIndex: number,
-): Promise<TransactionInstruction> {
-  return await client.program.methods
-    .serum3RegisterMarket(marketIndex)
-    .accounts({
-      group: groupPk,
-      admin: adminPk,
-      serumProgram: serumProgramPk,
-      serumMarketExternal: serumMarketExternalPk,
-      quoteBank: quoteBankPk,
-      baseBank: baseBankPk,
-      payer: adminPk,
-    })
-    .instruction();
-}
-
-/** @deprecated */
-export async function getSerum3MarketForBaseAndQuote(
-  client: MangoClient,
-  groupPk: PublicKey,
-  baseTokenIndex: number,
-  quoteTokenIndex: number,
-): Promise<Serum3Market[]> {
-  const bbuf = Buffer.alloc(2);
-  bbuf.writeUInt16LE(baseTokenIndex);
-
-  const qbuf = Buffer.alloc(2);
-  qbuf.writeUInt16LE(quoteTokenIndex);
-
-  const bumpfbuf = Buffer.alloc(1);
-  bumpfbuf.writeUInt8(255);
-
-  return (
-    await client.program.account.serum3Market.all([
-      {
-        memcmp: {
-          bytes: groupPk.toBase58(),
-          offset: 8,
-        },
-      },
-      {
-        memcmp: {
-          bytes: bs58.encode(bbuf),
-          offset: 106,
-        },
-      },
-      {
-        memcmp: {
-          bytes: bs58.encode(qbuf),
-          offset: 108,
-        },
-      },
-    ])
-  ).map((tuple) => Serum3Market.from(tuple.publicKey, tuple.account));
 }
 
 export async function serum3CreateOpenOrders(

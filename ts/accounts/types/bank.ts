@@ -1,10 +1,4 @@
-import {
-  PublicKey,
-  SYSVAR_RENT_PUBKEY,
-  Transaction,
-  TransactionInstruction,
-  TransactionSignature,
-} from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { MangoClient } from '../../client';
 import { I80F48, I80F48Dto } from './I80F48';
@@ -80,83 +74,6 @@ export class Bank {
       this.tokenIndex
     } deposit index - ${this.depositIndex.toNumber()}, borrow index - ${this.borrowIndex.toNumber()}`;
   }
-}
-
-/**
- * @deprecated
- */
-export async function registerToken(
-  client: MangoClient,
-  groupPk: PublicKey,
-  adminPk: PublicKey,
-  mintPk: PublicKey,
-  oraclePk: PublicKey,
-  tokenIndex: number,
-): Promise<TransactionSignature> {
-  const tx = new Transaction();
-  const ix = await registerTokenIx(
-    client,
-    groupPk,
-    adminPk,
-    mintPk,
-    oraclePk,
-    tokenIndex,
-  );
-  tx.add(ix);
-  return await client.program.provider.send(tx);
-}
-
-/**
- * @deprecated
- */
-export async function registerTokenIx(
-  client: MangoClient,
-  groupPk: PublicKey,
-  adminPk: PublicKey,
-  mintPk: PublicKey,
-  oraclePk: PublicKey,
-  tokenIndex: number,
-): Promise<TransactionInstruction> {
-  return await client.program.methods
-    .registerToken(tokenIndex, 0.8, 0.6, 1.2, 1.4, 0.02)
-    .accounts({
-      group: groupPk,
-      admin: adminPk,
-      mint: mintPk,
-      oracle: oraclePk,
-      payer: adminPk,
-      rent: SYSVAR_RENT_PUBKEY,
-    })
-    .instruction();
-}
-
-/**
- * @deprecated
- */
-export async function getBank(
-  client: MangoClient,
-  address: PublicKey,
-): Promise<Bank> {
-  return Bank.from(address, await client.program.account.bank.fetch(address));
-}
-
-/**
- * @deprecated
- */
-export async function getBanksForGroup(
-  client: MangoClient,
-  groupPk: PublicKey,
-): Promise<Bank[]> {
-  return (
-    await client.program.account.bank.all([
-      {
-        memcmp: {
-          bytes: groupPk.toBase58(),
-          offset: 8,
-        },
-      },
-    ])
-  ).map((tuple) => Bank.from(tuple.publicKey, tuple.account));
 }
 
 export async function getBankForGroupAndMint(
