@@ -1,4 +1,3 @@
-export { Bank, getBankForGroupAndMint } from './accounts/types/bank';
 export { Group } from './accounts/types/group';
 export * from './accounts/types/I80F48';
 export {

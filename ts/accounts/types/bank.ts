@@ -76,29 +76,6 @@ export class Bank {
   }
 }
 
-export async function getBankForGroupAndMint(
-  client: MangoClient,
-  groupPk: PublicKey,
-  mintPk: PublicKey,
-): Promise<Bank[]> {
-  return (
-    await client.program.account.bank.all([
-      {
-        memcmp: {
-          bytes: groupPk.toBase58(),
-          offset: 8,
-        },
-      },
-      {
-        memcmp: {
-          bytes: mintPk.toBase58(),
-          offset: 40,
-        },
-      },
-    ])
-  ).map((tuple) => Bank.from(tuple.publicKey, tuple.account));
-}
-
 export class MintInfo {
   static from(
     publicKey: PublicKey,

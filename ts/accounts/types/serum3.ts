@@ -1,6 +1,4 @@
-import { AccountMeta, PublicKey } from '@solana/web3.js';
-import BN from 'bn.js';
-import { MangoClient } from '../../client';
+import { PublicKey } from '@solana/web3.js';
 
 export class Serum3Market {
   static from(
@@ -38,28 +36,6 @@ export class Serum3Market {
   ) {}
 }
 
-export async function serum3CreateOpenOrders(
-  client: MangoClient,
-  groupPk: PublicKey,
-  accountPk: PublicKey,
-  serumMarketPk: PublicKey,
-  serumProgramPk: PublicKey,
-  serumMarketExternalPk: PublicKey,
-  ownerPk: PublicKey,
-): Promise<void> {
-  return await client.program.methods
-    .serum3CreateOpenOrders()
-    .accounts({
-      group: groupPk,
-      account: accountPk,
-      serumMarket: serumMarketPk,
-      serumProgram: serumProgramPk,
-      serumMarketExternal: serumMarketExternalPk,
-      owner: ownerPk,
-      payer: ownerPk,
-    })
-    .rpc();
-}
 export class Serum3SelfTradeBehavior {
   static decrementTake = { decrementTake: {} };
   static cancelProvide = { cancelProvide: {} };
@@ -75,75 +51,4 @@ export class Serum3OrderType {
 export class Serum3Side {
   static bid = { bid: {} };
   static ask = { ask: {} };
-}
-
-export async function serum3PlaceOrder(
-  client: MangoClient,
-  groupPk: PublicKey,
-  accountPk: PublicKey,
-  ownerPk: PublicKey,
-  openOrdersPk: PublicKey,
-  serumMarketPk: PublicKey,
-  serumProgramPk: PublicKey,
-  serumMarketExternalPk: PublicKey,
-  marketBidsPk: PublicKey,
-  marketAsksPk: PublicKey,
-  marketEventQueuePk: PublicKey,
-  marketRequestQueuePk: PublicKey,
-  marketBaseVaultPk: PublicKey,
-  marketQuoteVaultPk: PublicKey,
-  marketVaultSignerPk: PublicKey,
-  quoteBankPk: PublicKey,
-  quoteVaultPk: PublicKey,
-  baseBankPk: PublicKey,
-  baseVaultPk: PublicKey,
-  healthRemainingAccounts: PublicKey[],
-  side: Serum3Side,
-  limitPrice: number,
-  maxBaseQty: number,
-  maxNativeQuoteQtyIncludingFees: number,
-  selfTradeBehavior: Serum3SelfTradeBehavior,
-  orderType: Serum3OrderType,
-  clientOrderId: number,
-  limit: number,
-): Promise<void> {
-  return await client.program.methods
-    .serum3PlaceOrder(
-      side,
-      new BN(limitPrice),
-      new BN(maxBaseQty),
-      new BN(maxNativeQuoteQtyIncludingFees),
-      selfTradeBehavior,
-      orderType,
-      new BN(clientOrderId),
-      limit,
-    )
-    .accounts({
-      group: groupPk,
-      account: accountPk,
-      owner: ownerPk,
-      openOrders: openOrdersPk,
-      serumMarket: serumMarketPk,
-      serumProgram: serumProgramPk,
-      serumMarketExternal: serumMarketExternalPk,
-      marketBids: marketBidsPk,
-      marketAsks: marketAsksPk,
-      marketEventQueue: marketEventQueuePk,
-      marketRequestQueue: marketRequestQueuePk,
-      marketBaseVault: marketBaseVaultPk,
-      marketQuoteVault: marketQuoteVaultPk,
-      marketVaultSigner: marketVaultSignerPk,
-      quoteBank: quoteBankPk,
-      quoteVault: quoteVaultPk,
-      baseBank: baseBankPk,
-      baseVault: baseVaultPk,
-    })
-    .remainingAccounts(
-      healthRemainingAccounts.map(
-        (pk) =>
-          ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
-      ),
-    )
-
-    .rpc();
 }
