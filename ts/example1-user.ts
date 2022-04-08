@@ -48,21 +48,81 @@ async function main() {
   await client.withdraw(group, mangoAccount, 'USDC', 500000, false);
 
   // serum3
-  console.log(`Placing serum3 order`);
+  console.log(
+    `Placing serum3 bid which would not be settled since its relatively low then midprice`,
+  );
   await client.serum3PlaceOrder(
     group,
     mangoAccount,
     DEVNET_SERUM3_PROGRAM_ID,
     'BTC/USDC',
     Serum3Side.bid,
-    40000,
-    1,
-    1000000,
+    20000,
+    0.0001,
     Serum3SelfTradeBehavior.decrementTake,
     Serum3OrderType.limit,
     Date.now(),
     10,
   );
+  console.log(`Placing serum3 bid way above midprice`);
+  await client.serum3PlaceOrder(
+    group,
+    mangoAccount,
+    DEVNET_SERUM3_PROGRAM_ID,
+    'BTC/USDC',
+    Serum3Side.bid,
+    90000,
+    0.0001,
+    Serum3SelfTradeBehavior.decrementTake,
+    Serum3OrderType.limit,
+    Date.now(),
+    10,
+  );
+  console.log(`Placing serum3 ask way below midprice`);
+  await client.serum3PlaceOrder(
+    group,
+    mangoAccount,
+    DEVNET_SERUM3_PROGRAM_ID,
+    'BTC/USDC',
+    Serum3Side.ask,
+    30000,
+    0.0001,
+    Serum3SelfTradeBehavior.decrementTake,
+    Serum3OrderType.limit,
+    Date.now(),
+    10,
+  );
+
+  console.log(`Current own orders on OB...`);
+  let orders = await client.getSerum3Orders(
+    group,
+    DEVNET_SERUM3_PROGRAM_ID,
+    'BTC/USDC',
+  );
+  for (const order of orders) {
+    console.log(
+      `Order orderId ${order.orderId}, ${order.side}, ${order.price}, ${order.size}`,
+    );
+    console.log(`Cancelling order with ${order.orderId}`);
+    await client.cancelSerumOrder(
+      group,
+      mangoAccount,
+      DEVNET_SERUM3_PROGRAM_ID,
+      'BTC/USDC',
+      order.side === 'buy' ? Serum3Side.bid : Serum3Side.ask,
+      order.orderId,
+    );
+  }
+
+  console.log(`Current own orders on OB...`);
+  orders = await client.getSerum3Orders(
+    group,
+    DEVNET_SERUM3_PROGRAM_ID,
+    'BTC/USDC',
+  );
+  for (const order of orders) {
+    console.log(order);
+  }
 
   process.exit();
 }

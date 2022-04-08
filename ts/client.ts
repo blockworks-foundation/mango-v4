@@ -1,5 +1,6 @@
 import { BN, Program, Provider } from '@project-serum/anchor';
-import { Market } from '@project-serum/serum';
+import { getFeeRates, getFeeTier, Market } from '@project-serum/serum';
+import { Order } from '@project-serum/serum/lib/market';
 import * as spl from '@solana/spl-token';
 import {
   AccountMeta,
@@ -383,9 +384,8 @@ export class MangoClient {
     serum3ProgramId: PublicKey,
     serum3MarketName: string,
     side: Serum3Side,
-    limitPrice: number,
-    maxBaseQty: number,
-    maxNativeQuoteQtyIncludingFees: number,
+    price: number,
+    size: number,
     selfTradeBehavior: Serum3SelfTradeBehavior,
     orderType: Serum3OrderType,
     clientOrderId: number,
@@ -421,12 +421,25 @@ export class MangoClient {
     const healthRemainingAccounts: PublicKey[] =
       await this.buildHealthRemainingAccounts(group, mangoAccount);
 
+    const limitPrice = serum3MarketExternal.priceNumberToLots(price);
+    const maxBaseQuantity = serum3MarketExternal.baseSizeNumberToLots(size);
+    const feeTier = getFeeTier(0, 0 /** TODO: fix msrm/srm balance */);
+    const rates = getFeeRates(feeTier);
+    const maxQuoteQuantity = new BN(
+      serum3MarketExternal.decoded.quoteLotSize.toNumber() *
+        (1 + rates.taker) /** TODO: fix taker/maker */,
+    ).mul(
+      serum3MarketExternal
+        .baseSizeNumberToLots(size)
+        .mul(serum3MarketExternal.priceNumberToLots(price)),
+    );
+
     return await this.program.methods
       .serum3PlaceOrder(
         side,
-        new BN(limitPrice),
-        new BN(maxBaseQty),
-        new BN(maxNativeQuoteQtyIncludingFees),
+        limitPrice,
+        maxBaseQuantity,
+        maxQuoteQuantity,
         selfTradeBehavior,
         orderType,
         new BN(clientOrderId),
@@ -461,6 +474,58 @@ export class MangoClient {
       )
 
       .rpc();
+  }
+
+  async cancelSerumOrder(
+    group: Group,
+    mangoAccount: MangoAccount,
+    serum3ProgramId: PublicKey,
+    serum3MarketName: string,
+    side: Serum3Side,
+    orderId: BN,
+  ): Promise<TransactionSignature> {
+    const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
+
+    const serum3MarketExternal = await Market.load(
+      this.program.provider.connection,
+      serum3Market.serumMarketExternal,
+      { commitment: this.program.provider.connection.commitment },
+      serum3ProgramId,
+    );
+    return await this.program.methods
+      .serum3CancelOrder(side, orderId)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        openOrders: mangoAccount.findSerum3Account(serum3Market.marketIndex)
+          ?.openOrders,
+        serumMarket: serum3Market.publicKey,
+        serumProgram: serum3ProgramId,
+        serumMarketExternal: serum3Market.serumMarketExternal,
+        marketBids: serum3MarketExternal.bidsAddress,
+        marketAsks: serum3MarketExternal.asksAddress,
+        marketEventQueue: serum3MarketExternal.decoded.eventQueue,
+      })
+      .rpc();
+  }
+
+  async getSerum3Orders(
+    group: Group,
+    serum3ProgramId: PublicKey,
+    serum3MarketName: string,
+  ): Promise<Order[]> {
+    const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
+
+    const serum3MarketExternal = await Market.load(
+      this.program.provider.connection,
+      serum3Market.serumMarketExternal,
+      { commitment: this.program.provider.connection.commitment },
+      serum3ProgramId,
+    );
+    return await serum3MarketExternal.loadOrdersForOwner(
+      this.program.provider.connection,
+      group.publicKey,
+    );
   }
 
   /// static
