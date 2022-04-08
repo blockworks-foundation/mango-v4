@@ -45,7 +45,16 @@ export class MangoClient {
       .rpc();
   }
 
-  public async getGroup(adminPk: PublicKey): Promise<Group> {
+  public async getGroup(groupPk: PublicKey): Promise<Group> {
+    const group = Group.from(
+      groupPk,
+      await this.program.account.group.fetch(groupPk),
+    );
+    await group.reload(this);
+    return group;
+  }
+
+  public async getGroupForAdmin(adminPk: PublicKey): Promise<Group> {
     const groups = (
       await this.program.account.group.all([
         {
@@ -168,8 +177,8 @@ export class MangoClient {
     let mangoAccounts = await this.getMangoAccountForOwner(group, ownerPk);
     if (mangoAccounts.length === 0) {
       await this.createMangoAccount(group, accountNumber ?? 0);
+      mangoAccounts = await this.getMangoAccountForOwner(group, ownerPk);
     }
-    mangoAccounts = await this.getMangoAccountForOwner(group, ownerPk);
     return mangoAccounts[0];
   }
 
@@ -489,7 +498,58 @@ export class MangoClient {
       .rpc();
   }
 
-  async cancelSerumOrder(
+  async serum3SettleFunds(
+    group: Group,
+    mangoAccount: MangoAccount,
+    serum3ProgramId: PublicKey,
+    serum3MarketName: string,
+  ): Promise<TransactionSignature> {
+    const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
+
+    const serum3MarketExternal = await Market.load(
+      this.program.provider.connection,
+      serum3Market.serumMarketExternal,
+      { commitment: this.program.provider.connection.commitment },
+      serum3ProgramId,
+    );
+
+    const serum3MarketExternalVaultSigner =
+      // TODO: put into a helper method, and remove copy pasta
+      await PublicKey.createProgramAddress(
+        [
+          serum3Market.serumMarketExternal.toBuffer(),
+          serum3MarketExternal.decoded.vaultSignerNonce.toArrayLike(
+            Buffer,
+            'le',
+            8,
+          ),
+        ],
+        serum3ProgramId,
+      );
+
+    return await this.program.methods
+      .serum3SettleFunds()
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: this.program.provider.wallet.publicKey,
+        openOrders: mangoAccount.findSerum3Account(serum3Market.marketIndex)
+          ?.openOrders,
+        serumMarket: serum3Market.publicKey,
+        serumProgram: serum3ProgramId,
+        serumMarketExternal: serum3Market.serumMarketExternal,
+        marketBaseVault: serum3MarketExternal.decoded.baseVault,
+        marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
+        marketVaultSigner: serum3MarketExternalVaultSigner,
+        quoteBank: group.findBank(serum3Market.quoteTokenIndex)?.publicKey,
+        quoteVault: group.findBank(serum3Market.quoteTokenIndex)?.vault,
+        baseBank: group.findBank(serum3Market.baseTokenIndex)?.publicKey,
+        baseVault: group.findBank(serum3Market.baseTokenIndex)?.vault,
+      })
+      .rpc();
+  }
+
+  async serum3CancelOrder(
     group: Group,
     mangoAccount: MangoAccount,
     serum3ProgramId: PublicKey,

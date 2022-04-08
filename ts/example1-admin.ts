@@ -30,13 +30,15 @@ async function main() {
   const client = await MangoClient.connect(adminProvider, true);
 
   // group
+  console.log(`Group...`);
   try {
     await client.createGroup();
   } catch (error) {}
-  const group = await client.getGroup(admin.publicKey);
+  const group = await client.getGroupForAdmin(admin.publicKey);
   console.log(`Group ${group.publicKey}`);
 
   // register token 0
+  console.log(`Token 0...`);
   const btcDevnetMint = new PublicKey(DEVNET_MINTS.get('BTC')!);
   const btcDevnetOracle = new PublicKey(DEVNET_ORACLES.get('BTC')!);
   try {
@@ -44,7 +46,8 @@ async function main() {
   } catch (error) {}
 
   // stub oracle + register token 1
-  const usdcDevnetMint = new PublicKey(DEVNET_MINTS.get('BTC')!);
+  console.log(`Token 1...`);
+  const usdcDevnetMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
     await client.createStubOracle(group, usdcDevnetMint, 1.0);
   } catch (error) {}
@@ -67,11 +70,11 @@ async function main() {
   }
 
   // register serum market
+  console.log(`Serum3 market...`);
   const serumMarketExternalPk = new PublicKey(
     DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
   );
   try {
-  } catch (error) {
     await client.serum3RegisterMarket(
       group,
       DEVNET_SERUM3_PROGRAM_ID,
@@ -80,11 +83,13 @@ async function main() {
       banks[1],
       0,
     );
-  }
+  } catch (error) {}
   const markets = await client.serum3GetMarket(
     group,
-    banks[0].tokenIndex,
-    banks[1].tokenIndex,
+    banks.find((bank) => bank.mint.toBase58() === DEVNET_MINTS.get('BTC'))
+      ?.tokenIndex,
+    banks.find((bank) => bank.mint.toBase58() === DEVNET_MINTS.get('USDC'))
+      ?.tokenIndex,
   );
   console.log(`Serum3 market ${markets[0].publicKey}`);
 

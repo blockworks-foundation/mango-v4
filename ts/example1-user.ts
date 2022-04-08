@@ -42,10 +42,11 @@ async function main() {
   console.log(`MangoAccount ${mangoAccount.publicKey}`);
 
   // deposit and withdraw
-  console.log(`Depositing...1000000`);
-  await client.deposit(group, mangoAccount, 'USDC', 1000000);
-  console.log(`Withdrawing...500000`);
-  await client.withdraw(group, mangoAccount, 'USDC', 500000, false);
+  console.log(`Depositing...5000000`);
+  await client.deposit(group, mangoAccount, 'USDC', 5000000);
+  await client.deposit(group, mangoAccount, 'BTC', 5000000);
+  console.log(`Withdrawing...1000000`);
+  await client.withdraw(group, mangoAccount, 'USDC', 1000000, false);
 
   // serum3
   console.log(
@@ -57,7 +58,7 @@ async function main() {
     DEVNET_SERUM3_PROGRAM_ID,
     'BTC/USDC',
     Serum3Side.bid,
-    20000,
+    20,
     0.0001,
     Serum3SelfTradeBehavior.decrementTake,
     Serum3OrderType.limit,
@@ -104,7 +105,7 @@ async function main() {
       `Order orderId ${order.orderId}, ${order.side}, ${order.price}, ${order.size}`,
     );
     console.log(`Cancelling order with ${order.orderId}`);
-    await client.cancelSerumOrder(
+    await client.serum3CancelOrder(
       group,
       mangoAccount,
       DEVNET_SERUM3_PROGRAM_ID,
@@ -126,6 +127,14 @@ async function main() {
 
   // console.log(`Close mango account...`);
   // await client.closeMangoAccount(mangoAccount);
+
+  console.log(`Settling funds...`);
+  await client.serum3SettleFunds(
+    group,
+    mangoAccount,
+    DEVNET_SERUM3_PROGRAM_ID,
+    'BTC/USDC',
+  );
 
   process.exit();
 }
