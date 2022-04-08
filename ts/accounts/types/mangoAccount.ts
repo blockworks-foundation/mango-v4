@@ -1,10 +1,4 @@
-import {
-  PublicKey,
-  Transaction,
-  TransactionInstruction,
-  TransactionSignature,
-} from '@solana/web3.js';
-import { MangoClient } from '../../client';
+import { PublicKey } from '@solana/web3.js';
 import { Bank } from './bank';
 import { I80F48, I80F48Dto } from './I80F48';
 
@@ -133,56 +127,4 @@ export class Serum3AccountDto {
     public quoteTokenIndex: number,
     public reserved: number[],
   ) {}
-}
-
-export async function closeMangoAccount(
-  client: MangoClient,
-  accountPk: PublicKey,
-  ownerPk: PublicKey,
-): Promise<TransactionSignature> {
-  const tx = new Transaction();
-  const ix = await closeMangoAccountIx(client, accountPk, ownerPk);
-  tx.add(ix);
-  return await client.program.provider.send(tx);
-}
-
-export async function closeMangoAccountIx(
-  client: MangoClient,
-  accountPk: PublicKey,
-  ownerPk: PublicKey,
-): Promise<TransactionInstruction> {
-  return await client.program.methods
-    .closeAccount()
-    .accounts({
-      account: accountPk,
-      owner: ownerPk,
-      solDestination: ownerPk,
-    })
-    .instruction();
-}
-
-export async function getMangoAccount(
-  client: MangoClient,
-  address: PublicKey,
-): Promise<MangoAccount> {
-  return MangoAccount.from(
-    address,
-    await client.program.account.mangoAccount.fetch(address),
-  );
-}
-
-export async function getMangoAccountsForGroup(
-  client: MangoClient,
-  groupPk: PublicKey,
-): Promise<MangoAccount[]> {
-  return (
-    await client.program.account.mangoAccount.all([
-      {
-        memcmp: {
-          bytes: groupPk.toBase58(),
-          offset: 8,
-        },
-      },
-    ])
-  ).map((pa) => MangoAccount.from(pa.publicKey, pa.account));
 }

@@ -124,6 +124,9 @@ async function main() {
     console.log(order);
   }
 
+  // console.log(`Close mango account...`);
+  // await client.closeMangoAccount(mangoAccount);
+
   process.exit();
 }
 

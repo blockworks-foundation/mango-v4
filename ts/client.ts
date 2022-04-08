@@ -218,6 +218,19 @@ export class MangoClient {
     });
   }
 
+  public async closeMangoAccount(
+    mangoAccount: MangoAccount,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .closeAccount()
+      .accounts({
+        account: mangoAccount.publicKey,
+        owner: this.program.provider.wallet.publicKey,
+        solDestination: this.program.provider.wallet.publicKey,
+      })
+      .rpc();
+  }
+
   public async deposit(
     group: Group,
     mangoAccount: MangoAccount,
