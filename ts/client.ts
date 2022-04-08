@@ -1,7 +1,9 @@
 import { BN, Program, Provider } from '@project-serum/anchor';
+import { Market } from '@project-serum/serum';
 import * as spl from '@solana/spl-token';
 import {
   AccountMeta,
+  MemcmpFilter,
   PublicKey,
   SYSVAR_RENT_PUBKEY,
   TransactionSignature,
@@ -12,7 +14,12 @@ import { Group } from './accounts/types/group';
 import { I80F48 } from './accounts/types/I80F48';
 import { MangoAccount } from './accounts/types/mangoAccount';
 import { StubOracle } from './accounts/types/oracle';
-import { Serum3Market } from './accounts/types/serum3';
+import {
+  Serum3Market,
+  Serum3OrderType,
+  Serum3SelfTradeBehavior,
+  Serum3Side,
+} from './accounts/types/serum3';
 import { IDL, MangoV4 } from './mango_v4';
 
 export const MANGO_V4_ID = new PublicKey(
@@ -48,6 +55,7 @@ export class MangoClient {
         },
       ])
     ).map((tuple) => Group.from(tuple.publicKey, tuple.account));
+    await groups[0].reload(this);
     return groups[0];
   }
 
@@ -151,6 +159,19 @@ export class MangoClient {
 
   // MangoAccount
 
+  public async getOrCreateMangoAccount(
+    group: Group,
+    ownerPk: PublicKey,
+    accountNumber?: number,
+  ): Promise<MangoAccount> {
+    let mangoAccounts = await this.getMangoAccountForOwner(group, ownerPk);
+    if (mangoAccounts.length === 0) {
+      await this.createMangoAccount(group, accountNumber ?? 0);
+    }
+    mangoAccounts = await this.getMangoAccountForOwner(group, ownerPk);
+    return mangoAccounts[0];
+  }
+
   public async createMangoAccount(
     group: Group,
     accountNumber: number,
@@ -165,7 +186,14 @@ export class MangoClient {
       .rpc();
   }
 
-  public async getMangoAccount(
+  public async getMangoAccount(mangoAccount: MangoAccount) {
+    return MangoAccount.from(
+      mangoAccount.publicKey,
+      await this.program.account.mangoAccount.fetch(mangoAccount.publicKey),
+    );
+  }
+
+  public async getMangoAccountForOwner(
     group: Group,
     ownerPk: PublicKey,
   ): Promise<MangoAccount[]> {
@@ -192,9 +220,11 @@ export class MangoClient {
   public async deposit(
     group: Group,
     mangoAccount: MangoAccount,
-    bank: Bank,
+    tokenName: string,
     amount: number,
   ) {
+    const bank = group.banksMap.get(tokenName)!;
+
     const tokenAccountPk = await spl.getAssociatedTokenAddress(
       bank.mint,
       mangoAccount.owner,
@@ -225,10 +255,12 @@ export class MangoClient {
   public async withdraw(
     group: Group,
     mangoAccount: MangoAccount,
-    bank: Bank,
+    tokenName: string,
     amount: number,
     allowBorrow: boolean,
   ) {
+    const bank = group.banksMap.get(tokenName)!;
+
     const tokenAccountPk = await spl.getAssociatedTokenAddress(
       bank.mint,
       mangoAccount.owner,
@@ -280,49 +312,57 @@ export class MangoClient {
       .rpc();
   }
 
-  public async serum3GetMarketForBaseAndQuote(
+  public async serum3GetMarket(
     group: Group,
-    baseTokenIndex: number,
-    quoteTokenIndex: number,
+    baseTokenIndex?: number,
+    quoteTokenIndex?: number,
   ): Promise<Serum3Market[]> {
-    const bbuf = Buffer.alloc(2);
-    bbuf.writeUInt16LE(baseTokenIndex);
-
-    const qbuf = Buffer.alloc(2);
-    qbuf.writeUInt16LE(quoteTokenIndex);
-
     const bumpfbuf = Buffer.alloc(1);
     bumpfbuf.writeUInt8(255);
 
-    return (
-      await this.program.account.serum3Market.all([
-        {
-          memcmp: {
-            bytes: group.publicKey.toBase58(),
-            offset: 8,
-          },
+    const filters: MemcmpFilter[] = [
+      {
+        memcmp: {
+          bytes: group.publicKey.toBase58(),
+          offset: 8,
         },
-        {
-          memcmp: {
-            bytes: bs58.encode(bbuf),
-            offset: 106,
-          },
+      },
+    ];
+
+    if (baseTokenIndex) {
+      const bbuf = Buffer.alloc(2);
+      bbuf.writeUInt16LE(baseTokenIndex);
+      filters.push({
+        memcmp: {
+          bytes: bs58.encode(bbuf),
+          offset: 106,
         },
-        {
-          memcmp: {
-            bytes: bs58.encode(qbuf),
-            offset: 108,
-          },
+      });
+    }
+
+    if (quoteTokenIndex) {
+      const qbuf = Buffer.alloc(2);
+      qbuf.writeUInt16LE(quoteTokenIndex);
+      filters.push({
+        memcmp: {
+          bytes: bs58.encode(qbuf),
+          offset: 106,
         },
-      ])
-    ).map((tuple) => Serum3Market.from(tuple.publicKey, tuple.account));
+      });
+    }
+
+    return (await this.program.account.serum3Market.all(filters)).map((tuple) =>
+      Serum3Market.from(tuple.publicKey, tuple.account),
+    );
   }
 
   public async serum3CreateOpenOrders(
     group: Group,
     mangoAccount: MangoAccount,
-    serum3Market: Serum3Market,
+    marketName: string,
   ): Promise<TransactionSignature> {
+    const serum3Market: Serum3Market = group.serum3MarketsMap.get(marketName)!;
+
     return await this.program.methods
       .serum3CreateOpenOrders()
       .accounts({
@@ -334,6 +374,92 @@ export class MangoClient {
         owner: this.program.provider.wallet.publicKey,
         payer: this.program.provider.wallet.publicKey,
       })
+      .rpc();
+  }
+
+  public async serum3PlaceOrder(
+    group: Group,
+    mangoAccount: MangoAccount,
+    serum3ProgramId: PublicKey,
+    serum3MarketName: string,
+    side: Serum3Side,
+    limitPrice: number,
+    maxBaseQty: number,
+    maxNativeQuoteQtyIncludingFees: number,
+    selfTradeBehavior: Serum3SelfTradeBehavior,
+    orderType: Serum3OrderType,
+    clientOrderId: number,
+    limit: number,
+  ) {
+    const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
+
+    if (!mangoAccount.findSerum3Account(serum3Market.marketIndex)) {
+      await this.serum3CreateOpenOrders(group, mangoAccount, 'BTC/USDC');
+      mangoAccount = await this.getMangoAccount(mangoAccount);
+    }
+
+    const serum3MarketExternal = await Market.load(
+      this.program.provider.connection,
+      serum3Market.serumMarketExternal,
+      { commitment: this.program.provider.connection.commitment },
+      serum3ProgramId,
+    );
+
+    const serum3MarketExternalVaultSigner =
+      await PublicKey.createProgramAddress(
+        [
+          serum3Market.serumMarketExternal.toBuffer(),
+          serum3MarketExternal.decoded.vaultSignerNonce.toArrayLike(
+            Buffer,
+            'le',
+            8,
+          ),
+        ],
+        serum3ProgramId,
+      );
+
+    const healthRemainingAccounts: PublicKey[] =
+      await this.buildHealthRemainingAccounts(group, mangoAccount);
+
+    return await this.program.methods
+      .serum3PlaceOrder(
+        side,
+        new BN(limitPrice),
+        new BN(maxBaseQty),
+        new BN(maxNativeQuoteQtyIncludingFees),
+        selfTradeBehavior,
+        orderType,
+        new BN(clientOrderId),
+        limit,
+      )
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: this.program.provider.wallet.publicKey,
+        openOrders: mangoAccount.findSerum3Account(serum3Market.marketIndex)
+          ?.openOrders,
+        serumMarket: serum3Market.publicKey,
+        serumProgram: serum3ProgramId,
+        serumMarketExternal: serum3Market.serumMarketExternal,
+        marketBids: serum3MarketExternal.bidsAddress,
+        marketAsks: serum3MarketExternal.asksAddress,
+        marketEventQueue: serum3MarketExternal.decoded.eventQueue,
+        marketRequestQueue: serum3MarketExternal.decoded.requestQueue,
+        marketBaseVault: serum3MarketExternal.decoded.baseVault,
+        marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
+        marketVaultSigner: serum3MarketExternalVaultSigner,
+        quoteBank: group.findBank(serum3Market.quoteTokenIndex)?.publicKey,
+        quoteVault: group.findBank(serum3Market.quoteTokenIndex)?.vault,
+        baseBank: group.findBank(serum3Market.baseTokenIndex)?.publicKey,
+        baseVault: group.findBank(serum3Market.baseTokenIndex)?.vault,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+
       .rpc();
   }
 
@@ -383,40 +509,43 @@ export class MangoClient {
   private async buildHealthRemainingAccounts(
     group: Group,
     mangoAccount: MangoAccount,
-    bank: Bank,
+    bank?: Bank /** TODO for serum3PlaceOrde we are just ingoring this atm */,
   ) {
     const healthRemainingAccounts: PublicKey[] = [];
-    {
-      const tokenIndices = mangoAccount.tokens
-        .filter((token) => token.tokenIndex !== 65535)
-        .map((token) => token.tokenIndex);
-      tokenIndices.push(bank.tokenIndex);
 
-      const mintInfos = await Promise.all(
-        [...new Set(tokenIndices)].map(async (tokenIndex) =>
-          getMintInfoForTokenIndex(this, group.publicKey, tokenIndex),
-        ),
-      );
-      healthRemainingAccounts.push(
-        ...mintInfos.flatMap((mintinfos) => {
-          return mintinfos.flatMap((mintinfo) => {
-            return mintinfo.bank;
-          });
-        }),
-      );
-      healthRemainingAccounts.push(
-        ...mintInfos.flatMap((mintinfos) => {
-          return mintinfos.flatMap((mintinfo) => {
-            return mintinfo.oracle;
-          });
-        }),
-      );
-      healthRemainingAccounts.push(
-        ...mangoAccount.serum3
-          .filter((serum3Account) => serum3Account.marketIndex !== 65535)
-          .map((serum3Account) => serum3Account.openOrders),
-      );
+    const tokenIndices = mangoAccount.tokens
+      .filter((token) => token.tokenIndex !== 65535)
+      .map((token) => token.tokenIndex);
+
+    if (bank) {
+      tokenIndices.push(bank.tokenIndex);
     }
+
+    const mintInfos = await Promise.all(
+      [...new Set(tokenIndices)].map(async (tokenIndex) =>
+        getMintInfoForTokenIndex(this, group.publicKey, tokenIndex),
+      ),
+    );
+    healthRemainingAccounts.push(
+      ...mintInfos.flatMap((mintinfos) => {
+        return mintinfos.flatMap((mintinfo) => {
+          return mintinfo.bank;
+        });
+      }),
+    );
+    healthRemainingAccounts.push(
+      ...mintInfos.flatMap((mintinfos) => {
+        return mintinfos.flatMap((mintinfo) => {
+          return mintinfo.oracle;
+        });
+      }),
+    );
+    healthRemainingAccounts.push(
+      ...mangoAccount.serum3
+        .filter((serum3Account) => serum3Account.marketIndex !== 65535)
+        .map((serum3Account) => serum3Account.openOrders),
+    );
+
     return healthRemainingAccounts;
   }
 }

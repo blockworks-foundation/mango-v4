@@ -2,6 +2,12 @@ import { Provider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from './client';
+import {
+  DEVNET_MINTS,
+  DEVNET_ORACLES,
+  DEVNET_SERUM3_MARKETS,
+  DEVNET_SERUM3_PROGRAM_ID,
+} from './constants';
 
 //
 // An example for admins based on high level api i.e. the client
@@ -31,20 +37,14 @@ async function main() {
   console.log(`Group ${group.publicKey}`);
 
   // register token 0
-  const btcDevnetMint = new PublicKey(
-    '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU',
-  );
-  const btcDevnetOracle = new PublicKey(
-    'HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J',
-  );
+  const btcDevnetMint = new PublicKey(DEVNET_MINTS['BTC']);
+  const btcDevnetOracle = new PublicKey(DEVNET_ORACLES['BTC']);
   try {
     await client.registerToken(group, btcDevnetMint, btcDevnetOracle, 0);
   } catch (error) {}
 
   // stub oracle + register token 1
-  const usdcDevnetMint = new PublicKey(
-    '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN',
-  );
+  const usdcDevnetMint = new PublicKey(DEVNET_MINTS['USDC']);
   try {
     await client.createStubOracle(group, usdcDevnetMint, 1.0);
   } catch (error) {}
@@ -67,24 +67,21 @@ async function main() {
   }
 
   // register serum market
-  const serumProgramId = new PublicKey(
-    'DESVgJVGajEgKGXhb6XmqDHGz3VjdgP7rEVESBgxmroY',
-  );
   const serumMarketExternalPk = new PublicKey(
-    'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB',
+    DEVNET_SERUM3_MARKETS['BTC/USDC'],
   );
   try {
   } catch (error) {
     await client.serum3RegisterMarket(
       group,
-      serumProgramId,
+      DEVNET_SERUM3_PROGRAM_ID,
       serumMarketExternalPk,
       banks[0],
       banks[1],
       0,
     );
   }
-  const markets = await client.serum3GetMarketForBaseAndQuote(
+  const markets = await client.serum3GetMarket(
     group,
     banks[0].tokenIndex,
     banks[1].tokenIndex,

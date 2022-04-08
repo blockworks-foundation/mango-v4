@@ -1,8 +1,13 @@
 import { Provider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
-import { MangoAccount } from './accounts/types/mangoAccount';
+import {
+  Serum3OrderType,
+  Serum3SelfTradeBehavior,
+  Serum3Side,
+} from './accounts/types/serum3';
 import { MangoClient } from './client';
+import { DEVNET_GROUP, DEVNET_SERUM3_PROGRAM_ID } from './constants';
 
 //
 // An example for users based on high level api i.e. the client
@@ -25,42 +30,39 @@ async function main() {
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
   // fetch group
-  const group = await client.getGroup(
-    new PublicKey('6ACH752p6FsdLzuociVkmDwc3wJW8pcCoxZKfXJKfKcD'),
-  );
-  console.log(`Group ${group.publicKey}`);
-
-  // fetch banks
-  const banks = await client.getBanksForGroup(group);
-  for (const bank of banks) {
-    console.log(`Bank ${bank.tokenIndex} ${bank.publicKey}`);
-  }
+  const group = await client.getGroup(new PublicKey(DEVNET_GROUP));
+  console.log(`Group ${group.publicKey.toBase58()}`);
 
   // create + fetch account
-  let mangoAccounts: MangoAccount[] = [];
-  let mangoAccount: MangoAccount;
-  mangoAccounts = await client.getMangoAccount(group, user.publicKey);
-  if (mangoAccounts.length === 0) {
-    await client.createMangoAccount(group, 0);
-    mangoAccounts = await client.getMangoAccount(group, user.publicKey);
-  }
-  mangoAccount = mangoAccounts[0];
+  const mangoAccount = await client.getOrCreateMangoAccount(
+    group,
+    user.publicKey,
+    0,
+  );
   console.log(`MangoAccount ${mangoAccount.publicKey}`);
 
   // deposit and withdraw
-  console.log(`Depositing...1000`);
-  await client.deposit(group, mangoAccount, banks[0], 1000);
-  console.log(`Withdrawing...500`);
-  await client.withdraw(group, mangoAccount, banks[0], 500, false);
+  console.log(`Depositing...1000000`);
+  await client.deposit(group, mangoAccount, 'USDC', 1000000);
+  console.log(`Withdrawing...500000`);
+  await client.withdraw(group, mangoAccount, 'USDC', 500000, false);
 
   // serum3
-  const markets = await client.serum3GetMarketForBaseAndQuote(
+  console.log(`Placing serum3 order`);
+  await client.serum3PlaceOrder(
     group,
-    banks[1].tokenIndex,
-    banks[0].tokenIndex,
+    mangoAccount,
+    DEVNET_SERUM3_PROGRAM_ID,
+    'BTC/USDC',
+    Serum3Side.bid,
+    40000,
+    1,
+    1000000,
+    Serum3SelfTradeBehavior.decrementTake,
+    Serum3OrderType.limit,
+    Date.now(),
+    10,
   );
-  console.log(markets);
-  await client.serum3CreateOpenOrders(group, mangoAccount, markets[0]);
 
   process.exit();
 }

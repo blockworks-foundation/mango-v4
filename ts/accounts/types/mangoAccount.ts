@@ -68,6 +68,10 @@ export class MangoAccount {
     return this.tokens.find((ta) => ta.tokenIndex == tokenIndex);
   }
 
+  findSerum3Account(marketIndex: number): Serum3Account | undefined {
+    return this.serum3.find((sa) => sa.marketIndex == marketIndex);
+  }
+
   getNativeDeposit(bank: Bank): I80F48 {
     const ta = this.findToken(bank.tokenIndex);
     return bank.depositIndex.mul(ta?.indexedValue!);

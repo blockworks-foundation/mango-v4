@@ -35,6 +35,11 @@ import {
   Serum3Side,
 } from './accounts/types/serum3';
 import { MangoClient } from './client';
+import {
+  DEVNET_MINTS,
+  DEVNET_ORACLES,
+  DEVNET_SERUM3_PROGRAM_ID,
+} from './constants';
 import { findOrCreate } from './utils';
 
 //
@@ -86,9 +91,7 @@ async function main() {
   //
   // Find existing or register new oracles
   //
-  const usdcDevnetMint = new PublicKey(
-    '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN',
-  );
+  const usdcDevnetMint = new PublicKey(DEVNET_MINTS['USDC']);
   const usdcDevnetStubOracle = await findOrCreate<StubOracle>(
     'stubOracle',
     getStubOracleForGroupAndMint,
@@ -99,12 +102,8 @@ async function main() {
   console.log(
     `usdcDevnetStubOracle ${usdcDevnetStubOracle.publicKey.toBase58()}`,
   );
-  const btcDevnetMint = new PublicKey(
-    '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU',
-  );
-  const btcDevnetOracle = new PublicKey(
-    'HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J',
-  );
+  const btcDevnetMint = new PublicKey(DEVNET_MINTS['BTC']);
+  const btcDevnetOracle = new PublicKey(DEVNET_ORACLES['BTC']);
 
   //
   // Find existing or register new tokens
@@ -185,9 +184,7 @@ async function main() {
   //
   // Find existing or register a new serum3 market
   //
-  const serumProgramId = new web3.PublicKey(
-    'DESVgJVGajEgKGXhb6XmqDHGz3VjdgP7rEVESBgxmroY',
-  );
+
   const serumMarketExternalPk = new web3.PublicKey(
     'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB',
   );
@@ -200,7 +197,7 @@ async function main() {
       adminClient,
       group.publicKey,
       admin.publicKey,
-      serumProgramId,
+      DEVNET_SERUM3_PROGRAM_ID,
       serumMarketExternalPk,
       usdcBank.publicKey,
       btcBank.publicKey,
@@ -219,7 +216,7 @@ async function main() {
       group.publicKey,
       mangoAccount.publicKey,
       serum3Market.publicKey,
-      serumProgramId,
+      DEVNET_SERUM3_PROGRAM_ID,
       serumMarketExternalPk,
       user.publicKey,
     );
@@ -317,7 +314,7 @@ async function main() {
     userClient.program.provider.connection,
     serumMarketExternalPk,
     { commitment: userClient.program.provider.connection.commitment },
-    serumProgramId,
+    DEVNET_SERUM3_PROGRAM_ID,
   );
   const serum3MarketExternalVaultSigner = await PublicKey.createProgramAddress(
     [
@@ -328,7 +325,7 @@ async function main() {
         8,
       ),
     ],
-    serumProgramId,
+    DEVNET_SERUM3_PROGRAM_ID,
   );
   const clientOrderId = Date.now();
   await serum3PlaceOrder(
@@ -338,7 +335,7 @@ async function main() {
     user.publicKey,
     mangoAccount.serum3[0].openOrders,
     serum3Market.publicKey,
-    serumProgramId,
+    DEVNET_SERUM3_PROGRAM_ID,
     serumMarketExternalPk,
     serum3MarketExternal.bidsAddress,
     serum3MarketExternal.asksAddress,
