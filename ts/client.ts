@@ -6,11 +6,13 @@ import {
   SYSVAR_RENT_PUBKEY,
   TransactionSignature,
 } from '@solana/web3.js';
+import bs58 from 'bs58';
 import { Bank, getMintInfoForTokenIndex } from './accounts/types/bank';
 import { Group } from './accounts/types/group';
 import { I80F48 } from './accounts/types/I80F48';
 import { MangoAccount } from './accounts/types/mangoAccount';
 import { StubOracle } from './accounts/types/oracle';
+import { Serum3Market } from './accounts/types/serum3';
 import { IDL, MangoV4 } from './mango_v4';
 
 export const MANGO_V4_ID = new PublicKey(
@@ -251,6 +253,87 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
+      .rpc();
+  }
+
+  // Serum
+
+  public async serum3RegisterMarket(
+    group: Group,
+    serum3ProgramId: PublicKey,
+    serum3MarketExternalPk: PublicKey,
+    baseBank: Bank,
+    quoteBank: Bank,
+    marketIndex: number,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .serum3RegisterMarket(marketIndex)
+      .accounts({
+        group: group.publicKey,
+        admin: this.program.provider.wallet.publicKey,
+        serumProgram: serum3ProgramId,
+        serumMarketExternal: serum3MarketExternalPk,
+        baseBank: baseBank.publicKey,
+        quoteBank: quoteBank.publicKey,
+        payer: this.program.provider.wallet.publicKey,
+      })
+      .rpc();
+  }
+
+  public async serum3GetMarketForBaseAndQuote(
+    group: Group,
+    baseTokenIndex: number,
+    quoteTokenIndex: number,
+  ): Promise<Serum3Market[]> {
+    const bbuf = Buffer.alloc(2);
+    bbuf.writeUInt16LE(baseTokenIndex);
+
+    const qbuf = Buffer.alloc(2);
+    qbuf.writeUInt16LE(quoteTokenIndex);
+
+    const bumpfbuf = Buffer.alloc(1);
+    bumpfbuf.writeUInt8(255);
+
+    return (
+      await this.program.account.serum3Market.all([
+        {
+          memcmp: {
+            bytes: group.publicKey.toBase58(),
+            offset: 8,
+          },
+        },
+        {
+          memcmp: {
+            bytes: bs58.encode(bbuf),
+            offset: 106,
+          },
+        },
+        {
+          memcmp: {
+            bytes: bs58.encode(qbuf),
+            offset: 108,
+          },
+        },
+      ])
+    ).map((tuple) => Serum3Market.from(tuple.publicKey, tuple.account));
+  }
+
+  public async serum3CreateOpenOrders(
+    group: Group,
+    mangoAccount: MangoAccount,
+    serum3Market: Serum3Market,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .serum3CreateOpenOrders()
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        serumMarket: serum3Market.publicKey,
+        serumProgram: serum3Market.serumProgram,
+        serumMarketExternal: serum3Market.serumMarketExternal,
+        owner: this.program.provider.wallet.publicKey,
+        payer: this.program.provider.wallet.publicKey,
+      })
       .rpc();
   }
 

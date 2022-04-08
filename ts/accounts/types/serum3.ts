@@ -45,6 +45,7 @@ export class Serum3Market {
   ) {}
 }
 
+/** @deprecated */
 export async function serum3RegisterMarket(
   client: MangoClient,
   groupPk: PublicKey,
@@ -70,6 +71,7 @@ export async function serum3RegisterMarket(
   return await client.program.provider.send(tx);
 }
 
+/** @deprecated */
 export async function serum3RegisterMarketIx(
   client: MangoClient,
   groupPk: PublicKey,
@@ -94,6 +96,7 @@ export async function serum3RegisterMarketIx(
     .instruction();
 }
 
+/** @deprecated */
 export async function getSerum3MarketForBaseAndQuote(
   client: MangoClient,
   groupPk: PublicKey,

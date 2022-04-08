@@ -66,6 +66,31 @@ async function main() {
     );
   }
 
+  // register serum market
+  const serumProgramId = new PublicKey(
+    'DESVgJVGajEgKGXhb6XmqDHGz3VjdgP7rEVESBgxmroY',
+  );
+  const serumMarketExternalPk = new PublicKey(
+    'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB',
+  );
+  try {
+  } catch (error) {
+    await client.serum3RegisterMarket(
+      group,
+      serumProgramId,
+      serumMarketExternalPk,
+      banks[0],
+      banks[1],
+      0,
+    );
+  }
+  const markets = await client.serum3GetMarketForBaseAndQuote(
+    group,
+    banks[0].tokenIndex,
+    banks[1].tokenIndex,
+  );
+  console.log(`Serum3 market ${markets[0].publicKey}`);
+
   process.exit();
 }
 

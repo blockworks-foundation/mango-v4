@@ -52,6 +52,17 @@ async function main() {
   await client.deposit(group, mangoAccount, banks[0], 1000);
   console.log(`Withdrawing...500`);
   await client.withdraw(group, mangoAccount, banks[0], 500, false);
+
+  // serum3
+  const markets = await client.serum3GetMarketForBaseAndQuote(
+    group,
+    banks[1].tokenIndex,
+    banks[0].tokenIndex,
+  );
+  console.log(markets);
+  await client.serum3CreateOpenOrders(group, mangoAccount, markets[0]);
+
+  process.exit();
 }
 
 main();
