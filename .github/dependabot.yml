@@ -9,7 +9,7 @@ updates:
     commit-message:
       prefix: 'v4'
     open-pull-requests-limit: 5
-    label:
+    labels:
       - 'cargo'
       - 'dependency'
       
@@ -22,6 +22,6 @@ updates:
     commit-message:
       prefix: 'margin'
     open-pull-requests-limit: 5
-    label:
+    labels:
       - 'cargo'
       - 'dependency'
