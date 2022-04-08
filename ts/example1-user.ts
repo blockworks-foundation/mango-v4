@@ -43,10 +43,10 @@ async function main() {
 
   // deposit and withdraw
   console.log(`Depositing...5000000`);
-  await client.deposit(group, mangoAccount, 'USDC', 5000000);
+  await client.deposit(group, mangoAccount, 'USDC', 50_000000);
   await client.deposit(group, mangoAccount, 'BTC', 5000000);
   console.log(`Withdrawing...1000000`);
-  await client.withdraw(group, mangoAccount, 'USDC', 1000000, false);
+  await client.withdraw(group, mangoAccount, 'USDC', 1_000000, false);
 
   // serum3
   console.log(
