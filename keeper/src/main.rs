@@ -3,6 +3,12 @@ use std::{rc::Rc, str::FromStr, time::Duration};
 use solana_sdk::{instruction::Instruction, signature::Keypair};
 use tokio::time;
 
+// TODO:
+// cmd line args
+// expand to various tasks e.g. crank event queue, crank banks, run liquidators
+// support multiple workers
+// logging facility
+// robust error handling
 fn main() {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
