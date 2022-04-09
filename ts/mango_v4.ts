@@ -165,6 +165,26 @@ export type MangoV4 = {
           "type": "u16"
         },
         {
+          "name": "util0",
+          "type": "f32"
+        },
+        {
+          "name": "rate0",
+          "type": "f32"
+        },
+        {
+          "name": "util1",
+          "type": "f32"
+        },
+        {
+          "name": "rate1",
+          "type": "f32"
+        },
+        {
+          "name": "maxRate",
+          "type": "f32"
+        },
+        {
           "name": "maintAssetWeight",
           "type": "f32"
         },
@@ -185,6 +205,17 @@ export type MangoV4 = {
           "type": "f32"
         }
       ]
+    },
+    {
+      "name": "updateIndex",
+      "accounts": [
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
     },
     {
       "name": "createAccount",
@@ -1351,6 +1382,40 @@ export type MangoV4 = {
           },
           {
             "name": "indexedTotalBorrows",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "lastUpdated",
+            "type": "i64"
+          },
+          {
+            "name": "util0",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "rate0",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "util1",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "rate1",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maxRate",
             "type": {
               "defined": "I80F48"
             }
@@ -2563,6 +2628,26 @@ export const IDL: MangoV4 = {
           "type": "u16"
         },
         {
+          "name": "util0",
+          "type": "f32"
+        },
+        {
+          "name": "rate0",
+          "type": "f32"
+        },
+        {
+          "name": "util1",
+          "type": "f32"
+        },
+        {
+          "name": "rate1",
+          "type": "f32"
+        },
+        {
+          "name": "maxRate",
+          "type": "f32"
+        },
+        {
           "name": "maintAssetWeight",
           "type": "f32"
         },
@@ -2583,6 +2668,17 @@ export const IDL: MangoV4 = {
           "type": "f32"
         }
       ]
+    },
+    {
+      "name": "updateIndex",
+      "accounts": [
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
     },
     {
       "name": "createAccount",
@@ -3749,6 +3845,40 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "indexedTotalBorrows",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "lastUpdated",
+            "type": "i64"
+          },
+          {
+            "name": "util0",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "rate0",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "util1",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "rate1",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maxRate",
             "type": {
               "defined": "I80F48"
             }

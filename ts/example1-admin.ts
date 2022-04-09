@@ -42,7 +42,22 @@ async function main() {
   const btcDevnetMint = new PublicKey(DEVNET_MINTS.get('BTC')!);
   const btcDevnetOracle = new PublicKey(DEVNET_ORACLES.get('BTC')!);
   try {
-    await client.registerToken(group, btcDevnetMint, btcDevnetOracle, 0);
+    await client.registerToken(
+      group,
+      btcDevnetMint,
+      btcDevnetOracle,
+      0,
+      0.4,
+      0.07,
+      0.8,
+      0.9,
+      1.5,
+      0.8,
+      0.6,
+      1.2,
+      1.4,
+      0.02,
+    );
   } catch (error) {}
 
   // stub oracle + register token 1
@@ -58,6 +73,16 @@ async function main() {
       usdcDevnetMint,
       usdcDevnetOracle.publicKey,
       1,
+      0.4,
+      0.07,
+      0.8,
+      0.9,
+      1.5,
+      0.8,
+      0.6,
+      1.2,
+      1.4,
+      0.02,
     );
   } catch (error) {}
 
