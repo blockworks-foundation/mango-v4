@@ -82,6 +82,9 @@ impl SolanaCookie {
         let mut clock = self.get_clock().await;
         let old_ts = clock.unix_timestamp;
 
+        // just advance enough to ensure we get changes over last_updated in various ix
+        // if this gets too slow for our tests, remove and replace with manual time offset
+        // which is configurable
         while clock.unix_timestamp <= old_ts {
             self.context
                 .borrow_mut()
