@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "programs/*",
+    "keeper",
     "lib/*"
 ]

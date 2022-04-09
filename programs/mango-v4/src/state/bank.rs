@@ -165,7 +165,11 @@ impl Bank {
     }
 
     pub fn update_index(&mut self, now_ts: i64) -> Result<()> {
-        let utilization = cm!(self.native_total_borrows() / self.native_total_deposits());
+        let utilization = if self.native_total_deposits() == I80F48::ZERO {
+            I80F48::ZERO
+        } else {
+            cm!(self.native_total_borrows() / self.native_total_deposits())
+        };
 
         let interest_rate = self.compute_interest_rate(utilization);
 

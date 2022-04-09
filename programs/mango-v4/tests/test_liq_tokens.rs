@@ -2,7 +2,7 @@
 
 use fixed::types::I80F48;
 use solana_program_test::*;
-use solana_sdk::{signature::Keypair, transport::TransportError};
+use solana_sdk::signature::Keypair;
 
 use mango_v4::{
     instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side},
@@ -13,7 +13,7 @@ use program_test::*;
 mod program_test;
 
 #[tokio::test]
-async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
+async fn test_liq_tokens_force_cancel() -> Result<(), BanksClientError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
@@ -216,7 +216,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
 }
 
 #[tokio::test]
-async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
+async fn test_liq_tokens_with_token() -> Result<(), BanksClientError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 

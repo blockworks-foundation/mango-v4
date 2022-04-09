@@ -12,7 +12,6 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
     transaction::Transaction,
-    transport::TransportError,
 };
 use spl_token::*;
 
@@ -30,7 +29,7 @@ impl SolanaCookie {
         &self,
         instructions: &[Instruction],
         signers: Option<&[&Keypair]>,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         self.program_log.write().unwrap().clear();
 
         let mut context = self.context.borrow_mut();

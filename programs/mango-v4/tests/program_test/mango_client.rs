@@ -7,9 +7,10 @@ use fixed::types::I80F48;
 use itertools::Itertools;
 use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use solana_program::instruction::Instruction;
+use solana_program_test::BanksClientError;
 use solana_sdk::instruction;
 use solana_sdk::signature::{Keypair, Signer};
-use solana_sdk::transport::TransportError;
+
 use std::str::FromStr;
 
 use super::solana::SolanaCookie;
@@ -35,7 +36,7 @@ impl ClientAccountLoader for &SolanaCookie {
 pub async fn send_tx<CI: ClientInstruction>(
     solana: &SolanaCookie,
     ix: CI,
-) -> std::result::Result<CI::Accounts, TransportError> {
+) -> std::result::Result<CI::Accounts, BanksClientError> {
     let (accounts, instruction) = ix.to_instruction(solana).await;
     let signers = ix.signers();
     let instructions = vec![instruction];

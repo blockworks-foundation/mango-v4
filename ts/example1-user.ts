@@ -33,6 +33,10 @@ async function main() {
   const group = await client.getGroup(new PublicKey(DEVNET_GROUP));
   console.log(`Group ${group.publicKey.toBase58()}`);
 
+  for (const bank of group.banksMap.values()) {
+    console.log(bank.publicKey.toBase58());
+  }
+
   // create + fetch account
   const mangoAccount = await client.getOrCreateMangoAccount(
     group,
