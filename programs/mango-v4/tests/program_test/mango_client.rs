@@ -444,6 +444,11 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
 pub struct RegisterTokenInstruction<'keypair> {
     pub token_index: TokenIndex,
     pub decimals: u8,
+    pub util0: f32,
+    pub rate0: f32,
+    pub util1: f32,
+    pub rate1: f32,
+    pub max_rate: f32,
     pub maint_asset_weight: f32,
     pub init_asset_weight: f32,
     pub maint_liab_weight: f32,
@@ -467,6 +472,11 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             token_index: self.token_index,
+            util0: self.util0,
+            rate0: self.rate0,
+            util1: self.util1,
+            rate1: self.rate1,
+            max_rate: self.max_rate,
             maint_asset_weight: self.maint_asset_weight,
             init_asset_weight: self.init_asset_weight,
             maint_liab_weight: self.maint_liab_weight,
@@ -1384,6 +1394,29 @@ impl ClientInstruction for BenchmarkInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
         let accounts = Self::Accounts {};
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![]
+    }
+}
+pub struct UpdateIndexInstruction {
+    pub bank: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for UpdateIndexInstruction {
+    type Accounts = mango_v4::accounts::UpdateIndex;
+    type Instruction = mango_v4::instruction::UpdateIndex;
+    async fn to_instruction(
+        &self,
+        _loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+        let accounts = Self::Accounts { bank: self.bank };
 
         let instruction = make_instruction(program_id, &accounts, instruction);
         (accounts, instruction)

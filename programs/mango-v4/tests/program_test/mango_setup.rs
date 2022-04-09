@@ -72,6 +72,11 @@ impl<'a> GroupWithTokensConfig<'a> {
                 RegisterTokenInstruction {
                     token_index,
                     decimals: mint.decimals,
+                    util0: 0.50,
+                    rate0: 0.06,
+                    util1: 0.70,
+                    rate1: 1.3,
+                    max_rate: 1.50,
                     maint_asset_weight: 0.8,
                     init_asset_weight: 0.6,
                     maint_liab_weight: 1.2,

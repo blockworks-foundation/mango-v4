@@ -1,10 +1,12 @@
+use super::{TokenAccount, TokenIndex};
+use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
+use fixed_macro::types::I80F48;
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
-use super::{TokenAccount, TokenIndex};
-use crate::util::checked_math as cm;
+pub const YEAR: I80F48 = I80F48!(31536000);
 
 #[account(zero_copy)]
 pub struct Bank {
@@ -21,10 +23,13 @@ pub struct Bank {
     /// total deposits/borrows, for utilization
     pub indexed_total_deposits: I80F48,
     pub indexed_total_borrows: I80F48,
-    // todo: multi-leg interest
-    // pub optimal_util: I80F48,
-    // pub optimal_rate: I80F48,
-    // pub max_rate: I80F48,
+
+    pub last_updated: i64,
+    pub util0: I80F48,
+    pub rate0: I80F48,
+    pub util1: I80F48,
+    pub rate1: I80F48,
+    pub max_rate: I80F48,
 
     // This is a _lot_ of bytes (64) - seems unnecessary
     // (could maybe store them in one byte each, as an informal U1F7?
@@ -47,10 +52,14 @@ pub struct Bank {
 
     pub reserved: [u8; 6],
 }
-const_assert_eq!(size_of::<Bank>(), 32 * 4 + 16 * 10 + 2 + 6);
+const_assert_eq!(size_of::<Bank>(), 32 * 4 + 8 + 16 * 15 + 2 + 6);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
 impl Bank {
+    pub fn native_total_borrows(&self) -> I80F48 {
+        self.borrow_index * self.indexed_total_borrows
+    }
+
     pub fn native_total_deposits(&self) -> I80F48 {
         self.deposit_index * self.indexed_total_deposits
     }
@@ -152,6 +161,67 @@ impl Bank {
             self.deposit(position, native_amount)
         } else {
             self.withdraw(position, -native_amount)
+        }
+    }
+
+    pub fn update_index(&mut self, now_ts: i64) -> Result<()> {
+        let utilization = cm!(self.native_total_borrows() / self.native_total_deposits());
+
+        let interest_rate = self.compute_interest_rate(utilization);
+
+        let diff_ts = I80F48::from_num(now_ts - self.last_updated);
+
+        let borrow_interest: I80F48 = cm!(interest_rate * diff_ts);
+        let deposit_interest = cm!(borrow_interest * utilization);
+
+        self.last_updated = Clock::get()?.unix_timestamp;
+
+        if borrow_interest <= I80F48::ZERO || deposit_interest <= I80F48::ZERO {
+            return Ok(());
+        }
+
+        self.borrow_index = cm!((self.borrow_index * borrow_interest) / YEAR + self.borrow_index);
+        self.deposit_index =
+            cm!((self.deposit_index * deposit_interest) / YEAR + self.deposit_index);
+
+        Ok(())
+    }
+
+    /// returns the current interest rate in APR
+    #[inline(always)]
+    pub fn compute_interest_rate(&self, utilization: I80F48) -> I80F48 {
+        Bank::interest_rate_curve_calculator(
+            utilization,
+            self.util0,
+            self.rate0,
+            self.util1,
+            self.rate1,
+            self.max_rate,
+        )
+    }
+
+    /// calcualtor function that can be used to compute an interest
+    /// rate based on the given parameters
+    #[inline(always)]
+    pub fn interest_rate_curve_calculator(
+        utilization: I80F48,
+        util0: I80F48,
+        rate0: I80F48,
+        util1: I80F48,
+        rate1: I80F48,
+        max_rate: I80F48,
+    ) -> I80F48 {
+        if utilization <= util0 {
+            let slope = cm!(rate0 / util0);
+            cm!(slope * utilization)
+        } else if utilization <= util1 {
+            let extra_util = cm!(utilization - util0);
+            let slope = cm!((rate1 - rate0) / (util1 - util0));
+            cm!(rate0 + slope * extra_util)
+        } else {
+            let extra_util = utilization - util1;
+            let slope = (max_rate - rate1) / (I80F48::ONE - util1);
+            rate1 + slope * extra_util
         }
     }
 }

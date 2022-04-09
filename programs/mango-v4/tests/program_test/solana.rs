@@ -3,6 +3,7 @@ use std::sync::{Arc, RwLock};
 
 use anchor_lang::AccountDeserialize;
 use anchor_spl::token::TokenAccount;
+use solana_program::clock::UnixTimestamp;
 use solana_program::{program_pack::Pack, rent::*, system_instruction};
 use solana_program_test::*;
 use solana_sdk::{
@@ -14,6 +15,8 @@ use solana_sdk::{
     transport::TransportError,
 };
 use spl_token::*;
+
+use super::mango_client::ClientAccountLoader;
 
 pub struct SolanaCookie {
     pub context: RefCell<ProgramTestContext>,
@@ -71,6 +74,21 @@ impl SolanaCookie {
             .borrow_mut()
             .warp_to_slot(clock.slot + slots + 1)
             .unwrap();
+    }
+
+    #[allow(dead_code)]
+
+    pub async fn advance_clock(&self) {
+        let mut clock = self.get_clock().await;
+        let old_ts = clock.unix_timestamp;
+
+        while clock.unix_timestamp <= old_ts {
+            self.context
+                .borrow_mut()
+                .warp_to_slot(clock.slot + 50)
+                .unwrap();
+            clock = self.get_clock().await;
+        }
     }
 
     pub async fn get_newest_slot_from_history(&self) -> u64 {

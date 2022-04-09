@@ -33,9 +33,15 @@ pub mod mango_v4 {
         instructions::create_group(ctx)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn register_token(
         ctx: Context<RegisterToken>,
         token_index: TokenIndex,
+        util0: f32,
+        rate0: f32,
+        util1: f32,
+        rate1: f32,
+        max_rate: f32,
         maint_asset_weight: f32,
         init_asset_weight: f32,
         maint_liab_weight: f32,
@@ -45,12 +51,21 @@ pub mod mango_v4 {
         instructions::register_token(
             ctx,
             token_index,
+            util0,
+            rate0,
+            util1,
+            rate1,
+            max_rate,
             maint_asset_weight,
             init_asset_weight,
             maint_liab_weight,
             init_liab_weight,
             liquidation_fee,
         )
+    }
+
+    pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
+        instructions::update_index(ctx)
     }
 
     pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()> {
