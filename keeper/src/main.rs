@@ -4,7 +4,8 @@ use solana_sdk::{instruction::Instruction, signature::Keypair};
 use tokio::time;
 
 // TODO:
-// cmd line args
+// cmd line args with defaults
+// make keypair, rpc server, net, etc. configurable
 // expand to various tasks e.g. crank event queue, crank banks, run liquidators
 // support multiple workers
 // logging facility
