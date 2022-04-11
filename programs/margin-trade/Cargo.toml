@@ -19,5 +19,5 @@ test-bpf = []
 
 [dependencies]
 anchor-lang = { version = "0.22.0", features = [] }
-anchor-spl = "0.22.0"
+anchor-spl = "0.23.0"
 solana-program = "1.9.5"
