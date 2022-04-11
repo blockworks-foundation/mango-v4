@@ -24,7 +24,7 @@ anchor-lang = { version = "0.22.0", features = [] }
 anchor-spl = { version = "0.22.0", features = [] }
 bytemuck = "^1.7.2"
 # todo: higher versions don't work
-fixed = { version = "=1.11.0", features = ["serde", "borsh"] }
+fixed = { version = "=1.14.0", features = ["serde", "borsh"] }
 fixed-macro = "^1.1.1"
 pyth-client = {version = "0.5.0", features = ["no-entrypoint"]}
 serde = "^1.0"
