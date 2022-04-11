@@ -13,7 +13,6 @@ jobs:
   build:
     name: Soteria
     runs-on: ubuntu-latest
-    if: (github.actor != 'dependabot[bot]')
     steps:
       - name: Check-out repo
         uses: actions/checkout@v2
