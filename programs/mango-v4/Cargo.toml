@@ -21,7 +21,7 @@ test-bpf = []
 # todo: when to fix, when to use caret? need a regular chore to bump dependencies
 # note: possibly need init-if-needed feature
 anchor-lang = { version = "0.22.0", features = [] }
-anchor-spl = { version = "0.22.0", features = [] }
+anchor-spl = { version = "0.23.0", features = [] }
 bytemuck = "^1.7.2"
 # todo: higher versions don't work
 fixed = { version = "=1.11.0", features = ["serde", "borsh"] }
