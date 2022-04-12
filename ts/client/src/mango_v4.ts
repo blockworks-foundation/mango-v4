@@ -165,6 +165,16 @@ export type MangoV4 = {
           "type": "u16"
         },
         {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "interestRateParams",
+          "type": {
+            "defined": "InterestRateParams"
+          }
+        },
+        {
           "name": "maintAssetWeight",
           "type": "f32"
         },
@@ -185,6 +195,17 @@ export type MangoV4 = {
           "type": "f32"
         }
       ]
+    },
+    {
+      "name": "updateIndex",
+      "accounts": [
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
     },
     {
       "name": "createAccount",
@@ -243,6 +264,10 @@ export type MangoV4 = {
         {
           "name": "accountNum",
           "type": "u8"
+        },
+        {
+          "name": "name",
+          "type": "string"
         }
       ]
     },
@@ -568,6 +593,10 @@ export type MangoV4 = {
         {
           "name": "marketIndex",
           "type": "u16"
+        },
+        {
+          "name": "name",
+          "type": "string"
         }
       ]
     },
@@ -1316,6 +1345,15 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
             "name": "group",
             "type": "publicKey"
           },
@@ -1351,6 +1389,40 @@ export type MangoV4 = {
           },
           {
             "name": "indexedTotalBorrows",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "lastUpdated",
+            "type": "i64"
+          },
+          {
+            "name": "util0",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "rate0",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "util1",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "rate1",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maxRate",
             "type": {
               "defined": "I80F48"
             }
@@ -1492,6 +1564,15 @@ export type MangoV4 = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
           {
             "name": "group",
             "type": "publicKey"
@@ -1803,6 +1884,15 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
             "name": "group",
             "type": "publicKey"
           },
@@ -2046,6 +2136,34 @@ export type MangoV4 = {
                 8
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InterestRateParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "util0",
+            "type": "f32"
+          },
+          {
+            "name": "rate0",
+            "type": "f32"
+          },
+          {
+            "name": "util1",
+            "type": "f32"
+          },
+          {
+            "name": "rate1",
+            "type": "f32"
+          },
+          {
+            "name": "maxRate",
+            "type": "f32"
           }
         ]
       }
@@ -2563,6 +2681,16 @@ export const IDL: MangoV4 = {
           "type": "u16"
         },
         {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "interestRateParams",
+          "type": {
+            "defined": "InterestRateParams"
+          }
+        },
+        {
           "name": "maintAssetWeight",
           "type": "f32"
         },
@@ -2583,6 +2711,17 @@ export const IDL: MangoV4 = {
           "type": "f32"
         }
       ]
+    },
+    {
+      "name": "updateIndex",
+      "accounts": [
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
     },
     {
       "name": "createAccount",
@@ -2641,6 +2780,10 @@ export const IDL: MangoV4 = {
         {
           "name": "accountNum",
           "type": "u8"
+        },
+        {
+          "name": "name",
+          "type": "string"
         }
       ]
     },
@@ -2966,6 +3109,10 @@ export const IDL: MangoV4 = {
         {
           "name": "marketIndex",
           "type": "u16"
+        },
+        {
+          "name": "name",
+          "type": "string"
         }
       ]
     },
@@ -3714,6 +3861,15 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
             "name": "group",
             "type": "publicKey"
           },
@@ -3749,6 +3905,40 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "indexedTotalBorrows",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "lastUpdated",
+            "type": "i64"
+          },
+          {
+            "name": "util0",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "rate0",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "util1",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "rate1",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maxRate",
             "type": {
               "defined": "I80F48"
             }
@@ -3890,6 +4080,15 @@ export const IDL: MangoV4 = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
           {
             "name": "group",
             "type": "publicKey"
@@ -4201,6 +4400,15 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
             "name": "group",
             "type": "publicKey"
           },
@@ -4444,6 +4652,34 @@ export const IDL: MangoV4 = {
                 8
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InterestRateParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "util0",
+            "type": "f32"
+          },
+          {
+            "name": "rate0",
+            "type": "f32"
+          },
+          {
+            "name": "util1",
+            "type": "f32"
+          },
+          {
+            "name": "rate1",
+            "type": "f32"
+          },
+          {
+            "name": "maxRate",
+            "type": "f32"
           }
         ]
       }

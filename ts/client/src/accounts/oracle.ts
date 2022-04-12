@@ -1,6 +1,6 @@
 import { PublicKey, TransactionSignature } from '@solana/web3.js';
 import BN from 'bn.js';
-import { MangoClient } from '../../client';
+import { MangoClient } from '../client';
 import { I80F48, I80F48Dto } from './I80F48';
 
 export class StubOracle {

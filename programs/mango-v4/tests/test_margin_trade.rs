@@ -3,8 +3,8 @@
 use anchor_lang::InstructionData;
 use fixed::types::I80F48;
 use solana_program_test::*;
+use solana_sdk::signature::Keypair;
 use solana_sdk::signature::Signer;
-use solana_sdk::{signature::Keypair, transport::TransportError};
 
 use mango_v4::state::*;
 use program_test::*;
@@ -14,7 +14,7 @@ mod program_test;
 // This is an unspecific happy-case test that just runs a few instructions to check
 // that they work in principle. It should be split up / renamed.
 #[tokio::test]
-async fn test_margin_trade() -> Result<(), TransportError> {
+async fn test_margin_trade() -> Result<(), BanksClientError> {
     let mut builder = TestContextBuilder::new();
     let margin_trade = builder.add_margin_trade_program();
     let context = builder.start_default().await;

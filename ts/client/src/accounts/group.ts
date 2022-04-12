@@ -1,9 +1,5 @@
 import { PublicKey } from '@solana/web3.js';
-import { MangoClient } from '../../client';
-import {
-  DEVNET_MINTS_REVERSE,
-  DEVNET_SERUM3_MARKETS_REVERSE,
-} from '../../constants';
+import { MangoClient } from '../client';
 import { Bank } from './bank';
 import { Serum3Market } from './serum3';
 
@@ -32,20 +28,13 @@ export class Group {
 
   public async reloadBanks(client: MangoClient) {
     const banks = await client.getBanksForGroup(this);
-    this.banksMap = new Map(
-      banks.map((bank) => [DEVNET_MINTS_REVERSE[bank.mint.toBase58()], bank]),
-    );
+    this.banksMap = new Map(banks.map((bank) => [bank.name, bank]));
   }
 
   public async reloadSerum3Markets(client: MangoClient) {
     const serum3Markets = await client.serum3GetMarket(this);
     this.serum3MarketsMap = new Map(
-      serum3Markets.map((serum3Market) => [
-        DEVNET_SERUM3_MARKETS_REVERSE[
-          serum3Market.serumMarketExternal.toBase58()
-        ],
-        serum3Market,
-      ]),
+      serum3Markets.map((serum3Market) => [serum3Market.name, serum3Market]),
     );
   }
 }

@@ -3,7 +3,6 @@ use std::sync::{Arc, RwLock};
 
 use anchor_lang::AccountDeserialize;
 use anchor_spl::token::TokenAccount;
-use solana_program::clock::UnixTimestamp;
 use solana_program::{program_pack::Pack, rent::*, system_instruction};
 use solana_program_test::*;
 use solana_sdk::{
@@ -12,11 +11,8 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
     transaction::Transaction,
-    transport::TransportError,
 };
 use spl_token::*;
-
-use super::mango_client::ClientAccountLoader;
 
 pub struct SolanaCookie {
     pub context: RefCell<ProgramTestContext>,
@@ -30,7 +26,7 @@ impl SolanaCookie {
         &self,
         instructions: &[Instruction],
         signers: Option<&[&Keypair]>,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), BanksClientError> {
         self.program_log.write().unwrap().clear();
 
         let mut context = self.context.borrow_mut();

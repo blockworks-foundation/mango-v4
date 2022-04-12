@@ -10,17 +10,17 @@ import {
   TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { Bank, getMintInfoForTokenIndex } from './accounts/types/bank';
-import { Group } from './accounts/types/group';
-import { I80F48 } from './accounts/types/I80F48';
-import { MangoAccount } from './accounts/types/mangoAccount';
-import { StubOracle } from './accounts/types/oracle';
+import { Bank, getMintInfoForTokenIndex } from './accounts/bank';
+import { Group } from './accounts/group';
+import { I80F48 } from './accounts/I80F48';
+import { MangoAccount } from './accounts/mangoAccount';
+import { StubOracle } from './accounts/oracle';
 import {
   Serum3Market,
   Serum3OrderType,
   Serum3SelfTradeBehavior,
   Serum3Side,
-} from './accounts/types/serum3';
+} from './accounts/serum3';
 import { IDL, MangoV4 } from './mango_v4';
 
 export const MANGO_V4_ID = new PublicKey(
@@ -76,15 +76,28 @@ export class MangoClient {
     mintPk: PublicKey,
     oraclePk: PublicKey,
     tokenIndex: number,
+    name: string,
+    util0: number,
+    rate0: number,
+    util1: number,
+    rate1: number,
+    maxRate: number,
+    maintAssetWeight: number,
+    initAssetWeight: number,
+    maintLiabWeight: number,
+    initLiabWeight: number,
+    liquidationFee: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
       .registerToken(
         tokenIndex,
-        0.8,
-        0.6,
-        1.2,
-        1.4,
-        0.02 /*TODO expose as args*/,
+        name,
+        { util0, rate0, util1, rate1, maxRate },
+        maintAssetWeight,
+        initAssetWeight,
+        maintLiabWeight,
+        initLiabWeight,
+        liquidationFee,
       )
       .accounts({
         group: group.publicKey,
@@ -103,7 +116,7 @@ export class MangoClient {
         {
           memcmp: {
             bytes: group.publicKey.toBase58(),
-            offset: 8,
+            offset: 24,
           },
         },
       ])
@@ -173,10 +186,11 @@ export class MangoClient {
     group: Group,
     ownerPk: PublicKey,
     accountNumber?: number,
+    name?: string,
   ): Promise<MangoAccount> {
     let mangoAccounts = await this.getMangoAccountForOwner(group, ownerPk);
     if (mangoAccounts.length === 0) {
-      await this.createMangoAccount(group, accountNumber ?? 0);
+      await this.createMangoAccount(group, accountNumber ?? 0, name ?? '');
       mangoAccounts = await this.getMangoAccountForOwner(group, ownerPk);
     }
     return mangoAccounts[0];
@@ -185,9 +199,10 @@ export class MangoClient {
   public async createMangoAccount(
     group: Group,
     accountNumber: number,
+    name?: string,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .createAccount(accountNumber)
+      .createAccount(accountNumber, name ?? '')
       .accounts({
         group: group.publicKey,
         owner: this.program.provider.wallet.publicKey,
@@ -212,13 +227,13 @@ export class MangoClient {
         {
           memcmp: {
             bytes: group.publicKey.toBase58(),
-            offset: 8,
+            offset: 24,
           },
         },
         {
           memcmp: {
             bytes: ownerPk.toBase58(),
-            offset: 40,
+            offset: 56,
           },
         },
       ])
@@ -320,9 +335,10 @@ export class MangoClient {
     baseBank: Bank,
     quoteBank: Bank,
     marketIndex: number,
+    name: string,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .serum3RegisterMarket(marketIndex)
+      .serum3RegisterMarket(marketIndex, name)
       .accounts({
         group: group.publicKey,
         admin: this.program.provider.wallet.publicKey,
@@ -347,7 +363,7 @@ export class MangoClient {
       {
         memcmp: {
           bytes: group.publicKey.toBase58(),
-          offset: 8,
+          offset: 24,
         },
       },
     ];
@@ -358,7 +374,7 @@ export class MangoClient {
       filters.push({
         memcmp: {
           bytes: bs58.encode(bbuf),
-          offset: 106,
+          offset: 122,
         },
       });
     }
@@ -369,7 +385,7 @@ export class MangoClient {
       filters.push({
         memcmp: {
           bytes: bs58.encode(qbuf),
-          offset: 108,
+          offset: 124,
         },
       });
     }

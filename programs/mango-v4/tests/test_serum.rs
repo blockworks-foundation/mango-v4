@@ -1,7 +1,7 @@
 #![cfg(feature = "test-bpf")]
 
 use solana_program_test::*;
-use solana_sdk::{signature::Keypair, transport::TransportError};
+use solana_sdk::signature::Keypair;
 
 use mango_v4::{
     instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side},
@@ -12,7 +12,7 @@ use program_test::*;
 mod program_test;
 
 #[tokio::test]
-async fn test_serum() -> Result<(), TransportError> {
+async fn test_serum() -> Result<(), BanksClientError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 

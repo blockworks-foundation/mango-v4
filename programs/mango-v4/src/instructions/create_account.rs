@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::error::*;
 use crate::state::*;
+use crate::util::fill32_from_str;
 
 #[derive(Accounts)]
 #[instruction(account_num: u8)]
@@ -25,10 +26,11 @@ pub struct CreateAccount<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()> {
+pub fn create_account(ctx: Context<CreateAccount>, account_num: u8, name: String) -> Result<()> {
     let mut account = ctx.accounts.account.load_init()?;
     // TODO: dont init on stack
     *account = MangoAccount {
+        name: fill32_from_str(name)?,
         group: ctx.accounts.group.key(),
         owner: ctx.accounts.owner.key(),
         delegate: Pubkey::default(),

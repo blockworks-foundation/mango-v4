@@ -1,7 +1,7 @@
+use crate::error::MangoError;
 use anchor_lang::prelude::*;
 use anchor_lang::ZeroCopy;
 use arrayref::array_ref;
-use fixed::types::I80F48;
 use std::cell::RefMut;
 use std::{cell::Ref, mem};
 
@@ -90,10 +90,20 @@ impl<'info> LoadZeroCopy for AccountInfo<'info> {
     }
 }
 
-// Returns asset_weight and liab_weight
-pub fn get_leverage_weights(leverage: I80F48) -> (I80F48, I80F48) {
-    (
-        (leverage - I80F48::ONE).checked_div(leverage).unwrap(),
-        (leverage + I80F48::ONE).checked_div(leverage).unwrap(),
-    )
+pub fn fill16_from_str(name: String) -> Result<[u8; 16]> {
+    let name_bytes = name.as_bytes();
+    msg!("{}", name);
+    require!(name_bytes.len() < 16, MangoError::SomeError);
+    let mut name_ = [0u8; 16];
+    name_[..name_bytes.len()].copy_from_slice(name_bytes);
+    Ok(name_)
+}
+
+pub fn fill32_from_str(name: String) -> Result<[u8; 32]> {
+    let name_bytes = name.as_bytes();
+    msg!("{}", name);
+    require!(name_bytes.len() < 32, MangoError::SomeError);
+    let mut name_ = [0u8; 32];
+    name_[..name_bytes.len()].copy_from_slice(name_bytes);
+    Ok(name_)
 }

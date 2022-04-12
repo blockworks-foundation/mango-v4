@@ -5,11 +5,14 @@ use anchor_lang::solana_program::sysvar::{self, SysvarId};
 use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
-use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::instructions::{
+    InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
+};
 use solana_program::instruction::Instruction;
+use solana_program_test::BanksClientError;
 use solana_sdk::instruction;
 use solana_sdk::signature::{Keypair, Signer};
-use solana_sdk::transport::TransportError;
+
 use std::str::FromStr;
 
 use super::solana::SolanaCookie;
@@ -35,7 +38,7 @@ impl ClientAccountLoader for &SolanaCookie {
 pub async fn send_tx<CI: ClientInstruction>(
     solana: &SolanaCookie,
     ix: CI,
-) -> std::result::Result<CI::Accounts, TransportError> {
+) -> std::result::Result<CI::Accounts, BanksClientError> {
     let (accounts, instruction) = ix.to_instruction(solana).await;
     let signers = ix.signers();
     let instructions = vec![instruction];
@@ -471,12 +474,15 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
+            name: "some_ticker".to_string(),
             token_index: self.token_index,
-            util0: self.util0,
-            rate0: self.rate0,
-            util1: self.util1,
-            rate1: self.rate1,
-            max_rate: self.max_rate,
+            interest_rate_params: InterestRateParams {
+                util0: self.util0,
+                rate0: self.rate0,
+                util1: self.util1,
+                rate1: self.rate1,
+                max_rate: self.max_rate,
+            },
             maint_asset_weight: self.maint_asset_weight,
             init_asset_weight: self.init_asset_weight,
             maint_liab_weight: self.maint_liab_weight,
@@ -699,6 +705,7 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = mango_v4::instruction::CreateAccount {
             account_num: self.account_num,
+            name: "my_mango_account".to_string(),
         };
 
         let account = Pubkey::find_program_address(
@@ -785,6 +792,7 @@ impl<'keypair> ClientInstruction for Serum3RegisterMarketInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             market_index: self.market_index,
+            name: "UUU/usdc".to_string(),
         };
 
         let serum_market = Pubkey::find_program_address(

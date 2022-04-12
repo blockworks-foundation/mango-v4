@@ -1,7 +1,7 @@
 #![cfg(feature = "test-bpf")]
 
 use solana_program_test::*;
-use solana_sdk::{signature::Keypair, transport::TransportError};
+use solana_sdk::signature::Keypair;
 
 use program_test::*;
 
@@ -9,7 +9,7 @@ mod program_test;
 
 // Try to reach compute limits in health checks by having many different tokens in an account
 #[tokio::test]
-async fn test_health_compute_tokens() -> Result<(), TransportError> {
+async fn test_health_compute_tokens() -> Result<(), BanksClientError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
@@ -72,7 +72,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
 
 // Try to reach compute limits in health checks by having many serum markets in an account
 #[tokio::test]
-async fn test_health_compute_serum() -> Result<(), TransportError> {
+async fn test_health_compute_serum() -> Result<(), BanksClientError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 

@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 use crate::error::MangoError;
 use crate::serum3_cpi::{load_market_state, pubkey_from_u64_array};
 use crate::state::*;
+use crate::util::fill16_from_str;
 
 #[derive(Accounts)]
 pub struct Serum3RegisterMarket<'info> {
@@ -42,6 +43,7 @@ pub struct Serum3RegisterMarket<'info> {
 pub fn serum3_register_market(
     ctx: Context<Serum3RegisterMarket>,
     market_index: Serum3MarketIndex,
+    name: String,
 ) -> Result<()> {
     // TODO: must guard against accidentally using the same market_index twice!
 
@@ -62,6 +64,7 @@ pub fn serum3_register_market(
 
     let mut serum_market = ctx.accounts.serum_market.load_init()?;
     *serum_market = Serum3Market {
+        name: fill16_from_str(name)?,
         group: ctx.accounts.group.key(),
         serum_program: ctx.accounts.serum_program.key(),
         serum_market_external: ctx.accounts.serum_market_external.key(),

@@ -5,7 +5,7 @@ import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
   Serum3Side,
-} from './accounts/types/serum3';
+} from './accounts/serum3';
 import { MangoClient } from './client';
 import { DEVNET_GROUP, DEVNET_SERUM3_PROGRAM_ID } from './constants';
 
@@ -33,11 +33,16 @@ async function main() {
   const group = await client.getGroup(new PublicKey(DEVNET_GROUP));
   console.log(`Group ${group.publicKey.toBase58()}`);
 
+  for (const bank of group.banksMap.values()) {
+    console.log(bank.publicKey.toBase58());
+  }
+
   // create + fetch account
   const mangoAccount = await client.getOrCreateMangoAccount(
     group,
     user.publicKey,
     0,
+    'my_mango_account',
   );
   console.log(`MangoAccount ${mangoAccount.publicKey}`);
 

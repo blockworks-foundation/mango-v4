@@ -10,6 +10,8 @@ pub const YEAR: I80F48 = I80F48!(31536000);
 
 #[account(zero_copy)]
 pub struct Bank {
+    pub name: [u8; 16],
+
     pub group: Pubkey,
     pub mint: Pubkey,
     pub vault: Pubkey,
@@ -52,7 +54,7 @@ pub struct Bank {
 
     pub reserved: [u8; 6],
 }
-const_assert_eq!(size_of::<Bank>(), 32 * 4 + 8 + 16 * 15 + 2 + 6);
+const_assert_eq!(size_of::<Bank>(), 16 + 32 * 4 + 8 + 16 * 15 + 2 + 6);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
 impl Bank {
@@ -165,16 +167,19 @@ impl Bank {
     }
 
     pub fn update_index(&mut self, now_ts: i64) -> Result<()> {
-        let utilization = cm!(self.native_total_borrows() / self.native_total_deposits());
+        let utilization = if self.native_total_deposits() == I80F48::ZERO {
+            I80F48::ZERO
+        } else {
+            cm!(self.native_total_borrows() / self.native_total_deposits())
+        };
 
         let interest_rate = self.compute_interest_rate(utilization);
 
         let diff_ts = I80F48::from_num(now_ts - self.last_updated);
+        self.last_updated = now_ts;
 
         let borrow_interest: I80F48 = cm!(interest_rate * diff_ts);
         let deposit_interest = cm!(borrow_interest * utilization);
-
-        self.last_updated = Clock::get()?.unix_timestamp;
 
         if borrow_interest <= I80F48::ZERO || deposit_interest <= I80F48::ZERO {
             return Ok(());
@@ -219,9 +224,9 @@ impl Bank {
             let slope = cm!((rate1 - rate0) / (util1 - util0));
             cm!(rate0 + slope * extra_util)
         } else {
-            let extra_util = utilization - util1;
-            let slope = (max_rate - rate1) / (I80F48::ONE - util1);
-            rate1 + slope * extra_util
+            let extra_util = cm!(utilization - util1);
+            let slope = cm!((max_rate - rate1) / (I80F48::ONE - util1));
+            cm!(rate1 + slope * extra_util)
         }
     }
 }
