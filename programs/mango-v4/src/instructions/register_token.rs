@@ -75,6 +75,15 @@ pub struct RegisterToken<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Default)]
+pub struct InterestRateParams {
+    util0: f32,
+    rate0: f32,
+    util1: f32,
+    rate1: f32,
+    max_rate: f32,
+}
+
 // TODO: should this be "configure_mint", we pass an explicit index, and allow
 // overwriting config as long as the mint account stays the same?
 #[allow(clippy::too_many_arguments)]
@@ -82,11 +91,7 @@ pub fn register_token(
     ctx: Context<RegisterToken>,
     token_index: TokenIndex,
     name: String,
-    util0: f32,
-    rate0: f32,
-    util1: f32,
-    rate1: f32,
-    max_rate: f32,
+    interest_rate_params: InterestRateParams,
     maint_asset_weight: f32,
     init_asset_weight: f32,
     maint_liab_weight: f32,
@@ -107,11 +112,12 @@ pub fn register_token(
         indexed_total_deposits: I80F48::ZERO,
         indexed_total_borrows: I80F48::ZERO,
         last_updated: Clock::get()?.unix_timestamp,
-        util0: I80F48::from_num(util0),
-        rate0: I80F48::from_num(rate0),
-        util1: I80F48::from_num(util1),
-        rate1: I80F48::from_num(rate1),
-        max_rate: I80F48::from_num(max_rate),
+        // TODO: add a require! verifying relation between the parameters
+        util0: I80F48::from_num(interest_rate_params.util0),
+        rate0: I80F48::from_num(interest_rate_params.rate0),
+        util1: I80F48::from_num(interest_rate_params.util1),
+        rate1: I80F48::from_num(interest_rate_params.rate1),
+        max_rate: I80F48::from_num(interest_rate_params.max_rate),
         maint_asset_weight: I80F48::from_num(maint_asset_weight),
         init_asset_weight: I80F48::from_num(init_asset_weight),
         maint_liab_weight: I80F48::from_num(maint_liab_weight),

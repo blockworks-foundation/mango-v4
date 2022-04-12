@@ -169,24 +169,10 @@ export type MangoV4 = {
           "type": "string"
         },
         {
-          "name": "util0",
-          "type": "f32"
-        },
-        {
-          "name": "rate0",
-          "type": "f32"
-        },
-        {
-          "name": "util1",
-          "type": "f32"
-        },
-        {
-          "name": "rate1",
-          "type": "f32"
-        },
-        {
-          "name": "maxRate",
-          "type": "f32"
+          "name": "interestRateParams",
+          "type": {
+            "defined": "InterestRateParams"
+          }
         },
         {
           "name": "maintAssetWeight",
@@ -2150,6 +2136,34 @@ export type MangoV4 = {
                 8
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InterestRateParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "util0",
+            "type": "f32"
+          },
+          {
+            "name": "rate0",
+            "type": "f32"
+          },
+          {
+            "name": "util1",
+            "type": "f32"
+          },
+          {
+            "name": "rate1",
+            "type": "f32"
+          },
+          {
+            "name": "maxRate",
+            "type": "f32"
           }
         ]
       }
@@ -2671,24 +2685,10 @@ export const IDL: MangoV4 = {
           "type": "string"
         },
         {
-          "name": "util0",
-          "type": "f32"
-        },
-        {
-          "name": "rate0",
-          "type": "f32"
-        },
-        {
-          "name": "util1",
-          "type": "f32"
-        },
-        {
-          "name": "rate1",
-          "type": "f32"
-        },
-        {
-          "name": "maxRate",
-          "type": "f32"
+          "name": "interestRateParams",
+          "type": {
+            "defined": "InterestRateParams"
+          }
         },
         {
           "name": "maintAssetWeight",
@@ -4652,6 +4652,34 @@ export const IDL: MangoV4 = {
                 8
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InterestRateParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "util0",
+            "type": "f32"
+          },
+          {
+            "name": "rate0",
+            "type": "f32"
+          },
+          {
+            "name": "util1",
+            "type": "f32"
+          },
+          {
+            "name": "rate1",
+            "type": "f32"
+          },
+          {
+            "name": "maxRate",
+            "type": "f32"
           }
         ]
       }

@@ -92,11 +92,7 @@ export class MangoClient {
       .registerToken(
         tokenIndex,
         name,
-        util0,
-        rate0,
-        util1,
-        rate1,
-        maxRate,
+        { util0, rate0, util1, rate1, maxRate },
         maintAssetWeight,
         initAssetWeight,
         maintLiabWeight,
