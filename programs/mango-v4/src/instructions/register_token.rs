@@ -77,11 +77,11 @@ pub struct RegisterToken<'info> {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Default)]
 pub struct InterestRateParams {
-    util0: f32,
-    rate0: f32,
-    util1: f32,
-    rate1: f32,
-    max_rate: f32,
+    pub util0: f32,
+    pub rate0: f32,
+    pub util1: f32,
+    pub rate1: f32,
+    pub max_rate: f32,
 }
 
 // TODO: should this be "configure_mint", we pass an explicit index, and allow
