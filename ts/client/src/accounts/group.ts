@@ -1,5 +1,5 @@
 import { PublicKey } from '@solana/web3.js';
-import { MangoClient } from '../../client';
+import { MangoClient } from '../client';
 import { Bank } from './bank';
 import { Serum3Market } from './serum3';
 

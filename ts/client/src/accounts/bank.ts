@@ -1,7 +1,7 @@
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { MangoClient } from '../../client';
+import { MangoClient } from '../client';
 import { I80F48, I80F48Dto } from './I80F48';
 
 export class Bank {

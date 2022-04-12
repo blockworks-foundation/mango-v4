@@ -5,7 +5,7 @@ use anchor_lang::solana_program::sysvar::{self, SysvarId};
 use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
-use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side, InterestRateParams};
 use solana_program::instruction::Instruction;
 use solana_program_test::BanksClientError;
 use solana_sdk::instruction;
@@ -474,11 +474,13 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
         let instruction = Self::Instruction {
             name: "some_ticker".to_string(),
             token_index: self.token_index,
-            util0: self.util0,
-            rate0: self.rate0,
-            util1: self.util1,
-            rate1: self.rate1,
-            max_rate: self.max_rate,
+            interest_rate_params: InterestRateParams {
+                util0: self.util0,
+                rate0: self.rate0,
+                util1: self.util1,
+                rate1: self.rate1,
+                max_rate: self.max_rate,
+            },
             maint_asset_weight: self.maint_asset_weight,
             init_asset_weight: self.init_asset_weight,
             maint_liab_weight: self.maint_liab_weight,

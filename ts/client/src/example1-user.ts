@@ -5,7 +5,7 @@ import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
   Serum3Side,
-} from './accounts/types/serum3';
+} from './accounts/serum3';
 import { MangoClient } from './client';
 import { DEVNET_GROUP, DEVNET_SERUM3_PROGRAM_ID } from './constants';
 

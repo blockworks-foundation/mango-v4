@@ -10,17 +10,17 @@ import {
   TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { Bank, getMintInfoForTokenIndex } from './accounts/types/bank';
-import { Group } from './accounts/types/group';
-import { I80F48 } from './accounts/types/I80F48';
-import { MangoAccount } from './accounts/types/mangoAccount';
-import { StubOracle } from './accounts/types/oracle';
+import { Bank, getMintInfoForTokenIndex } from './accounts/bank';
+import { Group } from './accounts/group';
+import { I80F48 } from './accounts/I80F48';
+import { MangoAccount } from './accounts/mangoAccount';
+import { StubOracle } from './accounts/oracle';
 import {
   Serum3Market,
   Serum3OrderType,
   Serum3SelfTradeBehavior,
   Serum3Side,
-} from './accounts/types/serum3';
+} from './accounts/serum3';
 import { IDL, MangoV4 } from './mango_v4';
 
 export const MANGO_V4_ID = new PublicKey(
