@@ -2,8 +2,8 @@
   "name": "@blockworks-foundation/mango-client",
   "version": "0.1.0",
   "description": "Typescript Client for mango-v4 program.",
-  "main": "lib/src/index.js",
-  "types": "lib/src/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "repository": "https://github.com/blockworks-foundation/mango-v4",
   "scripts": {
     "build": "tsc",
