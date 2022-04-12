@@ -8,7 +8,7 @@ use fixed_macro::types::I80F48;
 // TODO: ALTs are unavailable
 //use crate::address_lookup_table;
 use crate::state::*;
-use crate::util::fill_from_str;
+use crate::util::fill16_from_str;
 
 const INDEX_START: I80F48 = I80F48!(1_000_000);
 
@@ -102,7 +102,7 @@ pub fn register_token(
 
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
-        name: fill_from_str(name)?,
+        name: fill16_from_str(name)?,
         group: ctx.accounts.group.key(),
         mint: ctx.accounts.mint.key(),
         vault: ctx.accounts.vault.key(),

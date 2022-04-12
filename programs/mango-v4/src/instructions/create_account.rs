@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::error::*;
 use crate::state::*;
-use crate::util::fill_from_str;
+use crate::util::fill32_from_str;
 
 #[derive(Accounts)]
 #[instruction(account_num: u8)]
@@ -30,7 +30,7 @@ pub fn create_account(ctx: Context<CreateAccount>, account_num: u8, name: String
     let mut account = ctx.accounts.account.load_init()?;
     // TODO: dont init on stack
     *account = MangoAccount {
-        name: fill_from_str(name)?,
+        name: fill32_from_str(name)?,
         group: ctx.accounts.group.key(),
         owner: ctx.accounts.owner.key(),
         delegate: Pubkey::default(),
