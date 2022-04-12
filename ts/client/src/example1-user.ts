@@ -38,7 +38,7 @@ async function main() {
   }
 
   // create + fetch account
-  const mangoAccount = await client.getOrCreateMangoAccount(
+  let mangoAccount = await client.getOrCreateMangoAccount(
     group,
     user.publicKey,
     0,
@@ -47,15 +47,39 @@ async function main() {
   console.log(`MangoAccount ${mangoAccount.publicKey}`);
 
   // deposit and withdraw
-  console.log(`Depositing...5000000`);
+  console.log(`Depositing...50_000000 USDC`);
   await client.deposit(group, mangoAccount, 'USDC', 50_000000);
+
+  // manual reload for now
+  mangoAccount = await client.getOrCreateMangoAccount(
+    group,
+    user.publicKey,
+    0,
+    'my_mango_account',
+  );
+  console.log(`Depositing...5000000 BTC`);
   await client.deposit(group, mangoAccount, 'BTC', 5000000);
+
   console.log(`Withdrawing...1000000`);
+  // manual reload for now
+  mangoAccount = await client.getOrCreateMangoAccount(
+    group,
+    user.publicKey,
+    0,
+    'my_mango_account',
+  );
   await client.withdraw(group, mangoAccount, 'USDC', 1_000000, false);
 
   // serum3
   console.log(
     `Placing serum3 bid which would not be settled since its relatively low then midprice`,
+  );
+  // manual reload for now
+  mangoAccount = await client.getOrCreateMangoAccount(
+    group,
+    user.publicKey,
+    0,
+    'my_mango_account',
   );
   await client.serum3PlaceOrder(
     group,
@@ -70,7 +94,15 @@ async function main() {
     Date.now(),
     10,
   );
+
   console.log(`Placing serum3 bid way above midprice`);
+  // manual reload for now
+  mangoAccount = await client.getOrCreateMangoAccount(
+    group,
+    user.publicKey,
+    0,
+    'my_mango_account',
+  );
   await client.serum3PlaceOrder(
     group,
     mangoAccount,
@@ -84,7 +116,22 @@ async function main() {
     Date.now(),
     10,
   );
+
   console.log(`Placing serum3 ask way below midprice`);
+  // manual reload for now
+  mangoAccount = await client.getOrCreateMangoAccount(
+    group,
+    user.publicKey,
+    0,
+    'my_mango_account',
+  );
+  // manual reload for now
+  mangoAccount = await client.getOrCreateMangoAccount(
+    group,
+    user.publicKey,
+    0,
+    'my_mango_account',
+  );
   await client.serum3PlaceOrder(
     group,
     mangoAccount,

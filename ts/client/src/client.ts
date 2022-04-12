@@ -700,6 +700,10 @@ export class MangoClient {
         .map((serum3Account) => serum3Account.openOrders),
     );
 
+    // TODO: remove
+    console.log(
+      `number of healthRemainingAccounts: ${healthRemainingAccounts.length}`,
+    );
     return healthRemainingAccounts;
   }
 }
