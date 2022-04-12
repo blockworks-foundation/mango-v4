@@ -5,7 +5,9 @@ use anchor_lang::solana_program::sysvar::{self, SysvarId};
 use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
-use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side, InterestRateParams};
+use mango_v4::instructions::{
+    InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
+};
 use solana_program::instruction::Instruction;
 use solana_program_test::BanksClientError;
 use solana_sdk::instruction;
