@@ -10,6 +10,8 @@ pub const YEAR: I80F48 = I80F48!(31536000);
 
 #[account(zero_copy)]
 pub struct Bank {
+    pub name: [u8; 16],
+
     pub group: Pubkey,
     pub mint: Pubkey,
     pub vault: Pubkey,
@@ -52,7 +54,7 @@ pub struct Bank {
 
     pub reserved: [u8; 6],
 }
-const_assert_eq!(size_of::<Bank>(), 32 * 4 + 8 + 16 * 15 + 2 + 6);
+const_assert_eq!(size_of::<Bank>(), 16 + 32 * 4 + 8 + 16 * 15 + 2 + 6);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
 impl Bank {

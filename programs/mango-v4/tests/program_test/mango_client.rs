@@ -472,6 +472,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
+            name: "some_ticker".to_string(),
             token_index: self.token_index,
             util0: self.util0,
             rate0: self.rate0,
@@ -700,6 +701,7 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = mango_v4::instruction::CreateAccount {
             account_num: self.account_num,
+            name: "my_mango_account".to_string(),
         };
 
         let account = Pubkey::find_program_address(
@@ -786,6 +788,7 @@ impl<'keypair> ClientInstruction for Serum3RegisterMarketInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             market_index: self.market_index,
+            name: "some_ticker/usdc".to_string(),
         };
 
         let serum_market = Pubkey::find_program_address(

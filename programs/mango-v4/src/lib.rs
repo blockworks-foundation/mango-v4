@@ -37,6 +37,7 @@ pub mod mango_v4 {
     pub fn register_token(
         ctx: Context<RegisterToken>,
         token_index: TokenIndex,
+        name: String,
         util0: f32,
         rate0: f32,
         util1: f32,
@@ -51,6 +52,7 @@ pub mod mango_v4 {
         instructions::register_token(
             ctx,
             token_index,
+            name,
             util0,
             rate0,
             util1,
@@ -68,8 +70,12 @@ pub mod mango_v4 {
         instructions::update_index(ctx)
     }
 
-    pub fn create_account(ctx: Context<CreateAccount>, account_num: u8) -> Result<()> {
-        instructions::create_account(ctx, account_num)
+    pub fn create_account(
+        ctx: Context<CreateAccount>,
+        account_num: u8,
+        name: String,
+    ) -> Result<()> {
+        instructions::create_account(ctx, account_num, name)
     }
 
     pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
@@ -112,8 +118,9 @@ pub mod mango_v4 {
     pub fn serum3_register_market(
         ctx: Context<Serum3RegisterMarket>,
         market_index: Serum3MarketIndex,
+        name: String,
     ) -> Result<()> {
-        instructions::serum3_register_market(ctx, market_index)
+        instructions::serum3_register_market(ctx, market_index, name)
     }
 
     pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result<()> {

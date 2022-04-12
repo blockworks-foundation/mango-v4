@@ -1,6 +1,6 @@
 import { PublicKey } from '@solana/web3.js';
 
-export const DEVNET_GROUP = '882CDTXBMgqvD2ZzDcW2DxzMwEz1kD4eg7bzEBhFYejd';
+export const DEVNET_GROUP = 'EjDBeQkKQ1y68ki4YskWjSZc4v5hJ44KWH64uvMNubsg';
 
 export const DEVNET_MINTS = new Map([
   ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'],

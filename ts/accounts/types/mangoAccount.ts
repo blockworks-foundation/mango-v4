@@ -1,14 +1,16 @@
+import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { Bank } from './bank';
 import { I80F48, I80F48Dto } from './I80F48';
-
 export class MangoAccount {
   public tokens: TokenAccount[];
   public serum3: Serum3Account[];
+  public name: string;
 
   static from(
     publicKey: PublicKey,
     obj: {
+      name: number[];
       group: PublicKey;
       owner: PublicKey;
       delegate: PublicKey;
@@ -24,6 +26,7 @@ export class MangoAccount {
   ) {
     return new MangoAccount(
       publicKey,
+      obj.name,
       obj.group,
       obj.owner,
       obj.delegate,
@@ -40,6 +43,7 @@ export class MangoAccount {
 
   constructor(
     public publicKey: PublicKey,
+    name: number[],
     public group: PublicKey,
     public owner: PublicKey,
     public delegate: PublicKey,
@@ -52,6 +56,7 @@ export class MangoAccount {
     bump: number,
     reserved: number[],
   ) {
+    this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.tokens = tokens.values.map((dto) => TokenAccount.from(dto));
     this.serum3 = serum3.values.map((dto) => Serum3Account.from(dto));
   }

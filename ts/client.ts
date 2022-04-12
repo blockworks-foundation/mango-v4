@@ -76,6 +76,7 @@ export class MangoClient {
     mintPk: PublicKey,
     oraclePk: PublicKey,
     tokenIndex: number,
+    name: string,
     util0: number,
     rate0: number,
     util1: number,
@@ -90,6 +91,7 @@ export class MangoClient {
     return await this.program.methods
       .registerToken(
         tokenIndex,
+        name,
         util0,
         rate0,
         util1,
@@ -118,7 +120,7 @@ export class MangoClient {
         {
           memcmp: {
             bytes: group.publicKey.toBase58(),
-            offset: 8,
+            offset: 24,
           },
         },
       ])
@@ -188,10 +190,11 @@ export class MangoClient {
     group: Group,
     ownerPk: PublicKey,
     accountNumber?: number,
+    name?: string,
   ): Promise<MangoAccount> {
     let mangoAccounts = await this.getMangoAccountForOwner(group, ownerPk);
     if (mangoAccounts.length === 0) {
-      await this.createMangoAccount(group, accountNumber ?? 0);
+      await this.createMangoAccount(group, accountNumber ?? 0, name ?? '');
       mangoAccounts = await this.getMangoAccountForOwner(group, ownerPk);
     }
     return mangoAccounts[0];
@@ -200,9 +203,10 @@ export class MangoClient {
   public async createMangoAccount(
     group: Group,
     accountNumber: number,
+    name?: string,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .createAccount(accountNumber)
+      .createAccount(accountNumber, name ?? '')
       .accounts({
         group: group.publicKey,
         owner: this.program.provider.wallet.publicKey,
@@ -227,13 +231,13 @@ export class MangoClient {
         {
           memcmp: {
             bytes: group.publicKey.toBase58(),
-            offset: 8,
+            offset: 24,
           },
         },
         {
           memcmp: {
             bytes: ownerPk.toBase58(),
-            offset: 40,
+            offset: 56,
           },
         },
       ])
@@ -335,9 +339,10 @@ export class MangoClient {
     baseBank: Bank,
     quoteBank: Bank,
     marketIndex: number,
+    name: string,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .serum3RegisterMarket(marketIndex)
+      .serum3RegisterMarket(marketIndex, name)
       .accounts({
         group: group.publicKey,
         admin: this.program.provider.wallet.publicKey,
@@ -362,7 +367,7 @@ export class MangoClient {
       {
         memcmp: {
           bytes: group.publicKey.toBase58(),
-          offset: 8,
+          offset: 24,
         },
       },
     ];
@@ -373,7 +378,7 @@ export class MangoClient {
       filters.push({
         memcmp: {
           bytes: bs58.encode(bbuf),
-          offset: 106,
+          offset: 122,
         },
       });
     }
@@ -384,7 +389,7 @@ export class MangoClient {
       filters.push({
         memcmp: {
           bytes: bs58.encode(qbuf),
-          offset: 108,
+          offset: 124,
         },
       });
     }

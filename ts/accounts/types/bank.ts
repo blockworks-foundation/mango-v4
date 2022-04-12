@@ -1,15 +1,18 @@
+import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { MangoClient } from '../../client';
 import { I80F48, I80F48Dto } from './I80F48';
 
 export class Bank {
+  public name: string;
   public depositIndex: I80F48;
   public borrowIndex: I80F48;
 
   static from(
     publicKey: PublicKey,
     obj: {
+      name: number[];
       group: PublicKey;
       mint: PublicKey;
       vault: PublicKey;
@@ -29,6 +32,7 @@ export class Bank {
   ) {
     return new Bank(
       publicKey,
+      obj.name,
       obj.group,
       obj.mint,
       obj.vault,
@@ -49,6 +53,7 @@ export class Bank {
 
   constructor(
     public publicKey: PublicKey,
+    name: number[],
     public group: PublicKey,
     public mint: PublicKey,
     public vault: PublicKey,
@@ -65,6 +70,7 @@ export class Bank {
     dust: Object,
     public tokenIndex: number,
   ) {
+    this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.depositIndex = I80F48.from(depositIndex);
     this.borrowIndex = I80F48.from(borrowIndex);
   }

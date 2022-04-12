@@ -512,6 +512,8 @@ impl Default for MangoAccountPerps {
 
 #[account(zero_copy)]
 pub struct MangoAccount {
+    pub name: [u8; 16],
+
     pub group: Pubkey,
     pub owner: Pubkey,
 
@@ -542,7 +544,7 @@ pub struct MangoAccount {
 }
 const_assert_eq!(
     size_of::<MangoAccount>(),
-    3 * 32
+    16 + 3 * 32
         + size_of::<MangoAccountTokens>()
         + size_of::<MangoAccountSerum3>()
         + size_of::<MangoAccountPerps>()

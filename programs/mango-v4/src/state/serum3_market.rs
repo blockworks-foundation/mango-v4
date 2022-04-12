@@ -8,6 +8,7 @@ pub type Serum3MarketIndex = u16;
 
 #[account(zero_copy)]
 pub struct Serum3Market {
+    pub name: [u8; 16],
     pub group: Pubkey,
     pub serum_program: Pubkey,
     pub serum_market_external: Pubkey,
@@ -19,7 +20,7 @@ pub struct Serum3Market {
     pub bump: u8,
     pub reserved: [u8; 1],
 }
-const_assert_eq!(size_of::<Serum3Market>(), 32 * 3 + 3 * 2 + 1 + 1);
+const_assert_eq!(size_of::<Serum3Market>(), 16 + 32 * 3 + 3 * 2 + 1 + 1);
 const_assert_eq!(size_of::<Serum3Market>() % 8, 0);
 
 #[macro_export]

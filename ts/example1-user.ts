@@ -42,6 +42,7 @@ async function main() {
     group,
     user.publicKey,
     0,
+    'my_mango_account',
   );
   console.log(`MangoAccount ${mangoAccount.publicKey}`);
 

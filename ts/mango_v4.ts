@@ -165,6 +165,10 @@ export type MangoV4 = {
           "type": "u16"
         },
         {
+          "name": "name",
+          "type": "string"
+        },
+        {
           "name": "util0",
           "type": "f32"
         },
@@ -274,6 +278,10 @@ export type MangoV4 = {
         {
           "name": "accountNum",
           "type": "u8"
+        },
+        {
+          "name": "name",
+          "type": "string"
         }
       ]
     },
@@ -599,6 +607,10 @@ export type MangoV4 = {
         {
           "name": "marketIndex",
           "type": "u16"
+        },
+        {
+          "name": "name",
+          "type": "string"
         }
       ]
     },
@@ -1347,6 +1359,15 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
             "name": "group",
             "type": "publicKey"
           },
@@ -1557,6 +1578,15 @@ export type MangoV4 = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
           {
             "name": "group",
             "type": "publicKey"
@@ -1867,6 +1897,15 @@ export type MangoV4 = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
           {
             "name": "group",
             "type": "publicKey"
@@ -2628,6 +2667,10 @@ export const IDL: MangoV4 = {
           "type": "u16"
         },
         {
+          "name": "name",
+          "type": "string"
+        },
+        {
           "name": "util0",
           "type": "f32"
         },
@@ -2737,6 +2780,10 @@ export const IDL: MangoV4 = {
         {
           "name": "accountNum",
           "type": "u8"
+        },
+        {
+          "name": "name",
+          "type": "string"
         }
       ]
     },
@@ -3062,6 +3109,10 @@ export const IDL: MangoV4 = {
         {
           "name": "marketIndex",
           "type": "u16"
+        },
+        {
+          "name": "name",
+          "type": "string"
         }
       ]
     },
@@ -3810,6 +3861,15 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
             "name": "group",
             "type": "publicKey"
           },
@@ -4020,6 +4080,15 @@ export const IDL: MangoV4 = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
           {
             "name": "group",
             "type": "publicKey"
@@ -4330,6 +4399,15 @@ export const IDL: MangoV4 = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
           {
             "name": "group",
             "type": "publicKey"

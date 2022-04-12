@@ -47,6 +47,7 @@ async function main() {
       btcDevnetMint,
       btcDevnetOracle,
       0,
+      'btc',
       0.4,
       0.07,
       0.8,
@@ -73,6 +74,7 @@ async function main() {
       usdcDevnetMint,
       usdcDevnetOracle.publicKey,
       1,
+      'usdc',
       0.4,
       0.07,
       0.8,
@@ -107,6 +109,7 @@ async function main() {
       banks[0],
       banks[1],
       0,
+      'btc/usdc',
     );
   } catch (error) {}
   const markets = await client.serum3GetMarket(
