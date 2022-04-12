@@ -792,7 +792,7 @@ impl<'keypair> ClientInstruction for Serum3RegisterMarketInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             market_index: self.market_index,
-            name: "some_ticker/usdc".to_string(),
+            name: "UUU/usdc".to_string(),
         };
 
         let serum_market = Pubkey::find_program_address(
