@@ -4,6 +4,7 @@ use crate::state::Bank;
 
 #[derive(Accounts)]
 pub struct UpdateIndex<'info> {
+    // TODO: should we support arbitrary number of banks with remaining accounts?
     #[account(mut)]
     pub bank: AccountLoader<'info, Bank>,
 }
