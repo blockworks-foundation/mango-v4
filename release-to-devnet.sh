@@ -13,7 +13,7 @@ anchor build --skip-lint
 ./idl-fixup.sh
 
 # update types in ts client package
-cp -v ./target/types/mango_v4.ts ./ts/mango_v4.ts
+cp -v ./target/types/mango_v4.ts ./ts/client/src/mango_v4.ts
 
 if [[ -z "${NO_DEPLOY}" ]]; then
     # publish program
@@ -29,13 +29,4 @@ fi
 
 
 # build npm package
-tsc
-# yarn clean && yarn build && cp package.json ./dist/
-
-# publish the npm package
-# yarn publish dist
-
-# echo
-# echo Remember to commit and push the version update as well as the changes
-# echo to ts/mango_v4.tx.
-# echo
+(cd ./ts/client && tsc)

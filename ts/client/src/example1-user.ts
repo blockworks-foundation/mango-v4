@@ -1,5 +1,5 @@
 import { Provider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import {
   Serum3OrderType,
@@ -7,7 +7,7 @@ import {
   Serum3Side,
 } from './accounts/serum3';
 import { MangoClient } from './client';
-import { DEVNET_GROUP, DEVNET_SERUM3_PROGRAM_ID } from './constants';
+import { DEVNET_SERUM3_PROGRAM_ID } from './constants';
 
 //
 // An example for users based on high level api i.e. the client
@@ -30,12 +30,13 @@ async function main() {
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
   // fetch group
-  const group = await client.getGroup(new PublicKey(DEVNET_GROUP));
+  const admin = Keypair.fromSecretKey(
+    Buffer.from(
+      JSON.parse(fs.readFileSync(process.env.ADMIN_KEYPAIR!, 'utf-8')),
+    ),
+  );
+  const group = await client.getGroupForAdmin(admin.publicKey);
   console.log(`Group ${group.publicKey.toBase58()}`);
-
-  for (const bank of group.banksMap.values()) {
-    console.log(bank.publicKey.toBase58());
-  }
 
   // create + fetch account
   const mangoAccount = await client.getOrCreateMangoAccount(

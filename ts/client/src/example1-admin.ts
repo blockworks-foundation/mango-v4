@@ -2,12 +2,18 @@ import { Provider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from './client';
-import {
-  DEVNET_MINTS,
-  DEVNET_ORACLES,
-  DEVNET_SERUM3_MARKETS,
-  DEVNET_SERUM3_PROGRAM_ID,
-} from './constants';
+import { DEVNET_SERUM3_PROGRAM_ID } from './constants';
+
+const DEVNET_SERUM3_MARKETS = new Map([
+  ['BTC/USDC', 'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB'],
+]);
+const DEVNET_MINTS = new Map([
+  ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'],
+  ['BTC', '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU'],
+]);
+const DEVNET_ORACLES = new Map([
+  ['BTC', 'HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J'],
+]);
 
 //
 // An example for admins based on high level api i.e. the client
@@ -59,6 +65,7 @@ async function main() {
       1.4,
       0.02,
     );
+    await group.reload(client);
   } catch (error) {}
 
   // stub oracle + register token 1
@@ -86,11 +93,11 @@ async function main() {
       1.4,
       0.02,
     );
+    await group.reload(client);
   } catch (error) {}
 
   // log tokens/banks
-  const banks = await client.getBanksForGroup(group);
-  for (const bank of banks) {
+  for (const bank of await group.banksMap.values()) {
     console.log(
       `Bank ${bank.tokenIndex} ${bank.publicKey}, mint ${bank.mint}, oracle ${bank.oracle}`,
     );
@@ -106,18 +113,16 @@ async function main() {
       group,
       DEVNET_SERUM3_PROGRAM_ID,
       serumMarketExternalPk,
-      banks[0],
-      banks[1],
+      group.banksMap.get('BTC')!,
+      group.banksMap.get('USDC')!,
       0,
       'BTC/USDC',
     );
   } catch (error) {}
   const markets = await client.serum3GetMarket(
     group,
-    banks.find((bank) => bank.mint.toBase58() === DEVNET_MINTS.get('BTC'))
-      ?.tokenIndex,
-    banks.find((bank) => bank.mint.toBase58() === DEVNET_MINTS.get('USDC'))
-      ?.tokenIndex,
+    group.banksMap.get('BTC')?.tokenIndex,
+    group.banksMap.get('USDC')?.tokenIndex,
   );
   console.log(`Serum3 market ${markets[0].publicKey}`);
 
