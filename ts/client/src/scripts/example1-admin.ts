@@ -1,16 +1,28 @@
 import { Provider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
-import { MangoClient } from './client';
-import {
-  DEVNET_MINTS,
-  DEVNET_ORACLES,
-  DEVNET_SERUM3_MARKETS,
-  DEVNET_SERUM3_PROGRAM_ID,
-} from './constants';
+import { MangoClient } from '../client';
+import { DEVNET_SERUM3_PROGRAM_ID } from '../constants';
+
+const DEVNET_SERUM3_MARKETS = new Map([
+  ['BTC/USDC', 'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB'],
+]);
+const DEVNET_MINTS = new Map([
+  ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'],
+  ['BTC', '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU'],
+]);
+const DEVNET_ORACLES = new Map([
+  ['BTC', 'HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J'],
+]);
 
 //
 // An example for admins based on high level api i.e. the client
+// Depoys a new mango group to devnet, registers 2 tokens, and 1 serum3 spot market
+//
+// process.env.ADMIN_KEYPAIR - group admin keypair path
+// to create a new admin keypair:
+// * solana-keygen new --outfile ~/.config/solana/admin.json
+// * solana airdrop 1  -k ~/.config/solana/admin.json
 //
 async function main() {
   const options = Provider.defaultOptions();
@@ -30,15 +42,15 @@ async function main() {
   const client = await MangoClient.connect(adminProvider, true);
 
   // group
-  console.log(`Group...`);
+  console.log(`Creating Group...`);
   try {
     await client.createGroup();
   } catch (error) {}
   const group = await client.getGroupForAdmin(admin.publicKey);
-  console.log(`Group ${group.publicKey}`);
+  console.log(`...registered group ${group.publicKey}`);
 
   // register token 0
-  console.log(`Token 0...`);
+  console.log(`Registering BTC...`);
   const btcDevnetMint = new PublicKey(DEVNET_MINTS.get('BTC')!);
   const btcDevnetOracle = new PublicKey(DEVNET_ORACLES.get('BTC')!);
   try {
@@ -59,10 +71,11 @@ async function main() {
       1.4,
       0.02,
     );
+    await group.reload(client);
   } catch (error) {}
 
   // stub oracle + register token 1
-  console.log(`Token 1...`);
+  console.log(`Registering USDC...`);
   const usdcDevnetMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
     await client.createStubOracle(group, usdcDevnetMint, 1.0);
@@ -86,18 +99,18 @@ async function main() {
       1.4,
       0.02,
     );
+    await group.reload(client);
   } catch (error) {}
 
   // log tokens/banks
-  const banks = await client.getBanksForGroup(group);
-  for (const bank of banks) {
+  for (const bank of await group.banksMap.values()) {
     console.log(
-      `Bank ${bank.tokenIndex} ${bank.publicKey}, mint ${bank.mint}, oracle ${bank.oracle}`,
+      `...registered Bank ${bank.tokenIndex} ${bank.publicKey}, mint ${bank.mint}, oracle ${bank.oracle}`,
     );
   }
 
   // register serum market
-  console.log(`Serum3 market...`);
+  console.log(`Registering serum3 market...`);
   const serumMarketExternalPk = new PublicKey(
     DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
   );
@@ -106,20 +119,18 @@ async function main() {
       group,
       DEVNET_SERUM3_PROGRAM_ID,
       serumMarketExternalPk,
-      banks[0],
-      banks[1],
+      group.banksMap.get('BTC')!,
+      group.banksMap.get('USDC')!,
       0,
       'BTC/USDC',
     );
   } catch (error) {}
   const markets = await client.serum3GetMarket(
     group,
-    banks.find((bank) => bank.mint.toBase58() === DEVNET_MINTS.get('BTC'))
-      ?.tokenIndex,
-    banks.find((bank) => bank.mint.toBase58() === DEVNET_MINTS.get('USDC'))
-      ?.tokenIndex,
+    group.banksMap.get('BTC')?.tokenIndex,
+    group.banksMap.get('USDC')?.tokenIndex,
   );
-  console.log(`Serum3 market ${markets[0].publicKey}`);
+  console.log(`...registerd serum3 market ${markets[0].publicKey}`);
 
   process.exit();
 }

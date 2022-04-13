@@ -227,13 +227,13 @@ export class MangoClient {
         {
           memcmp: {
             bytes: group.publicKey.toBase58(),
-            offset: 24,
+            offset: 40,
           },
         },
         {
           memcmp: {
             bytes: ownerPk.toBase58(),
-            offset: 56,
+            offset: 72,
           },
         },
       ])
@@ -700,10 +700,6 @@ export class MangoClient {
         .map((serum3Account) => serum3Account.openOrders),
     );
 
-    // TODO: remove
-    console.log(
-      `number of healthRemainingAccounts: ${healthRemainingAccounts.length}`,
-    );
     return healthRemainingAccounts;
   }
 }

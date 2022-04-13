@@ -1,5 +1,6 @@
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
+import { MangoClient } from '../client';
 import { Bank } from './bank';
 import { I80F48, I80F48Dto } from './I80F48';
 export class MangoAccount {
@@ -59,6 +60,10 @@ export class MangoAccount {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.tokens = tokens.values.map((dto) => TokenAccount.from(dto));
     this.serum3 = serum3.values.map((dto) => Serum3Account.from(dto));
+  }
+
+  async reload(client: MangoClient) {
+    Object.assign(this, await client.getMangoAccount(this));
   }
 
   findToken(tokenIndex: number): TokenAccount | undefined {

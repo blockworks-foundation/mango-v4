@@ -1569,7 +1569,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                16
+                32
               ]
             }
           },
@@ -4085,7 +4085,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                16
+                32
               ]
             }
           },
