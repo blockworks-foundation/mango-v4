@@ -47,11 +47,17 @@ async function main() {
   console.log(`MangoAccount ${mangoAccount.publicKey}`);
 
   // deposit and withdraw
-  console.log(`Depositing...5000000`);
+  console.log(`Depositing...5000000 USDC`);
   await client.deposit(group, mangoAccount, 'USDC', 50_000000);
+  await mangoAccount.reload(client);
+
+  console.log(`Depositing...5000000 BTC`);
   await client.deposit(group, mangoAccount, 'BTC', 5000000);
+  await mangoAccount.reload(client);
+
   console.log(`Withdrawing...1000000`);
   await client.withdraw(group, mangoAccount, 'USDC', 1_000000, false);
+  await mangoAccount.reload(client);
 
   // serum3
   console.log(
@@ -70,6 +76,8 @@ async function main() {
     Date.now(),
     10,
   );
+  await mangoAccount.reload(client);
+
   console.log(`Placing serum3 bid way above midprice`);
   await client.serum3PlaceOrder(
     group,
@@ -84,6 +92,8 @@ async function main() {
     Date.now(),
     10,
   );
+  await mangoAccount.reload(client);
+
   console.log(`Placing serum3 ask way below midprice`);
   await client.serum3PlaceOrder(
     group,
