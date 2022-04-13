@@ -5,12 +5,15 @@ import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
   Serum3Side,
-} from './accounts/serum3';
-import { MangoClient } from './client';
-import { DEVNET_SERUM3_PROGRAM_ID } from './constants';
+} from '../accounts/serum3';
+import { MangoClient } from '../client';
+import { DEVNET_SERUM3_PROGRAM_ID } from '../constants';
 
 //
 // An example for users based on high level api i.e. the client
+// Create
+// process.env.USER_KEYPAIR - mango account owner keypair path
+// process.env.ADMIN_KEYPAIR - group admin keypair path (useful for automatically finding the group)
 //
 async function main() {
   const options = Provider.defaultOptions();
@@ -36,16 +39,17 @@ async function main() {
     ),
   );
   const group = await client.getGroupForAdmin(admin.publicKey);
-  console.log(`Group ${group.publicKey.toBase58()}`);
+  console.log(`Found group ${group.publicKey.toBase58()}`);
 
   // create + fetch account
+  console.log(`Creating mangoaccount...`);
   const mangoAccount = await client.getOrCreateMangoAccount(
     group,
     user.publicKey,
     0,
     'my_mango_account',
   );
-  console.log(`MangoAccount ${mangoAccount.publicKey}`);
+  console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
 
   // deposit and withdraw
   console.log(`Depositing...5000000 USDC`);
@@ -56,13 +60,13 @@ async function main() {
   await client.deposit(group, mangoAccount, 'BTC', 5000000);
   await mangoAccount.reload(client);
 
-  console.log(`Withdrawing...1000000`);
+  console.log(`Withdrawing...1000000 USDC`);
   await client.withdraw(group, mangoAccount, 'USDC', 1_000000, false);
   await mangoAccount.reload(client);
 
   // serum3
   console.log(
-    `Placing serum3 bid which would not be settled since its relatively low then midprice`,
+    `Placing serum3 bid which would not be settled since its relatively low then midprice...`,
   );
   await client.serum3PlaceOrder(
     group,
@@ -79,7 +83,7 @@ async function main() {
   );
   await mangoAccount.reload(client);
 
-  console.log(`Placing serum3 bid way above midprice`);
+  console.log(`Placing serum3 bid way above midprice...`);
   await client.serum3PlaceOrder(
     group,
     mangoAccount,
@@ -95,7 +99,7 @@ async function main() {
   );
   await mangoAccount.reload(client);
 
-  console.log(`Placing serum3 ask way below midprice`);
+  console.log(`Placing serum3 ask way below midprice...`);
   await client.serum3PlaceOrder(
     group,
     mangoAccount,
@@ -118,9 +122,9 @@ async function main() {
   );
   for (const order of orders) {
     console.log(
-      `Order orderId ${order.orderId}, ${order.side}, ${order.price}, ${order.size}`,
+      ` - Order orderId ${order.orderId}, ${order.side}, ${order.price}, ${order.size}`,
     );
-    console.log(`Cancelling order with ${order.orderId}`);
+    console.log(` - Cancelling order with ${order.orderId}`);
     await client.serum3CancelOrder(
       group,
       mangoAccount,
@@ -131,7 +135,7 @@ async function main() {
     );
   }
 
-  console.log(`Current own orders on OB...`);
+  console.log(` - Current own orders on OB...`);
   orders = await client.getSerum3Orders(
     group,
     DEVNET_SERUM3_PROGRAM_ID,
