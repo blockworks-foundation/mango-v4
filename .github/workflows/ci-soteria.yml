@@ -13,6 +13,13 @@ jobs:
   build:
     name: Soteria
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        program: [ 'programs/mango-v4' ]
+    env:
+      PROGRAM_PATH: ${{ matrix.program }}
+      
     steps:
       - name: Check-out repo
         uses: actions/checkout@v2
@@ -52,5 +59,8 @@ jobs:
         shell: bash
 
       - name: Run Soteria
-        run: soteria -analyzeAll .
+        run: |
+          cd ${{ matrix.program }}
+          soteria -analyzeAll .
         shell: bash
+        
