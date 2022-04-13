@@ -2,7 +2,7 @@ use std::{env, time::Duration};
 
 use anchor_client::{Client, Cluster, Program};
 use clap::{Parser, Subcommand};
-use log::info;
+use log::{error, info};
 use mango_v4::state::Bank;
 use solana_client::rpc_client::RpcClient;
 use solana_client::rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType};
@@ -179,7 +179,7 @@ pub async fn update_index(mango_client: &MangoClient) -> anyhow::Result<()> {
 
     // Call update index ix
     for bank in banks {
-        let sig = mango_client
+        let sig_result = mango_client
             .program
             .request()
             .instruction(Instruction {
@@ -190,9 +190,13 @@ pub async fn update_index(mango_client: &MangoClient) -> anyhow::Result<()> {
                 ),
                 data: anchor_lang::InstructionData::data(&mango_v4::instruction::UpdateIndex {}),
             })
-            .send()?;
-
-        info!("update_index ix signature: {:?}", sig);
+            .send();
+        match sig_result {
+            Ok(sig) => {
+                info!("Crank: update_index ix signature: {:?}", sig);
+            }
+            Err(e) => error!("Crank: {:?}", e),
+        }
     }
 
     Ok(())
