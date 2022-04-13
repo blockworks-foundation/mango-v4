@@ -127,16 +127,14 @@ fn main() {
         Command::Crank { .. } => CommitmentConfig::processed(),
     };
 
-    let mango_client: &'static _ = Box::leak(Box::new(MangoClient::new(
-        cluster, commitment, payer, admin,
-    )));
+    let mango_client = MangoClient::new(cluster, commitment, payer, admin);
 
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();
 
-    rt.block_on(update_index_runner(mango_client))
+    rt.block_on(update_index_runner(&mango_client))
         .expect("Something went wrong here...");
 }
 
