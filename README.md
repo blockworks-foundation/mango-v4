@@ -8,6 +8,7 @@
 
 Devnet deployment - m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD
 
-TS client based examples (for details check respective scripts)
-(cd ts/client && yarn example1-admin) - create a devnet group
-(cd ts/client && yarn example1-user) - run through some mangoaccount operations for a user on devnet
+TS client based examples
+
+- ts/client/src/scripts/example1-admin.ts
+- ts/client/src/scripts/example1-user.ts
