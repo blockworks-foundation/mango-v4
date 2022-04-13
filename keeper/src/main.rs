@@ -2,6 +2,7 @@ use std::{env, time::Duration};
 
 use anchor_client::{Client, Cluster, Program};
 use clap::{Parser, Subcommand};
+use log::info;
 use mango_v4::state::Bank;
 use solana_client::rpc_client::RpcClient;
 use solana_client::rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType};
@@ -14,17 +15,14 @@ use solana_sdk::{
 };
 use tokio::time;
 
-// TODO:
-// logging facility
-// robust error handling
-
+/// Wrapper around anchor client with some mango specific useful things
 pub struct MangoClient {
+    pub program: Program,
     pub rpc: RpcClient,
     pub cluster: Cluster,
     pub commitment: CommitmentConfig,
     pub payer: Keypair,
     pub admin: Keypair,
-    pub program: Program,
 }
 
 impl MangoClient {
@@ -44,11 +42,11 @@ impl MangoClient {
         let rpc = program.rpc();
         Self {
             program,
-            cluster,
             rpc,
+            cluster,
+            commitment,
             admin,
             payer,
-            commitment,
         }
     }
 
@@ -77,11 +75,16 @@ struct Cli {
     command: Command,
 }
 
+// future: more subcommands e.g. Liquidator
 #[derive(Subcommand)]
 enum Command {
     Crank {},
 }
 fn main() {
+    env_logger::init_from_env(
+        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
+    );
+
     dotenv::dotenv().ok();
 
     let Cli {
@@ -134,25 +137,31 @@ fn main() {
         .build()
         .unwrap();
 
+    // future: match on various subcommands
     rt.block_on(update_index_runner(&mango_client))
         .expect("Something went wrong here...");
 }
 
 pub async fn update_index_runner(mango_client: &MangoClient) -> anyhow::Result<()> {
+    // future: make configurable
     let mut interval = time::interval(Duration::from_millis(10));
 
     loop {
         interval.tick().await;
-        update_index(mango_client).await?;
+        update_index(mango_client)
+            .await
+            .expect("Something went wrong here...");
     }
 }
 
 pub async fn update_index(mango_client: &MangoClient) -> anyhow::Result<()> {
+    // Collect all banks for a group belonging to an admin
     let banks = mango_client
         .program
         .accounts::<Bank>(vec![RpcFilterType::Memcmp(Memcmp {
             offset: 24,
             bytes: MemcmpEncodedBytes::Base58({
+                // find group belonging to admin
                 Pubkey::find_program_address(
                     &["Group".as_ref(), mango_client.admin.pubkey().as_ref()],
                     &mango_client.program.id(),
@@ -163,6 +172,12 @@ pub async fn update_index(mango_client: &MangoClient) -> anyhow::Result<()> {
             encoding: None,
         })])?;
 
+    assert!(
+        !banks.is_empty(),
+        "Found 0 banks, some part of the configuration might be wrong..."
+    );
+
+    // Call update index ix
     for bank in banks {
         let sig = mango_client
             .program
@@ -177,7 +192,7 @@ pub async fn update_index(mango_client: &MangoClient) -> anyhow::Result<()> {
             })
             .send()?;
 
-        println!("update_index: {:?}", sig);
+        info!("update_index ix signature: {:?}", sig);
     }
 
     Ok(())

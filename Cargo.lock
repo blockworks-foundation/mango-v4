@@ -1313,6 +1313,19 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a19187fea3ac7e84da7dacf48de0c45d63c6a76f9490dae389aead16c243fce3"
+dependencies = [
+ "atty",
+ "humantime",
+ "log",
+ "regex",
+ "termcolor",
+]
+
+[[package]]
+name = "env_logger"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b2cf0344971ee6c64c31be0d530793fba457d322dfec2810c453d0ef228f9c3"
@@ -2168,6 +2181,8 @@ dependencies = [
  "anyhow",
  "clap 3.1.8",
  "dotenv",
+ "env_logger 0.8.4",
+ "log",
  "mango-v4",
  "serde",
  "serde_json",
@@ -2353,7 +2368,7 @@ dependencies = [
  "bincode",
  "bytemuck",
  "checked_math",
- "env_logger",
+ "env_logger 0.9.0",
  "fixed",
  "fixed-macro",
  "itertools 0.10.3",
@@ -4397,7 +4412,7 @@ version = "1.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b75bee4762c5db25ae6d665abaddb93d1b5bb97944c0660639431057a3e336e8"
 dependencies = [
- "env_logger",
+ "env_logger 0.9.0",
  "lazy_static",
  "log",
 ]

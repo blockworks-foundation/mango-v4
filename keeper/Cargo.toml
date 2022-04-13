@@ -22,3 +22,5 @@ solana-rpc = "1.9.5"
 solana-sdk = "1.9.5"
 solana-transaction-status = "1.9.5"
 tokio = { version = "1.17", features = ["rt-multi-thread", "time", "macros", "sync"] }
+log = "0.4.0"
+env_logger = "0.8.4"
