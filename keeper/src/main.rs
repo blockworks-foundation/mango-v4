@@ -1,6 +1,7 @@
 use std::{env, time::Duration};
 
 use anchor_client::{Client, Cluster, Program};
+use anyhow::ensure;
 use clap::{Parser, Subcommand};
 use log::{error, info};
 use mango_v4::state::Bank;
@@ -163,7 +164,7 @@ pub async fn update_index(mango_client: &MangoClient) -> anyhow::Result<()> {
             bytes: MemcmpEncodedBytes::Base58({
                 // find group belonging to admin
                 Pubkey::find_program_address(
-                    &["Group".as_ref(), mango_client.admin.pubkey().as_ref()],
+                    &["Group1".as_ref(), mango_client.admin.pubkey().as_ref()],
                     &mango_client.program.id(),
                 )
                 .0
@@ -172,10 +173,7 @@ pub async fn update_index(mango_client: &MangoClient) -> anyhow::Result<()> {
             encoding: None,
         })])?;
 
-    assert!(
-        !banks.is_empty(),
-        "Found 0 banks, some part of the configuration might be wrong..."
-    );
+    ensure!(!banks.is_empty());
 
     // Call update index ix
     for bank in banks {
