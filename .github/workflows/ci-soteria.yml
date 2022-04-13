@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        program: [ 'programs/mango-v4' ]
+        program: [ 'programs/mango-v4', 'programs/margin-trade' ]
     env:
       PROGRAM_PATH: ${{ matrix.program }}
       
@@ -63,4 +63,3 @@ jobs:
           cd ${{ matrix.program }}
           soteria -analyzeAll .
         shell: bash
-        
