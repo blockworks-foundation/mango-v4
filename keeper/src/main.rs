@@ -16,6 +16,13 @@ use solana_sdk::{
 };
 use tokio::time;
 
+// TODO
+// - may be nice to have one-shot cranking as well as the interval cranking
+// - doing a gPA for all banks call every 10millis may be too often,
+// might make sense that we maintain a service when users should query group for changes
+// - I'm really annoyed about Keypair not being clonable. Seems everyone works around that manually. Should make a PR to solana to newtype it and provide that function.
+// keypair_from_arg_or_env could be a function
+
 /// Wrapper around anchor client with some mango specific useful things
 pub struct MangoClient {
     pub program: Program,
