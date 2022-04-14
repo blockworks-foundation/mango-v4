@@ -164,7 +164,7 @@ pub async fn update_index(mango_client: &MangoClient) -> anyhow::Result<()> {
             bytes: MemcmpEncodedBytes::Base58({
                 // find group belonging to admin
                 Pubkey::find_program_address(
-                    &["Group1".as_ref(), mango_client.admin.pubkey().as_ref()],
+                    &["Group".as_ref(), mango_client.admin.pubkey().as_ref()],
                     &mango_client.program.id(),
                 )
                 .0
