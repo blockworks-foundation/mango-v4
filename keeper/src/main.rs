@@ -149,9 +149,7 @@ pub async fn update_index_runner(mango_client: &MangoClient) -> anyhow::Result<(
 
     loop {
         interval.tick().await;
-        update_index(mango_client)
-            .await
-            .expect("Something went wrong here...");
+        update_index(mango_client).await?;
     }
 }
 
