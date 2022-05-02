@@ -8,3 +8,4 @@ export {
 export { StubOracle } from './accounts/oracle';
 export { Serum3Market } from './accounts/serum3';
 export * from './client';
+export * from './constants';

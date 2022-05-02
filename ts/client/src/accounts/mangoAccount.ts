@@ -2,7 +2,7 @@ import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
 import { Bank } from './bank';
-import { I80F48, I80F48Dto } from './I80F48';
+import { I80F48, I80F48Dto, ZERO_I80F48 } from './I80F48';
 export class MangoAccount {
   public tokens: TokenAccount[];
   public serum3: Serum3Account[];
@@ -76,12 +76,12 @@ export class MangoAccount {
 
   getNativeDeposit(bank: Bank): I80F48 {
     const ta = this.findToken(bank.tokenIndex);
-    return bank.depositIndex.mul(ta?.indexedValue!);
+    return ta ? bank.depositIndex.mul(ta?.indexedValue) : ZERO_I80F48;
   }
 
   getNativeBorrow(bank: Bank): I80F48 {
     const ta = this.findToken(bank.tokenIndex);
-    return bank.borrowIndex.mul(ta?.indexedValue!);
+    return ta ? bank.borrowIndex.mul(ta?.indexedValue) : ZERO_I80F48;
   }
 }
 
@@ -99,6 +99,10 @@ export class TokenAccount {
     public tokenIndex: number,
     public inUseCount: number,
   ) {}
+
+  isActive(): boolean {
+    return this.tokenIndex !== 65535;
+  }
 }
 
 export class TokenAccountDto {
