@@ -1,4 +1,5 @@
 pub use self::margin_trade::*;
+pub use benchmark::*;
 pub use close_account::*;
 pub use create_account::*;
 pub use create_group::*;
@@ -19,6 +20,7 @@ pub use set_stub_oracle::*;
 pub use update_index::*;
 pub use withdraw::*;
 
+mod benchmark;
 mod close_account;
 mod create_account;
 mod create_group;
