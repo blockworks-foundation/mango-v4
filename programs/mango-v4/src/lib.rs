@@ -243,6 +243,29 @@ pub mod mango_v4 {
         instructions::perp_consume_events(ctx, limit)
     }
 
+    // TODO
+
+    // set delegate
+
+    // serum3_cancel_all_spot_orders
+    // serum3_change_spot_market_params
+
+    // msrm
+
+    // perp_cancel_order
+    // perp_cancel_order_by_client_id
+    // perp_cancel_all
+    // perp_cancel_all_side
+    // perp_force_cancel_order
+    
+    // liquidate_token_and_perp
+    // liquidate_perp_and_perp
+
+    // settle_* - settle_funds, settle_pnl, settle_fees
+
+    // resolve_banktruptcy
+
+
     ///
     /// benchmark
     ///
