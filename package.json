@@ -1,6 +1,6 @@
 {
   "name": "@blockworks-foundation/mango-v4",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Typescript Client for mango-v4 program.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
