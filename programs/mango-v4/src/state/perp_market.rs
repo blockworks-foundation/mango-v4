@@ -90,6 +90,15 @@ impl PerpMarket {
             .unwrap()
     }
 
+    pub fn native_price_to_lot(&self, price: I80F48) -> i64 {
+        price
+            .checked_mul(I80F48::from_num(self.base_lot_size))
+            .unwrap()
+            .checked_div(I80F48::from_num(self.quote_lot_size))
+            .unwrap()
+            .to_num()
+    }
+
     /// Is `native_price` an acceptable order for the `side` of this market, given `oracle_price`?
     pub fn inside_price_limit(
         &self,

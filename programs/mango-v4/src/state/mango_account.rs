@@ -23,6 +23,7 @@ pub const MAX_PERP_OPEN_ORDERS: usize = 8;
 pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 
 #[zero_copy]
+#[derive(Debug)]
 pub struct TokenAccount {
     // TODO: Why did we have deposits and borrows as two different values
     //       if only one of them was allowed to be != 0 at a time?
@@ -74,6 +75,21 @@ const_assert_eq!(
     MAX_TOKEN_ACCOUNTS * size_of::<TokenAccount>()
 );
 const_assert_eq!(size_of::<MangoAccountTokens>() % 8, 0);
+
+impl std::fmt::Debug for MangoAccountTokens {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MangoAccountTokens")
+            .field(
+                "values",
+                &self
+                    .values
+                    .iter()
+                    .filter(|value| value.is_active())
+                    .collect::<Vec<&TokenAccount>>(),
+            )
+            .finish()
+    }
+}
 
 impl Default for MangoAccountTokens {
     fn default() -> Self {
@@ -153,6 +169,7 @@ impl MangoAccountTokens {
 }
 
 #[zero_copy]
+#[derive(Debug)]
 pub struct Serum3Account {
     pub open_orders: Pubkey,
 
@@ -201,6 +218,21 @@ const_assert_eq!(
 );
 const_assert_eq!(size_of::<MangoAccountSerum3>() % 8, 0);
 
+impl std::fmt::Debug for MangoAccountSerum3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MangoAccountSerum3")
+            .field(
+                "values",
+                &self
+                    .values
+                    .iter()
+                    .filter(|value| value.is_active())
+                    .collect::<Vec<&Serum3Account>>(),
+            )
+            .finish()
+    }
+}
+
 impl Default for MangoAccountSerum3 {
     fn default() -> Self {
         Self::new()
@@ -245,6 +277,7 @@ impl MangoAccountSerum3 {
 }
 
 #[zero_copy]
+#[derive(Debug)]
 pub struct PerpAccount {
     pub market_index: PerpMarketIndex,
     pub reserved: [u8; 6],
@@ -340,6 +373,55 @@ const_assert_eq!(
     MAX_PERP_ACCOUNTS * size_of::<PerpAccount>() + MAX_PERP_OPEN_ORDERS * (2 + 1 + 16 + 8)
 );
 const_assert_eq!(size_of::<MangoAccountPerps>() % 8, 0);
+
+impl std::fmt::Debug for MangoAccountPerps {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MangoAccountPerps")
+            .field(
+                "accounts",
+                &self
+                    .accounts
+                    .iter()
+                    .filter(|value| value.is_active())
+                    .collect::<Vec<&PerpAccount>>(),
+            )
+            .field(
+                "order_market",
+                &self
+                    .order_market
+                    .iter()
+                    .filter(|value| **value != PerpMarketIndex::MAX)
+                    .collect::<Vec<&PerpMarketIndex>>(),
+            )
+            .field(
+                "order_side",
+                &self
+                    .order_side
+                    .iter()
+                    .zip(self.order_id)
+                    .filter(|value| value.1 != 0)
+                    .map(|value| value.0)
+                    .collect::<Vec<&Side>>(),
+            )
+            .field(
+                "order_id",
+                &self
+                    .order_id
+                    .iter()
+                    .filter(|value| **value != 0)
+                    .collect::<Vec<&i128>>(),
+            )
+            .field(
+                "order_client_id",
+                &self
+                    .order_client_id
+                    .iter()
+                    .filter(|value| **value != 0)
+                    .collect::<Vec<&u64>>(),
+            )
+            .finish()
+    }
+}
 
 impl MangoAccountPerps {
     pub fn new() -> Self {
@@ -552,6 +634,30 @@ const_assert_eq!(
         + 4
 );
 const_assert_eq!(size_of::<MangoAccount>() % 8, 0);
+
+impl std::fmt::Debug for MangoAccount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MangoAccount")
+            .field(
+                "name",
+                &std::str::from_utf8(&self.name)
+                    .unwrap()
+                    .trim_matches(char::from(0)),
+            )
+            .field("group", &self.group)
+            .field("owner", &self.owner)
+            .field("delegate", &self.delegate)
+            .field("tokens", &self.tokens)
+            .field("serum3", &self.serum3)
+            .field("perps", &self.perps)
+            .field("being_liquidated", &self.being_liquidated)
+            .field("is_bankrupt", &self.is_bankrupt)
+            .field("account_num", &self.account_num)
+            .field("bump", &self.bump)
+            .field("reserved", &self.reserved)
+            .finish()
+    }
+}
 
 #[macro_export]
 macro_rules! account_seeds {

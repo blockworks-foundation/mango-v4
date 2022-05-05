@@ -1390,6 +1390,44 @@ impl<'keypair> ClientInstruction for PerpPlaceOrderInstruction<'keypair> {
         vec![self.owner]
     }
 }
+pub struct PerpConsumeEventsInstruction {
+    pub group: Pubkey,
+    pub perp_market: Pubkey,
+    pub event_queue: Pubkey,
+    pub mango_accounts: Vec<Pubkey>,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpConsumeEventsInstruction {
+    type Accounts = mango_v4::accounts::PerpConsumeEvents;
+    type Instruction = mango_v4::instruction::PerpConsumeEvents;
+    async fn to_instruction(
+        &self,
+        _loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction { limit: 10 };
+        let accounts = Self::Accounts {
+            group: self.group,
+            perp_market: self.perp_market,
+            event_queue: self.event_queue,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction
+            .accounts
+            .extend(self.mango_accounts.iter().map(|ma| AccountMeta {
+                pubkey: *ma,
+                is_signer: false,
+                is_writable: true,
+            }));
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![]
+    }
+}
+
 pub struct BenchmarkInstruction {}
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for BenchmarkInstruction {
