@@ -2182,6 +2182,7 @@ dependencies = [
  "clap 3.1.8",
  "dotenv",
  "env_logger 0.8.4",
+ "futures 0.3.21",
  "log",
  "mango-v4",
  "serde",

@@ -1,20 +1,19 @@
-use std::{env, time::Duration};
+mod update_index;
+
+use std::env;
 
 use anchor_client::{Client, Cluster, Program};
-use anyhow::ensure;
+
 use clap::{Parser, Subcommand};
-use log::{error, info};
-use mango_v4::state::Bank;
+
 use solana_client::rpc_client::RpcClient;
-use solana_client::rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType};
+
 use solana_sdk::signature::Keypair;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
-    instruction::Instruction,
     pubkey::Pubkey,
     signer::{keypair, Signer},
 };
-use tokio::time;
 
 // TODO
 // - may be nice to have one-shot cranking as well as the interval cranking
@@ -25,7 +24,6 @@ use tokio::time;
 
 /// Wrapper around anchor client with some mango specific useful things
 pub struct MangoClient {
-    pub program: Program,
     pub rpc: RpcClient,
     pub cluster: Cluster,
     pub commitment: CommitmentConfig,
@@ -49,13 +47,24 @@ impl MangoClient {
 
         let rpc = program.rpc();
         Self {
-            program,
             rpc,
             cluster,
             commitment,
             admin,
             payer,
         }
+    }
+
+    pub fn client(&self) -> Client {
+        Client::new_with_options(
+            self.cluster.clone(),
+            std::rc::Rc::new(Keypair::from_bytes(&self.payer.to_bytes()).unwrap()),
+            self.commitment,
+        )
+    }
+
+    pub fn program(&self) -> Program {
+        self.client().program(mango_v4::ID)
     }
 
     pub fn payer(&self) -> Pubkey {
@@ -87,8 +96,9 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     Crank {},
+    Liquidator {},
 }
-fn main() {
+fn main() -> Result<(), anyhow::Error> {
     env_logger::init_from_env(
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
     );
@@ -135,71 +145,26 @@ fn main() {
 
     let cluster = Cluster::Custom(rpc_url, ws_url);
     let commitment = match command {
-        Command::Crank { .. } => CommitmentConfig::processed(),
+        Command::Crank { .. } => CommitmentConfig::confirmed(),
+        Command::Liquidator {} => CommitmentConfig::confirmed(),
     };
 
-    let mango_client = MangoClient::new(cluster, commitment, payer, admin);
+    // let mango_client = Arc::new(MangoClient::new(cluster, commitment, payer, admin));
+    let mango_client: &'static _ = Box::leak(Box::new(MangoClient::new(
+        cluster, commitment, payer, admin,
+    )));
 
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();
 
-    // future: match on various subcommands
-    rt.block_on(update_index_runner(&mango_client))
-        .expect("Something went wrong here...");
-}
-
-pub async fn update_index_runner(mango_client: &MangoClient) -> anyhow::Result<()> {
-    // future: make configurable
-    let mut interval = time::interval(Duration::from_millis(10));
-
-    loop {
-        interval.tick().await;
-        update_index(mango_client).await?;
-    }
-}
-
-pub async fn update_index(mango_client: &MangoClient) -> anyhow::Result<()> {
-    // Collect all banks for a group belonging to an admin
-    let banks = mango_client
-        .program
-        .accounts::<Bank>(vec![RpcFilterType::Memcmp(Memcmp {
-            offset: 24,
-            bytes: MemcmpEncodedBytes::Base58({
-                // find group belonging to admin
-                Pubkey::find_program_address(
-                    &["Group".as_ref(), mango_client.admin.pubkey().as_ref()],
-                    &mango_client.program.id(),
-                )
-                .0
-                .to_string()
-            }),
-            encoding: None,
-        })])?;
-
-    ensure!(!banks.is_empty());
-
-    // Call update index ix
-    for bank in banks {
-        let sig_result = mango_client
-            .program
-            .request()
-            .instruction(Instruction {
-                program_id: mango_v4::id(),
-                accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::UpdateIndex { bank: bank.0 },
-                    None,
-                ),
-                data: anchor_lang::InstructionData::data(&mango_v4::instruction::UpdateIndex {}),
-            })
-            .send();
-        match sig_result {
-            Ok(sig) => {
-                info!("Crank: update_index ix signature: {:?}", sig);
-            }
-            Err(e) => error!("Crank: {:?}", e),
+    match command {
+        Command::Crank { .. } => {
+            let x: Result<(), anyhow::Error> = rt.block_on(update_index::runner(mango_client));
+            x.expect("Something went wrong here...");
         }
+        Command::Liquidator { .. } => {}
     }
 
     Ok(())

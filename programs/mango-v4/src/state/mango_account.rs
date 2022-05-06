@@ -638,12 +638,7 @@ const_assert_eq!(size_of::<MangoAccount>() % 8, 0);
 impl std::fmt::Debug for MangoAccount {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MangoAccount")
-            .field(
-                "name",
-                &std::str::from_utf8(&self.name)
-                    .unwrap()
-                    .trim_matches(char::from(0)),
-            )
+            .field("name", &self.name())
             .field("group", &self.group)
             .field("owner", &self.owner)
             .field("delegate", &self.delegate)
@@ -656,6 +651,14 @@ impl std::fmt::Debug for MangoAccount {
             .field("bump", &self.bump)
             .field("reserved", &self.reserved)
             .finish()
+    }
+}
+
+impl MangoAccount {
+    fn name(&self) -> &str {
+        std::str::from_utf8(&self.name)
+            .unwrap()
+            .trim_matches(char::from(0))
     }
 }
 

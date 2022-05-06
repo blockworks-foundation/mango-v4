@@ -58,6 +58,12 @@ const_assert_eq!(size_of::<Bank>(), 16 + 32 * 4 + 8 + 16 * 15 + 2 + 6);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
 impl Bank {
+    pub fn name(&self) -> &str {
+        std::str::from_utf8(&self.name)
+            .unwrap()
+            .trim_matches(char::from(0))
+    }
+
     pub fn native_total_borrows(&self) -> I80F48 {
         self.borrow_index * self.indexed_total_borrows
     }
