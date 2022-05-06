@@ -181,6 +181,7 @@ pub mod mango_v4 {
     pub fn perp_create_market(
         ctx: Context<PerpCreateMarket>,
         perp_market_index: PerpMarketIndex,
+        name: String,
         base_token_index_opt: Option<TokenIndex>,
         quote_token_index: TokenIndex,
         quote_lot_size: i64,
@@ -196,6 +197,7 @@ pub mod mango_v4 {
         instructions::perp_create_market(
             ctx,
             perp_market_index,
+            name,
             base_token_index_opt,
             quote_token_index,
             quote_lot_size,

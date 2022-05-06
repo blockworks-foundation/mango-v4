@@ -1,3 +1,5 @@
+mod consume_events;
+mod crank;
 mod update_index;
 
 use std::env;
@@ -92,7 +94,6 @@ struct Cli {
     command: Command,
 }
 
-// future: more subcommands e.g. Liquidator
 #[derive(Subcommand)]
 enum Command {
     Crank {},
@@ -146,10 +147,9 @@ fn main() -> Result<(), anyhow::Error> {
     let cluster = Cluster::Custom(rpc_url, ws_url);
     let commitment = match command {
         Command::Crank { .. } => CommitmentConfig::confirmed(),
-        Command::Liquidator {} => CommitmentConfig::confirmed(),
+        Command::Liquidator {} => todo!(),
     };
 
-    // let mango_client = Arc::new(MangoClient::new(cluster, commitment, payer, admin));
     let mango_client: &'static _ = Box::leak(Box::new(MangoClient::new(
         cluster, commitment, payer, admin,
     )));
@@ -161,10 +161,12 @@ fn main() -> Result<(), anyhow::Error> {
 
     match command {
         Command::Crank { .. } => {
-            let x: Result<(), anyhow::Error> = rt.block_on(update_index::runner(mango_client));
+            let x: Result<(), anyhow::Error> = rt.block_on(crank::runner(mango_client));
             x.expect("Something went wrong here...");
         }
-        Command::Liquidator { .. } => {}
+        Command::Liquidator { .. } => {
+            todo!()
+        }
     }
 
     Ok(())

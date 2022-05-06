@@ -23,6 +23,14 @@ pub struct Serum3Market {
 const_assert_eq!(size_of::<Serum3Market>(), 16 + 32 * 3 + 3 * 2 + 1 + 1);
 const_assert_eq!(size_of::<Serum3Market>() % 8, 0);
 
+impl Serum3Market {
+    pub fn name(&self) -> &str {
+        std::str::from_utf8(&self.name)
+            .unwrap()
+            .trim_matches(char::from(0))
+    }
+}
+
 #[macro_export]
 macro_rules! serum_market_seeds {
     ( $acc:expr ) => {

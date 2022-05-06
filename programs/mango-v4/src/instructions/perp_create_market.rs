@@ -3,6 +3,7 @@ use fixed::types::I80F48;
 
 use crate::error::MangoError;
 use crate::state::*;
+use crate::util::fill16_from_str;
 
 #[derive(Accounts)]
 #[instruction(perp_market_index: PerpMarketIndex)]
@@ -43,6 +44,7 @@ pub struct PerpCreateMarket<'info> {
 pub fn perp_create_market(
     ctx: Context<PerpCreateMarket>,
     perp_market_index: PerpMarketIndex,
+    name: String,
     base_token_index_opt: Option<TokenIndex>,
     quote_token_index: TokenIndex,
     quote_lot_size: i64,
@@ -57,6 +59,7 @@ pub fn perp_create_market(
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_init()?;
     *perp_market = PerpMarket {
+        name: fill16_from_str(name)?,
         group: ctx.accounts.group.key(),
         oracle: ctx.accounts.oracle.key(),
         bids: ctx.accounts.bids.key(),
@@ -78,6 +81,7 @@ pub fn perp_create_market(
         perp_market_index,
         base_token_index: base_token_index_opt.ok_or(TokenIndex::MAX).unwrap(),
         quote_token_index,
+        reserved: Default::default(),
     };
 
     let mut bids = ctx.accounts.bids.load_init()?;

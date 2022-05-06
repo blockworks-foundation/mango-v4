@@ -1293,6 +1293,7 @@ impl<'keypair> ClientInstruction for PerpCreateMarketInstruction<'keypair> {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
+            name: "UUU-PERP".to_string(),
             perp_market_index: self.perp_market_index,
             base_token_index_opt: Option::from(self.base_token_index),
             quote_token_index: self.quote_token_index,

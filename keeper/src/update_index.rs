@@ -1,53 +1,14 @@
-use std::{time::Duration};
-
-
-use anyhow::ensure;
+use std::time::Duration;
 
 use log::{error, info};
 use mango_v4::state::Bank;
 
-use solana_client::rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType};
-
-use solana_sdk::{
-    instruction::Instruction,
-    pubkey::Pubkey,
-    signer::{Signer},
-};
+use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 use tokio::time;
 
 use crate::MangoClient;
 
-pub async fn runner(mango_client: &'static MangoClient) -> Result<(), anyhow::Error> {
-    // Collect all banks for a group belonging to an admin
-    let banks = mango_client
-        .program()
-        .accounts::<Bank>(vec![RpcFilterType::Memcmp(Memcmp {
-            offset: 24,
-            bytes: MemcmpEncodedBytes::Base58({
-                // find group belonging to admin
-                Pubkey::find_program_address(
-                    &["Group".as_ref(), mango_client.admin.pubkey().as_ref()],
-                    &mango_client.program().id(),
-                )
-                .0
-                .to_string()
-            }),
-            encoding: None,
-        })])?;
-
-    ensure!(!banks.is_empty());
-
-    let handles = banks
-        .iter()
-        .map(|(pk, bank)| loop_blocking(mango_client, *pk, *bank))
-        .collect::<Vec<_>>();
-
-    futures::join!(futures::future::join_all(handles));
-
-    Ok(())
-}
-
-async fn loop_blocking(mango_client: &'static MangoClient, pk: Pubkey, bank: Bank) {
+pub async fn loop_blocking(mango_client: &'static MangoClient, pk: Pubkey, bank: Bank) {
     let mut interval = time::interval(Duration::from_secs(5));
     loop {
         interval.tick().await;

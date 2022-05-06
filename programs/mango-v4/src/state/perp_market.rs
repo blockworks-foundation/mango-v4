@@ -1,5 +1,8 @@
+use std::mem::size_of;
+
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
+use static_assertions::const_assert_eq;
 
 use crate::state::orderbook::order_type::Side;
 use crate::state::TokenIndex;
@@ -9,6 +12,8 @@ pub type PerpMarketIndex = u16;
 
 #[account(zero_copy)]
 pub struct PerpMarket {
+    pub name: [u8; 16],
+
     pub group: Pubkey,
 
     pub oracle: Pubkey,
@@ -60,6 +65,7 @@ pub struct PerpMarket {
 
     /// PDA bump
     pub bump: u8,
+    pub reserved: [u8; 1],
 
     /// Lookup indices
     pub perp_market_index: PerpMarketIndex,
@@ -69,8 +75,19 @@ pub struct PerpMarket {
     pub quote_token_index: TokenIndex,
 }
 
+const_assert_eq!(
+    size_of::<PerpMarket>(),
+    16 + 32 * 5 + 8 * 2 + 16 * 7 + 8 * 2 + 16 + 8
+);
+const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
+
 impl PerpMarket {
-    /// TODO why is this based on price?
+    pub fn name(&self) -> &str {
+        std::str::from_utf8(&self.name)
+            .unwrap()
+            .trim_matches(char::from(0))
+    }
+
     pub fn gen_order_id(&mut self, side: Side, price: i64) -> i128 {
         self.seq_num += 1;
 
