@@ -16,3 +16,4 @@ yarn-error.log
 programs/margin-trade/src/lib-expanded.rs
 programs/mango-v4/src/lib-expanded.rs
 
+keeper/.env

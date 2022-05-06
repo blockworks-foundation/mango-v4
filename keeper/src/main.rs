@@ -1,66 +1,206 @@
-use std::{rc::Rc, str::FromStr, time::Duration};
+use std::{env, time::Duration};
 
-use solana_sdk::{instruction::Instruction, signature::Keypair};
+use anchor_client::{Client, Cluster, Program};
+use anyhow::ensure;
+use clap::{Parser, Subcommand};
+use log::{error, info};
+use mango_v4::state::Bank;
+use solana_client::rpc_client::RpcClient;
+use solana_client::rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType};
+use solana_sdk::signature::Keypair;
+use solana_sdk::{
+    commitment_config::CommitmentConfig,
+    instruction::Instruction,
+    pubkey::Pubkey,
+    signer::{keypair, Signer},
+};
 use tokio::time;
 
-// TODO:
-// cmd line args with defaults
-// make keypair, rpc server, net, etc. configurable
-// expand to various tasks e.g. crank event queue, crank banks, run liquidators
-// support multiple workers
-// logging facility
-// robust error handling
+// TODO
+// - may be nice to have one-shot cranking as well as the interval cranking
+// - doing a gPA for all banks call every 10millis may be too often,
+// might make sense that we maintain a service when users should query group for changes
+// - I'm really annoyed about Keypair not being clonable. Seems everyone works around that manually. Should make a PR to solana to newtype it and provide that function.
+// keypair_from_arg_or_env could be a function
+
+/// Wrapper around anchor client with some mango specific useful things
+pub struct MangoClient {
+    pub program: Program,
+    pub rpc: RpcClient,
+    pub cluster: Cluster,
+    pub commitment: CommitmentConfig,
+    pub payer: Keypair,
+    pub admin: Keypair,
+}
+
+impl MangoClient {
+    pub fn new(
+        cluster: Cluster,
+        commitment: CommitmentConfig,
+        payer: Keypair,
+        admin: Keypair,
+    ) -> Self {
+        let program = Client::new_with_options(
+            cluster.clone(),
+            std::rc::Rc::new(Keypair::from_bytes(&payer.to_bytes()).unwrap()),
+            commitment,
+        )
+        .program(mango_v4::ID);
+
+        let rpc = program.rpc();
+        Self {
+            program,
+            rpc,
+            cluster,
+            commitment,
+            admin,
+            payer,
+        }
+    }
+
+    pub fn payer(&self) -> Pubkey {
+        self.payer.pubkey()
+    }
+
+    pub fn admin(&self) -> Pubkey {
+        self.payer.pubkey()
+    }
+}
+
+#[derive(Parser)]
+#[clap()]
+struct Cli {
+    #[clap(short, long, env = "RPC_URL")]
+    rpc_url: Option<String>,
+
+    #[clap(short, long, env = "PAYER_KEYPAIR")]
+    payer: Option<std::path::PathBuf>,
+
+    #[clap(short, long, env = "ADMIN_KEYPAIR")]
+    admin: Option<std::path::PathBuf>,
+
+    #[clap(subcommand)]
+    command: Command,
+}
+
+// future: more subcommands e.g. Liquidator
+#[derive(Subcommand)]
+enum Command {
+    Crank {},
+}
 fn main() {
+    env_logger::init_from_env(
+        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
+    );
+
+    dotenv::dotenv().ok();
+
+    let Cli {
+        rpc_url,
+        payer,
+        admin,
+        command,
+    } = Cli::parse();
+
+    let payer = match payer {
+        Some(p) => keypair::read_keypair_file(&p)
+            .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy())),
+        None => match env::var("PAYER_KEYPAIR").ok() {
+            Some(k) => {
+                keypair::read_keypair(&mut k.as_bytes()).expect("Failed to parse $PAYER_KEYPAIR")
+            }
+            None => panic!("Payer keypair not provided..."),
+        },
+    };
+
+    let admin = match admin {
+        Some(p) => keypair::read_keypair_file(&p)
+            .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy())),
+        None => match env::var("ADMIN_KEYPAIR").ok() {
+            Some(k) => {
+                keypair::read_keypair(&mut k.as_bytes()).expect("Failed to parse $ADMIN_KEYPAIR")
+            }
+            None => panic!("Admin keypair not provided..."),
+        },
+    };
+
+    let rpc_url = match rpc_url {
+        Some(rpc_url) => rpc_url,
+        None => match env::var("RPC_URL").ok() {
+            Some(rpc_url) => rpc_url,
+            None => panic!("Rpc URL not provided..."),
+        },
+    };
+    let ws_url = rpc_url.replace("https", "wss");
+
+    let cluster = Cluster::Custom(rpc_url, ws_url);
+    let commitment = match command {
+        Command::Crank { .. } => CommitmentConfig::processed(),
+    };
+
+    let mango_client = MangoClient::new(cluster, commitment, payer, admin);
+
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();
 
-    rt.block_on(update_index_runner())
+    // future: match on various subcommands
+    rt.block_on(update_index_runner(&mango_client))
         .expect("Something went wrong here...");
 }
 
-pub async fn update_index_runner() -> anyhow::Result<()> {
+pub async fn update_index_runner(mango_client: &MangoClient) -> anyhow::Result<()> {
+    // future: make configurable
     let mut interval = time::interval(Duration::from_millis(10));
 
     loop {
         interval.tick().await;
-        update_index().await?;
+        update_index(mango_client).await?;
     }
 }
 
-pub async fn update_index() -> anyhow::Result<()> {
-    let keypair = load_default_keypair()?;
-    let rpc = "https://mango.devnet.rpcpool.com".to_owned();
-    let wss = rpc.replace("https", "wss");
-    let connection =
-        anchor_client::Client::new(anchor_client::Cluster::Custom(rpc, wss), Rc::new(keypair));
-    let client = connection.program(mango_v4::ID);
+pub async fn update_index(mango_client: &MangoClient) -> anyhow::Result<()> {
+    // Collect all banks for a group belonging to an admin
+    let banks = mango_client
+        .program
+        .accounts::<Bank>(vec![RpcFilterType::Memcmp(Memcmp {
+            offset: 24,
+            bytes: MemcmpEncodedBytes::Base58({
+                // find group belonging to admin
+                Pubkey::find_program_address(
+                    &["Group".as_ref(), mango_client.admin.pubkey().as_ref()],
+                    &mango_client.program.id(),
+                )
+                .0
+                .to_string()
+            }),
+            encoding: None,
+        })])?;
 
-    let update_index_ix = Instruction {
-        program_id: mango_v4::id(),
-        accounts: anchor_lang::ToAccountMetas::to_account_metas(
-            &mango_v4::accounts::UpdateIndex {
-                bank: anchor_lang::prelude::Pubkey::from_str(
-                    "9xmZdkWbYNYsBshr7PwjhU8c7mmrvzmocu8dSQeNCKTG",
-                )?,
-            },
-            None,
-        ),
-        data: anchor_lang::InstructionData::data(&mango_v4::instruction::UpdateIndex {}),
-    };
+    ensure!(!banks.is_empty());
 
-    let sig = client.request().instruction(update_index_ix).send()?;
-    println!("update_index: {:?}", sig);
+    // Call update index ix
+    for bank in banks {
+        let sig_result = mango_client
+            .program
+            .request()
+            .instruction(Instruction {
+                program_id: mango_v4::id(),
+                accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::UpdateIndex { bank: bank.0 },
+                    None,
+                ),
+                data: anchor_lang::InstructionData::data(&mango_v4::instruction::UpdateIndex {}),
+            })
+            .send();
+        match sig_result {
+            Ok(sig) => {
+                info!("Crank: update_index ix signature: {:?}", sig);
+            }
+            Err(e) => error!("Crank: {:?}", e),
+        }
+    }
 
     Ok(())
-}
-
-fn load_default_keypair() -> anyhow::Result<Keypair> {
-    let keypair_path = shellexpand::tilde("~/.config/solana/mango-devnet.json");
-    let keypair_data = std::fs::read_to_string(keypair_path.to_string())?;
-    let keypair_bytes: Vec<u8> = serde_json::from_str(&keypair_data)?;
-    let keypair = Keypair::from_bytes(&keypair_bytes)?;
-
-    Ok(keypair)
 }
