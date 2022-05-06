@@ -1,8 +1,8 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use anchor_lang::{AccountDeserialize, __private::bytemuck::cast_ref};
 
-use log::{error, info, warn};
+use log::{info, warn};
 use mango_v4::state::{EventQueue, EventType, FillEvent, OutEvent, PerpMarket};
 
 use solana_sdk::{
@@ -13,26 +13,23 @@ use tokio::time;
 
 use crate::MangoClient;
 
-pub async fn loop_blocking(
-    mango_client: &'static MangoClient,
-    pk: Pubkey,
-    perp_market: PerpMarket,
-) {
+pub async fn loop_blocking(mango_client: Arc<MangoClient>, pk: Pubkey, perp_market: PerpMarket) {
     let mut interval = time::interval(Duration::from_secs(5));
     loop {
         interval.tick().await;
+        let client = mango_client.clone();
         tokio::task::spawn_blocking(move || {
-            perform_operation(mango_client, pk, perp_market).expect("Something went wrong here...");
+            perform_operation(client, pk, perp_market).expect("Something went wrong here...");
         });
     }
 }
 
 pub fn perform_operation(
-    mango_client: &'static MangoClient,
+    mango_client: Arc<MangoClient>,
     pk: Pubkey,
     perp_market: PerpMarket,
 ) -> anyhow::Result<()> {
-    let mut event_queue = match get_event_queue(mango_client, &perp_market) {
+    let mut event_queue = match get_event_queue(&mango_client, &perp_market) {
         Ok(value) => value,
         Err(value) => return value,
     };
@@ -101,7 +98,7 @@ pub fn perform_operation(
                 sig
             );
         }
-        Err(e) => error!("Crank: {:?}", e),
+        Err(e) => log::error!("Crank: {:?}", e),
     }
 
     Ok(())
@@ -128,6 +125,6 @@ fn get_event_queue(
         let mut data_slice: &[u8] = &data;
         AccountDeserialize::try_deserialize(&mut data_slice).ok()
     };
-    let mut event_queue = event_queue_opt.unwrap();
+    let event_queue = event_queue_opt.unwrap();
     Ok(event_queue)
 }

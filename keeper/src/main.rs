@@ -3,6 +3,7 @@ mod crank;
 mod update_index;
 
 use std::env;
+use std::sync::Arc;
 
 use anchor_client::{Client, Cluster, Program};
 
@@ -16,6 +17,7 @@ use solana_sdk::{
     pubkey::Pubkey,
     signer::{keypair, Signer},
 };
+use tokio::time;
 
 // TODO
 // - may be nice to have one-shot cranking as well as the interval cranking
@@ -150,18 +152,31 @@ fn main() -> Result<(), anyhow::Error> {
         Command::Liquidator {} => todo!(),
     };
 
-    let mango_client: &'static _ = Box::leak(Box::new(MangoClient::new(
-        cluster, commitment, payer, admin,
-    )));
+    let mango_client = Arc::new(MangoClient::new(cluster, commitment, payer, admin));
 
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();
 
+    let debugging_handle = async {
+        let mut interval = time::interval(time::Duration::from_secs(5));
+        loop {
+            interval.tick().await;
+            let client = mango_client.clone();
+            tokio::task::spawn_blocking(move || {
+                log::info!(
+                    "std::sync::Arc<MangoClient>::strong_count() {}",
+                    Arc::<MangoClient>::strong_count(&client)
+                )
+            });
+        }
+    };
+
     match command {
         Command::Crank { .. } => {
-            let x: Result<(), anyhow::Error> = rt.block_on(crank::runner(mango_client));
+            let client = mango_client.clone();
+            let x: Result<(), anyhow::Error> = rt.block_on(crank::runner(client, debugging_handle));
             x.expect("Something went wrong here...");
         }
         Command::Liquidator { .. } => {

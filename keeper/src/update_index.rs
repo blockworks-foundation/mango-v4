@@ -1,6 +1,6 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
-use log::{error, info};
+use log::{info};
 use mango_v4::state::Bank;
 
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
@@ -8,18 +8,19 @@ use tokio::time;
 
 use crate::MangoClient;
 
-pub async fn loop_blocking(mango_client: &'static MangoClient, pk: Pubkey, bank: Bank) {
+pub async fn loop_blocking(mango_client: Arc<MangoClient>, pk: Pubkey, bank: Bank) {
     let mut interval = time::interval(Duration::from_secs(5));
     loop {
         interval.tick().await;
+        let client = mango_client.clone();
         tokio::task::spawn_blocking(move || {
-            perform_operation(mango_client, pk, bank).expect("Something went wrong here...");
+            perform_operation(client, pk, bank).expect("Something went wrong here...");
         });
     }
 }
 
 pub fn perform_operation(
-    mango_client: &'static MangoClient,
+    mango_client: Arc<MangoClient>,
     pk: Pubkey,
     bank: Bank,
 ) -> anyhow::Result<()> {
@@ -43,7 +44,7 @@ pub fn perform_operation(
                 sig
             );
         }
-        Err(e) => error!("Crank: {:?}", e),
+        Err(e) => log::error!("Crank: {:?}", e),
     }
 
     Ok(())

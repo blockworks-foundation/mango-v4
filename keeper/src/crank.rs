@@ -1,6 +1,10 @@
+use std::sync::Arc;
+
 use crate::{consume_events, update_index, MangoClient};
 
 use anyhow::ensure;
+
+use futures::Future;
 
 use mango_v4::state::{Bank, PerpMarket};
 
@@ -8,7 +12,11 @@ use solana_client::rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType};
 
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
 
-pub async fn runner(mango_client: &'static MangoClient) -> Result<(), anyhow::Error> {
+
+pub async fn runner(
+    mango_client: Arc<MangoClient>,
+    debugging_handle: impl Future,
+) -> Result<(), anyhow::Error> {
     // Collect all banks for a group belonging to an admin
     let banks = mango_client
         .program()
@@ -30,7 +38,7 @@ pub async fn runner(mango_client: &'static MangoClient) -> Result<(), anyhow::Er
 
     let handles1 = banks
         .iter()
-        .map(|(pk, bank)| update_index::loop_blocking(mango_client, *pk, *bank))
+        .map(|(pk, bank)| update_index::loop_blocking(mango_client.clone(), *pk, *bank))
         .collect::<Vec<_>>();
 
     // Collect all perp markets for a group belonging to an admin
@@ -51,16 +59,20 @@ pub async fn runner(mango_client: &'static MangoClient) -> Result<(), anyhow::Er
                 encoding: None,
             })])?;
 
-    ensure!(!perp_markets.is_empty());
+    // TODO: enable
+    // ensure!(!perp_markets.is_empty());
 
     let handles2 = perp_markets
         .iter()
-        .map(|(pk, perp_market)| consume_events::loop_blocking(mango_client, *pk, *perp_market))
+        .map(|(pk, perp_market)| {
+            consume_events::loop_blocking(mango_client.clone(), *pk, *perp_market)
+        })
         .collect::<Vec<_>>();
 
     futures::join!(
         futures::future::join_all(handles1),
-        futures::future::join_all(handles2)
+        futures::future::join_all(handles2),
+        debugging_handle
     );
 
     Ok(())
