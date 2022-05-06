@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use log::{info};
+use log::info;
 use mango_v4::state::Bank;
 
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey};

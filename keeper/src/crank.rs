@@ -12,7 +12,6 @@ use solana_client::rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType};
 
 use solana_sdk::{pubkey::Pubkey, signer::Signer};
 
-
 pub async fn runner(
     mango_client: Arc<MangoClient>,
     debugging_handle: impl Future,
