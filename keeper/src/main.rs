@@ -159,6 +159,7 @@ fn main() -> Result<(), anyhow::Error> {
         .build()
         .unwrap();
 
+    // TODO: future: remove, just for learning purposes
     let debugging_handle = async {
         let mut interval = time::interval(time::Duration::from_secs(5));
         loop {

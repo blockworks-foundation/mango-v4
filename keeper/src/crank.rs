@@ -60,6 +60,7 @@ pub async fn runner(
 
     // TODO: enable
     // ensure!(!perp_markets.is_empty());
+    // atm no perp code is deployed to devnet, and no perp markets have been init
 
     let handles2 = perp_markets
         .iter()

@@ -2,7 +2,6 @@ use std::{sync::Arc, time::Duration};
 
 use anchor_lang::{AccountDeserialize, __private::bytemuck::cast_ref};
 
-use log::{info, warn};
 use mango_v4::state::{EventQueue, EventType, FillEvent, OutEvent, PerpMarket};
 
 use solana_sdk::{
@@ -36,6 +35,8 @@ pub fn perform_operation(
 
     let mut ams_ = vec![];
 
+    // TODO: future, choose better constant of how many max events to pack
+    // TODO: future, choose better constant of how many max mango accounts to pack
     for _ in 0..10 {
         let event = match event_queue.peek_front() {
             None => break,
@@ -92,7 +93,7 @@ pub fn perform_operation(
         .send();
     match sig_result {
         Ok(sig) => {
-            info!(
+            log::info!(
                 "Crank: consume event for perp_market {:?} ix signature: {:?}",
                 format!("{: >6}", perp_market.name()),
                 sig
@@ -113,15 +114,7 @@ fn get_event_queue(
             .rpc
             .get_account_with_commitment(&perp_market.event_queue, mango_client.commitment);
 
-        let res = match res {
-            Ok(x) => x,
-            Err(e) => {
-                warn!("{}", e);
-                return Err(Ok(()));
-            }
-        };
-
-        let data = res.value.unwrap().data;
+        let data = res.unwrap().value.unwrap().data;
         let mut data_slice: &[u8] = &data;
         AccountDeserialize::try_deserialize(&mut data_slice).ok()
     };

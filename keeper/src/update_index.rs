@@ -1,6 +1,5 @@
 use std::{sync::Arc, time::Duration};
 
-use log::info;
 use mango_v4::state::Bank;
 
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
@@ -38,7 +37,7 @@ pub fn perform_operation(
         .send();
     match sig_result {
         Ok(sig) => {
-            info!(
+            log::info!(
                 "Crank: update_index for bank {:?} ix signature: {:?}",
                 format!("{: >6}", bank.name()),
                 sig
