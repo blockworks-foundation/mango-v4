@@ -77,6 +77,8 @@ impl<'a> GroupWithTokensConfig<'a> {
                     util1: 0.80,
                     rate1: 0.9,
                     max_rate: 1.50,
+                    loan_origination_fee_rate: 0.0005,
+                    loan_fee_rate: 0.0005,
                     maint_asset_weight: 0.8,
                     init_asset_weight: 0.6,
                     maint_liab_weight: 1.2,

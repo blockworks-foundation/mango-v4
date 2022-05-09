@@ -33,6 +33,11 @@ pub struct Bank {
     pub rate1: I80F48,
     pub max_rate: I80F48,
 
+    // TODO: add ix/logic to regular send this to DAO
+    pub collected_fees_native: I80F48,
+    pub loan_origination_fee_rate: I80F48,
+    pub loan_fee_rate: I80F48,
+
     // This is a _lot_ of bytes (64) - seems unnecessary
     // (could maybe store them in one byte each, as an informal U1F7?
     // that could store values between 0-2 and converting to I80F48 would be a cheap expand+shift)
@@ -54,8 +59,41 @@ pub struct Bank {
 
     pub reserved: [u8; 6],
 }
-const_assert_eq!(size_of::<Bank>(), 16 + 32 * 4 + 8 + 16 * 15 + 2 + 6);
+const_assert_eq!(size_of::<Bank>(), 16 + 32 * 4 + 8 + 16 * 18 + 2 + 6);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
+
+impl std::fmt::Debug for Bank {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Bank")
+            .field("name", &self.name())
+            .field("group", &self.group)
+            .field("mint", &self.mint)
+            .field("vault", &self.vault)
+            .field("oracle", &self.oracle)
+            .field("deposit_index", &self.deposit_index)
+            .field("borrow_index", &self.borrow_index)
+            .field("indexed_total_deposits", &self.indexed_total_deposits)
+            .field("indexed_total_borrows", &self.indexed_total_borrows)
+            .field("last_updated", &self.last_updated)
+            .field("util0", &self.util0)
+            .field("rate0", &self.rate0)
+            .field("util1", &self.util1)
+            .field("rate1", &self.rate1)
+            .field("max_rate", &self.max_rate)
+            .field("collected_fees_native", &self.collected_fees_native)
+            .field("loan_origination_fee_rate", &self.loan_origination_fee_rate)
+            .field("loan_fee_rate", &self.loan_fee_rate)
+            .field("maint_asset_weight", &self.maint_asset_weight)
+            .field("init_asset_weight", &self.init_asset_weight)
+            .field("maint_liab_weight", &self.maint_liab_weight)
+            .field("init_liab_weight", &self.init_liab_weight)
+            .field("liquidation_fee", &self.liquidation_fee)
+            .field("dust", &self.dust)
+            .field("token_index", &self.token_index)
+            .field("reserved", &self.reserved)
+            .finish()
+    }
+}
 
 impl Bank {
     pub fn name(&self) -> &str {
@@ -173,6 +211,21 @@ impl Bank {
     }
 
     pub fn update_index(&mut self, now_ts: i64) -> Result<()> {
+        let diff_ts = I80F48::from_num(now_ts - self.last_updated);
+        self.last_updated = now_ts;
+
+        // Step 1
+        // Borrows expose insurance fund to risk, collect fees for DAO from borrowers,
+        let native_total_borrows_old = self.native_total_borrows();
+        self.indexed_total_borrows =
+            cm!((self.indexed_total_borrows
+                * (I80F48::ONE + self.loan_fee_rate * (diff_ts / YEAR))));
+        self.collected_fees_native = cm!(
+            self.collected_fees_native + self.native_total_borrows() - native_total_borrows_old
+        );
+
+        // Step 2
+        // Update index based on utilization
         let utilization = if self.native_total_deposits() == I80F48::ZERO {
             I80F48::ZERO
         } else {
@@ -180,9 +233,6 @@ impl Bank {
         };
 
         let interest_rate = self.compute_interest_rate(utilization);
-
-        let diff_ts = I80F48::from_num(now_ts - self.last_updated);
-        self.last_updated = now_ts;
 
         let borrow_interest: I80F48 = cm!(interest_rate * diff_ts);
         let deposit_interest = cm!(borrow_interest * utilization);
