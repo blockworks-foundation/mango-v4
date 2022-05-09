@@ -1,13 +1,16 @@
 name: Lint and Test
 on:
   push:
-    branches: master
+    branches:
+      - main
+      - dev
   pull_request:
 
 env:
   CARGO_TERM_COLOR: always
   SOLANA_VERSION: "1.9.5"
   RUST_TOOLCHAIN: stable
+  LOG_PROGRAM: "m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD"
 
 defaults:
   run:
