@@ -19,7 +19,9 @@ pub async fn loop_blocking(mango_client: Arc<MangoClient>, pk: Pubkey, perp_mark
         let client = mango_client.clone();
         tokio::task::spawn_blocking(move || {
             perform_operation(client, pk, perp_market).expect("Something went wrong here...");
-        });
+        })
+        .await
+        .expect("Something went wrong here...");
     }
 }
 
