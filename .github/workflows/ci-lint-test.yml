@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - dev
+      - silas/cu
   pull_request:
   workflow_dispatch:
 
@@ -82,9 +83,9 @@ jobs:
 # Download logs and process them
   process-logs:
     name: Process logs
-    if: |
-      (github.actor != 'github-actions[bot]' && github.ref_name =='main') ||
-      (github.actor != 'github-actions[bot]' &&github.ref_name=='dev')
+#    if: |
+#      (github.actor != 'github-actions[bot]' && github.ref_name =='main') ||
+#      (github.actor != 'github-actions[bot]' && github.ref_name=='dev')
     runs-on: ubuntu-latest
     needs: [lint, tests]
     steps:
@@ -120,9 +121,9 @@ jobs:
   # Push clean logs to git
   push-logs:
     name: Push logs
-    if: |
-      (github.actor != 'github-actions[bot]' && github.ref_name =='main') ||
-      (github.actor != 'github-actions[bot]' &&github.ref_name=='dev')
+#    if: |
+#      (github.actor != 'github-actions[bot]' && github.ref_name =='main') ||
+#      (github.actor != 'github-actions[bot]' && github.ref_name=='dev')
     runs-on: ubuntu-latest
     needs: [lint, tests, process-logs]
     steps:
