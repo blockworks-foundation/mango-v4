@@ -1,3 +1,4 @@
+import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import bs58 from 'bs58';
@@ -21,6 +22,15 @@ export class Bank {
       borrowIndex: I80F48Dto;
       indexedTotalDeposits: I80F48Dto;
       indexedTotalBorrows: I80F48Dto;
+      lastUpdated: BN;
+      util0: I80F48Dto;
+      rate0: I80F48Dto;
+      util1: I80F48Dto;
+      rate1: I80F48Dto;
+      maxRate: I80F48Dto;
+      collectedFeesNative: I80F48Dto;
+      loanOriginationFeeRate: I80F48Dto;
+      loanFeeRate: I80F48Dto;
       maintAssetWeight: I80F48Dto;
       initAssetWeight: I80F48Dto;
       maintLiabWeight: I80F48Dto;
@@ -41,6 +51,15 @@ export class Bank {
       obj.borrowIndex,
       obj.indexedTotalDeposits,
       obj.indexedTotalBorrows,
+      obj.lastUpdated,
+      obj.util0,
+      obj.rate0,
+      obj.util1,
+      obj.rate1,
+      obj.maxRate,
+      obj.collectedFeesNative,
+      obj.loanOriginationFeeRate,
+      obj.loanFeeRate,
       obj.maintAssetWeight,
       obj.initAssetWeight,
       obj.maintLiabWeight,
@@ -62,6 +81,15 @@ export class Bank {
     borrowIndex: I80F48Dto,
     indexedTotalDeposits: I80F48Dto,
     indexedTotalBorrows: I80F48Dto,
+    last_updated: BN,
+    util0: I80F48Dto,
+    rate0: I80F48Dto,
+    util1: I80F48Dto,
+    rate1: I80F48Dto,
+    max_rate: I80F48Dto,
+    collected_fees_native: I80F48Dto,
+    loan_origination_fee_rate: I80F48Dto,
+    loan_fee_rate: I80F48Dto,
     maintAssetWeight: I80F48Dto,
     initAssetWeight: I80F48Dto,
     maintLiabWeight: I80F48Dto,

@@ -175,6 +175,14 @@ export type MangoV4 = {
           }
         },
         {
+          "name": "loanFeeRate",
+          "type": "f32"
+        },
+        {
+          "name": "loanOriginationFeeRate",
+          "type": "f32"
+        },
+        {
           "name": "maintAssetWeight",
           "type": "f32"
         },
@@ -1174,6 +1182,10 @@ export type MangoV4 = {
           "type": "u16"
         },
         {
+          "name": "name",
+          "type": "string"
+        },
+        {
           "name": "baseTokenIndexOpt",
           "type": {
             "option": "u16"
@@ -1423,6 +1435,24 @@ export type MangoV4 = {
           },
           {
             "name": "maxRate",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collectedFeesNative",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "loanOriginationFeeRate",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "loanFeeRate",
             "type": {
               "defined": "I80F48"
             }
@@ -1725,6 +1755,15 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
             "name": "group",
             "type": "publicKey"
           },
@@ -1811,6 +1850,15 @@ export type MangoV4 = {
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                1
+              ]
+            }
           },
           {
             "name": "perpMarketIndex",
@@ -2691,6 +2739,14 @@ export const IDL: MangoV4 = {
           }
         },
         {
+          "name": "loanFeeRate",
+          "type": "f32"
+        },
+        {
+          "name": "loanOriginationFeeRate",
+          "type": "f32"
+        },
+        {
           "name": "maintAssetWeight",
           "type": "f32"
         },
@@ -3690,6 +3746,10 @@ export const IDL: MangoV4 = {
           "type": "u16"
         },
         {
+          "name": "name",
+          "type": "string"
+        },
+        {
           "name": "baseTokenIndexOpt",
           "type": {
             "option": "u16"
@@ -3939,6 +3999,24 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "maxRate",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collectedFeesNative",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "loanOriginationFeeRate",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "loanFeeRate",
             "type": {
               "defined": "I80F48"
             }
@@ -4241,6 +4319,15 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
             "name": "group",
             "type": "publicKey"
           },
@@ -4327,6 +4414,15 @@ export const IDL: MangoV4 = {
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                1
+              ]
+            }
           },
           {
             "name": "perpMarketIndex",
