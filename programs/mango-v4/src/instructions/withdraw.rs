@@ -52,6 +52,7 @@ impl<'info> Withdraw<'info> {
 // TODO: It may make sense to have the token_index passed in from the outside.
 //       That would save a lot of computation that needs to go into finding the
 //       right index for the mint.
+// TODO: https://github.com/blockworks-foundation/mango-v4/commit/15961ec81c7e9324b37d79d0e2a1650ce6bd981d comments
 pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
     require!(amount > 0, MangoError::SomeError);
 
