@@ -6,6 +6,7 @@
     "declaration": true,
     "declarationDir": "dist",
     "declarationMap": true,
+    "noErrorTruncation": true,
     "esModuleInterop": true,
     "lib": [
       "es2019"

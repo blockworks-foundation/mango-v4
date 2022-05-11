@@ -136,6 +136,36 @@ async function main() {
   );
   console.log(`...registerd serum3 market ${markets[0].publicKey}`);
 
+  // register perp market
+  console.log(`Registering perp market...`);
+  try {
+    await client.perpCreateMarket(
+      group,
+      btcDevnetOracle,
+      0,
+      'BTC/USDC',
+      0,
+      1,
+      10,
+      100,
+      0.975,
+      0.95,
+      1.025,
+      1.05,
+      0.012,
+      0.0002,
+      0.0,
+    );
+  } catch (error) {
+    console.log(error);
+  }
+  const perpMarkets = await client.perpGetMarket(
+    group,
+    group.banksMap.get('BTC')?.tokenIndex,
+    group.banksMap.get('USDC')?.tokenIndex,
+  );
+  console.log(`...created perp market ${perpMarkets[0].publicKey}`);
+
   process.exit();
 }
 

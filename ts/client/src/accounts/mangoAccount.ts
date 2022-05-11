@@ -1,3 +1,4 @@
+import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
@@ -6,6 +7,7 @@ import { I80F48, I80F48Dto } from './I80F48';
 export class MangoAccount {
   public tokens: TokenAccount[];
   public serum3: Serum3Account[];
+  public perps: PerpAccount[];
   public name: string;
 
   static from(
@@ -33,7 +35,7 @@ export class MangoAccount {
       obj.delegate,
       obj.tokens as { values: TokenAccountDto[] },
       obj.serum3 as { values: Serum3AccountDto[] },
-      obj.perps,
+      obj.perps as { accounts: PerpAccountDto[] },
       obj.beingLiquidated,
       obj.isBankrupt,
       obj.accountNum,
@@ -50,7 +52,7 @@ export class MangoAccount {
     public delegate: PublicKey,
     tokens: { values: TokenAccountDto[] },
     serum3: { values: Serum3AccountDto[] },
-    perps: unknown,
+    perps: { accounts: PerpAccountDto[] },
     beingLiquidated: number,
     isBankrupt: number,
     accountNum: number,
@@ -60,6 +62,7 @@ export class MangoAccount {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.tokens = tokens.values.map((dto) => TokenAccount.from(dto));
     this.serum3 = serum3.values.map((dto) => Serum3Account.from(dto));
+    this.perps = perps.accounts.map((dto) => PerpAccount.from(dto));
   }
 
   async reload(client: MangoClient) {
@@ -83,9 +86,40 @@ export class MangoAccount {
     const ta = this.findToken(bank.tokenIndex);
     return bank.borrowIndex.mul(ta?.indexedValue!);
   }
+
+  toString(): string {
+    return (
+      'tokens:' +
+      JSON.stringify(
+        this.tokens.filter(
+          (token) => token.tokenIndex != TokenAccount.TokenIndexUnset,
+        ),
+        null,
+        4,
+      ) +
+      '\nserum:' +
+      JSON.stringify(
+        this.serum3.filter(
+          (serum3) =>
+            serum3.marketIndex != Serum3Account.Serum3MarketIndexUnset,
+        ),
+        null,
+        4,
+      ) +
+      '\nperps:' +
+      JSON.stringify(
+        this.perps.filter(
+          (perp) => perp.marketIndex != PerpAccount.PerpMarketIndexUnset,
+        ),
+        null,
+        4,
+      )
+    );
+  }
 }
 
 export class TokenAccount {
+  static TokenIndexUnset: number = 65535;
   static from(dto: TokenAccountDto) {
     return new TokenAccount(
       I80F48.from(dto.indexedValue),
@@ -136,5 +170,43 @@ export class Serum3AccountDto {
     public baseTokenIndex: number,
     public quoteTokenIndex: number,
     public reserved: number[],
+  ) {}
+}
+
+export class PerpAccount {
+  static PerpMarketIndexUnset = 65535;
+  static from(dto: PerpAccountDto) {
+    return new PerpAccount(
+      dto.marketIndex,
+      dto.basePositionLots.toNumber(),
+      dto.quotePositionNative.val.toNumber(),
+      dto.bidsBaseLots.toNumber(),
+      dto.asksBaseLots.toNumber(),
+      dto.takerBaseLots.toNumber(),
+      dto.takerQuoteLots.toNumber(),
+    );
+  }
+
+  constructor(
+    public marketIndex: number,
+    public basePositionLots: number,
+    public quotePositionNative: number,
+    public bidsBaseLots: number,
+    public asksBaseLots: number,
+    public takerBaseLots: number,
+    public takerQuoteLots: number,
+  ) {}
+}
+
+export class PerpAccountDto {
+  constructor(
+    public marketIndex: number,
+    public reserved: [],
+    public basePositionLots: BN,
+    public quotePositionNative: { val: BN },
+    public bidsBaseLots: BN,
+    public asksBaseLots: BN,
+    public takerBaseLots: BN,
+    public takerQuoteLots: BN,
   ) {}
 }

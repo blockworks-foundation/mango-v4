@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use bytemuck::{cast, cast_mut, cast_ref};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use static_assertions::const_assert_eq;
 
 use crate::state::orderbook::bookside_iterator::BookSideIter;
 
@@ -44,6 +45,11 @@ pub struct BookSide {
     pub leaf_count: usize,
     pub nodes: [AnyNode; MAX_BOOK_NODES],
 }
+const_assert_eq!(
+    std::mem::size_of::<BookSide>(),
+    8 + 8 * 2 + 4 + 4 + 8 + 88 * 1024
+);
+const_assert_eq!(std::mem::size_of::<BookSide>() % 8, 0);
 
 impl BookSide {
     /// Iterate over all entries in the book filtering out invalid orders

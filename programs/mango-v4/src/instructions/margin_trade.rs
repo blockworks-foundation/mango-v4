@@ -20,6 +20,7 @@ pub struct MarginTrade<'info> {
     pub owner: Signer<'info>,
 }
 
+// TODO: add loan fees
 pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, MarginTrade<'info>>,
     banks_len: usize,

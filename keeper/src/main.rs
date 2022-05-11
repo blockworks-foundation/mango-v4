@@ -154,6 +154,9 @@ fn main() -> Result<(), anyhow::Error> {
 
     let mango_client = Arc::new(MangoClient::new(cluster, commitment, payer, admin));
 
+    log::info!("Program Id {}", &mango_client.program().id());
+    log::info!("Admin {}", &mango_client.admin.to_base58_string());
+
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()

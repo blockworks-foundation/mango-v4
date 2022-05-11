@@ -4,8 +4,10 @@ import { Order } from '@project-serum/serum/lib/market';
 import * as spl from '@solana/spl-token';
 import {
   AccountMeta,
+  Keypair,
   MemcmpFilter,
   PublicKey,
+  SystemProgram,
   SYSVAR_RENT_PUBKEY,
   TransactionSignature,
 } from '@solana/web3.js';
@@ -15,6 +17,7 @@ import { Group } from './accounts/group';
 import { I80F48 } from './accounts/I80F48';
 import { MangoAccount } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
+import { OrderType, PerpMarket, Side } from './accounts/perp';
 import {
   Serum3Market,
   Serum3OrderType,
@@ -621,6 +624,175 @@ export class MangoClient {
     );
   }
 
+  /// perps
+
+  async perpCreateMarket(
+    group: Group,
+    oraclePk: PublicKey,
+    perpMarketIndex: number,
+    name: string,
+    baseTokenIndex: number,
+    quoteTokenIndex: number,
+    quoteLotSize: number,
+    baseLotSize: number,
+    maintAssetWeight: number,
+    initAssetWeight: number,
+    maintLiabWeight: number,
+    initLiabWeight: number,
+    liquidationFee: number,
+    makerFee: number,
+    takerFee: number,
+  ): Promise<TransactionSignature> {
+    const bids = new Keypair();
+    const asks = new Keypair();
+    const eventQueue = new Keypair();
+
+    console.log(this.program.provider.wallet.publicKey.toBase58());
+
+    return await this.program.methods
+      .perpCreateMarket(
+        perpMarketIndex,
+        name,
+        baseTokenIndex,
+        quoteTokenIndex,
+        new BN(quoteLotSize),
+        new BN(baseLotSize),
+        maintAssetWeight,
+        initAssetWeight,
+        maintLiabWeight,
+        initLiabWeight,
+        liquidationFee,
+        makerFee,
+        takerFee,
+      )
+      .accounts({
+        group: group.publicKey,
+        admin: this.program.provider.wallet.publicKey,
+        oracle: oraclePk,
+        bids: bids.publicKey,
+        asks: asks.publicKey,
+        eventQueue: eventQueue.publicKey,
+        payer: this.program.provider.wallet.publicKey,
+      })
+      .preInstructions([
+        SystemProgram.createAccount({
+          programId: this.program.programId,
+          space: 8 + 90152,
+          lamports:
+            await this.program.provider.connection.getMinimumBalanceForRentExemption(
+              90160,
+            ),
+          fromPubkey: this.program.provider.wallet.publicKey,
+          newAccountPubkey: bids.publicKey,
+        }),
+        SystemProgram.createAccount({
+          programId: this.program.programId,
+          space: 8 + 90152,
+          lamports:
+            await this.program.provider.connection.getMinimumBalanceForRentExemption(
+              90160,
+            ),
+          fromPubkey: this.program.provider.wallet.publicKey,
+          newAccountPubkey: asks.publicKey,
+        }),
+        SystemProgram.createAccount({
+          programId: this.program.programId,
+          space: 8 + 102424,
+          lamports:
+            await this.program.provider.connection.getMinimumBalanceForRentExemption(
+              102432,
+            ),
+          fromPubkey: this.program.provider.wallet.publicKey,
+          newAccountPubkey: eventQueue.publicKey,
+        }),
+      ])
+      .signers([bids, asks, eventQueue])
+      .rpc();
+  }
+
+  public async perpGetMarket(
+    group: Group,
+    baseTokenIndex?: number,
+    quoteTokenIndex?: number,
+  ): Promise<PerpMarket[]> {
+    const bumpfbuf = Buffer.alloc(1);
+    bumpfbuf.writeUInt8(255);
+
+    const filters: MemcmpFilter[] = [
+      {
+        memcmp: {
+          bytes: group.publicKey.toBase58(),
+          offset: 24,
+        },
+      },
+    ];
+
+    if (baseTokenIndex) {
+      const bbuf = Buffer.alloc(2);
+      bbuf.writeUInt16LE(baseTokenIndex);
+      filters.push({
+        memcmp: {
+          bytes: bs58.encode(bbuf),
+          offset: 348,
+        },
+      });
+    }
+
+    if (quoteTokenIndex) {
+      const qbuf = Buffer.alloc(2);
+      qbuf.writeUInt16LE(quoteTokenIndex);
+      filters.push({
+        memcmp: {
+          bytes: bs58.encode(qbuf),
+          offset: 350,
+        },
+      });
+    }
+
+    return (await this.program.account.perpMarket.all(filters)).map((tuple) =>
+      PerpMarket.from(tuple.publicKey, tuple.account),
+    );
+  }
+
+  async perpPlaceOrder(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketName: string,
+    side: Side,
+    priceLots: number,
+    maxBaseLots: number,
+    maxQuoteLots: number,
+    clientOrderId: number,
+    orderType: OrderType,
+    expiryTimestamp: number,
+    limit: number,
+  ) {
+    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+
+    await this.program.methods
+      .perpPlaceOrder(
+        side,
+        new BN((priceLots * perpMarket.baseLotSize) / perpMarket.quoteLotSize),
+        new BN(maxBaseLots),
+        new BN(maxQuoteLots),
+        new BN(clientOrderId),
+        orderType,
+        new BN(expiryTimestamp),
+        limit,
+      )
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        perpMarket: perpMarket.publicKey,
+        asks: perpMarket.asks,
+        bids: perpMarket.bids,
+        eventQueue: perpMarket.eventQueue,
+        oracle: perpMarket.oracle,
+        owner: this.program.provider.wallet.publicKey,
+      })
+      .rpc();
+  }
+
   /// static
 
   static async connect(
@@ -702,6 +874,16 @@ export class MangoClient {
       ...mangoAccount.serum3
         .filter((serum3Account) => serum3Account.marketIndex !== 65535)
         .map((serum3Account) => serum3Account.openOrders),
+    );
+    healthRemainingAccounts.push(
+      ...mangoAccount.perps
+        .filter((perp) => perp.marketIndex !== 65535)
+        .map(
+          (perp) =>
+            Array.from(group.perpMarketsMap.values()).filter(
+              (perpMarket) => perpMarket.perpMarketIndex === perp.marketIndex,
+            )[0].publicKey,
+        ),
     );
 
     return healthRemainingAccounts;

@@ -153,6 +153,8 @@ impl QueueHeader for EventQueueHeader {
 }
 
 pub type EventQueue = Queue<EventQueueHeader>;
+const_assert_eq!(std::mem::size_of::<EventQueue>(), 8 * 3 + 512 * 200);
+const_assert_eq!(std::mem::size_of::<EventQueue>() % 8, 0);
 
 const EVENT_SIZE: usize = 200;
 #[derive(Copy, Clone, Debug, Pod)]

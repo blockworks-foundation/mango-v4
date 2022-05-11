@@ -1,6 +1,7 @@
 import { Provider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
+import { OrderType, Side } from '../accounts/perp';
 import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
@@ -155,6 +156,46 @@ async function main() {
     DEVNET_SERUM3_PROGRAM_ID,
     'BTC/USDC',
   );
+
+  // perps
+  console.log(`Placing perp bid...`);
+  await client.perpPlaceOrder(
+    group,
+    mangoAccount,
+    'BTC/USDC',
+    Side.bid,
+    1,
+    1,
+    65535,
+    65535,
+    OrderType.limit,
+    0,
+    1,
+  );
+
+  console.log(`Placing perp ask...`);
+  await client.perpPlaceOrder(
+    group,
+    mangoAccount,
+    'BTC/USDC',
+    Side.ask,
+    1,
+    1,
+    65535,
+    65535,
+    OrderType.limit,
+    0,
+    1,
+  );
+
+  while (true) {
+    // TODO: quotePositionNative might be buggy on program side, investigate...
+    console.log(
+      `Waiting for self trade to consume (note: make sure keeper crank is running)...`,
+    );
+    await mangoAccount.reload(client);
+    console.log(mangoAccount.toString());
+  }
 
   process.exit();
 }
