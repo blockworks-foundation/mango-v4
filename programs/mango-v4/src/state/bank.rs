@@ -210,6 +210,7 @@ impl Bank {
         }
     }
 
+    // TODO: daffy: use optimal interest from oracle
     pub fn update_index(&mut self, now_ts: i64) -> Result<()> {
         let diff_ts = I80F48::from_num(now_ts - self.last_updated);
         self.last_updated = now_ts;
