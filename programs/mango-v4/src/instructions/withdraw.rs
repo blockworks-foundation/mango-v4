@@ -91,27 +91,18 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
 
         let amount_i80f48 = I80F48::from(amount);
 
-        // collect loan origination fee
-        let mut loan_origination_fees = I80F48::ZERO;
-        if amount_i80f48 > native_position {
-            let borrow_amount = cm!(amount_i80f48 - native_position);
-            loan_origination_fees = cm!(bank.loan_origination_fee_rate * borrow_amount);
-            bank.collected_fees_native = cm!(bank.collected_fees_native + loan_origination_fees);
-        }
+        let loan_origination_fees =
+            bank.charge_loan_origination_fee(amount_i80f48, native_position)?;
 
         // Update the bank and position
-        let position_is_active = bank.withdraw(position, cm!(amount_i80f48))?;
+        let position_is_active =
+            bank.withdraw(position, cm!(amount_i80f48 + loan_origination_fees))?;
 
         // Transfer the actual tokens
-        // TODO: This rounding may mean that if we deposit and immediately withdraw (event without borrowing)
-        //       we can't withdraw the full amount!
-        let amount_to_transfer = cm!(amount_i80f48 - loan_origination_fees)
-            .floor()
-            .to_num::<u64>();
         let group_seeds = group_seeds!(group);
         token::transfer(
             ctx.accounts.transfer_ctx().with_signer(&[group_seeds]),
-            amount_to_transfer,
+            amount,
         )?;
 
         position_is_active

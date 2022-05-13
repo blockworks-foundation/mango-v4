@@ -119,9 +119,14 @@ pub fn liq_token_with_token(
 
         // Apply the balance changes to the liqor and liqee accounts
         liab_bank.deposit(liqee.tokens.get_mut(liab_token_index)?, liab_transfer)?;
+
+        let position = liqor.tokens.get_mut_or_create(liab_token_index)?.0;
+        let position_native = position.native(&liab_bank);
+        let loan_origination_fees =
+            liab_bank.charge_loan_origination_fee(liab_transfer, position_native)?;
         liab_bank.withdraw(
             liqor.tokens.get_mut_or_create(liab_token_index)?.0,
-            liab_transfer,
+            cm!(liab_transfer + loan_origination_fees),
         )?;
 
         asset_bank.deposit(

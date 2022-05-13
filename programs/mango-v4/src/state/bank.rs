@@ -1,4 +1,5 @@
 use super::{TokenAccount, TokenIndex};
+use crate::error::MangoError;
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
@@ -210,13 +211,30 @@ impl Bank {
         }
     }
 
-    // TODO: daffy: use optimal interest from oracle
-    pub fn update_index(&mut self, now_ts: i64) -> Result<()> {
-        let diff_ts = I80F48::from_num(now_ts - self.last_updated);
-        self.last_updated = now_ts;
+    // collect loan origination fee for borrows
+    pub fn charge_loan_origination_fee(
+        &mut self,
+        withdraw_amount: I80F48,
+        position: I80F48,
+    ) -> Result<I80F48> {
+        require!(withdraw_amount.is_positive(), MangoError::SomeError);
 
-        // Step 1
-        // Borrows expose insurance fund to risk, collect fees for DAO from borrowers,
+        let mut loan_origination_fees = I80F48::ZERO;
+        if withdraw_amount > position {
+            let native_position_deposits_only = if position.is_negative() {
+                I80F48::ZERO
+            } else {
+                position
+            };
+            let borrow = cm!(withdraw_amount - native_position_deposits_only);
+            loan_origination_fees = cm!(self.loan_origination_fee_rate * borrow);
+            self.collected_fees_native = cm!(self.collected_fees_native + loan_origination_fees);
+        }
+        Ok(loan_origination_fees)
+    }
+
+    // Borrows continously expose insurance fund to risk, collect fees from borrowers
+    pub fn charge_loan_fee(&mut self, diff_ts: I80F48) {
         let native_total_borrows_old = self.native_total_borrows();
         self.indexed_total_borrows =
             cm!((self.indexed_total_borrows
@@ -224,8 +242,15 @@ impl Bank {
         self.collected_fees_native = cm!(
             self.collected_fees_native + self.native_total_borrows() - native_total_borrows_old
         );
+    }
 
-        // Step 2
+    // TODO: daffy: use optimal interest from oracle
+    pub fn update_index(&mut self, now_ts: i64) -> Result<()> {
+        let diff_ts = I80F48::from_num(now_ts - self.last_updated);
+        self.last_updated = now_ts;
+
+        self.charge_loan_fee(diff_ts);
+
         // Update index based on utilization
         let utilization = if self.native_total_deposits() == I80F48::ZERO {
             I80F48::ZERO
