@@ -171,17 +171,33 @@ async fn test_position_lifetime() -> Result<()> {
         );
 
         // give it back, closing the position
-        send_tx(
-            solana,
-            DepositInstruction {
-                amount: borrow_amount,
-                account,
-                token_account: payer_mint_accounts[1],
-                token_authority: payer,
-            },
-        )
-        .await
-        .unwrap();
+        {
+            send_tx(
+                solana,
+                DepositInstruction {
+                    // deposit withdraw amount + some more to cover loan origination fees
+                    amount: borrow_amount + 2,
+                    account,
+                    token_account: payer_mint_accounts[1],
+                    token_authority: payer,
+                },
+            )
+            .await
+            .unwrap();
+            send_tx(
+                solana,
+                WithdrawInstruction {
+                    // withdraw residual amount left
+                    amount: u64::MAX,
+                    allow_borrow: false,
+                    account,
+                    owner,
+                    token_account: payer_mint_accounts[1],
+                },
+            )
+            .await
+            .unwrap();
+        }
 
         // withdraw the collateral, closing the position
         send_tx(
