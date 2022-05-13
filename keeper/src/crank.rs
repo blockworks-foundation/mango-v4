@@ -40,6 +40,8 @@ pub async fn runner(
         .map(|(pk, bank)| update_index::loop_blocking(mango_client.clone(), *pk, *bank))
         .collect::<Vec<_>>();
 
+    // TODO: future, maybe we want to only consume events for specific markets,
+    // TODO: future, maybe we want to crank certain markets more often than others
     // Collect all perp markets for a group belonging to an admin
     let perp_markets =
         mango_client
