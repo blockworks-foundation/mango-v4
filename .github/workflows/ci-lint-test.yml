@@ -103,15 +103,15 @@ jobs:
         run: echo "::set-output name=today::$(date +'%Y-%m-%d')"
       - name: Process raw log
         run: |
-          rg -oNI "(Mango:|Instruction: |Program ${{ env.LOG_PROGRAM }} consumed).*$" raw-test-bpf.log \
-            | rg -U 'Mango: .*\nProgram ${{ env.LOG_PROGRAM }}.*' \
+          rg -oNI "(Instruction: |Program ${{ env.LOG_PROGRAM }} consumed).*$" raw-test-bpf.log \
+            | rg -U 'Instruction:.*\nProgram ${{ env.LOG_PROGRAM }}.*' \
             | awk 'NR % 2 == 1 { o=$0 ; next } { print o " " $0 }' \
             | sort | uniq -u | sort > cu-per-ix.log
       - name: Clean up log
         run: |
-          rg -N 'Mango: (\w+) .* consumed (\d+) .*' cu-per-ix.log -r '${{ steps.date.outputs.today }},${{ github.repository }},$1,$2' \
-            | uniq | xsv sort -s 3 -N -R \
-            | sort -t ',' -k 3,4 -u \
+          rg -N 'Instruction: (\w+) .* consumed (\d+) .*' cu-per-ix.log -r '${{ steps.date.outputs.today }},$1,$2' \
+            | uniq | xsv sort -s 2 -N -R \
+            | sort -t ',' -k 2,3 -u \
             | sort > cu-per-ix-clean.log
       - name: Save clean log
         uses: actions/upload-artifact@v3
