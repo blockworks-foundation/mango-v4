@@ -4,7 +4,6 @@ on:
     branches:
       - main
       - dev
-      - silas/cu
   pull_request:
   workflow_dispatch:
 
@@ -80,12 +79,11 @@ jobs:
         with:
           name: raw-test-bpf
           path: raw-test-bpf.log
+
 # Download logs and process them
   process-logs:
     name: Process logs
-#    if: |
-#      (github.actor != 'github-actions[bot]' && github.ref_name =='main') ||
-#      (github.actor != 'github-actions[bot]' && github.ref_name=='dev')
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     needs: [lint, tests]
     steps:
@@ -118,12 +116,13 @@ jobs:
         with:
           name: cu-per-ix-clean
           path: cu-per-ix-clean.log
-  # Push clean logs to git
+  
+  # Push clean logs to git if main/dev branch
   push-logs:
     name: Push logs
-#    if: |
-#      (github.actor != 'github-actions[bot]' && github.ref_name =='main') ||
-#      (github.actor != 'github-actions[bot]' && github.ref_name=='dev')
+    if: |
+      (github.actor != 'github-actions[bot]' && github.ref_name == 'main') ||
+      (github.actor != 'github-actions[bot]' && github.ref_name == 'dev')
     runs-on: ubuntu-latest
     needs: [lint, tests, process-logs]
     steps:
@@ -133,7 +132,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: cu-per-ix-clean
-          path: cu-stats/
+          path: ./
       - name: Push log to git
         run: |
           git config --global user.name "github-actions[bot]"
@@ -141,4 +140,3 @@ jobs:
           git add -A
           git commit -m "chore: push cu test logs"
           git push
-  
