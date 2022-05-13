@@ -462,13 +462,14 @@ async fn test_liq_tokens_with_token() -> Result<(), BanksClientError> {
     // health after borrow2 liquidation was (1000-32) * 0.6 - 350 * 2 * 1.4 = -399.2
     // borrow1 needed 399.2 / (1.4*2 - 0.6*2*1.04) = 257.2
     // asset cost = 257.2 * 2 * 1.04 = 535
+    // loan orignation fee = 1
     assert_eq!(
         account_position(solana, account, borrow_token1.bank).await,
         -350 + 257
     );
     assert_eq!(
         account_position(solana, account, collateral_token1.bank).await,
-        1000 - 32 - 535
+        1000 - 32 - 535 - 1
     );
     let liqee: MangoAccount = solana.get_account(account).await;
     assert_eq!(liqee.being_liquidated, 0);
