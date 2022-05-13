@@ -125,17 +125,31 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
 
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let base_position = account.tokens.get_mut(base_bank.token_index)?;
-        base_bank.change(
-            base_position,
-            I80F48::from(after_base_vault) - I80F48::from(before_base_vault),
-        )?;
+        let change = I80F48::from(after_base_vault) - I80F48::from(before_base_vault);
+        if change.is_negative() {
+            let withdraw_amount = -change;
+            let native_position = base_position.native(&base_bank);
+            let loan_origination_fees =
+                base_bank.charge_loan_origination_fee(withdraw_amount, native_position)?;
+            base_bank.withdraw(base_position, withdraw_amount + loan_origination_fees)?;
+        } else {
+            let deposit_amount = change;
+            base_bank.deposit(base_position, deposit_amount)?;
+        }
 
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
         let quote_position = account.tokens.get_mut(quote_bank.token_index)?;
-        quote_bank.change(
-            quote_position,
-            I80F48::from(after_quote_vault) - I80F48::from(before_quote_vault),
-        )?;
+        let change = I80F48::from(after_quote_vault) - I80F48::from(before_quote_vault);
+        if change.is_negative() {
+            let withdraw_amount = -change;
+            let native_position = quote_position.native(&quote_bank);
+            let loan_origination_fees =
+                quote_bank.charge_loan_origination_fee(withdraw_amount, native_position)?;
+            quote_bank.withdraw(quote_position, withdraw_amount + loan_origination_fees)?;
+        } else {
+            let deposit_amount = change;
+            quote_bank.deposit(quote_position, deposit_amount)?;
+        }
     }
 
     Ok(())
