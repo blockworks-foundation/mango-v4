@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
+use fixed_macro::types::I80F48;
 
 use crate::error::MangoError;
 use crate::state::*;
@@ -56,6 +57,9 @@ pub fn perp_create_market(
     liquidation_fee: f32,
     maker_fee: f32,
     taker_fee: f32,
+    max_funding: f32,
+    min_funding: f32,
+    impact_quantity: u64,
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_init()?;
     *perp_market = PerpMarket {
@@ -74,14 +78,20 @@ pub fn perp_create_market(
         liquidation_fee: I80F48::from_num(liquidation_fee),
         maker_fee: I80F48::from_num(maker_fee),
         taker_fee: I80F48::from_num(taker_fee),
+        max_funding: I80F48!(0.05),
+        min_funding: I80F48!(0.05),
+        long_funding: I80F48::ZERO,
+        short_funding: I80F48::ZERO,
+        funding_last_updated: Clock::get()?.unix_timestamp,
+        impact_quantity: 100,
         open_interest: 0,
         seq_num: 0,
         fees_accrued: I80F48::ZERO,
         bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
+        reserved: Default::default(),
         perp_market_index,
         base_token_index: base_token_index_opt.ok_or(TokenIndex::MAX).unwrap(),
         quote_token_index,
-        reserved: Default::default(),
     };
 
     let mut bids = ctx.accounts.bids.load_init()?;

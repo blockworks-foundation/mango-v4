@@ -2,11 +2,14 @@ use std::mem::size_of;
 
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
+
 use static_assertions::const_assert_eq;
 
 use crate::state::orderbook::order_type::Side;
-use crate::state::TokenIndex;
+use crate::state::{TokenIndex, DAY};
 use crate::util::checked_math as cm;
+
+use super::Book;
 
 pub type PerpMarketIndex = u16;
 
@@ -44,9 +47,12 @@ pub struct PerpMarket {
     pub maker_fee: I80F48,
     pub taker_fee: I80F48,
 
-    /// pub long_funding: I80F48,
-    /// pub short_funding: I80F48,
-    /// pub funding_last_updated: u64,
+    pub max_funding: I80F48,
+    pub min_funding: I80F48,
+    pub long_funding: I80F48,
+    pub short_funding: I80F48,
+    pub funding_last_updated: i64,
+    pub impact_quantity: i64,
 
     ///
     pub open_interest: i64,
@@ -77,7 +83,7 @@ pub struct PerpMarket {
 
 const_assert_eq!(
     size_of::<PerpMarket>(),
-    16 + 32 * 5 + 8 * 2 + 16 * 7 + 8 * 2 + 16 + 8
+    16 + 32 * 5 + 8 * 2 + 16 * 11 + 8 * 2 + 8 * 2 + 16 + 8
 );
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
 
@@ -96,6 +102,38 @@ impl PerpMarket {
             Side::Bid => upper | (!self.seq_num as i128),
             Side::Ask => upper | (self.seq_num as i128),
         }
+    }
+
+    /// Use current order book price and index price to update the instantaneous funding
+    pub fn update_funding(&mut self, book: &Book, oracle_price: I80F48, now_ts: u64) -> Result<()> {
+        let index_price = oracle_price;
+
+        // Get current book price & compare it to index price
+        let bid = book.get_impact_price(Side::Bid, self.impact_quantity, now_ts);
+        let ask = book.get_impact_price(Side::Ask, self.impact_quantity, now_ts);
+
+        let diff_price = match (bid, ask) {
+            (Some(bid), Some(ask)) => {
+                // calculate mid-market rate
+                let book_price = self.lot_to_native_price((bid + ask) / 2);
+                let diff = cm!(book_price / index_price - I80F48::ONE);
+                diff.clamp(self.min_funding, self.max_funding)
+            }
+            (Some(_bid), None) => self.max_funding,
+            (None, Some(_ask)) => self.min_funding,
+            (None, None) => I80F48::ZERO,
+        };
+
+        let diff_ts = I80F48::from_num(now_ts - self.funding_last_updated as u64);
+        let time_factor = cm!(diff_ts / DAY);
+        let base_lot_size = I80F48::from_num(self.base_lot_size);
+        let funding_delta = cm!(index_price * diff_price * base_lot_size * time_factor);
+
+        self.long_funding += funding_delta;
+        self.short_funding += funding_delta;
+        self.funding_last_updated = now_ts as i64;
+
+        Ok(())
     }
 
     /// Convert from the price stored on the book to the price used in value calculations
