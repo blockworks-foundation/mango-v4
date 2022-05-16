@@ -277,7 +277,6 @@ impl MangoAccountSerum3 {
 }
 
 #[zero_copy]
-#[derive(Debug)]
 pub struct PerpAccount {
     pub market_index: PerpMarketIndex,
     pub reserved: [u8; 6],
@@ -303,6 +302,20 @@ pub struct PerpAccount {
     /// Amount that's on EventQueue waiting to be processed
     pub taker_base_lots: i64,
     pub taker_quote_lots: i64,
+}
+
+impl std::fmt::Debug for PerpAccount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PerpAccount")
+            .field("market_index", &self.market_index)
+            .field("base_position_lots", &self.base_position_lots)
+            .field("quote_position_native", &self.quote_position_native)
+            .field("bids_base_lots", &self.bids_base_lots)
+            .field("asks_base_lots", &self.asks_base_lots)
+            .field("taker_base_lots", &self.taker_base_lots)
+            .field("taker_quote_lots", &self.taker_quote_lots)
+            .finish()
+    }
 }
 const_assert_eq!(size_of::<PerpAccount>(), 8 + 8 * 5 + 16);
 const_assert_eq!(size_of::<PerpAccount>() % 8, 0);
@@ -366,7 +379,7 @@ pub struct MangoAccountPerps {
     pub order_market: [PerpMarketIndex; MAX_PERP_OPEN_ORDERS],
     pub order_side: [Side; MAX_PERP_OPEN_ORDERS], // TODO: storing enums isn't POD
     pub order_id: [i128; MAX_PERP_OPEN_ORDERS],
-    pub order_client_id: [u64; MAX_PERP_OPEN_ORDERS],
+    pub client_order_id: [u64; MAX_PERP_OPEN_ORDERS],
 }
 const_assert_eq!(
     size_of::<MangoAccountPerps>(),
@@ -412,9 +425,9 @@ impl std::fmt::Debug for MangoAccountPerps {
                     .collect::<Vec<&i128>>(),
             )
             .field(
-                "order_client_id",
+                "client_order_id",
                 &self
-                    .order_client_id
+                    .client_order_id
                     .iter()
                     .filter(|value| **value != 0)
                     .collect::<Vec<&u64>>(),
@@ -430,7 +443,7 @@ impl MangoAccountPerps {
             order_market: [FREE_ORDER_SLOT; MAX_PERP_OPEN_ORDERS],
             order_side: [Side::Bid; MAX_PERP_OPEN_ORDERS],
             order_id: [0; MAX_PERP_OPEN_ORDERS],
-            order_client_id: [0; MAX_PERP_OPEN_ORDERS],
+            client_order_id: [0; MAX_PERP_OPEN_ORDERS],
         }
     }
 
@@ -495,7 +508,7 @@ impl MangoAccountPerps {
         self.order_market[slot] = perp_market_index;
         self.order_side[slot] = side;
         self.order_id[slot] = order.key;
-        self.order_client_id[slot] = order.client_order_id;
+        self.client_order_id[slot] = order.client_order_id;
         Ok(())
     }
 
@@ -521,10 +534,9 @@ impl MangoAccountPerps {
         // release space
         self.order_market[slot] = FREE_ORDER_SLOT;
 
-        // TODO OPT - remove these; unnecessary
         self.order_side[slot] = Side::Bid;
         self.order_id[slot] = 0i128;
-        self.order_client_id[slot] = 0u64;
+        self.client_order_id[slot] = 0u64;
         Ok(())
     }
 
@@ -583,6 +595,28 @@ impl MangoAccountPerps {
 
         pa.quote_position_native += quote;
         Ok(())
+    }
+
+    pub fn find_order_with_client_order_id(
+        &self,
+        market_index: PerpMarketIndex,
+        client_order_id: u64,
+    ) -> Option<(i128, Side)> {
+        for i in 0..MAX_PERP_OPEN_ORDERS {
+            if self.order_market[i] == market_index && self.client_order_id[i] == client_order_id {
+                return Some((self.order_id[i], self.order_side[i]));
+            }
+        }
+        None
+    }
+
+    pub fn find_order_side(&self, market_index: PerpMarketIndex, order_id: i128) -> Option<Side> {
+        for i in 0..MAX_PERP_OPEN_ORDERS {
+            if self.order_market[i] == market_index && self.order_id[i] == order_id {
+                return Some(self.order_side[i]);
+            }
+        }
+        None
     }
 }
 

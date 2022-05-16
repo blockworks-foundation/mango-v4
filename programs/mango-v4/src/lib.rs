@@ -70,6 +70,8 @@ pub mod mango_v4 {
         instructions::create_account(ctx, account_num, name)
     }
 
+    // TODO set delegate
+
     pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
         instructions::close_account(ctx)
     }
@@ -107,6 +109,8 @@ pub mod mango_v4 {
     /// Serum
     ///
 
+    // TODO deposit/withdraw msrm
+
     pub fn serum3_register_market(
         ctx: Context<Serum3RegisterMarket>,
         market_index: Serum3MarketIndex,
@@ -114,6 +118,8 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::serum3_register_market(ctx, market_index, name)
     }
+
+    // TODO serum3_change_spot_market_params
 
     pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result<()> {
         instructions::serum3_create_open_orders(ctx)
@@ -162,6 +168,8 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::serum3_liq_force_cancel_orders(ctx, limit)
     }
+
+    // TODO serum3_cancel_all_spot_orders
 
     pub fn liq_token_with_token(
         ctx: Context<LiqTokenWithToken>,
@@ -216,6 +224,8 @@ pub mod mango_v4 {
         )
     }
 
+    // TODO perp_change_perp_market_params
+
     #[allow(clippy::too_many_arguments)]
     pub fn perp_place_order(
         ctx: Context<PerpPlaceOrder>,
@@ -241,23 +251,35 @@ pub mod mango_v4 {
         )
     }
 
+    pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: i128) -> Result<()> {
+        instructions::perp_cancel_order(ctx, order_id)
+    }
+
+    pub fn perp_cancel_order_by_client_order_id(
+        ctx: Context<PerpCancelOrderByClientOrderId>,
+        client_order_id: u64,
+    ) -> Result<()> {
+        instructions::perp_cancel_order_by_client_order_id(ctx, client_order_id)
+    }
+
+    pub fn perp_cancel_all_orders(ctx: Context<PerpCancelAllOrders>, limit: u8) -> Result<()> {
+        instructions::perp_cancel_all_orders(ctx, limit)
+    }
+
+    pub fn perp_cancel_all_orders_by_side(
+        ctx: Context<PerpCancelAllOrdersBySide>,
+        side_option: Option<Side>,
+        limit: u8,
+    ) -> Result<()> {
+        instructions::perp_cancel_all_orders_by_side(ctx, side_option, limit)
+    }
+
     pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Result<()> {
         instructions::perp_consume_events(ctx, limit)
     }
 
     // TODO
 
-    // set delegate
-
-    // serum3_cancel_all_spot_orders
-    // serum3_change_spot_market_params
-
-    // msrm
-
-    // perp_cancel_order
-    // perp_cancel_order_by_client_id
-    // perp_cancel_all
-    // perp_cancel_all_side
     // perp_force_cancel_order
 
     // liquidate_token_and_perp
@@ -270,7 +292,7 @@ pub mod mango_v4 {
     ///
     /// benchmark
     ///
-    ///
+
     pub fn benchmark(ctx: Context<Benchmark>) -> Result<()> {
         instructions::benchmark(ctx)
     }

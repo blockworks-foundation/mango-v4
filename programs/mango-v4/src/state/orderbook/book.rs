@@ -4,7 +4,8 @@ use crate::{
     error::MangoError,
     state::{
         orderbook::{bookside::BookSide, nodes::LeafNode},
-        EventQueue, MangoAccountPerps, PerpMarket,
+        EventQueue, MangoAccount, MangoAccountPerps, PerpMarket, FREE_ORDER_SLOT,
+        MAX_PERP_OPEN_ORDERS,
     },
     util::LoadZeroCopy,
 };
@@ -306,6 +307,7 @@ impl<'a> Book<'a> {
 
         // If there are still quantity unmatched, place on the book
         let book_base_quantity = remaining_base_lots.min(remaining_quote_lots / price_lots);
+        msg!("{:?}", post_allowed);
         if post_allowed && book_base_quantity > 0 {
             // Drop an expired order if possible
             let bookside = self.get_bookside(side);
@@ -377,6 +379,57 @@ impl<'a> Book<'a> {
         }
 
         Ok(())
+    }
+
+    pub fn cancel_all_order(
+        &mut self,
+        mango_account: &mut MangoAccount,
+        perp_market: &mut PerpMarket,
+        mut limit: u8,
+        side_to_cancel_option: Option<Side>,
+    ) -> Result<()> {
+        for i in 0..MAX_PERP_OPEN_ORDERS {
+            if mango_account.perps.order_market[i] == FREE_ORDER_SLOT
+                || mango_account.perps.order_market[i] != perp_market.perp_market_index
+            {
+                continue;
+            }
+
+            let order_id = mango_account.perps.order_id[i];
+            let order_side = mango_account.perps.order_side[i];
+
+            if let Some(side_to_cancel) = side_to_cancel_option {
+                if side_to_cancel != order_side {
+                    continue;
+                }
+            }
+
+            if let Ok(leaf_node) = self.cancel_order(order_id, order_side) {
+                mango_account
+                    .perps
+                    .remove_order(leaf_node.owner_slot as usize, leaf_node.quantity)?
+            };
+
+            limit = limit - 1;
+            if limit == 0 {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn cancel_order(&mut self, order_id: i128, side: Side) -> Result<LeafNode> {
+        match side {
+            Side::Bid => self
+                .bids
+                .remove_by_key(order_id)
+                .ok_or_else(|| error!(MangoError::SomeError)), // InvalidOrderId
+            Side::Ask => self
+                .asks
+                .remove_by_key(order_id)
+                .ok_or_else(|| error!(MangoError::SomeError)), // InvalidOrderId
+        }
     }
 }
 

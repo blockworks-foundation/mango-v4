@@ -1,5 +1,6 @@
 #![cfg(all(feature = "test-bpf"))]
 
+use anchor_lang::prelude::Pubkey;
 use fixed_macro::types::I80F48;
 use mango_v4::state::*;
 use program_test::*;
@@ -168,6 +169,9 @@ async fn test_perp() -> Result<(), BanksClientError> {
         perp_market.native_price_to_lot(I80F48!(1))
     };
 
+    //
+    // Place and cancel order with order_id
+    //
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
@@ -183,6 +187,174 @@ async fn test_perp() -> Result<(), BanksClientError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            client_order_id: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    let order_id_to_cancel = solana
+        .get_account::<MangoAccount>(account_0)
+        .await
+        .perps
+        .order_id[0];
+    send_tx(
+        solana,
+        PerpCancelOrderInstruction {
+            group,
+            account: account_0,
+            perp_market,
+            asks,
+            bids,
+            owner,
+            order_id: order_id_to_cancel,
+        },
+    )
+    .await
+    .unwrap();
+
+    assert_no_perp_orders(solana, account_0).await;
+
+    //
+    // Place and cancel order with client_order_id
+    //
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            group,
+            account: account_0,
+            perp_market,
+            asks,
+            bids,
+            event_queue,
+            oracle: tokens[0].oracle,
+            owner,
+            side: Side::Bid,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 1,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        PerpCancelOrderByClientOrderIdInstruction {
+            group,
+            account: account_0,
+            perp_market,
+            asks,
+            bids,
+            owner,
+            client_order_id: 1,
+        },
+    )
+    .await
+    .unwrap();
+
+    assert_no_perp_orders(solana, account_0).await;
+
+    //
+    // Place and cancel all orders
+    //
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            group,
+            account: account_0,
+            perp_market,
+            asks,
+            bids,
+            event_queue,
+            oracle: tokens[0].oracle,
+            owner,
+            side: Side::Bid,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 2,
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            group,
+            account: account_0,
+            perp_market,
+            asks,
+            bids,
+            event_queue,
+            oracle: tokens[0].oracle,
+            owner,
+            side: Side::Bid,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 3,
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            group,
+            account: account_0,
+            perp_market,
+            asks,
+            bids,
+            event_queue,
+            oracle: tokens[0].oracle,
+            owner,
+            side: Side::Bid,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 4,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        PerpCancelAllOrdersInstruction {
+            group,
+            account: account_0,
+            perp_market,
+            asks,
+            bids,
+            owner,
+        },
+    )
+    .await
+    .unwrap();
+
+    assert_no_perp_orders(solana, account_0).await;
+
+    //
+    // Place a bid, corresponding ask, and consume event
+    //
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            group,
+            account: account_0,
+            perp_market,
+            asks,
+            bids,
+            event_queue,
+            oracle: tokens[0].oracle,
+            owner,
+            side: Side::Bid,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 5,
         },
     )
     .await
@@ -203,6 +375,7 @@ async fn test_perp() -> Result<(), BanksClientError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            client_order_id: 6,
         },
     )
     .await
@@ -229,4 +402,15 @@ async fn test_perp() -> Result<(), BanksClientError> {
     assert_eq!(mango_account_1.perps.accounts[0].quote_position_native, 100);
 
     Ok(())
+}
+
+async fn assert_no_perp_orders(solana: &SolanaCookie, account_0: Pubkey) {
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+
+    for i in 0..MAX_PERP_OPEN_ORDERS {
+        assert!(mango_account_0.perps.order_id[i] == 0);
+        assert!(mango_account_0.perps.order_side[i] == Side::Bid);
+        assert!(mango_account_0.perps.client_order_id[i] == 0);
+        assert!(mango_account_0.perps.order_market[i] == FREE_ORDER_SLOT);
+    }
 }
