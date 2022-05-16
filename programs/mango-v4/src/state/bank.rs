@@ -7,6 +7,7 @@ use fixed_macro::types::I80F48;
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
+pub const DAY: I80F48 = I80F48!(86400);
 pub const YEAR: I80F48 = I80F48!(31536000);
 
 #[account(zero_copy)]
