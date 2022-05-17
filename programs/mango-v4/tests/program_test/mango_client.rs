@@ -1310,6 +1310,9 @@ impl<'keypair> ClientInstruction for PerpCreateMarketInstruction<'keypair> {
             liquidation_fee: self.liquidation_fee,
             maker_fee: self.maker_fee,
             taker_fee: self.taker_fee,
+            max_funding: 0.05,
+            min_funding: 0.05,
+            impact_quantity: 100,
         };
 
         let perp_market = Pubkey::find_program_address(

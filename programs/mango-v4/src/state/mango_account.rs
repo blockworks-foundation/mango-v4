@@ -288,8 +288,8 @@ pub struct PerpAccount {
     pub quote_position_native: I80F48,
 
     /// Already settled funding
-    // pub long_settled_funding: I80F48,
-    // pub short_settled_funding: I80F48,
+    pub long_settled_funding: I80F48,
+    pub short_settled_funding: I80F48,
 
     /// Base lots in bids
     pub bids_base_lots: i64,
@@ -317,7 +317,7 @@ impl std::fmt::Debug for PerpAccount {
             .finish()
     }
 }
-const_assert_eq!(size_of::<PerpAccount>(), 8 + 8 * 5 + 16);
+const_assert_eq!(size_of::<PerpAccount>(), 8 + 8 * 5 + 3 * 16);
 const_assert_eq!(size_of::<PerpAccount>() % 8, 0);
 
 impl Default for PerpAccount {
@@ -331,6 +331,8 @@ impl Default for PerpAccount {
             taker_base_lots: 0,
             taker_quote_lots: 0,
             reserved: Default::default(),
+            long_settled_funding: I80F48::ZERO,
+            short_settled_funding: I80F48::ZERO,
         }
     }
 }
@@ -368,6 +370,19 @@ impl PerpAccount {
         let start = self.base_position_lots;
         self.base_position_lots += base_change;
         perp_market.open_interest += self.base_position_lots.abs() - start.abs();
+    }
+
+    /// Move unrealized funding payments into the quote_position
+    pub fn settle_funding(&mut self, perp_market: &PerpMarket) {
+        if self.base_position_lots > 0 {
+            self.quote_position_native -= (perp_market.long_funding - self.long_settled_funding)
+                * I80F48::from_num(self.base_position_lots);
+        } else if self.base_position_lots < 0 {
+            self.quote_position_native -= (perp_market.short_funding - self.short_settled_funding)
+                * I80F48::from_num(self.base_position_lots);
+        }
+        self.long_settled_funding = perp_market.long_funding;
+        self.short_settled_funding = perp_market.short_funding;
     }
 }
 
@@ -547,7 +562,7 @@ impl MangoAccountPerps {
         fill: &FillEvent,
     ) -> Result<()> {
         let pa = self.get_account_mut_or_create(perp_market_index).unwrap().0;
-        // pa.settle_funding(cache);
+        pa.settle_funding(perp_market);
 
         let side = fill.taker_side.invert_side();
         let (base_change, quote_change) = fill.base_quote_change(side);
@@ -586,6 +601,8 @@ impl MangoAccountPerps {
         fill: &FillEvent,
     ) -> Result<()> {
         let pa = self.get_account_mut_or_create(perp_market_index).unwrap().0;
+        pa.settle_funding(perp_market);
+
         let (base_change, quote_change) = fill.base_quote_change(fill.taker_side);
         pa.remove_taker_trade(base_change, quote_change);
         pa.change_base_position(perp_market, base_change);
