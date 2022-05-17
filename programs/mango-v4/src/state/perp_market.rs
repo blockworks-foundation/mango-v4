@@ -115,7 +115,7 @@ impl PerpMarket {
         let diff_price = match (bid, ask) {
             (Some(bid), Some(ask)) => {
                 // calculate mid-market rate
-                let mid_price = (bid.checked_add(ask)) / 2;
+                let mid_price = bid.checked_add(ask).unwrap() / 2;
                 let book_price = self.lot_to_native_price(mid_price);
                 let diff = cm!(book_price / index_price - I80F48::ONE);
                 diff.clamp(self.min_funding, self.max_funding)
