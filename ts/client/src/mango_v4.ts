@@ -1232,11 +1232,11 @@ export type MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "maxFunding",
+          "name": "minFunding",
           "type": "f32"
         },
         {
-          "name": "minFunding",
+          "name": "maxFunding",
           "type": "f32"
         },
         {
@@ -2069,16 +2069,20 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "minFunding",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "maxFunding",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "minFunding",
-            "type": {
-              "defined": "I80F48"
-            }
+            "name": "impactQuantity",
+            "type": "i64"
           },
           {
             "name": "longFunding",
@@ -2094,10 +2098,6 @@ export type MangoV4 = {
           },
           {
             "name": "fundingLastUpdated",
-            "type": "i64"
-          },
-          {
-            "name": "impactQuantity",
             "type": "i64"
           },
           {
@@ -4024,11 +4024,11 @@ export const IDL: MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "maxFunding",
+          "name": "minFunding",
           "type": "f32"
         },
         {
-          "name": "minFunding",
+          "name": "maxFunding",
           "type": "f32"
         },
         {
@@ -4861,16 +4861,20 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "minFunding",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "maxFunding",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "minFunding",
-            "type": {
-              "defined": "I80F48"
-            }
+            "name": "impactQuantity",
+            "type": "i64"
           },
           {
             "name": "longFunding",
@@ -4886,10 +4890,6 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "fundingLastUpdated",
-            "type": "i64"
-          },
-          {
-            "name": "impactQuantity",
             "type": "i64"
           },
           {
