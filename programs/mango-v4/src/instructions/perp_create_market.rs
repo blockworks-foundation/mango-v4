@@ -59,7 +59,7 @@ pub fn perp_create_market(
     taker_fee: f32,
     max_funding: f32,
     min_funding: f32,
-    impact_quantity: u64,
+    impact_quantity: i64,
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_init()?;
     *perp_market = PerpMarket {
@@ -78,12 +78,12 @@ pub fn perp_create_market(
         liquidation_fee: I80F48::from_num(liquidation_fee),
         maker_fee: I80F48::from_num(maker_fee),
         taker_fee: I80F48::from_num(taker_fee),
-        max_funding: I80F48!(0.05),
-        min_funding: I80F48!(0.05),
+        max_funding: I80F48::from_num(max_funding),
+        min_funding: I80F48::from_num(min_funding),
         long_funding: I80F48::ZERO,
         short_funding: I80F48::ZERO,
         funding_last_updated: Clock::get()?.unix_timestamp,
-        impact_quantity: 100,
+        impact_quantity,
         open_interest: 0,
         seq_num: 0,
         fees_accrued: I80F48::ZERO,

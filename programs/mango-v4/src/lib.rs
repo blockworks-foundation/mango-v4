@@ -205,6 +205,9 @@ pub mod mango_v4 {
         liquidation_fee: f32,
         maker_fee: f32,
         taker_fee: f32,
+        max_funding: f32,
+        min_funding: f32,
+        impact_quantity: i64,
     ) -> Result<()> {
         instructions::perp_create_market(
             ctx,
@@ -221,6 +224,9 @@ pub mod mango_v4 {
             liquidation_fee,
             maker_fee,
             taker_fee,
+            max_funding,
+            min_funding,
+            impact_quantity,
         )
     }
 
