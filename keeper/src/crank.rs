@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{consume_events, update_index, MangoClient, update_funding};
+use crate::{consume_events, update_funding, update_index, MangoClient};
 
 use anyhow::ensure;
 

@@ -86,27 +86,27 @@ impl<'a> Book<'a> {
 
     /// Get the quantity of valid bids above and including the price
     pub fn get_bids_size_above(&self, price: i64, max_depth: i64, now_ts: u64) -> i64 {
-        let mut s = 0;
+        let mut sum: i64 = 0;
         for (_, bid) in self.bids.iter_valid(now_ts) {
-            if price > bid.price() || s >= max_depth {
+            if price > bid.price() || sum >= max_depth {
                 break;
             }
-            s += bid.quantity;
+            sum = sum.checked_add(bid.quantity).unwrap();
         }
-        s.min(max_depth)
+        sum.min(max_depth)
     }
 
     /// Walk up the book `quantity` units and return the price at that level. If `quantity` units
     /// not on book, return None
     pub fn get_impact_price(&self, side: Side, quantity: i64, now_ts: u64) -> Option<i64> {
-        let mut s = 0;
+        let mut sum: i64 = 0;
         let book_side = match side {
             Side::Bid => self.bids.iter_valid(now_ts),
             Side::Ask => self.asks.iter_valid(now_ts),
         };
         for (_, order) in book_side {
-            s += order.quantity;
-            if s >= quantity {
+            sum = sum.checked_add(order.quantity).unwrap();
+            if sum >= quantity {
                 return Some(order.price());
             }
         }

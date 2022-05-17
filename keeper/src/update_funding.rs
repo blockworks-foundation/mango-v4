@@ -1,13 +1,8 @@
 use std::{sync::Arc, time::Duration};
 
+use mango_v4::state::PerpMarket;
 
-
-use mango_v4::state::{PerpMarket};
-
-use solana_sdk::{
-    instruction::{Instruction},
-    pubkey::Pubkey,
-};
+use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 use tokio::time;
 
 use crate::MangoClient;
