@@ -84,14 +84,20 @@ impl MangoClient {
 #[derive(Parser)]
 #[clap()]
 struct Cli {
-    #[clap(short, long, env = "RPC_URL")]
+    #[clap(long, env = "RPC_URL")]
     rpc_url: Option<String>,
 
-    #[clap(short, long, env = "PAYER_KEYPAIR")]
+    #[clap(long, env = "PAYER_KEYPAIR")]
     payer: Option<std::path::PathBuf>,
 
-    #[clap(short, long, env = "ADMIN_KEYPAIR")]
+    #[clap(long, env = "PAYER_KEYPAIR_BASE58")]
+    payer_base58: Option<String>,
+
+    #[clap(long, env = "ADMIN_KEYPAIR")]
     admin: Option<std::path::PathBuf>,
+
+    #[clap(long, env = "ADMIN_KEYPAIR_BASE58")]
+    admin_base58: Option<String>,
 
     #[clap(subcommand)]
     command: Command,
@@ -112,30 +118,44 @@ fn main() -> Result<(), anyhow::Error> {
     let Cli {
         rpc_url,
         payer,
+        payer_base58,
         admin,
+        admin_base58,
         command,
     } = Cli::parse();
 
-    let payer = match payer {
-        Some(p) => keypair::read_keypair_file(&p)
-            .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy())),
-        None => match env::var("PAYER_KEYPAIR").ok() {
-            Some(k) => {
-                keypair::read_keypair(&mut k.as_bytes()).expect("Failed to parse $PAYER_KEYPAIR")
+    let payer = {
+        if let Some(base58_string) = payer_base58 {
+            Keypair::from_base58_string(&base58_string)
+        } else {
+            match payer {
+                Some(p) => keypair::read_keypair_file(&p).unwrap_or_else(|_| {
+                    panic!("Failed to read keypair from {}", p.to_string_lossy())
+                }),
+                None => match env::var("PAYER_KEYPAIR").ok() {
+                    Some(k) => keypair::read_keypair(&mut k.as_bytes())
+                        .expect("Failed to parse $PAYER_KEYPAIR"),
+                    None => panic!("Payer keypair not provided..."),
+                },
             }
-            None => panic!("Payer keypair not provided..."),
-        },
+        }
     };
 
-    let admin = match admin {
-        Some(p) => keypair::read_keypair_file(&p)
-            .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy())),
-        None => match env::var("ADMIN_KEYPAIR").ok() {
-            Some(k) => {
-                keypair::read_keypair(&mut k.as_bytes()).expect("Failed to parse $ADMIN_KEYPAIR")
+    let admin = {
+        if let Some(base58_string) = admin_base58 {
+            Keypair::from_base58_string(&base58_string)
+        } else {
+            match admin {
+                Some(p) => keypair::read_keypair_file(&p).unwrap_or_else(|_| {
+                    panic!("Failed to read keypair from {}", p.to_string_lossy())
+                }),
+                None => match env::var("ADMIN_KEYPAIR").ok() {
+                    Some(k) => keypair::read_keypair(&mut k.as_bytes())
+                        .expect("Failed to parse $ADMIN_KEYPAIR"),
+                    None => panic!("Admin keypair not provided..."),
+                },
             }
-            None => panic!("Admin keypair not provided..."),
-        },
+        }
     };
 
     let rpc_url = match rpc_url {
