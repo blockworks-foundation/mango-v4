@@ -1552,6 +1552,38 @@ impl ClientInstruction for PerpConsumeEventsInstruction {
     }
 }
 
+pub struct PerpUpdateFundingInstruction {
+    pub perp_market: Pubkey,
+    pub bids: Pubkey,
+    pub asks: Pubkey,
+    pub oracle: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpUpdateFundingInstruction {
+    type Accounts = mango_v4::accounts::PerpUpdateFunding;
+    type Instruction = mango_v4::instruction::PerpUpdateFunding;
+    async fn to_instruction(
+        &self,
+        _loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+        let accounts = Self::Accounts {
+            perp_market: self.perp_market,
+            bids: self.bids,
+            asks: self.asks,
+            oracle: self.oracle,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![]
+    }
+}
+
 pub struct BenchmarkInstruction {}
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for BenchmarkInstruction {

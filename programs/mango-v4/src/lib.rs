@@ -284,6 +284,10 @@ pub mod mango_v4 {
         instructions::perp_consume_events(ctx, limit)
     }
 
+    pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
+        instructions::perp_update_funding(ctx)
+    }
+
     // TODO
 
     // perp_force_cancel_order

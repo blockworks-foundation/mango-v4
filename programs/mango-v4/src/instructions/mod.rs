@@ -21,7 +21,7 @@ pub use serum3_place_order::*;
 pub use serum3_register_market::*;
 pub use serum3_settle_funds::*;
 pub use set_stub_oracle::*;
-pub use update_funding::*;
+pub use perp_update_funding::*;
 pub use update_index::*;
 pub use withdraw::*;
 
@@ -48,6 +48,6 @@ mod serum3_place_order;
 mod serum3_register_market;
 mod serum3_settle_funds;
 mod set_stub_oracle;
-mod update_funding;
+mod perp_update_funding;
 mod update_index;
 mod withdraw;

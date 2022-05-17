@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{consume_events, update_index, MangoClient};
+use crate::{consume_events, update_index, MangoClient, update_funding};
 
 use anyhow::ensure;
 
@@ -71,9 +71,17 @@ pub async fn runner(
         })
         .collect::<Vec<_>>();
 
+    let handles3 = perp_markets
+        .iter()
+        .map(|(pk, perp_market)| {
+            update_funding::loop_blocking(mango_client.clone(), *pk, *perp_market)
+        })
+        .collect::<Vec<_>>();
+
     futures::join!(
         futures::future::join_all(handles1),
         futures::future::join_all(handles2),
+        futures::future::join_all(handles3),
         debugging_handle
     );
 

@@ -1529,6 +1529,32 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "perpUpdateFunding",
+      "accounts": [
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "benchmark",
       "accounts": [],
       "args": []
@@ -4319,6 +4345,32 @@ export const IDL: MangoV4 = {
           }
         }
       ]
+    },
+    {
+      "name": "perpUpdateFunding",
+      "accounts": [
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
     },
     {
       "name": "benchmark",

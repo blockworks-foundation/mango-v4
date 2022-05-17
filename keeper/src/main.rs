@@ -1,5 +1,6 @@
 mod consume_events;
 mod crank;
+mod update_funding;
 mod update_index;
 
 use std::env;

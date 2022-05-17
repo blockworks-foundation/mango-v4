@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::state::{oracle_price, Book, PerpMarket};
 
 #[derive(Accounts)]
-pub struct UpdateFunding<'info> {
+pub struct PerpUpdateFunding<'info> {
     #[account(
         mut,
         has_one = bids,
@@ -18,7 +18,7 @@ pub struct UpdateFunding<'info> {
 
     pub oracle: UncheckedAccount<'info>,
 }
-pub fn update_funding(ctx: Context<UpdateFunding>) -> Result<()> {
+pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
     // TODO: should we enforce a minimum window between 2 update_funding ix calls?
     let now_ts = Clock::get()?.unix_timestamp;
 
