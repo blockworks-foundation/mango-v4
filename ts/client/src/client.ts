@@ -642,6 +642,9 @@ export class MangoClient {
     liquidationFee: number,
     makerFee: number,
     takerFee: number,
+    minFunding: number,
+    maxFunding: number,
+    impactQuantity: number,
   ): Promise<TransactionSignature> {
     const bids = new Keypair();
     const asks = new Keypair();
@@ -664,6 +667,9 @@ export class MangoClient {
         liquidationFee,
         makerFee,
         takerFee,
+        minFunding,
+        maxFunding,
+        new BN(impactQuantity),
       )
       .accounts({
         group: group.publicKey,

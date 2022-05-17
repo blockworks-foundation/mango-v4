@@ -155,6 +155,9 @@ async function main() {
       0.012,
       0.0002,
       0.0,
+      0.05,
+      0.05,
+      100,
     );
   } catch (error) {
     console.log(error);

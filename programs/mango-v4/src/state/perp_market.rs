@@ -47,12 +47,12 @@ pub struct PerpMarket {
     pub maker_fee: I80F48,
     pub taker_fee: I80F48,
 
-    pub max_funding: I80F48,
     pub min_funding: I80F48,
+    pub max_funding: I80F48,
+    pub impact_quantity: i64,
     pub long_funding: I80F48,
     pub short_funding: I80F48,
     pub funding_last_updated: i64,
-    pub impact_quantity: i64,
 
     ///
     pub open_interest: i64,
