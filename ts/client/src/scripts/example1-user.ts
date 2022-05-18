@@ -1,4 +1,4 @@
-import { Provider, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { OrderType, Side } from '../accounts/perp';
@@ -17,7 +17,7 @@ import { DEVNET_SERUM3_PROGRAM_ID } from '../constants';
 // process.env.ADMIN_KEYPAIR - group admin keypair path (useful for automatically finding the group)
 //
 async function main() {
-  const options = Provider.defaultOptions();
+  const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
     'https://mango.devnet.rpcpool.com',
     options,
@@ -29,7 +29,7 @@ async function main() {
     ),
   );
   const userWallet = new Wallet(user);
-  const userProvider = new Provider(connection, userWallet, options);
+  const userProvider = new AnchorProvider(connection, userWallet, options);
   const client = await MangoClient.connect(userProvider, true);
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 

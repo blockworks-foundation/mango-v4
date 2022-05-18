@@ -15,6 +15,8 @@ anchor build --skip-lint
 # update types in ts client package
 cp -v ./target/types/mango_v4.ts ./ts/client/src/mango_v4.ts
 
+(cd ./ts/client && tsc)
+
 if [[ -z "${NO_DEPLOY}" ]]; then
     # publish program
     solana --url https://mango.devnet.rpcpool.com program deploy --program-id $PROGRAM_ID  \

@@ -410,7 +410,7 @@ impl<'a> Book<'a> {
                     .remove_order(leaf_node.owner_slot as usize, leaf_node.quantity)?
             };
 
-            limit = limit - 1;
+            limit -= 1;
             if limit == 0 {
                 break;
             }

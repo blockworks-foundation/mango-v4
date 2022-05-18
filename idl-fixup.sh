@@ -7,6 +7,8 @@ for pair_str in \
         "TokenIndex u16" \
         "Serum3MarketIndex u16" \
         "PerpMarketIndex u16" \
+        "usize u64" \
+        "NodeHandle u32" \
         ; do
     pair=( $pair_str );
     perl -0777 -pi -e "s/\{\s*\"defined\":\s*\"${pair[0]}\"\s*\}/\"${pair[1]}\"/g" \
