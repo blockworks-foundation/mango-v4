@@ -121,6 +121,7 @@ impl Bank {
         position: &mut TokenAccount,
         mut native_amount: I80F48,
     ) -> Result<bool> {
+        require!(native_amount >= 0, MangoError::SomeError);
         let native_position = position.native(self);
 
         if native_position.is_negative() {
@@ -158,15 +159,39 @@ impl Bank {
         Ok(true)
     }
 
-    /// Returns whether the position is active
+    /// Returns whether the position is active after withdrawing from a position
+    /// without applying the loan origination fee.
     ///
     /// native_amount must be >= 0
     /// fractional withdraws can be relevant during liquidation, for example
-    pub fn withdraw(
+    pub fn withdraw_without_fee(
+        &mut self,
+        position: &mut TokenAccount,
+        native_amount: I80F48,
+    ) -> Result<bool> {
+        self.withdraw_internal(position, native_amount, false)
+    }
+
+    /// Returns whether the position is active after withdrawing from a position
+    /// while applying the loan origination fee if a borrow is created.
+    ///
+    /// native_amount must be >= 0
+    /// fractional withdraws can be relevant during liquidation, for example
+    pub fn withdraw_with_fee(
+        &mut self,
+        position: &mut TokenAccount,
+        native_amount: I80F48,
+    ) -> Result<bool> {
+        self.withdraw_internal(position, native_amount, true)
+    }
+
+    fn withdraw_internal(
         &mut self,
         position: &mut TokenAccount,
         mut native_amount: I80F48,
+        with_loan_origination_fee: bool,
     ) -> Result<bool> {
+        require!(native_amount >= 0, MangoError::SomeError);
         let native_position = position.native(self);
 
         if native_position.is_positive() {
@@ -196,6 +221,13 @@ impl Bank {
             native_amount = -new_native_position;
         }
 
+        if with_loan_origination_fee {
+            // charge loan origination fee
+            let loan_origination_fee = cm!(self.loan_origination_fee_rate * native_amount);
+            self.collected_fees_native = cm!(self.collected_fees_native + loan_origination_fee);
+            native_amount = cm!(native_amount + loan_origination_fee);
+        }
+
         // add to borrows
         let indexed_change = cm!(native_amount / self.borrow_index);
         self.indexed_total_borrows = cm!(self.indexed_total_borrows + indexed_change);
@@ -204,34 +236,30 @@ impl Bank {
         Ok(true)
     }
 
-    pub fn change(&mut self, position: &mut TokenAccount, native_amount: I80F48) -> Result<bool> {
+    /// Change a position without applying the loan origination fee
+    pub fn change_without_fee(
+        &mut self,
+        position: &mut TokenAccount,
+        native_amount: I80F48,
+    ) -> Result<bool> {
         if native_amount >= 0 {
             self.deposit(position, native_amount)
         } else {
-            self.withdraw(position, -native_amount)
+            self.withdraw_without_fee(position, -native_amount)
         }
     }
 
-    // collect loan origination fee for borrows
-    pub fn charge_loan_origination_fee(
+    /// Change a position, while taking the loan origination fee into account
+    pub fn change_with_fee(
         &mut self,
-        withdraw_amount: I80F48,
-        position: I80F48,
-    ) -> Result<I80F48> {
-        require!(withdraw_amount.is_positive(), MangoError::SomeError);
-
-        let mut loan_origination_fees = I80F48::ZERO;
-        if withdraw_amount > position {
-            let native_position_deposits_only = if position.is_negative() {
-                I80F48::ZERO
-            } else {
-                position
-            };
-            let borrow = cm!(withdraw_amount - native_position_deposits_only);
-            loan_origination_fees = cm!(self.loan_origination_fee_rate * borrow);
-            self.collected_fees_native = cm!(self.collected_fees_native + loan_origination_fees);
+        position: &mut TokenAccount,
+        native_amount: I80F48,
+    ) -> Result<bool> {
+        if native_amount >= 0 {
+            self.deposit(position, native_amount)
+        } else {
+            self.withdraw_with_fee(position, -native_amount)
         }
-        Ok(loan_origination_fees)
     }
 
     // Borrows continously expose insurance fund to risk, collect fees from borrowers
@@ -317,6 +345,7 @@ impl Bank {
 #[cfg(test)]
 mod tests {
     use bytemuck::Zeroable;
+    use std::cmp::min;
 
     use super::*;
 
@@ -358,6 +387,7 @@ mod tests {
                 let mut bank = Bank::zeroed();
                 bank.deposit_index = I80F48::from_num(100.0);
                 bank.borrow_index = I80F48::from_num(10.0);
+                bank.loan_origination_fee_rate = I80F48::from_num(0.1);
                 let indexed = |v: I80F48, b: &Bank| {
                     if v > 0 {
                         v / b.deposit_index
@@ -388,7 +418,7 @@ mod tests {
                 //
 
                 let change = I80F48::from(change);
-                let is_active = bank.change(&mut account, change)?;
+                let is_active = bank.change_with_fee(&mut account, change)?;
 
                 let mut expected_native = start_native + change;
                 if expected_native >= 0.0 && expected_native < 1.0 && !is_in_use {
@@ -398,6 +428,10 @@ mod tests {
                 } else {
                     assert!(is_active);
                     assert_eq!(bank.dust, I80F48::ZERO);
+                }
+                if change < 0 && expected_native < 0 {
+                    let new_borrow = -(expected_native - min(start_native, I80F48::ZERO));
+                    expected_native -= new_borrow * bank.loan_origination_fee_rate;
                 }
                 let expected_indexed = indexed(expected_native, &bank);
 

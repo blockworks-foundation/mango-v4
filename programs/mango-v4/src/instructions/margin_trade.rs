@@ -3,7 +3,6 @@ use crate::state::{compute_health_from_fixed_accounts, Bank, Group, HealthType, 
 use crate::{group_seeds, Mango};
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
-use checked_math as cm;
 use fixed::types::I80F48;
 use solana_program::instruction::Instruction;
 #[derive(Accounts)]
@@ -177,17 +176,7 @@ fn adjust_for_post_cpi_amounts(
             let position = account.tokens.get_mut_or_create(bank.token_index)?.0;
 
             let change = I80F48::from(vault.amount) - I80F48::from(*pre_cpi_amount);
-
-            if change.is_negative() {
-                let withdraw_amount = -change;
-                let native_position = position.native(&bank);
-                let loan_origination_fees =
-                    bank.charge_loan_origination_fee(withdraw_amount, native_position)?;
-                bank.withdraw(position, cm!(withdraw_amount + loan_origination_fees))?;
-            } else {
-                let deposit_amount = change;
-                bank.deposit(position, deposit_amount)?;
-            }
+            bank.change_with_fee(position, change)?;
         }
     }
     Ok(())

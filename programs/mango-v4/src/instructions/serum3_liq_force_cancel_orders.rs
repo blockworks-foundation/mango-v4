@@ -138,14 +138,14 @@ pub fn serum3_liq_force_cancel_orders(
 
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let base_position = account.tokens.get_mut(base_bank.token_index)?;
-        base_bank.change(
+        base_bank.deposit(
             base_position,
             I80F48::from(after_base_vault) - I80F48::from(before_base_vault),
         )?;
 
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
         let quote_position = account.tokens.get_mut(quote_bank.token_index)?;
-        quote_bank.change(
+        quote_bank.deposit(
             quote_position,
             I80F48::from(after_quote_vault) - I80F48::from(before_quote_vault),
         )?;
