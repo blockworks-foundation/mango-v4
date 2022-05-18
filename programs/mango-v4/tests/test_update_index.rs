@@ -2,14 +2,14 @@
 
 use mango_v4::state::Bank;
 use solana_program_test::*;
-use solana_sdk::signature::Keypair;
+use solana_sdk::{signature::Keypair, transport::TransportError};
 
 use program_test::*;
 
 mod program_test;
 
 #[tokio::test]
-async fn test_update_index() -> Result<(), BanksClientError> {
+async fn test_update_index() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 

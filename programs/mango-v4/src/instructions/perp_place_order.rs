@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::error::*;
 use crate::state::{
-    oracle_price, Book, EventQueueHeader, Group, MangoAccount, OrderType, PerpMarket, Queue, Side,
+    oracle_price, Book, EventQueue, Group, MangoAccount, OrderType, PerpMarket, Side,
 };
 
 #[derive(Accounts)]
@@ -30,7 +30,7 @@ pub struct PerpPlaceOrder<'info> {
     #[account(mut)]
     pub bids: UncheckedAccount<'info>,
     #[account(mut)]
-    pub event_queue: AccountLoader<'info, Queue<EventQueueHeader>>,
+    pub event_queue: AccountLoader<'info, EventQueue>,
 
     pub oracle: UncheckedAccount<'info>,
 

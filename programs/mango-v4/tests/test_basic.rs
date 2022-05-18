@@ -2,7 +2,7 @@
 
 use fixed::types::I80F48;
 use solana_program_test::*;
-use solana_sdk::{signature::Keypair, signature::Signer};
+use solana_sdk::{signature::Keypair, signature::Signer, transport::TransportError};
 
 use mango_v4::state::*;
 use program_test::*;
@@ -12,7 +12,7 @@ mod program_test;
 // This is an unspecific happy-case test that just runs a few instructions to check
 // that they work in principle. It should be split up / renamed.
 #[tokio::test]
-async fn test_basic() -> Result<(), BanksClientError> {
+async fn test_basic() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 

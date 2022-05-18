@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use checked_math as cm;
 use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
+use std::cmp::Ordering;
 use std::mem::size_of;
 
 use crate::error::*;
@@ -374,12 +375,18 @@ impl PerpAccount {
 
     /// Move unrealized funding payments into the quote_position
     pub fn settle_funding(&mut self, perp_market: &PerpMarket) {
-        if self.base_position_lots > 0 {
-            self.quote_position_native -= (perp_market.long_funding - self.long_settled_funding)
-                * I80F48::from_num(self.base_position_lots);
-        } else if self.base_position_lots < 0 {
-            self.quote_position_native -= (perp_market.short_funding - self.short_settled_funding)
-                * I80F48::from_num(self.base_position_lots);
+        match self.base_position_lots.cmp(&0) {
+            Ordering::Greater => {
+                self.quote_position_native -= (perp_market.long_funding
+                    - self.long_settled_funding)
+                    * I80F48::from_num(self.base_position_lots);
+            }
+            Ordering::Less => {
+                self.quote_position_native -= (perp_market.short_funding
+                    - self.short_settled_funding)
+                    * I80F48::from_num(self.base_position_lots);
+            }
+            Ordering::Equal => (),
         }
         self.long_settled_funding = perp_market.long_funding;
         self.short_settled_funding = perp_market.short_funding;

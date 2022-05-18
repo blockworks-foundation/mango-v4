@@ -23,12 +23,12 @@ pub trait QueueHeader: bytemuck::Pod {
 }
 
 #[account(zero_copy)]
-pub struct Queue<H: QueueHeader> {
-    pub header: H,
-    pub buf: [H::Item; MAX_NUM_EVENTS],
+pub struct EventQueue {
+    pub header: EventQueueHeader,
+    pub buf: [AnyEvent; MAX_NUM_EVENTS],
 }
 
-impl<'a, H: QueueHeader> Queue<H> {
+impl EventQueue {
     pub fn len(&self) -> usize {
         self.header.count()
     }
@@ -45,7 +45,7 @@ impl<'a, H: QueueHeader> Queue<H> {
         self.header.count() == 0
     }
 
-    pub fn push_back(&mut self, value: H::Item) -> std::result::Result<(), H::Item> {
+    pub fn push_back(&mut self, value: AnyEvent) -> std::result::Result<(), AnyEvent> {
         if self.full() {
             return Err(value);
         }
@@ -59,21 +59,21 @@ impl<'a, H: QueueHeader> Queue<H> {
         Ok(())
     }
 
-    pub fn peek_front(&self) -> Option<&H::Item> {
+    pub fn peek_front(&self) -> Option<&AnyEvent> {
         if self.empty() {
             return None;
         }
         Some(&self.buf[self.header.head()])
     }
 
-    pub fn peek_front_mut(&mut self) -> Option<&mut H::Item> {
+    pub fn peek_front_mut(&mut self) -> Option<&mut AnyEvent> {
         if self.empty() {
             return None;
         }
         Some(&mut self.buf[self.header.head()])
     }
 
-    pub fn pop_front(&mut self) -> Result<H::Item> {
+    pub fn pop_front(&mut self) -> Result<AnyEvent> {
         require!(!self.empty(), MangoError::SomeError);
 
         let value = self.buf[self.header.head()];
@@ -95,21 +95,21 @@ impl<'a, H: QueueHeader> Queue<H> {
         Ok(())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &H::Item> {
-        QueueIterator {
+    pub fn iter(&self) -> impl Iterator<Item = &AnyEvent> {
+        EventQueueIterator {
             queue: self,
             index: 0,
         }
     }
 }
 
-struct QueueIterator<'a, H: QueueHeader> {
-    queue: &'a Queue<H>,
+struct EventQueueIterator<'a> {
+    queue: &'a EventQueue,
     index: usize,
 }
 
-impl<'a, H: QueueHeader> Iterator for QueueIterator<'a, H> {
-    type Item = &'a H::Item;
+impl<'a> Iterator for EventQueueIterator<'a> {
+    type Item = &'a AnyEvent;
     fn next(&mut self) -> Option<Self::Item> {
         if self.index == self.queue.len() {
             None
@@ -122,7 +122,8 @@ impl<'a, H: QueueHeader> Iterator for QueueIterator<'a, H> {
     }
 }
 
-#[account(zero_copy)]
+#[zero_copy]
+#[derive(Pod)]
 pub struct EventQueueHeader {
     head: usize,
     count: usize,
@@ -152,17 +153,18 @@ impl QueueHeader for EventQueueHeader {
     }
 }
 
-pub type EventQueue = Queue<EventQueueHeader>;
 const_assert_eq!(std::mem::size_of::<EventQueue>(), 8 * 3 + 512 * 200);
 const_assert_eq!(std::mem::size_of::<EventQueue>() % 8, 0);
 
 const EVENT_SIZE: usize = 200;
-#[derive(Copy, Clone, Debug, Pod)]
-#[repr(C)]
+#[zero_copy]
+#[derive(Debug, Pod)]
 pub struct AnyEvent {
     pub event_type: u8,
-    pub padding: [u8; EVENT_SIZE - 1],
+    pub padding: [u8; 199], // note: anchor can't parse the struct for IDL when it includes non numbers, EVENT_SIZE == 200, 199 == 200 - 1
 }
+
+const_assert_eq!(size_of::<AnyEvent>(), EVENT_SIZE);
 
 #[derive(Copy, Clone, IntoPrimitive, TryFromPrimitive, Eq, PartialEq)]
 #[repr(u8)]

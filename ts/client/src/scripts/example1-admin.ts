@@ -1,4 +1,4 @@
-import { Provider, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
@@ -25,7 +25,7 @@ const DEVNET_ORACLES = new Map([
 // * solana airdrop 1  -k ~/.config/solana/admin.json
 //
 async function main() {
-  const options = Provider.defaultOptions();
+  const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
     'https://mango.devnet.rpcpool.com',
     options,
@@ -38,7 +38,7 @@ async function main() {
   );
   const adminWallet = new Wallet(admin);
   console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
-  const adminProvider = new Provider(connection, adminWallet, options);
+  const adminProvider = new AnchorProvider(connection, adminWallet, options);
   const client = await MangoClient.connect(adminProvider, true);
 
   // group

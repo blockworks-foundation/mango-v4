@@ -519,9 +519,7 @@ export type MangoV4 = {
       "args": [
         {
           "name": "banksLen",
-          "type": {
-            "defined": "usize"
-          }
+          "type": "u64"
         },
         {
           "name": "cpiData",
@@ -1522,9 +1520,7 @@ export type MangoV4 = {
       "args": [
         {
           "name": "limit",
-          "type": {
-            "defined": "usize"
-          }
+          "type": "u64"
         }
       ]
     },
@@ -1917,33 +1913,23 @@ export type MangoV4 = {
           },
           {
             "name": "bumpIndex",
-            "type": {
-              "defined": "usize"
-            }
+            "type": "u64"
           },
           {
             "name": "freeListLen",
-            "type": {
-              "defined": "usize"
-            }
+            "type": "u64"
           },
           {
             "name": "freeListHead",
-            "type": {
-              "defined": "NodeHandle"
-            }
+            "type": "u32"
           },
           {
             "name": "rootNode",
-            "type": {
-              "defined": "NodeHandle"
-            }
+            "type": "u32"
           },
           {
             "name": "leafCount",
-            "type": {
-              "defined": "usize"
-            }
+            "type": "u64"
           },
           {
             "name": "nodes",
@@ -1960,14 +1946,14 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "queue",
+      "name": "eventQueue",
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "header",
             "type": {
-              "defined": "H"
+              "defined": "EventQueueHeader"
             }
           },
           {
@@ -1975,36 +1961,10 @@ export type MangoV4 = {
             "type": {
               "array": [
                 {
-                  "defined": "H::Item"
+                  "defined": "AnyEvent"
                 },
                 512
               ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "eventQueueHeader",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "head",
-            "type": {
-              "defined": "usize"
-            }
-          },
-          {
-            "name": "count",
-            "type": {
-              "defined": "usize"
-            }
-          },
-          {
-            "name": "seqNum",
-            "type": {
-              "defined": "usize"
             }
           }
         ]
@@ -2464,6 +2424,68 @@ export type MangoV4 = {
               "array": [
                 "u64",
                 8
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AnyNode",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tag",
+            "type": "u32"
+          },
+          {
+            "name": "data",
+            "type": {
+              "array": [
+                "u8",
+                84
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "EventQueueHeader",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "head",
+            "type": "u64"
+          },
+          {
+            "name": "count",
+            "type": "u64"
+          },
+          {
+            "name": "seqNum",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AnyEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "eventType",
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                199
               ]
             }
           }
@@ -3337,9 +3359,7 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "banksLen",
-          "type": {
-            "defined": "usize"
-          }
+          "type": "u64"
         },
         {
           "name": "cpiData",
@@ -4340,9 +4360,7 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "limit",
-          "type": {
-            "defined": "usize"
-          }
+          "type": "u64"
         }
       ]
     },
@@ -4735,33 +4753,23 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "bumpIndex",
-            "type": {
-              "defined": "usize"
-            }
+            "type": "u64"
           },
           {
             "name": "freeListLen",
-            "type": {
-              "defined": "usize"
-            }
+            "type": "u64"
           },
           {
             "name": "freeListHead",
-            "type": {
-              "defined": "NodeHandle"
-            }
+            "type": "u32"
           },
           {
             "name": "rootNode",
-            "type": {
-              "defined": "NodeHandle"
-            }
+            "type": "u32"
           },
           {
             "name": "leafCount",
-            "type": {
-              "defined": "usize"
-            }
+            "type": "u64"
           },
           {
             "name": "nodes",
@@ -4778,14 +4786,14 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "queue",
+      "name": "eventQueue",
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "header",
             "type": {
-              "defined": "H"
+              "defined": "EventQueueHeader"
             }
           },
           {
@@ -4793,36 +4801,10 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 {
-                  "defined": "H::Item"
+                  "defined": "AnyEvent"
                 },
                 512
               ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "eventQueueHeader",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "head",
-            "type": {
-              "defined": "usize"
-            }
-          },
-          {
-            "name": "count",
-            "type": {
-              "defined": "usize"
-            }
-          },
-          {
-            "name": "seqNum",
-            "type": {
-              "defined": "usize"
             }
           }
         ]
@@ -5282,6 +5264,68 @@ export const IDL: MangoV4 = {
               "array": [
                 "u64",
                 8
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AnyNode",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tag",
+            "type": "u32"
+          },
+          {
+            "name": "data",
+            "type": {
+              "array": [
+                "u8",
+                84
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "EventQueueHeader",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "head",
+            "type": "u64"
+          },
+          {
+            "name": "count",
+            "type": "u64"
+          },
+          {
+            "name": "seqNum",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AnyEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "eventType",
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                199
               ]
             }
           }

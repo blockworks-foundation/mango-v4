@@ -5,6 +5,7 @@ use anchor_lang::AccountDeserialize;
 use anchor_spl::token::TokenAccount;
 use solana_program::{program_pack::Pack, rent::*, system_instruction};
 use solana_program_test::*;
+use solana_sdk::transport::TransportError;
 use solana_sdk::{
     account::ReadableAccount,
     instruction::Instruction,
@@ -26,7 +27,7 @@ impl SolanaCookie {
         &self,
         instructions: &[Instruction],
         signers: Option<&[&Keypair]>,
-    ) -> Result<(), BanksClientError> {
+    ) -> Result<(), TransportError> {
         self.program_log.write().unwrap().clear();
 
         let mut context = self.context.borrow_mut();
