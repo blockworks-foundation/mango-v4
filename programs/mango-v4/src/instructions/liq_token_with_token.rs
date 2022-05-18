@@ -119,21 +119,17 @@ pub fn liq_token_with_token(
 
         // Apply the balance changes to the liqor and liqee accounts
         liab_bank.deposit(liqee.tokens.get_mut(liab_token_index)?, liab_transfer)?;
-
-        let position = liqor.tokens.get_mut_or_create(liab_token_index)?.0;
-        let position_native = position.native(&liab_bank);
-        let loan_origination_fees =
-            liab_bank.charge_loan_origination_fee(liab_transfer, position_native)?;
-        liab_bank.withdraw(
+        liab_bank.withdraw_with_fee(
             liqor.tokens.get_mut_or_create(liab_token_index)?.0,
-            cm!(liab_transfer + loan_origination_fees),
+            liab_transfer,
         )?;
 
         asset_bank.deposit(
             liqor.tokens.get_mut_or_create(asset_token_index)?.0,
             asset_transfer,
         )?;
-        asset_bank.withdraw(liqee.tokens.get_mut(asset_token_index)?, asset_transfer)?;
+        asset_bank
+            .withdraw_without_fee(liqee.tokens.get_mut(asset_token_index)?, asset_transfer)?;
 
         // Update the health cache
         liqee_health_cache.adjust_token_balance(liab_token_index, liab_transfer)?;

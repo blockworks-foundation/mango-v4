@@ -4,7 +4,6 @@ use anchor_lang::prelude::*;
 use anchor_spl::token;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
-use checked_math as cm;
 use fixed::types::I80F48;
 
 #[derive(Accounts)]
@@ -91,12 +90,8 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
 
         let amount_i80f48 = I80F48::from(amount);
 
-        let loan_origination_fees =
-            bank.charge_loan_origination_fee(amount_i80f48, native_position)?;
-
         // Update the bank and position
-        let position_is_active =
-            bank.withdraw(position, cm!(amount_i80f48 + loan_origination_fees))?;
+        let position_is_active = bank.withdraw_with_fee(position, amount_i80f48)?;
 
         // Transfer the actual tokens
         let group_seeds = group_seeds!(group);
