@@ -247,6 +247,7 @@ pub async fn account_position(solana: &SolanaCookie, account: Pubkey, bank: Pubk
 pub struct MarginTradeInstruction<'keypair> {
     pub account: Pubkey,
     pub owner: &'keypair Keypair,
+    pub mango_token_bank: Pubkey,
     pub mango_token_vault: Pubkey,
     pub margin_trade_program_id: Pubkey,
     pub deposit_account: Pubkey,
@@ -265,25 +266,34 @@ impl<'keypair> ClientInstruction for MarginTradeInstruction<'keypair> {
 
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
 
-        let instruction = Self::Instruction {
-            banks_len: account.tokens.iter_active().count(),
-            cpi_data: self.margin_trade_program_ix_cpi_data.clone(),
-        };
-
         let accounts = Self::Accounts {
             group: account.group,
             account: self.account,
             owner: self.owner.pubkey(),
         };
 
-        let health_check_metas =
-            derive_health_check_remaining_account_metas(&account_loader, &account, None, true)
-                .await;
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            Some(self.mango_token_bank),
+            true,
+        )
+        .await;
+
+        let instruction = Self::Instruction {
+            num_health_accounts: health_check_metas.len(),
+            cpi_data: self.margin_trade_program_ix_cpi_data.clone(),
+        };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
         instruction.accounts.extend(health_check_metas.into_iter());
         instruction.accounts.push(AccountMeta {
             pubkey: self.margin_trade_program_id,
+            is_writable: false,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.mango_token_bank,
             is_writable: false,
             is_signer: false,
         });

@@ -105,14 +105,15 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
             MarginTradeInstruction {
                 account,
                 owner,
+                mango_token_bank: bank,
                 mango_token_vault: vault,
                 margin_trade_program_id: margin_trade.program,
                 deposit_account: margin_trade.token_account.pubkey(),
                 deposit_account_owner: margin_trade.token_account_owner,
                 margin_trade_program_ix_cpi_data: {
                     let ix = margin_trade::instruction::MarginTrade {
-                        amount_from: 2,
-                        amount_to: 1,
+                        amount_from: withdraw_amount,
+                        amount_to: deposit_amount,
                         deposit_account_owner_bump_seeds: margin_trade.token_account_bump,
                     };
                     ix.data()
@@ -132,6 +133,93 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
             .await,
         withdraw_amount - deposit_amount
     );
+
+    //
+    // TEST: Bringing the balance to 0 deactivates the token
+    //
+    let deposit_amount_initial = solana.token_account_balance(vault).await;
+    let margin_account_initial = solana
+        .token_account_balance(margin_trade.token_account.pubkey())
+        .await;
+    let withdraw_amount = deposit_amount_initial;
+    let deposit_amount = 0;
+    {
+        send_tx(
+            solana,
+            MarginTradeInstruction {
+                account,
+                owner,
+                mango_token_bank: bank,
+                mango_token_vault: vault,
+                margin_trade_program_id: margin_trade.program,
+                deposit_account: margin_trade.token_account.pubkey(),
+                deposit_account_owner: margin_trade.token_account_owner,
+                margin_trade_program_ix_cpi_data: {
+                    let ix = margin_trade::instruction::MarginTrade {
+                        amount_from: withdraw_amount,
+                        amount_to: deposit_amount,
+                        deposit_account_owner_bump_seeds: margin_trade.token_account_bump,
+                    };
+                    ix.data()
+                },
+            },
+        )
+        .await
+        .unwrap();
+    }
+    assert_eq!(solana.token_account_balance(vault).await, 0);
+    assert_eq!(
+        solana
+            .token_account_balance(margin_trade.token_account.pubkey())
+            .await,
+        margin_account_initial + withdraw_amount
+    );
+    // Check that position is fully deactivated
+    let account_data: MangoAccount = solana.get_account(account).await;
+    assert_eq!(account_data.tokens.iter_active().count(), 0);
+
+    //
+    // TEST: Activating a token via margin trade
+    //
+    let margin_account_initial = solana
+        .token_account_balance(margin_trade.token_account.pubkey())
+        .await;
+    let withdraw_amount = 0;
+    let deposit_amount = margin_account_initial;
+    {
+        send_tx(
+            solana,
+            MarginTradeInstruction {
+                account,
+                owner,
+                mango_token_bank: bank,
+                mango_token_vault: vault,
+                margin_trade_program_id: margin_trade.program,
+                deposit_account: margin_trade.token_account.pubkey(),
+                deposit_account_owner: margin_trade.token_account_owner,
+                margin_trade_program_ix_cpi_data: {
+                    let ix = margin_trade::instruction::MarginTrade {
+                        amount_from: withdraw_amount,
+                        amount_to: deposit_amount,
+                        deposit_account_owner_bump_seeds: margin_trade.token_account_bump,
+                    };
+                    ix.data()
+                },
+            },
+        )
+        .await
+        .unwrap();
+    }
+    assert_eq!(solana.token_account_balance(vault).await, deposit_amount);
+    assert_eq!(
+        solana
+            .token_account_balance(margin_trade.token_account.pubkey())
+            .await,
+        0
+    );
+    // Check that position is active
+    let account_data: MangoAccount = solana.get_account(account).await;
+    assert_eq!(account_data.tokens.iter_active().count(), 1);
 
     Ok(())
 }

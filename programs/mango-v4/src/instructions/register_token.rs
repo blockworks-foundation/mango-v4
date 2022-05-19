@@ -1,12 +1,11 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
-use anchor_spl::token::Token;
-use anchor_spl::token::TokenAccount;
+use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
 // TODO: ALTs are unavailable
 //use crate::address_lookup_table;
+use crate::error::*;
 use crate::state::*;
 use crate::util::fill16_from_str;
 
@@ -75,6 +74,18 @@ pub struct RegisterToken<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
+impl<'info> RegisterToken<'info> {
+    pub fn approve_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Approve<'info>> {
+        let program = self.token_program.to_account_info();
+        let accounts = token::Approve {
+            to: self.vault.to_account_info(),
+            delegate: self.bank.to_account_info(),
+            authority: self.group.to_account_info(),
+        };
+        CpiContext::new(program, accounts)
+    }
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Default)]
 pub struct InterestRateParams {
     pub util0: f32,
@@ -101,6 +112,17 @@ pub fn register_token(
     liquidation_fee: f32,
 ) -> Result<()> {
     // TODO: Error if mint is already configured (technically, init of vault will fail)
+
+    // Approve the bank account for withdraws from the vault. This allows us to later sign with a
+    // bank for foreign cpi calls in margin_trade and thereby give the foreign program the ability
+    // to withdraw - without the ability to set new delegates or close the token account.
+    // TODO: we need to refresh this approve occasionally?!
+    let group = ctx.accounts.group.load()?;
+    let group_seeds = group_seeds!(group);
+    token::approve(
+        ctx.accounts.approve_ctx().with_signer(&[group_seeds]),
+        u64::MAX,
+    )?;
 
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
@@ -130,6 +152,7 @@ pub fn register_token(
         liquidation_fee: I80F48::from_num(liquidation_fee),
         dust: I80F48::ZERO,
         token_index,
+        bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         reserved: Default::default(),
     };
 

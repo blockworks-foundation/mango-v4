@@ -59,9 +59,11 @@ pub struct Bank {
     // Index into TokenInfo on the group
     pub token_index: TokenIndex,
 
-    pub reserved: [u8; 6],
+    pub bump: u8,
+
+    pub reserved: [u8; 5],
 }
-const_assert_eq!(size_of::<Bank>(), 16 + 32 * 4 + 8 + 16 * 18 + 2 + 6);
+const_assert_eq!(size_of::<Bank>(), 16 + 32 * 4 + 8 + 16 * 18 + 3 + 5);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
 impl std::fmt::Debug for Bank {
@@ -341,6 +343,20 @@ impl Bank {
         }
     }
 }
+
+#[macro_export]
+macro_rules! bank_seeds {
+    ( $bank:expr ) => {
+        &[
+            $bank.group.as_ref(),
+            b"Bank".as_ref(),
+            $bank.token_index.to_le_bytes(),
+            &[$bank.bump],
+        ]
+    };
+}
+
+pub use bank_seeds;
 
 #[cfg(test)]
 mod tests {
