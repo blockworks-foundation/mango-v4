@@ -113,17 +113,6 @@ pub fn register_token(
 ) -> Result<()> {
     // TODO: Error if mint is already configured (technically, init of vault will fail)
 
-    // Approve the bank account for withdraws from the vault. This allows us to later sign with a
-    // bank for foreign cpi calls in margin_trade and thereby give the foreign program the ability
-    // to withdraw - without the ability to set new delegates or close the token account.
-    // TODO: we need to refresh this approve occasionally?!
-    let group = ctx.accounts.group.load()?;
-    let group_seeds = group_seeds!(group);
-    token::approve(
-        ctx.accounts.approve_ctx().with_signer(&[group_seeds]),
-        u64::MAX,
-    )?;
-
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
         name: fill16_from_str(name)?,
