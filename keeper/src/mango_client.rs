@@ -188,20 +188,6 @@ impl MangoClient {
         self.group
     }
 
-    pub fn reload_cache(&mut self) {
-        // TODO
-    }
-
-    pub fn get_banks(&self) -> Result<Vec<(Pubkey, Bank)>, anchor_client::ClientError> {
-        self.program()
-            .accounts::<Bank>(vec![RpcFilterType::Memcmp(Memcmp {
-                offset: 24,
-                bytes: MemcmpEncodedBytes::Base58(self.group().to_string()),
-                encoding: None,
-            })])
-    }
-
-    // todo cache some uses
     pub fn get_account(&self) -> Result<(Pubkey, MangoAccount), anchor_client::ClientError> {
         let mango_accounts = self.program().accounts::<MangoAccount>(vec![
             RpcFilterType::Memcmp(Memcmp {
@@ -679,17 +665,6 @@ impl MangoClient {
     //
     // Perps
     //
-
-    pub fn get_perp_markets(
-        &self,
-    ) -> Result<Vec<(Pubkey, PerpMarket)>, anchor_client::ClientError> {
-        self.program()
-            .accounts::<PerpMarket>(vec![RpcFilterType::Memcmp(Memcmp {
-                offset: 24,
-                bytes: MemcmpEncodedBytes::Base58(self.group().to_string()),
-                encoding: None,
-            })])
-    }
 
     //
     //
