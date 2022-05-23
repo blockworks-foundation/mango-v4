@@ -464,13 +464,18 @@ impl MangoClient {
 
         let health_check_metas = self.derive_health_check_remaining_account_metas(None, false)?;
 
-        // todo: review below code
-        // todo: replace 10u64.pow(6) with actual values from mint
+        // https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1306
         let limit_price = {
-            (price * ((10u64.pow(6) * market_external.coin_lot_size) as f64)) as u64
-                / (10u64.pow(6) * market_external.pc_lot_size)
+            (price
+                * ((10u64.pow(quote_mint.decimals as u32) * market_external.coin_lot_size) as f64))
+                as u64
+                / (10u64.pow(base_mint.decimals as u32) * market_external.pc_lot_size)
         };
-        let max_base_qty = { (size * 10u64.pow(6) as f64) as u64 / market_external.coin_lot_size };
+        // https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1333
+        let max_base_qty = {
+            (size * 10u64.pow(base_mint.decimals as u32) as f64) as u64
+                / market_external.coin_lot_size
+        };
         let max_native_quote_qty_including_fees = {
             fn get_fee_tier(msrm_balance: u64, srm_balance: u64) -> u64 {
                 if msrm_balance >= 1 {
