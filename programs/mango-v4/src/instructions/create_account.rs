@@ -33,15 +33,9 @@ pub fn create_account(ctx: Context<CreateAccount>, account_num: u8, name: String
         name: fill32_from_str(name)?,
         group: ctx.accounts.group.key(),
         owner: ctx.accounts.owner.key(),
-        delegate: Pubkey::default(),
-        tokens: MangoAccountTokens::new(),
-        serum3: MangoAccountSerum3::new(),
-        perps: MangoAccountPerps::new(),
-        being_liquidated: 0,
-        is_bankrupt: 0,
         account_num,
         bump: *ctx.bumps.get("account").ok_or(MangoError::SomeError)?,
-        reserved: Default::default(),
+        ..MangoAccount::default()
     };
 
     Ok(())

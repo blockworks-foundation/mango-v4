@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 use serum_dex::state::OpenOrders;
 use std::cell::{Ref, RefMut};
-use std::cmp::min;
 use std::collections::HashMap;
 
 use crate::error::MangoError;
@@ -122,7 +121,7 @@ impl<'a, 'b> ScanningAccountRetriever<'a, 'b> {
             };
         }
 
-        // skip all banks and oracles
+        // skip all banks and oracles, then find number of PerpMarket accounts
         let skip = token_index_map.len() * 2;
         let mut perp_index_map = HashMap::with_capacity(ais.len() - skip);
         for (i, ai) in ais[skip..].iter().enumerate() {
@@ -133,7 +132,9 @@ impl<'a, 'b> ScanningAccountRetriever<'a, 'b> {
                 }
                 Err(Error::AnchorError(error))
                     if error.error_code_number
-                        == ErrorCode::AccountDiscriminatorMismatch as u32 =>
+                        == ErrorCode::AccountDiscriminatorMismatch as u32
+                        || error.error_code_number
+                            == ErrorCode::AccountOwnedByWrongProgram as u32 =>
                 {
                     break;
                 }
@@ -212,7 +213,7 @@ impl<'a, 'b> AccountRetriever<'a, 'b> for ScanningAccountRetriever<'a, 'b> {
         let oo = self.ais[self.begin_serum3()..]
             .iter()
             .find(|ai| ai.key == key)
-            .unwrap();
+            .ok_or_else(|| error!(MangoError::SomeError))?;
         serum3_cpi::load_open_orders(oo)
     }
 }
@@ -306,8 +307,33 @@ impl TokenInfo {
     }
 }
 
+struct PerpInfo {
+    maint_asset_weight: I80F48,
+    init_asset_weight: I80F48,
+    maint_liab_weight: I80F48,
+    init_liab_weight: I80F48,
+    // in health-reference-token native units, needs scaling by asset/liab
+    base: I80F48,
+    // in health-reference-token native units, no asset/liab factor needed
+    quote: I80F48,
+}
+
+impl PerpInfo {
+    #[inline(always)]
+    fn health_contribution(&self, health_type: HealthType) -> I80F48 {
+        let factor = match (health_type, self.base.is_negative()) {
+            (HealthType::Init, true) => self.init_liab_weight,
+            (HealthType::Init, false) => self.init_asset_weight,
+            (HealthType::Maint, true) => self.maint_liab_weight,
+            (HealthType::Maint, false) => self.maint_asset_weight,
+        };
+        cm!(self.quote + factor * self.base)
+    }
+}
+
 pub struct HealthCache {
     token_infos: Vec<TokenInfo>,
+    perp_infos: Vec<PerpInfo>,
 }
 
 impl HealthCache {
@@ -315,6 +341,10 @@ impl HealthCache {
         let mut health = I80F48::ZERO;
         for token_info in self.token_infos.iter() {
             let contrib = health_contribution(health_type, token_info, token_info.balance)?;
+            health = cm!(health + contrib);
+        }
+        for perp_info in self.perp_infos.iter() {
+            let contrib = perp_info.health_contribution(health_type);
             health = cm!(health + contrib);
         }
         Ok(health)
@@ -346,28 +376,6 @@ fn health_contribution(
         info.asset_weight(health_type)
     };
     Ok(cm!(balance * weight))
-}
-
-/// Weigh a perp base balance (in lots) with the appropriate health weight
-#[inline(always)]
-fn health_weighted_perp_base_lots(
-    health_type: HealthType,
-    market: &PerpMarket,
-    lots: i64,
-) -> Result<I80F48> {
-    let weight = if lots.is_negative() {
-        match health_type {
-            HealthType::Init => market.init_liab_weight,
-            HealthType::Maint => market.maint_liab_weight,
-        }
-    } else {
-        match health_type {
-            HealthType::Init => market.init_asset_weight,
-            HealthType::Maint => market.maint_asset_weight,
-        }
-    };
-    let lots = I80F48::from(lots);
-    Ok(cm!(weight * lots))
 }
 
 /// Compute health contribution of two tokens - pure convenience
@@ -471,6 +479,7 @@ fn compute_health_detail<'a, 'b: 'a>(
     }
 
     // health contribution from perp accounts
+    let mut perp_infos = Vec::with_capacity(account.perps.iter_active_accounts().count());
     for (i, perp_account) in account.perps.iter_active_accounts().enumerate() {
         let perp_market = retriever.perp_market(&account.group, i, perp_account.market_index)?;
 
@@ -479,17 +488,7 @@ fn compute_health_detail<'a, 'b: 'a>(
             .iter()
             .position(|ti| ti.token_index == perp_market.base_token_index)
             .ok_or_else(|| error!(MangoError::SomeError))?;
-        let quote_index = token_infos
-            .iter()
-            .position(|ti| ti.token_index == perp_market.quote_token_index)
-            .ok_or_else(|| error!(MangoError::SomeError))?;
-        let (base_info, quote_info) = if base_index < quote_index {
-            let (l, r) = token_infos.split_at_mut(quote_index);
-            (&mut l[base_index], &mut r[0])
-        } else {
-            let (l, r) = token_infos.split_at_mut(base_index);
-            (&mut r[0], &mut l[quote_index])
-        };
+        let base_info = &token_infos[base_index];
 
         let base_lot_size = I80F48::from(perp_market.base_lot_size);
 
@@ -497,87 +496,91 @@ fn compute_health_detail<'a, 'b: 'a>(
         let taker_quote = I80F48::from(cm!(
             perp_account.taker_quote_lots * perp_market.quote_lot_size
         ));
-        let quote = cm!(perp_account.quote_position_native + taker_quote);
+        let quote_current = cm!(perp_account.quote_position_native + taker_quote);
 
         // Two scenarios:
         // 1. The price goes low and all bids execute, converting to base.
+        //    That means the perp position is increased by `bids` and the quote position
+        //    is decreased by `bids * base_lot_size * price`.
         //    The health for this case is:
-        //        (weighted(base_lots + bids) - bids) * base_lots * price + quote
+        //        (weighted(base_lots + bids) - bids) * base_lot_size * price + quote
         // 2. The price goes high and all asks execute, converting to quote.
         //    The health for this case is:
-        //        (weighted(base_lots - asks) + asks) * base_lots * price + quote
+        //        (weighted(base_lots - asks) + asks) * base_lot_size * price + quote
         //
         // Comparing these makes it clear we need to pick the worse subfactor
-        //    weighted(base_lots + bids) - bids
+        //    weighted(base_lots + bids) - bids =: scenario1
         // or
-        //    weighted(base_lots - asks) + asks
-        let weighted_base_lots_bids = health_weighted_perp_base_lots(
-            health_type,
-            &perp_market,
-            cm!(base_lots + perp_account.bids_base_lots),
-        )?;
-        let bids_base_lots = I80F48::from(perp_account.bids_base_lots);
-        let scenario1 = cm!(weighted_base_lots_bids - bids_base_lots);
+        //    weighted(base_lots - asks) + asks =: scenario2
+        //
+        // Additionally, we want this scenario choice to be the same no matter whether we're
+        // computing init or maint health. This can be guaranteed by requiring the weights
+        // to satisfy the property (P):
+        //
+        //     (1 - init_asset_weight) / (init_liab_weight - 1)
+        //  == (1 - maint_asset_weight) / (maint_liab_weight - 1)
+        //
+        // Derivation:
+        //   Set asks_net_lots := base_lots - asks, bids_net_lots := base_lots + bids.
+        //   Now
+        //     scenario1 = weighted(bids_net_lots) - bids_net_lots + base_lots and
+        //     scenario2 = weighted(asks_net_lots) - asks_net_lots + base_lots
+        //   So with expanding weigthed(a) = weight_factor_for_a * a, the question
+        //     scenario1 < scenario2
+        //   becomes:
+        //     (weight_factor_for_bids_net_lots - 1) * bids_net_lots
+        //       < (weight_factor_for_asks_net_lots - 1) * asks_net_lots
+        //   Since asks_net_lots < 0 and bids_net_lots > 0 is the only interesting case, (P) follows.
+        //
+        // We satisfy (P) by requiring
+        //   asset_weight = 1 - x and liab_weight = 1 + x
+        //
+        // And with that assumption the scenario choice condition further simplifies to:
+        //            scenario1 < scenario2
+        //   iff  abs(bids_net_lots) > abs(asks_net_lots)
+        let bids_net_lots = cm!(base_lots + perp_account.bids_base_lots);
+        let asks_net_lots = cm!(base_lots - perp_account.asks_base_lots);
 
-        let weighted_base_lots_asks = health_weighted_perp_base_lots(
-            health_type,
-            &perp_market,
-            cm!(base_lots - perp_account.asks_base_lots),
-        )?;
-        let asks_base_lots = I80F48::from(perp_account.asks_base_lots);
-        let scenario2 = cm!(weighted_base_lots_asks + asks_base_lots);
+        let lots_to_quote = base_lot_size * base_info.oracle_price;
+        let base;
+        let quote;
+        if cm!(bids_net_lots.abs()) > cm!(asks_net_lots.abs()) {
+            let bids_net_lots = I80F48::from(bids_net_lots);
+            let bids_base_lots = I80F48::from(perp_account.bids_base_lots);
+            base = cm!(bids_net_lots * lots_to_quote);
+            quote = cm!(quote_current - bids_base_lots * lots_to_quote);
+        } else {
+            let asks_net_lots = I80F48::from(asks_net_lots);
+            let asks_base_lots = I80F48::from(perp_account.asks_base_lots);
+            base = cm!(asks_net_lots * lots_to_quote);
+            quote = cm!(quote_current + asks_base_lots * lots_to_quote);
+        };
 
-        // TODO remove since unused
-        {
-            let worse_scenario = min(scenario1, scenario2);
-            let _health = cm!(worse_scenario * base_lot_size * base_info.oracle_price + quote);
-
-            // The above choice between scenario1 and 2 depends on the asset_weight and
-            // liab weight. Thus it needs to be redone for init and maint health.
-            //
-            // The condition for the choice to be the same is:
-            //     (1 - init_asset_weight) / (init_liab_weight - 1)
-            //  == (1 - maint_asset_weight) / (maint_liab_weight - 1)
-            //
-            // Which can be derived by noticing that health for both scenarios is
-            //    weighted(x) + y - x
-            // and that the only interesting case is
-            //     asks_net = base_lots - asks < 0 and
-            //     bids_net = base_lots + bids > 0.
-            // Then
-            //       health_bids_scenario < health_asks_scenario
-            //   iff (asset_weight - 1) * bids_net < (liab_weight - 1) * asks_net
-            //   iff (1 - asset_weightt) / (liab_weight - 1) bids_net > abs(asks_net)
-
-            // Probably the resolution here is to go to v3's assumption that there's an x
-            // such that asset_weight = 1-x and liab_weight = 1+x.
-            // This is ok as long as perp markets are strictly isolated.
-        }
-
-        // if all bids were executed
-        if scenario1 <= scenario2 {
-            base_info.balance = base_info.balance + I80F48::from(base_lots) + bids_base_lots;
-            quote_info.balance = quote_info.balance
-                + -bids_base_lots * base_lot_size * base_info.oracle_price
-                + quote;
-        }
-        // if all asks were executed
-        else {
-            base_info.balance = base_info.balance + I80F48::from(base_lots) - asks_base_lots;
-            quote_info.balance = quote_info.balance
-                + asks_base_lots * base_lot_size * base_info.oracle_price
-                + quote;
-        }
+        perp_infos.push(PerpInfo {
+            init_asset_weight: perp_market.init_asset_weight,
+            init_liab_weight: perp_market.init_liab_weight,
+            maint_asset_weight: perp_market.maint_asset_weight,
+            maint_liab_weight: perp_market.maint_liab_weight,
+            base,
+            quote,
+        });
     }
 
-    Ok(HealthCache { token_infos })
+    Ok(HealthCache {
+        token_infos,
+        perp_infos,
+    })
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::state::oracle::StubOracle;
+    use std::cell::RefCell;
+    use std::convert::identity;
+    use std::mem::size_of;
+    use std::rc::Rc;
     use std::str::FromStr;
-
-    use fixed::types::I80F48;
 
     #[test]
     fn test_precision() {
@@ -600,5 +603,345 @@ mod tests {
             I80F48::from_str(format!("0.{}1", "0".repeat(14)).as_str()).unwrap(),
             0
         );
+    }
+
+    // Implementing TestAccount directly for ZeroCopy + Owner leads to a conflict
+    // because OpenOrders may add impls for those in the future.
+    trait MyZeroCopy: anchor_lang::ZeroCopy + Owner {}
+    impl MyZeroCopy for StubOracle {}
+    impl MyZeroCopy for Bank {}
+    impl MyZeroCopy for PerpMarket {}
+
+    struct TestAccount<T> {
+        bytes: Vec<u8>,
+        pubkey: Pubkey,
+        owner: Pubkey,
+        lamports: u64,
+        _phantom: std::marker::PhantomData<T>,
+    }
+
+    impl<T> TestAccount<T> {
+        fn new(bytes: Vec<u8>, owner: Pubkey) -> Self {
+            Self {
+                bytes,
+                owner,
+                pubkey: Pubkey::new_unique(),
+                lamports: 0,
+                _phantom: std::marker::PhantomData,
+            }
+        }
+
+        fn as_account_info(&mut self) -> AccountInfo {
+            AccountInfo {
+                key: &self.pubkey,
+                owner: &self.owner,
+                lamports: Rc::new(RefCell::new(&mut self.lamports)),
+                data: Rc::new(RefCell::new(&mut self.bytes)),
+                is_signer: false,
+                is_writable: false,
+                executable: false,
+                rent_epoch: 0,
+            }
+        }
+    }
+
+    impl<T: MyZeroCopy> TestAccount<T> {
+        fn new_zeroed() -> Self {
+            let mut bytes = vec![0u8; 8 + size_of::<T>()];
+            bytes[0..8].copy_from_slice(&T::discriminator());
+            Self::new(bytes, T::owner())
+        }
+
+        fn data(&mut self) -> &mut T {
+            bytemuck::from_bytes_mut(&mut self.bytes[8..])
+        }
+    }
+
+    impl TestAccount<OpenOrders> {
+        fn new_zeroed() -> Self {
+            let mut bytes = vec![0u8; 12 + size_of::<OpenOrders>()];
+            bytes[0..5].copy_from_slice(b"serum");
+            Self::new(bytes, Pubkey::new_unique())
+        }
+
+        fn data(&mut self) -> &mut OpenOrders {
+            bytemuck::from_bytes_mut(&mut self.bytes[5..5 + size_of::<OpenOrders>()])
+        }
+    }
+
+    fn mock_bank_and_oracle(
+        group: Pubkey,
+        token_index: TokenIndex,
+        price: f64,
+        init_weights: f64,
+        maint_weights: f64,
+    ) -> (TestAccount<Bank>, TestAccount<StubOracle>) {
+        let mut oracle = TestAccount::<StubOracle>::new_zeroed();
+        oracle.data().price = I80F48::from_num(price);
+        let mut bank = TestAccount::<Bank>::new_zeroed();
+        bank.data().token_index = token_index;
+        bank.data().group = group;
+        bank.data().oracle = oracle.pubkey;
+        bank.data().deposit_index = I80F48::from(1_000_000);
+        bank.data().borrow_index = I80F48::from(1_000_000);
+        bank.data().init_asset_weight = I80F48::from_num(1.0 - init_weights);
+        bank.data().init_liab_weight = I80F48::from_num(1.0 + init_weights);
+        bank.data().maint_asset_weight = I80F48::from_num(1.0 - maint_weights);
+        bank.data().maint_liab_weight = I80F48::from_num(1.0 + maint_weights);
+        (bank, oracle)
+    }
+
+    // Run a health test that includes all the side values (like referrer_rebates_accrued)
+    #[test]
+    fn test_health0() {
+        let mut account = MangoAccount::default();
+        let group = Pubkey::new_unique();
+
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
+        let (mut bank2, mut oracle2) = mock_bank_and_oracle(group, 4, 5.0, 0.5, 0.3);
+        bank1
+            .data()
+            .deposit(
+                account.tokens.get_mut_or_create(1).unwrap().0,
+                I80F48::from(100),
+            )
+            .unwrap();
+        bank2
+            .data()
+            .withdraw_without_fee(
+                account.tokens.get_mut_or_create(4).unwrap().0,
+                I80F48::from(10),
+            )
+            .unwrap();
+
+        let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
+        let serum3account = account.serum3.create(2).unwrap();
+        serum3account.open_orders = oo1.pubkey;
+        serum3account.base_token_index = 4;
+        serum3account.quote_token_index = 1;
+        oo1.data().native_pc_total = 21;
+        oo1.data().native_coin_total = 18;
+        oo1.data().native_pc_free = 1;
+        oo1.data().native_coin_free = 3;
+        oo1.data().referrer_rebates_accrued = 2;
+
+        let mut perp1 = TestAccount::<PerpMarket>::new_zeroed();
+        perp1.data().group = group;
+        perp1.data().perp_market_index = 9;
+        perp1.data().base_token_index = 4;
+        perp1.data().quote_token_index = 1;
+        perp1.data().init_asset_weight = I80F48::from_num(1.0 - 0.2f64);
+        perp1.data().init_liab_weight = I80F48::from_num(1.0 + 0.2f64);
+        perp1.data().maint_asset_weight = I80F48::from_num(1.0 - 0.1f64);
+        perp1.data().maint_liab_weight = I80F48::from_num(1.0 + 0.1f64);
+        perp1.data().quote_lot_size = 100;
+        perp1.data().base_lot_size = 10;
+        let perpaccount = account.perps.get_account_mut_or_create(9).unwrap().0;
+        perpaccount.base_position_lots = 3;
+        perpaccount.quote_position_native = I80F48::from(31u8);
+        perpaccount.bids_base_lots = 7;
+        perpaccount.asks_base_lots = 11;
+        perpaccount.taker_base_lots = 1;
+        perpaccount.taker_quote_lots = 2;
+
+        let ais = vec![
+            bank1.as_account_info(),
+            bank2.as_account_info(),
+            oracle1.as_account_info(),
+            oracle2.as_account_info(),
+            perp1.as_account_info(),
+            oo1.as_account_info(),
+        ];
+
+        let retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
+
+        let health_eq = |a: I80F48, b: f64| {
+            if (a - I80F48::from_num(b)).abs() < 0.001 {
+                true
+            } else {
+                println!("health is {}, but expected {}", a, b);
+                false
+            }
+        };
+
+        // for bank1/oracle1, including open orders (scenario: bids execute)
+        let health1 = (100.0 + 1.0 + 2.0 + (20.0 + 15.0 * 5.0)) * 0.8;
+        // for bank2/oracle2
+        let health2 = (-10.0 + 3.0) * 5.0 * 1.5;
+        // for perp (scenario: bids execute)
+        let health3 =
+            (3.0 + 7.0 + 1.0) * 10.0 * 5.0 * 0.8 + (31.0 + 2.0 * 100.0 - 7.0 * 10.0 * 5.0);
+        assert!(health_eq(
+            compute_health(&account, HealthType::Init, &retriever).unwrap(),
+            health1 + health2 + health3
+        ));
+    }
+
+    #[test]
+    fn test_scanning_account_retriever() {
+        let group = Pubkey::new_unique();
+
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
+        let (mut bank2, mut oracle2) = mock_bank_and_oracle(group, 4, 5.0, 0.5, 0.3);
+
+        let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
+        let oo1key = oo1.pubkey;
+        oo1.data().native_pc_total = 20;
+
+        let mut perp1 = TestAccount::<PerpMarket>::new_zeroed();
+        perp1.data().group = group;
+        perp1.data().perp_market_index = 9;
+
+        let ais = vec![
+            bank1.as_account_info(),
+            bank2.as_account_info(),
+            oracle1.as_account_info(),
+            oracle2.as_account_info(),
+            perp1.as_account_info(),
+            oo1.as_account_info(),
+        ];
+
+        let retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
+
+        assert_eq!(retriever.n_banks(), 2);
+        assert_eq!(retriever.begin_serum3(), 5);
+        assert_eq!(retriever.perp_index_map.len(), 1);
+
+        let (b1, o1) = retriever.bank_mut_and_oracle(1).unwrap();
+        assert_eq!(b1.token_index, 1);
+        assert_eq!(o1.key, ais[2].key);
+
+        let (b2, o2) = retriever.bank_mut_and_oracle(4).unwrap();
+        assert_eq!(b2.token_index, 4);
+        assert_eq!(o2.key, ais[3].key);
+
+        retriever.bank_mut_and_oracle(2).unwrap_err();
+
+        let oo = retriever.serum_oo(0, &oo1key).unwrap();
+        assert_eq!(identity(oo.native_pc_total), 20);
+
+        assert!(retriever.serum_oo(1, &Pubkey::default()).is_err());
+
+        let perp = retriever.perp_market(&group, 0, 9).unwrap();
+        assert_eq!(identity(perp.perp_market_index), 9);
+
+        assert!(retriever.perp_market(&group, 1, 5).is_err());
+    }
+
+    struct TestHealth1Case {
+        token1: i64,
+        token2: i64,
+        oo_1_2: (u64, u64),
+        perp1: (i64, i64, i64, i64),
+        expected_health: f64,
+    }
+    fn test_health1_runner(testcase: &TestHealth1Case) {
+        let mut account = MangoAccount::default();
+        let group = Pubkey::new_unique();
+
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
+        let (mut bank2, mut oracle2) = mock_bank_and_oracle(group, 4, 5.0, 0.5, 0.3);
+        bank1
+            .data()
+            .change_without_fee(
+                account.tokens.get_mut_or_create(1).unwrap().0,
+                I80F48::from(testcase.token1),
+            )
+            .unwrap();
+        bank2
+            .data()
+            .change_without_fee(
+                account.tokens.get_mut_or_create(4).unwrap().0,
+                I80F48::from(testcase.token2),
+            )
+            .unwrap();
+
+        let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
+        let serum3account = account.serum3.create(2).unwrap();
+        serum3account.open_orders = oo1.pubkey;
+        serum3account.base_token_index = 4;
+        serum3account.quote_token_index = 1;
+        oo1.data().native_pc_total = testcase.oo_1_2.0;
+        oo1.data().native_coin_total = testcase.oo_1_2.1;
+
+        let mut perp1 = TestAccount::<PerpMarket>::new_zeroed();
+        perp1.data().group = group;
+        perp1.data().perp_market_index = 9;
+        perp1.data().base_token_index = 4;
+        perp1.data().quote_token_index = 1;
+        perp1.data().init_asset_weight = I80F48::from_num(1.0 - 0.2f64);
+        perp1.data().init_liab_weight = I80F48::from_num(1.0 + 0.2f64);
+        perp1.data().maint_asset_weight = I80F48::from_num(1.0 - 0.1f64);
+        perp1.data().maint_liab_weight = I80F48::from_num(1.0 + 0.1f64);
+        perp1.data().quote_lot_size = 100;
+        perp1.data().base_lot_size = 10;
+        let perpaccount = account.perps.get_account_mut_or_create(9).unwrap().0;
+        perpaccount.base_position_lots = testcase.perp1.0;
+        perpaccount.quote_position_native = I80F48::from(testcase.perp1.1);
+        perpaccount.bids_base_lots = testcase.perp1.2;
+        perpaccount.asks_base_lots = testcase.perp1.3;
+
+        let ais = vec![
+            bank1.as_account_info(),
+            bank2.as_account_info(),
+            oracle1.as_account_info(),
+            oracle2.as_account_info(),
+            perp1.as_account_info(),
+            oo1.as_account_info(),
+        ];
+
+        let retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
+
+        let health_eq = |a: I80F48, b: f64| {
+            if (a - I80F48::from_num(b)).abs() < 0.001 {
+                true
+            } else {
+                println!("health is {}, but expected {}", a, b);
+                false
+            }
+        };
+
+        assert!(health_eq(
+            compute_health(&account, HealthType::Init, &retriever).unwrap(),
+            testcase.expected_health
+        ));
+    }
+
+    // Check some specific health constellations
+    #[test]
+    fn test_health1() {
+        let testcases = vec![
+            TestHealth1Case {
+                token1: 100,
+                token2: -10,
+                oo_1_2: (20, 15),
+                perp1: (3, 31, 7, 11),
+                expected_health:
+                    // for token1, including open orders (scenario: bids execute)
+                    (100.0 + (20.0 + 15.0 * 5.0)) * 0.8
+                    // for token2
+                    - 10.0 * 5.0 * 1.5
+                    // for perp (scenario: bids execute)
+                    + (3.0 + 7.0) * 10.0 * 5.0 * 0.8 + (31.0 - 7.0 * 10.0 * 5.0),
+            },
+            TestHealth1Case {
+                token1: -100,
+                token2: 10,
+                oo_1_2: (20, 15),
+                perp1: (-10, 31, 7, 11),
+                expected_health:
+                    // for token1
+                    -100.0 * 1.2
+                    // for token2, including open orders (scenario: asks execute)
+                    + (10.0 * 5.0 + (20.0 + 15.0 * 5.0)) * 0.5
+                    // for perp (scenario: asks execute)
+                    + (-10.0 - 11.0) * 10.0 * 5.0 * 1.2 + (31.0 + 11.0 * 10.0 * 5.0),
+            },
+        ];
+
+        for (i, testcase) in testcases.iter().enumerate() {
+            println!("checking testcase {}", i);
+            test_health1_runner(&testcase);
+        }
     }
 }

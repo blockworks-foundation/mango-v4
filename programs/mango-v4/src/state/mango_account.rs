@@ -724,6 +724,25 @@ impl MangoAccount {
     }
 }
 
+impl Default for MangoAccount {
+    fn default() -> Self {
+        Self {
+            name: Default::default(),
+            group: Pubkey::default(),
+            owner: Pubkey::default(),
+            delegate: Pubkey::default(),
+            tokens: MangoAccountTokens::new(),
+            serum3: MangoAccountSerum3::new(),
+            perps: MangoAccountPerps::new(),
+            being_liquidated: 0,
+            is_bankrupt: 0,
+            account_num: 0,
+            bump: 0,
+            reserved: Default::default(),
+        }
+    }
+}
+
 #[macro_export]
 macro_rules! account_seeds {
     ( $account:expr ) => {
