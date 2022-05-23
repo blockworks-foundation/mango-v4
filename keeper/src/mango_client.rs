@@ -100,7 +100,7 @@ impl MangoClient {
             })])
             .unwrap();
         for (k, v) in mint_info_tuples {
-            let mut data = program
+            let data = program
                 .rpc()
                 .get_account_with_commitment(&v.mint, commitment)
                 .unwrap()
