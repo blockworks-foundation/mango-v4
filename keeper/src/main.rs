@@ -42,7 +42,6 @@ struct Cli {
 enum Command {
     Crank {},
     Taker {},
-    Liquidator {},
 }
 fn main() -> Result<(), anyhow::Error> {
     env_logger::init_from_env(
@@ -93,7 +92,6 @@ fn main() -> Result<(), anyhow::Error> {
     let commitment = match command {
         Command::Crank { .. } => CommitmentConfig::confirmed(),
         Command::Taker { .. } => CommitmentConfig::confirmed(),
-        Command::Liquidator {} => todo!(),
     };
 
     let mango_client = Arc::new(MangoClient::new(cluster, commitment, payer, admin));
@@ -106,7 +104,6 @@ fn main() -> Result<(), anyhow::Error> {
         .build()
         .unwrap();
 
-    // TODO: future: remove, just for learning purposes
     let debugging_handle = async {
         let mut interval = time::interval(time::Duration::from_secs(5));
         loop {
@@ -131,9 +128,6 @@ fn main() -> Result<(), anyhow::Error> {
             let client = mango_client.clone();
             let x: Result<(), anyhow::Error> = rt.block_on(taker::runner(client, debugging_handle));
             x.expect("Something went wrong here...");
-        }
-        Command::Liquidator { .. } => {
-            todo!()
         }
     }
 

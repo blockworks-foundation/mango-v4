@@ -24,19 +24,13 @@ pub async fn runner(
     let handles2 = mango_client
         .perp_markets_cache
         .values()
-        .map(|(pk, perp_market)| {
-            // todo: inline entire call
-            loop_consume_events(mango_client.clone(), *pk, *perp_market)
-        })
+        .map(|(pk, perp_market)| loop_consume_events(mango_client.clone(), *pk, *perp_market))
         .collect::<Vec<_>>();
 
     let handles3 = mango_client
         .perp_markets_cache
         .values()
-        .map(|(pk, perp_market)| {
-            // todo: inline entire call
-            loop_update_funding(mango_client.clone(), *pk, *perp_market)
-        })
+        .map(|(pk, perp_market)| loop_update_funding(mango_client.clone(), *pk, *perp_market))
         .collect::<Vec<_>>();
 
     futures::join!(
