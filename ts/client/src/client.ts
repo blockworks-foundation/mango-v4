@@ -471,6 +471,7 @@ export class MangoClient {
     const maxBaseQuantity = serum3MarketExternal.baseSizeNumberToLots(size);
     const feeTier = getFeeTier(0, 0 /** TODO: fix msrm/srm balance */);
     const rates = getFeeRates(feeTier);
+    console.log(rates.taker);
     const maxQuoteQuantity = new BN(
       serum3MarketExternal.decoded.quoteLotSize.toNumber() *
         (1 + rates.taker) /** TODO: fix taker/maker */,

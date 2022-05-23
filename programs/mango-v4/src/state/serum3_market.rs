@@ -7,6 +7,7 @@ use crate::state::*;
 pub type Serum3MarketIndex = u16;
 
 #[account(zero_copy)]
+#[derive(Debug)]
 pub struct Serum3Market {
     pub name: [u8; 16],
     pub group: Pubkey,

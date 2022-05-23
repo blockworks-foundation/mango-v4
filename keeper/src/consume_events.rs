@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use anchor_lang::{AccountDeserialize, __private::bytemuck::cast_ref};
+use anchor_lang::__private::bytemuck::cast_ref;
 
 use mango_v4::state::{EventQueue, EventType, FillEvent, OutEvent, PerpMarket};
 
@@ -30,10 +30,10 @@ pub fn perform_operation(
     pk: Pubkey,
     perp_market: PerpMarket,
 ) -> anyhow::Result<()> {
-    let mut event_queue = match get_event_queue(&mango_client, &perp_market) {
-        Ok(value) => value,
-        Err(value) => return value,
-    };
+    let mut event_queue: EventQueue = mango_client
+        .program()
+        .account(perp_market.event_queue)
+        .unwrap();
 
     let mut ams_ = vec![];
 
@@ -93,33 +93,10 @@ pub fn perform_operation(
             }),
         })
         .send();
-    match sig_result {
-        Ok(sig) => {
-            log::info!(
-                "Crank: consume event for perp_market {:?} ix signature: {:?}",
-                format!("{: >6}", perp_market.name()),
-                sig
-            );
-        }
-        Err(e) => log::error!("Crank: {:?}", e),
+
+    if let Err(e) = sig_result {
+        log::error!("{:?}", e)
     }
 
     Ok(())
-}
-
-fn get_event_queue(
-    mango_client: &MangoClient,
-    perp_market: &PerpMarket,
-) -> Result<mango_v4::state::EventQueue, Result<(), anyhow::Error>> {
-    let event_queue_opt: Option<EventQueue> = {
-        let res = mango_client
-            .rpc
-            .get_account_with_commitment(&perp_market.event_queue, mango_client.commitment);
-
-        let data = res.unwrap().value.unwrap().data;
-        let mut data_slice: &[u8] = &data;
-        AccountDeserialize::try_deserialize(&mut data_slice).ok()
-    };
-    let event_queue = event_queue_opt.unwrap();
-    Ok(event_queue)
 }

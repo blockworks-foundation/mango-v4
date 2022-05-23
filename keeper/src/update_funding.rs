@@ -42,15 +42,8 @@ pub fn perform_operation(
             data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpUpdateFunding {}),
         })
         .send();
-    match sig_result {
-        Ok(sig) => {
-            log::info!(
-                "Crank: update funding for perp_market {:?} ix signature: {:?}",
-                format!("{: >6}", perp_market.name()),
-                sig
-            );
-        }
-        Err(e) => log::error!("Crank: {:?}", e),
+    if let Err(e) = sig_result {
+        log::error!("{:?}", e)
     }
 
     Ok(())
