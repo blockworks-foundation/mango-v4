@@ -464,6 +464,7 @@ impl MangoClient {
 
         let health_check_metas = self.derive_health_check_remaining_account_metas(None, false)?;
 
+        // todo: review below code
         // todo: replace 10u64.pow(6) with actual values from mint
         let limit_price = {
             (price * ((10u64.pow(6) * market_external.coin_lot_size) as f64)) as u64
