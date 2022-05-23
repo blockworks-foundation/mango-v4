@@ -1,9 +1,6 @@
-mod consume_events;
 mod crank;
 mod mango_client;
 mod taker;
-mod update_funding;
-mod update_index;
 mod util;
 
 use std::env;
@@ -117,7 +114,7 @@ fn main() -> Result<(), anyhow::Error> {
             let client = mango_client.clone();
             tokio::task::spawn_blocking(move || {
                 log::info!(
-                    "std::sync::Arc<MangoClient>::strong_count() {}",
+                    "Arc<MangoClient>::strong_count() {}",
                     Arc::<MangoClient>::strong_count(&client)
                 )
             });
