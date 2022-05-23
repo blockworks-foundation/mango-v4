@@ -4,9 +4,9 @@ use anchor_client::{Client, Cluster, Program};
 
 use anchor_lang::__private::bytemuck;
 use anchor_lang::prelude::System;
-use anchor_lang::Id;
+use anchor_lang::{AccountDeserialize, Id};
 use anchor_spl::associated_token::get_associated_token_address;
-use anchor_spl::token::Token;
+use anchor_spl::token::{Mint, Token};
 
 use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{Bank, MangoAccount, MintInfo, PerpMarket, Serum3Market, TokenIndex};
@@ -29,8 +29,8 @@ pub struct MangoClient {
     pub group: Pubkey,
     pub banks_cache: HashMap<String, (Pubkey, Bank)>,
     pub banks_cache_by_token_index: HashMap<TokenIndex, (Pubkey, Bank)>,
-    pub mint_infos_cache: HashMap<Pubkey, (Pubkey, MintInfo)>,
-    pub mint_infos_cache_by_token_index: HashMap<TokenIndex, (Pubkey, MintInfo)>,
+    pub mint_infos_cache: HashMap<Pubkey, (Pubkey, MintInfo, Mint)>,
+    pub mint_infos_cache_by_token_index: HashMap<TokenIndex, (Pubkey, MintInfo, Mint)>,
     pub serum3_markets_cache: HashMap<String, (Pubkey, Serum3Market)>,
     pub serum3_external_markets_cache: HashMap<String, (Pubkey, Vec<u8>)>,
     pub perp_markets_cache: HashMap<String, (Pubkey, PerpMarket)>,
@@ -100,8 +100,17 @@ impl MangoClient {
             })])
             .unwrap();
         for (k, v) in mint_info_tuples {
-            mint_infos_cache.insert(v.mint, (k, v));
-            mint_infos_cache_by_token_index.insert(v.token_index, (k, v));
+            let mut data = program
+                .rpc()
+                .get_account_with_commitment(&v.mint, commitment)
+                .unwrap()
+                .value
+                .unwrap()
+                .data;
+            let mint = Mint::try_deserialize(&mut &data[..]).unwrap();
+
+            mint_infos_cache.insert(v.mint, (k, v, mint.clone()));
+            mint_infos_cache_by_token_index.insert(v.token_index, (k, v, mint));
         }
 
         let mut serum3_markets_cache = HashMap::new();
@@ -427,16 +436,14 @@ impl MangoClient {
             .find(serum3_market.1.market_index)
             .unwrap()
             .open_orders;
-        let quote_info = self
+        let (_, quote_info, quote_mint) = self
             .mint_infos_cache_by_token_index
             .get(&serum3_market.1.quote_token_index)
-            .unwrap()
-            .1;
-        let base_info = self
+            .unwrap();
+        let (_, base_info, base_mint) = self
             .mint_infos_cache_by_token_index
             .get(&serum3_market.1.base_token_index)
-            .unwrap()
-            .1;
+            .unwrap();
 
         let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
             &(self.serum3_external_markets_cache.get(name).unwrap().1)
