@@ -6,7 +6,7 @@ use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
 use mango_v4::instructions::{
-    InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
+    InterestRateParams, MarginTradeWithdraw, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
 };
 use solana_program::instruction::Instruction;
 use solana_sdk::instruction;
@@ -295,7 +295,10 @@ impl<'keypair> ClientInstruction for MarginTradeInstruction<'keypair> {
 
         let instruction = Self::Instruction {
             num_health_accounts: health_check_metas.len(),
-            withdraws: vec![(1, self.withdraw_amount)],
+            withdraws: vec![MarginTradeWithdraw {
+                index: 1,
+                amount: self.withdraw_amount,
+            }],
             cpi_data: self.margin_trade_program_ix_cpi_data.clone(),
         };
 
