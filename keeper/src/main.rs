@@ -60,23 +60,13 @@ fn main() -> Result<(), anyhow::Error> {
     let payer = match payer {
         Some(p) => keypair::read_keypair_file(&p)
             .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy())),
-        None => match env::var("PAYER_KEYPAIR").ok() {
-            Some(k) => {
-                keypair::read_keypair(&mut k.as_bytes()).expect("Failed to parse $PAYER_KEYPAIR")
-            }
-            None => panic!("Payer keypair not provided..."),
-        },
+        None => panic!("Payer keypair not provided..."),
     };
 
     let admin = match admin {
         Some(p) => keypair::read_keypair_file(&p)
             .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy())),
-        None => match env::var("ADMIN_KEYPAIR").ok() {
-            Some(k) => {
-                keypair::read_keypair(&mut k.as_bytes()).expect("Failed to parse $ADMIN_KEYPAIR")
-            }
-            None => panic!("Admin keypair not provided..."),
-        },
+        None => panic!("Admin keypair not provided..."),
     };
 
     let rpc_url = match rpc_url {
@@ -94,7 +84,7 @@ fn main() -> Result<(), anyhow::Error> {
         Command::Taker { .. } => CommitmentConfig::confirmed(),
     };
 
-    let mango_client = Arc::new(MangoClient::new(cluster, commitment, payer, admin));
+    let mango_client = Arc::new(MangoClient::new(cluster, commitment, payer, admin)?);
 
     log::info!("Program Id {}", &mango_client.program().id());
     log::info!("Admin {}", &mango_client.admin.to_base58_string());
@@ -121,15 +111,11 @@ fn main() -> Result<(), anyhow::Error> {
     match command {
         Command::Crank { .. } => {
             let client = mango_client.clone();
-            let x: Result<(), anyhow::Error> = rt.block_on(crank::runner(client, debugging_handle));
-            x.expect("Something went wrong here...");
+            rt.block_on(crank::runner(client, debugging_handle))
         }
         Command::Taker { .. } => {
             let client = mango_client.clone();
-            let x: Result<(), anyhow::Error> = rt.block_on(taker::runner(client, debugging_handle));
-            x.expect("Something went wrong here...");
+            rt.block_on(taker::runner(client, debugging_handle))
         }
     }
-
-    Ok(())
 }

@@ -40,7 +40,13 @@ pub async fn runner(
     let mut price_arcs = HashMap::new();
     for market_name in mango_client.serum3_markets_cache.keys() {
         let price = mango_client
-            .get_oracle_price(market_name.split('/').collect::<Vec<&str>>()[0])
+            .get_oracle_price(
+                market_name
+                    .split('/')
+                    .collect::<Vec<&str>>()
+                    .get(0)
+                    .unwrap(),
+            )
             .unwrap();
         price_arcs.insert(market_name.to_owned(), Arc::new(RwLock::new(price.price)));
     }
@@ -89,22 +95,18 @@ pub async fn loop_blocking_price_update(
         let client1 = mango_client.clone();
         let market_name1 = market_name.clone();
         let price = price.clone();
-        tokio::task::spawn_blocking(move || {
-            || -> anyhow::Result<()> {
-                let token_name = market_name1.split('/').collect::<Vec<&str>>()[0];
-                let fresh_price = client1.get_oracle_price(token_name).unwrap();
-                log::info!("{} Updated price is {:?}", token_name, fresh_price.price);
-                if let Ok(mut price) = price.try_write() {
-                    *price = fresh_price.price;
-                }
-                Ok(())
-            }()
-            .expect("Something went wrong here...");
-        })
-        .await
-        .expect("Something went wrong here...");
+        tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+            let token_name = market_name1.split('/').collect::<Vec<&str>>()[0];
+            let fresh_price = client1.get_oracle_price(token_name).unwrap();
+            log::info!("{} Updated price is {:?}", token_name, fresh_price.price);
+            if let Ok(mut price) = price.write() {
+                *price = fresh_price.price;
+            }
+            Ok(())
+        });
     }
 }
+
 pub async fn loop_blocking_orders(
     mango_client: Arc<MangoClient>,
     market_name: String,
@@ -117,56 +119,52 @@ pub async fn loop_blocking_orders(
         let client = mango_client.clone();
         let market_name = market_name.clone();
         let price = price.clone();
-        tokio::task::spawn_blocking(move || {
-            || -> anyhow::Result<()> {
-                let orders: Vec<u128> = client.serum3_cancel_all_orders(&market_name)?;
-                log::info!("Cancelled orders - {:?} for {}", orders, market_name);
 
-                let fresh_price = match price.read() {
-                    Ok(price) => *price,
-                    Err(_) => {
-                        return Ok(());
-                    }
-                };
+        tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+            let orders: Vec<u128> = client.serum3_cancel_all_orders(&market_name)?;
+            log::info!("Cancelled orders - {:?} for {}", orders, market_name);
 
-                let mut bid_price = fresh_price as f64 / 10u64.pow(8) as f64;
-                bid_price = bid_price + bid_price * 0.01;
-                client.serum3_place_order(
-                    &market_name,
-                    Serum3Side::Bid,
-                    bid_price,
-                    0.0001,
-                    Serum3SelfTradeBehavior::DecrementTake,
-                    Serum3OrderType::Limit,
-                    SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
-                    10,
-                )?;
+            let fresh_price = match price.read() {
+                Ok(price) => *price,
+                Err(_) => {
+                    return Ok(());
+                }
+            };
 
-                let mut ask_price = fresh_price as f64 / 10u64.pow(8) as f64;
-                ask_price = ask_price - ask_price * 0.01;
-                client.serum3_place_order(
-                    &market_name,
-                    Serum3Side::Ask,
-                    ask_price,
-                    0.0001,
-                    Serum3SelfTradeBehavior::DecrementTake,
-                    Serum3OrderType::Limit,
-                    SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
-                    10,
-                )?;
+            let mut bid_price = fresh_price as f64 / 10u64.pow(8) as f64;
+            bid_price = bid_price + bid_price * 0.01;
+            client.serum3_place_order(
+                &market_name,
+                Serum3Side::Bid,
+                bid_price,
+                0.0001,
+                Serum3SelfTradeBehavior::DecrementTake,
+                Serum3OrderType::Limit,
+                SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
+                10,
+            )?;
 
-                log::info!(
-                    "Placed bid at {}, and ask at {} for {}",
-                    bid_price,
-                    ask_price,
-                    market_name
-                );
+            let mut ask_price = fresh_price as f64 / 10u64.pow(8) as f64;
+            ask_price = ask_price - ask_price * 0.01;
+            client.serum3_place_order(
+                &market_name,
+                Serum3Side::Ask,
+                ask_price,
+                0.0001,
+                Serum3SelfTradeBehavior::DecrementTake,
+                Serum3OrderType::Limit,
+                SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
+                10,
+            )?;
 
-                Ok(())
-            }()
-            .expect("Something went wrong here...");
-        })
-        .await
-        .expect("Something went wrong here...");
+            log::info!(
+                "Placed bid at {}, and ask at {} for {}",
+                bid_price,
+                ask_price,
+                market_name
+            );
+
+            Ok(())
+        });
     }
 }

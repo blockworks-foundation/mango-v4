@@ -56,6 +56,13 @@ jobs:
           override: true
           profile: minimal
           toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v1
+      - name: Cache Solana binaries
+        uses: actions/cache@v2
+        with:
+          path: ~/.cache/solana
+          key: ${{ runner.os }}-${{ env.SOLANA_VERSION }}
       - name: Install Solana
         run: |
           sh -c "$(curl -sSfL https://release.solana.com/v${{ env.SOLANA_VERSION }}/install)"
