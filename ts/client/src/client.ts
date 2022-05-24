@@ -2,6 +2,8 @@ import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
 import { getFeeRates, getFeeTier, Market } from '@project-serum/serum';
 import { Order } from '@project-serum/serum/lib/market';
 import * as spl from '@solana/spl-token';
+import { TokenSwap } from '@solana/spl-token-swap';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import {
   AccountMeta,
   Keypair,
@@ -12,6 +14,9 @@ import {
   TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
+import { ORCA_TOKEN_SWAP_ID_DEVNET } from '@orca-so/sdk';
+import { orcaDevnetPoolConfigs } from '@orca-so/sdk/dist/constants/devnet/pools';
+import { OrcaPoolConfig as OrcaDevnetPoolConfig } from '@orca-so/sdk/dist/public/devnet/pools';
 import { Bank, getMintInfoForTokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
 import { I80F48 } from './accounts/I80F48';
@@ -803,6 +808,72 @@ export class MangoClient {
       .rpc();
   }
 
+  /// margin trade (orca)
+
+  public async marginTrade({
+    group,
+    mangoAccount,
+    inputToken,
+    amountIn,
+    outputToken,
+    minimumAmountOut,
+  }: {
+    group: Group;
+    mangoAccount: MangoAccount;
+    inputToken: string;
+    amountIn: number;
+    outputToken: string;
+    minimumAmountOut: number;
+  }): Promise<TransactionSignature> {
+    const healthRemainingAccounts: PublicKey[] =
+      await this.buildHealthRemainingAccounts(group, mangoAccount);
+    const parsedHealthAccounts = healthRemainingAccounts.map(
+      (pk) =>
+        ({
+          pubkey: pk,
+          isWritable: false,
+          isSigner: false,
+        } as AccountMeta),
+    );
+
+    const inputBank = group.banksMap.get(inputToken);
+    const outputBank = group.banksMap.get(outputToken);
+
+    if (!inputBank || !outputBank) throw new Error('Invalid token');
+
+    const targetProgramId = ORCA_TOKEN_SWAP_ID_DEVNET;
+
+    const instruction = await this.buildOrcaInstruction(
+      targetProgramId,
+      inputBank,
+      outputBank,
+      amountIn, // todo: convert to u64?
+      minimumAmountOut, // todo: convert to u64?
+    );
+    const targetRemainingAccounts = instruction.keys;
+
+    const withdraws = []; // todo:
+    const cpiData = instruction.data; // todo: is it just instruction.data?
+
+    return await this.program.methods
+      .marginTrade(new BN(parsedHealthAccounts.length), withdraws, cpiData)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .remainingAccounts([
+        ...parsedHealthAccounts,
+        {
+          pubkey: targetProgramId,
+          isWritable: false,
+          isSigner: false,
+        } as AccountMeta,
+        ...targetRemainingAccounts,
+      ])
+      .rpc();
+  }
+
   /// static
 
   static connect(provider?: Provider, devnet?: boolean): MangoClient {
@@ -870,5 +941,46 @@ export class MangoClient {
     );
 
     return healthRemainingAccounts;
+  }
+
+  private async buildOrcaInstruction(
+    orcaTokenSwapId,
+    inputBank,
+    outputBank,
+    amountInU64,
+    minimumAmountOutU64,
+  ) {
+    const poolParams = orcaDevnetPoolConfigs[OrcaDevnetPoolConfig.SOL_USDC];
+
+    const [authorityForPoolAddress] = await PublicKey.findProgramAddress(
+      [poolParams.address.toBuffer()],
+      orcaTokenSwapId,
+    );
+
+    const userTransferAuthority = new Keypair();
+
+    /*
+      Orca references:
+        swap fn: https://github.com/orca-so/typescript-sdk/blob/main/src/model/orca/pool/orca-pool.ts#L162
+        swap ix: https://github.com/orca-so/typescript-sdk/blob/main/src/public/utils/web3/instructions/pool-instructions.ts#L41
+    */
+    const swapInstruction = TokenSwap.swapInstruction(
+      poolParams.address,
+      authorityForPoolAddress,
+      userTransferAuthority.publicKey, // what is this?
+      inputBank.vault, // inputTokenUserAddress
+      inputBank.mint, // inputToken.addr
+      outputBank.mint, // outputToken.addr
+      outputBank.vault, // outputTokenUserAddress
+      poolParams.poolTokenMint,
+      poolParams.feeAccount,
+      null, // hostFeeAccount
+      orcaTokenSwapId,
+      TOKEN_PROGRAM_ID,
+      amountInU64,
+      minimumAmountOutU64,
+    );
+
+    return swapInstruction;
   }
 }
