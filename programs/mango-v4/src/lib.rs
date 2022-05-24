@@ -34,6 +34,9 @@ dd TODOs
 8. deposit should also update the bank first
 9. interest rate should be based on oracle
 10. decentralized incentives to run the keeper
+11. open interest limits
+12. net deposit limits
+13. keep track globally everytime new OpenOrders is created so we can know when we have closed all of them
  */
 
 
