@@ -36,10 +36,17 @@ pub struct MarginTrade<'info> {
 }
 
 struct AllowedVault {
+    // index of the vault in cpi_ais
     vault_cpi_ai_index: usize,
+    // index of the bank in health_ais
     bank_health_ai_index: usize,
+    // raw index into account.tokens
+    raw_token_index: usize,
+    // vault amount before cpi
     pre_amount: u64,
+    // withdraw request
     withdraw_amount: u64,
+    // amount of withdraw request that is a loan
     loan_amount: I80F48,
 }
 
@@ -66,13 +73,14 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     // Note: This depends on the particular health account ordering.
     let health_ais = &ctx.remaining_accounts[0..num_health_accounts];
     let mut allowed_banks = HashMap::<&Pubkey, Ref<Bank>>::new();
-    let mut allowed_vaults = HashMap::<Pubkey, usize>::new();
+    // vault pubkey -> (bank_account_index, raw_token_index)
+    let mut allowed_vaults = HashMap::<Pubkey, (usize, usize)>::new();
     for (i, ai) in health_ais.iter().enumerate() {
         match ai.load::<Bank>() {
             Ok(bank) => {
                 require!(bank.group == account.group, MangoError::SomeError);
-                account.tokens.get_mut_or_create(bank.token_index)?;
-                allowed_vaults.insert(bank.vault, i);
+                let (_, raw_token_index) = account.tokens.get_mut_or_create(bank.token_index)?;
+                allowed_vaults.insert(bank.vault, (i, raw_token_index));
                 allowed_banks.insert(ai.key, bank);
             }
             Err(Error::AnchorError(error))
@@ -85,8 +93,10 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     }
 
     // Check pre-cpi health
+    // NOTE: This health check isn't strictly necessary. It will be, later, when
+    // we want to have reduce_only or be able to move an account out of bankruptcy.
     let pre_cpi_health =
-        compute_health_from_fixed_accounts(&account, HealthType::Maint, health_ais)?;
+        compute_health_from_fixed_accounts(&account, HealthType::Init, health_ais)?;
     require!(pre_cpi_health >= 0, MangoError::HealthMustBePositive);
     msg!("pre_cpi_health {:?}", pre_cpi_health);
 
@@ -113,12 +123,13 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
             }
 
             // Every group-owned token account must be a vault of one of the banks.
-            if let Some(&bank_index) = allowed_vaults.get(&ai.key) {
+            if let Some(&(bank_index, raw_token_index)) = allowed_vaults.get(&ai.key) {
                 return Some(Ok((
                     ai.key,
                     AllowedVault {
                         vault_cpi_ai_index: i,
                         bank_health_ai_index: bank_index,
+                        raw_token_index,
                         pre_amount: token_account.amount,
                         // these two are updated later
                         withdraw_amount: 0,
@@ -147,6 +158,8 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
                     .find_map(|&(index, amount)| {
                         (index as usize == vault_info.vault_cpi_ai_index).then(|| amount)
                     })
+                    // Even if we don't withdraw from a vault we still need to track it:
+                    // Possibly the invoked program will deposit funds into it.
                     .unwrap_or(0);
                 require!(
                     withdraw_amount <= vault_info.pre_amount,
@@ -156,7 +169,7 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
 
                 // if there are withdraws: figure out loan amount, mark as signer
                 if withdraw_amount > 0 {
-                    let token_account = account.tokens.get_mut(bank.token_index)?;
+                    let token_account = account.tokens.get_mut_raw(vault_info.raw_token_index);
                     let native_position = token_account.native(&bank);
                     vault_info.loan_amount = if native_position > 0 {
                         (I80F48::from(withdraw_amount) - native_position).max(I80F48::ZERO)
@@ -216,22 +229,6 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     };
     solana_program::program::invoke_signed(&cpi_ix, &cpi_ais, &signers_ref)?;
 
-    // Track vault changes and apply them to the user's token positions
-    let mut account = ctx.accounts.account.load_mut()?;
-    let inactive_tokens =
-        adjust_for_post_cpi_vault_amounts(health_ais, cpi_ais, &used_vaults, &mut account)?;
-
-    // Check post-cpi health
-    let post_cpi_health =
-        compute_health_from_fixed_accounts(&account, HealthType::Init, health_ais)?;
-    require!(post_cpi_health >= 0, MangoError::HealthMustBePositive);
-    msg!("post_cpi_health {:?}", post_cpi_health);
-
-    // Deactivate inactive token accounts after health check
-    for raw_token_index in inactive_tokens {
-        account.tokens.deactivate(raw_token_index);
-    }
-
     // Revoke delegates for vaults
     let group = ctx.accounts.group.load()?;
     let group_seeds = group_seeds!(group);
@@ -254,6 +251,22 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
         }
     }
 
+    // Track vault changes and apply them to the user's token positions
+    let mut account = ctx.accounts.account.load_mut()?;
+    let inactive_tokens =
+        adjust_for_post_cpi_vault_amounts(health_ais, cpi_ais, &used_vaults, &mut account)?;
+
+    // Check post-cpi health
+    let post_cpi_health =
+        compute_health_from_fixed_accounts(&account, HealthType::Init, health_ais)?;
+    require!(post_cpi_health >= 0, MangoError::HealthMustBePositive);
+    msg!("post_cpi_health {:?}", post_cpi_health);
+
+    // Deactivate inactive token accounts after health check
+    for raw_token_index in inactive_tokens {
+        account.tokens.deactivate(raw_token_index);
+    }
+
     Ok(())
 }
 
@@ -267,7 +280,7 @@ fn adjust_for_post_cpi_vault_amounts(
     for (_, info) in used_vaults.iter() {
         let vault = Account::<TokenAccount>::try_from(&cpi_ais[info.vault_cpi_ai_index]).unwrap();
         let mut bank = health_ais[info.bank_health_ai_index].load_mut::<Bank>()?;
-        let (position, raw_index) = account.tokens.get_mut_or_create(bank.token_index)?;
+        let position = account.tokens.get_mut_raw(info.raw_token_index);
 
         let loan_origination_fee = info.loan_amount * bank.loan_origination_fee_rate;
         bank.collected_fees_native += loan_origination_fee;
@@ -277,7 +290,7 @@ fn adjust_for_post_cpi_vault_amounts(
             I80F48::from(vault.amount) - I80F48::from(info.pre_amount) - loan_origination_fee,
         )?;
         if !is_active {
-            inactive_token_raw_indexes.push(raw_index);
+            inactive_token_raw_indexes.push(info.raw_token_index);
         }
     }
     Ok(inactive_token_raw_indexes)

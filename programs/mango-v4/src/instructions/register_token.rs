@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount};
+use anchor_spl::token::{Mint, Token, TokenAccount};
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
@@ -72,18 +72,6 @@ pub struct RegisterToken<'info> {
     // TODO: ALTs are unavailable
     //pub address_lookup_table_program: UncheckedAccount<'info>, // TODO: force address?
     pub rent: Sysvar<'info, Rent>,
-}
-
-impl<'info> RegisterToken<'info> {
-    pub fn approve_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Approve<'info>> {
-        let program = self.token_program.to_account_info();
-        let accounts = token::Approve {
-            to: self.vault.to_account_info(),
-            delegate: self.bank.to_account_info(),
-            authority: self.group.to_account_info(),
-        };
-        CpiContext::new(program, accounts)
-    }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Default)]
