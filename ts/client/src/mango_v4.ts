@@ -514,12 +514,25 @@ export type MangoV4 = {
           "name": "owner",
           "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
-          "name": "banksLen",
+          "name": "numHealthAccounts",
           "type": "u64"
+        },
+        {
+          "name": "withdraws",
+          "type": {
+            "vec": {
+              "defined": "(u8,u64)"
+            }
+          }
         },
         {
           "name": "cpiData",
@@ -1704,11 +1717,15 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                6
+                5
               ]
             }
           }
@@ -3354,12 +3371,25 @@ export const IDL: MangoV4 = {
           "name": "owner",
           "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
-          "name": "banksLen",
+          "name": "numHealthAccounts",
           "type": "u64"
+        },
+        {
+          "name": "withdraws",
+          "type": {
+            "vec": {
+              "defined": "(u8,u64)"
+            }
+          }
         },
         {
           "name": "cpiData",
@@ -4544,11 +4574,15 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                6
+                5
               ]
             }
           }

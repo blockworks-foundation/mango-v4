@@ -9,6 +9,7 @@ export class Bank {
   public name: string;
   public depositIndex: I80F48;
   public borrowIndex: I80F48;
+  public indexedTotalDeposits: I80F48;
 
   static from(
     publicKey: PublicKey,
@@ -101,6 +102,7 @@ export class Bank {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.depositIndex = I80F48.from(depositIndex);
     this.borrowIndex = I80F48.from(borrowIndex);
+    this.indexedTotalDeposits = I80F48.from(indexedTotalDeposits);
   }
 
   toString(): string {

@@ -49,10 +49,8 @@ export class MangoClient {
   }
 
   public async getGroup(groupPk: PublicKey): Promise<Group> {
-    const group = Group.from(
-      groupPk,
-      await this.program.account.group.fetch(groupPk),
-    );
+    const groupAccount = await this.program.account.group.fetch(groupPk);
+    const group = Group.from(groupPk, groupAccount);
     await group.reload(this);
     return group;
   }
@@ -807,10 +805,7 @@ export class MangoClient {
 
   /// static
 
-  static async connect(
-    provider: Provider,
-    devnet?: boolean,
-  ): Promise<MangoClient> {
+  static connect(provider?: Provider, devnet?: boolean): MangoClient {
     // TODO: use IDL on chain or in repository? decide...
     // Alternatively we could fetch IDL from chain.
     // const idl = await Program.fetchIdl(MANGO_V4_ID, provider);
