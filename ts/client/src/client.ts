@@ -850,9 +850,9 @@ export class MangoClient {
       amountIn, // todo: convert to u64?
       minimumAmountOut, // todo: convert to u64?
     );
-    const targetRemainingAccounts = instruction.keys;
+    const targetRemainingAccounts = instruction.keys; // todo: verify this does not contain programId
 
-    const withdraws = []; // todo:
+    const withdraws = [{ index: 3, amount: amountIn }];
     const cpiData = instruction.data; // todo: is it just instruction.data?
 
     return await this.program.methods
