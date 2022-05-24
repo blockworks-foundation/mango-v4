@@ -530,7 +530,7 @@ export type MangoV4 = {
           "name": "withdraws",
           "type": {
             "vec": {
-              "defined": "(u8,u64)"
+              "defined": "MarginTradeWithdraw"
             }
           }
         },
@@ -2201,6 +2201,22 @@ export type MangoV4 = {
     }
   ],
   "types": [
+    {
+      "name": "MarginTradeWithdraw",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "index",
+            "type": "u8"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
     {
       "name": "InterestRateParams",
       "type": {
@@ -3387,7 +3403,7 @@ export const IDL: MangoV4 = {
           "name": "withdraws",
           "type": {
             "vec": {
-              "defined": "(u8,u64)"
+              "defined": "MarginTradeWithdraw"
             }
           }
         },
@@ -5058,6 +5074,22 @@ export const IDL: MangoV4 = {
     }
   ],
   "types": [
+    {
+      "name": "MarginTradeWithdraw",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "index",
+            "type": "u8"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
     {
       "name": "InterestRateParams",
       "type": {

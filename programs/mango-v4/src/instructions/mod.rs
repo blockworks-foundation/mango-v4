@@ -32,7 +32,7 @@ mod create_group;
 mod create_stub_oracle;
 mod deposit;
 mod liq_token_with_token;
-mod margin_trade;
+pub mod margin_trade;
 mod perp_cancel_all_orders;
 mod perp_cancel_all_orders_by_side;
 mod perp_cancel_order;

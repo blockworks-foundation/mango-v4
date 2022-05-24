@@ -50,6 +50,12 @@ struct AllowedVault {
     loan_amount: I80F48,
 }
 
+#[derive(AnchorDeserialize, AnchorSerialize, Clone, Copy)]
+pub struct MarginTradeWithdraw {
+    pub index: u8,
+    pub amount: u64,
+}
+
 /// - `num_health_accounts` is the number of health accounts that remaining_accounts starts with.
 /// - `withdraws` is a list of tuples containing the index to a vault in target_accounts and the
 ///    amount that the target program shall be allowed to withdraw
@@ -57,7 +63,7 @@ struct AllowedVault {
 pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, MarginTrade<'info>>,
     num_health_accounts: usize,
-    withdraws: Vec<(u8, u64)>,
+    withdraws: Vec<MarginTradeWithdraw>,
     cpi_data: Vec<u8>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
@@ -155,8 +161,9 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
             if let Some(vault_info) = used_vaults.get_mut(&bank.vault) {
                 let withdraw_amount = withdraws
                     .iter()
-                    .find_map(|&(index, amount)| {
-                        (index as usize == vault_info.vault_cpi_ai_index).then(|| amount)
+                    .find_map(|&withdraw| {
+                        (withdraw.index as usize == vault_info.vault_cpi_ai_index)
+                            .then(|| withdraw.amount)
                     })
                     // Even if we don't withdraw from a vault we still need to track it:
                     // Possibly the invoked program will deposit funds into it.
