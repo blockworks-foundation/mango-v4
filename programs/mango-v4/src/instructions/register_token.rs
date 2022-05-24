@@ -1,12 +1,11 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
-use anchor_spl::token::Token;
-use anchor_spl::token::TokenAccount;
+use anchor_spl::token::{Mint, Token, TokenAccount};
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
 // TODO: ALTs are unavailable
 //use crate::address_lookup_table;
+use crate::error::*;
 use crate::state::*;
 use crate::util::fill16_from_str;
 
@@ -130,6 +129,7 @@ pub fn register_token(
         liquidation_fee: I80F48::from_num(liquidation_fee),
         dust: I80F48::ZERO,
         token_index,
+        bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         reserved: Default::default(),
     };
 
