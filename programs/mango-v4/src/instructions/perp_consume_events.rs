@@ -2,10 +2,9 @@ use anchor_lang::prelude::*;
 use bytemuck::cast_ref;
 
 use crate::error::MangoError;
+use crate::state::EventQueue;
 use crate::{
-    state::{
-        EventQueueHeader, EventType, FillEvent, Group, MangoAccount, OutEvent, PerpMarket, Queue,
-    },
+    state::{EventType, FillEvent, Group, MangoAccount, OutEvent, PerpMarket},
     util::LoadZeroCopy,
 };
 
@@ -20,7 +19,7 @@ pub struct PerpConsumeEvents<'info> {
     pub perp_market: AccountLoader<'info, PerpMarket>,
 
     #[account(mut)]
-    pub event_queue: AccountLoader<'info, Queue<EventQueueHeader>>,
+    pub event_queue: AccountLoader<'info, EventQueue>,
 }
 
 pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Result<()> {

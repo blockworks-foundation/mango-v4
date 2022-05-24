@@ -1,13 +1,17 @@
 name: Lint and Test
 on:
   push:
-    branches: master
+    branches:
+      - main
+      - dev
   pull_request:
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
-  SOLANA_VERSION: "1.9.5"
-  RUST_TOOLCHAIN: stable
+  SOLANA_VERSION: "1.9.14"
+  RUST_TOOLCHAIN: 1.60.0
+  LOG_PROGRAM: "m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD"
 
 defaults:
   run:
@@ -16,11 +20,14 @@ defaults:
 jobs:
   lint:
     name: Lint
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v2
-      - name: Install Rust nightly
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Linux dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config build-essential libudev-dev
+      - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           override: true
@@ -29,36 +36,26 @@ jobs:
           components: rustfmt, clippy
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v1
-
       - name: Run fmt
         run: cargo fmt -- --check
-      # The style and complexity lints have not been processed yet.
       - name: Run clippy
         run: cargo clippy -- --deny=warnings --allow=clippy::style --allow=clippy::complexity
 
   tests:
     name: Test
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v2
       - name: Install Linux dependencies
         run: sudo apt-get update && sudo apt-get install -y pkg-config build-essential libudev-dev
-      - name: Install Rust nightly
+      - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           override: true
           profile: minimal
           toolchain: ${{ env.RUST_TOOLCHAIN }}
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v1
-        
-      # Install Solana
-      - name: Cache Solana binaries
-        uses: actions/cache@v2
-        with:
-          path: ~/.cache/solana
-          key: ${{ runner.os }}-${{ env.SOLANA_VERSION }}
       - name: Install Solana
         run: |
           sh -c "$(curl -sSfL https://release.solana.com/v${{ env.SOLANA_VERSION }}/install)"
@@ -69,5 +66,72 @@ jobs:
           solana-keygen new -o "$HOME/.config/solana/id.json" --no-passphrase --silent
       - name: Build all deps
         run: cargo build-bpf
-      - name: Run bpf tests
-        run: cargo test-bpf
+        # Run bpf tests and output to runner and log
+      - name: Run tests
+        run: cargo test-bpf 2> >(tee raw-test-bpf.log >&2)
+      - name: Save raw log
+        uses: actions/upload-artifact@v3
+        with:
+          name: raw-test-bpf
+          path: raw-test-bpf.log
+
+  # Download logs and process them
+  process-logs:
+    name: Process logs
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    needs: [lint, tests]
+    steps:
+      - name: Download raw log
+        uses: actions/download-artifact@v3
+        with:
+          name: raw-test-bpf
+      - name: Install deps
+        run: |
+          sudo apt-get install ripgrep
+          curl -Lo xsv.tar.gz "https://github.com/BurntSushi/xsv/releases/latest/download/xsv-0.13.0-x86_64-unknown-linux-musl.tar.gz"
+          sudo tar xf xsv.tar.gz -C /usr/local/bin
+      - name: Setup date input
+        id: date
+        run: echo "::set-output name=today::$(date +'%Y-%m-%d')"
+      - name: Process raw log
+        run: |
+          rg -oNI "(Instruction: |Program ${{ env.LOG_PROGRAM }} consumed).*$" raw-test-bpf.log \
+            | rg -U 'Instruction:.*\nProgram ${{ env.LOG_PROGRAM }}.*' \
+            | awk 'NR % 2 == 1 { o=$0 ; next } { print o " " $0 }' \
+            | sort | uniq -u | sort > cu-per-ix.log
+      - name: Clean up log
+        run: |
+          rg -N 'Instruction: (\w+) .* consumed (\d+) .*' cu-per-ix.log -r '${{ steps.date.outputs.today }},$1,$2' \
+            | uniq | xsv sort -s 2 -N -R \
+            | sort -t ',' -k 2,3 -u \
+            | sort > cu-per-ix-clean.log
+      - name: Save clean log
+        uses: actions/upload-artifact@v3
+        with:
+          name: cu-per-ix-clean
+          path: cu-per-ix-clean.log
+
+  # Push clean logs to git if main/dev branch
+  push-logs:
+    name: Push logs
+    if: |
+      (github.actor != 'github-actions[bot]' && github.ref_name == 'main') ||
+      (github.actor != 'github-actions[bot]' && github.ref_name == 'dev')
+    runs-on: ubuntu-latest
+    needs: [lint, tests, process-logs]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Download clean log
+        uses: actions/download-artifact@v3
+        with:
+          name: cu-per-ix-clean
+          path: ./
+      - name: Push log to git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: push cu test logs"
+          git push

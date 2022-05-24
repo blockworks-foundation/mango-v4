@@ -1,4 +1,4 @@
-import { Provider, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
@@ -25,7 +25,7 @@ const DEVNET_ORACLES = new Map([
 // * solana airdrop 1  -k ~/.config/solana/admin.json
 //
 async function main() {
-  const options = Provider.defaultOptions();
+  const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
     'https://mango.devnet.rpcpool.com',
     options,
@@ -38,7 +38,7 @@ async function main() {
   );
   const adminWallet = new Wallet(admin);
   console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
-  const adminProvider = new Provider(connection, adminWallet, options);
+  const adminProvider = new AnchorProvider(connection, adminWallet, options);
   const client = await MangoClient.connect(adminProvider, true);
 
   // group
@@ -64,6 +64,8 @@ async function main() {
       0.07,
       0.8,
       0.9,
+      0.0005,
+      0.0005,
       1.5,
       0.8,
       0.6,
@@ -92,6 +94,8 @@ async function main() {
       0.07,
       0.8,
       0.9,
+      0.0005,
+      0.0005,
       1.5,
       0.8,
       0.6,
@@ -131,6 +135,39 @@ async function main() {
     group.banksMap.get('USDC')?.tokenIndex,
   );
   console.log(`...registerd serum3 market ${markets[0].publicKey}`);
+
+  // register perp market
+  console.log(`Registering perp market...`);
+  try {
+    await client.perpCreateMarket(
+      group,
+      btcDevnetOracle,
+      0,
+      'BTC/USDC',
+      0,
+      1,
+      10,
+      100,
+      0.975,
+      0.95,
+      1.025,
+      1.05,
+      0.012,
+      0.0002,
+      0.0,
+      0.05,
+      0.05,
+      100,
+    );
+  } catch (error) {
+    console.log(error);
+  }
+  const perpMarkets = await client.perpGetMarket(
+    group,
+    group.banksMap.get('BTC')?.tokenIndex,
+    group.banksMap.get('USDC')?.tokenIndex,
+  );
+  console.log(`...created perp market ${perpMarkets[0].publicKey}`);
 
   process.exit();
 }

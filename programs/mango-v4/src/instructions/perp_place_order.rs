@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::error::*;
 use crate::state::{
-    oracle_price, Book, EventQueueHeader, Group, MangoAccount, OrderType, PerpMarket, Queue, Side,
+    oracle_price, Book, EventQueue, Group, MangoAccount, OrderType, PerpMarket, Side,
 };
 
 #[derive(Accounts)]
@@ -30,7 +30,7 @@ pub struct PerpPlaceOrder<'info> {
     #[account(mut)]
     pub bids: UncheckedAccount<'info>,
     #[account(mut)]
-    pub event_queue: AccountLoader<'info, Queue<EventQueueHeader>>,
+    pub event_queue: AccountLoader<'info, EventQueue>,
 
     pub oracle: UncheckedAccount<'info>,
 
@@ -76,6 +76,8 @@ pub fn perp_place_order(
     // When the limit is reached, processing stops and the instruction succeeds.
     limit: u8,
 ) -> Result<()> {
+    // TODO: check pre and post health
+
     let mut mango_account = ctx.accounts.account.load_mut()?;
     require!(mango_account.is_bankrupt == 0, MangoError::IsBankrupt);
     let mango_account_pk = ctx.accounts.account.key();

@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use checked_math as cm;
 use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
+use std::cmp::Ordering;
 use std::mem::size_of;
 
 use crate::error::*;
@@ -23,6 +24,7 @@ pub const MAX_PERP_OPEN_ORDERS: usize = 8;
 pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 
 #[zero_copy]
+#[derive(Debug)]
 pub struct TokenAccount {
     // TODO: Why did we have deposits and borrows as two different values
     //       if only one of them was allowed to be != 0 at a time?
@@ -75,6 +77,21 @@ const_assert_eq!(
 );
 const_assert_eq!(size_of::<MangoAccountTokens>() % 8, 0);
 
+impl std::fmt::Debug for MangoAccountTokens {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MangoAccountTokens")
+            .field(
+                "values",
+                &self
+                    .values
+                    .iter()
+                    .filter(|value| value.is_active())
+                    .collect::<Vec<&TokenAccount>>(),
+            )
+            .finish()
+    }
+}
+
 impl Default for MangoAccountTokens {
     fn default() -> Self {
         Self::new()
@@ -105,6 +122,10 @@ impl MangoAccountTokens {
             .iter_mut()
             .find(|p| p.is_active_for_token(token_index))
             .ok_or_else(|| error!(MangoError::SomeError)) // TODO: not found error
+    }
+
+    pub fn get_mut_raw(&mut self, raw_token_index: usize) -> &mut TokenAccount {
+        &mut self.values[raw_token_index]
     }
 
     pub fn get_mut_or_create(
@@ -153,6 +174,7 @@ impl MangoAccountTokens {
 }
 
 #[zero_copy]
+#[derive(Debug)]
 pub struct Serum3Account {
     pub open_orders: Pubkey,
 
@@ -200,6 +222,21 @@ const_assert_eq!(
     MAX_SERUM3_ACCOUNTS * size_of::<Serum3Account>()
 );
 const_assert_eq!(size_of::<MangoAccountSerum3>() % 8, 0);
+
+impl std::fmt::Debug for MangoAccountSerum3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MangoAccountSerum3")
+            .field(
+                "values",
+                &self
+                    .values
+                    .iter()
+                    .filter(|value| value.is_active())
+                    .collect::<Vec<&Serum3Account>>(),
+            )
+            .finish()
+    }
+}
 
 impl Default for MangoAccountSerum3 {
     fn default() -> Self {
@@ -256,8 +293,8 @@ pub struct PerpAccount {
     pub quote_position_native: I80F48,
 
     /// Already settled funding
-    // pub long_settled_funding: I80F48,
-    // pub short_settled_funding: I80F48,
+    pub long_settled_funding: I80F48,
+    pub short_settled_funding: I80F48,
 
     /// Base lots in bids
     pub bids_base_lots: i64,
@@ -271,7 +308,21 @@ pub struct PerpAccount {
     pub taker_base_lots: i64,
     pub taker_quote_lots: i64,
 }
-const_assert_eq!(size_of::<PerpAccount>(), 8 + 8 * 5 + 16);
+
+impl std::fmt::Debug for PerpAccount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PerpAccount")
+            .field("market_index", &self.market_index)
+            .field("base_position_lots", &self.base_position_lots)
+            .field("quote_position_native", &self.quote_position_native)
+            .field("bids_base_lots", &self.bids_base_lots)
+            .field("asks_base_lots", &self.asks_base_lots)
+            .field("taker_base_lots", &self.taker_base_lots)
+            .field("taker_quote_lots", &self.taker_quote_lots)
+            .finish()
+    }
+}
+const_assert_eq!(size_of::<PerpAccount>(), 8 + 8 * 5 + 3 * 16);
 const_assert_eq!(size_of::<PerpAccount>() % 8, 0);
 
 impl Default for PerpAccount {
@@ -285,6 +336,8 @@ impl Default for PerpAccount {
             taker_base_lots: 0,
             taker_quote_lots: 0,
             reserved: Default::default(),
+            long_settled_funding: I80F48::ZERO,
+            short_settled_funding: I80F48::ZERO,
         }
     }
 }
@@ -323,6 +376,25 @@ impl PerpAccount {
         self.base_position_lots += base_change;
         perp_market.open_interest += self.base_position_lots.abs() - start.abs();
     }
+
+    /// Move unrealized funding payments into the quote_position
+    pub fn settle_funding(&mut self, perp_market: &PerpMarket) {
+        match self.base_position_lots.cmp(&0) {
+            Ordering::Greater => {
+                self.quote_position_native -= (perp_market.long_funding
+                    - self.long_settled_funding)
+                    * I80F48::from_num(self.base_position_lots);
+            }
+            Ordering::Less => {
+                self.quote_position_native -= (perp_market.short_funding
+                    - self.short_settled_funding)
+                    * I80F48::from_num(self.base_position_lots);
+            }
+            Ordering::Equal => (),
+        }
+        self.long_settled_funding = perp_market.long_funding;
+        self.short_settled_funding = perp_market.short_funding;
+    }
 }
 
 #[zero_copy]
@@ -333,13 +405,62 @@ pub struct MangoAccountPerps {
     pub order_market: [PerpMarketIndex; MAX_PERP_OPEN_ORDERS],
     pub order_side: [Side; MAX_PERP_OPEN_ORDERS], // TODO: storing enums isn't POD
     pub order_id: [i128; MAX_PERP_OPEN_ORDERS],
-    pub order_client_id: [u64; MAX_PERP_OPEN_ORDERS],
+    pub client_order_id: [u64; MAX_PERP_OPEN_ORDERS],
 }
 const_assert_eq!(
     size_of::<MangoAccountPerps>(),
     MAX_PERP_ACCOUNTS * size_of::<PerpAccount>() + MAX_PERP_OPEN_ORDERS * (2 + 1 + 16 + 8)
 );
 const_assert_eq!(size_of::<MangoAccountPerps>() % 8, 0);
+
+impl std::fmt::Debug for MangoAccountPerps {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MangoAccountPerps")
+            .field(
+                "accounts",
+                &self
+                    .accounts
+                    .iter()
+                    .filter(|value| value.is_active())
+                    .collect::<Vec<&PerpAccount>>(),
+            )
+            .field(
+                "order_market",
+                &self
+                    .order_market
+                    .iter()
+                    .filter(|value| **value != PerpMarketIndex::MAX)
+                    .collect::<Vec<&PerpMarketIndex>>(),
+            )
+            .field(
+                "order_side",
+                &self
+                    .order_side
+                    .iter()
+                    .zip(self.order_id)
+                    .filter(|value| value.1 != 0)
+                    .map(|value| value.0)
+                    .collect::<Vec<&Side>>(),
+            )
+            .field(
+                "order_id",
+                &self
+                    .order_id
+                    .iter()
+                    .filter(|value| **value != 0)
+                    .collect::<Vec<&i128>>(),
+            )
+            .field(
+                "client_order_id",
+                &self
+                    .client_order_id
+                    .iter()
+                    .filter(|value| **value != 0)
+                    .collect::<Vec<&u64>>(),
+            )
+            .finish()
+    }
+}
 
 impl MangoAccountPerps {
     pub fn new() -> Self {
@@ -348,7 +469,7 @@ impl MangoAccountPerps {
             order_market: [FREE_ORDER_SLOT; MAX_PERP_OPEN_ORDERS],
             order_side: [Side::Bid; MAX_PERP_OPEN_ORDERS],
             order_id: [0; MAX_PERP_OPEN_ORDERS],
-            order_client_id: [0; MAX_PERP_OPEN_ORDERS],
+            client_order_id: [0; MAX_PERP_OPEN_ORDERS],
         }
     }
 
@@ -413,7 +534,7 @@ impl MangoAccountPerps {
         self.order_market[slot] = perp_market_index;
         self.order_side[slot] = side;
         self.order_id[slot] = order.key;
-        self.order_client_id[slot] = order.client_order_id;
+        self.client_order_id[slot] = order.client_order_id;
         Ok(())
     }
 
@@ -439,10 +560,9 @@ impl MangoAccountPerps {
         // release space
         self.order_market[slot] = FREE_ORDER_SLOT;
 
-        // TODO OPT - remove these; unnecessary
         self.order_side[slot] = Side::Bid;
         self.order_id[slot] = 0i128;
-        self.order_client_id[slot] = 0u64;
+        self.client_order_id[slot] = 0u64;
         Ok(())
     }
 
@@ -453,7 +573,7 @@ impl MangoAccountPerps {
         fill: &FillEvent,
     ) -> Result<()> {
         let pa = self.get_account_mut_or_create(perp_market_index).unwrap().0;
-        // pa.settle_funding(cache);
+        pa.settle_funding(perp_market);
 
         let side = fill.taker_side.invert_side();
         let (base_change, quote_change) = fill.base_quote_change(side);
@@ -492,6 +612,8 @@ impl MangoAccountPerps {
         fill: &FillEvent,
     ) -> Result<()> {
         let pa = self.get_account_mut_or_create(perp_market_index).unwrap().0;
+        pa.settle_funding(perp_market);
+
         let (base_change, quote_change) = fill.base_quote_change(fill.taker_side);
         pa.remove_taker_trade(base_change, quote_change);
         pa.change_base_position(perp_market, base_change);
@@ -501,6 +623,28 @@ impl MangoAccountPerps {
 
         pa.quote_position_native += quote;
         Ok(())
+    }
+
+    pub fn find_order_with_client_order_id(
+        &self,
+        market_index: PerpMarketIndex,
+        client_order_id: u64,
+    ) -> Option<(i128, Side)> {
+        for i in 0..MAX_PERP_OPEN_ORDERS {
+            if self.order_market[i] == market_index && self.client_order_id[i] == client_order_id {
+                return Some((self.order_id[i], self.order_side[i]));
+            }
+        }
+        None
+    }
+
+    pub fn find_order_side(&self, market_index: PerpMarketIndex, order_id: i128) -> Option<Side> {
+        for i in 0..MAX_PERP_OPEN_ORDERS {
+            if self.order_market[i] == market_index && self.order_id[i] == order_id {
+                return Some(self.order_side[i]);
+            }
+        }
+        None
     }
 }
 
@@ -552,6 +696,33 @@ const_assert_eq!(
         + 4
 );
 const_assert_eq!(size_of::<MangoAccount>() % 8, 0);
+
+impl std::fmt::Debug for MangoAccount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MangoAccount")
+            .field("name", &self.name())
+            .field("group", &self.group)
+            .field("owner", &self.owner)
+            .field("delegate", &self.delegate)
+            .field("tokens", &self.tokens)
+            .field("serum3", &self.serum3)
+            .field("perps", &self.perps)
+            .field("being_liquidated", &self.being_liquidated)
+            .field("is_bankrupt", &self.is_bankrupt)
+            .field("account_num", &self.account_num)
+            .field("bump", &self.bump)
+            .field("reserved", &self.reserved)
+            .finish()
+    }
+}
+
+impl MangoAccount {
+    fn name(&self) -> &str {
+        std::str::from_utf8(&self.name)
+            .unwrap()
+            .trim_matches(char::from(0))
+    }
+}
 
 #[macro_export]
 macro_rules! account_seeds {

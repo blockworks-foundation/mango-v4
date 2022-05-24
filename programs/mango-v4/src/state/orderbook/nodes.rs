@@ -161,13 +161,14 @@ pub struct FreeNode {
     pub(crate) reserve: [u8; NODE_SIZE - 8],
 }
 
-#[derive(Copy, Clone, Pod)]
-#[repr(C)]
+#[zero_copy]
+#[derive(Pod)]
 pub struct AnyNode {
     pub tag: u32,
-    pub data: [u8; NODE_SIZE - 4],
+    pub data: [u8; 84], // note: anchor can't parse the struct for IDL when it includes non numbers, NODE_SIZE == 88, 84 == 88 - 4
 }
 
+const_assert_eq!(size_of::<AnyNode>(), NODE_SIZE);
 const_assert_eq!(size_of::<AnyNode>(), size_of::<InnerNode>());
 const_assert_eq!(size_of::<AnyNode>(), size_of::<LeafNode>());
 const_assert_eq!(size_of::<AnyNode>(), size_of::<FreeNode>());

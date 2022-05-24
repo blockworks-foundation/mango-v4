@@ -1,9 +1,10 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
-use fixed::types::I80F48;
 
 use crate::error::*;
 use crate::state::*;
+
+use super::apply_vault_difference;
 
 #[derive(Accounts)]
 pub struct Serum3SettleFunds<'info> {
@@ -120,23 +121,15 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     let after_quote_vault = ctx.accounts.quote_vault.amount;
 
     // Charge the difference in vault balances to the user's account
-    {
-        let mut account = ctx.accounts.account.load_mut()?;
-
-        let mut base_bank = ctx.accounts.base_bank.load_mut()?;
-        let base_position = account.tokens.get_mut(base_bank.token_index)?;
-        base_bank.change(
-            base_position,
-            I80F48::from(after_base_vault) - I80F48::from(before_base_vault),
-        )?;
-
-        let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-        let quote_position = account.tokens.get_mut(quote_bank.token_index)?;
-        quote_bank.change(
-            quote_position,
-            I80F48::from(after_quote_vault) - I80F48::from(before_quote_vault),
-        )?;
-    }
+    apply_vault_difference(
+        ctx.accounts.account.load_mut()?,
+        ctx.accounts.base_bank.load_mut()?,
+        after_base_vault,
+        before_base_vault,
+        ctx.accounts.quote_bank.load_mut()?,
+        after_quote_vault,
+        before_quote_vault,
+    )?;
 
     Ok(())
 }

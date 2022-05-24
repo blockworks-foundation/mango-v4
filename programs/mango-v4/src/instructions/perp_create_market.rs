@@ -3,6 +3,7 @@ use fixed::types::I80F48;
 
 use crate::error::MangoError;
 use crate::state::*;
+use crate::util::fill16_from_str;
 
 #[derive(Accounts)]
 #[instruction(perp_market_index: PerpMarketIndex)]
@@ -43,6 +44,7 @@ pub struct PerpCreateMarket<'info> {
 pub fn perp_create_market(
     ctx: Context<PerpCreateMarket>,
     perp_market_index: PerpMarketIndex,
+    name: String,
     base_token_index_opt: Option<TokenIndex>,
     quote_token_index: TokenIndex,
     quote_lot_size: i64,
@@ -54,9 +56,13 @@ pub fn perp_create_market(
     liquidation_fee: f32,
     maker_fee: f32,
     taker_fee: f32,
+    min_funding: f32,
+    max_funding: f32,
+    impact_quantity: i64,
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_init()?;
     *perp_market = PerpMarket {
+        name: fill16_from_str(name)?,
         group: ctx.accounts.group.key(),
         oracle: ctx.accounts.oracle.key(),
         bids: ctx.accounts.bids.key(),
@@ -71,10 +77,17 @@ pub fn perp_create_market(
         liquidation_fee: I80F48::from_num(liquidation_fee),
         maker_fee: I80F48::from_num(maker_fee),
         taker_fee: I80F48::from_num(taker_fee),
+        min_funding: I80F48::from_num(min_funding),
+        max_funding: I80F48::from_num(max_funding),
+        long_funding: I80F48::ZERO,
+        short_funding: I80F48::ZERO,
+        funding_last_updated: Clock::get()?.unix_timestamp,
+        impact_quantity,
         open_interest: 0,
         seq_num: 0,
         fees_accrued: I80F48::ZERO,
         bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
+        reserved: Default::default(),
         perp_market_index,
         base_token_index: base_token_index_opt.ok_or(TokenIndex::MAX).unwrap(),
         quote_token_index,

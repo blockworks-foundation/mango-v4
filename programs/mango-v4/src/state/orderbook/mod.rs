@@ -221,7 +221,7 @@ mod tests {
         assert_eq!(maker.order_market[0], market.perp_market_index);
         assert_eq!(maker.order_market[1], FREE_ORDER_SLOT);
         assert_ne!(maker.order_id[0], 0);
-        assert_eq!(maker.order_client_id[0], 42);
+        assert_eq!(maker.client_order_id[0], 42);
         assert_eq!(maker.order_side[0], Side::Bid);
         assert!(bookside_contains_key(&book.bids, maker.order_id[0]));
         assert!(bookside_contains_price(&book.bids, price));

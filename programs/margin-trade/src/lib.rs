@@ -14,12 +14,14 @@ pub mod margin_trade {
         deposit_account_owner_bump_seeds: u8,
         amount_to: u64,
     ) -> Result<()> {
-        msg!(
-            "withdrawing({}) for mint {:?}",
-            amount_from,
-            ctx.accounts.withdraw_account.mint
-        );
-        token::transfer(ctx.accounts.transfer_from_mango_vault_ctx(), amount_from)?;
+        if amount_from > 0 {
+            msg!(
+                "withdrawing({}) for mint {:?}",
+                amount_from,
+                ctx.accounts.withdraw_account.mint
+            );
+            token::transfer(ctx.accounts.transfer_from_mango_vault_ctx(), amount_from)?;
+        }
 
         msg!("TODO: do something with the loan");
 
@@ -52,7 +54,7 @@ impl anchor_lang::Id for MarginTrade {
 #[derive(Accounts)]
 
 pub struct MarginTradeCtx<'info> {
-    pub withdraw_account_owner: Signer<'info>,
+    pub withdraw_account_owner: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub withdraw_account: Account<'info, TokenAccount>,

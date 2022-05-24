@@ -1,4 +1,5 @@
 use super::{TokenAccount, TokenIndex};
+use crate::error::MangoError;
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
@@ -6,6 +7,7 @@ use fixed_macro::types::I80F48;
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
+pub const DAY: I80F48 = I80F48!(86400);
 pub const YEAR: I80F48 = I80F48!(31536000);
 
 #[account(zero_copy)]
@@ -33,6 +35,11 @@ pub struct Bank {
     pub rate1: I80F48,
     pub max_rate: I80F48,
 
+    // TODO: add ix/logic to regular send this to DAO
+    pub collected_fees_native: I80F48,
+    pub loan_origination_fee_rate: I80F48,
+    pub loan_fee_rate: I80F48,
+
     // This is a _lot_ of bytes (64) - seems unnecessary
     // (could maybe store them in one byte each, as an informal U1F7?
     // that could store values between 0-2 and converting to I80F48 would be a cheap expand+shift)
@@ -52,12 +59,53 @@ pub struct Bank {
     // Index into TokenInfo on the group
     pub token_index: TokenIndex,
 
-    pub reserved: [u8; 6],
+    pub bump: u8,
+
+    pub reserved: [u8; 5],
 }
-const_assert_eq!(size_of::<Bank>(), 16 + 32 * 4 + 8 + 16 * 15 + 2 + 6);
+const_assert_eq!(size_of::<Bank>(), 16 + 32 * 4 + 8 + 16 * 18 + 3 + 5);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
+impl std::fmt::Debug for Bank {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Bank")
+            .field("name", &self.name())
+            .field("group", &self.group)
+            .field("mint", &self.mint)
+            .field("vault", &self.vault)
+            .field("oracle", &self.oracle)
+            .field("deposit_index", &self.deposit_index)
+            .field("borrow_index", &self.borrow_index)
+            .field("indexed_total_deposits", &self.indexed_total_deposits)
+            .field("indexed_total_borrows", &self.indexed_total_borrows)
+            .field("last_updated", &self.last_updated)
+            .field("util0", &self.util0)
+            .field("rate0", &self.rate0)
+            .field("util1", &self.util1)
+            .field("rate1", &self.rate1)
+            .field("max_rate", &self.max_rate)
+            .field("collected_fees_native", &self.collected_fees_native)
+            .field("loan_origination_fee_rate", &self.loan_origination_fee_rate)
+            .field("loan_fee_rate", &self.loan_fee_rate)
+            .field("maint_asset_weight", &self.maint_asset_weight)
+            .field("init_asset_weight", &self.init_asset_weight)
+            .field("maint_liab_weight", &self.maint_liab_weight)
+            .field("init_liab_weight", &self.init_liab_weight)
+            .field("liquidation_fee", &self.liquidation_fee)
+            .field("dust", &self.dust)
+            .field("token_index", &self.token_index)
+            .field("reserved", &self.reserved)
+            .finish()
+    }
+}
+
 impl Bank {
+    pub fn name(&self) -> &str {
+        std::str::from_utf8(&self.name)
+            .unwrap()
+            .trim_matches(char::from(0))
+    }
+
     pub fn native_total_borrows(&self) -> I80F48 {
         self.borrow_index * self.indexed_total_borrows
     }
@@ -75,6 +123,7 @@ impl Bank {
         position: &mut TokenAccount,
         mut native_amount: I80F48,
     ) -> Result<bool> {
+        require!(native_amount >= 0, MangoError::SomeError);
         let native_position = position.native(self);
 
         if native_position.is_negative() {
@@ -112,15 +161,39 @@ impl Bank {
         Ok(true)
     }
 
-    /// Returns whether the position is active
+    /// Returns whether the position is active after withdrawing from a position
+    /// without applying the loan origination fee.
     ///
     /// native_amount must be >= 0
     /// fractional withdraws can be relevant during liquidation, for example
-    pub fn withdraw(
+    pub fn withdraw_without_fee(
+        &mut self,
+        position: &mut TokenAccount,
+        native_amount: I80F48,
+    ) -> Result<bool> {
+        self.withdraw_internal(position, native_amount, false)
+    }
+
+    /// Returns whether the position is active after withdrawing from a position
+    /// while applying the loan origination fee if a borrow is created.
+    ///
+    /// native_amount must be >= 0
+    /// fractional withdraws can be relevant during liquidation, for example
+    pub fn withdraw_with_fee(
+        &mut self,
+        position: &mut TokenAccount,
+        native_amount: I80F48,
+    ) -> Result<bool> {
+        self.withdraw_internal(position, native_amount, true)
+    }
+
+    fn withdraw_internal(
         &mut self,
         position: &mut TokenAccount,
         mut native_amount: I80F48,
+        with_loan_origination_fee: bool,
     ) -> Result<bool> {
+        require!(native_amount >= 0, MangoError::SomeError);
         let native_position = position.native(self);
 
         if native_position.is_positive() {
@@ -150,6 +223,13 @@ impl Bank {
             native_amount = -new_native_position;
         }
 
+        if with_loan_origination_fee {
+            // charge loan origination fee
+            let loan_origination_fee = cm!(self.loan_origination_fee_rate * native_amount);
+            self.collected_fees_native = cm!(self.collected_fees_native + loan_origination_fee);
+            native_amount = cm!(native_amount + loan_origination_fee);
+        }
+
         // add to borrows
         let indexed_change = cm!(native_amount / self.borrow_index);
         self.indexed_total_borrows = cm!(self.indexed_total_borrows + indexed_change);
@@ -158,15 +238,50 @@ impl Bank {
         Ok(true)
     }
 
-    pub fn change(&mut self, position: &mut TokenAccount, native_amount: I80F48) -> Result<bool> {
+    /// Change a position without applying the loan origination fee
+    pub fn change_without_fee(
+        &mut self,
+        position: &mut TokenAccount,
+        native_amount: I80F48,
+    ) -> Result<bool> {
         if native_amount >= 0 {
             self.deposit(position, native_amount)
         } else {
-            self.withdraw(position, -native_amount)
+            self.withdraw_without_fee(position, -native_amount)
         }
     }
 
+    /// Change a position, while taking the loan origination fee into account
+    pub fn change_with_fee(
+        &mut self,
+        position: &mut TokenAccount,
+        native_amount: I80F48,
+    ) -> Result<bool> {
+        if native_amount >= 0 {
+            self.deposit(position, native_amount)
+        } else {
+            self.withdraw_with_fee(position, -native_amount)
+        }
+    }
+
+    // Borrows continously expose insurance fund to risk, collect fees from borrowers
+    pub fn charge_loan_fee(&mut self, diff_ts: I80F48) {
+        let native_total_borrows_old = self.native_total_borrows();
+        self.indexed_total_borrows =
+            cm!((self.indexed_total_borrows
+                * (I80F48::ONE + self.loan_fee_rate * (diff_ts / YEAR))));
+        self.collected_fees_native = cm!(
+            self.collected_fees_native + self.native_total_borrows() - native_total_borrows_old
+        );
+    }
+
     pub fn update_index(&mut self, now_ts: i64) -> Result<()> {
+        let diff_ts = I80F48::from_num(now_ts - self.last_updated);
+        self.last_updated = now_ts;
+
+        self.charge_loan_fee(diff_ts);
+
+        // Update index based on utilization
         let utilization = if self.native_total_deposits() == I80F48::ZERO {
             I80F48::ZERO
         } else {
@@ -174,9 +289,6 @@ impl Bank {
         };
 
         let interest_rate = self.compute_interest_rate(utilization);
-
-        let diff_ts = I80F48::from_num(now_ts - self.last_updated);
-        self.last_updated = now_ts;
 
         let borrow_interest: I80F48 = cm!(interest_rate * diff_ts);
         let deposit_interest = cm!(borrow_interest * utilization);
@@ -216,6 +328,7 @@ impl Bank {
         rate1: I80F48,
         max_rate: I80F48,
     ) -> I80F48 {
+        // TODO: daffy: use optimal interest from oracle
         if utilization <= util0 {
             let slope = cm!(rate0 / util0);
             cm!(slope * utilization)
@@ -231,9 +344,24 @@ impl Bank {
     }
 }
 
+#[macro_export]
+macro_rules! bank_seeds {
+    ( $bank:expr ) => {
+        &[
+            $bank.group.as_ref(),
+            b"Bank".as_ref(),
+            $bank.token_index.to_le_bytes(),
+            &[$bank.bump],
+        ]
+    };
+}
+
+pub use bank_seeds;
+
 #[cfg(test)]
 mod tests {
     use bytemuck::Zeroable;
+    use std::cmp::min;
 
     use super::*;
 
@@ -275,6 +403,7 @@ mod tests {
                 let mut bank = Bank::zeroed();
                 bank.deposit_index = I80F48::from_num(100.0);
                 bank.borrow_index = I80F48::from_num(10.0);
+                bank.loan_origination_fee_rate = I80F48::from_num(0.1);
                 let indexed = |v: I80F48, b: &Bank| {
                     if v > 0 {
                         v / b.deposit_index
@@ -305,7 +434,7 @@ mod tests {
                 //
 
                 let change = I80F48::from(change);
-                let is_active = bank.change(&mut account, change)?;
+                let is_active = bank.change_with_fee(&mut account, change)?;
 
                 let mut expected_native = start_native + change;
                 if expected_native >= 0.0 && expected_native < 1.0 && !is_in_use {
@@ -315,6 +444,10 @@ mod tests {
                 } else {
                     assert!(is_active);
                     assert_eq!(bank.dust, I80F48::ZERO);
+                }
+                if change < 0 && expected_native < 0 {
+                    let new_borrow = -(expected_native - min(start_native, I80F48::ZERO));
+                    expected_native -= new_borrow * bank.loan_origination_fee_rate;
                 }
                 let expected_indexed = indexed(expected_native, &bank);
 

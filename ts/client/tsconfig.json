@@ -1,0 +1,29 @@
+{
+  "extends": "@tsconfig/recommended/tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "declaration": true,
+    "declarationDir": "dist",
+    "declarationMap": true,
+    "noErrorTruncation": true,
+    "esModuleInterop": true,
+    "lib": [
+      "es2019"
+    ],
+    "noImplicitAny": false,
+    "outDir": "dist",
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "strictNullChecks": true,
+    "target": "es6"
+  },
+  "include": [
+    "./src/**/*"
+  ],
+  "exclude": [
+    "./src/**/*.test.js",
+    "node_modules",
+    "**/node_modules"
+  ]
+}

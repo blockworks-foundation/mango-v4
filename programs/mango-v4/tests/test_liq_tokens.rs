@@ -2,7 +2,7 @@
 
 use fixed::types::I80F48;
 use solana_program_test::*;
-use solana_sdk::signature::Keypair;
+use solana_sdk::{signature::Keypair, transport::TransportError};
 
 use mango_v4::{
     instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side},
@@ -13,7 +13,7 @@ use program_test::*;
 mod program_test;
 
 #[tokio::test]
-async fn test_liq_tokens_force_cancel() -> Result<(), BanksClientError> {
+async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
@@ -216,7 +216,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), BanksClientError> {
 }
 
 #[tokio::test]
-async fn test_liq_tokens_with_token() -> Result<(), BanksClientError> {
+async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
@@ -462,13 +462,14 @@ async fn test_liq_tokens_with_token() -> Result<(), BanksClientError> {
     // health after borrow2 liquidation was (1000-32) * 0.6 - 350 * 2 * 1.4 = -399.2
     // borrow1 needed 399.2 / (1.4*2 - 0.6*2*1.04) = 257.2
     // asset cost = 257.2 * 2 * 1.04 = 535
+    // loan orignation fee = 1
     assert_eq!(
         account_position(solana, account, borrow_token1.bank).await,
         -350 + 257
     );
     assert_eq!(
         account_position(solana, account, collateral_token1.bank).await,
-        1000 - 32 - 535
+        1000 - 32 - 535 - 1
     );
     let liqee: MangoAccount = solana.get_account(account).await;
     assert_eq!(liqee.being_liquidated, 0);

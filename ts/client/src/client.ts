@@ -1,11 +1,13 @@
-import { BN, Program, Provider } from '@project-serum/anchor';
+import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
 import { getFeeRates, getFeeTier, Market } from '@project-serum/serum';
 import { Order } from '@project-serum/serum/lib/market';
 import * as spl from '@solana/spl-token';
 import {
   AccountMeta,
+  Keypair,
   MemcmpFilter,
   PublicKey,
+  SystemProgram,
   SYSVAR_RENT_PUBKEY,
   TransactionSignature,
 } from '@solana/web3.js';
@@ -15,6 +17,7 @@ import { Group } from './accounts/group';
 import { I80F48 } from './accounts/I80F48';
 import { MangoAccount } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
+import { OrderType, PerpMarket, Side } from './accounts/perp';
 import {
   Serum3Market,
   Serum3OrderType,
@@ -35,7 +38,7 @@ export class MangoClient {
   // Group
 
   public async createGroup(): Promise<TransactionSignature> {
-    const adminPk = this.program.provider.wallet.publicKey;
+    const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
     return await this.program.methods
       .createGroup()
       .accounts({
@@ -80,6 +83,8 @@ export class MangoClient {
     util1: number,
     rate1: number,
     maxRate: number,
+    loanFeeRate: number,
+    loanOriginationFeeRate: number,
     maintAssetWeight: number,
     initAssetWeight: number,
     maintLiabWeight: number,
@@ -91,6 +96,8 @@ export class MangoClient {
         tokenIndex,
         name,
         { util0, rate0, util1, rate1, maxRate },
+        loanFeeRate,
+        loanOriginationFeeRate,
         maintAssetWeight,
         initAssetWeight,
         maintLiabWeight,
@@ -99,10 +106,10 @@ export class MangoClient {
       )
       .accounts({
         group: group.publicKey,
-        admin: this.program.provider.wallet.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         mint: mintPk,
         oracle: oraclePk,
-        payer: this.program.provider.wallet.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
         rent: SYSVAR_RENT_PUBKEY,
       })
       .rpc();
@@ -132,9 +139,9 @@ export class MangoClient {
       .createStubOracle({ val: I80F48.fromNumber(price).getData() })
       .accounts({
         group: group.publicKey,
-        admin: this.program.provider.wallet.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         tokenMint: mintPk,
-        payer: this.program.provider.wallet.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .rpc();
   }
@@ -148,9 +155,9 @@ export class MangoClient {
       .setStubOracle({ val: I80F48.fromNumber(price).getData() })
       .accounts({
         group: group.publicKey,
-        admin: this.program.provider.wallet.publicKey,
-        tokenMint: mintPk,
-        payer: this.program.provider.wallet.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        oracle: mintPk,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .rpc();
   }
@@ -203,8 +210,8 @@ export class MangoClient {
       .createAccount(accountNumber, name ?? '')
       .accounts({
         group: group.publicKey,
-        owner: this.program.provider.wallet.publicKey,
-        payer: this.program.provider.wallet.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .rpc();
   }
@@ -247,8 +254,9 @@ export class MangoClient {
       .closeAccount()
       .accounts({
         account: mangoAccount.publicKey,
-        owner: this.program.provider.wallet.publicKey,
-        solDestination: this.program.provider.wallet.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        solDestination: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
       })
       .rpc();
   }
@@ -277,7 +285,8 @@ export class MangoClient {
         bank: bank.publicKey,
         vault: bank.vault,
         tokenAccount: tokenAccountPk,
-        tokenAuthority: this.program.provider.wallet.publicKey,
+        tokenAuthority: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
       })
       .remainingAccounts(
         healthRemainingAccounts.map(
@@ -313,7 +322,6 @@ export class MangoClient {
         bank: bank.publicKey,
         vault: bank.vault,
         tokenAccount: tokenAccountPk,
-        tokenAuthority: this.program.provider.wallet.publicKey,
       })
       .remainingAccounts(
         healthRemainingAccounts.map(
@@ -339,12 +347,12 @@ export class MangoClient {
       .serum3RegisterMarket(marketIndex, name)
       .accounts({
         group: group.publicKey,
-        admin: this.program.provider.wallet.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         serumProgram: serum3ProgramId,
         serumMarketExternal: serum3MarketExternalPk,
         baseBank: baseBank.publicKey,
         quoteBank: quoteBank.publicKey,
-        payer: this.program.provider.wallet.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .rpc();
   }
@@ -408,8 +416,8 @@ export class MangoClient {
         serumMarket: serum3Market.publicKey,
         serumProgram: serum3Market.serumProgram,
         serumMarketExternal: serum3Market.serumMarketExternal,
-        owner: this.program.provider.wallet.publicKey,
-        payer: this.program.provider.wallet.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .rpc();
   }
@@ -484,7 +492,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
-        owner: this.program.provider.wallet.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         openOrders: mangoAccount.findSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
@@ -546,7 +554,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
-        owner: this.program.provider.wallet.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         openOrders: mangoAccount.findSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
@@ -615,6 +623,186 @@ export class MangoClient {
     );
   }
 
+  /// perps
+
+  async perpCreateMarket(
+    group: Group,
+    oraclePk: PublicKey,
+    perpMarketIndex: number,
+    name: string,
+    baseTokenIndex: number,
+    quoteTokenIndex: number,
+    quoteLotSize: number,
+    baseLotSize: number,
+    maintAssetWeight: number,
+    initAssetWeight: number,
+    maintLiabWeight: number,
+    initLiabWeight: number,
+    liquidationFee: number,
+    makerFee: number,
+    takerFee: number,
+    minFunding: number,
+    maxFunding: number,
+    impactQuantity: number,
+  ): Promise<TransactionSignature> {
+    const bids = new Keypair();
+    const asks = new Keypair();
+    const eventQueue = new Keypair();
+
+    console.log(
+      (this.program.provider as AnchorProvider).wallet.publicKey.toBase58(),
+    );
+
+    return await this.program.methods
+      .perpCreateMarket(
+        perpMarketIndex,
+        name,
+        baseTokenIndex,
+        quoteTokenIndex,
+        new BN(quoteLotSize),
+        new BN(baseLotSize),
+        maintAssetWeight,
+        initAssetWeight,
+        maintLiabWeight,
+        initLiabWeight,
+        liquidationFee,
+        makerFee,
+        takerFee,
+        minFunding,
+        maxFunding,
+        new BN(impactQuantity),
+      )
+      .accounts({
+        group: group.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        oracle: oraclePk,
+        bids: bids.publicKey,
+        asks: asks.publicKey,
+        eventQueue: eventQueue.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .preInstructions([
+        SystemProgram.createAccount({
+          programId: this.program.programId,
+          space: 8 + 90152,
+          lamports:
+            await this.program.provider.connection.getMinimumBalanceForRentExemption(
+              90160,
+            ),
+          fromPubkey: (this.program.provider as AnchorProvider).wallet
+            .publicKey,
+          newAccountPubkey: bids.publicKey,
+        }),
+        SystemProgram.createAccount({
+          programId: this.program.programId,
+          space: 8 + 90152,
+          lamports:
+            await this.program.provider.connection.getMinimumBalanceForRentExemption(
+              90160,
+            ),
+          fromPubkey: (this.program.provider as AnchorProvider).wallet
+            .publicKey,
+          newAccountPubkey: asks.publicKey,
+        }),
+        SystemProgram.createAccount({
+          programId: this.program.programId,
+          space: 8 + 102424,
+          lamports:
+            await this.program.provider.connection.getMinimumBalanceForRentExemption(
+              102432,
+            ),
+          fromPubkey: (this.program.provider as AnchorProvider).wallet
+            .publicKey,
+          newAccountPubkey: eventQueue.publicKey,
+        }),
+      ])
+      .signers([bids, asks, eventQueue])
+      .rpc();
+  }
+
+  public async perpGetMarket(
+    group: Group,
+    baseTokenIndex?: number,
+    quoteTokenIndex?: number,
+  ): Promise<PerpMarket[]> {
+    const bumpfbuf = Buffer.alloc(1);
+    bumpfbuf.writeUInt8(255);
+
+    const filters: MemcmpFilter[] = [
+      {
+        memcmp: {
+          bytes: group.publicKey.toBase58(),
+          offset: 24,
+        },
+      },
+    ];
+
+    if (baseTokenIndex) {
+      const bbuf = Buffer.alloc(2);
+      bbuf.writeUInt16LE(baseTokenIndex);
+      filters.push({
+        memcmp: {
+          bytes: bs58.encode(bbuf),
+          offset: 428,
+        },
+      });
+    }
+
+    if (quoteTokenIndex) {
+      const qbuf = Buffer.alloc(2);
+      qbuf.writeUInt16LE(quoteTokenIndex);
+      filters.push({
+        memcmp: {
+          bytes: bs58.encode(qbuf),
+          offset: 430,
+        },
+      });
+    }
+
+    return (await this.program.account.perpMarket.all(filters)).map((tuple) =>
+      PerpMarket.from(tuple.publicKey, tuple.account),
+    );
+  }
+
+  async perpPlaceOrder(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketName: string,
+    side: Side,
+    priceLots: number,
+    maxBaseLots: number,
+    maxQuoteLots: number,
+    clientOrderId: number,
+    orderType: OrderType,
+    expiryTimestamp: number,
+    limit: number,
+  ) {
+    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+
+    await this.program.methods
+      .perpPlaceOrder(
+        side,
+        new BN((priceLots * perpMarket.baseLotSize) / perpMarket.quoteLotSize),
+        new BN(maxBaseLots),
+        new BN(maxQuoteLots),
+        new BN(clientOrderId),
+        orderType,
+        new BN(expiryTimestamp),
+        limit,
+      )
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        perpMarket: perpMarket.publicKey,
+        asks: perpMarket.asks,
+        bids: perpMarket.bids,
+        eventQueue: perpMarket.eventQueue,
+        oracle: perpMarket.oracle,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
+  }
+
   /// static
 
   static connect(provider?: Provider, devnet?: boolean): MangoClient {
@@ -622,30 +810,6 @@ export class MangoClient {
     // Alternatively we could fetch IDL from chain.
     // const idl = await Program.fetchIdl(MANGO_V4_ID, provider);
     let idl = IDL;
-
-    // TODO: remove...
-    // Temporarily add missing (dummy) type definitions, so we can do new Program(...) below
-    // without anchor throwing errors. These types come from part of the code we don't yet care about
-    // in the client.
-    function addDummyType(idl: MangoV4, typeName: string) {
-      if (idl.types.find((type) => type.name === typeName)) {
-        return;
-      }
-      (idl.types as any).push({
-        name: typeName,
-        type: {
-          kind: 'struct',
-          fields: [],
-        },
-      });
-    }
-    addDummyType(idl, 'usize');
-    addDummyType(idl, 'AnyNode');
-    addDummyType(idl, 'EventQueueHeader');
-    addDummyType(idl, 'AnyEvent');
-    addDummyType(idl, 'H');
-    addDummyType(idl, 'H::Item');
-    addDummyType(idl, 'NodeHandle');
 
     return new MangoClient(
       new Program<MangoV4>(idl as MangoV4, MANGO_V4_ID, provider),
@@ -693,6 +857,16 @@ export class MangoClient {
       ...mangoAccount.serum3
         .filter((serum3Account) => serum3Account.marketIndex !== 65535)
         .map((serum3Account) => serum3Account.openOrders),
+    );
+    healthRemainingAccounts.push(
+      ...mangoAccount.perps
+        .filter((perp) => perp.marketIndex !== 65535)
+        .map(
+          (perp) =>
+            Array.from(group.perpMarketsMap.values()).filter(
+              (perpMarket) => perpMarket.perpMarketIndex === perp.marketIndex,
+            )[0].publicKey,
+        ),
     );
 
     return healthRemainingAccounts;

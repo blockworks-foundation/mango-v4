@@ -2,24 +2,28 @@ name: Soteria Scan
 
 on:
   push:
-    branches: master
+    branches:
+      - main
+      - dev
   pull_request:
   workflow_dispatch: #pick branch to manually run on
+
 env:
   CARGO_TERM_COLOR: always
-  SOLANA_VERSION: "1.9.5"
+  SOLANA_VERSION: "1.9.14"
 
 jobs:
   build:
     name: Soteria
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        program: [ 'programs/mango-v4', 'programs/margin-trade' ]
+        program: ["programs/mango-v4", "programs/margin-trade"]
     env:
       PROGRAM_PATH: ${{ matrix.program }}
-      
+
     steps:
       - name: Check-out repo
         uses: actions/checkout@v2

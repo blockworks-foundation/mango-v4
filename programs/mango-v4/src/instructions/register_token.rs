@@ -1,12 +1,11 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
-use anchor_spl::token::Token;
-use anchor_spl::token::TokenAccount;
+use anchor_spl::token::{Mint, Token, TokenAccount};
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
 // TODO: ALTs are unavailable
 //use crate::address_lookup_table;
+use crate::error::*;
 use crate::state::*;
 use crate::util::fill16_from_str;
 
@@ -92,6 +91,8 @@ pub fn register_token(
     token_index: TokenIndex,
     name: String,
     interest_rate_params: InterestRateParams,
+    loan_fee_rate: f32,
+    loan_origination_fee_rate: f32,
     maint_asset_weight: f32,
     init_asset_weight: f32,
     maint_liab_weight: f32,
@@ -118,6 +119,9 @@ pub fn register_token(
         util1: I80F48::from_num(interest_rate_params.util1),
         rate1: I80F48::from_num(interest_rate_params.rate1),
         max_rate: I80F48::from_num(interest_rate_params.max_rate),
+        collected_fees_native: I80F48::ZERO,
+        loan_origination_fee_rate: I80F48::from_num(loan_origination_fee_rate),
+        loan_fee_rate: I80F48::from_num(loan_fee_rate),
         maint_asset_weight: I80F48::from_num(maint_asset_weight),
         init_asset_weight: I80F48::from_num(init_asset_weight),
         maint_liab_weight: I80F48::from_num(maint_liab_weight),
@@ -125,6 +129,7 @@ pub fn register_token(
         liquidation_fee: I80F48::from_num(liquidation_fee),
         dust: I80F48::ZERO,
         token_index,
+        bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         reserved: Default::default(),
     };
 

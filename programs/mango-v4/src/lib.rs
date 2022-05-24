@@ -23,10 +23,6 @@ declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
 #[program]
 pub mod mango_v4 {
 
-    use std::str::FromStr;
-
-    use solana_program::{log::sol_log_compute_units, program_memory::sol_memcmp};
-
     use super::*;
 
     pub fn create_group(ctx: Context<CreateGroup>) -> Result<()> {
@@ -39,6 +35,8 @@ pub mod mango_v4 {
         token_index: TokenIndex,
         name: String,
         interest_rate_params: InterestRateParams,
+        loan_fee_rate: f32,
+        loan_origination_fee_rate: f32,
         maint_asset_weight: f32,
         init_asset_weight: f32,
         maint_liab_weight: f32,
@@ -50,6 +48,8 @@ pub mod mango_v4 {
             token_index,
             name,
             interest_rate_params,
+            loan_fee_rate,
+            loan_origination_fee_rate,
             maint_asset_weight,
             init_asset_weight,
             maint_liab_weight,
@@ -69,6 +69,8 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::create_account(ctx, account_num, name)
     }
+
+    // TODO set delegate
 
     pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
         instructions::close_account(ctx)
@@ -97,15 +99,18 @@ pub mod mango_v4 {
 
     pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, MarginTrade<'info>>,
-        banks_len: usize,
+        num_health_accounts: usize,
+        withdraws: Vec<(u8, u64)>,
         cpi_data: Vec<u8>,
     ) -> Result<()> {
-        instructions::margin_trade(ctx, banks_len, cpi_data)
+        instructions::margin_trade(ctx, num_health_accounts, withdraws, cpi_data)
     }
 
     ///
     /// Serum
     ///
+
+    // TODO deposit/withdraw msrm
 
     pub fn serum3_register_market(
         ctx: Context<Serum3RegisterMarket>,
@@ -114,6 +119,8 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::serum3_register_market(ctx, market_index, name)
     }
+
+    // TODO serum3_change_spot_market_params
 
     pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result<()> {
         instructions::serum3_create_open_orders(ctx)
@@ -163,6 +170,8 @@ pub mod mango_v4 {
         instructions::serum3_liq_force_cancel_orders(ctx, limit)
     }
 
+    // TODO serum3_cancel_all_spot_orders
+
     pub fn liq_token_with_token(
         ctx: Context<LiqTokenWithToken>,
         asset_token_index: TokenIndex,
@@ -185,6 +194,7 @@ pub mod mango_v4 {
     pub fn perp_create_market(
         ctx: Context<PerpCreateMarket>,
         perp_market_index: PerpMarketIndex,
+        name: String,
         base_token_index_opt: Option<TokenIndex>,
         quote_token_index: TokenIndex,
         quote_lot_size: i64,
@@ -196,10 +206,14 @@ pub mod mango_v4 {
         liquidation_fee: f32,
         maker_fee: f32,
         taker_fee: f32,
+        min_funding: f32,
+        max_funding: f32,
+        impact_quantity: i64,
     ) -> Result<()> {
         instructions::perp_create_market(
             ctx,
             perp_market_index,
+            name,
             base_token_index_opt,
             quote_token_index,
             quote_lot_size,
@@ -211,8 +225,13 @@ pub mod mango_v4 {
             liquidation_fee,
             maker_fee,
             taker_fee,
+            max_funding,
+            min_funding,
+            impact_quantity,
         )
     }
+
+    // TODO perp_change_perp_market_params
 
     #[allow(clippy::too_many_arguments)]
     pub fn perp_place_order(
@@ -239,60 +258,54 @@ pub mod mango_v4 {
         )
     }
 
+    pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: i128) -> Result<()> {
+        instructions::perp_cancel_order(ctx, order_id)
+    }
+
+    pub fn perp_cancel_order_by_client_order_id(
+        ctx: Context<PerpCancelOrderByClientOrderId>,
+        client_order_id: u64,
+    ) -> Result<()> {
+        instructions::perp_cancel_order_by_client_order_id(ctx, client_order_id)
+    }
+
+    pub fn perp_cancel_all_orders(ctx: Context<PerpCancelAllOrders>, limit: u8) -> Result<()> {
+        instructions::perp_cancel_all_orders(ctx, limit)
+    }
+
+    pub fn perp_cancel_all_orders_by_side(
+        ctx: Context<PerpCancelAllOrdersBySide>,
+        side_option: Option<Side>,
+        limit: u8,
+    ) -> Result<()> {
+        instructions::perp_cancel_all_orders_by_side(ctx, side_option, limit)
+    }
+
     pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Result<()> {
         instructions::perp_consume_events(ctx, limit)
     }
 
+    pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
+        instructions::perp_update_funding(ctx)
+    }
+
+    // TODO
+
+    // perp_force_cancel_order
+
+    // liquidate_token_and_perp
+    // liquidate_perp_and_perp
+
+    // settle_* - settle_funds, settle_pnl, settle_fees
+
+    // resolve_banktruptcy
+
     ///
     /// benchmark
     ///
-    ///
-    pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
-        // 101000
-        // 477
-        sol_log_compute_units(); // 100422
 
-        sol_log_compute_units(); // 100321 -> 101
-
-        msg!("msg!"); // 100079+101 -> 203
-        sol_log_compute_units(); // 100117
-
-        let pk1 = Pubkey::default(); // 10
-        sol_log_compute_units(); // 100006
-        let pk2 = Pubkey::default(); // 10
-        sol_log_compute_units(); // 99895
-
-        let _ = pk1 == pk2; // 56
-        sol_log_compute_units(); // 99739
-
-        let _ = sol_memcmp(&pk1.to_bytes(), &pk2.to_bytes(), 32); // 64
-        sol_log_compute_units(); // 99574
-
-        let large_number = I80F48::from_str("777472127991.999999999999996").unwrap();
-        let half = I80F48::MAX / 2;
-        let max = I80F48::MAX;
-        sol_log_compute_units(); // 92610
-
-        let _ = checked_math!(half + half); // 0
-        sol_log_compute_units(); // 92509
-
-        let _ = checked_math!(max - max); // 0
-        sol_log_compute_units(); // 92408
-
-        let _ = checked_math!(large_number * large_number); // 77
-        sol_log_compute_units(); // 92230
-
-        // /
-        let _ = checked_math!(I80F48::ZERO / max); // 839
-        sol_log_compute_units(); // 91290
-
-        let _ = checked_math!(half / max); // 3438
-        sol_log_compute_units(); // 87751
-
-        let _ = checked_math!(max / max); // 3457
-        sol_log_compute_units(); // 84193
-
-        Ok(())
+    pub fn benchmark(ctx: Context<Benchmark>) -> Result<()> {
+        instructions::benchmark(ctx)
     }
 }
 
@@ -304,6 +317,3 @@ impl anchor_lang::Id for Mango {
         ID
     }
 }
-
-#[derive(Accounts)]
-pub struct Benchmark {}

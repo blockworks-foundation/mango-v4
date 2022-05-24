@@ -26,7 +26,7 @@ const_assert_eq!(size_of::<StubOracle>(), 32 + 32 + 16 + 8 + 8);
 const_assert_eq!(size_of::<StubOracle>() % 8, 0);
 
 pub fn determine_oracle_type(data: &[u8]) -> Result<OracleType> {
-    if u32::from_le_bytes(data[0..4].try_into().unwrap()) == pyth_client::MAGIC {
+    if u32::from_le_bytes(data[0..4].try_into().unwrap()) == pyth_sdk_solana::state::MAGIC {
         return Ok(OracleType::Pyth);
     } else if data[0..8] == StubOracle::discriminator() {
         return Ok(OracleType::Stub);
@@ -42,8 +42,8 @@ pub fn oracle_price(acc_info: &AccountInfo) -> Result<I80F48> {
     Ok(match oracle_type {
         OracleType::Stub => acc_info.load::<StubOracle>()?.price,
         OracleType::Pyth => {
-            let price_struct = pyth_client::load_price(data).unwrap();
-            I80F48::from_num(price_struct.agg.price)
+            let price_struct = pyth_sdk_solana::load_price(data).unwrap();
+            I80F48::from_num(price_struct.price)
         }
     })
 }
@@ -51,7 +51,6 @@ pub fn oracle_price(acc_info: &AccountInfo) -> Result<I80F48> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pyth_client::load_price;
     use solana_program_test::{find_file, read_file};
     use std::path::PathBuf;
 
@@ -67,9 +66,8 @@ mod tests {
         let pyth_price_data = read_file(find_file(filename).unwrap());
 
         assert!(determine_oracle_type(&pyth_price_data).unwrap() == OracleType::Pyth);
-        let price = load_price(pyth_price_data.as_slice()).unwrap();
-        assert_eq!(price.valid_slot, 64338667);
-        assert_eq!(price.agg.price, 32112500000);
+        let price = pyth_sdk_solana::load_price(pyth_price_data.as_slice()).unwrap();
+        assert_eq!(price.price, 32112500000);
 
         Ok(())
     }

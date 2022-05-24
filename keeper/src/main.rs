@@ -1,16 +1,20 @@
-use std::{env, time::Duration};
+mod consume_events;
+mod crank;
+mod update_funding;
+mod update_index;
+
+use std::env;
+use std::sync::Arc;
 
 use anchor_client::{Client, Cluster, Program};
-use anyhow::ensure;
+
 use clap::{Parser, Subcommand};
-use log::{error, info};
-use mango_v4::state::Bank;
+
 use solana_client::rpc_client::RpcClient;
-use solana_client::rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType};
+
 use solana_sdk::signature::Keypair;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
-    instruction::Instruction,
     pubkey::Pubkey,
     signer::{keypair, Signer},
 };
@@ -25,7 +29,6 @@ use tokio::time;
 
 /// Wrapper around anchor client with some mango specific useful things
 pub struct MangoClient {
-    pub program: Program,
     pub rpc: RpcClient,
     pub cluster: Cluster,
     pub commitment: CommitmentConfig,
@@ -49,13 +52,24 @@ impl MangoClient {
 
         let rpc = program.rpc();
         Self {
-            program,
             rpc,
             cluster,
             commitment,
             admin,
             payer,
         }
+    }
+
+    pub fn client(&self) -> Client {
+        Client::new_with_options(
+            self.cluster.clone(),
+            std::rc::Rc::new(Keypair::from_bytes(&self.payer.to_bytes()).unwrap()),
+            self.commitment,
+        )
+    }
+
+    pub fn program(&self) -> Program {
+        self.client().program(mango_v4::ID)
     }
 
     pub fn payer(&self) -> Pubkey {
@@ -70,25 +84,31 @@ impl MangoClient {
 #[derive(Parser)]
 #[clap()]
 struct Cli {
-    #[clap(short, long, env = "RPC_URL")]
+    #[clap(long, env = "RPC_URL")]
     rpc_url: Option<String>,
 
-    #[clap(short, long, env = "PAYER_KEYPAIR")]
+    #[clap(long, env = "PAYER_KEYPAIR")]
     payer: Option<std::path::PathBuf>,
 
-    #[clap(short, long, env = "ADMIN_KEYPAIR")]
+    #[clap(long, env = "PAYER_KEYPAIR_BASE58")]
+    payer_base58: Option<String>,
+
+    #[clap(long, env = "ADMIN_KEYPAIR")]
     admin: Option<std::path::PathBuf>,
+
+    #[clap(long, env = "ADMIN_KEYPAIR_BASE58")]
+    admin_base58: Option<String>,
 
     #[clap(subcommand)]
     command: Command,
 }
 
-// future: more subcommands e.g. Liquidator
 #[derive(Subcommand)]
 enum Command {
     Crank {},
+    Liquidator {},
 }
-fn main() {
+fn main() -> Result<(), anyhow::Error> {
     env_logger::init_from_env(
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
     );
@@ -98,30 +118,44 @@ fn main() {
     let Cli {
         rpc_url,
         payer,
+        payer_base58,
         admin,
+        admin_base58,
         command,
     } = Cli::parse();
 
-    let payer = match payer {
-        Some(p) => keypair::read_keypair_file(&p)
-            .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy())),
-        None => match env::var("PAYER_KEYPAIR").ok() {
-            Some(k) => {
-                keypair::read_keypair(&mut k.as_bytes()).expect("Failed to parse $PAYER_KEYPAIR")
+    let payer = {
+        if let Some(base58_string) = payer_base58 {
+            Keypair::from_base58_string(&base58_string)
+        } else {
+            match payer {
+                Some(p) => keypair::read_keypair_file(&p).unwrap_or_else(|_| {
+                    panic!("Failed to read keypair from {}", p.to_string_lossy())
+                }),
+                None => match env::var("PAYER_KEYPAIR").ok() {
+                    Some(k) => keypair::read_keypair(&mut k.as_bytes())
+                        .expect("Failed to parse $PAYER_KEYPAIR"),
+                    None => panic!("Payer keypair not provided..."),
+                },
             }
-            None => panic!("Payer keypair not provided..."),
-        },
+        }
     };
 
-    let admin = match admin {
-        Some(p) => keypair::read_keypair_file(&p)
-            .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy())),
-        None => match env::var("ADMIN_KEYPAIR").ok() {
-            Some(k) => {
-                keypair::read_keypair(&mut k.as_bytes()).expect("Failed to parse $ADMIN_KEYPAIR")
+    let admin = {
+        if let Some(base58_string) = admin_base58 {
+            Keypair::from_base58_string(&base58_string)
+        } else {
+            match admin {
+                Some(p) => keypair::read_keypair_file(&p).unwrap_or_else(|_| {
+                    panic!("Failed to read keypair from {}", p.to_string_lossy())
+                }),
+                None => match env::var("ADMIN_KEYPAIR").ok() {
+                    Some(k) => keypair::read_keypair(&mut k.as_bytes())
+                        .expect("Failed to parse $ADMIN_KEYPAIR"),
+                    None => panic!("Admin keypair not provided..."),
+                },
             }
-            None => panic!("Admin keypair not provided..."),
-        },
+        }
     };
 
     let rpc_url = match rpc_url {
@@ -135,70 +169,43 @@ fn main() {
 
     let cluster = Cluster::Custom(rpc_url, ws_url);
     let commitment = match command {
-        Command::Crank { .. } => CommitmentConfig::processed(),
+        Command::Crank { .. } => CommitmentConfig::confirmed(),
+        Command::Liquidator {} => todo!(),
     };
 
-    let mango_client = MangoClient::new(cluster, commitment, payer, admin);
+    let mango_client = Arc::new(MangoClient::new(cluster, commitment, payer, admin));
+
+    log::info!("Program Id {}", &mango_client.program().id());
+    log::info!("Admin {}", &mango_client.admin.to_base58_string());
 
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();
 
-    // future: match on various subcommands
-    rt.block_on(update_index_runner(&mango_client))
-        .expect("Something went wrong here...");
-}
-
-pub async fn update_index_runner(mango_client: &MangoClient) -> anyhow::Result<()> {
-    // future: make configurable
-    let mut interval = time::interval(Duration::from_millis(10));
-
-    loop {
-        interval.tick().await;
-        update_index(mango_client).await?;
-    }
-}
-
-pub async fn update_index(mango_client: &MangoClient) -> anyhow::Result<()> {
-    // Collect all banks for a group belonging to an admin
-    let banks = mango_client
-        .program
-        .accounts::<Bank>(vec![RpcFilterType::Memcmp(Memcmp {
-            offset: 24,
-            bytes: MemcmpEncodedBytes::Base58({
-                // find group belonging to admin
-                Pubkey::find_program_address(
-                    &["Group".as_ref(), mango_client.admin.pubkey().as_ref()],
-                    &mango_client.program.id(),
+    // TODO: future: remove, just for learning purposes
+    let debugging_handle = async {
+        let mut interval = time::interval(time::Duration::from_secs(5));
+        loop {
+            interval.tick().await;
+            let client = mango_client.clone();
+            tokio::task::spawn_blocking(move || {
+                log::info!(
+                    "std::sync::Arc<MangoClient>::strong_count() {}",
+                    Arc::<MangoClient>::strong_count(&client)
                 )
-                .0
-                .to_string()
-            }),
-            encoding: None,
-        })])?;
+            });
+        }
+    };
 
-    ensure!(!banks.is_empty());
-
-    // Call update index ix
-    for bank in banks {
-        let sig_result = mango_client
-            .program
-            .request()
-            .instruction(Instruction {
-                program_id: mango_v4::id(),
-                accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::UpdateIndex { bank: bank.0 },
-                    None,
-                ),
-                data: anchor_lang::InstructionData::data(&mango_v4::instruction::UpdateIndex {}),
-            })
-            .send();
-        match sig_result {
-            Ok(sig) => {
-                info!("Crank: update_index ix signature: {:?}", sig);
-            }
-            Err(e) => error!("Crank: {:?}", e),
+    match command {
+        Command::Crank { .. } => {
+            let client = mango_client.clone();
+            let x: Result<(), anyhow::Error> = rt.block_on(crank::runner(client, debugging_handle));
+            x.expect("Something went wrong here...");
+        }
+        Command::Liquidator { .. } => {
+            todo!()
         }
     }
 
