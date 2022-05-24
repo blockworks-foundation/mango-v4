@@ -25,6 +25,7 @@
   ],
   "devDependencies": {
     "@tsconfig/recommended": "^1.0.1",
+    "@types/bs58": "^4.0.1",
     "@types/chai": "^4.3.0",
     "@types/mocha": "^9.1.0",
     "@types/node": "^14.14.37",
@@ -52,7 +53,6 @@
     "@project-serum/anchor": "^0.24.2",
     "@project-serum/serum": "^0.13.65",
     "@solana/spl-token": "^0.2.0",
-    "@types/bs58": "^4.0.1",
     "big.js": "^6.1.1",
     "bs58": "^5.0.0"
   },
