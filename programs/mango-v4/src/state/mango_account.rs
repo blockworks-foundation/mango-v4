@@ -135,6 +135,10 @@ impl MangoAccountTokens {
             .ok_or_else(|| error!(MangoError::SomeError)) // TODO: not found error
     }
 
+    pub fn get_mut_raw(&mut self, raw_token_index: usize) -> &mut TokenAccount {
+        &mut self.values[raw_token_index]
+    }
+
     pub fn get_mut_or_create(
         &mut self,
         token_index: TokenIndex,

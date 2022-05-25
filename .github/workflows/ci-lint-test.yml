@@ -9,9 +9,9 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  SOLANA_VERSION: "1.9.14"
+  SOLANA_VERSION: '1.9.14'
   RUST_TOOLCHAIN: 1.60.0
-  LOG_PROGRAM: "m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD"
+  LOG_PROGRAM: 'm43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD'
 
 defaults:
   run:
@@ -56,13 +56,6 @@ jobs:
           override: true
           profile: minimal
           toolchain: ${{ env.RUST_TOOLCHAIN }}
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v1
-      - name: Cache Solana binaries
-        uses: actions/cache@v2
-        with:
-          path: ~/.cache/solana
-          key: ${{ runner.os }}-${{ env.SOLANA_VERSION }}
       - name: Install Solana
         run: |
           sh -c "$(curl -sSfL https://release.solana.com/v${{ env.SOLANA_VERSION }}/install)"
@@ -118,27 +111,3 @@ jobs:
         with:
           name: cu-per-ix-clean
           path: cu-per-ix-clean.log
-
-  # Push clean logs to git if main/dev branch
-  push-logs:
-    name: Push logs
-    if: |
-      (github.actor != 'github-actions[bot]' && github.ref_name == 'main') ||
-      (github.actor != 'github-actions[bot]' && github.ref_name == 'dev')
-    runs-on: ubuntu-latest
-    needs: [lint, tests, process-logs]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Download clean log
-        uses: actions/download-artifact@v3
-        with:
-          name: cu-per-ix-clean
-          path: ./
-      - name: Push log to git
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "chore: push cu test logs"
-          git push

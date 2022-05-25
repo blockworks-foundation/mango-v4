@@ -1,24 +1,28 @@
 {
-  "name": "@blockworks-foundation/mango-client",
-  "version": "0.1.0",
+  "name": "@blockworks-foundation/mango-v4",
+  "version": "0.0.1",
   "description": "Typescript Client for mango-v4 program.",
-  "main": "lib/src/index.js",
-  "types": "lib/src/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "repository": "https://github.com/blockworks-foundation/mango-v4",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "example1-user": "ts-node src/scripts/example1-user.ts",
-    "example1-admin": "ts-node src/scripts/example1-admin.ts",
+    "example1-user": "ts-node ts/client/src/scripts/example1-user.ts",
+    "example1-admin": "ts-node ts/client/src/scripts/example1-admin.ts",
     "format": "prettier --check .",
     "lint": "eslint . --ext ts --ext tsx --ext js --quiet",
-    "type-check": "tsc --pretty --noEmit"
+    "type-check": "tsc --pretty --noEmit",
+    "prepare": "yarn build"
   },
   "author": {
     "name": "Blockworks Foundation",
     "email": "hello@blockworks.foundation",
     "url": "https://blockworks.foundation"
   },
+  "files": [
+    "dist"
+  ],
   "devDependencies": {
     "@tsconfig/recommended": "^1.0.1",
     "@types/chai": "^4.3.0",
@@ -35,6 +39,9 @@
     "ts-node": "^9.1.1",
     "typedoc": "^0.22.5",
     "typescript": "^4.4.4"
+  },
+  "resolutions": {
+    "@types/bn.js": "^4.11.6"
   },
   "publishConfig": {
     "access": "public"
