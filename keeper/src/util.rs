@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use solana_sdk::signature::Keypair;
 
+#[allow(dead_code)]
 pub fn retry<T>(request: impl Fn() -> Result<T, anchor_client::ClientError>) -> anyhow::Result<T> {
     for _i in 0..5 {
         match request() {

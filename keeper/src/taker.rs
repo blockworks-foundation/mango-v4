@@ -161,7 +161,7 @@ pub async fn loop_blocking_orders(
 
             let fresh_price = match price.read() {
                 Ok(price) => *price,
-                Err(err) => {
+                Err(_) => {
                     anyhow::bail!("Price RwLock PoisonError!");
                 }
             };
