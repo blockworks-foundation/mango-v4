@@ -242,15 +242,16 @@ pub fn compute_health_from_fixed_accounts(
     let active_serum3_len = account.serum3.iter_active().count();
     let active_perp_len = account.perps.iter_active_accounts().count();
     let expected_ais = cm!(active_token_len * 2 // banks + oracles
-        + active_serum3_len // open_orders
-        + active_perp_len); // PerpMarkets
+        + active_perp_len // PerpMarkets
+        + active_serum3_len); // open_orders
+    msg!("{} {}", ais.len(), expected_ais);
     require!(ais.len() == expected_ais, MangoError::SomeError);
 
     let retriever = FixedOrderAccountRetriever {
         ais,
         n_banks: active_token_len,
-        begin_serum3: cm!(active_token_len * 2),
-        begin_perp: cm!(active_token_len * 2 + active_serum3_len),
+        begin_perp: cm!(active_token_len * 2),
+        begin_serum3: cm!(active_token_len * 2 + active_perp_len),
     };
     compute_health_detail(account, &retriever, health_type, true)?.health(health_type)
 }
