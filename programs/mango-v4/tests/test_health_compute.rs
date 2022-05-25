@@ -1,5 +1,6 @@
 #![cfg(feature = "test-bpf")]
 
+use fixed::types::I80F48;
 use mango_v4::state::*;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, transport::TransportError};
@@ -284,6 +285,11 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
         perp_markets.push((perp_market, asks, bids, event_queue));
     }
 
+    let price_lots = {
+        let perp_market = solana.get_account::<PerpMarket>(perp_markets[0].0).await;
+        perp_market.native_price_to_lot(I80F48::from(1))
+    };
+
     //
     // TEST: Create a perp order for each market
     //
@@ -301,7 +307,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 oracle: tokens[i + 1].oracle,
                 owner,
                 side: Side::Bid,
-                price_lots: 1,
+                price_lots,
                 max_base_lots: 1,
                 max_quote_lots: i64::MAX,
                 client_order_id: 0,
