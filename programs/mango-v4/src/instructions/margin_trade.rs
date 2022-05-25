@@ -36,30 +36,32 @@ pub struct MarginTrade<'info> {
 }
 
 struct AllowedVault {
-    // index of the vault in cpi_ais
+    /// index of the vault in cpi_ais
     vault_cpi_ai_index: usize,
-    // index of the bank in health_ais
+    /// index of the bank in health_ais
     bank_health_ai_index: usize,
-    // raw index into account.tokens
+    /// raw index into account.tokens
     raw_token_index: usize,
-    // vault amount before cpi
+    /// vault amount before cpi
     pre_amount: u64,
-    // withdraw request
+    /// requested withdraw amount
     withdraw_amount: u64,
-    // amount of withdraw request that is a loan
+    /// amount of withdraw request that is a loan
     loan_amount: I80F48,
 }
 
 #[derive(AnchorDeserialize, AnchorSerialize, Clone, Copy)]
 pub struct MarginTradeWithdraw {
+    /// Account index of the vault to withdraw from in the target_accounts section.
+    /// Meaning that the first account after target_program_id would have index 0.
     pub index: u8,
+    /// Requested withdraw amount.
     pub amount: u64,
 }
 
 /// - `num_health_accounts` is the number of health accounts that remaining_accounts starts with.
-/// - `withdraws` is a list of tuples containing the index to a vault in target_accounts and the
-///    amount that the target program shall be allowed to withdraw
-/// - `cpi_data` is the bytes to call the target_program_id with
+/// - `withdraws` is a list of MarginTradeWithdraw requests.
+/// - `cpi_data` is the bytes to call the target_program_id with.
 pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, MarginTrade<'info>>,
     num_health_accounts: usize,
