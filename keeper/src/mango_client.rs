@@ -29,6 +29,8 @@ pub struct MangoClient {
     pub admin: Keypair,
     pub mango_account_cache: (Pubkey, MangoAccount),
     pub group: Pubkey,
+    // TODO: future: this may not scale if there's thousands of mints, probably some function
+    // wrapping getMultipleAccounts is needed (or bettew: we provide this data as a service)
     pub banks_cache: HashMap<String, (Pubkey, Bank)>,
     pub banks_cache_by_token_index: HashMap<TokenIndex, (Pubkey, Bank)>,
     pub mint_infos_cache: HashMap<Pubkey, (Pubkey, MintInfo, Mint)>,
@@ -39,6 +41,9 @@ pub struct MangoClient {
 }
 
 // TODO: add retry framework for sending tx and rpc calls
+// 1/ this works right now, but I think mid-term the MangoClient will want to interact with multiple mango accounts
+// -- then we should probably specify accounts by owner+account_num / or pubkey
+// 2/ pubkey, can be both owned, but also delegated accouns
 
 impl MangoClient {
     pub fn new(
@@ -376,7 +381,7 @@ impl MangoClient {
         order_type: Serum3OrderType,
         client_order_id: u64,
         limit: u16,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<Signature, anchor_client::ClientError> {
         let (_, account) = self.get_account()?;
 
         let serum3_market = self.serum3_markets_cache.get(name).unwrap();
@@ -519,9 +524,69 @@ impl MangoClient {
                     },
                 ),
             })
-            .send()?;
+            .send()
+    }
 
-        Ok(())
+    pub fn serum3_settle_funds(&self, name: &str) -> Result<Signature, anchor_client::ClientError> {
+        let (_, account) = self.get_account()?;
+
+        let serum3_market = self.serum3_markets_cache.get(name).unwrap();
+        let open_orders = account
+            .serum3
+            .find(serum3_market.1.market_index)
+            .unwrap()
+            .open_orders;
+        let (_, quote_info, _) = self
+            .mint_infos_cache_by_token_index
+            .get(&serum3_market.1.quote_token_index)
+            .unwrap();
+        let (_, base_info, _) = self
+            .mint_infos_cache_by_token_index
+            .get(&serum3_market.1.base_token_index)
+            .unwrap();
+
+        let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
+            &(self.serum3_external_markets_cache.get(name).unwrap().1)
+                [5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
+        );
+        let coin_vault = market_external.coin_vault;
+        let pc_vault = market_external.pc_vault;
+        let vault_signer = serum_dex::state::gen_vault_signer_key(
+            market_external.vault_signer_nonce,
+            &serum3_market.1.serum_market_external,
+            &serum3_market.1.serum_program,
+        )
+        .unwrap();
+
+        self.program()
+            .request()
+            .instruction(Instruction {
+                program_id: mango_v4::id(),
+                accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::Serum3SettleFunds {
+                        group: self.group(),
+                        account: self.mango_account_cache.0,
+                        open_orders,
+                        quote_bank: quote_info.bank,
+                        quote_vault: quote_info.vault,
+                        base_bank: base_info.bank,
+                        base_vault: base_info.vault,
+                        serum_market: serum3_market.0,
+                        serum_program: serum3_market.1.serum_program,
+                        serum_market_external: serum3_market.1.serum_market_external,
+                        market_base_vault: from_serum_style_pubkey(&coin_vault),
+                        market_quote_vault: from_serum_style_pubkey(&pc_vault),
+                        market_vault_signer: vault_signer,
+                        owner: self.payer(),
+                        token_program: Token::id(),
+                    },
+                    None,
+                ),
+                data: anchor_lang::InstructionData::data(
+                    &mango_v4::instruction::Serum3SettleFunds {},
+                ),
+            })
+            .send()
     }
 
     pub fn serum3_cancel_all_orders(&self, market_name: &str) -> Result<Vec<u128>, anyhow::Error> {
@@ -551,10 +616,12 @@ impl MangoClient {
         let mut orders = vec![];
         for order_id in open_orders_data.orders {
             if order_id != 0 {
+                // TODO: find side for order_id, and only cancel the relevant order
                 self.serum3_cancel_order(market_name, Serum3Side::Bid, order_id)
                     .ok();
                 self.serum3_cancel_order(market_name, Serum3Side::Ask, order_id)
                     .ok();
+
                 orders.push(order_id);
             }
         }

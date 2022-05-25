@@ -88,6 +88,8 @@ fn main() -> Result<(), anyhow::Error> {
 
     log::info!("Program Id {}", &mango_client.program().id());
     log::info!("Admin {}", &mango_client.admin.to_base58_string());
+    log::info!("Group {}", &mango_client.group());
+    log::info!("User {}", &mango_client.payer());
 
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
