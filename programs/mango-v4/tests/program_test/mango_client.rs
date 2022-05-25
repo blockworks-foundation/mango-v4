@@ -103,6 +103,18 @@ async fn get_mint_info_by_token_index(
     get_mint_info_by_mint(account_loader, account, bank.mint).await
 }
 
+fn get_perp_market_address_by_index(group: Pubkey, perp_market_index: PerpMarketIndex) -> Pubkey {
+    Pubkey::find_program_address(
+        &[
+            group.as_ref(),
+            b"PerpMarket".as_ref(),
+            &perp_market_index.to_le_bytes(),
+        ],
+        &mango_v4::id(),
+    )
+    .0
+}
+
 // all the accounts that instructions like deposit/withdraw need to compute account health
 async fn derive_health_check_remaining_account_metas(
     account_loader: &impl ClientAccountLoader,
@@ -143,7 +155,17 @@ async fn derive_health_check_remaining_account_metas(
         }
     }
 
+    let perp_markets = account
+        .perps
+        .iter_active_accounts()
+        .map(|perp| get_perp_market_address_by_index(account.group, perp.market_index));
     let serum_oos = account.serum3.iter_active().map(|&s| s.open_orders);
+
+    let to_account_meta = |pubkey| AccountMeta {
+        pubkey,
+        is_writable: false,
+        is_signer: false,
+    };
 
     banks
         .iter()
@@ -152,16 +174,9 @@ async fn derive_health_check_remaining_account_metas(
             is_writable: writable_banks,
             is_signer: false,
         })
-        .chain(oracles.iter().map(|&pubkey| AccountMeta {
-            pubkey,
-            is_writable: false,
-            is_signer: false,
-        }))
-        .chain(serum_oos.map(|pubkey| AccountMeta {
-            pubkey,
-            is_writable: false,
-            is_signer: false,
-        }))
+        .chain(oracles.into_iter().map(to_account_meta))
+        .chain(perp_markets.map(to_account_meta))
+        .chain(serum_oos.map(to_account_meta))
         .collect()
 }
 
@@ -198,11 +213,24 @@ async fn derive_liquidation_remaining_account_metas(
         oracles.push(mint_info.oracle);
     }
 
+    let perp_markets = liqee
+        .perps
+        .iter_active_accounts()
+        .chain(liqee.perps.iter_active_accounts())
+        .map(|perp| get_perp_market_address_by_index(liqee.group, perp.market_index))
+        .unique();
+
     let serum_oos = liqee
         .serum3
         .iter_active()
         .chain(liqor.serum3.iter_active())
         .map(|&s| s.open_orders);
+
+    let to_account_meta = |pubkey| AccountMeta {
+        pubkey,
+        is_writable: false,
+        is_signer: false,
+    };
 
     banks
         .iter()
@@ -211,16 +239,9 @@ async fn derive_liquidation_remaining_account_metas(
             is_writable: *is_writable,
             is_signer: false,
         })
-        .chain(oracles.iter().map(|&pubkey| AccountMeta {
-            pubkey,
-            is_writable: false,
-            is_signer: false,
-        }))
-        .chain(serum_oos.map(|pubkey| AccountMeta {
-            pubkey,
-            is_writable: false,
-            is_signer: false,
-        }))
+        .chain(oracles.into_iter().map(to_account_meta))
+        .chain(perp_markets.map(to_account_meta))
+        .chain(serum_oos.map(to_account_meta))
         .collect()
 }
 
