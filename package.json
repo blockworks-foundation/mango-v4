@@ -52,12 +52,9 @@
     "@orca-so/sdk": "^1.2.24",
     "@project-serum/anchor": "^0.24.2",
     "@project-serum/serum": "^0.13.65",
-    "@solana/spl-token": "^0.2.0",
+    "@solana/spl-token": "~0.1.8",
     "big.js": "^6.1.1",
     "bs58": "^5.0.0"
-  },
-  "resolutions": {
-    "@solana/spl-token": "^0.2.0"
   },
   "license": "MIT"
 }
