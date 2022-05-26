@@ -90,7 +90,8 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
                 allowed_banks.insert(ai.key, bank);
             }
             Err(Error::AnchorError(error))
-                if error.error_code_number == ErrorCode::AccountDiscriminatorMismatch as u32 =>
+                if error.error_code_number == ErrorCode::AccountDiscriminatorMismatch as u32
+                    || error.error_code_number == ErrorCode::AccountOwnedByWrongProgram as u32 =>
             {
                 break;
             }
