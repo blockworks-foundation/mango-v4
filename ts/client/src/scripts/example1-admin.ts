@@ -6,13 +6,16 @@ import { DEVNET_SERUM3_PROGRAM_ID } from '../constants';
 
 const DEVNET_SERUM3_MARKETS = new Map([
   ['BTC/USDC', 'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB'],
+  ['SOL/USDC', '5xWpt56U1NCuHoAEtpLeUrQcxDkEpNfScjfLFaRzLPgR'],
 ]);
 const DEVNET_MINTS = new Map([
   ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'],
   ['BTC', '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU'],
+  ['SOL', 'So11111111111111111111111111111111111111112'],
 ]);
 const DEVNET_ORACLES = new Map([
   ['BTC', 'HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J'],
+  ['SOL', 'J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix'],
 ]);
 
 //
@@ -106,6 +109,33 @@ async function main() {
     await group.reload(client);
   } catch (error) {}
 
+  // register token 2
+  console.log(`Registering SOL...`);
+  const solDevnetMint = new PublicKey(DEVNET_MINTS.get('SOL')!);
+  const solDevnetOracle = new PublicKey(DEVNET_ORACLES.get('SOL')!);
+  try {
+    await client.registerToken(
+      group,
+      solDevnetMint,
+      solDevnetOracle,
+      2, // tokenIndex
+      'SOL',
+      0.4,
+      0.07,
+      0.8,
+      0.9,
+      0.0005,
+      0.0005,
+      1.5,
+      0.8,
+      0.6,
+      1.2,
+      1.4,
+      0.02,
+    );
+    await group.reload(client);
+  } catch (error) {}
+
   // log tokens/banks
   for (const bank of await group.banksMap.values()) {
     console.log(
@@ -159,6 +189,7 @@ async function main() {
       0.05,
       100,
     );
+    console.log('done');
   } catch (error) {
     console.log(error);
   }
