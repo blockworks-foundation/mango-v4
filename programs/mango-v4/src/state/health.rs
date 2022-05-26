@@ -114,7 +114,9 @@ impl<'a, 'b> ScanningAccountRetriever<'a, 'b> {
                 }
                 Err(Error::AnchorError(error))
                     if error.error_code_number
-                        == ErrorCode::AccountDiscriminatorMismatch as u32 =>
+                        == ErrorCode::AccountDiscriminatorMismatch as u32
+                        || error.error_code_number
+                            == ErrorCode::AccountOwnedByWrongProgram as u32 =>
                 {
                     break;
                 }
