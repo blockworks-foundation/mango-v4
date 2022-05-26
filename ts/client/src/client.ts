@@ -1,7 +1,11 @@
 import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
 import { getFeeRates, getFeeTier, Market } from '@project-serum/serum';
 import { Order } from '@project-serum/serum/lib/market';
-import * as spl from '@solana/spl-token';
+import {
+  closeAccount,
+  initializeAccount,
+  WRAPPED_SOL_MINT,
+} from '@project-serum/serum/lib/token-instructions';
 import { TokenSwap } from '@solana/spl-token-swap';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import {
@@ -12,6 +16,9 @@ import {
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
   TransactionSignature,
+  TransactionInstruction,
+  LAMPORTS_PER_SOL,
+  Signer,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { ORCA_TOKEN_SWAP_ID_DEVNET } from '@orca-so/sdk';
@@ -30,6 +37,8 @@ import {
   Serum3Side,
 } from './accounts/serum3';
 import { IDL, MangoV4 } from './mango_v4';
+import { getAssociatedTokenAddress, toNativeDecimals } from './utils';
+import tokens, { getTokenDecimals } from './constants/tokens';
 
 export const MANGO_V4_ID = new PublicKey(
   'm43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD',
@@ -274,22 +283,56 @@ export class MangoClient {
   ) {
     const bank = group.banksMap.get(tokenName)!;
 
-    const tokenAccountPk = await spl.getAssociatedTokenAddress(
+    const tokenAccountPk = await getAssociatedTokenAddress(
       bank.mint,
       mangoAccount.owner,
     );
 
+    let wrappedSolAccount: Keypair | undefined;
+    let preInstructions: TransactionInstruction[] = [];
+    let postInstructions: TransactionInstruction[] = [];
+    let additionalSigners: Signer[] = [];
+    if (bank.mint.equals(WRAPPED_SOL_MINT)) {
+      wrappedSolAccount = new Keypair();
+      const lamports = Math.round(amount * LAMPORTS_PER_SOL) + 1e7;
+
+      preInstructions = [
+        SystemProgram.createAccount({
+          fromPubkey: mangoAccount.owner,
+          newAccountPubkey: wrappedSolAccount.publicKey,
+          lamports,
+          space: 165,
+          programId: TOKEN_PROGRAM_ID,
+        }),
+        initializeAccount({
+          account: wrappedSolAccount.publicKey,
+          mint: WRAPPED_SOL_MINT,
+          owner: mangoAccount.owner,
+        }),
+      ];
+      postInstructions = [
+        closeAccount({
+          source: wrappedSolAccount.publicKey,
+          destination: mangoAccount.owner,
+          owner: mangoAccount.owner,
+        }),
+      ];
+      additionalSigners.push(wrappedSolAccount);
+    }
+
     const healthRemainingAccounts: PublicKey[] =
       await this.buildHealthRemainingAccounts(group, mangoAccount, bank);
 
+    const tokenDecimals = getTokenDecimals(tokenName);
+
     return await this.program.methods
-      .deposit(new BN(amount))
+      .deposit(toNativeDecimals(amount, tokenDecimals))
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
         bank: bank.publicKey,
         vault: bank.vault,
-        tokenAccount: tokenAccountPk,
+        tokenAccount: wrappedSolAccount?.publicKey ?? tokenAccountPk,
         tokenAuthority: (this.program.provider as AnchorProvider).wallet
           .publicKey,
       })
@@ -299,7 +342,10 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-      .rpc();
+      .preInstructions(preInstructions)
+      .postInstructions(postInstructions)
+      .signers(additionalSigners)
+      .rpc({ skipPreflight: true });
   }
 
   public async withdraw(
@@ -311,7 +357,7 @@ export class MangoClient {
   ) {
     const bank = group.banksMap.get(tokenName)!;
 
-    const tokenAccountPk = await spl.getAssociatedTokenAddress(
+    const tokenAccountPk = await getAssociatedTokenAddress(
       bank.mint,
       mangoAccount.owner,
     );
