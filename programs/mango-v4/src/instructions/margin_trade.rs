@@ -126,7 +126,14 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
             if ai.owner != &TokenAccount::owner() {
                 return None;
             }
-            let token_account = Account::<TokenAccount>::try_from(ai).unwrap();
+
+            // Skip mints and other accounts that may be owned by the spl_token program
+            let maybe_token_account = Account::<TokenAccount>::try_from(ai);
+            if maybe_token_account.is_err() {
+                return None;
+            }
+
+            let token_account = maybe_token_account.unwrap();
             if token_account.owner != ctx.accounts.group.key() {
                 return None;
             }
