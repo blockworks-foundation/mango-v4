@@ -694,10 +694,14 @@ impl<'keypair> ClientInstruction for CreateGroupInstruction<'keypair> {
         _account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction {};
+        let instruction = Self::Instruction { group_num: 0 };
 
         let group = Pubkey::find_program_address(
-            &[b"Group".as_ref(), self.admin.pubkey().as_ref()],
+            &[
+                b"Group".as_ref(),
+                self.admin.pubkey().as_ref(),
+                &instruction.group_num.to_le_bytes(),
+            ],
             &program_id,
         )
         .0;

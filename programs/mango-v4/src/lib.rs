@@ -25,8 +25,8 @@ pub mod mango_v4 {
 
     use super::*;
 
-    pub fn create_group(ctx: Context<CreateGroup>) -> Result<()> {
-        instructions::create_group(ctx)
+    pub fn create_group(ctx: Context<CreateGroup>, group_num: u32) -> Result<()> {
+        instructions::create_group(ctx, group_num)
     }
 
     #[allow(clippy::too_many_arguments)]
