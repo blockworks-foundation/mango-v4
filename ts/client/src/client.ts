@@ -37,10 +37,10 @@ export class MangoClient {
 
   // Group
 
-  public async createGroup(): Promise<TransactionSignature> {
+  public async createGroup(groupNum: number): Promise<TransactionSignature> {
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
     return await this.program.methods
-      .createGroup()
+      .createGroup(groupNum)
       .accounts({
         admin: adminPk,
         payer: adminPk,
@@ -55,17 +55,33 @@ export class MangoClient {
     return group;
   }
 
-  public async getGroupForAdmin(adminPk: PublicKey): Promise<Group> {
-    const groups = (
-      await this.program.account.group.all([
-        {
-          memcmp: {
-            bytes: adminPk.toBase58(),
-            offset: 8,
-          },
+  public async getGroupForAdmin(
+    adminPk: PublicKey,
+    groupNum?: number,
+  ): Promise<Group> {
+    const filters: MemcmpFilter[] = [
+      {
+        memcmp: {
+          bytes: adminPk.toBase58(),
+          offset: 8,
         },
-      ])
-    ).map((tuple) => Group.from(tuple.publicKey, tuple.account));
+      },
+    ];
+
+    if (groupNum) {
+      const bbuf = Buffer.alloc(4);
+      bbuf.writeUInt32LE(groupNum);
+      filters.push({
+        memcmp: {
+          bytes: bs58.encode(bbuf),
+          offset: 44,
+        },
+      });
+    }
+
+    const groups = (await this.program.account.group.all(filters)).map(
+      (tuple) => Group.from(tuple.publicKey, tuple.account),
+    );
     await groups[0].reload(this);
     return groups[0];
   }

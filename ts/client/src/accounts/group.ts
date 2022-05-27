@@ -5,13 +5,24 @@ import { PerpMarket } from './perp';
 import { Serum3Market } from './serum3';
 
 export class Group {
-  static from(publicKey: PublicKey, obj: { admin: PublicKey }): Group {
-    return new Group(publicKey, obj.admin, new Map(), new Map(), new Map());
+  static from(
+    publicKey: PublicKey,
+    obj: { admin: PublicKey; groupNum: number },
+  ): Group {
+    return new Group(
+      publicKey,
+      obj.admin,
+      obj.groupNum,
+      new Map(),
+      new Map(),
+      new Map(),
+    );
   }
 
   constructor(
     public publicKey: PublicKey,
     public admin: PublicKey,
+    public groupNum: number,
     public banksMap: Map<string, Bank>,
     public serum3MarketsMap: Map<string, Serum3Market>,
     public perpMarketsMap: Map<string, PerpMarket>,
