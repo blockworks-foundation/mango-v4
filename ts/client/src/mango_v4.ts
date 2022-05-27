@@ -1731,11 +1731,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "mintDecimals",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           }
@@ -4627,11 +4631,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "mintDecimals",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           }

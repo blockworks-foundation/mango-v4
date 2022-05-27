@@ -61,7 +61,9 @@ pub struct Bank {
 
     pub bump: u8,
 
-    pub reserved: [u8; 5],
+    pub mint_decimals: u8,
+
+    pub reserved: [u8; 4],
 }
 const_assert_eq!(size_of::<Bank>(), 16 + 32 * 4 + 8 + 16 * 18 + 3 + 5);
 const_assert_eq!(size_of::<Bank>() % 8, 0);

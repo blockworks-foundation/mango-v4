@@ -39,6 +39,7 @@ export class Bank {
       liquidationFee: I80F48Dto;
       dust: Object;
       tokenIndex: number;
+      mintDecimals: number;
     },
   ) {
     return new Bank(
@@ -68,6 +69,7 @@ export class Bank {
       obj.liquidationFee,
       obj.dust,
       obj.tokenIndex,
+      obj.mintDecimals,
     );
   }
 
@@ -98,6 +100,7 @@ export class Bank {
     liquidationFee: I80F48Dto,
     dust: Object,
     public tokenIndex: number,
+    public mintDecimals: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.depositIndex = I80F48.from(depositIndex);
