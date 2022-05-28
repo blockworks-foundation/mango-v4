@@ -9,9 +9,9 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  SOLANA_VERSION: "1.9.14"
+  SOLANA_VERSION: '1.9.14'
   RUST_TOOLCHAIN: 1.60.0
-  LOG_PROGRAM: "m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD"
+  LOG_PROGRAM: 'm43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD'
 
 defaults:
   run:
@@ -111,4 +111,3 @@ jobs:
         with:
           name: cu-per-ix-clean
           path: cu-per-ix-clean.log
-
