@@ -90,16 +90,22 @@ fn ensure_deposit(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> 
         let mint = &mango_client.mint_infos_cache.get(&bank.mint).unwrap().2;
         let desired_balance = I80F48::from_num(10_000 * 10u64.pow(mint.decimals as u32));
 
-        let token_account = mango_account.tokens.find(bank.token_index).unwrap();
-        let native = token_account.native(bank);
+        let token_account_opt = mango_account.tokens.find(bank.token_index);
 
-        let ui = token_account.ui(bank, mint);
-        log::info!("Current balance {} {}", ui, bank.name());
+        let deposit_native = match token_account_opt {
+            Some(token_account) => {
+                let native = token_account.native(bank);
 
-        let deposit_native = if native < I80F48::ZERO {
-            desired_balance - native
-        } else {
-            desired_balance - native.min(desired_balance)
+                let ui = token_account.ui(bank, mint);
+                log::info!("Current balance {} {}", ui, bank.name());
+
+                if native < I80F48::ZERO {
+                    desired_balance - native
+                } else {
+                    desired_balance - native.min(desired_balance)
+                }
+            }
+            None => desired_balance,
         };
 
         if deposit_native == I80F48::ZERO {

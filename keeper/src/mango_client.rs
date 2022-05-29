@@ -8,18 +8,19 @@ use anchor_lang::{AccountDeserialize, Id};
 use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::{Mint, Token};
 
+use log::logger;
 use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{Bank, MangoAccount, MintInfo, PerpMarket, Serum3Market, TokenIndex};
 
 use solana_client::rpc_client::RpcClient;
 
+use crate::util::MyClone;
+use anyhow::Context;
 use solana_client::rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType};
 use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::sysvar;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer};
-
-use crate::util::MyClone;
 
 pub struct MangoClient {
     pub rpc: RpcClient,
@@ -51,6 +52,7 @@ impl MangoClient {
         commitment: CommitmentConfig,
         payer: Keypair,
         admin: Keypair,
+        mango_account_name: String,
     ) -> anyhow::Result<Self> {
         let program =
             Client::new_with_options(cluster.clone(), std::rc::Rc::new(payer.clone()), commitment)
@@ -59,12 +61,22 @@ impl MangoClient {
         let rpc = program.rpc();
 
         let group = Pubkey::find_program_address(
-            &["Group".as_ref(), admin.pubkey().as_ref()],
+            &[
+                "Group".as_ref(),
+                admin.pubkey().as_ref(),
+                0u32.to_le_bytes().as_ref(),
+            ],
             &program.id(),
         )
         .0;
 
-        let mango_accounts = program.accounts::<MangoAccount>(vec![
+        log::info!("Program Id {}", program.id());
+        log::info!("Admin {}", admin.pubkey());
+        log::info!("Group {}", group);
+        log::info!("User {}", payer.pubkey());
+
+        // Mango Account
+        let mut mango_account_tuples = program.accounts::<MangoAccount>(vec![
             RpcFilterType::Memcmp(Memcmp {
                 offset: 40,
                 bytes: MemcmpEncodedBytes::Base58(group.to_string()),
@@ -76,8 +88,70 @@ impl MangoClient {
                 encoding: None,
             }),
         ])?;
-        let mango_account_cache = mango_accounts[0];
+        let mango_account_opt = mango_account_tuples
+            .iter()
+            .find(|tuple| tuple.1.name() == mango_account_name);
+        if mango_account_opt.is_none() {
+            mango_account_tuples
+                .sort_by(|a, b| a.1.account_num.partial_cmp(&b.1.account_num).unwrap());
+            let account_num = match mango_account_tuples.last() {
+                Some(tuple) => tuple.1.account_num + 1,
+                None => 0u8,
+            };
+            program
+                .request()
+                .instruction(Instruction {
+                    program_id: mango_v4::id(),
+                    accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                        &mango_v4::accounts::CreateAccount {
+                            group,
+                            owner: payer.pubkey(),
+                            account: {
+                                Pubkey::find_program_address(
+                                    &[
+                                        group.as_ref(),
+                                        b"MangoAccount".as_ref(),
+                                        payer.pubkey().as_ref(),
+                                        &account_num.to_le_bytes(),
+                                    ],
+                                    &mango_v4::id(),
+                                )
+                                .0
+                            },
+                            payer: payer.pubkey(),
+                            system_program: System::id(),
+                        },
+                        None,
+                    ),
+                    data: anchor_lang::InstructionData::data(
+                        &mango_v4::instruction::CreateAccount {
+                            account_num,
+                            name: mango_account_name.to_owned(),
+                        },
+                    ),
+                })
+                .send()
+                .context("Failed to create account...")?;
+        }
+        let mango_account_tuples = program.accounts::<MangoAccount>(vec![
+            RpcFilterType::Memcmp(Memcmp {
+                offset: 40,
+                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
+                encoding: None,
+            }),
+            RpcFilterType::Memcmp(Memcmp {
+                offset: 72,
+                bytes: MemcmpEncodedBytes::Base58(payer.pubkey().to_string()),
+                encoding: None,
+            }),
+        ])?;
+        let index = mango_account_tuples
+            .iter()
+            .position(|tuple| tuple.1.name() == &mango_account_name)
+            .unwrap();
+        let mango_account_cache = mango_account_tuples[index];
 
+        // banks cache
         let mut banks_cache = HashMap::new();
         let mut banks_cache_by_token_index = HashMap::new();
         let bank_tuples = program.accounts::<Bank>(vec![RpcFilterType::Memcmp(Memcmp {
@@ -90,6 +164,7 @@ impl MangoClient {
             banks_cache_by_token_index.insert(v.token_index, (k, v));
         }
 
+        // mintinfo cache
         let mut mint_infos_cache = HashMap::new();
         let mut mint_infos_cache_by_token_index = HashMap::new();
         let mint_info_tuples =
@@ -111,6 +186,7 @@ impl MangoClient {
             mint_infos_cache_by_token_index.insert(v.token_index, (k, v, mint));
         }
 
+        // serum3 markets cache
         let mut serum3_markets_cache = HashMap::new();
         let mut serum3_external_markets_cache = HashMap::new();
         let serum3_market_tuples =
@@ -134,6 +210,7 @@ impl MangoClient {
             );
         }
 
+        // perp markets cache
         let mut perp_markets_cache = HashMap::new();
         let perp_market_tuples =
             program.accounts::<PerpMarket>(vec![RpcFilterType::Memcmp(Memcmp {

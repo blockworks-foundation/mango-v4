@@ -728,7 +728,7 @@ impl std::fmt::Debug for MangoAccount {
 }
 
 impl MangoAccount {
-    fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         std::str::from_utf8(&self.name)
             .unwrap()
             .trim_matches(char::from(0))
