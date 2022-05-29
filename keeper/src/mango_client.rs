@@ -8,7 +8,6 @@ use anchor_lang::{AccountDeserialize, Id};
 use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::{Mint, Token};
 
-use log::logger;
 use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{Bank, MangoAccount, MintInfo, PerpMarket, Serum3Market, TokenIndex};
 
