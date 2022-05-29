@@ -125,7 +125,7 @@ pub async fn loop_blocking_price_update(
         let client1 = mango_client.clone();
         let market_name1 = market_name.clone();
         let price = price.clone();
-        tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+        let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
             let token_name = market_name1.split('/').collect::<Vec<&str>>()[0];
             let fresh_price = client1.get_oracle_price(token_name).unwrap();
             log::info!("{} Updated price is {:?}", token_name, fresh_price.price);
@@ -134,7 +134,19 @@ pub async fn loop_blocking_price_update(
                     / I80F48::from_num(10u64.pow(-fresh_price.expo as u32));
             }
             Ok(())
-        });
+        })
+        .await;
+
+        match res {
+            Ok(inner_res) => {
+                if inner_res.is_err() {
+                    log::error!("{}", inner_res.unwrap_err());
+                }
+            }
+            Err(join_error) => {
+                log::error!("{}", join_error);
+            }
+        }
     }
 }
 
@@ -156,7 +168,7 @@ pub async fn loop_blocking_orders(
         let market_name = market_name.clone();
         let price = price.clone();
 
-        tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+        let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
             client.serum3_settle_funds(&market_name)?;
 
             let fresh_price = match price.read() {
@@ -203,6 +215,18 @@ pub async fn loop_blocking_orders(
             }
 
             Ok(())
-        });
+        })
+        .await;
+
+        match res {
+            Ok(inner_res) => {
+                if inner_res.is_err() {
+                    log::error!("{}", inner_res.unwrap_err());
+                }
+            }
+            Err(join_error) => {
+                log::error!("{}", join_error);
+            }
+        }
     }
 }

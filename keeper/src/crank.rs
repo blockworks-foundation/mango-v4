@@ -49,7 +49,7 @@ pub async fn loop_update_index(mango_client: Arc<MangoClient>, pk: Pubkey, bank:
         interval.tick().await;
 
         let client = mango_client.clone();
-        tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+        let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
             let sig_result = client
                 .program()
                 .request()
@@ -71,7 +71,19 @@ pub async fn loop_update_index(mango_client: Arc<MangoClient>, pk: Pubkey, bank:
             }
 
             Ok(())
-        });
+        })
+        .await;
+
+        match res {
+            Ok(inner_res) => {
+                if inner_res.is_err() {
+                    log::error!("{}", inner_res.unwrap_err());
+                }
+            }
+            Err(join_error) => {
+                log::error!("{}", join_error);
+            }
+        }
     }
 }
 
@@ -85,7 +97,7 @@ pub async fn loop_consume_events(
         interval.tick().await;
 
         let client = mango_client.clone();
-        tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+        let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
             let mut event_queue: EventQueue =
                 client.program().account(perp_market.event_queue).unwrap();
 
@@ -159,7 +171,19 @@ pub async fn loop_consume_events(
             }
 
             Ok(())
-        });
+        })
+        .await;
+
+        match res {
+            Ok(inner_res) => {
+                if inner_res.is_err() {
+                    log::error!("{}", inner_res.unwrap_err());
+                }
+            }
+            Err(join_error) => {
+                log::error!("{}", join_error);
+            }
+        }
     }
 }
 
@@ -173,7 +197,7 @@ pub async fn loop_update_funding(
         interval.tick().await;
 
         let client = mango_client.clone();
-        tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+        let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
             let sig_result = client
                 .program()
                 .request()
@@ -204,6 +228,18 @@ pub async fn loop_update_funding(
             }
 
             Ok(())
-        });
+        })
+        .await;
+
+        match res {
+            Ok(inner_res) => {
+                if inner_res.is_err() {
+                    log::error!("{}", inner_res.unwrap_err());
+                }
+            }
+            Err(join_error) => {
+                log::error!("{}", join_error);
+            }
+        }
     }
 }
