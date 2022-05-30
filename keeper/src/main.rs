@@ -34,6 +34,9 @@ struct Cli {
     #[clap(short, long, env = "ADMIN_KEYPAIR")]
     admin: Option<std::path::PathBuf>,
 
+    #[clap(short, long, env = "MANGO_ACCOUNT_NAME")]
+    mango_account_name: String,
+
     #[clap(subcommand)]
     command: Command,
 }
@@ -55,6 +58,7 @@ fn main() -> Result<(), anyhow::Error> {
         payer,
         admin,
         command,
+        mango_account_name,
     } = Cli::parse();
 
     let payer = match payer {
@@ -84,12 +88,13 @@ fn main() -> Result<(), anyhow::Error> {
         Command::Taker { .. } => CommitmentConfig::confirmed(),
     };
 
-    let mango_client = Arc::new(MangoClient::new(cluster, commitment, payer, admin)?);
-
-    log::info!("Program Id {}", &mango_client.program().id());
-    log::info!("Admin {}", &mango_client.admin.to_base58_string());
-    log::info!("Group {}", &mango_client.group());
-    log::info!("User {}", &mango_client.payer());
+    let mango_client = Arc::new(MangoClient::new(
+        cluster,
+        commitment,
+        payer,
+        admin,
+        mango_account_name,
+    )?);
 
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
