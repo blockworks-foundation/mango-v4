@@ -22,4 +22,4 @@ pyth-sdk-solana = "0.1.0"
 serum_dex = { version = "0.4.0", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false, features = ["no-entrypoint", "program"] }
 solana-client = "~1.9.13"
 solana-sdk = "~1.9.13"
-tokio = { version = "1.18.2", features = ["rt-multi-thread", "time", "macros", "sync"] }
+tokio = { version = "1.14.1", features = ["rt-multi-thread", "time", "macros", "sync"] }

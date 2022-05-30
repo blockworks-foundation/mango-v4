@@ -1,0 +1,13 @@
+rpc_ws_url = "ws://mango.devnet.rpcpool.com"
+rpc_http_url = "https://mango.devnet.rpcpool.com"
+mango_program_id = "4skJ85cdxQAFVKbcGgfun8iZPL7BadVYXG3kGEGkufqA"
+mango_group_id = "5vQp48Wx55Ft1PUAx8qWbsioNaLeXWVkyCq2XpQSv34M"
+mango_cache_id = "Ge5isD68ThYorC6CoL4xdSK9eShEg2KXrnwABSzyFP4j"
+mango_signer_id = "DUWfSgNPHJfmTEhnzE19W2Jchdno69M1mJ1mwHkAu7GK"
+serum_program_id = "DESVgJVGajEgKGXhb6XmqDHGz3VjdgP7rEVESBgxmroY"
+snapshot_interval_secs = 240
+parallel_rpc_requests = 10
+get_multiple_accounts_count = 100
+websocket_server_bind_address = "localhost:9123"
+early_candidate_percentage = 1.0
+
