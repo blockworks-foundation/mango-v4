@@ -322,15 +322,33 @@ struct PerpInfo {
 }
 
 impl PerpInfo {
+    /// Total health contribution from perp balances
+    ///
+    /// Due to isolation of perp markets, only positive quote positions can lead to
+    /// positive perp-based health. Users need to settle their perp pnl with other
+    /// perp market participants in order to realize their gains if they want to use
+    /// them as collateral.
+    ///
+    /// This is because we don't trust the perp's base price to not suddenly jump to
+    /// zero (if users could borrow against their perp balances they might now
+    /// be bankrupt) or suddenly increase a lot (if users could borrow against perp
+    /// balances they could now borrow other assets).
     #[inline(always)]
     fn health_contribution(&self, health_type: HealthType) -> I80F48 {
-        let factor = match (health_type, self.base.is_negative()) {
+        let weight = match (health_type, self.base.is_negative()) {
             (HealthType::Init, true) => self.init_liab_weight,
             (HealthType::Init, false) => self.init_asset_weight,
             (HealthType::Maint, true) => self.maint_liab_weight,
             (HealthType::Maint, false) => self.maint_asset_weight,
         };
-        cm!(self.quote + factor * self.base)
+        // FUTURE: Allow v3-style "reliable" markets where we can return
+        // `self.quote + weight * self.base` here
+        if self.quote.is_positive() {
+            let limited_base_health = cm!(weight * self.base).min(I80F48::ZERO);
+            cm!(self.quote + limited_base_health)
+        } else {
+            cm!(self.quote + weight * self.base).min(I80F48::ZERO)
+        }
     }
 }
 
@@ -741,7 +759,7 @@ mod tests {
         perp1.data().base_lot_size = 10;
         let perpaccount = account.perps.get_account_mut_or_create(9).unwrap().0;
         perpaccount.base_position_lots = 3;
-        perpaccount.quote_position_native = I80F48::from(31u8);
+        perpaccount.quote_position_native = -I80F48::from(310u16);
         perpaccount.bids_base_lots = 7;
         perpaccount.asks_base_lots = 11;
         perpaccount.taker_base_lots = 1;
@@ -773,7 +791,7 @@ mod tests {
         let health2 = (-10.0 + 3.0) * 5.0 * 1.5;
         // for perp (scenario: bids execute)
         let health3 =
-            (3.0 + 7.0 + 1.0) * 10.0 * 5.0 * 0.8 + (31.0 + 2.0 * 100.0 - 7.0 * 10.0 * 5.0);
+            (3.0 + 7.0 + 1.0) * 10.0 * 5.0 * 0.8 + (-310.0 + 2.0 * 100.0 - 7.0 * 10.0 * 5.0);
         assert!(health_eq(
             compute_health(&account, HealthType::Init, &retriever).unwrap(),
             health1 + health2 + health3
@@ -831,6 +849,7 @@ mod tests {
         assert!(retriever.perp_market(&group, 1, 5).is_err());
     }
 
+    #[derive(Default)]
     struct TestHealth1Case {
         token1: i64,
         token2: i64,
@@ -913,32 +932,54 @@ mod tests {
     // Check some specific health constellations
     #[test]
     fn test_health1() {
+        let base_price = 5.0;
+        let base_lots_to_quote = 10.0 * base_price;
         let testcases = vec![
             TestHealth1Case {
                 token1: 100,
                 token2: -10,
                 oo_1_2: (20, 15),
-                perp1: (3, 31, 7, 11),
+                perp1: (3, -131, 7, 11),
                 expected_health:
                     // for token1, including open orders (scenario: bids execute)
-                    (100.0 + (20.0 + 15.0 * 5.0)) * 0.8
+                    (100.0 + (20.0 + 15.0 * base_price)) * 0.8
                     // for token2
-                    - 10.0 * 5.0 * 1.5
+                    - 10.0 * base_price * 1.5
                     // for perp (scenario: bids execute)
-                    + (3.0 + 7.0) * 10.0 * 5.0 * 0.8 + (31.0 - 7.0 * 10.0 * 5.0),
+                    + (3.0 + 7.0) * base_lots_to_quote * 0.8 + (-131.0 - 7.0 * base_lots_to_quote),
             },
             TestHealth1Case {
                 token1: -100,
                 token2: 10,
                 oo_1_2: (20, 15),
-                perp1: (-10, 31, 7, 11),
+                perp1: (-10, -131, 7, 11),
                 expected_health:
                     // for token1
                     -100.0 * 1.2
                     // for token2, including open orders (scenario: asks execute)
-                    + (10.0 * 5.0 + (20.0 + 15.0 * 5.0)) * 0.5
+                    + (10.0 * base_price + (20.0 + 15.0 * base_price)) * 0.5
                     // for perp (scenario: asks execute)
-                    + (-10.0 - 11.0) * 10.0 * 5.0 * 1.2 + (31.0 + 11.0 * 10.0 * 5.0),
+                    + (-10.0 - 11.0) * base_lots_to_quote * 1.2 + (-131.0 + 11.0 * base_lots_to_quote),
+            },
+            TestHealth1Case {
+                perp1: (-1, 100, 0, 0),
+                expected_health: 100.0 - 1.2 * 1.0 * base_lots_to_quote,
+                ..Default::default()
+            },
+            TestHealth1Case {
+                perp1: (1, -100, 0, 0),
+                expected_health: -100.0 + 0.8 * 1.0 * base_lots_to_quote,
+                ..Default::default()
+            },
+            TestHealth1Case {
+                perp1: (10, 100, 0, 0),
+                expected_health: 100.0, // no health gain from positive base pos above 0
+                ..Default::default()
+            },
+            TestHealth1Case {
+                perp1: (30, -100, 0, 0),
+                expected_health: 0.0, // no health gain from positive base pos above 0
+                ..Default::default()
             },
         ];
 
