@@ -103,17 +103,45 @@ async fn get_mint_info_by_token_index(
     get_mint_info_by_mint(account_loader, account, bank.mint).await
 }
 
+fn get_perp_market_address_by_index(group: Pubkey, perp_market_index: PerpMarketIndex) -> Pubkey {
+    Pubkey::find_program_address(
+        &[
+            group.as_ref(),
+            b"PerpMarket".as_ref(),
+            &perp_market_index.to_le_bytes(),
+        ],
+        &mango_v4::id(),
+    )
+    .0
+}
+
 // all the accounts that instructions like deposit/withdraw need to compute account health
 async fn derive_health_check_remaining_account_metas(
     account_loader: &impl ClientAccountLoader,
     account: &MangoAccount,
     affected_bank: Option<Pubkey>,
     writable_banks: bool,
+    affected_perp_market_index: Option<PerpMarketIndex>,
 ) -> Vec<AccountMeta> {
+    let mut adjusted_account = account.clone();
+    if let Some(affected_bank) = affected_bank {
+        let bank: Bank = account_loader.load(&affected_bank).await.unwrap();
+        adjusted_account
+            .tokens
+            .get_mut_or_create(bank.token_index)
+            .unwrap();
+    }
+    if let Some(affected_perp_market_index) = affected_perp_market_index {
+        adjusted_account
+            .perps
+            .get_account_mut_or_create(affected_perp_market_index)
+            .unwrap();
+    }
+
     // figure out all the banks/oracles that need to be passed for the health check
     let mut banks = vec![];
     let mut oracles = vec![];
-    for position in account.tokens.iter_active() {
+    for position in adjusted_account.tokens.iter_active() {
         let mint_info =
             get_mint_info_by_token_index(account_loader, account, position.token_index).await;
         // TODO: ALTs are unavailable
@@ -127,23 +155,19 @@ async fn derive_health_check_remaining_account_metas(
         banks.push(mint_info.bank);
         oracles.push(mint_info.oracle);
     }
-    if let Some(affected_bank) = affected_bank {
-        if banks.iter().find(|&&v| v == affected_bank).is_none() {
-            // If there is not yet an active position for the token, we need to pass
-            // the bank/oracle for health check anyway.
-            let new_position = account
-                .tokens
-                .values
-                .iter()
-                .position(|p| !p.is_active())
-                .unwrap();
-            banks.insert(new_position, affected_bank);
-            let affected_bank: Bank = account_loader.load(&affected_bank).await.unwrap();
-            oracles.insert(new_position, affected_bank.oracle);
-        }
-    }
+
+    let perp_markets = adjusted_account
+        .perps
+        .iter_active_accounts()
+        .map(|perp| get_perp_market_address_by_index(account.group, perp.market_index));
 
     let serum_oos = account.serum3.iter_active().map(|&s| s.open_orders);
+
+    let to_account_meta = |pubkey| AccountMeta {
+        pubkey,
+        is_writable: false,
+        is_signer: false,
+    };
 
     banks
         .iter()
@@ -152,16 +176,9 @@ async fn derive_health_check_remaining_account_metas(
             is_writable: writable_banks,
             is_signer: false,
         })
-        .chain(oracles.iter().map(|&pubkey| AccountMeta {
-            pubkey,
-            is_writable: false,
-            is_signer: false,
-        }))
-        .chain(serum_oos.map(|pubkey| AccountMeta {
-            pubkey,
-            is_writable: false,
-            is_signer: false,
-        }))
+        .chain(oracles.into_iter().map(to_account_meta))
+        .chain(perp_markets.map(to_account_meta))
+        .chain(serum_oos.map(to_account_meta))
         .collect()
 }
 
@@ -198,11 +215,24 @@ async fn derive_liquidation_remaining_account_metas(
         oracles.push(mint_info.oracle);
     }
 
+    let perp_markets = liqee
+        .perps
+        .iter_active_accounts()
+        .chain(liqee.perps.iter_active_accounts())
+        .map(|perp| get_perp_market_address_by_index(liqee.group, perp.market_index))
+        .unique();
+
     let serum_oos = liqee
         .serum3
         .iter_active()
         .chain(liqor.serum3.iter_active())
         .map(|&s| s.open_orders);
+
+    let to_account_meta = |pubkey| AccountMeta {
+        pubkey,
+        is_writable: false,
+        is_signer: false,
+    };
 
     banks
         .iter()
@@ -211,16 +241,9 @@ async fn derive_liquidation_remaining_account_metas(
             is_writable: *is_writable,
             is_signer: false,
         })
-        .chain(oracles.iter().map(|&pubkey| AccountMeta {
-            pubkey,
-            is_writable: false,
-            is_signer: false,
-        }))
-        .chain(serum_oos.map(|pubkey| AccountMeta {
-            pubkey,
-            is_writable: false,
-            is_signer: false,
-        }))
+        .chain(oracles.into_iter().map(to_account_meta))
+        .chain(perp_markets.map(to_account_meta))
+        .chain(serum_oos.map(to_account_meta))
         .collect()
 }
 
@@ -290,6 +313,7 @@ impl<'keypair> ClientInstruction for MarginTradeInstruction<'keypair> {
             &account,
             Some(self.mango_token_bank),
             true,
+            None,
         )
         .await;
 
@@ -384,6 +408,7 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
             &account,
             Some(mint_info.bank),
             false,
+            None,
         )
         .await;
 
@@ -447,6 +472,7 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
             &account,
             Some(mint_info.bank),
             false,
+            None,
         )
         .await;
 
@@ -694,10 +720,14 @@ impl<'keypair> ClientInstruction for CreateGroupInstruction<'keypair> {
         _account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction {};
+        let instruction = Self::Instruction { group_num: 0 };
 
         let group = Pubkey::find_program_address(
-            &[b"Group".as_ref(), self.admin.pubkey().as_ref()],
+            &[
+                b"Group".as_ref(),
+                self.admin.pubkey().as_ref(),
+                &instruction.group_num.to_le_bytes(),
+            ],
             &program_id,
         )
         .0;
@@ -978,9 +1008,14 @@ impl<'keypair> ClientInstruction for Serum3PlaceOrderInstruction<'keypair> {
         )
         .unwrap();
 
-        let health_check_metas =
-            derive_health_check_remaining_account_metas(&account_loader, &account, None, false)
-                .await;
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            None,
+            false,
+            None,
+        )
+        .await;
 
         let accounts = Self::Accounts {
             group: account.group,
@@ -1205,9 +1240,14 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
         )
         .unwrap();
 
-        let health_check_metas =
-            derive_health_check_remaining_account_metas(&account_loader, &account, None, false)
-                .await;
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            None,
+            false,
+            None,
+        )
+        .await;
 
         let accounts = Self::Accounts {
             group: account.group,
@@ -1394,7 +1434,7 @@ impl<'keypair> ClientInstruction for PerpPlaceOrderInstruction<'keypair> {
     type Instruction = mango_v4::instruction::PerpPlaceOrder;
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -1418,7 +1458,20 @@ impl<'keypair> ClientInstruction for PerpPlaceOrderInstruction<'keypair> {
             owner: self.owner.pubkey(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            None,
+            false,
+            Some(perp_market.perp_market_index),
+        )
+        .await;
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas);
+
         (accounts, instruction)
     }
 

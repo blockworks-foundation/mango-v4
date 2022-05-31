@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::Mint;
 use checked_math as cm;
 use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
@@ -59,6 +60,16 @@ impl TokenAccount {
             self.indexed_value * bank.deposit_index
         } else {
             self.indexed_value * bank.borrow_index
+        }
+    }
+
+    pub fn ui(&self, bank: &Bank, mint: &Mint) -> I80F48 {
+        if self.indexed_value.is_positive() {
+            (self.indexed_value * bank.deposit_index)
+                / I80F48::from_num(10u64.pow(mint.decimals as u32))
+        } else {
+            (self.indexed_value * bank.borrow_index)
+                / I80F48::from_num(10u64.pow(mint.decimals as u32))
         }
     }
 
@@ -717,10 +728,29 @@ impl std::fmt::Debug for MangoAccount {
 }
 
 impl MangoAccount {
-    fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         std::str::from_utf8(&self.name)
             .unwrap()
             .trim_matches(char::from(0))
+    }
+}
+
+impl Default for MangoAccount {
+    fn default() -> Self {
+        Self {
+            name: Default::default(),
+            group: Pubkey::default(),
+            owner: Pubkey::default(),
+            delegate: Pubkey::default(),
+            tokens: MangoAccountTokens::new(),
+            serum3: MangoAccountSerum3::new(),
+            perps: MangoAccountPerps::new(),
+            being_liquidated: 0,
+            is_bankrupt: 0,
+            account_num: 0,
+            bump: 0,
+            reserved: Default::default(),
+        }
     }
 }
 

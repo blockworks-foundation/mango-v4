@@ -20,6 +20,11 @@ export type MangoV4 = {
                 "kind": "account",
                 "type": "publicKey",
                 "path": "admin"
+              },
+              {
+                "kind": "arg",
+                "type": "u32",
+                "path": "group_num"
               }
             ]
           }
@@ -40,7 +45,12 @@ export type MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "groupNum",
+          "type": "u32"
+        }
+      ]
     },
     {
       "name": "registerToken",
@@ -1721,11 +1731,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "mintDecimals",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           }
@@ -1746,11 +1760,24 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
+          },
+          {
+            "name": "groupNum",
+            "type": "u32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                7
+                8
               ]
             }
           }
@@ -2893,6 +2920,11 @@ export const IDL: MangoV4 = {
                 "kind": "account",
                 "type": "publicKey",
                 "path": "admin"
+              },
+              {
+                "kind": "arg",
+                "type": "u32",
+                "path": "group_num"
               }
             ]
           }
@@ -2913,7 +2945,12 @@ export const IDL: MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "groupNum",
+          "type": "u32"
+        }
+      ]
     },
     {
       "name": "registerToken",
@@ -4594,11 +4631,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "mintDecimals",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           }
@@ -4619,11 +4660,24 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
+          },
+          {
+            "name": "groupNum",
+            "type": "u32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                7
+                8
               ]
             }
           }

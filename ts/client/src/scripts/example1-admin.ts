@@ -47,7 +47,7 @@ async function main() {
   // group
   console.log(`Creating Group...`);
   try {
-    await client.createGroup();
+    await client.createGroup(0);
   } catch (error) {}
   const group = await client.getGroupForAdmin(admin.publicKey);
   console.log(`...registered group ${group.publicKey}`);

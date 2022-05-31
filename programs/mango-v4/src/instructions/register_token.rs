@@ -131,6 +131,7 @@ pub fn register_token(
         token_index,
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         reserved: Default::default(),
+        mint_decimals: ctx.accounts.mint.decimals,
     };
 
     // TODO: ALTs are unavailable
