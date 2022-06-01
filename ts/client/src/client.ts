@@ -1,3 +1,6 @@
+import { ORCA_TOKEN_SWAP_ID_DEVNET } from '@orca-so/sdk';
+import { orcaDevnetPoolConfigs } from '@orca-so/sdk/dist/constants/devnet/pools';
+import { OrcaPoolConfig as OrcaDevnetPoolConfig } from '@orca-so/sdk/dist/public/devnet/pools';
 import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
 import { getFeeRates, getFeeTier, Market } from '@project-serum/serum';
 import { Order } from '@project-serum/serum/lib/market';
@@ -6,24 +9,21 @@ import {
   initializeAccount,
   WRAPPED_SOL_MINT,
 } from '@project-serum/serum/lib/token-instructions';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { TokenSwap } from '@solana/spl-token-swap';
-import { TOKEN_PROGRAM_ID, u64 } from '@solana/spl-token';
 import {
   AccountMeta,
   Keypair,
+  LAMPORTS_PER_SOL,
   MemcmpFilter,
   PublicKey,
+  Signer,
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
-  TransactionSignature,
   TransactionInstruction,
-  LAMPORTS_PER_SOL,
-  Signer,
+  TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { ORCA_TOKEN_SWAP_ID_DEVNET } from '@orca-so/sdk';
-import { orcaDevnetPoolConfigs } from '@orca-so/sdk/dist/constants/devnet/pools';
-import { OrcaPoolConfig as OrcaDevnetPoolConfig } from '@orca-so/sdk/dist/public/devnet/pools';
 import { Bank, getMintInfoForTokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
 import { I80F48 } from './accounts/I80F48';
@@ -36,10 +36,10 @@ import {
   Serum3SelfTradeBehavior,
   Serum3Side,
 } from './accounts/serum3';
-import { IDL, MangoV4 } from './mango_v4';
-import { getAssociatedTokenAddress, toNativeDecimals, toU64 } from './utils';
 import { getTokenDecimals } from './constants/tokens';
+import { IDL, MangoV4 } from './mango_v4';
 import { MarginTradeWithdraw } from './types';
+import { getAssociatedTokenAddress, toNativeDecimals, toU64 } from './utils';
 
 export const MANGO_V4_ID = new PublicKey(
   'm43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD',
@@ -717,10 +717,6 @@ export class MangoClient {
     const bids = new Keypair();
     const asks = new Keypair();
     const eventQueue = new Keypair();
-
-    console.log(
-      (this.program.provider as AnchorProvider).wallet.publicKey.toBase58(),
-    );
 
     return await this.program.methods
       .perpCreateMarket(

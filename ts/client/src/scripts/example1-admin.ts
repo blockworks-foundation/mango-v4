@@ -219,9 +219,7 @@ async function main() {
       100,
     );
     console.log('done');
-  } catch (error) {
-    console.log(error);
-  }
+  } catch (error) {}
   const perpMarkets = await client.perpGetMarket(
     group,
     group.banksMap.get('BTC')?.tokenIndex,
