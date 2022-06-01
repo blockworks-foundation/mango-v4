@@ -71,10 +71,12 @@ pub struct PerpMarket {
 
     /// PDA bump
     pub bump: u8,
-    pub reserved: [u8; 1],
+
+    pub base_token_decimals: u8,
 
     /// Lookup indices
     pub perp_market_index: PerpMarketIndex,
+
     pub base_token_index: TokenIndex,
 
     /// Cannot be chosen freely, must be the health-reference token, same for all PerpMarkets

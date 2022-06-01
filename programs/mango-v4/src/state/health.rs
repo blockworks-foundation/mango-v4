@@ -410,7 +410,7 @@ fn compute_health_detail<'a, 'b: 'a>(
     for (i, position) in account.tokens.iter_active().enumerate() {
         let (bank, oracle_ai) =
             retriever.bank_and_oracle(&account.group, i, position.token_index)?;
-        let oracle_price = oracle_price(oracle_ai)?;
+        let oracle_price = oracle_price(oracle_ai, bank.mint_decimals)?;
 
         // converts the token value to the basis token value for health computations
         // TODO: health basis token == USDC?

@@ -89,7 +89,10 @@ pub fn perp_place_order(
 
         let mut event_queue = ctx.accounts.event_queue.load_mut()?;
 
-        let oracle_price = oracle_price(&ctx.accounts.oracle.to_account_info())?;
+        let oracle_price = oracle_price(
+            &ctx.accounts.oracle.to_account_info(),
+            perp_market.base_token_decimals,
+        )?;
 
         let now_ts = Clock::get()?.unix_timestamp as u64;
         let time_in_force = if expiry_timestamp != 0 {

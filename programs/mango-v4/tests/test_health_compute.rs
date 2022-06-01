@@ -267,6 +267,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 payer,
                 perp_market_index: perp_market_index as PerpMarketIndex,
                 base_token_index: quote_token.index,
+                base_token_decimals: quote_token.mint.decimals,
                 quote_token_index: token.index,
                 quote_lot_size: 10,
                 base_lot_size: 100,

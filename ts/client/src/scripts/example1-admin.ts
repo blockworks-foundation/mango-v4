@@ -204,6 +204,7 @@ async function main() {
       0,
       'BTC/USDC',
       0,
+      6,
       1,
       10,
       100,

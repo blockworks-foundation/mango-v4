@@ -149,6 +149,7 @@ async fn test_perp() -> Result<(), TransportError> {
             payer,
             perp_market_index: 0,
             base_token_index: tokens[0].index,
+            base_token_decimals: tokens[0].mint.decimals,
             quote_token_index: tokens[1].index,
             quote_lot_size: 10,
             base_lot_size: 100,

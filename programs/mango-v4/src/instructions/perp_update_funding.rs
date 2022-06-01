@@ -27,7 +27,10 @@ pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
     let asks = &ctx.accounts.asks.to_account_info();
     let book = Book::load_mut(bids, asks, &perp_market)?;
 
-    let oracle_price = oracle_price(&ctx.accounts.oracle.to_account_info())?;
+    let oracle_price = oracle_price(
+        &ctx.accounts.oracle.to_account_info(),
+        perp_market.base_token_decimals,
+    )?;
 
     perp_market.update_funding(&book, oracle_price, now_ts as u64)?;
 

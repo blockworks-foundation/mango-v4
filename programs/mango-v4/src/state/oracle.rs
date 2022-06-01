@@ -5,8 +5,11 @@ use anchor_lang::Discriminator;
 use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
 
+use crate::checked_math as cm;
 use crate::error::MangoError;
 use crate::util::LoadZeroCopy;
+
+pub const QUOTE_DECIMALS: u32 = 6;
 
 #[derive(PartialEq)]
 pub enum OracleType {
@@ -35,7 +38,7 @@ pub fn determine_oracle_type(data: &[u8]) -> Result<OracleType> {
     Err(MangoError::UnknownOracleType.into())
 }
 
-pub fn oracle_price(acc_info: &AccountInfo) -> Result<I80F48> {
+pub fn oracle_price(acc_info: &AccountInfo, base_token_decimals: u8) -> Result<I80F48> {
     let data = &acc_info.try_borrow_data()?;
     let oracle_type = determine_oracle_type(data)?;
 
@@ -43,7 +46,14 @@ pub fn oracle_price(acc_info: &AccountInfo) -> Result<I80F48> {
         OracleType::Stub => acc_info.load::<StubOracle>()?.price,
         OracleType::Pyth => {
             let price_struct = pyth_sdk_solana::load_price(data).unwrap();
-            I80F48::from_num(price_struct.price)
+            let price = I80F48::from_num(price_struct.price);
+            let decimals = (price_struct.expo as u32)
+                .checked_add(QUOTE_DECIMALS)
+                .unwrap()
+                .checked_sub(base_token_decimals as u32)
+                .unwrap();
+            let decimal_adj = I80F48::from_num(10_u32.pow(decimals));
+            cm!(price * decimal_adj)
         }
     })
 }

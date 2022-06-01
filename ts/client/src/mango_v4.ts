@@ -1213,6 +1213,12 @@ export type MangoV4 = {
           }
         },
         {
+          "name": "baseTokenDecimalsOpt",
+          "type": {
+            "option": "u8"
+          }
+        },
+        {
           "name": "quoteTokenIndex",
           "type": "u16"
         },
@@ -2149,13 +2155,8 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "name": "baseTokenDecimals",
+            "type": "u8"
           },
           {
             "name": "perpMarketIndex",
@@ -4113,6 +4114,12 @@ export const IDL: MangoV4 = {
           }
         },
         {
+          "name": "baseTokenDecimalsOpt",
+          "type": {
+            "option": "u8"
+          }
+        },
+        {
           "name": "quoteTokenIndex",
           "type": "u16"
         },
@@ -5049,13 +5056,8 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "name": "baseTokenDecimals",
+            "type": "u8"
           },
           {
             "name": "perpMarketIndex",
