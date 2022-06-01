@@ -9,13 +9,15 @@ const DEVNET_SERUM3_MARKETS = new Map([
   ['SOL/USDC', '5xWpt56U1NCuHoAEtpLeUrQcxDkEpNfScjfLFaRzLPgR'],
 ]);
 const DEVNET_MINTS = new Map([
-  ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'],
+  ['USDC', 'EmXq3Ni9gfudTiyNKzzYvpnQqnJEMRw2ttnVXoJXjLo1'], // use devnet usdc
   ['BTC', '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU'],
   ['SOL', 'So11111111111111111111111111111111111111112'],
+  ['ORCA', 'orcarKHSqC5CDDsGbho8GKvwExejWHxTqGzXgcewB9L'],
 ]);
 const DEVNET_ORACLES = new Map([
   ['BTC', 'HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J'],
   ['SOL', 'J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix'],
+  ['ORCA', 'A1WttWF7X3Rg6ZRpB2YQUFHCRh1kiXV8sKKLV3S9neJV'],
 ]);
 
 //
@@ -120,6 +122,33 @@ async function main() {
       solDevnetOracle,
       2, // tokenIndex
       'SOL',
+      0.4,
+      0.07,
+      0.8,
+      0.9,
+      0.0005,
+      0.0005,
+      1.5,
+      0.8,
+      0.6,
+      1.2,
+      1.4,
+      0.02,
+    );
+    await group.reload(client);
+  } catch (error) {}
+
+  // register token 3
+  console.log(`Registering ORCA...`);
+  const orcaDevnetMint = new PublicKey(DEVNET_MINTS.get('ORCA')!);
+  const orcaDevnetOracle = new PublicKey(DEVNET_ORACLES.get('ORCA')!);
+  try {
+    await client.registerToken(
+      group,
+      orcaDevnetMint,
+      orcaDevnetOracle,
+      3, // tokenIndex
+      'ORCA',
       0.4,
       0.07,
       0.8,

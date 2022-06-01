@@ -7,7 +7,7 @@ import {
   WRAPPED_SOL_MINT,
 } from '@project-serum/serum/lib/token-instructions';
 import { TokenSwap } from '@solana/spl-token-swap';
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { TOKEN_PROGRAM_ID, u64 } from '@solana/spl-token';
 import {
   AccountMeta,
   Keypair,
@@ -37,8 +37,9 @@ import {
   Serum3Side,
 } from './accounts/serum3';
 import { IDL, MangoV4 } from './mango_v4';
-import { getAssociatedTokenAddress, toNativeDecimals } from './utils';
-import tokens, { getTokenDecimals } from './constants/tokens';
+import { getAssociatedTokenAddress, toNativeDecimals, toU64 } from './utils';
+import { getTokenDecimals } from './constants/tokens';
+import { MarginTradeWithdraw } from './types';
 
 export const MANGO_V4_ID = new PublicKey(
   'm43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD',
@@ -337,7 +338,7 @@ export class MangoClient {
     }
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount, bank);
+      await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     const tokenDecimals = getTokenDecimals(tokenName);
 
@@ -379,7 +380,7 @@ export class MangoClient {
     );
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount, bank);
+      await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     return await this.program.methods
       .withdraw(new BN(amount), allowBorrow)
@@ -888,35 +889,43 @@ export class MangoClient {
     outputToken: string;
     minimumAmountOut: number;
   }): Promise<TransactionSignature> {
-    const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount);
-    const parsedHealthAccounts = healthRemainingAccounts.map(
-      (pk) =>
-        ({
-          pubkey: pk,
-          isWritable: false,
-          isSigner: false,
-        } as AccountMeta),
-    );
-
     const inputBank = group.banksMap.get(inputToken);
     const outputBank = group.banksMap.get(outputToken);
 
     if (!inputBank || !outputBank) throw new Error('Invalid token');
 
+    const healthRemainingAccounts: PublicKey[] =
+      await this.buildHealthRemainingAccounts(group, mangoAccount, [
+        inputBank,
+        outputBank,
+      ]);
+    const parsedHealthAccounts = healthRemainingAccounts.map(
+      (pk) =>
+        ({
+          pubkey: pk,
+          isWritable:
+            pk.equals(inputBank.publicKey) || pk.equals(outputBank.publicKey)
+              ? true
+              : false,
+          isSigner: false,
+        } as AccountMeta),
+    );
+
     const targetProgramId = ORCA_TOKEN_SWAP_ID_DEVNET;
 
-    const instruction = await this.buildOrcaInstruction(
+    const { instruction, signers } = await this.buildOrcaInstruction(
       targetProgramId,
       inputBank,
       outputBank,
-      amountIn, // todo: convert to u64?
-      minimumAmountOut, // todo: convert to u64?
+      toU64(amountIn, 9),
+      toU64(minimumAmountOut, 6),
     );
-    const targetRemainingAccounts = instruction.keys; // todo: verify this does not contain programId
+    const targetRemainingAccounts = instruction.keys;
 
-    const withdraws = [{ index: 3, amount: amountIn }];
-    const cpiData = instruction.data; // todo: is it just instruction.data?
+    const withdraws: MarginTradeWithdraw[] = [
+      { index: 3, amount: toU64(amountIn, 9) },
+    ];
+    const cpiData = instruction.data;
 
     return await this.program.methods
       .marginTrade(new BN(parsedHealthAccounts.length), withdraws, cpiData)
@@ -934,7 +943,8 @@ export class MangoClient {
         } as AccountMeta,
         ...targetRemainingAccounts,
       ])
-      .rpc();
+      .signers(signers)
+      .rpc({ skipPreflight: true });
   }
 
   /// static
@@ -956,7 +966,7 @@ export class MangoClient {
   private async buildHealthRemainingAccounts(
     group: Group,
     mangoAccount: MangoAccount,
-    bank?: Bank /** TODO for serum3PlaceOrde we are just ingoring this atm */,
+    banks?: Bank[] /** TODO for serum3PlaceOrder we are just ingoring this atm */,
   ) {
     const healthRemainingAccounts: PublicKey[] = [];
 
@@ -964,8 +974,10 @@ export class MangoClient {
       .filter((token) => token.tokenIndex !== 65535)
       .map((token) => token.tokenIndex);
 
-    if (bank) {
-      tokenIndices.push(bank.tokenIndex);
+    if (banks?.length) {
+      for (const bank of banks) {
+        tokenIndices.push(bank.tokenIndex);
+      }
     }
 
     const mintInfos = await Promise.all(
@@ -1006,34 +1018,32 @@ export class MangoClient {
     return healthRemainingAccounts;
   }
 
+  /*
+    Orca ix references:
+      swap fn: https://github.com/orca-so/typescript-sdk/blob/main/src/model/orca/pool/orca-pool.ts#L162
+      swap ix: https://github.com/orca-so/typescript-sdk/blob/main/src/public/utils/web3/instructions/pool-instructions.ts#L41
+  */
   private async buildOrcaInstruction(
-    orcaTokenSwapId,
-    inputBank,
-    outputBank,
-    amountInU64,
-    minimumAmountOutU64,
+    orcaTokenSwapId: PublicKey,
+    inputBank: Bank,
+    outputBank: Bank,
+    amountInU64: BN,
+    minimumAmountOutU64: BN,
   ) {
-    const poolParams = orcaDevnetPoolConfigs[OrcaDevnetPoolConfig.SOL_USDC];
+    const poolParams = orcaDevnetPoolConfigs[OrcaDevnetPoolConfig.ORCA_SOL];
 
     const [authorityForPoolAddress] = await PublicKey.findProgramAddress(
       [poolParams.address.toBuffer()],
       orcaTokenSwapId,
     );
 
-    const userTransferAuthority = new Keypair();
-
-    /*
-      Orca references:
-        swap fn: https://github.com/orca-so/typescript-sdk/blob/main/src/model/orca/pool/orca-pool.ts#L162
-        swap ix: https://github.com/orca-so/typescript-sdk/blob/main/src/public/utils/web3/instructions/pool-instructions.ts#L41
-    */
-    const swapInstruction = TokenSwap.swapInstruction(
+    const instruction = TokenSwap.swapInstruction(
       poolParams.address,
       authorityForPoolAddress,
-      userTransferAuthority.publicKey, // what is this?
+      inputBank.publicKey, // userTransferAuthority
       inputBank.vault, // inputTokenUserAddress
-      inputBank.mint, // inputToken.addr
-      outputBank.mint, // outputToken.addr
+      poolParams.tokens[inputBank.mint.toString()].addr, // inputToken.addr
+      poolParams.tokens[outputBank.mint.toString()].addr, // outputToken.addr
       outputBank.vault, // outputTokenUserAddress
       poolParams.poolTokenMint,
       poolParams.feeAccount,
@@ -1044,6 +1054,9 @@ export class MangoClient {
       minimumAmountOutU64,
     );
 
-    return swapInstruction;
+    instruction.keys[2].isSigner = false;
+    instruction.keys[2].isWritable = true;
+
+    return { instruction, signers: [] };
   }
 }
