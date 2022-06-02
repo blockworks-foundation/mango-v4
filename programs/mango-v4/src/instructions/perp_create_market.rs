@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
 use crate::error::MangoError;
-use crate::state::QUOTE_DECIMALS;
+
 use crate::state::*;
 use crate::util::fill16_from_str;
 
