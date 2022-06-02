@@ -1213,10 +1213,8 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "baseTokenDecimalsOpt",
-          "type": {
-            "option": "u8"
-          }
+          "name": "baseTokenDecimals",
+          "type": "u8"
         },
         {
           "name": "quoteTokenIndex",
@@ -4114,10 +4112,8 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "baseTokenDecimalsOpt",
-          "type": {
-            "option": "u8"
-          }
+          "name": "baseTokenDecimals",
+          "type": "u8"
         },
         {
           "name": "quoteTokenIndex",
