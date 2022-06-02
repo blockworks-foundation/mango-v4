@@ -1343,6 +1343,7 @@ pub struct PerpCreateMarketInstruction<'keypair> {
     pub payer: &'keypair Keypair,
     pub perp_market_index: PerpMarketIndex,
     pub base_token_index: TokenIndex,
+    pub base_token_decimals: u8,
     pub quote_token_index: TokenIndex,
     pub quote_lot_size: i64,
     pub base_lot_size: i64,
@@ -1380,6 +1381,7 @@ impl<'keypair> ClientInstruction for PerpCreateMarketInstruction<'keypair> {
             max_funding: 0.05,
             min_funding: 0.05,
             impact_quantity: 100,
+            base_token_decimals: self.base_token_decimals,
         };
 
         let perp_market = Pubkey::find_program_address(
@@ -1636,6 +1638,7 @@ pub struct PerpUpdateFundingInstruction {
     pub perp_market: Pubkey,
     pub bids: Pubkey,
     pub asks: Pubkey,
+    pub bank: Pubkey,
     pub oracle: Pubkey,
 }
 #[async_trait::async_trait(?Send)]

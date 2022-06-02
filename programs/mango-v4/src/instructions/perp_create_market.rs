@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
 use crate::error::MangoError;
+
 use crate::state::*;
 use crate::util::fill16_from_str;
 
@@ -46,6 +47,7 @@ pub fn perp_create_market(
     perp_market_index: PerpMarketIndex,
     name: String,
     base_token_index_opt: Option<TokenIndex>,
+    base_token_decimals: u8,
     quote_token_index: TokenIndex,
     quote_lot_size: i64,
     base_lot_size: i64,
@@ -79,17 +81,18 @@ pub fn perp_create_market(
         taker_fee: I80F48::from_num(taker_fee),
         min_funding: I80F48::from_num(min_funding),
         max_funding: I80F48::from_num(max_funding),
+        impact_quantity,
         long_funding: I80F48::ZERO,
         short_funding: I80F48::ZERO,
         funding_last_updated: Clock::get()?.unix_timestamp,
-        impact_quantity,
         open_interest: 0,
         seq_num: 0,
         fees_accrued: I80F48::ZERO,
         bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
-        reserved: Default::default(),
-        perp_market_index,
+        // Why optional - Perp could be based purely on an oracle
         base_token_index: base_token_index_opt.ok_or(TokenIndex::MAX).unwrap(),
+        base_token_decimals,
+        perp_market_index,
         quote_token_index,
     };
 

@@ -71,8 +71,8 @@ pub fn liq_token_with_token(
             account_retriever.bank_mut_and_oracle(asset_token_index)?;
         let (mut liab_bank, liab_oracle) =
             account_retriever.bank_mut_and_oracle(liab_token_index)?;
-        let asset_price = oracle_price(asset_oracle)?;
-        let liab_price = oracle_price(liab_oracle)?;
+        let asset_price = oracle_price(asset_oracle, asset_bank.mint_decimals)?;
+        let liab_price = oracle_price(liab_oracle, liab_bank.mint_decimals)?;
 
         let liqee_assets_native = liqee
             .tokens
