@@ -1,10 +1,12 @@
-import BN from 'bn.js';
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
   u64,
 } from '@solana/spl-token';
 import { AccountMeta, PublicKey } from '@solana/web3.js';
+import BN from 'bn.js';
+
+export const I64_MAX_BN = new BN('9223372036854775807').toTwos(64);
 
 export function debugAccountMetas(ams: AccountMeta[]) {
   for (const am of ams) {

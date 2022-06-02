@@ -5,6 +5,8 @@ import bs58 from 'bs58';
 import { MangoClient } from '../client';
 import { I80F48, I80F48Dto } from './I80F48';
 
+export const QUOTE_DECIMALS = 6;
+
 export class Bank {
   public name: string;
   public depositIndex: I80F48;

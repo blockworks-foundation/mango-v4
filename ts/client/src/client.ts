@@ -39,7 +39,12 @@ import {
 import { getTokenDecimals } from './constants/tokens';
 import { IDL, MangoV4 } from './mango_v4';
 import { MarginTradeWithdraw } from './types';
-import { getAssociatedTokenAddress, toNativeDecimals, toU64 } from './utils';
+import {
+  getAssociatedTokenAddress,
+  I64_MAX_BN,
+  toNativeDecimals,
+  toU64,
+} from './utils';
 
 export const MANGO_V4_ID = new PublicKey(
   'm43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD',
@@ -584,7 +589,6 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-
       .rpc();
   }
 
@@ -836,9 +840,9 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     perpMarketName: string,
     side: Side,
-    priceLots: number,
-    maxBaseLots: number,
-    maxQuoteLots: number,
+    price: number,
+    quantity: number,
+    maxQuoteQuantity: number,
     clientOrderId: number,
     orderType: OrderType,
     expiryTimestamp: number,
@@ -846,12 +850,24 @@ export class MangoClient {
   ) {
     const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
 
+    const healthRemainingAccounts: PublicKey[] =
+      await this.buildHealthRemainingAccounts(group, mangoAccount);
+
+    let [nativePrice, nativeQuantity] = perpMarket.uiToNativePriceQuantity(
+      price,
+      quantity,
+    );
+
+    const maxQuoteQuantityLots = maxQuoteQuantity
+      ? perpMarket.uiQuoteToLots(maxQuoteQuantity)
+      : I64_MAX_BN;
+
     await this.program.methods
       .perpPlaceOrder(
         side,
-        new BN((priceLots * perpMarket.baseLotSize) / perpMarket.quoteLotSize),
-        new BN(maxBaseLots),
-        new BN(maxQuoteLots),
+        nativePrice,
+        nativeQuantity,
+        maxQuoteQuantityLots,
         new BN(clientOrderId),
         orderType,
         new BN(expiryTimestamp),
@@ -867,6 +883,12 @@ export class MangoClient {
         oracle: perpMarket.oracle,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
       .rpc();
   }
 
