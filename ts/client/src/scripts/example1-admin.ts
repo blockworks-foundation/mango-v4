@@ -9,7 +9,7 @@ const DEVNET_SERUM3_MARKETS = new Map([
   ['SOL/USDC', '5xWpt56U1NCuHoAEtpLeUrQcxDkEpNfScjfLFaRzLPgR'],
 ]);
 const DEVNET_MINTS = new Map([
-  ['USDC', 'EmXq3Ni9gfudTiyNKzzYvpnQqnJEMRw2ttnVXoJXjLo1'], // use devnet usdc
+  ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'], // use devnet usdc
   ['BTC', '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU'],
   ['SOL', 'So11111111111111111111111111111111111111112'],
   ['ORCA', 'orcarKHSqC5CDDsGbho8GKvwExejWHxTqGzXgcewB9L'],
@@ -50,7 +50,9 @@ async function main() {
   console.log(`Creating Group...`);
   try {
     await client.createGroup(0);
-  } catch (error) {}
+  } catch (error) {
+    console.log(error);
+  }
   const group = await client.getGroupForAdmin(admin.publicKey);
   console.log(`...registered group ${group.publicKey}`);
 
@@ -79,14 +81,18 @@ async function main() {
       0.02,
     );
     await group.reload(client);
-  } catch (error) {}
+  } catch (error) {
+    console.log(error);
+  }
 
   // stub oracle + register token 1
   console.log(`Registering USDC...`);
   const usdcDevnetMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
     await client.createStubOracle(group, usdcDevnetMint, 1.0);
-  } catch (error) {}
+  } catch (error) {
+    console.log(error);
+  }
   const usdcDevnetOracle = await client.getStubOracle(group, usdcDevnetMint);
   try {
     await client.registerToken(
@@ -136,7 +142,9 @@ async function main() {
       0.02,
     );
     await group.reload(client);
-  } catch (error) {}
+  } catch (error) {
+    console.log(error);
+  }
 
   // register token 3
   console.log(`Registering ORCA...`);
@@ -163,7 +171,9 @@ async function main() {
       0.02,
     );
     await group.reload(client);
-  } catch (error) {}
+  } catch (error) {
+    console.log(error);
+  }
 
   // log tokens/banks
   for (const bank of await group.banksMap.values()) {
@@ -187,7 +197,9 @@ async function main() {
       0,
       'BTC/USDC',
     );
-  } catch (error) {}
+  } catch (error) {
+    console.log(error);
+  }
   const markets = await client.serum3GetMarket(
     group,
     group.banksMap.get('BTC')?.tokenIndex,
@@ -220,7 +232,9 @@ async function main() {
       100,
     );
     console.log('done');
-  } catch (error) {}
+  } catch (error) {
+    console.log(error);
+  }
   const perpMarkets = await client.perpGetMarket(
     group,
     group.banksMap.get('BTC')?.tokenIndex,
