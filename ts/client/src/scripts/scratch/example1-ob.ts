@@ -1,8 +1,8 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
-import { TokenAccount } from '../accounts/mangoAccount';
-import { MangoClient } from '../client';
+import { MangoClient } from '../../client';
+import { DEVNET_SERUM3_PROGRAM_ID } from '../../constants';
 
 //
 // An example for users based on high level api i.e. the client
@@ -46,10 +46,22 @@ async function main() {
   );
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
 
-  // log users tokens
-  for (const token of mangoAccount.tokens) {
-    if (token.tokenIndex == TokenAccount.TokenIndexUnset) continue;
-    console.log(token.toString());
+  // logging serum3 open orders for user
+  while (true) {
+    console.log(`Current own orders on OB...`);
+    const orders = await client.getSerum3Orders(
+      group,
+      DEVNET_SERUM3_PROGRAM_ID,
+      'BTC/USDC',
+    );
+    for (const order of orders) {
+      console.log(
+        ` - Order orderId ${order.orderId}, ${order.side}, ${order.price}, ${
+          order.size
+        } ${order.openOrdersAddress.toBase58()}`,
+      );
+    }
+    await new Promise((r) => setTimeout(r, 500));
   }
 
   process.exit();

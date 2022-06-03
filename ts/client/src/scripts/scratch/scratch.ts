@@ -4,7 +4,7 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Market } from '@project-serum/serum';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 
-import { MangoClient } from '../client';
+import { MangoClient } from '../../client';
 
 const main = async () => {
   const options = AnchorProvider.defaultOptions();

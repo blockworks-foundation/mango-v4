@@ -3,6 +3,7 @@ import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
 import { Bank } from './bank';
+import { Group } from './group';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from './I80F48';
 export class MangoAccount {
   public tokens: TokenAccount[];
@@ -77,23 +78,27 @@ export class MangoAccount {
     return this.serum3.find((sa) => sa.marketIndex == marketIndex);
   }
 
-  getNativeDeposit(bank: Bank): I80F48 {
+  getNative(bank: Bank): I80F48 {
     const ta = this.findToken(bank.tokenIndex);
-    return ta ? bank.depositIndex.mul(ta?.indexedValue) : ZERO_I80F48;
+    return ta ? ta.native(bank) : ZERO_I80F48;
   }
 
-  getNativeBorrow(bank: Bank): I80F48 {
+  getUi(bank: Bank): number {
     const ta = this.findToken(bank.tokenIndex);
-    return ta ? bank.borrowIndex.mul(ta?.indexedValue) : ZERO_I80F48;
+    return ta ? ta.ui(bank) : 0;
   }
 
-  toString(): string {
+  tokens_active(): TokenAccount[] {
+    return this.tokens.filter((token) => token.isActive());
+  }
+
+  toString(group?: Group): string {
     return (
       'tokens:' +
       JSON.stringify(
-        this.tokens.filter(
-          (token) => token.tokenIndex != TokenAccount.TokenIndexUnset,
-        ),
+        this.tokens
+          .filter((token) => token.tokenIndex != TokenAccount.TokenIndexUnset)
+          .map((token) => token.toString(group)),
         null,
         4,
       ) +
@@ -134,8 +139,43 @@ export class TokenAccount {
     public inUseCount: number,
   ) {}
 
-  isActive(): boolean {
+  public isActive(): boolean {
     return this.tokenIndex !== 65535;
+  }
+
+  public native(bank: Bank): I80F48 {
+    if (this.indexedValue.isPos()) {
+      return bank.depositIndex.mul(this.indexedValue);
+    } else {
+      return bank.borrowIndex.mul(this.indexedValue);
+    }
+  }
+
+  public ui(bank: Bank): number {
+    return this.native(bank).toNumber() / Math.pow(10, bank.mintDecimals);
+  }
+
+  public toString(group?: Group): String {
+    let extra: string = '';
+    if (group) {
+      let bank = group.findBank(this.tokenIndex);
+      if (bank) {
+        let native = this.native(bank);
+        extra += ', native: ' + native.toNumber();
+        extra += ', ui: ' + this.ui(bank);
+        extra += ', tokenName: ' + bank.name;
+      }
+    }
+
+    return (
+      'tokenIndex: ' +
+      this.tokenIndex +
+      ', inUseCount: ' +
+      this.inUseCount +
+      ', indexedValue: ' +
+      this.indexedValue.toNumber() +
+      extra
+    );
   }
 }
 

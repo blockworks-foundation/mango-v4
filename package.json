@@ -10,7 +10,7 @@
     "clean": "rm -rf dist",
     "example1-user": "ts-node ts/client/src/scripts/example1-user.ts",
     "example1-admin": "ts-node ts/client/src/scripts/example1-admin.ts",
-    "scratch": "ts-node ts/client/src/scripts/scratch.ts",
+    "scratch": "ts-node ts/client/src/scripts/scratch/scratch.ts",
     "format": "prettier --check .",
     "lint": "eslint . --ext ts --ext tsx --ext js --quiet",
     "type-check": "tsc --pretty --noEmit",

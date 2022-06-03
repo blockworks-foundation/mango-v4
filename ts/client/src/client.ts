@@ -385,7 +385,7 @@ export class MangoClient {
       await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     return await this.program.methods
-      .withdraw(new BN(amount), allowBorrow)
+      .withdraw(toNativeDecimals(amount, bank.mintDecimals), allowBorrow)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
