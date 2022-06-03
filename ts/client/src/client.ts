@@ -36,7 +36,6 @@ import {
   Serum3SelfTradeBehavior,
   Serum3Side,
 } from './accounts/serum3';
-import { getTokenDecimals } from './constants/tokens';
 import { IDL, MangoV4 } from './mango_v4';
 import { MarginTradeWithdraw } from './types';
 import {
@@ -345,10 +344,8 @@ export class MangoClient {
     const healthRemainingAccounts: PublicKey[] =
       await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
-    const tokenDecimals = getTokenDecimals(tokenName);
-
     return await this.program.methods
-      .deposit(toNativeDecimals(amount, tokenDecimals))
+      .deposit(toNativeDecimals(amount, bank.mintDecimals))
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
