@@ -27,7 +27,6 @@ pub struct PerpMarket {
     pub event_queue: Pubkey,
 
     /// Number of quote native that reresents min tick
-    /// e.g. when base lot size is 100, and quote lot size is 10, then tick i.e. price increment is 10/100 i.e. 0.1
     pub quote_lot_size: i64,
 
     /// Represents number of base native quantity
