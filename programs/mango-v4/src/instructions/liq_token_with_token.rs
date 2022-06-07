@@ -3,8 +3,8 @@ use fixed::types::I80F48;
 use std::cmp::min;
 
 use crate::error::*;
+use crate::state::ScanningAccountRetriever;
 use crate::state::*;
-use crate::state::{oracle_price, ScanningAccountRetriever};
 use crate::util::checked_math as cm;
 
 #[derive(Accounts)]
@@ -35,7 +35,7 @@ pub fn liq_token_with_token(
     let group_pk = &ctx.accounts.group.key();
 
     require!(asset_token_index != liab_token_index, MangoError::SomeError);
-    let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)?;
+    let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)?;
 
     let mut liqor = ctx.accounts.liqor.load_mut()?;
     require!(liqor.is_bankrupt == 0, MangoError::IsBankrupt);
@@ -67,12 +67,8 @@ pub fn liq_token_with_token(
         //
         // This must happen _after_ the health computation, since immutable borrows of
         // the bank are not allowed at the same time.
-        let (mut asset_bank, asset_oracle) =
-            account_retriever.bank_mut_and_oracle(asset_token_index)?;
-        let (mut liab_bank, liab_oracle) =
-            account_retriever.bank_mut_and_oracle(liab_token_index)?;
-        let asset_price = oracle_price(asset_oracle, asset_bank.mint_decimals)?;
-        let liab_price = oracle_price(liab_oracle, liab_bank.mint_decimals)?;
+        let (asset_bank, liab_bank, asset_price, liab_price) =
+            account_retriever.banks_mut_and_oracles(asset_token_index, liab_token_index)?;
 
         let liqee_assets_native = liqee
             .tokens

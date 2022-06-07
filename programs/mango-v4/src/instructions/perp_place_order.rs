@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::state::{
     compute_health_from_fixed_accounts, oracle_price, Book, EventQueue, Group, HealthType,
@@ -90,7 +91,7 @@ pub fn perp_place_order(
         let mut event_queue = ctx.accounts.event_queue.load_mut()?;
 
         let oracle_price = oracle_price(
-            &ctx.accounts.oracle.to_account_info(),
+            &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
             perp_market.base_token_decimals,
         )?;
 

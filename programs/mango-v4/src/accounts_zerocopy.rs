@@ -1,0 +1,213 @@
+use anchor_lang::prelude::*;
+use anchor_lang::ZeroCopy;
+use arrayref::array_ref;
+use std::cell::RefMut;
+use std::{cell::Ref, mem};
+
+/// Functions should prefer to work with AccountReader where possible, to abstract over
+/// AccountInfo and AccountSharedData. That way the functions become usable in the program
+/// and in client code.
+// NOTE: would love to use solana's ReadableAccount, but that's in solana_sdk -- unavailable for programs
+// TODO: Maybe have KeyedAccountReader that also includes fn key() -> &Pukey?
+pub trait AccountReader {
+    fn owner(&self) -> &Pubkey;
+    fn data(&self) -> &[u8];
+}
+
+/// A Ref to an AccountInfo - makes AccountInfo compatible with AccountReader
+pub struct AccountInfoRef<'a, 'info: 'a> {
+    pub key: &'info Pubkey,
+    pub owner: &'info Pubkey,
+    pub data: Ref<'a, &'info mut [u8]>,
+}
+
+impl<'a, 'info: 'a> AccountInfoRef<'a, 'info> {
+    pub fn borrow(account_info: &'a AccountInfo<'info>) -> Result<Self> {
+        Ok(Self {
+            key: account_info.key,
+            owner: account_info.owner,
+            data: account_info
+                .data
+                .try_borrow()
+                .map_err(|_| ProgramError::AccountBorrowFailed)?,
+            // Why is the following not acceptable?
+            //data: account_info.try_borrow_data()?,
+        })
+    }
+}
+
+pub struct AccountInfoRefMut<'a, 'info: 'a> {
+    pub key: &'info Pubkey,
+    pub owner: &'info Pubkey,
+    pub data: RefMut<'a, &'info mut [u8]>,
+}
+
+impl<'a, 'info: 'a> AccountInfoRefMut<'a, 'info> {
+    pub fn borrow(account_info: &'a AccountInfo<'info>) -> Result<Self> {
+        Ok(Self {
+            key: account_info.key,
+            owner: account_info.owner,
+            data: account_info
+                .data
+                .try_borrow_mut()
+                .map_err(|_| ProgramError::AccountBorrowFailed)?,
+        })
+    }
+}
+
+impl<'info, 'a> AccountReader for AccountInfoRef<'info, 'a> {
+    fn owner(&self) -> &Pubkey {
+        self.owner
+    }
+
+    fn data(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+impl<'info, 'a> AccountReader for AccountInfoRefMut<'info, 'a> {
+    fn owner(&self) -> &Pubkey {
+        self.owner
+    }
+
+    fn data(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+//
+// Common traits for loading from account data.
+//
+
+pub trait LoadZeroCopy {
+    /// Using AccountLoader forces a AccountInfo.clone() and then binds the loaded
+    /// lifetime to the AccountLoader's lifetime. This function avoids both.
+    /// It checks the account owner and discriminator, then casts the data.
+    fn load<T: ZeroCopy + Owner>(&self) -> Result<&T>;
+
+    /// Same as load(), but doesn't check the discriminator or owner.
+    fn load_fully_unchecked<T: ZeroCopy + Owner>(&self) -> Result<&T>;
+}
+
+pub trait LoadMutZeroCopy {
+    /// Same as load(), but mut
+    fn load_mut<T: ZeroCopy + Owner>(&mut self) -> Result<&mut T>;
+
+    /// Same as load_fully_unchecked(), but mut
+    fn load_mut_fully_unchecked<T: ZeroCopy + Owner>(&mut self) -> Result<&mut T>;
+}
+
+pub trait LoadZeroCopyRef {
+    /// Using AccountLoader forces a AccountInfo.clone() and then binds the loaded
+    /// lifetime to the AccountLoader's lifetime. This function avoids both.
+    /// It checks the account owner and discriminator, then casts the data.
+    fn load<T: ZeroCopy + Owner>(&self) -> Result<Ref<T>>;
+
+    /// Same as load(), but doesn't check the discriminator or owner.
+    fn load_fully_unchecked<T: ZeroCopy + Owner>(&self) -> Result<Ref<T>>;
+}
+
+pub trait LoadMutZeroCopyRef {
+    /// Same as load(), but mut
+    fn load_mut<T: ZeroCopy + Owner>(&self) -> Result<RefMut<T>>;
+
+    /// Same as load_fully_unchecked(), but mut
+    fn load_mut_fully_unchecked<T: ZeroCopy + Owner>(&self) -> Result<RefMut<T>>;
+}
+
+impl<A: AccountReader> LoadZeroCopy for A {
+    fn load<T: ZeroCopy + Owner>(&self) -> Result<&T> {
+        if self.owner() != &T::owner() {
+            return Err(ErrorCode::AccountOwnedByWrongProgram.into());
+        }
+
+        let data = self.data();
+        let disc_bytes = array_ref![data, 0, 8];
+        if disc_bytes != &T::discriminator() {
+            return Err(ErrorCode::AccountDiscriminatorMismatch.into());
+        }
+
+        Ok(bytemuck::from_bytes(&data[8..mem::size_of::<T>() + 8]))
+    }
+
+    fn load_fully_unchecked<T: ZeroCopy + Owner>(&self) -> Result<&T> {
+        Ok(bytemuck::from_bytes(
+            &self.data()[8..mem::size_of::<T>() + 8],
+        ))
+    }
+}
+
+impl<'info, 'a> LoadMutZeroCopy for AccountInfoRefMut<'info, 'a> {
+    fn load_mut<T: ZeroCopy + Owner>(&mut self) -> Result<&mut T> {
+        if self.owner != &T::owner() {
+            return Err(ErrorCode::AccountOwnedByWrongProgram.into());
+        }
+
+        let disc_bytes = array_ref![self.data, 0, 8];
+        if disc_bytes != &T::discriminator() {
+            return Err(ErrorCode::AccountDiscriminatorMismatch.into());
+        }
+
+        Ok(bytemuck::from_bytes_mut(
+            &mut self.data[8..mem::size_of::<T>() + 8],
+        ))
+    }
+
+    fn load_mut_fully_unchecked<T: ZeroCopy + Owner>(&mut self) -> Result<&mut T> {
+        Ok(bytemuck::from_bytes_mut(
+            &mut self.data[8..mem::size_of::<T>() + 8],
+        ))
+    }
+}
+
+impl<'info> LoadZeroCopyRef for AccountInfo<'info> {
+    fn load<T: ZeroCopy + Owner>(&self) -> Result<Ref<T>> {
+        if self.owner != &T::owner() {
+            return Err(ErrorCode::AccountOwnedByWrongProgram.into());
+        }
+
+        let data = self.try_borrow_data()?;
+
+        let disc_bytes = array_ref![data, 0, 8];
+        if disc_bytes != &T::discriminator() {
+            return Err(ErrorCode::AccountDiscriminatorMismatch.into());
+        }
+
+        Ok(Ref::map(data, |data| {
+            bytemuck::from_bytes(&data[8..mem::size_of::<T>() + 8])
+        }))
+    }
+
+    fn load_fully_unchecked<T: ZeroCopy + Owner>(&self) -> Result<Ref<T>> {
+        let data = self.try_borrow_data()?;
+        Ok(Ref::map(data, |data| {
+            bytemuck::from_bytes(&data[8..mem::size_of::<T>() + 8])
+        }))
+    }
+}
+
+impl<'info> LoadMutZeroCopyRef for AccountInfo<'info> {
+    fn load_mut<T: ZeroCopy + Owner>(&self) -> Result<RefMut<T>> {
+        if self.owner != &T::owner() {
+            return Err(ErrorCode::AccountOwnedByWrongProgram.into());
+        }
+
+        let data = self.try_borrow_mut_data()?;
+
+        let disc_bytes = array_ref![data, 0, 8];
+        if disc_bytes != &T::discriminator() {
+            return Err(ErrorCode::AccountDiscriminatorMismatch.into());
+        }
+
+        Ok(RefMut::map(data, |data| {
+            bytemuck::from_bytes_mut(&mut data[8..mem::size_of::<T>() + 8])
+        }))
+    }
+
+    fn load_mut_fully_unchecked<T: ZeroCopy + Owner>(&self) -> Result<RefMut<T>> {
+        let data = self.try_borrow_mut_data()?;
+        Ok(RefMut::map(data, |data| {
+            bytemuck::from_bytes_mut(&mut data[8..mem::size_of::<T>() + 8])
+        }))
+    }
+}

@@ -6,18 +6,24 @@ use std::cmp::min;
 use std::convert::identity;
 use std::mem::size_of;
 
+use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::state::*;
 
 /// Serum padding is "serum" + data + "padding"
-fn strip_dex_padding<'a>(acc: &'a AccountInfo) -> Result<Ref<'a, [u8]>> {
+fn strip_dex_padding<'a>(data: &[u8]) -> Result<&[u8]> {
+    require!(data.len() >= 12, MangoError::SomeError);
+    Ok(&data[5..data.len() - 7])
+}
+
+fn strip_dex_padding_ref<'a>(acc: &'a AccountInfo) -> Result<Ref<'a, [u8]>> {
     require!(acc.data_len() >= 12, MangoError::SomeError);
     Ok(Ref::map(acc.try_borrow_data()?, |data| {
         &data[5..data.len() - 7]
     }))
 }
 
-fn strip_dex_padding_mut<'a>(acc: &'a AccountInfo) -> Result<RefMut<'a, [u8]>> {
+fn strip_dex_padding_ref_mut<'a>(acc: &'a AccountInfo) -> Result<RefMut<'a, [u8]>> {
     require!(acc.data_len() >= 12, MangoError::SomeError);
     Ok(RefMut::map(acc.try_borrow_mut_data()?, |data| {
         let len = data.len();
@@ -49,7 +55,7 @@ pub fn load_market_state<'a>(
 ) -> Result<Ref<'a, serum_dex::state::MarketState>> {
     require!(market_account.owner == program_id, MangoError::SomeError);
     let state: Ref<serum_dex::state::MarketState> =
-        Ref::map(strip_dex_padding(market_account)?, |data| {
+        Ref::map(strip_dex_padding_ref(market_account)?, |data| {
             bytemuck::from_bytes(data)
         });
     state
@@ -75,7 +81,7 @@ pub fn load_bids_mut<'a>(
         bids.key.to_aligned_bytes() == identity(sm.bids),
         MangoError::SomeError
     );
-    let orig_data = strip_dex_padding_mut(bids)?;
+    let orig_data = strip_dex_padding_ref_mut(bids)?;
     let (header, buf) = strip_data_header_mut::<OrderBookStateHeader, u8>(orig_data)?;
     require!(
         header.account_flags
@@ -94,7 +100,7 @@ pub fn load_asks_mut<'a>(
         asks.key.to_aligned_bytes() == identity(sm.asks),
         MangoError::SomeError
     );
-    let orig_data = strip_dex_padding_mut(asks)?;
+    let orig_data = strip_dex_padding_ref_mut(asks)?;
     let (header, buf) = strip_data_header_mut::<OrderBookStateHeader, u8>(orig_data)?;
     require!(
         header.account_flags
@@ -105,8 +111,14 @@ pub fn load_asks_mut<'a>(
     Ok(RefMut::map(buf, serum_dex::critbit::Slab::new))
 }
 
-pub fn load_open_orders<'a>(acc: &'a AccountInfo) -> Result<Ref<'a, serum_dex::state::OpenOrders>> {
-    Ok(Ref::map(strip_dex_padding(acc)?, bytemuck::from_bytes))
+pub fn load_open_orders_ref<'a>(
+    acc: &'a AccountInfo,
+) -> Result<Ref<'a, serum_dex::state::OpenOrders>> {
+    Ok(Ref::map(strip_dex_padding_ref(acc)?, bytemuck::from_bytes))
+}
+
+pub fn load_open_orders<'a>(acc: &impl AccountReader) -> Result<&serum_dex::state::OpenOrders> {
+    Ok(bytemuck::from_bytes(strip_dex_padding(acc.data())?))
 }
 
 pub fn pubkey_from_u64_array(d: [u64; 4]) -> Pubkey {
@@ -318,7 +330,7 @@ impl<'a> CancelOrder<'a> {
         // find all cancels by scanning open_orders/bids/asks
         let mut cancels = vec![];
         {
-            let open_orders = load_open_orders(&self.open_orders)?;
+            let open_orders = load_open_orders_ref(&self.open_orders)?;
             let market = load_market_state(&self.market, self.program.key)?;
             let bids = load_bids_mut(&market, &self.bids)?;
             let asks = load_asks_mut(&market, &self.asks)?;

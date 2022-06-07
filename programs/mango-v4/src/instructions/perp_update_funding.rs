@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+use crate::accounts_zerocopy::*;
 use crate::state::{oracle_price, Book, PerpMarket};
 
 #[derive(Accounts)]
@@ -28,7 +29,7 @@ pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
     let book = Book::load_mut(bids, asks, &perp_market)?;
 
     let oracle_price = oracle_price(
-        &ctx.accounts.oracle.to_account_info(),
+        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
         perp_market.base_token_decimals,
     )?;
 

@@ -1,5 +1,6 @@
 use std::cell::RefMut;
 
+use crate::accounts_zerocopy::*;
 use crate::{
     error::MangoError,
     state::{
@@ -7,7 +8,6 @@ use crate::{
         EventQueue, MangoAccount, MangoAccountPerps, PerpMarket, FREE_ORDER_SLOT,
         MAX_PERP_OPEN_ORDERS,
     },
-    util::LoadZeroCopy,
 };
 use anchor_lang::prelude::*;
 use bytemuck::cast;
