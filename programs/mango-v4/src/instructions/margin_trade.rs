@@ -110,6 +110,8 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     msg!("pre_cpi_health {:?}", pre_cpi_health);
 
     let cpi_program_id = *ctx.remaining_accounts[num_health_accounts].key;
+    require_keys_neq!(cpi_program_id, crate::id(), MangoError::SomeError);
+
     let cpi_ais = &ctx.remaining_accounts[num_health_accounts + 1..];
     let mut cpi_ams = cpi_ais
         .iter()
