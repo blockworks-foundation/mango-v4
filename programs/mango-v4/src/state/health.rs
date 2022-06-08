@@ -43,14 +43,14 @@ pub trait AccountRetriever {
 /// 2. n_banks oracle accounts, one for each bank in the same order
 /// 3. PerpMarket accounts, in the order of account.perps.iter_active_accounts()
 /// 4. serum3 OpenOrders accounts, in the order of account.serum3.iter_active()
-pub struct FixedOrderAccountRetriever<'a, 'info> {
-    ais: Vec<AccountInfoRef<'a, 'info>>,
+pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
+    ais: Vec<T>,
     n_banks: usize,
     begin_perp: usize,
     begin_serum3: usize,
 }
 
-impl<'a, 'info> AccountRetriever for FixedOrderAccountRetriever<'a, 'info> {
+impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
     fn bank_and_oracle(
         &self,
         group: &Pubkey,
@@ -61,7 +61,7 @@ impl<'a, 'info> AccountRetriever for FixedOrderAccountRetriever<'a, 'info> {
         require!(&bank.group == group, MangoError::SomeError);
         require!(bank.token_index == token_index, MangoError::SomeError);
         let oracle = &self.ais[cm!(self.n_banks + account_index)];
-        require!(&bank.oracle == oracle.key, MangoError::SomeError);
+        require!(&bank.oracle == oracle.key(), MangoError::SomeError);
         Ok((bank, oracle_price(oracle, bank.mint_decimals)?))
     }
 
@@ -83,7 +83,7 @@ impl<'a, 'info> AccountRetriever for FixedOrderAccountRetriever<'a, 'info> {
 
     fn serum_oo(&self, account_index: usize, key: &Pubkey) -> Result<&OpenOrders> {
         let ai = &self.ais[cm!(self.begin_serum3 + account_index)];
-        require!(key == ai.key, MangoError::SomeError);
+        require!(key == ai.key(), MangoError::SomeError);
         serum3_cpi::load_open_orders(ai)
     }
 }

@@ -8,10 +8,14 @@ use std::{cell::Ref, mem};
 /// AccountInfo and AccountSharedData. That way the functions become usable in the program
 /// and in client code.
 // NOTE: would love to use solana's ReadableAccount, but that's in solana_sdk -- unavailable for programs
-// TODO: Maybe have KeyedAccountReader that also includes fn key() -> &Pukey?
 pub trait AccountReader {
     fn owner(&self) -> &Pubkey;
     fn data(&self) -> &[u8];
+}
+
+/// Like AccountReader, but can also get the account pubkey
+pub trait KeyedAccountReader: AccountReader {
+    fn key(&self) -> &Pubkey;
 }
 
 /// A Ref to an AccountInfo - makes AccountInfo compatible with AccountReader
@@ -72,6 +76,18 @@ impl<'info, 'a> AccountReader for AccountInfoRefMut<'info, 'a> {
 
     fn data(&self) -> &[u8] {
         &self.data
+    }
+}
+
+impl<'info, 'a> KeyedAccountReader for AccountInfoRef<'info, 'a> {
+    fn key(&self) -> &Pubkey {
+        self.key
+    }
+}
+
+impl<'info, 'a> KeyedAccountReader for AccountInfoRefMut<'info, 'a> {
+    fn key(&self) -> &Pubkey {
+        self.key
     }
 }
 
