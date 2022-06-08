@@ -621,7 +621,6 @@ fn compute_health_detail(
     })
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -851,21 +850,29 @@ mod tests {
             oo1.as_account_info(),
         ];
 
-        let retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
+        let mut retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
 
         assert_eq!(retriever.n_banks(), 2);
         assert_eq!(retriever.begin_serum3(), 5);
         assert_eq!(retriever.perp_index_map.len(), 1);
 
-        let (b1, o1) = retriever.bank_mut_and_oracle(1).unwrap();
-        assert_eq!(b1.token_index, 1);
-        assert_eq!(o1.key, ais[2].key);
+        {
+            let (b1, b2, o1, o2) = retriever.banks_mut_and_oracles(1, 4).unwrap();
+            assert_eq!(b1.token_index, 1);
+            assert_eq!(o1, I80F48::ONE);
+            assert_eq!(b2.token_index, 4);
+            assert_eq!(o2, 5 * I80F48::ONE);
+        }
 
-        let (b2, o2) = retriever.bank_mut_and_oracle(4).unwrap();
-        assert_eq!(b2.token_index, 4);
-        assert_eq!(o2.key, ais[3].key);
+        {
+            let (b1, b2, o1, o2) = retriever.banks_mut_and_oracles(4, 1).unwrap();
+            assert_eq!(b1.token_index, 4);
+            assert_eq!(o1, 5 * I80F48::ONE);
+            assert_eq!(b2.token_index, 1);
+            assert_eq!(o2, I80F48::ONE);
+        }
 
-        retriever.bank_mut_and_oracle(2).unwrap_err();
+        retriever.banks_mut_and_oracles(4, 2).unwrap_err();
 
         let oo = retriever.serum_oo(0, &oo1key).unwrap();
         assert_eq!(identity(oo.native_pc_total), 20);
@@ -1018,4 +1025,3 @@ mod tests {
         }
     }
 }
-*/
