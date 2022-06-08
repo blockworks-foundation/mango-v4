@@ -9,6 +9,7 @@ use anchor_lang::prelude::*;
 
 use instructions::*;
 
+pub mod accounts_zerocopy;
 pub mod address_lookup_table;
 pub mod error;
 pub mod instructions;

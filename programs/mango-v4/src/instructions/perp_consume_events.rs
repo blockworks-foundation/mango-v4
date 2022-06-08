@@ -1,12 +1,10 @@
 use anchor_lang::prelude::*;
 use bytemuck::cast_ref;
 
+use crate::accounts_zerocopy::*;
 use crate::error::MangoError;
 use crate::state::EventQueue;
-use crate::{
-    state::{EventType, FillEvent, Group, MangoAccount, OutEvent, PerpMarket},
-    util::LoadZeroCopy,
-};
+use crate::state::{EventType, FillEvent, Group, MangoAccount, OutEvent, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpConsumeEvents<'info> {

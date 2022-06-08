@@ -5,9 +5,9 @@ use anchor_lang::Discriminator;
 use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
 
+use crate::accounts_zerocopy::*;
 use crate::checked_math as cm;
 use crate::error::MangoError;
-use crate::util::LoadZeroCopy;
 
 pub const QUOTE_DECIMALS: i32 = 6;
 
@@ -38,8 +38,8 @@ pub fn determine_oracle_type(data: &[u8]) -> Result<OracleType> {
     Err(MangoError::UnknownOracleType.into())
 }
 
-pub fn oracle_price(acc_info: &AccountInfo, base_token_decimals: u8) -> Result<I80F48> {
-    let data = &acc_info.try_borrow_data()?;
+pub fn oracle_price(acc_info: &impl AccountReader, base_token_decimals: u8) -> Result<I80F48> {
+    let data = &acc_info.data();
     let oracle_type = determine_oracle_type(data)?;
 
     Ok(match oracle_type {
