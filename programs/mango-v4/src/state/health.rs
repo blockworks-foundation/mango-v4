@@ -44,10 +44,10 @@ pub trait AccountRetriever {
 /// 3. PerpMarket accounts, in the order of account.perps.iter_active_accounts()
 /// 4. serum3 OpenOrders accounts, in the order of account.serum3.iter_active()
 pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
-    ais: Vec<T>,
-    n_banks: usize,
-    begin_perp: usize,
-    begin_serum3: usize,
+    pub ais: Vec<T>,
+    pub n_banks: usize,
+    pub begin_perp: usize,
+    pub begin_serum3: usize,
 }
 
 impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {

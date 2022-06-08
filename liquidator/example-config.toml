@@ -24,6 +24,7 @@ parallel_rpc_requests = 10
 # Typically 100 for normal RPC nodes.
 get_multiple_accounts_count = 100
 
+# FUTURE: separate into a separate conf file? we are mixing feed + mango client conf in one place here
 # mango client specific
 payer = "/root/.config/solana/id.json"
 admin = "/root/.config/solana/admin.json"

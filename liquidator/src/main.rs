@@ -18,6 +18,7 @@ use std::fs::File;
 use std::io::Read;
 use std::str::FromStr;
 
+pub mod account_shared_data;
 pub mod chain_data;
 pub mod health;
 pub mod liquidate;
@@ -58,6 +59,7 @@ pub struct Config {
     // typically 100 is the max number for getMultipleAccounts
     pub get_multiple_accounts_count: usize,
 
+    // FUTURE: split mango client and feed config
     // mango client specific
     pub payer: String,
     pub admin: String,
@@ -69,8 +71,6 @@ pub fn encode_address(addr: &Pubkey) -> String {
 }
 
 #[tokio::main]
-// future: decouple feed setup and liquidator business logic
-// feed should send updates to a channel which liquidator can consume
 async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
@@ -85,6 +85,9 @@ async fn main() -> anyhow::Result<()> {
         toml::from_str(&contents).unwrap()
     };
 
+    //
+    // mango client setup
+    //
     let mango_client = {
         let payer = keypair::read_keypair_file(&config.payer).unwrap();
         let admin = keypair::read_keypair_file(&config.admin).unwrap();
@@ -110,6 +113,11 @@ async fn main() -> anyhow::Result<()> {
         .map(|value| value.1.oracle)
         .collect::<Vec<Pubkey>>();
 
+    //
+    // feed setup
+    //
+    // FUTURE: decouple feed setup and liquidator business logic
+    // feed should send updates to a channel which liquidator can consume
     let mango_program_id = Pubkey::from_str(&config.mango_program_id)?;
     let mango_group_id = Pubkey::from_str(&config.mango_group_id)?;
 
@@ -119,6 +127,7 @@ async fn main() -> anyhow::Result<()> {
     let metrics = metrics::start();
 
     // Sourcing account and slot data from solana via websockets
+    // FUTURE: websocket feed should take which accounts to listen to as an input
     let (websocket_sender, websocket_receiver) =
         async_channel::unbounded::<websocket_source::Message>();
     websocket_source::start(config.clone(), mango_pyth_oracles.clone(), websocket_sender);
@@ -131,6 +140,7 @@ async fn main() -> anyhow::Result<()> {
     // Getting solana account snapshots via jsonrpc
     let (snapshot_sender, snapshot_receiver) =
         async_channel::unbounded::<snapshot_source::AccountSnapshot>();
+    // FUTURE: of what to fetch a snapshot - should probably take as an input
     snapshot_source::start(config.clone(), mango_pyth_oracles, snapshot_sender);
 
     // The representation of current on-chain account data

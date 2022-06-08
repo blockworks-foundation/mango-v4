@@ -11,7 +11,7 @@ use solana_rpc::rpc_pubsub::RpcSolPubSubClient;
 use solana_sdk::{account::AccountSharedData, commitment_config::CommitmentConfig, pubkey::Pubkey};
 
 use log::*;
-use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
+use std::{str::FromStr, sync::Arc, time::Duration};
 use tokio_stream::StreamMap;
 
 use crate::{AnyhowWrap, Config};

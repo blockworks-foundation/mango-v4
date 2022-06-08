@@ -12,7 +12,7 @@ use solana_sdk::{account::AccountSharedData, commitment_config::CommitmentConfig
 use anyhow::Context;
 use futures::{stream, StreamExt};
 use log::*;
-use std::{collections::HashSet, str::FromStr};
+use std::str::FromStr;
 use tokio::time;
 
 use crate::{liquidate, AnyhowWrap, Config};
@@ -75,7 +75,7 @@ async fn feed_snapshots(
     sender: &async_channel::Sender<AccountSnapshot>,
 ) -> anyhow::Result<()> {
     let mango_program_id = Pubkey::from_str(&config.mango_program_id)?;
-    let pyth_program_id = Pubkey::from_str(&config.pyth_program_id)?;
+    let _pyth_program_id = Pubkey::from_str(&config.pyth_program_id)?;
 
     let rpc_client = http::connect_with_options::<AccountsDataClient>(&config.rpc_http_url, true)
         .await
@@ -141,12 +141,6 @@ async fn feed_snapshots(
                 .context("error during getMultipleAccounts for Pyth Oracles")?,
         )?;
     }
-
-    // if let OptionalContext::Context(account_snapshot_response) = response {
-    //     snapshot.extend_from_gpa_rpc(account_snapshot_response)?;
-    // } else {
-    //     anyhow::bail!("did not receive context");
-    // }
 
     // Get all the active open orders account keys
     let oo_account_pubkeys = snapshot

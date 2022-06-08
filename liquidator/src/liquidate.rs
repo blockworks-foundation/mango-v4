@@ -1,12 +1,12 @@
 use std::{collections::HashMap, str::FromStr};
 
-use crate::{cm, health::FixedOrderAccountRetrieverForAccountSharedData};
+use crate::{account_shared_data::AccountSharedDataRef, cm};
 
 use arrayref::array_ref;
 use client::MangoClient;
 use mango_v4::state::{
-    determine_oracle_type, Bank, HealthType, MangoAccount, MintInfo, OracleType, PerpMarketIndex,
-    StubOracle, TokenIndex, QUOTE_DECIMALS,
+    compute_health, oracle_price, Bank, FixedOrderAccountRetriever, HealthType, MangoAccount,
+    MintInfo, PerpMarketIndex, TokenIndex,
 };
 
 use {
@@ -60,7 +60,7 @@ fn load_mango_account_from_chain<
     )
 }
 
-pub fn compute_health(
+pub fn compute_health_(
     chain_data: &ChainData,
     mint_infos: &HashMap<TokenIndex, Pubkey>,
     perp_markets: &HashMap<PerpMarketIndex, Pubkey>,
@@ -95,16 +95,8 @@ pub fn compute_health(
         ));
     }
 
-    // collect OO for active serum markets
-    let mut serum_oos = account
-        .serum3
-        .iter_active()
-        .map(|&s| (s.open_orders, chain_data.account(&s.open_orders).unwrap()))
-        .collect::<Vec<(Pubkey, &AccountSharedData)>>();
-    let serum_len = serum_oos.len();
-
     // collect active perp markets
-    let mut perp_markets_ = account
+    let mut perp_markets = account
         .perps
         .iter_active_accounts()
         .map(|&s| {
@@ -122,25 +114,31 @@ pub fn compute_health(
             )
         })
         .collect::<Vec<(Pubkey, &AccountSharedData)>>();
+    let active_perp_len = perp_markets.len();
 
-    let banks_len = banks.len();
-    let oracles_len = oracles.len();
+    // collect OO for active serum markets
+    let mut serum_oos = account
+        .serum3
+        .iter_active()
+        .map(|&s| (s.open_orders, chain_data.account(&s.open_orders).unwrap()))
+        .collect::<Vec<(Pubkey, &AccountSharedData)>>();
+
+    let active_token_len = banks.len();
     health_accounts.append(&mut banks);
     health_accounts.append(&mut oracles);
+    health_accounts.append(&mut perp_markets);
     health_accounts.append(&mut serum_oos);
-    health_accounts.append(&mut perp_markets_);
 
-    let retriever = FixedOrderAccountRetrieverForAccountSharedData {
-        ais: &health_accounts[..],
-        n_banks: banks_len,
-        begin_serum3: cm!(banks_len + oracles_len),
-        begin_perp: cm!(banks_len + oracles_len + serum_len),
+    let retriever = FixedOrderAccountRetriever {
+        ais: health_accounts
+            .into_iter()
+            .map(|asd| AccountSharedDataRef::borrow(asd.0, asd.1))
+            .collect::<anchor_lang::Result<Vec<_>>>()?,
+        n_banks: active_token_len,
+        begin_perp: cm!(active_token_len * 2),
+        begin_serum3: cm!(active_token_len * 2 + active_perp_len),
     };
-
-    let health_cache = crate::health::compute_health_detail(account, &retriever, health_type, true)
-        .expect("error building health cache");
-
-    health_cache.health(health_type)
+    compute_health(account, health_type, &retriever)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -161,7 +159,8 @@ pub fn process_accounts<'a>(
             }
         };
 
-        let maint_health = compute_health(
+        // compute maint health for account
+        let maint_health = compute_health_(
             chain_data,
             mint_infos,
             perp_markets,
@@ -170,6 +169,7 @@ pub fn process_accounts<'a>(
         )
         .expect("always ok");
 
+        // try liquidating
         if maint_health.is_negative() {
             // find asset and liab tokens
             let mut tokens = account
@@ -181,40 +181,28 @@ pub fn process_accounts<'a>(
                         load_mango_account_from_chain::<MintInfo>(chain_data, mint_info_pk)?;
                     let bank = load_mango_account_from_chain::<Bank>(chain_data, &mint_info.bank)?;
                     let oracle = chain_data.account(&mint_info.oracle)?;
-                    // TODO: refactor oracle.rs in program code to work on just plain &[u8]] and not just AccountInfo
-                    let price = {
-                        let oracle_type = determine_oracle_type(oracle.data())?;
-                        match oracle_type {
-                            OracleType::Stub => load_mango_account::<StubOracle>(oracle)?.price,
-                            OracleType::Pyth => {
-                                let price_struct =
-                                    pyth_sdk_solana::load_price(oracle.data()).unwrap();
-                                let price = I80F48::from_num(price_struct.price);
-                                let decimals = (price_struct.expo as i32)
-                                    .checked_add(QUOTE_DECIMALS)
-                                    .unwrap()
-                                    .checked_sub(bank.mint_decimals as i32)
-                                    .unwrap();
-                                let decimal_adj =
-                                    I80F48::from_num(10_u32.pow(decimals.abs() as u32));
-                                if decimals < 0 {
-                                    cm!(price / decimal_adj)
-                                } else {
-                                    cm!(price * decimal_adj)
-                                }
-                            }
-                        }
-                    };
+                    let price = oracle_price(
+                        &AccountSharedDataRef::borrow(mint_info.oracle, &oracle)?,
+                        bank.mint_decimals,
+                    )?;
                     Ok((token.token_index, bank, token.native(bank) * price))
                 })
                 .collect::<anyhow::Result<Vec<(TokenIndex, &Bank, I80F48)>>>()?;
             tokens.sort_by(|a, b| a.2.cmp(&b.2));
             if tokens.len() < 2 {
-                continue;
+                anyhow::bail!(format!(
+                    "mango account {}, has less than 2 active tokens",
+                    pubkey
+                ));
             }
             let (asset_token_index, _asset_bank, _asset_price) = tokens.last().unwrap();
             let (liab_token_index, _liab_bank, _liab_price) = tokens.first().unwrap();
 
+            //
+            // TODO: log liqor's assets in UI form
+            // TODO: log liquee's liab_needed, need to refactor program code to be able to be accessed from client side
+            // TODO: swap inherited liabs to desired asset for liqor
+            //
             let sig = mango_client.liq_token_with_token(
                 (pubkey, account),
                 *asset_token_index,
