@@ -183,7 +183,7 @@ export class MangoClient {
 
   public async setStubOracle(
     group: Group,
-    mintPk: PublicKey,
+    oraclePk: PublicKey,
     price: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
@@ -191,7 +191,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
-        oracle: mintPk,
+        oracle: oraclePk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .rpc();
@@ -963,6 +963,21 @@ export class MangoClient {
       .signers(signers)
       .rpc({ skipPreflight: true });
   }
+
+  /// liquidations
+
+  // TODO
+  // async liqTokenWithToken(
+  //   assetTokenIndex: number,
+  //   liabTokenIndex: number,
+  //   maxLiabTransfer: number,
+  // ): Promise<TransactionSignature> {
+  //   return await this.program.methods
+  //     .liqTokenWithToken(assetTokenIndex, liabTokenIndex, {
+  //       val: I80F48.fromNumber(maxLiabTransfer).getData(),
+  //     })
+  //     .rpc();
+  // }
 
   /// static
 

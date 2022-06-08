@@ -8,8 +8,12 @@ use anchor_lang::{AccountDeserialize, Id};
 use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::{Mint, Token};
 
+use fixed::types::I80F48;
+use itertools::Itertools;
 use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
-use mango_v4::state::{Bank, MangoAccount, MintInfo, PerpMarket, Serum3Market, TokenIndex};
+use mango_v4::state::{
+    Bank, MangoAccount, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market, TokenIndex,
+};
 
 use solana_client::rpc_client::RpcClient;
 
@@ -38,6 +42,7 @@ pub struct MangoClient {
     pub serum3_markets_cache: HashMap<String, (Pubkey, Serum3Market)>,
     pub serum3_external_markets_cache: HashMap<String, (Pubkey, Vec<u8>)>,
     pub perp_markets_cache: HashMap<String, (Pubkey, PerpMarket)>,
+    pub perp_markets_cache_by_perp_market_index: HashMap<PerpMarketIndex, (Pubkey, PerpMarket)>,
 }
 
 // TODO: add retry framework for sending tx and rpc calls
@@ -51,7 +56,7 @@ impl MangoClient {
         commitment: CommitmentConfig,
         payer: Keypair,
         admin: Keypair,
-        mango_account_name: String,
+        mango_account_name: &str,
     ) -> anyhow::Result<Self> {
         let program =
             Client::new_with_options(cluster.clone(), std::rc::Rc::new(payer.clone()), commitment)
@@ -68,11 +73,6 @@ impl MangoClient {
             &program.id(),
         )
         .0;
-
-        log::info!("Program Id {}", program.id());
-        log::info!("Admin {}", admin.pubkey());
-        log::info!("Group {}", group);
-        log::info!("User {}", payer.pubkey());
 
         // Mango Account
         let mut mango_account_tuples = program.accounts::<MangoAccount>(vec![
@@ -146,7 +146,7 @@ impl MangoClient {
         ])?;
         let index = mango_account_tuples
             .iter()
-            .position(|tuple| tuple.1.name() == &mango_account_name)
+            .position(|tuple| tuple.1.name() == mango_account_name)
             .unwrap();
         let mango_account_cache = mango_account_tuples[index];
 
@@ -211,6 +211,7 @@ impl MangoClient {
 
         // perp markets cache
         let mut perp_markets_cache = HashMap::new();
+        let mut perp_markets_cache_by_perp_market_index = HashMap::new();
         let perp_market_tuples =
             program.accounts::<PerpMarket>(vec![RpcFilterType::Memcmp(Memcmp {
                 offset: 24,
@@ -219,6 +220,7 @@ impl MangoClient {
             })])?;
         for (k, v) in perp_market_tuples {
             perp_markets_cache.insert(v.name().to_owned(), (k, v));
+            perp_markets_cache_by_perp_market_index.insert(v.perp_market_index, (k, v));
         }
 
         Ok(Self {
@@ -236,6 +238,7 @@ impl MangoClient {
             serum3_markets_cache,
             serum3_external_markets_cache,
             perp_markets_cache,
+            perp_markets_cache_by_perp_market_index,
         })
     }
 
@@ -318,6 +321,12 @@ impl MangoClient {
         }
 
         let serum_oos = account.1.serum3.iter_active().map(|&s| s.open_orders);
+        let perp_markets = account.1.perps.iter_active_accounts().map(|&pa| {
+            self.perp_markets_cache_by_perp_market_index
+                .get(&pa.market_index)
+                .unwrap()
+                .0
+        });
 
         Ok(banks
             .iter()
@@ -336,6 +345,83 @@ impl MangoClient {
                 is_writable: false,
                 is_signer: false,
             }))
+            .chain(perp_markets.map(|pubkey| AccountMeta {
+                pubkey,
+                is_writable: false,
+                is_signer: false,
+            }))
+            .collect())
+    }
+
+    pub fn derive_liquidation_health_check_remaining_account_metas(
+        &self,
+        liqee: &MangoAccount,
+        asset_token_index: TokenIndex,
+        liab_token_index: TokenIndex,
+    ) -> Result<Vec<AccountMeta>, anchor_client::ClientError> {
+        // figure out all the banks/oracles that need to be passed for the health check
+        let mut banks = vec![];
+        let mut oracles = vec![];
+        let account = self.get_account()?;
+
+        let token_indexes = liqee
+            .tokens
+            .iter_active()
+            .chain(account.1.tokens.iter_active())
+            .map(|ta| ta.token_index)
+            .unique();
+
+        for token_index in token_indexes {
+            let mint_info = self
+                .mint_infos_cache_by_token_index
+                .get(&token_index)
+                .unwrap()
+                .1;
+            let writable_bank = token_index == asset_token_index || token_index == liab_token_index;
+            // TODO: ALTs are unavailable
+            // let lookup_table = account_loader
+            //     .load_bytes(&mint_info.address_lookup_table)
+            //     .await
+            //     .unwrap();
+            // let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
+            // banks.push(addresses[mint_info.address_lookup_table_bank_index as usize]);
+            // oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
+            banks.push((mint_info.bank, writable_bank));
+            oracles.push(mint_info.oracle);
+        }
+
+        let serum_oos = liqee
+            .serum3
+            .iter_active()
+            .chain(account.1.serum3.iter_active())
+            .map(|&s| s.open_orders);
+        let perp_markets = liqee
+            .perps
+            .iter_active_accounts()
+            .chain(account.1.perps.iter_active_accounts())
+            .map(|&pa| {
+                self.perp_markets_cache_by_perp_market_index
+                    .get(&pa.market_index)
+                    .unwrap()
+                    .0
+            });
+
+        let to_account_meta = |pubkey| AccountMeta {
+            pubkey,
+            is_writable: false,
+            is_signer: false,
+        };
+
+        Ok(banks
+            .iter()
+            .map(|(pubkey, is_writable)| AccountMeta {
+                pubkey: *pubkey,
+                is_writable: *is_writable,
+                is_signer: false,
+            })
+            .chain(oracles.into_iter().map(to_account_meta))
+            .chain(serum_oos.map(to_account_meta))
+            .chain(perp_markets.map(to_account_meta))
             .collect())
     }
 
@@ -771,8 +857,51 @@ impl MangoClient {
     //
 
     //
+    // Liquidation
     //
-    //
+
+    pub fn liq_token_with_token(
+        &self,
+        liqee: (&Pubkey, &MangoAccount),
+        asset_token_index: TokenIndex,
+        liab_token_index: TokenIndex,
+        max_liab_transfer: I80F48,
+    ) -> Result<Signature, anchor_client::ClientError> {
+        let health_remaining_ams = self
+            .derive_liquidation_health_check_remaining_account_metas(
+                liqee.1,
+                asset_token_index,
+                liab_token_index,
+            )
+            .unwrap();
+
+        self.program()
+            .request()
+            .instruction(Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        &mango_v4::accounts::LiqTokenWithToken {
+                            group: self.group(),
+                            liqee: *liqee.0,
+                            liqor: self.mango_account_cache.0,
+                            liqor_owner: self.payer.pubkey(),
+                        },
+                        None,
+                    );
+                    ams.extend(health_remaining_ams);
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(
+                    &mango_v4::instruction::LiqTokenWithToken {
+                        asset_token_index,
+                        liab_token_index,
+                        max_liab_transfer,
+                    },
+                ),
+            })
+            .send()
+    }
 }
 
 fn from_serum_style_pubkey(d: &[u64; 4]) -> Pubkey {

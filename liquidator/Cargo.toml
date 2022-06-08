@@ -4,43 +4,39 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
-jsonrpc-core = "18.0.0"
-jsonrpc-core-client = { version = "18.0.0", features = ["ws", "http", "tls"] }
-
-solana-rpc = "~1.9.24"
-solana-client = "~1.9.13"
-solana-account-decoder = "~1.9.13"
-solana-sdk = "~1.9.13"
-solana-logger = "~1.9.13"
-
-mango-v4 = { path = "../programs/mango-v4" } 
-# mango = { git = "https://github.com/blockworks-foundation/mango-v3", gitref = "f4294688fb00ff18b2bf0b730d79ce005f7d124e", features = ["client"] }
-# mango-common = { git = "https://github.com/blockworks-foundation/mango-v3", gitref = "f4294688fb00ff18b2bf0b730d79ce005f7d124e" }
-
-serum_dex = { version = "0.4.0", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false, features = ["no-entrypoint", "program"] }
-
-tokio = { version = "1", features = ["full"] }
-tokio-tungstenite = "0.16.1"
-
-serde = "1.0.130"
-serde_derive = "1.0.130"
-serde_json = "1.0.68"
-
-bs58 = "0.3.1"
-log = "0.4"
-rand = "0.7"
+anchor-client = "0.24.2"
+anchor-lang = "0.24.2"
 anyhow = "1.0"
-fixed = { version = "=1.11.0", features = ["serde"] }
-bytes = "1.0"
-toml = "0.5"
+arrayref = "0.3.6"
+async-channel = "1.6"
+async-stream = "0.2"
+async-trait = "0.1"
+bs58 = "0.3.1"
 bytemuck = "^1.7.2"
-
+bytes = "1.0"
+checked_math = { path = "../lib/checked_math" }
+client = { path = "../client" } 
+fixed = { version = "=1.11.0", features = ["serde"] }
 futures = "0.3.17"
 futures-core = "0.3"
 futures-util = "0.3"
-
-async-stream = "0.2"
-async-channel = "1.6"
-async-trait = "0.1"
-
 jemallocator = "0.3.2"
+jsonrpc-core = "18.0.0"
+jsonrpc-core-client = { version = "18.0.0", features = ["ws", "http", "tls"] }
+log = "0.4"
+mango-v4 = { path = "../programs/mango-v4" } 
+pyth-sdk-solana = "0.1.0"
+rand = "0.7"
+serde = "1.0.130"
+serde_derive = "1.0.130"
+serde_json = "1.0.68"
+serum_dex = { version = "0.4.0", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false, features = ["no-entrypoint", "program"] }
+solana-account-decoder = "~1.9.13"
+solana-client = "~1.9.13"
+solana-logger = "~1.9.13"
+solana-rpc = "~1.9.24"
+solana-sdk = "~1.9.13"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1.9"}
+tokio-tungstenite = "0.16.1"
+toml = "0.5"

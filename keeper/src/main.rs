@@ -1,7 +1,5 @@
 mod crank;
-mod mango_client;
 mod taker;
-mod util;
 
 use std::env;
 use std::sync::Arc;
@@ -9,11 +7,9 @@ use std::sync::Arc;
 use anchor_client::Cluster;
 
 use clap::{Parser, Subcommand};
-
+use client::MangoClient;
 use solana_sdk::{commitment_config::CommitmentConfig, signer::keypair};
 use tokio::time;
-
-use crate::mango_client::MangoClient;
 
 // TODO
 // - may be nice to have one-shot cranking as well as the interval cranking
@@ -93,7 +89,7 @@ fn main() -> Result<(), anyhow::Error> {
         commitment,
         payer,
         admin,
-        mango_account_name,
+        &mango_account_name,
     )?);
 
     let rt = tokio::runtime::Builder::new_multi_thread()

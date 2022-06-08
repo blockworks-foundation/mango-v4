@@ -5,13 +5,14 @@ use solana_account_decoder::UiAccountEncoding;
 use solana_client::{
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
     rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType},
-    rpc_response::{Response, RpcKeyedAccount},
+    rpc_response::{Response, RpcKeyedAccount, RpcResponseContext},
 };
 use solana_rpc::rpc_pubsub::RpcSolPubSubClient;
 use solana_sdk::{account::AccountSharedData, commitment_config::CommitmentConfig, pubkey::Pubkey};
 
 use log::*;
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
+use tokio_stream::StreamMap;
 
 use crate::{AnyhowWrap, Config};
 
@@ -44,7 +45,11 @@ pub enum Message {
     Slot(Arc<solana_client::rpc_response::SlotUpdate>),
 }
 
-async fn feed_data(config: &Config, sender: async_channel::Sender<Message>) -> anyhow::Result<()> {
+async fn feed_data(
+    config: &Config,
+    mango_pyth_oracles: Vec<Pubkey>,
+    sender: async_channel::Sender<Message>,
+) -> anyhow::Result<()> {
     let mango_program_id = Pubkey::from_str(&config.mango_program_id)?;
     let serum_program_id = Pubkey::from_str(&config.serum_program_id)?;
     let mango_signer_id = Pubkey::from_str(&config.mango_signer_id)?;
@@ -81,13 +86,29 @@ async fn feed_data(config: &Config, sender: async_channel::Sender<Message>) -> a
         with_context: Some(true),
         account_config: account_info_config.clone(),
     };
-
     let mut mango_sub = client
         .program_subscribe(
             mango_program_id.to_string(),
             Some(all_accounts_config.clone()),
         )
         .map_err_anyhow()?;
+    // TODO: mango_pyth_oracles should not contain stub mango_pyth_oracles, since they already sub'ed with mango_sub
+    let mut mango_pyth_oracles_sub_map = StreamMap::new();
+    for oracle in mango_pyth_oracles.into_iter() {
+        mango_pyth_oracles_sub_map.insert(
+            oracle,
+            client
+                .account_subscribe(
+                    oracle.to_string(),
+                    Some(RpcAccountInfoConfig {
+                        encoding: Some(UiAccountEncoding::Base64),
+                        commitment: Some(CommitmentConfig::processed()),
+                        data_slice: None,
+                    }),
+                )
+                .map_err_anyhow()?,
+        );
+    }
     let mut open_orders_sub = client
         .program_subscribe(
             serum_program_id.to_string(),
@@ -104,6 +125,16 @@ async fn feed_data(config: &Config, sender: async_channel::Sender<Message>) -> a
                     sender.send(Message::Account(AccountUpdate::from_rpc(response)?)).await.expect("sending must succeed");
                 } else {
                     warn!("mango stream closed");
+                    return Ok(());
+                }
+            },
+            message = mango_pyth_oracles_sub_map.next() => {
+                if let Some(data) = message {
+                    let response = data.1.map_err_anyhow()?;
+                    let response = solana_client::rpc_response::Response{ context: RpcResponseContext{ slot: response.context.slot }, value: RpcKeyedAccount{ pubkey: data.0.to_string(), account:  response.value} } ;
+                    sender.send(Message::Account(AccountUpdate::from_rpc(response)?)).await.expect("sending must succeed");
+                } else {
+                    warn!("pyth stream closed");
                     return Ok(());
                 }
             },
@@ -132,12 +163,16 @@ async fn feed_data(config: &Config, sender: async_channel::Sender<Message>) -> a
     }
 }
 
-pub fn start(config: Config, sender: async_channel::Sender<Message>) {
+pub fn start(
+    config: Config,
+    mango_pyth_oracles: Vec<Pubkey>,
+    sender: async_channel::Sender<Message>,
+) {
     tokio::spawn(async move {
         // if the websocket disconnects, we get no data in a while etc, reconnect and try again
         loop {
             info!("connecting to solana websocket streams");
-            let out = feed_data(&config, sender.clone());
+            let out = feed_data(&config, mango_pyth_oracles.clone(), sender.clone());
             let _ = out.await;
         }
     });

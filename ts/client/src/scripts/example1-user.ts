@@ -51,6 +51,7 @@ async function main() {
     'my_mango_account',
   );
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
+  console.log(mangoAccount.toString());
 
   if (true) {
     // deposit and withdraw

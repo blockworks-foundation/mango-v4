@@ -1,9 +1,10 @@
 [workspace]
 members = [
+    "client",
     "programs/*",
     "keeper",
     "lib/*",
-    "liquidator"
+    "liquidator",
 ]
 
 [patch.crates-io]

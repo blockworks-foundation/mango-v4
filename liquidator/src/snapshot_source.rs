@@ -1,20 +1,21 @@
 use jsonrpc_core_client::transports::http;
 
+use mango_v4::state::MangoAccount;
 use solana_account_decoder::{UiAccount, UiAccountEncoding};
 use solana_client::{
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
     rpc_response::{Response, RpcKeyedAccount},
 };
-use solana_rpc::{rpc::rpc_full::FullClient, rpc::OptionalContext};
+use solana_rpc::{rpc::rpc_accounts::AccountsDataClient, rpc::OptionalContext};
 use solana_sdk::{account::AccountSharedData, commitment_config::CommitmentConfig, pubkey::Pubkey};
 
 use anyhow::Context;
 use futures::{stream, StreamExt};
 use log::*;
-use std::str::FromStr;
+use std::{collections::HashSet, str::FromStr};
 use tokio::time;
 
-use crate::{healthcheck, AnyhowWrap, Config};
+use crate::{liquidate, AnyhowWrap, Config};
 
 #[derive(Clone)]
 pub struct AccountUpdate {
@@ -70,17 +71,19 @@ impl AccountSnapshot {
 
 async fn feed_snapshots(
     config: &Config,
+    mango_pyth_oracles: Vec<Pubkey>,
     sender: &async_channel::Sender<AccountSnapshot>,
 ) -> anyhow::Result<()> {
     let mango_program_id = Pubkey::from_str(&config.mango_program_id)?;
+    let pyth_program_id = Pubkey::from_str(&config.pyth_program_id)?;
 
-    let rpc_client = http::connect_with_options::<FullClient>(&config.rpc_http_url, true)
+    let rpc_client = http::connect_with_options::<AccountsDataClient>(&config.rpc_http_url, true)
         .await
         .map_err_anyhow()?;
 
     let account_info_config = RpcAccountInfoConfig {
         encoding: Some(UiAccountEncoding::Base64),
-        commitment: Some(CommitmentConfig::processed()),
+        commitment: Some(CommitmentConfig::finalized()),
         data_slice: None,
     };
     let all_accounts_config = RpcProgramAccountsConfig {
@@ -108,37 +111,73 @@ async fn feed_snapshots(
         anyhow::bail!("did not receive context");
     }
 
+    // Get all the pyth oracles referred to by mango banks
+    let results: Vec<(
+        Vec<Pubkey>,
+        Result<Response<Vec<Option<UiAccount>>>, jsonrpc_core_client::RpcError>,
+    )> = stream::iter(mango_pyth_oracles)
+        .chunks(config.get_multiple_accounts_count)
+        .map(|keys| {
+            let rpc_client = &rpc_client;
+            let account_info_config = account_info_config.clone();
+            async move {
+                let string_keys = keys.iter().map(|k| k.to_string()).collect::<Vec<_>>();
+                (
+                    keys,
+                    rpc_client
+                        .get_multiple_accounts(string_keys, Some(account_info_config))
+                        .await,
+                )
+            }
+        })
+        .buffer_unordered(config.parallel_rpc_requests)
+        .collect::<Vec<_>>()
+        .await;
+    for (keys, result) in results {
+        snapshot.extend_from_gma_rpc(
+            &keys,
+            result
+                .map_err_anyhow()
+                .context("error during getMultipleAccounts for Pyth Oracles")?,
+        )?;
+    }
+
+    // if let OptionalContext::Context(account_snapshot_response) = response {
+    //     snapshot.extend_from_gpa_rpc(account_snapshot_response)?;
+    // } else {
+    //     anyhow::bail!("did not receive context");
+    // }
+
     // Get all the active open orders account keys
-    let oo_account_pubkeys =
-        snapshot
-            .accounts
-            .iter()
-            .filter_map(|update| {
-                if let Ok(mango_account) = healthcheck::load_mango_account::<
-                    mango::state::MangoAccount,
-                >(
-                    mango::state::DataType::MangoAccount, &update.account
-                ) {
-                    if mango_account.mango_group.to_string() == config.mango_group_id {
-                        Some(mango_account)
-                    } else {
-                        None
-                    }
+    let oo_account_pubkeys = snapshot
+        .accounts
+        .iter()
+        .filter_map(|update| {
+            if let Ok(mango_account) =
+                liquidate::load_mango_account::<MangoAccount>(&update.account)
+            {
+                if mango_account.group.to_string() == config.mango_group_id {
+                    Some(mango_account)
                 } else {
                     None
                 }
-            })
-            .flat_map(|mango_account| {
-                mango_account
-                    .in_margin_basket
-                    .iter()
-                    .zip(mango_account.spot_open_orders.iter())
-                    .filter_map(|(in_basket, oo)| in_basket.then(|| *oo))
-            })
-            .collect::<Vec<Pubkey>>();
+            } else {
+                None
+            }
+        })
+        .flat_map(|mango_account| {
+            mango_account
+                .serum3
+                .iter_active()
+                .map(|serum3account| serum3account.open_orders)
+        })
+        .collect::<Vec<Pubkey>>();
 
     // Retrieve all the open orders accounts
-    let results = stream::iter(oo_account_pubkeys)
+    let results: Vec<(
+        Vec<Pubkey>,
+        Result<Response<Vec<Option<UiAccount>>>, jsonrpc_core_client::RpcError>,
+    )> = stream::iter(oo_account_pubkeys)
         .chunks(config.get_multiple_accounts_count)
         .map(|keys| {
             let rpc_client = &rpc_client;
@@ -169,13 +208,17 @@ async fn feed_snapshots(
     Ok(())
 }
 
-pub fn start(config: Config, sender: async_channel::Sender<AccountSnapshot>) {
+pub fn start(
+    config: Config,
+    mango_pyth_oracles: Vec<Pubkey>,
+    sender: async_channel::Sender<AccountSnapshot>,
+) {
     let mut interval = time::interval(time::Duration::from_secs(config.snapshot_interval_secs));
 
     tokio::spawn(async move {
         loop {
             interval.tick().await;
-            if let Err(err) = feed_snapshots(&config, &sender).await {
+            if let Err(err) = feed_snapshots(&config, mango_pyth_oracles.clone(), &sender).await {
                 warn!("snapshot error: {:?}", err);
             } else {
                 info!("snapshot success");

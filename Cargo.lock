@@ -903,6 +903,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "client"
+version = "0.1.0"
+dependencies = [
+ "anchor-client",
+ "anchor-lang",
+ "anchor-spl",
+ "anyhow",
+ "fixed",
+ "fixed-macro",
+ "itertools 0.10.3",
+ "mango-v4",
+ "pyth-sdk-solana",
+ "serum_dex",
+ "solana-client",
+ "solana-sdk",
+]
+
+[[package]]
 name = "cloudabi"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2494,6 +2512,7 @@ dependencies = [
  "anchor-spl",
  "anyhow",
  "clap 3.1.18",
+ "client",
  "dotenv",
  "env_logger 0.8.4",
  "fixed",
@@ -2628,13 +2647,18 @@ checksum = "7fb9b38af92608140b86b693604b9ffcc5824240a484d1ecd4795bacb2fe88f3"
 name = "liquidator"
 version = "0.0.1"
 dependencies = [
+ "anchor-client",
+ "anchor-lang",
  "anyhow",
+ "arrayref",
  "async-channel",
  "async-stream 0.2.1",
  "async-trait",
  "bs58 0.3.1",
  "bytemuck",
  "bytes 1.1.0",
+ "checked_math",
+ "client",
  "fixed",
  "futures 0.3.21",
  "futures-core",
@@ -2644,6 +2668,7 @@ dependencies = [
  "jsonrpc-core-client",
  "log 0.4.17",
  "mango-v4",
+ "pyth-sdk-solana",
  "rand 0.7.3",
  "serde",
  "serde_derive",
@@ -2655,6 +2680,7 @@ dependencies = [
  "solana-rpc",
  "solana-sdk",
  "tokio",
+ "tokio-stream",
  "tokio-tungstenite",
  "toml",
 ]
@@ -6104,9 +6130,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-stream"
-version = "0.1.8"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50145484efff8818b5ccd256697f36863f587da82cf8b409c53adf1e840798e3"
+checksum = "df54d54117d6fdc4e4fea40fe1e4e566b3505700e148a6827e59b34b0d2600d9"
 dependencies = [
  "futures-core",
  "pin-project-lite",
