@@ -147,9 +147,6 @@ async function main() {
       console.log(order);
     }
 
-    // console.log(`Close mango account...`);
-    // await client.closeMangoAccount(mangoAccount);
-
     console.log(`Settling funds...`);
     await client.serum3SettleFunds(
       group,
@@ -157,6 +154,16 @@ async function main() {
       DEVNET_SERUM3_PROGRAM_ID,
       'BTC/USDC',
     );
+
+    // try {
+    //   console.log(`Close OO...`);
+    //   await client.serum3CloseOpenOrders(group, mangoAccount, 'BTC/USDC');
+    // } catch (error) {
+    //   console.log(error);
+    // }
+
+    // console.log(`Close mango account...`);
+    // await client.closeMangoAccount(mangoAccount);
   }
 
   if (true) {

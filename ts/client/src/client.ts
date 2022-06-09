@@ -605,6 +605,10 @@ export class MangoClient {
   ): Promise<TransactionSignature> {
     const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
 
+    let openOrders = mangoAccount.serum3.find(
+      (account) => account.marketIndex === serum3Market.marketIndex,
+    )?.openOrders;
+
     return await this.program.methods
       .serum3CloseOpenOrders()
       .accounts({
@@ -613,6 +617,7 @@ export class MangoClient {
         serumMarket: serum3Market.publicKey,
         serumProgram: serum3Market.serumProgram,
         serumMarketExternal: serum3Market.serumMarketExternal,
+        openOrders,
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
       })
