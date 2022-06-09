@@ -8,7 +8,7 @@ const DEVNET_SERUM3_MARKETS = new Map([
   ['BTC/USDC', 'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB'],
   ['SOL/USDC', '5xWpt56U1NCuHoAEtpLeUrQcxDkEpNfScjfLFaRzLPgR'],
 ]);
-const DEVNET_MINTS = new Map([
+export const DEVNET_MINTS = new Map([
   ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'], // use devnet usdc
   ['BTC', '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU'],
   ['SOL', 'So11111111111111111111111111111111111111112'],
@@ -94,6 +94,7 @@ async function main() {
     console.log(error);
   }
   const usdcDevnetOracle = await client.getStubOracle(group, usdcDevnetMint);
+  console.log(`...created stub oracle ${usdcDevnetOracle.publicKey}`);
   try {
     await client.registerToken(
       group,

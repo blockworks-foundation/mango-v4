@@ -1,7 +1,7 @@
 #![cfg(feature = "test-bpf")]
 
 use solana_program_test::*;
-use solana_sdk::{signature::Keypair, transport::TransportError};
+use solana_sdk::{signature::Keypair, signer::Signer, transport::TransportError};
 
 use mango_v4::{
     instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side},
@@ -203,6 +203,43 @@ async fn test_serum() -> Result<(), TransportError> {
     let native1 = account_position(solana, account, quote_token.bank).await;
     assert_eq!(native0, 1000);
     assert_eq!(native1, 1000);
+
+    // close oo account
+    send_tx(
+        solana,
+        Serum3CancelAllOrdersInstruction {
+            account,
+            serum_market,
+            limit: u8::MAX,
+            owner,
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        Serum3CloseOpenOrdersInstruction {
+            account,
+            serum_market,
+            owner,
+            sol_destination: payer.pubkey(),
+        },
+    )
+    .await
+    .unwrap();
+
+    // deregister serum3 market
+    send_tx(
+        solana,
+        Serum3DeregisterMarketInstruction {
+            group,
+            admin,
+            serum_market_external: serum_market_cookie.market,
+            sol_destination: payer.pubkey(),
+        },
+    )
+    .await
+    .unwrap();
 
     Ok(())
 }

@@ -30,6 +30,10 @@ pub mod mango_v4 {
         instructions::create_group(ctx, group_num)
     }
 
+    pub fn close_group(ctx: Context<CloseGroup>) -> Result<()> {
+        instructions::close_group(ctx)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn register_token(
         ctx: Context<RegisterToken>,
@@ -59,6 +63,10 @@ pub mod mango_v4 {
         )
     }
 
+    pub fn deregister_token(ctx: Context<DeregisterToken>) -> Result<()> {
+        instructions::deregister_token(ctx)
+    }
+
     pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
         instructions::update_index(ctx)
     }
@@ -84,6 +92,10 @@ pub mod mango_v4 {
     // lets do an interface pass later
     pub fn create_stub_oracle(ctx: Context<CreateStubOracle>, price: I80F48) -> Result<()> {
         instructions::create_stub_oracle(ctx, price)
+    }
+
+    pub fn close_stub_oracle(ctx: Context<CloseStubOracle>) -> Result<()> {
+        instructions::close_stub_oracle(ctx)
     }
 
     pub fn set_stub_oracle(ctx: Context<SetStubOracle>, price: I80F48) -> Result<()> {
@@ -121,10 +133,18 @@ pub mod mango_v4 {
         instructions::serum3_register_market(ctx, market_index, name)
     }
 
+    pub fn serum3_deregister_market(ctx: Context<Serum3DeregisterMarket>) -> Result<()> {
+        instructions::serum3_deregister_market(ctx)
+    }
+
     // TODO serum3_change_spot_market_params
 
     pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result<()> {
         instructions::serum3_create_open_orders(ctx)
+    }
+
+    pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<()> {
+        instructions::serum3_close_open_orders(ctx)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -158,6 +178,10 @@ pub mod mango_v4 {
         order_id: u128,
     ) -> Result<()> {
         instructions::serum3_cancel_order(ctx, side, order_id)
+    }
+
+    pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) -> Result<()> {
+        instructions::serum3_cancel_all_orders(ctx, limit)
     }
 
     pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
@@ -232,6 +256,10 @@ pub mod mango_v4 {
             min_funding,
             impact_quantity,
         )
+    }
+
+    pub fn perp_close_market(ctx: Context<PerpCloseMarket>) -> Result<()> {
+        instructions::perp_close_market(ctx)
     }
 
     // TODO perp_change_perp_market_params

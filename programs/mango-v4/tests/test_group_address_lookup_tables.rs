@@ -66,7 +66,7 @@ async fn test_group_address_lookup_tables() -> Result<()> {
         let oracle = create_stub_oracle_accounts.oracle;
         send_tx(
             solana,
-            SetStubOracle {
+            SetStubOracleInstruction {
                 group,
                 admin,
                 mint: mint.pubkey,

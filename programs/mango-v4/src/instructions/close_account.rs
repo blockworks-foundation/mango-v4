@@ -19,8 +19,24 @@ pub struct CloseAccount<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-pub fn close_account(_ctx: Context<CloseAccount>) -> Result<()> {
-    // CRITICAL: currently can close any account, even one with bad health
-    // TODO: Implement
+pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
+    let account = ctx.accounts.account.load()?;
+    require_eq!(account.being_liquidated, 0);
+    require_eq!(account.delegate, Pubkey::default());
+    require_eq!(account.is_bankrupt, 0);
+    for ele in account.tokens.values {
+        require_eq!(ele.is_active(), false);
+    }
+    for ele in account.serum3.values {
+        require_eq!(ele.is_active(), false);
+    }
+    for ele in account.perps.accounts {
+        require_eq!(ele.is_active(), false);
+    }
+    for ele in account.perps.order_market {
+        require_eq!(ele, PerpMarketIndex::MAX);
+    }
+    // TODO: what else do we need to check? do we still need to check health?
+
     Ok(())
 }
