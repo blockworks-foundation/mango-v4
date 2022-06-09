@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
-use crate::{account_shared_data::AccountSharedDataRef, cm};
+use crate::account_shared_data::AccountSharedDataRef;
 
 use arrayref::array_ref;
 use client::MangoClient;
@@ -135,8 +135,8 @@ pub fn compute_health_(
             .map(|asd| AccountSharedDataRef::borrow(asd.0, asd.1))
             .collect::<anchor_lang::Result<Vec<_>>>()?,
         n_banks: active_token_len,
-        begin_perp: cm!(active_token_len * 2),
-        begin_serum3: cm!(active_token_len * 2 + active_perp_len),
+        begin_perp: active_token_len * 2,
+        begin_serum3: active_token_len * 2 + active_perp_len,
     };
     compute_health(account, health_type, &retriever)
 }

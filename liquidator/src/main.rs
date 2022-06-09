@@ -20,7 +20,6 @@ use std::str::FromStr;
 
 pub mod account_shared_data;
 pub mod chain_data;
-pub mod health;
 pub mod liquidate;
 pub mod metrics;
 pub mod snapshot_source;
