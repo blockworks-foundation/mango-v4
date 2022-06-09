@@ -53,7 +53,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     for &token_account in payer_mint_accounts {
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: 10000,
                 account: vault_account,
                 token_account,
@@ -108,7 +108,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     let deposit_amount = 1000;
     send_tx(
         solana,
-        DepositInstruction {
+        TokenDepositInstruction {
             amount: deposit_amount,
             account,
             token_account: payer_mint_accounts[1],
@@ -173,7 +173,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     // can't withdraw
     assert!(send_tx(
         solana,
-        WithdrawInstruction {
+        TokenWithdrawInstruction {
             amount: 1,
             allow_borrow: false,
             account,
@@ -201,7 +201,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     // can withdraw again
     send_tx(
         solana,
-        WithdrawInstruction {
+        TokenWithdrawInstruction {
             amount: 2,
             allow_borrow: false,
             account,
@@ -258,7 +258,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     for &token_account in payer_mint_accounts {
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: 100000,
                 account: vault_account,
                 token_account,
@@ -289,7 +289,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     let deposit2_amount = 20;
     send_tx(
         solana,
-        DepositInstruction {
+        TokenDepositInstruction {
             amount: deposit1_amount,
             account,
             token_account: payer_mint_accounts[2],
@@ -300,7 +300,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     .unwrap();
     send_tx(
         solana,
-        DepositInstruction {
+        TokenDepositInstruction {
             amount: deposit2_amount,
             account,
             token_account: payer_mint_accounts[3],
@@ -314,7 +314,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     let borrow2_amount = 50;
     send_tx(
         solana,
-        WithdrawInstruction {
+        TokenWithdrawInstruction {
             amount: borrow1_amount,
             allow_borrow: true,
             account,
@@ -326,7 +326,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     .unwrap();
     send_tx(
         solana,
-        WithdrawInstruction {
+        TokenWithdrawInstruction {
             amount: borrow2_amount,
             allow_borrow: true,
             account,

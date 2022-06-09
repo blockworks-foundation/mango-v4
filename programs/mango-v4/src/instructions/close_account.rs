@@ -33,10 +33,6 @@ pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
     for ele in account.perps.accounts {
         require_eq!(ele.is_active(), false);
     }
-    for ele in account.perps.order_market {
-        require_eq!(ele, PerpMarketIndex::MAX);
-    }
-    // TODO: what else do we need to check? do we still need to check health?
 
     Ok(())
 }

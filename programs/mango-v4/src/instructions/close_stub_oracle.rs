@@ -6,6 +6,7 @@ use crate::state::*;
 #[derive(Accounts)]
 pub struct CloseStubOracle<'info> {
     #[account(
+        constraint = group.load()?.testing == 1,
         has_one = admin,
     )]
     pub group: AccountLoader<'info, Group>,
@@ -14,7 +15,7 @@ pub struct CloseStubOracle<'info> {
     // match stub oracle to group
     #[account(
         mut,
-        constraint = oracle.load()?.group == group.key(),
+        has_one = group,
         close = sol_destination
     )]
     pub oracle: AccountLoader<'info, StubOracle>,
@@ -25,7 +26,6 @@ pub struct CloseStubOracle<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn close_stub_oracle(_ctx: Context<CloseStubOracle>) -> Result<()> {
     Ok(())
 }

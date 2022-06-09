@@ -55,15 +55,15 @@ async function main() {
   if (true) {
     // deposit and withdraw
     console.log(`Depositing...5 USDC`);
-    await client.deposit(group, mangoAccount, 'USDC', 5);
+    await client.tokenDeposit(group, mangoAccount, 'USDC', 5);
     await mangoAccount.reload(client);
 
     console.log(`Depositing...0.0005 BTC`);
-    await client.deposit(group, mangoAccount, 'BTC', 0.0005);
+    await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005);
     await mangoAccount.reload(client);
 
     console.log(`Withdrawing...1 USDC`);
-    await client.withdraw(group, mangoAccount, 'USDC', 1, false);
+    await client.tokenWithdraw(group, mangoAccount, 'USDC', 1, false);
     await mangoAccount.reload(client);
 
     // serum3

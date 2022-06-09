@@ -23,10 +23,11 @@ pub struct CreateGroup<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn create_group(ctx: Context<CreateGroup>, group_num: u32) -> Result<()> {
+pub fn create_group(ctx: Context<CreateGroup>, group_num: u32, testing: u8) -> Result<()> {
     let mut group = ctx.accounts.group.load_init()?;
     group.admin = ctx.accounts.admin.key();
     group.bump = *ctx.bumps.get("group").ok_or(MangoError::SomeError)?;
     group.group_num = group_num;
+    group.testing = testing;
     Ok(())
 }

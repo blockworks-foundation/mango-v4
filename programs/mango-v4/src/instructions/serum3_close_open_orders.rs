@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+use crate::error::MangoError;
 use crate::state::*;
 
 #[derive(Accounts)]
@@ -31,21 +32,28 @@ pub struct Serum3CloseOpenOrders<'info> {
 }
 
 pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<()> {
+    //
+    // Validation
+    //
     let mut account = ctx.accounts.account.load_mut()?;
-    require_eq!(
+    let serum_market = ctx.accounts.serum_market.load()?;
+    require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
+    // Validate open_orders
+    require!(
         account
             .serum3
-            .values
-            .iter()
-            .any(|serum3| serum3.open_orders == ctx.accounts.open_orders.key()),
-        true
+            .find(serum_market.market_index)
+            .ok_or_else(|| error!(MangoError::SomeError))?
+            .open_orders
+            == ctx.accounts.open_orders.key(),
+        MangoError::SomeError
     );
 
+    //
+    // close OO
+    //
     cpi_close_open_orders(ctx.accounts)?;
-
-    let serum_market = ctx.accounts.serum_market.load()?;
-
-    account.serum3.deactivate(serum_market.market_index);
+    account.serum3.deactivate(serum_market.market_index)?;
 
     Ok(())
 }

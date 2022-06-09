@@ -6,7 +6,8 @@ use anchor_spl::token::Token;
 pub struct CloseGroup<'info> {
     #[account(
         mut,
-        constraint = group.load()?.admin == admin.key(),
+        constraint = group.load()?.testing == 1,
+        has_one = admin,
         close = sol_destination
     )]
     pub group: AccountLoader<'info, Group>,
@@ -20,5 +21,6 @@ pub struct CloseGroup<'info> {
 }
 
 pub fn close_group(_ctx: Context<CloseGroup>) -> Result<()> {
+    // TODO: checks
     Ok(())
 }

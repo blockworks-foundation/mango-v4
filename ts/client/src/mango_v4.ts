@@ -49,6 +49,10 @@ export type MangoV4 = {
         {
           "name": "groupNum",
           "type": "u32"
+        },
+        {
+          "name": "testing",
+          "type": "u8"
         }
       ]
     },
@@ -79,7 +83,7 @@ export type MangoV4 = {
       "args": []
     },
     {
-      "name": "registerToken",
+      "name": "tokenRegister",
       "accounts": [
         {
           "name": "group",
@@ -241,7 +245,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "deregisterToken",
+      "name": "tokenDeregister",
       "accounts": [
         {
           "name": "group",
@@ -510,7 +514,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "deposit",
+      "name": "tokenDeposit",
       "accounts": [
         {
           "name": "group",
@@ -556,7 +560,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "withdraw",
+      "name": "tokenWithdraw",
       "accounts": [
         {
           "name": "group",
@@ -2046,11 +2050,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "testing",
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                3
+                2
               ]
             }
           },
@@ -3230,6 +3238,10 @@ export const IDL: MangoV4 = {
         {
           "name": "groupNum",
           "type": "u32"
+        },
+        {
+          "name": "testing",
+          "type": "u8"
         }
       ]
     },
@@ -3260,7 +3272,7 @@ export const IDL: MangoV4 = {
       "args": []
     },
     {
-      "name": "registerToken",
+      "name": "tokenRegister",
       "accounts": [
         {
           "name": "group",
@@ -3422,7 +3434,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "deregisterToken",
+      "name": "tokenDeregister",
       "accounts": [
         {
           "name": "group",
@@ -3691,7 +3703,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "deposit",
+      "name": "tokenDeposit",
       "accounts": [
         {
           "name": "group",
@@ -3737,7 +3749,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "withdraw",
+      "name": "tokenWithdraw",
       "accounts": [
         {
           "name": "group",
@@ -5227,11 +5239,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "testing",
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                3
+                2
               ]
             }
           },

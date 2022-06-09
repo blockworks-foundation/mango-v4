@@ -64,7 +64,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
 
     send_tx(
         solana,
-        DepositInstruction {
+        TokenDepositInstruction {
             amount: provided_amount,
             account: provider_account,
             token_account: payer_mint0_account,
@@ -75,7 +75,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     .unwrap();
     send_tx(
         solana,
-        DepositInstruction {
+        TokenDepositInstruction {
             amount: provided_amount,
             account: provider_account,
             token_account: payer_mint1_account,
@@ -111,7 +111,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
 
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: deposit_amount_initial,
                 account,
                 token_account: payer_mint0_account,

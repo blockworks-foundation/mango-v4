@@ -44,7 +44,7 @@ async function main() {
   // close all bank
   for (const bank of group.banksMap.values()) {
     try {
-      sig = await client.deregisterToken(group, bank.name);
+      sig = await client.tokenDeregister(group, bank.name);
       console.log(
         `Removed token ${bank.name}, sig https://explorer.solana.com/address/${sig}?cluster=devnet`,
       );

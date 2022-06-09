@@ -367,7 +367,7 @@ impl<'keypair> ClientInstruction for MarginTradeInstruction<'keypair> {
     }
 }
 
-pub struct WithdrawInstruction<'keypair> {
+pub struct TokenWithdrawInstruction<'keypair> {
     pub amount: u64,
     pub allow_borrow: bool,
 
@@ -376,9 +376,9 @@ pub struct WithdrawInstruction<'keypair> {
     pub token_account: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::Withdraw;
-    type Instruction = mango_v4::instruction::Withdraw;
+impl<'keypair> ClientInstruction for TokenWithdrawInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::TokenWithdraw;
+    type Instruction = mango_v4::instruction::TokenWithdraw;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -433,7 +433,7 @@ impl<'keypair> ClientInstruction for WithdrawInstruction<'keypair> {
     }
 }
 
-pub struct DepositInstruction<'keypair> {
+pub struct TokenDepositInstruction<'keypair> {
     pub amount: u64,
 
     pub account: Pubkey,
@@ -441,9 +441,9 @@ pub struct DepositInstruction<'keypair> {
     pub token_authority: &'keypair Keypair,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::Deposit;
-    type Instruction = mango_v4::instruction::Deposit;
+impl<'keypair> ClientInstruction for TokenDepositInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::TokenDeposit;
+    type Instruction = mango_v4::instruction::TokenDeposit;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -497,7 +497,7 @@ impl<'keypair> ClientInstruction for DepositInstruction<'keypair> {
     }
 }
 
-pub struct RegisterTokenInstruction<'keypair> {
+pub struct TokenRegisterInstruction<'keypair> {
     pub token_index: TokenIndex,
     pub decimals: u8,
     pub util0: f32,
@@ -520,9 +520,9 @@ pub struct RegisterTokenInstruction<'keypair> {
     pub payer: &'keypair Keypair,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::RegisterToken;
-    type Instruction = mango_v4::instruction::RegisterToken;
+impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::TokenRegister;
+    type Instruction = mango_v4::instruction::TokenRegister;
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
@@ -612,7 +612,7 @@ impl<'keypair> ClientInstruction for RegisterTokenInstruction<'keypair> {
     }
 }
 
-pub struct DeregisterTokenInstruction<'keypair> {
+pub struct TokenDeregisterInstruction<'keypair> {
     pub admin: &'keypair Keypair,
     pub payer: &'keypair Keypair,
     pub group: Pubkey,
@@ -621,9 +621,9 @@ pub struct DeregisterTokenInstruction<'keypair> {
     pub sol_destination: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for DeregisterTokenInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::DeregisterToken;
-    type Instruction = mango_v4::instruction::DeregisterToken;
+impl<'keypair> ClientInstruction for TokenDeregisterInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::TokenDeregister;
+    type Instruction = mango_v4::instruction::TokenDeregister;
 
     async fn to_instruction(
         &self,
@@ -832,7 +832,10 @@ impl<'keypair> ClientInstruction for CreateGroupInstruction<'keypair> {
         _account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction { group_num: 0 };
+        let instruction = Self::Instruction {
+            group_num: 0,
+            testing: 1,
+        };
 
         let group = Pubkey::find_program_address(
             &[

@@ -82,7 +82,13 @@ async function main() {
   while (true) {
     try {
       console.log(`Withdrawing...${amount} 'BTC'`);
-      await user2Client.withdraw(group, user2MangoAccount, token, amount, true);
+      await user2Client.tokenWithdraw(
+        group,
+        user2MangoAccount,
+        token,
+        amount,
+        true,
+      );
     } catch (error) {
       console.log(error);
       break;

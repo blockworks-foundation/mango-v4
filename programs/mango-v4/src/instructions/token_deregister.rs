@@ -4,33 +4,31 @@ use anchor_spl::token::{self, CloseAccount, Token, TokenAccount};
 use crate::state::*;
 
 #[derive(Accounts)]
-pub struct DeregisterToken<'info> {
+pub struct TokenDeregister<'info> {
     #[account(
+        constraint = group.load()?.testing == 1,
         has_one = admin,
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
 
     // match bank to group
+    // match bank to vault
     #[account(
         mut,
-        constraint = bank.load()?.group == group.key(),
+        has_one = group,
+        has_one = vault,
         close = sol_destination
     )]
     pub bank: AccountLoader<'info, Bank>,
 
-    // match vault to bank
-    #[account(
-        mut,
-        constraint =  vault.key() == bank.load()?.vault,
-        token::mint = bank.load()?.mint,
-    )]
+    #[account(mut)]
     pub vault: Account<'info, TokenAccount>,
 
     // match mint info to bank
     #[account(
         mut,
-        constraint = mint_info.load()?.bank == bank.key(),
+        has_one = bank,
         close = sol_destination
     )]
     pub mint_info: AccountLoader<'info, MintInfo>,
@@ -42,7 +40,7 @@ pub struct DeregisterToken<'info> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn deregister_token(ctx: Context<DeregisterToken>) -> Result<()> {
+pub fn token_deregister(ctx: Context<TokenDeregister>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
     let group_seeds = group_seeds!(group);
     let cpi_accounts = CloseAccount {

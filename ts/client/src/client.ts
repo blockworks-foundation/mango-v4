@@ -56,10 +56,13 @@ export class MangoClient {
 
   // Group
 
-  public async createGroup(groupNum: number): Promise<TransactionSignature> {
+  public async createGroup(
+    groupNum: number,
+    testing: boolean,
+  ): Promise<TransactionSignature> {
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
     return await this.program.methods
-      .createGroup(groupNum)
+      .createGroup(groupNum, testing ? 1 : 0)
       .accounts({
         admin: adminPk,
         payer: adminPk,
@@ -120,7 +123,7 @@ export class MangoClient {
 
   // Tokens/Banks
 
-  public async registerToken(
+  public async tokenRegister(
     group: Group,
     mintPk: PublicKey,
     oraclePk: PublicKey,
@@ -140,7 +143,7 @@ export class MangoClient {
     liquidationFee: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .registerToken(
+      .tokenRegister(
         tokenIndex,
         name,
         { util0, rate0, util1, rate1, maxRate },
@@ -163,7 +166,7 @@ export class MangoClient {
       .rpc();
   }
 
-  public async deregisterToken(
+  public async tokenDeregister(
     group: Group,
     tokenName: string,
   ): Promise<TransactionSignature> {
@@ -171,7 +174,7 @@ export class MangoClient {
 
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
     return await this.program.methods
-      .deregisterToken()
+      .tokenDeregister()
       .accounts({
         group: group.publicKey,
         admin: adminPk,
@@ -385,7 +388,7 @@ export class MangoClient {
       .rpc();
   }
 
-  public async deposit(
+  public async tokenDeposit(
     group: Group,
     mangoAccount: MangoAccount,
     tokenName: string,
@@ -434,7 +437,7 @@ export class MangoClient {
       await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     return await this.program.methods
-      .deposit(toNativeDecimals(amount, bank.mintDecimals))
+      .tokenDeposit(toNativeDecimals(amount, bank.mintDecimals))
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -456,7 +459,7 @@ export class MangoClient {
       .rpc({ skipPreflight: true });
   }
 
-  public async withdraw(
+  public async tokenWithdraw(
     group: Group,
     mangoAccount: MangoAccount,
     tokenName: string,
@@ -474,7 +477,7 @@ export class MangoClient {
       await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     return await this.program.methods
-      .withdraw(toNativeDecimals(amount, bank.mintDecimals), allowBorrow)
+      .tokenWithdraw(toNativeDecimals(amount, bank.mintDecimals), allowBorrow)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,

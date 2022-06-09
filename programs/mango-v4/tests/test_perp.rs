@@ -66,7 +66,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: deposit_amount,
                 account: account_0,
                 token_account: payer_mint_accounts[0],
@@ -78,7 +78,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: deposit_amount,
                 account: account_0,
                 token_account: payer_mint_accounts[1],
@@ -94,7 +94,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: deposit_amount,
                 account: account_1,
                 token_account: payer_mint_accounts[0],
@@ -106,7 +106,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: deposit_amount,
                 account: account_1,
                 token_account: payer_mint_accounts[1],

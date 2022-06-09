@@ -59,7 +59,7 @@ async fn test_basic() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: deposit_amount,
                 account,
                 token_account: payer_mint0_account,
@@ -94,7 +94,7 @@ async fn test_basic() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            WithdrawInstruction {
+            TokenWithdrawInstruction {
                 amount: withdraw_amount,
                 allow_borrow: true,
                 account,
@@ -129,7 +129,7 @@ async fn test_basic() -> Result<(), TransportError> {
     let bank_data: Bank = solana.get_account(bank).await;
     send_tx(
         solana,
-        WithdrawInstruction {
+        TokenWithdrawInstruction {
             amount: bank_data.native_total_deposits().to_num(),
             allow_borrow: false,
             account,
@@ -156,7 +156,7 @@ async fn test_basic() -> Result<(), TransportError> {
     let bank_data: Bank = solana.get_account(bank).await;
     send_tx(
         solana,
-        DeregisterTokenInstruction {
+        TokenDeregisterInstruction {
             admin,
             payer,
             group,

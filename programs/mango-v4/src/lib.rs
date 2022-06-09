@@ -26,8 +26,8 @@ pub mod mango_v4 {
 
     use super::*;
 
-    pub fn create_group(ctx: Context<CreateGroup>, group_num: u32) -> Result<()> {
-        instructions::create_group(ctx, group_num)
+    pub fn create_group(ctx: Context<CreateGroup>, group_num: u32, testing: u8) -> Result<()> {
+        instructions::create_group(ctx, group_num, testing)
     }
 
     pub fn close_group(ctx: Context<CloseGroup>) -> Result<()> {
@@ -35,8 +35,8 @@ pub mod mango_v4 {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn register_token(
-        ctx: Context<RegisterToken>,
+    pub fn token_register(
+        ctx: Context<TokenRegister>,
         token_index: TokenIndex,
         name: String,
         interest_rate_params: InterestRateParams,
@@ -48,7 +48,7 @@ pub mod mango_v4 {
         init_liab_weight: f32,
         liquidation_fee: f32,
     ) -> Result<()> {
-        instructions::register_token(
+        instructions::token_register(
             ctx,
             token_index,
             name,
@@ -63,8 +63,8 @@ pub mod mango_v4 {
         )
     }
 
-    pub fn deregister_token(ctx: Context<DeregisterToken>) -> Result<()> {
-        instructions::deregister_token(ctx)
+    pub fn token_deregister(ctx: Context<TokenDeregister>) -> Result<()> {
+        instructions::token_deregister(ctx)
     }
 
     pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
@@ -102,12 +102,16 @@ pub mod mango_v4 {
         instructions::set_stub_oracle(ctx, price)
     }
 
-    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
-        instructions::deposit(ctx, amount)
+    pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
+        instructions::token_deposit(ctx, amount)
     }
 
-    pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
-        instructions::withdraw(ctx, amount, allow_borrow)
+    pub fn token_withdraw(
+        ctx: Context<TokenWithdraw>,
+        amount: u64,
+        allow_borrow: bool,
+    ) -> Result<()> {
+        instructions::token_withdraw(ctx, amount, allow_borrow)
     }
 
     pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(

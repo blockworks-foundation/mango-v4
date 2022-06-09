@@ -49,7 +49,7 @@ async function main() {
   // group
   console.log(`Creating Group...`);
   try {
-    await client.createGroup(0);
+    await client.createGroup(0, true);
   } catch (error) {
     console.log(error);
   }
@@ -61,7 +61,7 @@ async function main() {
   const btcDevnetMint = new PublicKey(DEVNET_MINTS.get('BTC')!);
   const btcDevnetOracle = new PublicKey(DEVNET_ORACLES.get('BTC')!);
   try {
-    await client.registerToken(
+    await client.tokenRegister(
       group,
       btcDevnetMint,
       btcDevnetOracle,
@@ -96,7 +96,7 @@ async function main() {
   const usdcDevnetOracle = await client.getStubOracle(group, usdcDevnetMint);
   console.log(`...created stub oracle ${usdcDevnetOracle.publicKey}`);
   try {
-    await client.registerToken(
+    await client.tokenRegister(
       group,
       usdcDevnetMint,
       usdcDevnetOracle.publicKey,
@@ -123,7 +123,7 @@ async function main() {
   const solDevnetMint = new PublicKey(DEVNET_MINTS.get('SOL')!);
   const solDevnetOracle = new PublicKey(DEVNET_ORACLES.get('SOL')!);
   try {
-    await client.registerToken(
+    await client.tokenRegister(
       group,
       solDevnetMint,
       solDevnetOracle,
@@ -152,7 +152,7 @@ async function main() {
   const orcaDevnetMint = new PublicKey(DEVNET_MINTS.get('ORCA')!);
   const orcaDevnetOracle = new PublicKey(DEVNET_ORACLES.get('ORCA')!);
   try {
-    await client.registerToken(
+    await client.tokenRegister(
       group,
       orcaDevnetMint,
       orcaDevnetOracle,
