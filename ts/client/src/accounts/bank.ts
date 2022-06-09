@@ -1,8 +1,6 @@
 import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
-import bs58 from 'bs58';
-import { MangoClient } from '../client';
 import { I80F48, I80F48Dto } from './I80F48';
 
 export const QUOTE_DECIMALS = 6;
@@ -144,31 +142,4 @@ export class MintInfo {
     public vault: PublicKey,
     public oracle: PublicKey,
   ) {}
-}
-
-export async function getMintInfoForTokenIndex(
-  client: MangoClient,
-  groupPk: PublicKey,
-  tokenIndex: number,
-): Promise<MintInfo[]> {
-  const tokenIndexBuf = Buffer.alloc(2);
-  tokenIndexBuf.writeUInt16LE(tokenIndex);
-  return (
-    await client.program.account.mintInfo.all([
-      {
-        memcmp: {
-          bytes: groupPk.toBase58(),
-          offset: 8,
-        },
-      },
-      {
-        memcmp: {
-          bytes: bs58.encode(tokenIndexBuf),
-          offset: 200,
-        },
-      },
-    ])
-  ).map((tuple) => {
-    return MintInfo.from(tuple.publicKey, tuple.account);
-  });
 }

@@ -1,22 +1,21 @@
-use crate::error::*;
-use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 use fixed::types::I80F48;
 
+use crate::error::*;
+use crate::state::*;
+
 #[derive(Accounts)]
-pub struct Withdraw<'info> {
+pub struct TokenDeposit<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
         mut,
         has_one = group,
-        has_one = owner,
     )]
     pub account: AccountLoader<'info, MangoAccount>,
-    pub owner: Signer<'info>,
 
     #[account(
         mut,
@@ -32,17 +31,18 @@ pub struct Withdraw<'info> {
 
     #[account(mut)]
     pub token_account: Box<Account<'info, TokenAccount>>,
+    pub token_authority: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
 }
 
-impl<'info> Withdraw<'info> {
+impl<'info> TokenDeposit<'info> {
     pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
         let program = self.token_program.to_account_info();
         let accounts = token::Transfer {
-            from: self.vault.to_account_info(),
-            to: self.token_account.to_account_info(),
-            authority: self.group.to_account_info(),
+            from: self.token_account.to_account_info(),
+            to: self.vault.to_account_info(),
+            authority: self.token_authority.to_account_info(),
         };
         CpiContext::new(program, accounts)
     }
@@ -51,11 +51,9 @@ impl<'info> Withdraw<'info> {
 // TODO: It may make sense to have the token_index passed in from the outside.
 //       That would save a lot of computation that needs to go into finding the
 //       right index for the mint.
-// TODO: https://github.com/blockworks-foundation/mango-v4/commit/15961ec81c7e9324b37d79d0e2a1650ce6bd981d comments
-pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
+pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     require!(amount > 0, MangoError::SomeError);
 
-    let group = ctx.accounts.group.load()?;
     let token_index = ctx.accounts.bank.load()?.token_index;
 
     // Get the account's position for that token index
@@ -64,57 +62,29 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Resu
 
     let (position, position_index) = account.tokens.get_mut_or_create(token_index)?;
 
-    // The bank will also be passed in remainingAccounts. Use an explicit scope
-    // to drop the &mut before we borrow it immutably again later.
+    // Update the bank and position
     let position_is_active = {
         let mut bank = ctx.accounts.bank.load_mut()?;
-        let native_position = position.native(&bank);
-
-        // Handle amount special case for withdrawing everything
-        let amount = if amount == u64::MAX && !allow_borrow {
-            if native_position.is_positive() {
-                // TODO: This rounding may mean that if we deposit and immediately withdraw
-                //       we can't withdraw the full amount!
-                native_position.floor().to_num::<u64>()
-            } else {
-                return Ok(());
-            }
-        } else {
-            amount
-        };
-
-        require!(
-            allow_borrow || amount < native_position,
-            MangoError::SomeError
-        );
-
-        let amount_i80f48 = I80F48::from(amount);
-
-        // Update the bank and position
-        let position_is_active = bank.withdraw_with_fee(position, amount_i80f48)?;
-
-        // Transfer the actual tokens
-        let group_seeds = group_seeds!(group);
-        token::transfer(
-            ctx.accounts.transfer_ctx().with_signer(&[group_seeds]),
-            amount,
-        )?;
-
-        position_is_active
+        bank.deposit(position, I80F48::from(amount))?
     };
 
+    // Transfer the actual tokens
+    token::transfer(ctx.accounts.transfer_ctx(), amount)?;
+
     //
-    // Health check
+    // Health computation
+    // TODO: This will be used to disable is_bankrupt or being_liquidated
+    //       when health recovers sufficiently
     //
     let health =
         compute_health_from_fixed_accounts(&account, HealthType::Init, ctx.remaining_accounts)?;
     msg!("health: {}", health);
-    require!(health >= 0, MangoError::HealthMustBePositive);
 
     //
     // Deactivate the position only after the health check because the user passed in
     // remaining_accounts for all banks/oracles, including the account that will now be
     // deactivated.
+    // Deposits can deactivate a position if they cancel out a previous borrow.
     //
     if !position_is_active {
         account.tokens.deactivate(position_index);

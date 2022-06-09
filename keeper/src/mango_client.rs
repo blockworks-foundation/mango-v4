@@ -339,7 +339,7 @@ impl MangoClient {
             .collect())
     }
 
-    pub fn deposit(
+    pub fn token_deposit(
         &self,
         token_name: &str,
         amount: u64,
@@ -356,7 +356,7 @@ impl MangoClient {
                 program_id: mango_v4::id(),
                 accounts: {
                     let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                        &mango_v4::accounts::Deposit {
+                        &mango_v4::accounts::TokenDeposit {
                             group: self.group(),
                             account: self.mango_account_cache.0,
                             bank: bank.0,
@@ -373,7 +373,7 @@ impl MangoClient {
                     ams.extend(health_check_metas.into_iter());
                     ams
                 },
-                data: anchor_lang::InstructionData::data(&mango_v4::instruction::Deposit {
+                data: anchor_lang::InstructionData::data(&mango_v4::instruction::TokenDeposit {
                     amount,
                 }),
             })

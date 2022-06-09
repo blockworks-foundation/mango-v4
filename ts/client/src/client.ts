@@ -24,7 +24,7 @@ import {
   TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { Bank, getMintInfoForTokenIndex } from './accounts/bank';
+import { Bank, MintInfo } from './accounts/bank';
 import { Group } from './accounts/group';
 import { I80F48 } from './accounts/I80F48';
 import { MangoAccount } from './accounts/mangoAccount';
@@ -56,13 +56,29 @@ export class MangoClient {
 
   // Group
 
-  public async createGroup(groupNum: number): Promise<TransactionSignature> {
+  public async createGroup(
+    groupNum: number,
+    testing: boolean,
+  ): Promise<TransactionSignature> {
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
     return await this.program.methods
-      .createGroup(groupNum)
+      .createGroup(groupNum, testing ? 1 : 0)
       .accounts({
         admin: adminPk,
         payer: adminPk,
+      })
+      .rpc();
+  }
+
+  public async closeGroup(group: Group): Promise<TransactionSignature> {
+    const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
+    return await this.program.methods
+      .closeGroup()
+      .accounts({
+        group: group.publicKey,
+        admin: adminPk,
+        solDestination: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
       })
       .rpc();
   }
@@ -107,7 +123,7 @@ export class MangoClient {
 
   // Tokens/Banks
 
-  public async registerToken(
+  public async tokenRegister(
     group: Group,
     mintPk: PublicKey,
     oraclePk: PublicKey,
@@ -127,7 +143,7 @@ export class MangoClient {
     liquidationFee: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .registerToken(
+      .tokenRegister(
         tokenIndex,
         name,
         { util0, rate0, util1, rate1, maxRate },
@@ -150,6 +166,27 @@ export class MangoClient {
       .rpc();
   }
 
+  public async tokenDeregister(
+    group: Group,
+    tokenName: string,
+  ): Promise<TransactionSignature> {
+    const bank = group.banksMap.get(tokenName)!;
+
+    const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
+    return await this.program.methods
+      .tokenDeregister()
+      .accounts({
+        group: group.publicKey,
+        admin: adminPk,
+        bank: bank.publicKey,
+        vault: bank.vault,
+        mintInfo: group.mintInfosMap.get(bank.name)?.publicKey,
+        solDestination: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
+      })
+      .rpc();
+  }
+
   public async getBanksForGroup(group: Group): Promise<Bank[]> {
     return (
       await this.program.account.bank.all([
@@ -161,6 +198,47 @@ export class MangoClient {
         },
       ])
     ).map((tuple) => Bank.from(tuple.publicKey, tuple.account));
+  }
+
+  public async getMintInfosForGroup(group: Group): Promise<MintInfo[]> {
+    return (
+      await this.program.account.mintInfo.all([
+        {
+          memcmp: {
+            bytes: group.publicKey.toBase58(),
+            offset: 8,
+          },
+        },
+      ])
+    ).map((tuple) => {
+      return MintInfo.from(tuple.publicKey, tuple.account);
+    });
+  }
+
+  public async getMintInfoForTokenIndex(
+    group: Group,
+    tokenIndex: number,
+  ): Promise<MintInfo[]> {
+    const tokenIndexBuf = Buffer.alloc(2);
+    tokenIndexBuf.writeUInt16LE(tokenIndex);
+    return (
+      await this.program.account.mintInfo.all([
+        {
+          memcmp: {
+            bytes: group.publicKey.toBase58(),
+            offset: 8,
+          },
+        },
+        {
+          memcmp: {
+            bytes: bs58.encode(tokenIndexBuf),
+            offset: 200,
+          },
+        },
+      ])
+    ).map((tuple) => {
+      return MintInfo.from(tuple.publicKey, tuple.account);
+    });
   }
 
   // Stub Oracle
@@ -177,6 +255,21 @@ export class MangoClient {
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         tokenMint: mintPk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
+  }
+
+  public async closeStubOracle(
+    group: Group,
+    oracle: PublicKey,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .closeStubOracle()
+      .accounts({
+        group: group.publicKey,
+        oracle: oracle,
+        solDestination: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
       })
       .rpc();
   }
@@ -290,13 +383,12 @@ export class MangoClient {
       .accounts({
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        solDestination: (this.program.provider as AnchorProvider).wallet
-          .publicKey,
+        solDestination: mangoAccount.owner,
       })
       .rpc();
   }
 
-  public async deposit(
+  public async tokenDeposit(
     group: Group,
     mangoAccount: MangoAccount,
     tokenName: string,
@@ -345,7 +437,7 @@ export class MangoClient {
       await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     return await this.program.methods
-      .deposit(toNativeDecimals(amount, bank.mintDecimals))
+      .tokenDeposit(toNativeDecimals(amount, bank.mintDecimals))
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -367,7 +459,7 @@ export class MangoClient {
       .rpc({ skipPreflight: true });
   }
 
-  public async withdraw(
+  public async tokenWithdraw(
     group: Group,
     mangoAccount: MangoAccount,
     tokenName: string,
@@ -385,7 +477,7 @@ export class MangoClient {
       await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     return await this.program.methods
-      .withdraw(toNativeDecimals(amount, bank.mintDecimals), allowBorrow)
+      .tokenWithdraw(toNativeDecimals(amount, bank.mintDecimals), allowBorrow)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -423,6 +515,23 @@ export class MangoClient {
         baseBank: baseBank.publicKey,
         quoteBank: quoteBank.publicKey,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
+  }
+
+  public async serum3deregisterMarket(
+    group: Group,
+    serum3MarketName: string,
+  ): Promise<TransactionSignature> {
+    const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
+
+    return await this.program.methods
+      .serum3DeregisterMarket()
+      .accounts({
+        group: group.publicKey,
+        serumMarket: serum3Market.publicKey,
+        solDestination: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
       })
       .rpc();
   }
@@ -488,6 +597,32 @@ export class MangoClient {
         serumMarketExternal: serum3Market.serumMarketExternal,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
+  }
+
+  public async serum3CloseOpenOrders(
+    group: Group,
+    mangoAccount: MangoAccount,
+    serum3MarketName: string,
+  ): Promise<TransactionSignature> {
+    const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
+
+    let openOrders = mangoAccount.serum3.find(
+      (account) => account.marketIndex === serum3Market.marketIndex,
+    )?.openOrders;
+
+    return await this.program.methods
+      .serum3CloseOpenOrders()
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        serumMarket: serum3Market.publicKey,
+        serumProgram: serum3Market.serumProgram,
+        serumMarketExternal: serum3Market.serumMarketExternal,
+        openOrders,
+        solDestination: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
       })
       .rpc();
   }
@@ -586,6 +721,40 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
+      .rpc();
+  }
+
+  async serum3CancelAllorders(
+    group: Group,
+    mangoAccount: MangoAccount,
+    serum3ProgramId: PublicKey,
+    serum3MarketName: string,
+    limit: number,
+  ) {
+    const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
+
+    const serum3MarketExternal = await Market.load(
+      this.program.provider.connection,
+      serum3Market.serumMarketExternal,
+      { commitment: this.program.provider.connection.commitment },
+      serum3ProgramId,
+    );
+
+    return await this.program.methods
+      .serum3CancelAllOrders(limit)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        openOrders: mangoAccount.findSerum3Account(serum3Market.marketIndex)
+          ?.openOrders,
+        serumMarket: serum3Market.publicKey,
+        serumProgram: serum3ProgramId,
+        serumMarketExternal: serum3Market.serumMarketExternal,
+        marketBids: serum3MarketExternal.bidsAddress,
+        marketAsks: serum3MarketExternal.asksAddress,
+        marketEventQueue: serum3MarketExternal.decoded.eventQueue,
+      })
       .rpc();
   }
 
@@ -785,6 +954,27 @@ export class MangoClient {
         }),
       ])
       .signers([bids, asks, eventQueue])
+      .rpc();
+  }
+
+  async perpCloseMarket(
+    group: Group,
+    perpMarketName: string,
+  ): Promise<TransactionSignature> {
+    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+
+    return await this.program.methods
+      .perpCloseMarket()
+      .accounts({
+        group: group.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        perpMarket: perpMarket.publicKey,
+        asks: perpMarket.asks,
+        bids: perpMarket.bids,
+        eventQueue: perpMarket.eventQueue,
+        solDestination: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
+      })
       .rpc();
   }
 
@@ -999,7 +1189,7 @@ export class MangoClient {
 
     const mintInfos = await Promise.all(
       [...new Set(tokenIndices)].map(async (tokenIndex) =>
-        getMintInfoForTokenIndex(this, group.publicKey, tokenIndex),
+        this.getMintInfoForTokenIndex(group, tokenIndex),
       ),
     );
     healthRemainingAccounts.push(

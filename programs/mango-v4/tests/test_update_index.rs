@@ -47,7 +47,7 @@ async fn test_update_index() -> Result<(), TransportError> {
     for &token_account in payer_mint_accounts {
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: 10000,
                 account: deposit_account,
                 token_account,
@@ -73,7 +73,7 @@ async fn test_update_index() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        DepositInstruction {
+        TokenDepositInstruction {
             amount: 100000,
             account: withdraw_account,
             token_account: payer_mint_accounts[1],
@@ -85,7 +85,7 @@ async fn test_update_index() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        WithdrawInstruction {
+        TokenWithdrawInstruction {
             amount: 5000,
             allow_borrow: true,
             account: withdraw_account,

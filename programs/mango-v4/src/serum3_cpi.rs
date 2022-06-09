@@ -161,6 +161,42 @@ impl<'info> InitOpenOrders<'info> {
     }
 }
 
+pub struct CloseOpenOrders<'info> {
+    pub program: AccountInfo<'info>,
+    pub market: AccountInfo<'info>,
+    pub open_orders: AccountInfo<'info>,
+    pub open_orders_authority: AccountInfo<'info>,
+    pub sol_destination: AccountInfo<'info>,
+}
+
+impl<'info> CloseOpenOrders<'info> {
+    pub fn call(self, group: &Group) -> Result<()> {
+        let data = serum_dex::instruction::MarketInstruction::CloseOpenOrders.pack();
+        let instruction = solana_program::instruction::Instruction {
+            program_id: *self.program.key,
+            data,
+            accounts: vec![
+                AccountMeta::new(*self.open_orders.key, false),
+                AccountMeta::new_readonly(*self.open_orders_authority.key, true),
+                AccountMeta::new(*self.sol_destination.key, false),
+                AccountMeta::new_readonly(*self.market.key, false),
+            ],
+        };
+
+        let account_infos = [
+            self.program,
+            self.open_orders,
+            self.open_orders_authority,
+            self.sol_destination,
+            self.market,
+        ];
+
+        let seeds = group_seeds!(group);
+        solana_program::program::invoke_signed_unchecked(&instruction, &account_infos, &[seeds])?;
+        Ok(())
+    }
+}
+
 pub struct SettleFunds<'info> {
     pub program: AccountInfo<'info>,
     pub market: AccountInfo<'info>,

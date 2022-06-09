@@ -55,7 +55,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: deposit_amount,
                 account,
                 token_account,
@@ -165,7 +165,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: 10,
                 account,
                 token_account: payer_mint_accounts[0],
@@ -222,7 +222,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     // Give the account some quote currency
     send_tx(
         solana,
-        DepositInstruction {
+        TokenDepositInstruction {
             amount: 1000,
             account,
             token_account: payer_mint_accounts[0],
@@ -319,7 +319,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: 10,
                 account,
                 token_account: payer_mint_accounts[0],

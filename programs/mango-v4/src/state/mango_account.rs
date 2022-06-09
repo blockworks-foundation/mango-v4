@@ -277,8 +277,16 @@ impl MangoAccountSerum3 {
         }
     }
 
-    pub fn deactivate(&mut self, index: usize) {
+    pub fn deactivate(&mut self, market_index: Serum3MarketIndex) -> Result<()> {
+        let index = self
+            .values
+            .iter()
+            .position(|p| p.is_active_for_market(market_index))
+            .ok_or(MangoError::SomeError)?;
+
         self.values[index].market_index = Serum3MarketIndex::MAX;
+
+        Ok(())
     }
 
     pub fn iter_active(&self) -> impl Iterator<Item = &Serum3Account> {

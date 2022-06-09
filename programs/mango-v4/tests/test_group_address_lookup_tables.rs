@@ -66,7 +66,7 @@ async fn test_group_address_lookup_tables() -> Result<()> {
         let oracle = create_stub_oracle_accounts.oracle;
         send_tx(
             solana,
-            SetStubOracle {
+            SetStubOracleInstruction {
                 group,
                 admin,
                 mint: mint.pubkey,
@@ -134,7 +134,7 @@ async fn test_group_address_lookup_tables() -> Result<()> {
         for &payer_token in payer_mint_accounts {
             send_tx(
                 solana,
-                DepositInstruction {
+                TokenDepositInstruction {
                     amount: deposit_amount,
                     account,
                     token_account: payer_token,
@@ -155,7 +155,7 @@ async fn test_group_address_lookup_tables() -> Result<()> {
         for &payer_token in payer_mint_accounts {
             send_tx(
                 solana,
-                WithdrawInstruction {
+                TokenWithdrawInstruction {
                     amount: withdraw_amount,
                     allow_borrow: true,
                     account,

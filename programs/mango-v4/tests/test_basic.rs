@@ -59,7 +59,7 @@ async fn test_basic() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: deposit_amount,
                 account,
                 token_account: payer_mint0_account,
@@ -94,7 +94,7 @@ async fn test_basic() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            WithdrawInstruction {
+            TokenWithdrawInstruction {
                 amount: withdraw_amount,
                 allow_borrow: true,
                 account,
@@ -122,14 +122,71 @@ async fn test_basic() -> Result<(), TransportError> {
     }
 
     //
-    // TEST: Close account
-    // TODO: This just checks execution, preconditions etc need to be tested!
+    // TEST: Close account and de register bank
     //
+
+    // withdraw whatever is remaining, can't close bank vault without this
+    let bank_data: Bank = solana.get_account(bank).await;
+    send_tx(
+        solana,
+        TokenWithdrawInstruction {
+            amount: bank_data.native_total_deposits().to_num(),
+            allow_borrow: false,
+            account,
+            owner,
+            token_account: payer_mint0_account,
+        },
+    )
+    .await
+    .unwrap();
+
+    // close account
     send_tx(
         solana,
         CloseAccountInstruction {
             account,
             owner,
+            sol_destination: payer.pubkey(),
+        },
+    )
+    .await
+    .unwrap();
+
+    // deregister bank - closes bank, mint info, and bank vault
+    let bank_data: Bank = solana.get_account(bank).await;
+    send_tx(
+        solana,
+        TokenDeregisterInstruction {
+            admin,
+            payer,
+            group,
+            mint: bank_data.mint,
+            token_index: bank_data.token_index,
+            sol_destination: payer.pubkey(),
+        },
+    )
+    .await
+    .unwrap();
+
+    // close stub oracle
+    send_tx(
+        solana,
+        CloseStubOracleInstruction {
+            group,
+            mint: bank_data.mint,
+            admin,
+            sol_destination: payer.pubkey(),
+        },
+    )
+    .await
+    .unwrap();
+
+    // close group
+    send_tx(
+        solana,
+        CloseGroupInstruction {
+            group,
+            admin,
             sol_destination: payer.pubkey(),
         },
     )

@@ -26,13 +26,17 @@ pub mod mango_v4 {
 
     use super::*;
 
-    pub fn create_group(ctx: Context<CreateGroup>, group_num: u32) -> Result<()> {
-        instructions::create_group(ctx, group_num)
+    pub fn create_group(ctx: Context<CreateGroup>, group_num: u32, testing: u8) -> Result<()> {
+        instructions::create_group(ctx, group_num, testing)
+    }
+
+    pub fn close_group(ctx: Context<CloseGroup>) -> Result<()> {
+        instructions::close_group(ctx)
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn register_token(
-        ctx: Context<RegisterToken>,
+    pub fn token_register(
+        ctx: Context<TokenRegister>,
         token_index: TokenIndex,
         name: String,
         interest_rate_params: InterestRateParams,
@@ -44,7 +48,7 @@ pub mod mango_v4 {
         init_liab_weight: f32,
         liquidation_fee: f32,
     ) -> Result<()> {
-        instructions::register_token(
+        instructions::token_register(
             ctx,
             token_index,
             name,
@@ -57,6 +61,10 @@ pub mod mango_v4 {
             init_liab_weight,
             liquidation_fee,
         )
+    }
+
+    pub fn token_deregister(ctx: Context<TokenDeregister>) -> Result<()> {
+        instructions::token_deregister(ctx)
     }
 
     pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
@@ -86,16 +94,24 @@ pub mod mango_v4 {
         instructions::create_stub_oracle(ctx, price)
     }
 
+    pub fn close_stub_oracle(ctx: Context<CloseStubOracle>) -> Result<()> {
+        instructions::close_stub_oracle(ctx)
+    }
+
     pub fn set_stub_oracle(ctx: Context<SetStubOracle>, price: I80F48) -> Result<()> {
         instructions::set_stub_oracle(ctx, price)
     }
 
-    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
-        instructions::deposit(ctx, amount)
+    pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
+        instructions::token_deposit(ctx, amount)
     }
 
-    pub fn withdraw(ctx: Context<Withdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
-        instructions::withdraw(ctx, amount, allow_borrow)
+    pub fn token_withdraw(
+        ctx: Context<TokenWithdraw>,
+        amount: u64,
+        allow_borrow: bool,
+    ) -> Result<()> {
+        instructions::token_withdraw(ctx, amount, allow_borrow)
     }
 
     pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
@@ -121,10 +137,18 @@ pub mod mango_v4 {
         instructions::serum3_register_market(ctx, market_index, name)
     }
 
+    pub fn serum3_deregister_market(ctx: Context<Serum3DeregisterMarket>) -> Result<()> {
+        instructions::serum3_deregister_market(ctx)
+    }
+
     // TODO serum3_change_spot_market_params
 
     pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result<()> {
         instructions::serum3_create_open_orders(ctx)
+    }
+
+    pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<()> {
+        instructions::serum3_close_open_orders(ctx)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -158,6 +182,10 @@ pub mod mango_v4 {
         order_id: u128,
     ) -> Result<()> {
         instructions::serum3_cancel_order(ctx, side, order_id)
+    }
+
+    pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) -> Result<()> {
+        instructions::serum3_cancel_all_orders(ctx, limit)
     }
 
     pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
@@ -232,6 +260,10 @@ pub mod mango_v4 {
             min_funding,
             impact_quantity,
         )
+    }
+
+    pub fn perp_close_market(ctx: Context<PerpCloseMarket>) -> Result<()> {
+        instructions::perp_close_market(ctx)
     }
 
     // TODO perp_change_perp_market_params

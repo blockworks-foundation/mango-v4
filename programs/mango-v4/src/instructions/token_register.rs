@@ -13,7 +13,7 @@ const INDEX_START: I80F48 = I80F48!(1_000_000);
 
 #[derive(Accounts)]
 #[instruction(token_index: TokenIndex)]
-pub struct RegisterToken<'info> {
+pub struct TokenRegister<'info> {
     #[account(
         has_one = admin,
     )]
@@ -86,8 +86,8 @@ pub struct InterestRateParams {
 // TODO: should this be "configure_mint", we pass an explicit index, and allow
 // overwriting config as long as the mint account stays the same?
 #[allow(clippy::too_many_arguments)]
-pub fn register_token(
-    ctx: Context<RegisterToken>,
+pub fn token_register(
+    ctx: Context<TokenRegister>,
     token_index: TokenIndex,
     name: String,
     interest_rate_params: InterestRateParams,
