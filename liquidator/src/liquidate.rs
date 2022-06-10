@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
-use crate::account_shared_data::AccountSharedDataRef;
+use crate::account_shared_data::KeyedAccountSharedData;
 
 use arrayref::array_ref;
 use client::MangoClient;
@@ -132,8 +132,8 @@ pub fn compute_health_(
     let retriever = FixedOrderAccountRetriever {
         ais: health_accounts
             .into_iter()
-            .map(|asd| AccountSharedDataRef::borrow(asd.0, asd.1))
-            .collect::<anchor_lang::Result<Vec<_>>>()?,
+            .map(|asd| KeyedAccountSharedData::new(asd.0, asd.1.clone()))
+            .collect::<Vec<_>>(),
         n_banks: active_token_len,
         begin_perp: active_token_len * 2,
         begin_serum3: active_token_len * 2 + active_perp_len,
@@ -182,7 +182,7 @@ pub fn process_accounts<'a>(
                     let bank = load_mango_account_from_chain::<Bank>(chain_data, &mint_info.bank)?;
                     let oracle = chain_data.account(&mint_info.oracle)?;
                     let price = oracle_price(
-                        &AccountSharedDataRef::borrow(mint_info.oracle, &oracle)?,
+                        &KeyedAccountSharedData::new(mint_info.oracle, oracle.clone()),
                         bank.mint_decimals,
                     )?;
                     Ok((token.token_index, bank, token.native(bank) * price))

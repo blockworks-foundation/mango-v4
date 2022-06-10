@@ -4,35 +4,40 @@ use solana_sdk::{
     pubkey::Pubkey,
 };
 
-/// A Ref to an AccountSharedData - makes AccountSharedData compatible with AccountReader
-pub struct AccountSharedDataRef<'a> {
+#[derive(Clone)]
+pub struct KeyedAccountSharedData {
     pub key: Pubkey,
-    pub owner: &'a Pubkey,
-    pub data: &'a [u8],
+    pub data: AccountSharedData,
 }
 
-impl<'a> AccountSharedDataRef<'a> {
-    pub fn borrow(key: Pubkey, asd: &'a AccountSharedData) -> anchor_lang::Result<Self> {
-        Ok(Self {
-            key,
-            owner: asd.owner(),
-            data: asd.data(),
-        })
+impl KeyedAccountSharedData {
+    pub fn new(key: Pubkey, data: AccountSharedData) -> Self {
+        Self { key, data }
     }
 }
 
-impl<'a> AccountReader for AccountSharedDataRef<'a> {
+impl AccountReader for KeyedAccountSharedData {
     fn owner(&self) -> &Pubkey {
-        self.owner
+        self.data.owner()
     }
 
     fn data(&self) -> &[u8] {
-        &self.data
+        self.data.data()
     }
 }
 
-impl<'a> KeyedAccountReader for AccountSharedDataRef<'a> {
+impl KeyedAccountReader for KeyedAccountSharedData {
     fn key(&self) -> &Pubkey {
         &self.key
+    }
+}
+
+impl AccountReader for AccountSharedData {
+    fn owner(&self) -> &Pubkey {
+        self.owner()
+    }
+
+    fn data(&self) -> &[u8] {
+        self.data()
     }
 }
