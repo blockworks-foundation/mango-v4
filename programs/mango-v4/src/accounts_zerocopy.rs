@@ -91,6 +91,17 @@ impl<'info, 'a> KeyedAccountReader for AccountInfoRefMut<'info, 'a> {
     }
 }
 
+#[cfg(feature = "solana-sdk")]
+impl<T: solana_sdk::account::ReadableAccount> AccountReader for T {
+    fn owner(&self) -> &Pubkey {
+        self.owner()
+    }
+
+    fn data(&self) -> &[u8] {
+        self.data()
+    }
+}
+
 //
 // Common traits for loading from account data.
 //

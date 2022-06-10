@@ -1,8 +1,5 @@
 use mango_v4::accounts_zerocopy::{AccountReader, KeyedAccountReader};
-use solana_sdk::{
-    account::{AccountSharedData, ReadableAccount},
-    pubkey::Pubkey,
-};
+use solana_sdk::{account::AccountSharedData, pubkey::Pubkey};
 
 #[derive(Clone)]
 pub struct KeyedAccountSharedData {
@@ -18,26 +15,16 @@ impl KeyedAccountSharedData {
 
 impl AccountReader for KeyedAccountSharedData {
     fn owner(&self) -> &Pubkey {
-        self.data.owner()
+        AccountReader::owner(&self.data)
     }
 
     fn data(&self) -> &[u8] {
-        self.data.data()
+        AccountReader::data(&self.data)
     }
 }
 
 impl KeyedAccountReader for KeyedAccountSharedData {
     fn key(&self) -> &Pubkey {
         &self.key
-    }
-}
-
-impl AccountReader for AccountSharedData {
-    fn owner(&self) -> &Pubkey {
-        self.owner()
-    }
-
-    fn data(&self) -> &[u8] {
-        self.data()
     }
 }
