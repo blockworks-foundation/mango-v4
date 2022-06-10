@@ -1,6 +1,3 @@
-import { ORCA_TOKEN_SWAP_ID_DEVNET } from '@orca-so/sdk';
-import { orcaDevnetPoolConfigs } from '@orca-so/sdk/dist/constants/devnet/pools';
-import { OrcaPoolConfig as OrcaDevnetPoolConfig } from '@orca-so/sdk/dist/public/devnet/pools';
 import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
 import { getFeeRates, getFeeTier, Market } from '@project-serum/serum';
 import { Order } from '@project-serum/serum/lib/market';
@@ -10,7 +7,6 @@ import {
   WRAPPED_SOL_MINT,
 } from '@project-serum/serum/lib/token-instructions';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { TokenSwap } from '@solana/spl-token-swap';
 import {
   AccountMeta,
   Keypair,
@@ -36,6 +32,10 @@ import {
   Serum3SelfTradeBehavior,
   Serum3Side,
 } from './accounts/serum3';
+import {
+  buildOrcaInstruction,
+  ORCA_TOKEN_SWAP_ID_DEVNET,
+} from './integrations/orca/index';
 import { IDL, MangoV4 } from './mango_v4';
 import { MarginTradeWithdraw } from './types';
 import {
@@ -1120,7 +1120,7 @@ export class MangoClient {
 
     const targetProgramId = ORCA_TOKEN_SWAP_ID_DEVNET;
 
-    const { instruction, signers } = await this.buildOrcaInstruction(
+    const { instruction, signers } = await buildOrcaInstruction(
       targetProgramId,
       inputBank,
       outputBank,
@@ -1223,47 +1223,5 @@ export class MangoClient {
     );
 
     return healthRemainingAccounts;
-  }
-
-  /*
-    Orca ix references:
-      swap fn: https://github.com/orca-so/typescript-sdk/blob/main/src/model/orca/pool/orca-pool.ts#L162
-      swap ix: https://github.com/orca-so/typescript-sdk/blob/main/src/public/utils/web3/instructions/pool-instructions.ts#L41
-  */
-  private async buildOrcaInstruction(
-    orcaTokenSwapId: PublicKey,
-    inputBank: Bank,
-    outputBank: Bank,
-    amountInU64: BN,
-    minimumAmountOutU64: BN,
-  ) {
-    const poolParams = orcaDevnetPoolConfigs[OrcaDevnetPoolConfig.ORCA_SOL];
-
-    const [authorityForPoolAddress] = await PublicKey.findProgramAddress(
-      [poolParams.address.toBuffer()],
-      orcaTokenSwapId,
-    );
-
-    const instruction = TokenSwap.swapInstruction(
-      poolParams.address,
-      authorityForPoolAddress,
-      inputBank.publicKey, // userTransferAuthority
-      inputBank.vault, // inputTokenUserAddress
-      poolParams.tokens[inputBank.mint.toString()].addr, // inputToken.addr
-      poolParams.tokens[outputBank.mint.toString()].addr, // outputToken.addr
-      outputBank.vault, // outputTokenUserAddress
-      poolParams.poolTokenMint,
-      poolParams.feeAccount,
-      null, // hostFeeAccount
-      orcaTokenSwapId,
-      TOKEN_PROGRAM_ID,
-      amountInU64,
-      minimumAmountOutU64,
-    );
-
-    instruction.keys[2].isSigner = false;
-    instruction.keys[2].isWritable = true;
-
-    return { instruction, signers: [] };
   }
 }
