@@ -4,6 +4,7 @@ use crate::account_shared_data::KeyedAccountSharedData;
 
 use arrayref::array_ref;
 use client::MangoClient;
+use mango_v4::accounts_zerocopy::LoadZeroCopy;
 use mango_v4::state::{
     compute_health, oracle_price, Bank, FixedOrderAccountRetriever, HealthType, MangoAccount,
     MintInfo, PerpMarketIndex, TokenIndex,
@@ -18,38 +19,13 @@ use {
     solana_sdk::pubkey::Pubkey,
 };
 
-// FUTURE: It'd be very nice if I could map T to the DataType::T constant!
-pub fn load_mango_account<
-    T: anchor_lang::AccountDeserialize + anchor_lang::Discriminator + bytemuck::Pod,
->(
+pub fn load_mango_account<T: anchor_lang::ZeroCopy + anchor_lang::Owner>(
     account: &AccountSharedData,
 ) -> anyhow::Result<&T> {
-    let data = account.data();
-
-    let disc_bytes = array_ref![data, 0, 8];
-    if disc_bytes != &T::discriminator() {
-        anyhow::bail!(
-            "unexpected disc expected {:?}, got {:?}",
-            T::discriminator(),
-            disc_bytes
-        );
-    }
-
-    if data.len() != 8 + std::mem::size_of::<T>() {
-        anyhow::bail!(
-            "bad account size expected {}, got {}",
-            8 + std::mem::size_of::<T>(),
-            data.len(),
-        );
-    }
-
-    return Ok(bytemuck::try_from_bytes(&data[8..]).expect("always Ok"));
+    account.load::<T>().map_err(|e| e.into())
 }
 
-fn load_mango_account_from_chain<
-    'a,
-    T: anchor_lang::AccountDeserialize + anchor_lang::Discriminator + bytemuck::Pod,
->(
+fn load_mango_account_from_chain<'a, T: anchor_lang::ZeroCopy + anchor_lang::Owner>(
     chain_data: &'a ChainData,
     pubkey: &Pubkey,
 ) -> anyhow::Result<&'a T> {
