@@ -37,10 +37,12 @@ export class Group {
   }
 
   public async reload(client: MangoClient) {
-    await this.reloadBanks(client);
-    await this.reloadMintInfos(client);
-    await this.reloadSerum3Markets(client);
-    await this.reloadPerpMarkets(client);
+    await Promise.all([
+      this.reloadBanks(client),
+      this.reloadMintInfos(client),
+      this.reloadSerum3Markets(client),
+      this.reloadPerpMarkets(client),
+    ]);
   }
 
   public async reloadBanks(client: MangoClient) {
@@ -52,11 +54,6 @@ export class Group {
     const mintInfos = await client.getMintInfosForGroup(this);
     this.mintInfosMap = new Map(
       mintInfos.map((mintInfo) => {
-        // console.log(
-        //   Array.from(this.banksMap.values()).find(
-        //     (bank) => bank.mint.toBase58() === mintInfo.mint.toBase58(),
-        //   ),
-        // );
         return [
           Array.from(this.banksMap.values()).find(
             (bank) => bank.mint.toBase58() === mintInfo.mint.toBase58(),
@@ -65,9 +62,6 @@ export class Group {
         ];
       }),
     );
-
-    // console.log(this.banksMap);
-    // console.log(this.mintInfosMap);
   }
 
   public async reloadSerum3Markets(client: MangoClient) {
