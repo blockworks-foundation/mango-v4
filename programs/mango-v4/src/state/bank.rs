@@ -64,6 +64,8 @@ pub struct Bank {
     pub mint_decimals: u8,
 
     pub reserved: [u8; 4],
+    // TODO: add space for an oracle which services interest rate for the bank's mint
+    // interest rate tied to oracle might help reduce spreads between deposits and borrows
 }
 const_assert_eq!(size_of::<Bank>(), 16 + 32 * 4 + 8 + 16 * 18 + 3 + 5);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
