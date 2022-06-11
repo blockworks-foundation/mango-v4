@@ -2,6 +2,7 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../../client';
+import { MANGO_V4_ID } from '../../constants';
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
@@ -18,7 +19,12 @@ async function main() {
   );
   const user1Wallet = new Wallet(user1);
   const user1Provider = new AnchorProvider(connection, user1Wallet, options);
-  const user1Client = await MangoClient.connect(user1Provider, true);
+  const user1Client = await MangoClient.connect(
+    user1Provider,
+    'devnet',
+    MANGO_V4_ID['devnet'],
+    false,
+  );
   console.log(`user1 ${user1Wallet.publicKey.toBase58()}`);
 
   /// fetch group
@@ -60,7 +66,12 @@ async function main() {
   );
   const user2Wallet = new Wallet(user2);
   const user2Provider = new AnchorProvider(connection, user2Wallet, options);
-  const user2Client = await MangoClient.connect(user2Provider, true);
+  const user2Client = await MangoClient.connect(
+    user2Provider,
+    'devnet',
+    MANGO_V4_ID['devnet'],
+    false,
+  );
   console.log(`user2 ${user2Wallet.publicKey.toBase58()}`);
 
   // create + fetch account

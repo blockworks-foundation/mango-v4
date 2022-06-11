@@ -2,6 +2,7 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
+import { MANGO_V4_ID } from '../constants';
 
 export const DEVNET_MINTS = new Map([
   ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'], // use devnet usdc
@@ -22,7 +23,12 @@ async function main() {
   const adminWallet = new Wallet(admin);
   console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
   const adminProvider = new AnchorProvider(connection, adminWallet, options);
-  const client = await MangoClient.connect(adminProvider, true);
+  const client = await MangoClient.connect(
+    adminProvider,
+    'devnet',
+    MANGO_V4_ID['devnet'],
+    false,
+  );
 
   const group = await client.getGroupForAdmin(admin.publicKey);
   console.log(`Group ${group.publicKey}`);
@@ -32,7 +38,10 @@ async function main() {
   // close stub oracle
   const usdcDevnetMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
-    const usdcDevnetOracle = await client.getStubOracle(group, usdcDevnetMint);
+    const usdcDevnetOracle = await client.getStubOracle(
+      group,
+      usdcDevnetMint,
+    )[0];
     let sig = await client.closeStubOracle(group, usdcDevnetOracle.publicKey);
     console.log(
       `Closed USDC stub oracle, sig https://explorer.solana.com/address/${sig}?cluster=devnet`,

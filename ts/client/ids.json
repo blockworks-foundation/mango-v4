@@ -1,0 +1,34 @@
+{
+  "testnet": {},
+  "devnet": {
+    "m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD": {
+      "8nBa69Ed8LCeP5YpZ1qB58DTEXq8fq7epfH5RsUVFATb": {
+        "banks": {
+          "USDC": "ChuTYko8TLHb8Xn72gAe7PQTS9ULvrTayjMzjRGSmUn8",
+          "SOL": "3V7vwKfQPhJn2bSywqsrvJwwCK9B5Dy3mE2SXCFxfW1N",
+          "ORCA": "fiHgPevezzWH3zWFsqnHdcA9Qeg6B15HfsDXGygBcqF",
+          "BTC": "HGw2wgfnytS3uEwPeyNijhoruA3K7msQaogkxC8EKdGX"
+        },
+        "stubOracles": {
+          "USDC": "DfbZP2mdLnHKWT5tVGb3MyaqEJpEfVQGi8LSP1gxgCeN"
+        },
+        "mintInfos": {
+          "ORCA": "GXW8pBd3wZx8QZCoxsTj4CT3qGfoSGED6SB2bKXonZAs",
+          "BTC": "6onpaK9yFJBcV5d6Vs8vUnWF5pKDBDCo3rq4E9gva6nh",
+          "USDC": "4gdSUfDBo5YibmanYL1N5uDdcBSdkpx75AwmUZWasFPW",
+          "SOL": "BEckAgpZQmSpcA2ncgb3LWfRHxnwG3WsNqpkaXQzAMA2"
+        },
+        "serum3Markets": {
+          "BTC/USDC": "AThBBA35mBxnUi3rT7YPVZKDnpZbi2ZsNSzJZkfJrFoA"
+        },
+        "serum3MarketExternals": {
+          "BTC/USDC": "DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB"
+        },
+        "perpMarkets": {
+          "BTC/USDC": "D2cYz3LdYfzcpNcbx4TFr4P8C24XUzPtXPnyZSyhA8oa"
+        }
+      }
+    }
+  },
+  "mainnet": {}
+}
