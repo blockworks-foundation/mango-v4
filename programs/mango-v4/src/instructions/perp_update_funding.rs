@@ -30,6 +30,7 @@ pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
 
     let oracle_price = oracle_price(
         &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        &ctx.accounts.oracle.key(),
         perp_market.base_token_decimals,
     )?;
 
