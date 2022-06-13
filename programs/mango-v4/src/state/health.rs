@@ -64,7 +64,7 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
         require!(&bank.oracle == oracle.key(), MangoError::SomeError);
         Ok((
             bank,
-            oracle_price(oracle, &oracle.key(), bank.mint_decimals)?,
+            oracle_price(oracle, bank.oracle_config.conf_filter, bank.mint_decimals)?,
         ))
     }
 
@@ -206,8 +206,8 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         require!(&bank2.oracle == oracle2.key, MangoError::SomeError);
         let mint_decimals1 = bank1.mint_decimals;
         let mint_decimals2 = bank2.mint_decimals;
-        let price1 = oracle_price(oracle1, &bank1.oracle, mint_decimals1)?;
-        let price2 = oracle_price(oracle2, &bank2.oracle, mint_decimals2)?;
+        let price1 = oracle_price(oracle1, bank1.oracle_config.conf_filter, mint_decimals1)?;
+        let price2 = oracle_price(oracle2, bank2.oracle_config.conf_filter, mint_decimals2)?;
         if swap {
             Ok((bank2, bank1, price2, price1))
         } else {
@@ -229,7 +229,7 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
         require!(&bank.oracle == oracle.key, MangoError::SomeError);
         Ok((
             bank,
-            oracle_price(oracle, &bank.oracle, bank.mint_decimals)?,
+            oracle_price(oracle, bank.oracle_config.conf_filter, bank.mint_decimals)?,
         ))
     }
 

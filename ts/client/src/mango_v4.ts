@@ -209,6 +209,12 @@ export type MangoV4 = {
           "type": "string"
         },
         {
+          "name": "oracleConfig",
+          "type": {
+            "defined": "OracleConfig"
+          }
+        },
+        {
           "name": "interestRateParams",
           "type": {
             "defined": "InterestRateParams"
@@ -1447,6 +1453,12 @@ export type MangoV4 = {
           "type": "string"
         },
         {
+          "name": "oracleConfig",
+          "type": {
+            "defined": "OracleConfig"
+          }
+        },
+        {
           "name": "baseTokenIndexOpt",
           "type": {
             "option": "u16"
@@ -1901,6 +1913,12 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "oracleConfig",
+            "type": {
+              "defined": "OracleConfig"
+            }
+          },
+          {
             "name": "depositIndex",
             "type": {
               "defined": "I80F48"
@@ -2329,6 +2347,12 @@ export type MangoV4 = {
           {
             "name": "oracle",
             "type": "publicKey"
+          },
+          {
+            "name": "oracleConfig",
+            "type": {
+              "defined": "OracleConfig"
+            }
           },
           {
             "name": "bids",
@@ -2780,6 +2804,20 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "OracleConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "confFilter",
+            "type": {
+              "defined": "I80F48"
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "AnyNode",
       "type": {
         "kind": "struct",
@@ -3000,10 +3038,16 @@ export type MangoV4 = {
         "kind": "enum",
         "variants": [
           {
+            "name": "Pyth"
+          },
+          {
             "name": "Stub"
           },
           {
-            "name": "Pyth"
+            "name": "SwitchboardV1"
+          },
+          {
+            "name": "SwitchboardV2"
           }
         ]
       }
@@ -3398,6 +3442,12 @@ export const IDL: MangoV4 = {
           "type": "string"
         },
         {
+          "name": "oracleConfig",
+          "type": {
+            "defined": "OracleConfig"
+          }
+        },
+        {
           "name": "interestRateParams",
           "type": {
             "defined": "InterestRateParams"
@@ -4636,6 +4686,12 @@ export const IDL: MangoV4 = {
           "type": "string"
         },
         {
+          "name": "oracleConfig",
+          "type": {
+            "defined": "OracleConfig"
+          }
+        },
+        {
           "name": "baseTokenIndexOpt",
           "type": {
             "option": "u16"
@@ -5090,6 +5146,12 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "oracleConfig",
+            "type": {
+              "defined": "OracleConfig"
+            }
+          },
+          {
             "name": "depositIndex",
             "type": {
               "defined": "I80F48"
@@ -5518,6 +5580,12 @@ export const IDL: MangoV4 = {
           {
             "name": "oracle",
             "type": "publicKey"
+          },
+          {
+            "name": "oracleConfig",
+            "type": {
+              "defined": "OracleConfig"
+            }
           },
           {
             "name": "bids",
@@ -5969,6 +6037,20 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "OracleConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "confFilter",
+            "type": {
+              "defined": "I80F48"
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "AnyNode",
       "type": {
         "kind": "struct",
@@ -6189,10 +6271,16 @@ export const IDL: MangoV4 = {
         "kind": "enum",
         "variants": [
           {
+            "name": "Pyth"
+          },
+          {
             "name": "Stub"
           },
           {
-            "name": "Pyth"
+            "name": "SwitchboardV1"
+          },
+          {
+            "name": "SwitchboardV2"
           }
         ]
       }
