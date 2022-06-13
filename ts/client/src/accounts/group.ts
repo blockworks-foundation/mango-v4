@@ -124,7 +124,7 @@ export class Group {
           client.program.provider.connection,
           serum3Market.serumMarketExternal,
           { commitment: client.program.provider.connection.commitment },
-        SERUM3_PROGRAM_ID[client.cluster],
+          SERUM3_PROGRAM_ID[client.cluster],
         ),
       ),
     );
