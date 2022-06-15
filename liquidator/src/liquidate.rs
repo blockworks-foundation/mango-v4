@@ -2,7 +2,6 @@ use std::{collections::HashMap, str::FromStr};
 
 use crate::account_shared_data::KeyedAccountSharedData;
 
-use arrayref::array_ref;
 use client::MangoClient;
 use mango_v4::accounts_zerocopy::LoadZeroCopy;
 use mango_v4::state::{
@@ -11,12 +10,8 @@ use mango_v4::state::{
 };
 
 use {
-    crate::chain_data::ChainData,
-    anyhow::Context,
-    fixed::types::I80F48,
-    log::*,
-    solana_sdk::account::{AccountSharedData, ReadableAccount},
-    solana_sdk::pubkey::Pubkey,
+    crate::chain_data::ChainData, anyhow::Context, fixed::types::I80F48, log::*,
+    solana_sdk::account::AccountSharedData, solana_sdk::pubkey::Pubkey,
 };
 
 pub fn load_mango_account<T: anchor_lang::ZeroCopy + anchor_lang::Owner>(

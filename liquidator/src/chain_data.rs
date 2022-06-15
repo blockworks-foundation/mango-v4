@@ -1,3 +1,5 @@
+use crate::FIRST_WEBSOCKET_SLOT;
+
 use {
     log::*, solana_sdk::account::AccountSharedData, solana_sdk::pubkey::Pubkey,
     std::collections::HashMap,
@@ -231,6 +233,11 @@ impl ChainData {
                     _ => None,
                 };
                 if let Some(update) = slot_update {
+                    if FIRST_WEBSOCKET_SLOT.get().is_none() {
+                        FIRST_WEBSOCKET_SLOT.set(update.slot).expect("always Ok");
+                        log::debug!("first slot for websocket {}", update.slot);
+                    }
+
                     self.update_slot(update);
                 }
             }

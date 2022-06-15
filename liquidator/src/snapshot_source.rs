@@ -1,12 +1,14 @@
 use jsonrpc_core_client::transports::http;
 
-use mango_v4::state::MangoAccount;
 use solana_account_decoder::{UiAccount, UiAccountEncoding};
 use solana_client::{
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
     rpc_response::{Response, RpcKeyedAccount},
 };
-use solana_rpc::{rpc::rpc_accounts::AccountsDataClient, rpc::OptionalContext};
+use solana_rpc::{
+    rpc::OptionalContext,
+    rpc::{rpc_accounts::AccountsDataClient, rpc_minimal::MinimalClient},
+};
 use solana_sdk::{account::AccountSharedData, commitment_config::CommitmentConfig, pubkey::Pubkey};
 
 use anyhow::Context;
@@ -15,7 +17,7 @@ use log::*;
 use std::str::FromStr;
 use tokio::time;
 
-use crate::{liquidate, AnyhowWrap, Config};
+use crate::{util::is_mango_account, AnyhowWrap, Config, FIRST_WEBSOCKET_SLOT};
 
 #[derive(Clone)]
 pub struct AccountUpdate {
@@ -75,7 +77,7 @@ async fn feed_snapshots(
     sender: &async_channel::Sender<AccountSnapshot>,
 ) -> anyhow::Result<()> {
     let mango_program_id = Pubkey::from_str(&config.mango_program_id)?;
-    let _pyth_program_id = Pubkey::from_str(&config.pyth_program_id)?;
+    let mango_group_id = Pubkey::from_str(&config.mango_group_id)?;
 
     let rpc_client = http::connect_with_options::<AccountsDataClient>(&config.rpc_http_url, true)
         .await
@@ -146,19 +148,7 @@ async fn feed_snapshots(
     let oo_account_pubkeys = snapshot
         .accounts
         .iter()
-        .filter_map(|update| {
-            if let Ok(mango_account) =
-                liquidate::load_mango_account::<MangoAccount>(&update.account)
-            {
-                if mango_account.group.to_string() == config.mango_group_id {
-                    Some(mango_account)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        })
+        .filter_map(|update| is_mango_account(&update.account, &mango_program_id, &mango_group_id))
         .flat_map(|mango_account| {
             mango_account
                 .serum3
@@ -207,11 +197,37 @@ pub fn start(
     mango_pyth_oracles: Vec<Pubkey>,
     sender: async_channel::Sender<AccountSnapshot>,
 ) {
-    let mut interval = time::interval(time::Duration::from_secs(config.snapshot_interval_secs));
+    let mut poll_wait_first_snapshot = time::interval(time::Duration::from_secs(2));
+    let mut interval_between_snapshots =
+        time::interval(time::Duration::from_secs(config.snapshot_interval_secs));
 
     tokio::spawn(async move {
+        let rpc_client = http::connect_with_options::<MinimalClient>(&config.rpc_http_url, true)
+            .await
+            .expect("always Ok");
+
         loop {
-            interval.tick().await;
+            poll_wait_first_snapshot.tick().await;
+
+            let epoch_info = rpc_client
+                .get_epoch_info(Some(CommitmentConfig::finalized()))
+                .await
+                .expect("always Ok");
+            log::debug!("latest slot for snapshot {}", epoch_info.absolute_slot);
+
+            match FIRST_WEBSOCKET_SLOT.get() {
+                Some(first_websocket_slot) => {
+                    if first_websocket_slot < &epoch_info.absolute_slot {
+                        log::debug!("continuing to fetch snapshot now, first websocket feed slot {} is older than latest snapshot slot {}",first_websocket_slot,  epoch_info.absolute_slot);
+                        break;
+                    }
+                }
+                None => {}
+            }
+        }
+
+        loop {
+            interval_between_snapshots.tick().await;
             if let Err(err) = feed_snapshots(&config, mango_pyth_oracles.clone(), &sender).await {
                 warn!("snapshot error: {:?}", err);
             } else {

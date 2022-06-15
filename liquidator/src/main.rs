@@ -8,6 +8,8 @@ use anchor_client::Cluster;
 use client::MangoClient;
 use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
+
+use once_cell::sync::OnceCell;
 use serde_derive::Deserialize;
 
 use solana_sdk::commitment_config::CommitmentConfig;
@@ -30,6 +32,9 @@ pub mod websocket_source;
 // longer periods of time
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
+// first slot received from websocket feed
+static FIRST_WEBSOCKET_SLOT: OnceCell<u64> = OnceCell::new();
 
 trait AnyhowWrap {
     type Value;
@@ -131,11 +136,6 @@ async fn main() -> anyhow::Result<()> {
         async_channel::unbounded::<websocket_source::Message>();
     websocket_source::start(config.clone(), mango_pyth_oracles.clone(), websocket_sender);
 
-    // Wait for some websocket data to accumulate before requesting snapshots,
-    // to make it more likely that there's no gap between the slot the snapshot
-    // was for and the slot of the first websocket messages.
-    tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
-
     // Getting solana account snapshots via jsonrpc
     let (snapshot_sender, snapshot_receiver) =
         async_channel::unbounded::<snapshot_source::AccountSnapshot>();
@@ -172,6 +172,7 @@ async fn main() -> anyhow::Result<()> {
     loop {
         tokio::select! {
             message = websocket_receiver.recv() => {
+
                 metric_websocket_queue_len.set(websocket_receiver.len() as u64);
                 let message = message.expect("channel not closed");
 
