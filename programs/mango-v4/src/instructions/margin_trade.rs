@@ -13,8 +13,9 @@ use std::collections::HashMap;
 ///
 /// In addition to these accounts, there must be a sequence of remaining_accounts:
 /// 1. health_accounts: accounts needed for health checking
-/// 2. target_program_id: the target program account
-/// 3. target_accounts: the accounts to pass to the target program
+/// 2. per cpi
+/// 2.a. target_program_id: the target program account
+/// 2.b. target_accounts: the accounts to pass to the target program
 ///
 /// Every vault address listed in 3. must also have the matching bank and oracle appear in 1.
 ///
@@ -59,15 +60,20 @@ pub struct MarginTradeWithdraw {
     pub amount: u64,
 }
 
-/// - `num_health_accounts` is the number of health accounts that remaining_accounts starts with.
 /// - `withdraws` is a list of MarginTradeWithdraw requests.
-/// - `cpi_data` is the bytes to call the target_program_id with.
+/// - `cpi_datas` is a list of bytes per cpi to call the target_program_id with.
+/// - `cpi_account_starts` is a list of index into the remaining accounts per cpi to call the target_program_id with.
 pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, MarginTrade<'info>>,
-    num_health_accounts: usize,
     withdraws: Vec<MarginTradeWithdraw>,
-    cpi_data: Vec<u8>,
+    cpi_datas: Vec<Vec<u8>>,
+    cpi_account_starts: Vec<usize>,
 ) -> Result<()> {
+    require!(!cpi_datas.is_empty(), MangoError::SomeError);
+    require!(!cpi_account_starts.is_empty(), MangoError::SomeError);
+    let num_of_cpis = cpi_account_starts.len();
+    let num_health_accounts = *cpi_account_starts.get(0).unwrap();
+
     let group = ctx.accounts.group.load()?;
     let mut account = ctx.accounts.account.load_mut()?;
     require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
@@ -109,19 +115,19 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     require!(pre_cpi_health >= 0, MangoError::HealthMustBePositive);
     msg!("pre_cpi_health {:?}", pre_cpi_health);
 
-    let cpi_program_id = *ctx.remaining_accounts[num_health_accounts].key;
-    require_keys_neq!(cpi_program_id, crate::id(), MangoError::SomeError);
-
-    let cpi_ais = &ctx.remaining_accounts[num_health_accounts + 1..];
-    let mut cpi_ams = cpi_ais
+    let all_cpi_ais = &ctx.remaining_accounts[num_health_accounts + 1..];
+    let mut all_cpi_ams = all_cpi_ais
         .iter()
         .flat_map(|item| item.to_account_metas(None))
         .collect::<Vec<_>>();
-    require!(cpi_ais.len() == cpi_ams.len(), MangoError::SomeError);
+    require!(
+        all_cpi_ais.len() == all_cpi_ams.len(),
+        MangoError::SomeError
+    );
 
     // Check that each group-owned token account is the vault of one of the allowed banks,
     // and track its balance.
-    let mut used_vaults = cpi_ais
+    let mut used_vaults = all_cpi_ais
         .iter()
         .enumerate()
         .filter_map(|(i, ai)| {
@@ -165,7 +171,7 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     // Find banks for used vaults in cpi_ais and collect signer seeds for them.
     // Also update withdraw_amount and loan_amount.
     let mut bank_signer_data = Vec::with_capacity(used_vaults.len());
-    for (ai, am) in cpi_ais.iter().zip(cpi_ams.iter_mut()) {
+    for (ai, am) in all_cpi_ais.iter().zip(all_cpi_ams.iter_mut()) {
         if ai.owner != &Mango::id() {
             continue;
         }
@@ -212,7 +218,7 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
             let approve_ctx = CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
                 token::Approve {
-                    to: cpi_ais[vault_info.vault_cpi_ai_index].clone(),
+                    to: all_cpi_ais[vault_info.vault_cpi_ai_index].clone(),
                     delegate: health_ais[vault_info.bank_health_ai_index].clone(),
                     authority: ctx.accounts.group.to_account_info(),
                 },
@@ -241,12 +247,29 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
         })
         .collect::<Vec<_>>();
     let signers_ref = signers.iter().map(|v| &v[..]).collect::<Vec<_>>();
-    let cpi_ix = Instruction {
-        program_id: cpi_program_id,
-        data: cpi_data,
-        accounts: cpi_ams,
-    };
-    solana_program::program::invoke_signed(&cpi_ix, &cpi_ais, &signers_ref)?;
+    for (cpi_index, (cpi_data, cpi_account_start)) in
+        cpi_datas.iter().zip(cpi_account_starts.iter()).enumerate()
+    {
+        let cpi_program_id = *ctx.remaining_accounts[*cpi_account_start].key;
+        require_keys_neq!(cpi_program_id, crate::id(), MangoError::SomeError);
+
+        let all_cpi_ais_end_index = if cpi_index == num_of_cpis - 1 {
+            all_cpi_ams.len()
+        } else {
+            cpi_account_starts[cpi_index + 1] - num_health_accounts
+        };
+
+        let all_cpi_ais_start_index = *cpi_account_start - num_health_accounts;
+
+        let cpi_ais = &all_cpi_ais[all_cpi_ais_start_index..all_cpi_ais_end_index];
+        let cpi_ams = &all_cpi_ams[all_cpi_ais_start_index..all_cpi_ais_end_index];
+        let cpi_ix = Instruction {
+            program_id: cpi_program_id,
+            data: cpi_data.to_vec(),
+            accounts: cpi_ams.to_vec(),
+        };
+        solana_program::program::invoke_signed(&cpi_ix, &cpi_ais, &signers_ref)?;
+    }
 
     // Revoke delegates for vaults
     let group = ctx.accounts.group.load()?;
@@ -255,14 +278,14 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
         if vault_info.withdraw_amount > 0 {
             let ix = token::spl_token::instruction::revoke(
                 &token::spl_token::ID,
-                &cpi_ais[vault_info.vault_cpi_ai_index].key,
+                all_cpi_ais[vault_info.vault_cpi_ai_index].key,
                 &ctx.accounts.group.key(),
                 &[],
             )?;
             solana_program::program::invoke_signed(
                 &ix,
                 &[
-                    cpi_ais[vault_info.vault_cpi_ai_index].clone(),
+                    all_cpi_ais[vault_info.vault_cpi_ai_index].clone(),
                     ctx.accounts.group.to_account_info(),
                 ],
                 &[group_seeds],
@@ -273,7 +296,7 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     // Track vault changes and apply them to the user's token positions
     let mut account = ctx.accounts.account.load_mut()?;
     let inactive_tokens =
-        adjust_for_post_cpi_vault_amounts(health_ais, cpi_ais, &used_vaults, &mut account)?;
+        adjust_for_post_cpi_vault_amounts(health_ais, all_cpi_ais, &used_vaults, &mut account)?;
 
     // Check post-cpi health
     let post_cpi_health =

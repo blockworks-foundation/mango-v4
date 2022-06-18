@@ -108,10 +108,9 @@ impl TestContextBuilder {
             program_log: program_log_capture.clone(),
         }));
 
-        // intentionally set to half the limit, to catch potential problems early
+        // intentionally set to as tight as possible, to catch potential problems early
         // TODO make configurable
-        // margin trade test just goes above 100000 atm
-        test.set_compute_max_units(101000);
+        test.set_compute_max_units(86000);
 
         Self {
             test,
