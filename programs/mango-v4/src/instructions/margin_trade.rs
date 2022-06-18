@@ -262,6 +262,7 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
         let cpi_ams = &all_cpi_ams[all_cpi_ais_start_index..all_cpi_ais_end_index];
         let cpi_ix = Instruction {
             program_id: cpi_program_id,
+            // todo future: optimise out these to_vecs
             data: cpi_data.to_vec(),
             accounts: cpi_ams.to_vec(),
         };
