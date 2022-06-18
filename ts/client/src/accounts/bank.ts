@@ -126,13 +126,20 @@ export class MintInfo {
       vault: PublicKey;
       oracle: PublicKey;
       addressLookupTable: PublicKey;
-      tokenIndex: Number;
+      tokenIndex: number;
       addressLookupTableBankIndex: Number;
       addressLookupTableOracleIndex: Number;
       reserved: unknown;
     },
   ) {
-    return new MintInfo(publicKey, obj.mint, obj.bank, obj.vault, obj.oracle);
+    return new MintInfo(
+      publicKey,
+      obj.mint,
+      obj.bank,
+      obj.vault,
+      obj.oracle,
+      obj.tokenIndex,
+    );
   }
 
   constructor(
@@ -141,5 +148,6 @@ export class MintInfo {
     public bank: PublicKey,
     public vault: PublicKey,
     public oracle: PublicKey,
+    public tokenIndex: number,
   ) {}
 }

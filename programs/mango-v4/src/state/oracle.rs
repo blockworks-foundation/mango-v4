@@ -3,7 +3,7 @@ use std::mem::size_of;
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 use fixed::types::I80F48;
-use fixed_macro::types::I80F48;
+
 use static_assertions::const_assert_eq;
 use switchboard_program::FastRoundResultAccountData;
 use switchboard_v2::AggregatorAccountData;
@@ -167,11 +167,7 @@ pub fn oracle_price(
 mod tests {
     use super::*;
     use solana_program_test::{find_file, read_file};
-    use std::{
-        cell::{Ref, RefCell},
-        path::PathBuf,
-        str::FromStr,
-    };
+    use std::{cell::RefCell, path::PathBuf, str::FromStr};
 
     #[test]
     pub fn test_oracles() -> Result<()> {
@@ -230,7 +226,7 @@ mod tests {
         for idx in 1..=12 {
             assert_eq!(
                 LOOKUP[LOOKUP_FN(idx)],
-                I80F48::from_str(&format!("1{}", str::repeat("0", (idx.abs() as usize)))).unwrap()
+                I80F48::from_str(&format!("1{}", str::repeat("0", idx.abs() as usize))).unwrap()
             )
         }
     }

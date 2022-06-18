@@ -209,12 +209,6 @@ export type MangoV4 = {
           "type": "string"
         },
         {
-          "name": "oracleConfig",
-          "type": {
-            "defined": "OracleConfig"
-          }
-        },
-        {
           "name": "interestRateParams",
           "type": {
             "defined": "InterestRateParams"
@@ -641,10 +635,6 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "numHealthAccounts",
-          "type": "u64"
-        },
-        {
           "name": "withdraws",
           "type": {
             "vec": {
@@ -653,8 +643,12 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "cpiData",
-          "type": "bytes"
+          "name": "cpiDatas",
+          "type": {
+            "vec": {
+              "defined": "(u8,Vec<u8>)"
+            }
+          }
         }
       ]
     },
@@ -1453,12 +1447,6 @@ export type MangoV4 = {
           "type": "string"
         },
         {
-          "name": "oracleConfig",
-          "type": {
-            "defined": "OracleConfig"
-          }
-        },
-        {
           "name": "baseTokenIndexOpt",
           "type": {
             "option": "u16"
@@ -1913,12 +1901,6 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "oracleConfig",
-            "type": {
-              "defined": "OracleConfig"
-            }
-          },
-          {
             "name": "depositIndex",
             "type": {
               "defined": "I80F48"
@@ -2347,12 +2329,6 @@ export type MangoV4 = {
           {
             "name": "oracle",
             "type": "publicKey"
-          },
-          {
-            "name": "oracleConfig",
-            "type": {
-              "defined": "OracleConfig"
-            }
           },
           {
             "name": "bids",
@@ -2804,20 +2780,6 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "OracleConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "confFilter",
-            "type": {
-              "defined": "I80F48"
-            }
-          }
-        ]
-      }
-    },
-    {
       "name": "AnyNode",
       "type": {
         "kind": "struct",
@@ -3038,16 +3000,10 @@ export type MangoV4 = {
         "kind": "enum",
         "variants": [
           {
-            "name": "Pyth"
-          },
-          {
             "name": "Stub"
           },
           {
-            "name": "SwitchboardV1"
-          },
-          {
-            "name": "SwitchboardV2"
+            "name": "Pyth"
           }
         ]
       }
@@ -3442,12 +3398,6 @@ export const IDL: MangoV4 = {
           "type": "string"
         },
         {
-          "name": "oracleConfig",
-          "type": {
-            "defined": "OracleConfig"
-          }
-        },
-        {
           "name": "interestRateParams",
           "type": {
             "defined": "InterestRateParams"
@@ -3874,10 +3824,6 @@ export const IDL: MangoV4 = {
       ],
       "args": [
         {
-          "name": "numHealthAccounts",
-          "type": "u64"
-        },
-        {
           "name": "withdraws",
           "type": {
             "vec": {
@@ -3886,8 +3832,12 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "cpiData",
-          "type": "bytes"
+          "name": "cpiDatas",
+          "type": {
+            "vec": {
+              "defined": "(u8,Vec<u8>)"
+            }
+          }
         }
       ]
     },
@@ -4686,12 +4636,6 @@ export const IDL: MangoV4 = {
           "type": "string"
         },
         {
-          "name": "oracleConfig",
-          "type": {
-            "defined": "OracleConfig"
-          }
-        },
-        {
           "name": "baseTokenIndexOpt",
           "type": {
             "option": "u16"
@@ -5146,12 +5090,6 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "oracleConfig",
-            "type": {
-              "defined": "OracleConfig"
-            }
-          },
-          {
             "name": "depositIndex",
             "type": {
               "defined": "I80F48"
@@ -5580,12 +5518,6 @@ export const IDL: MangoV4 = {
           {
             "name": "oracle",
             "type": "publicKey"
-          },
-          {
-            "name": "oracleConfig",
-            "type": {
-              "defined": "OracleConfig"
-            }
           },
           {
             "name": "bids",
@@ -6037,20 +5969,6 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "OracleConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "confFilter",
-            "type": {
-              "defined": "I80F48"
-            }
-          }
-        ]
-      }
-    },
-    {
       "name": "AnyNode",
       "type": {
         "kind": "struct",
@@ -6271,16 +6189,10 @@ export const IDL: MangoV4 = {
         "kind": "enum",
         "variants": [
           {
-            "name": "Pyth"
-          },
-          {
             "name": "Stub"
           },
           {
-            "name": "SwitchboardV1"
-          },
-          {
-            "name": "SwitchboardV2"
+            "name": "Pyth"
           }
         ]
       }

@@ -1,6 +1,12 @@
 [workspace]
 members = [
+    "client",
     "programs/*",
     "keeper",
-    "lib/*"
+    "lib/*",
+    "liquidator",
 ]
+
+[patch.crates-io]
+# for gzip encoded responses
+jsonrpc-core-client = { git = "https://github.com/ckamm/jsonrpc.git", branch = "ckamm/http-with-gzip" }
