@@ -1,0 +1,13 @@
+rpc_ws_url = "ws://mango.devnet.rpcpool.com"
+rpc_http_url = "https://mango.devnet.rpcpool.com"
+mango_program_id = "m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD"
+pyth_program_id = "gSbePebfvPy7tRqimPoVecS2UsBvYv46ynrzWocc92s"
+mango_group_id = "8nBa69Ed8LCeP5YpZ1qB58DTEXq8fq7epfH5RsUVFATb"
+mango_signer_id = "C39mMdwA37oy1ZUwp5pCxumu758N3MxYBVdPB2oW7int"
+serum_program_id = "DESVgJVGajEgKGXhb6XmqDHGz3VjdgP7rEVESBgxmroY"
+snapshot_interval_secs = 240
+parallel_rpc_requests = 10
+get_multiple_accounts_count = 100
+payer = "/root/.config/solana/mango-devnet.json"
+admin = "/root/.config/solana/admin.json"
+mango_account_name = "Taker"

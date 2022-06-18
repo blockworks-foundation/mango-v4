@@ -1,4 +1,4 @@
-use super::{TokenAccount, TokenIndex};
+use super::{OracleConfig, TokenAccount, TokenIndex};
 use crate::error::MangoError;
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
@@ -18,6 +18,8 @@ pub struct Bank {
     pub mint: Pubkey,
     pub vault: Pubkey,
     pub oracle: Pubkey,
+
+    pub oracle_config: OracleConfig,
 
     /// the index used to scale the value of an IndexedPosition
     /// TODO: should always be >= 0, add checks?
@@ -67,7 +69,7 @@ pub struct Bank {
     // TODO: add space for an oracle which services interest rate for the bank's mint
     // interest rate tied to oracle might help reduce spreads between deposits and borrows
 }
-const_assert_eq!(size_of::<Bank>(), 16 + 32 * 4 + 8 + 16 * 18 + 3 + 5);
+const_assert_eq!(size_of::<Bank>(), 16 + 32 * 4 + 8 + 16 * 19 + 2 + 1 + 1 + 4);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
 impl std::fmt::Debug for Bank {

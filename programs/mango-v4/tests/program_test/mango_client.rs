@@ -533,6 +533,9 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
         let instruction = Self::Instruction {
             name: "some_ticker".to_string(),
             token_index: self.token_index,
+            oracle_config: OracleConfig {
+                conf_filter: I80F48::from_num::<f32>(0.10),
+            },
             interest_rate_params: InterestRateParams {
                 util0: self.util0,
                 rate0: self.rate0,
@@ -1667,6 +1670,9 @@ impl<'keypair> ClientInstruction for PerpCreateMarketInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             name: "UUU-PERP".to_string(),
+            oracle_config: OracleConfig {
+                conf_filter: I80F48::from_num::<f32>(0.10),
+            },
             perp_market_index: self.perp_market_index,
             base_token_index_opt: Option::from(self.base_token_index),
             quote_token_index: self.quote_token_index,

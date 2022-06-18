@@ -44,10 +44,10 @@ pub trait AccountRetriever {
 /// 3. PerpMarket accounts, in the order of account.perps.iter_active_accounts()
 /// 4. serum3 OpenOrders accounts, in the order of account.serum3.iter_active()
 pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
-    ais: Vec<T>,
-    n_banks: usize,
-    begin_perp: usize,
-    begin_serum3: usize,
+    pub ais: Vec<T>,
+    pub n_banks: usize,
+    pub begin_perp: usize,
+    pub begin_serum3: usize,
 }
 
 impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
@@ -62,7 +62,10 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
         require!(bank.token_index == token_index, MangoError::SomeError);
         let oracle = &self.ais[cm!(self.n_banks + account_index)];
         require!(&bank.oracle == oracle.key(), MangoError::SomeError);
-        Ok((bank, oracle_price(oracle, bank.mint_decimals)?))
+        Ok((
+            bank,
+            oracle_price(oracle, bank.oracle_config.conf_filter, bank.mint_decimals)?,
+        ))
     }
 
     fn perp_market(
@@ -203,8 +206,8 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         require!(&bank2.oracle == oracle2.key, MangoError::SomeError);
         let mint_decimals1 = bank1.mint_decimals;
         let mint_decimals2 = bank2.mint_decimals;
-        let price1 = oracle_price(oracle1, mint_decimals1)?;
-        let price2 = oracle_price(oracle2, mint_decimals2)?;
+        let price1 = oracle_price(oracle1, bank1.oracle_config.conf_filter, mint_decimals1)?;
+        let price2 = oracle_price(oracle2, bank2.oracle_config.conf_filter, mint_decimals2)?;
         if swap {
             Ok((bank2, bank1, price2, price1))
         } else {
@@ -224,7 +227,10 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
         let bank = self.ais[index].load_fully_unchecked::<Bank>()?;
         let oracle = &self.ais[cm!(self.n_banks() + index)];
         require!(&bank.oracle == oracle.key, MangoError::SomeError);
-        Ok((bank, oracle_price(oracle, bank.mint_decimals)?))
+        Ok((
+            bank,
+            oracle_price(oracle, bank.oracle_config.conf_filter, bank.mint_decimals)?,
+        ))
     }
 
     fn perp_market(

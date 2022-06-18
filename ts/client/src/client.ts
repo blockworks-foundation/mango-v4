@@ -130,6 +130,7 @@ export class MangoClient {
     group: Group,
     mintPk: PublicKey,
     oraclePk: PublicKey,
+    oracleConfFilter: number,
     tokenIndex: number,
     name: string,
     util0: number,
@@ -145,10 +146,16 @@ export class MangoClient {
     initLiabWeight: number,
     liquidationFee: number,
   ): Promise<TransactionSignature> {
+    const bn = I80F48.fromNumber(oracleConfFilter).getData();
     return await this.program.methods
       .tokenRegister(
         tokenIndex,
         name,
+        {
+          confFilter: {
+            val: I80F48.fromNumber(oracleConfFilter).getData(),
+          },
+        } as any, // future: nested custom types dont typecheck, fix if possible?
         { util0, rate0, util1, rate1, maxRate },
         loanFeeRate,
         loanOriginationFeeRate,
@@ -279,7 +286,7 @@ export class MangoClient {
 
   public async setStubOracle(
     group: Group,
-    mintPk: PublicKey,
+    oraclePk: PublicKey,
     price: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
@@ -287,7 +294,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
-        oracle: mintPk,
+        oracle: oraclePk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .rpc();
@@ -850,6 +857,7 @@ export class MangoClient {
     oraclePk: PublicKey,
     perpMarketIndex: number,
     name: string,
+    oracleConfFilter: number,
     baseTokenIndex: number,
     baseTokenDecimals: number,
     quoteTokenIndex: number,
@@ -874,6 +882,11 @@ export class MangoClient {
       .perpCreateMarket(
         perpMarketIndex,
         name,
+        {
+          confFilter: {
+            val: I80F48.fromNumber(oracleConfFilter).getData(),
+          },
+        } as any, // future: nested custom types dont typecheck, fix if possible?
         baseTokenIndex,
         baseTokenDecimals,
         quoteTokenIndex,
@@ -1134,6 +1147,21 @@ export class MangoClient {
       .signers(signers)
       .rpc({ skipPreflight: true });
   }
+
+  /// liquidations
+
+  // TODO
+  // async liqTokenWithToken(
+  //   assetTokenIndex: number,
+  //   liabTokenIndex: number,
+  //   maxLiabTransfer: number,
+  // ): Promise<TransactionSignature> {
+  //   return await this.program.methods
+  //     .liqTokenWithToken(assetTokenIndex, liabTokenIndex, {
+  //       val: I80F48.fromNumber(maxLiabTransfer).getData(),
+  //     })
+  //     .rpc();
+  // }
 
   /// static
 

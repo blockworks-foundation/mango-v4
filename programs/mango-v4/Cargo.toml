@@ -16,26 +16,31 @@ no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
 test-bpf = []
+client = ["solana-sdk"]
 
 [dependencies]
 # todo: when to fix, when to use caret? need a regular chore to bump dependencies
 # note: possibly need init-if-needed feature
 anchor-lang = { version = "0.24.2", features = [] }
 anchor-spl = { version = "0.24.2", features = [] }
+arrayref = "0.3.6"
+bincode = "1.3.3"
 bytemuck = "^1.7.2"
-# todo: higher versions don't work
-fixed = { version = "=1.11.0", features = ["serde", "borsh"] }
+checked_math = { path = "../../lib/checked_math" }
+fixed = { version = "=1.11.0", features = ["serde", "borsh"] } # todo: higher versions don't work
 fixed-macro = "^1.1.1"
+mango-macro = { path = "../../mango-macro" }
+num_enum = "0.5.1"
 pyth-sdk-solana = "0.1.0"
 serde = "^1.0"
+serum_dex = { version = "0.4.0", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false,features = ["no-entrypoint", "program"] }
 solana-program = "~1.9.13"
+solana-sdk = { version = "~1.9.13", default-features = false, optional = true }
 static_assertions = "1.1"
-serum_dex = { version = "0.4.0", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false, features = ["no-entrypoint", "program"] }
-checked_math = { path = "../../lib/checked_math" }
-arrayref = "0.3.6"
-num_enum = "0.5.1"
-bincode = "1.3.3"
-mango-macro = { path = "../../mango-macro" }
+switchboard-program = ">=0.2.0"
+switchboard-utils = ">=0.1.36"
+switchboard-v2 = "0.1.10"
+
 
 [dev-dependencies]
 solana-sdk = { version = "~1.9.13", default-features = false }
