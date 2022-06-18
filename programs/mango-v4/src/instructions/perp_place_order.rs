@@ -92,6 +92,7 @@ pub fn perp_place_order(
 
         let oracle_price = oracle_price(
             &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+            perp_market.oracle_config.conf_filter,
             perp_market.base_token_decimals,
         )?;
 

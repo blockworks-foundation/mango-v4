@@ -17,12 +17,14 @@ mod serum3_cpi;
 pub mod state;
 pub mod types;
 
-use state::{OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex};
+use state::{OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex};
 
 declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
 
 #[program]
 pub mod mango_v4 {
+
+    use crate::state::OracleConfig;
 
     use super::*;
 
@@ -39,6 +41,7 @@ pub mod mango_v4 {
         ctx: Context<TokenRegister>,
         token_index: TokenIndex,
         name: String,
+        oracle_config: OracleConfig,
         interest_rate_params: InterestRateParams,
         loan_fee_rate: f32,
         loan_origination_fee_rate: f32,
@@ -52,6 +55,7 @@ pub mod mango_v4 {
             ctx,
             token_index,
             name,
+            oracle_config,
             interest_rate_params,
             loan_fee_rate,
             loan_origination_fee_rate,
@@ -224,6 +228,7 @@ pub mod mango_v4 {
         ctx: Context<PerpCreateMarket>,
         perp_market_index: PerpMarketIndex,
         name: String,
+        oracle_config: OracleConfig,
         base_token_index_opt: Option<TokenIndex>,
         base_token_decimals: u8,
         quote_token_index: TokenIndex,
@@ -244,6 +249,7 @@ pub mod mango_v4 {
             ctx,
             perp_market_index,
             name,
+            oracle_config,
             base_token_index_opt,
             base_token_decimals,
             quote_token_index,

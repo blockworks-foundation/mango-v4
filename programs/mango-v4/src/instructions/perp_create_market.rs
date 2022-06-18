@@ -46,6 +46,7 @@ pub fn perp_create_market(
     ctx: Context<PerpCreateMarket>,
     perp_market_index: PerpMarketIndex,
     name: String,
+    oracle_config: OracleConfig,
     base_token_index_opt: Option<TokenIndex>,
     base_token_decimals: u8,
     quote_token_index: TokenIndex,
@@ -67,6 +68,7 @@ pub fn perp_create_market(
         name: fill16_from_str(name)?,
         group: ctx.accounts.group.key(),
         oracle: ctx.accounts.oracle.key(),
+        oracle_config,
         bids: ctx.accounts.bids.key(),
         asks: ctx.accounts.asks.key(),
         event_queue: ctx.accounts.event_queue.key(),
@@ -88,11 +90,11 @@ pub fn perp_create_market(
         open_interest: 0,
         seq_num: 0,
         fees_accrued: I80F48::ZERO,
-        bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
         // Why optional - Perp could be based purely on an oracle
-        base_token_index: base_token_index_opt.ok_or(TokenIndex::MAX).unwrap(),
+        bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
         base_token_decimals,
         perp_market_index,
+        base_token_index: base_token_index_opt.ok_or(TokenIndex::MAX).unwrap(),
         quote_token_index,
     };
 

@@ -9,7 +9,7 @@ use crate::state::orderbook::order_type::Side;
 use crate::state::{TokenIndex, DAY};
 use crate::util::checked_math as cm;
 
-use super::Book;
+use super::{Book, OracleConfig};
 
 pub type PerpMarketIndex = u16;
 
@@ -20,6 +20,8 @@ pub struct PerpMarket {
     pub group: Pubkey,
 
     pub oracle: Pubkey,
+
+    pub oracle_config: OracleConfig,
 
     pub bids: Pubkey,
     pub asks: Pubkey,
@@ -84,7 +86,7 @@ pub struct PerpMarket {
 
 const_assert_eq!(
     size_of::<PerpMarket>(),
-    16 + 32 * 5 + 8 * 2 + 16 * 11 + 8 * 2 + 8 * 2 + 16 + 8
+    16 + 32 * 2 + 16 + 32 * 3 + 8 * 2 + 16 * 11 + 8 * 2 + 8 * 2 + 16 + 8
 );
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
 

@@ -154,6 +154,7 @@ pub fn process_accounts<'a>(
                     let oracle = chain_data.account(&mint_info.oracle)?;
                     let price = oracle_price(
                         &KeyedAccountSharedData::new(mint_info.oracle, oracle.clone()),
+                        bank.oracle_config.conf_filter,
                         bank.mint_decimals,
                     )?;
                     Ok((token.token_index, bank, token.native(bank) * price))
