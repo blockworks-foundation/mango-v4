@@ -645,13 +645,9 @@ export type MangoV4 = {
         {
           "name": "cpiDatas",
           "type": {
-            "vec": "bytes"
-          }
-        },
-        {
-          "name": "cpiAccountStarts",
-          "type": {
-            "vec": "u64"
+            "vec": {
+              "defined": "(u8,Vec<u8>)"
+            }
           }
         }
       ]
@@ -3838,13 +3834,9 @@ export const IDL: MangoV4 = {
         {
           "name": "cpiDatas",
           "type": {
-            "vec": "bytes"
-          }
-        },
-        {
-          "name": "cpiAccountStarts",
-          "type": {
-            "vec": "u64"
+            "vec": {
+              "defined": "(u8,Vec<u8>)"
+            }
           }
         }
       ]

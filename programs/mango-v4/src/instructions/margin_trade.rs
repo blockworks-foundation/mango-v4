@@ -66,13 +66,11 @@ pub struct MarginTradeWithdraw {
 pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, MarginTrade<'info>>,
     withdraws: Vec<MarginTradeWithdraw>,
-    cpi_datas: Vec<Vec<u8>>,
-    cpi_account_starts: Vec<usize>,
+    cpi_datas: Vec<(u8, Vec<u8>)>,
 ) -> Result<()> {
     require!(!cpi_datas.is_empty(), MangoError::SomeError);
-    require!(!cpi_account_starts.is_empty(), MangoError::SomeError);
-    let num_of_cpis = cpi_account_starts.len();
-    let num_health_accounts = *cpi_account_starts.get(0).unwrap();
+    let num_of_cpis = cpi_datas.len();
+    let num_health_accounts = cpi_datas.get(0).unwrap().0 as usize;
 
     let group = ctx.accounts.group.load()?;
     let mut account = ctx.accounts.account.load_mut()?;
@@ -247,19 +245,18 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
         })
         .collect::<Vec<_>>();
     let signers_ref = signers.iter().map(|v| &v[..]).collect::<Vec<_>>();
-    for (cpi_index, (cpi_data, cpi_account_start)) in
-        cpi_datas.iter().zip(cpi_account_starts.iter()).enumerate()
-    {
-        let cpi_program_id = *ctx.remaining_accounts[*cpi_account_start].key;
+    for (cpi_index, (cpi_account_start, cpi_data)) in cpi_datas.iter().enumerate() {
+        let cpi_account_start = *cpi_account_start as usize;
+        let cpi_program_id = *ctx.remaining_accounts[cpi_account_start].key;
         require_keys_neq!(cpi_program_id, crate::id(), MangoError::SomeError);
 
         let all_cpi_ais_end_index = if cpi_index == num_of_cpis - 1 {
             all_cpi_ams.len()
         } else {
-            cpi_account_starts[cpi_index + 1] - num_health_accounts
+            cpi_datas[cpi_index + 1].0 as usize - num_health_accounts
         };
 
-        let all_cpi_ais_start_index = *cpi_account_start - num_health_accounts;
+        let all_cpi_ais_start_index = cpi_account_start - num_health_accounts;
 
         let cpi_ais = &all_cpi_ais[all_cpi_ais_start_index..all_cpi_ais_end_index];
         let cpi_ams = &all_cpi_ams[all_cpi_ais_start_index..all_cpi_ais_end_index];

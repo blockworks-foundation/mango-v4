@@ -322,8 +322,10 @@ impl<'keypair> ClientInstruction for MarginTradeInstruction<'keypair> {
                 index: 1,
                 amount: self.withdraw_amount,
             }],
-            cpi_datas: vec![self.margin_trade_program_ix_cpi_data.clone()],
-            cpi_account_starts: vec![health_check_metas.len()],
+            cpi_datas: vec![(
+                health_check_metas.len() as u8,
+                self.margin_trade_program_ix_cpi_data.clone(),
+            )],
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
