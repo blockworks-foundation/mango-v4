@@ -8,24 +8,24 @@ use std::mem::size_of;
 
 use super::Side;
 
-pub const MAX_NUM_EVENTS: usize = 512;
+pub const MAX_NUM_EVENTS: u32 = 512;
 
 pub trait QueueHeader: bytemuck::Pod {
     type Item: bytemuck::Pod + Copy;
 
     fn head(&self) -> usize;
-    fn set_head(&mut self, value: usize);
+    fn set_head(&mut self, value: u32);
     fn count(&self) -> usize;
-    fn set_count(&mut self, value: usize);
+    fn set_count(&mut self, value: u32);
 
     fn incr_event_id(&mut self);
-    fn decr_event_id(&mut self, n: usize);
+    fn decr_event_id(&mut self, n: u64);
 }
 
 #[account(zero_copy)]
 pub struct EventQueue {
     pub header: EventQueueHeader,
-    pub buf: [AnyEvent; MAX_NUM_EVENTS],
+    pub buf: [AnyEvent; MAX_NUM_EVENTS as usize],
 }
 
 impl EventQueue {
@@ -53,7 +53,7 @@ impl EventQueue {
         self.buf[slot] = value;
 
         let count = self.header.count();
-        self.header.set_count(count + 1);
+        self.header.set_count((count + 1) as u32); // guaranteed because of full() check
 
         self.header.incr_event_id();
         Ok(())
@@ -79,10 +79,10 @@ impl EventQueue {
         let value = self.buf[self.header.head()];
 
         let count = self.header.count();
-        self.header.set_count(count - 1);
+        self.header.set_count((count - 1) as u32);
 
         let head = self.header.head();
-        self.header.set_head((head + 1) % self.buf.len());
+        self.header.set_head(((head + 1) % self.buf.len()) as u32);
 
         Ok(value)
     }
@@ -90,8 +90,8 @@ impl EventQueue {
     pub fn revert_pushes(&mut self, desired_len: usize) -> Result<()> {
         require!(desired_len <= self.header.count(), MangoError::SomeError);
         let len_diff = self.header.count() - desired_len;
-        self.header.set_count(desired_len);
-        self.header.decr_event_id(len_diff);
+        self.header.set_count(desired_len as u32);
+        self.header.decr_event_id(len_diff as u64);
         Ok(())
     }
 
@@ -125,35 +125,35 @@ impl<'a> Iterator for EventQueueIterator<'a> {
 #[zero_copy]
 #[derive(Pod)]
 pub struct EventQueueHeader {
-    head: usize,
-    count: usize,
-    pub seq_num: usize,
+    head: u32,
+    count: u32,
+    pub seq_num: u64,
 }
 
 impl QueueHeader for EventQueueHeader {
     type Item = AnyEvent;
 
     fn head(&self) -> usize {
-        self.head
+        self.head as usize
     }
-    fn set_head(&mut self, value: usize) {
+    fn set_head(&mut self, value: u32) {
         self.head = value;
     }
     fn count(&self) -> usize {
-        self.count
+        self.count as usize
     }
-    fn set_count(&mut self, value: usize) {
+    fn set_count(&mut self, value: u32) {
         self.count = value;
     }
     fn incr_event_id(&mut self) {
         self.seq_num += 1;
     }
-    fn decr_event_id(&mut self, n: usize) {
+    fn decr_event_id(&mut self, n: u64) {
         self.seq_num -= n;
     }
 }
 
-const_assert_eq!(std::mem::size_of::<EventQueue>(), 8 * 3 + 512 * 200);
+const_assert_eq!(std::mem::size_of::<EventQueue>(), 4 * 2 + 8 + 512 * 200);
 const_assert_eq!(std::mem::size_of::<EventQueue>() % 8, 0);
 
 const EVENT_SIZE: usize = 200;
@@ -184,7 +184,7 @@ pub struct FillEvent {
     pub market_fees_applied: bool,
     pub padding: [u8; 3],
     pub timestamp: u64,
-    pub seq_num: usize, // note: usize same as u64
+    pub seq_num: u64,
 
     pub maker: Pubkey,
     pub maker_order_id: i128,
@@ -212,7 +212,7 @@ impl FillEvent {
         maker_out: bool,
         maker_slot: u8,
         timestamp: u64,
-        seq_num: usize,
+        seq_num: u64,
         maker: Pubkey,
         maker_order_id: i128,
         maker_client_order_id: u64,
@@ -272,7 +272,7 @@ pub struct OutEvent {
     pub owner_slot: u8,
     padding0: [u8; 5],
     pub timestamp: u64,
-    pub seq_num: usize,
+    pub seq_num: u64,
     pub owner: Pubkey,
     pub quantity: i64,
     padding1: [u8; EVENT_SIZE - 64],
@@ -284,7 +284,7 @@ impl OutEvent {
         side: Side,
         owner_slot: u8,
         timestamp: u64,
-        seq_num: usize,
+        seq_num: u64,
         owner: Pubkey,
         quantity: i64,
     ) -> Self {
