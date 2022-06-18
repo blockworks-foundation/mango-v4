@@ -48,7 +48,7 @@ async function main() {
   let amount = 0.001;
   let token = 'BTC';
   console.log(`Depositing...${amount} 'BTC'`);
-  await user1Client.deposit(group, user1MangoAccount, token, amount);
+  await user1Client.tokenDeposit(group, user1MangoAccount, token, amount);
   await user1MangoAccount.reload(user1Client);
   console.log(`${user1MangoAccount.toString(group)}`);
 
@@ -78,7 +78,7 @@ async function main() {
 
   /// user2 deposits some collateral and borrows BTC
   console.log(`Depositing...${300} 'USDC'`);
-  await user2Client.deposit(group, user2MangoAccount, 'USDC', 300);
+  await user2Client.tokenDeposit(group, user2MangoAccount, 'USDC', 300);
   await user2MangoAccount.reload(user2Client);
   console.log(`${user2MangoAccount.toString(group)}`);
   amount = amount / 10;
@@ -107,7 +107,12 @@ async function main() {
   const adminWallet = new Wallet(admin);
   console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
   const adminProvider = new AnchorProvider(connection, adminWallet, options);
-  const client = await MangoClient.connect(adminProvider, true);
+  const client = await MangoClient.connect(
+    adminProvider,
+    'devnet',
+    MANGO_V4_ID['devnet'],
+    false,
+  );
   await client.setStubOracle(group, group.banksMap.get('USDC')?.oracle!, 0.5);
 
   process.exit();
