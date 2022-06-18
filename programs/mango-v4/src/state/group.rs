@@ -12,7 +12,10 @@ pub struct Group {
     pub admin: Pubkey,
 
     pub bump: u8,
-    pub padding: [u8; 3],
+    // Only support closing/deregistering groups, stub oracles, tokens, and markets
+    // if testing == 1
+    pub testing: u8,
+    pub padding: [u8; 2],
     pub group_num: u32,
     pub reserved: [u8; 8],
 }

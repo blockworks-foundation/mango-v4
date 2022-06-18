@@ -5,7 +5,7 @@ use fixed_macro::types::I80F48;
 use mango_v4::state::*;
 use program_test::*;
 use solana_program_test::*;
-use solana_sdk::{signature::Keypair, transport::TransportError};
+use solana_sdk::{signature::Keypair, signer::Signer, transport::TransportError};
 
 mod program_test;
 
@@ -66,7 +66,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: deposit_amount,
                 account: account_0,
                 token_account: payer_mint_accounts[0],
@@ -78,7 +78,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: deposit_amount,
                 account: account_0,
                 token_account: payer_mint_accounts[1],
@@ -94,7 +94,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: deposit_amount,
                 account: account_1,
                 token_account: payer_mint_accounts[0],
@@ -106,7 +106,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: deposit_amount,
                 account: account_1,
                 token_account: payer_mint_accounts[1],
@@ -401,6 +401,21 @@ async fn test_perp() -> Result<(), TransportError> {
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(mango_account_1.perps.accounts[0].base_position_lots, -1);
     assert_eq!(mango_account_1.perps.accounts[0].quote_position_native, 100);
+
+    send_tx(
+        solana,
+        PerpCloseMarketInstruction {
+            group,
+            admin,
+            perp_market,
+            asks,
+            bids,
+            event_queue,
+            sol_destination: payer.pubkey(),
+        },
+    )
+    .await
+    .unwrap();
 
     Ok(())
 }

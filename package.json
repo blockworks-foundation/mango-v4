@@ -2,28 +2,33 @@
   "name": "@blockworks-foundation/mango-v4",
   "version": "0.0.1",
   "description": "Typescript Client for mango-v4 program.",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "repository": "https://github.com/blockworks-foundation/mango-v4",
+  "author": {
+    "name": "Blockworks Foundation",
+    "email": "hello@blockworks.foundation",
+    "url": "https://blockworks.foundation"
+  },
+  "main": "dist/cjs/index.js",
+  "types": "dist/types/index.d.ts",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "npm run build:cjs",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
     "clean": "rm -rf dist",
     "example1-user": "ts-node ts/client/src/scripts/example1-user.ts",
     "example1-admin": "ts-node ts/client/src/scripts/example1-admin.ts",
     "scratch": "ts-node ts/client/src/scripts/scratch/scratch.ts",
     "format": "prettier --check .",
     "lint": "eslint . --ext ts --ext tsx --ext js --quiet",
-    "type-check": "tsc --pretty --noEmit",
-    "prepare": "yarn build"
+    "typecheck": "tsc --noEmit --pretty",
+    "prepare": "yarn build",
+    "prebuild": "npm run clean",
+    "prepublishOnly": "npm run validate && npm run build",
+    "validate": "npm run typecheck && npm run test && npm run lint && npm run format-check"
   },
-  "author": {
-    "name": "Blockworks Foundation",
-    "email": "hello@blockworks.foundation",
-    "url": "https://blockworks.foundation"
-  },
-  "files": [
-    "dist"
-  ],
   "devDependencies": {
     "@tsconfig/recommended": "^1.0.1",
     "@types/bs58": "^4.0.1",
@@ -56,6 +61,9 @@
     "@solana/spl-token": "~0.1.8",
     "big.js": "^6.1.1",
     "bs58": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@solana/spl-token-swap": "^0.2.0"
   },
   "license": "MIT"
 }

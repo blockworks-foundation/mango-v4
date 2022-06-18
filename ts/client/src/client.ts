@@ -1,8 +1,5 @@
-import { ORCA_TOKEN_SWAP_ID_DEVNET } from '@orca-so/sdk';
-import { orcaDevnetPoolConfigs } from '@orca-so/sdk/dist/constants/devnet/pools';
-import { OrcaPoolConfig as OrcaDevnetPoolConfig } from '@orca-so/sdk/dist/public/devnet/pools';
 import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
-import { getFeeRates, getFeeTier, Market } from '@project-serum/serum';
+import { getFeeRates, getFeeTier } from '@project-serum/serum';
 import { Order } from '@project-serum/serum/lib/market';
 import {
   closeAccount,
@@ -10,9 +7,9 @@ import {
   WRAPPED_SOL_MINT,
 } from '@project-serum/serum/lib/token-instructions';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { TokenSwap } from '@solana/spl-token-swap';
 import {
   AccountMeta,
+  Cluster,
   Keypair,
   LAMPORTS_PER_SOL,
   MemcmpFilter,
@@ -24,7 +21,7 @@ import {
   TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { Bank, getMintInfoForTokenIndex } from './accounts/bank';
+import { Bank, MintInfo } from './accounts/bank';
 import { Group } from './accounts/group';
 import { I80F48 } from './accounts/I80F48';
 import { MangoAccount } from './accounts/mangoAccount';
@@ -36,6 +33,11 @@ import {
   Serum3SelfTradeBehavior,
   Serum3Side,
 } from './accounts/serum3';
+import { SERUM3_PROGRAM_ID } from './constants';
+import {
+  buildOrcaInstruction,
+  ORCA_TOKEN_SWAP_ID_DEVNET,
+} from './integrations/orca/index';
 import { IDL, MangoV4 } from './mango_v4';
 import { MarginTradeWithdraw } from './types';
 import {
@@ -45,21 +47,25 @@ import {
   toU64,
 } from './utils';
 
-export const MANGO_V4_ID = new PublicKey(
-  'm43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD',
-);
-
 export class MangoClient {
-  constructor(public program: Program<MangoV4>, public devnet?: boolean) {}
+  constructor(
+    public program: Program<MangoV4>,
+    public programId: PublicKey,
+    public cluster: Cluster,
+    public useIds: boolean,
+  ) {}
 
   /// public
 
   // Group
 
-  public async createGroup(groupNum: number): Promise<TransactionSignature> {
+  public async createGroup(
+    groupNum: number,
+    testing: boolean,
+  ): Promise<TransactionSignature> {
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
     return await this.program.methods
-      .createGroup(groupNum)
+      .createGroup(groupNum, testing ? 1 : 0)
       .accounts({
         admin: adminPk,
         payer: adminPk,
@@ -67,10 +73,23 @@ export class MangoClient {
       .rpc();
   }
 
+  public async closeGroup(group: Group): Promise<TransactionSignature> {
+    const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
+    return await this.program.methods
+      .closeGroup()
+      .accounts({
+        group: group.publicKey,
+        admin: adminPk,
+        solDestination: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
+      })
+      .rpc();
+  }
+
   public async getGroup(groupPk: PublicKey): Promise<Group> {
     const groupAccount = await this.program.account.group.fetch(groupPk);
     const group = Group.from(groupPk, groupAccount);
-    await group.reload(this);
+    await group.reloadAll(this);
     return group;
   }
 
@@ -101,13 +120,13 @@ export class MangoClient {
     const groups = (await this.program.account.group.all(filters)).map(
       (tuple) => Group.from(tuple.publicKey, tuple.account),
     );
-    await groups[0].reload(this);
+    await groups[0].reloadAll(this);
     return groups[0];
   }
 
   // Tokens/Banks
 
-  public async registerToken(
+  public async tokenRegister(
     group: Group,
     mintPk: PublicKey,
     oraclePk: PublicKey,
@@ -127,7 +146,7 @@ export class MangoClient {
     liquidationFee: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .registerToken(
+      .tokenRegister(
         tokenIndex,
         name,
         { util0, rate0, util1, rate1, maxRate },
@@ -150,6 +169,27 @@ export class MangoClient {
       .rpc();
   }
 
+  public async tokenDeregister(
+    group: Group,
+    tokenName: string,
+  ): Promise<TransactionSignature> {
+    const bank = group.banksMap.get(tokenName)!;
+
+    const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
+    return await this.program.methods
+      .tokenDeregister()
+      .accounts({
+        group: group.publicKey,
+        admin: adminPk,
+        bank: bank.publicKey,
+        vault: bank.vault,
+        mintInfo: group.mintInfosMap.get(bank.tokenIndex)?.publicKey,
+        solDestination: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
+      })
+      .rpc();
+  }
+
   public async getBanksForGroup(group: Group): Promise<Bank[]> {
     return (
       await this.program.account.bank.all([
@@ -161,6 +201,47 @@ export class MangoClient {
         },
       ])
     ).map((tuple) => Bank.from(tuple.publicKey, tuple.account));
+  }
+
+  public async getMintInfosForGroup(group: Group): Promise<MintInfo[]> {
+    return (
+      await this.program.account.mintInfo.all([
+        {
+          memcmp: {
+            bytes: group.publicKey.toBase58(),
+            offset: 8,
+          },
+        },
+      ])
+    ).map((tuple) => {
+      return MintInfo.from(tuple.publicKey, tuple.account);
+    });
+  }
+
+  public async getMintInfoForTokenIndex(
+    group: Group,
+    tokenIndex: number,
+  ): Promise<MintInfo[]> {
+    const tokenIndexBuf = Buffer.alloc(2);
+    tokenIndexBuf.writeUInt16LE(tokenIndex);
+    return (
+      await this.program.account.mintInfo.all([
+        {
+          memcmp: {
+            bytes: group.publicKey.toBase58(),
+            offset: 8,
+          },
+        },
+        {
+          memcmp: {
+            bytes: bs58.encode(tokenIndexBuf),
+            offset: 200,
+          },
+        },
+      ])
+    ).map((tuple) => {
+      return MintInfo.from(tuple.publicKey, tuple.account);
+    });
   }
 
   // Stub Oracle
@@ -177,6 +258,21 @@ export class MangoClient {
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         tokenMint: mintPk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
+  }
+
+  public async closeStubOracle(
+    group: Group,
+    oracle: PublicKey,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .closeStubOracle()
+      .accounts({
+        group: group.publicKey,
+        oracle: oracle,
+        solDestination: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
       })
       .rpc();
   }
@@ -199,25 +295,29 @@ export class MangoClient {
 
   public async getStubOracle(
     group: Group,
-    mintPk: PublicKey,
-  ): Promise<StubOracle> {
-    const stubOracles = (
-      await this.program.account.stubOracle.all([
-        {
-          memcmp: {
-            bytes: group.publicKey.toBase58(),
-            offset: 8,
-          },
+    mintPk?: PublicKey,
+  ): Promise<StubOracle[]> {
+    const filters = [
+      {
+        memcmp: {
+          bytes: group.publicKey.toBase58(),
+          offset: 8,
         },
-        {
-          memcmp: {
-            bytes: mintPk.toBase58(),
-            offset: 40,
-          },
+      },
+    ];
+
+    if (mintPk) {
+      filters.push({
+        memcmp: {
+          bytes: mintPk.toBase58(),
+          offset: 40,
         },
-      ])
-    ).map((pa) => StubOracle.from(pa.publicKey, pa.account));
-    return stubOracles[0];
+      });
+    }
+
+    return (await this.program.account.stubOracle.all(filters)).map((pa) =>
+      StubOracle.from(pa.publicKey, pa.account),
+    );
   }
 
   // MangoAccount
@@ -290,13 +390,12 @@ export class MangoClient {
       .accounts({
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        solDestination: (this.program.provider as AnchorProvider).wallet
-          .publicKey,
+        solDestination: mangoAccount.owner,
       })
       .rpc();
   }
 
-  public async deposit(
+  public async tokenDeposit(
     group: Group,
     mangoAccount: MangoAccount,
     tokenName: string,
@@ -345,7 +444,7 @@ export class MangoClient {
       await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     return await this.program.methods
-      .deposit(toNativeDecimals(amount, bank.mintDecimals))
+      .tokenDeposit(toNativeDecimals(amount, bank.mintDecimals))
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -367,7 +466,7 @@ export class MangoClient {
       .rpc({ skipPreflight: true });
   }
 
-  public async withdraw(
+  public async tokenWithdraw(
     group: Group,
     mangoAccount: MangoAccount,
     tokenName: string,
@@ -385,7 +484,7 @@ export class MangoClient {
       await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     return await this.program.methods
-      .withdraw(toNativeDecimals(amount, bank.mintDecimals), allowBorrow)
+      .tokenWithdraw(toNativeDecimals(amount, bank.mintDecimals), allowBorrow)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -406,7 +505,6 @@ export class MangoClient {
 
   public async serum3RegisterMarket(
     group: Group,
-    serum3ProgramId: PublicKey,
     serum3MarketExternalPk: PublicKey,
     baseBank: Bank,
     quoteBank: Bank,
@@ -418,7 +516,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
-        serumProgram: serum3ProgramId,
+        serumProgram: SERUM3_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3MarketExternalPk,
         baseBank: baseBank.publicKey,
         quoteBank: quoteBank.publicKey,
@@ -427,7 +525,24 @@ export class MangoClient {
       .rpc();
   }
 
-  public async serum3GetMarket(
+  public async serum3deregisterMarket(
+    group: Group,
+    serum3MarketName: string,
+  ): Promise<TransactionSignature> {
+    const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
+
+    return await this.program.methods
+      .serum3DeregisterMarket()
+      .accounts({
+        group: group.publicKey,
+        serumMarket: serum3Market.publicKey,
+        solDestination: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
+      })
+      .rpc();
+  }
+
+  public async serum3GetMarkets(
     group: Group,
     baseTokenIndex?: number,
     quoteTokenIndex?: number,
@@ -492,10 +607,35 @@ export class MangoClient {
       .rpc();
   }
 
+  public async serum3CloseOpenOrders(
+    group: Group,
+    mangoAccount: MangoAccount,
+    serum3MarketName: string,
+  ): Promise<TransactionSignature> {
+    const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
+
+    let openOrders = mangoAccount.serum3.find(
+      (account) => account.marketIndex === serum3Market.marketIndex,
+    )?.openOrders;
+
+    return await this.program.methods
+      .serum3CloseOpenOrders()
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        serumMarket: serum3Market.publicKey,
+        serumProgram: serum3Market.serumProgram,
+        serumMarketExternal: serum3Market.serumMarketExternal,
+        openOrders,
+        solDestination: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
+      })
+      .rpc();
+  }
+
   public async serum3PlaceOrder(
     group: Group,
     mangoAccount: MangoAccount,
-    serum3ProgramId: PublicKey,
     serum3MarketName: string,
     side: Serum3Side,
     price: number,
@@ -512,12 +652,8 @@ export class MangoClient {
       mangoAccount = await this.getMangoAccount(mangoAccount);
     }
 
-    const serum3MarketExternal = await Market.load(
-      this.program.provider.connection,
-      serum3Market.serumMarketExternal,
-      { commitment: this.program.provider.connection.commitment },
-      serum3ProgramId,
-    );
+    const serum3MarketExternal =
+      group.serum3MarketExternalsMap.get(serum3MarketName)!;
 
     const serum3MarketExternalVaultSigner =
       await PublicKey.createProgramAddress(
@@ -529,7 +665,7 @@ export class MangoClient {
             8,
           ),
         ],
-        serum3ProgramId,
+        SERUM3_PROGRAM_ID[this.cluster],
       );
 
     const healthRemainingAccounts: PublicKey[] =
@@ -566,7 +702,7 @@ export class MangoClient {
         openOrders: mangoAccount.findSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
-        serumProgram: serum3ProgramId,
+        serumProgram: SERUM3_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
         marketBids: serum3MarketExternal.bidsAddress,
         marketAsks: serum3MarketExternal.asksAddress,
@@ -589,20 +725,44 @@ export class MangoClient {
       .rpc();
   }
 
+  async serum3CancelAllorders(
+    group: Group,
+    mangoAccount: MangoAccount,
+    serum3MarketName: string,
+    limit: number,
+  ) {
+    const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
+
+    const serum3MarketExternal =
+      group.serum3MarketExternalsMap.get(serum3MarketName)!;
+
+    return await this.program.methods
+      .serum3CancelAllOrders(limit)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        openOrders: mangoAccount.findSerum3Account(serum3Market.marketIndex)
+          ?.openOrders,
+        serumMarket: serum3Market.publicKey,
+        serumProgram: SERUM3_PROGRAM_ID[this.cluster],
+        serumMarketExternal: serum3Market.serumMarketExternal,
+        marketBids: serum3MarketExternal.bidsAddress,
+        marketAsks: serum3MarketExternal.asksAddress,
+        marketEventQueue: serum3MarketExternal.decoded.eventQueue,
+      })
+      .rpc();
+  }
+
   async serum3SettleFunds(
     group: Group,
     mangoAccount: MangoAccount,
-    serum3ProgramId: PublicKey,
     serum3MarketName: string,
   ): Promise<TransactionSignature> {
     const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
 
-    const serum3MarketExternal = await Market.load(
-      this.program.provider.connection,
-      serum3Market.serumMarketExternal,
-      { commitment: this.program.provider.connection.commitment },
-      serum3ProgramId,
-    );
+    const serum3MarketExternal =
+      group.serum3MarketExternalsMap.get(serum3MarketName)!;
 
     const serum3MarketExternalVaultSigner =
       // TODO: put into a helper method, and remove copy pasta
@@ -615,7 +775,7 @@ export class MangoClient {
             8,
           ),
         ],
-        serum3ProgramId,
+        SERUM3_PROGRAM_ID[this.cluster],
       );
 
     return await this.program.methods
@@ -627,7 +787,7 @@ export class MangoClient {
         openOrders: mangoAccount.findSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
-        serumProgram: serum3ProgramId,
+        serumProgram: SERUM3_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
         marketBaseVault: serum3MarketExternal.decoded.baseVault,
         marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
@@ -643,19 +803,15 @@ export class MangoClient {
   async serum3CancelOrder(
     group: Group,
     mangoAccount: MangoAccount,
-    serum3ProgramId: PublicKey,
     serum3MarketName: string,
     side: Serum3Side,
     orderId: BN,
   ): Promise<TransactionSignature> {
     const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
 
-    const serum3MarketExternal = await Market.load(
-      this.program.provider.connection,
-      serum3Market.serumMarketExternal,
-      { commitment: this.program.provider.connection.commitment },
-      serum3ProgramId,
-    );
+    const serum3MarketExternal =
+      group.serum3MarketExternalsMap.get(serum3MarketName)!;
+
     return await this.program.methods
       .serum3CancelOrder(side, orderId)
       .accounts({
@@ -664,7 +820,7 @@ export class MangoClient {
         openOrders: mangoAccount.findSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
-        serumProgram: serum3ProgramId,
+        serumProgram: SERUM3_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
         marketBids: serum3MarketExternal.bidsAddress,
         marketAsks: serum3MarketExternal.asksAddress,
@@ -675,17 +831,11 @@ export class MangoClient {
 
   async getSerum3Orders(
     group: Group,
-    serum3ProgramId: PublicKey,
     serum3MarketName: string,
   ): Promise<Order[]> {
-    const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
+    const serum3MarketExternal =
+      group.serum3MarketExternalsMap.get(serum3MarketName)!;
 
-    const serum3MarketExternal = await Market.load(
-      this.program.provider.connection,
-      serum3Market.serumMarketExternal,
-      { commitment: this.program.provider.connection.commitment },
-      serum3ProgramId,
-    );
     // TODO: filter for mango account
     return await serum3MarketExternal.loadOrdersForOwner(
       this.program.provider.connection,
@@ -788,7 +938,28 @@ export class MangoClient {
       .rpc();
   }
 
-  public async perpGetMarket(
+  async perpCloseMarket(
+    group: Group,
+    perpMarketName: string,
+  ): Promise<TransactionSignature> {
+    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+
+    return await this.program.methods
+      .perpCloseMarket()
+      .accounts({
+        group: group.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        perpMarket: perpMarket.publicKey,
+        asks: perpMarket.asks,
+        bids: perpMarket.bids,
+        eventQueue: perpMarket.eventQueue,
+        solDestination: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
+      })
+      .rpc();
+  }
+
+  public async perpGetMarkets(
     group: Group,
     baseTokenIndex?: number,
     quoteTokenIndex?: number,
@@ -930,7 +1101,7 @@ export class MangoClient {
 
     const targetProgramId = ORCA_TOKEN_SWAP_ID_DEVNET;
 
-    const { instruction, signers } = await this.buildOrcaInstruction(
+    const { instruction, signers } = await buildOrcaInstruction(
       targetProgramId,
       inputBank,
       outputBank,
@@ -981,15 +1152,22 @@ export class MangoClient {
 
   /// static
 
-  static connect(provider?: Provider, devnet?: boolean): MangoClient {
+  static connect(
+    provider: Provider,
+    cluster: Cluster,
+    programId: PublicKey,
+    useIds: boolean,
+  ): MangoClient {
     // TODO: use IDL on chain or in repository? decide...
     // Alternatively we could fetch IDL from chain.
     // const idl = await Program.fetchIdl(MANGO_V4_ID, provider);
     let idl = IDL;
 
     return new MangoClient(
-      new Program<MangoV4>(idl as MangoV4, MANGO_V4_ID, provider),
-      devnet,
+      new Program<MangoV4>(idl as MangoV4, programId, provider),
+      programId,
+      cluster,
+      useIds,
     );
   }
 
@@ -1012,24 +1190,12 @@ export class MangoClient {
       }
     }
 
-    const mintInfos = await Promise.all(
-      [...new Set(tokenIndices)].map(async (tokenIndex) =>
-        getMintInfoForTokenIndex(this, group.publicKey, tokenIndex),
-      ),
+    const mintInfos = [...new Set(tokenIndices)].map(
+      (tokenIndex) => group.mintInfosMap.get(tokenIndex)!,
     );
+    healthRemainingAccounts.push(...mintInfos.map((mintInfo) => mintInfo.bank));
     healthRemainingAccounts.push(
-      ...mintInfos.flatMap((mintinfos) => {
-        return mintinfos.flatMap((mintinfo) => {
-          return mintinfo.bank;
-        });
-      }),
-    );
-    healthRemainingAccounts.push(
-      ...mintInfos.flatMap((mintinfos) => {
-        return mintinfos.flatMap((mintinfo) => {
-          return mintinfo.oracle;
-        });
-      }),
+      ...mintInfos.map((mintInfo) => mintInfo.oracle),
     );
     healthRemainingAccounts.push(
       ...mangoAccount.serum3
@@ -1048,47 +1214,5 @@ export class MangoClient {
     );
 
     return healthRemainingAccounts;
-  }
-
-  /*
-    Orca ix references:
-      swap fn: https://github.com/orca-so/typescript-sdk/blob/main/src/model/orca/pool/orca-pool.ts#L162
-      swap ix: https://github.com/orca-so/typescript-sdk/blob/main/src/public/utils/web3/instructions/pool-instructions.ts#L41
-  */
-  private async buildOrcaInstruction(
-    orcaTokenSwapId: PublicKey,
-    inputBank: Bank,
-    outputBank: Bank,
-    amountInU64: BN,
-    minimumAmountOutU64: BN,
-  ) {
-    const poolParams = orcaDevnetPoolConfigs[OrcaDevnetPoolConfig.ORCA_SOL];
-
-    const [authorityForPoolAddress] = await PublicKey.findProgramAddress(
-      [poolParams.address.toBuffer()],
-      orcaTokenSwapId,
-    );
-
-    const instruction = TokenSwap.swapInstruction(
-      poolParams.address,
-      authorityForPoolAddress,
-      inputBank.publicKey, // userTransferAuthority
-      inputBank.vault, // inputTokenUserAddress
-      poolParams.tokens[inputBank.mint.toString()].addr, // inputToken.addr
-      poolParams.tokens[outputBank.mint.toString()].addr, // outputToken.addr
-      outputBank.vault, // outputTokenUserAddress
-      poolParams.poolTokenMint,
-      poolParams.feeAccount,
-      null, // hostFeeAccount
-      orcaTokenSwapId,
-      TOKEN_PROGRAM_ID,
-      amountInU64,
-      minimumAmountOutU64,
-    );
-
-    instruction.keys[2].isSigner = false;
-    instruction.keys[2].isWritable = true;
-
-    return { instruction, signers: [] };
   }
 }

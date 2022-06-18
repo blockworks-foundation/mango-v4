@@ -72,6 +72,10 @@ export function toNativeDecimals(amount: number, decimals: number): BN {
   return new BN(Math.trunc(amount * Math.pow(10, decimals)));
 }
 
+export function toUiDecimals(amount: number, decimals: number): number {
+  return amount / Math.pow(10, decimals);
+}
+
 export function toU64(amount: number, decimals): BN {
   const bn = toNativeDecimals(amount, decimals).toString();
   console.log('bn', bn);

@@ -68,7 +68,7 @@ async fn test_position_lifetime() -> Result<()> {
         for &payer_token in payer_mint_accounts {
             send_tx(
                 solana,
-                DepositInstruction {
+                TokenDepositInstruction {
                     amount: funding_amount,
                     account: funding_account,
                     token_account: payer_token,
@@ -91,7 +91,7 @@ async fn test_position_lifetime() -> Result<()> {
         for &payer_token in payer_mint_accounts {
             send_tx(
                 solana,
-                DepositInstruction {
+                TokenDepositInstruction {
                     amount: deposit_amount,
                     account,
                     token_account: payer_token,
@@ -106,7 +106,7 @@ async fn test_position_lifetime() -> Result<()> {
         for &payer_token in payer_mint_accounts {
             send_tx(
                 solana,
-                WithdrawInstruction {
+                TokenWithdrawInstruction {
                     amount: u64::MAX,
                     allow_borrow: false,
                     account,
@@ -141,7 +141,7 @@ async fn test_position_lifetime() -> Result<()> {
         let collateral_amount = 1000;
         send_tx(
             solana,
-            DepositInstruction {
+            TokenDepositInstruction {
                 amount: collateral_amount,
                 account,
                 token_account: payer_mint_accounts[0],
@@ -155,7 +155,7 @@ async fn test_position_lifetime() -> Result<()> {
         let borrow_amount = 10;
         send_tx(
             solana,
-            WithdrawInstruction {
+            TokenWithdrawInstruction {
                 amount: borrow_amount,
                 allow_borrow: true,
                 account,
@@ -174,7 +174,7 @@ async fn test_position_lifetime() -> Result<()> {
         {
             send_tx(
                 solana,
-                DepositInstruction {
+                TokenDepositInstruction {
                     // deposit withdraw amount + some more to cover loan origination fees
                     amount: borrow_amount + 2,
                     account,
@@ -186,7 +186,7 @@ async fn test_position_lifetime() -> Result<()> {
             .unwrap();
             send_tx(
                 solana,
-                WithdrawInstruction {
+                TokenWithdrawInstruction {
                     // withdraw residual amount left
                     amount: u64::MAX,
                     allow_borrow: false,
@@ -202,7 +202,7 @@ async fn test_position_lifetime() -> Result<()> {
         // withdraw the collateral, closing the position
         send_tx(
             solana,
-            WithdrawInstruction {
+            TokenWithdrawInstruction {
                 amount: collateral_amount,
                 allow_borrow: false,
                 account,

@@ -2,7 +2,7 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
-import { DEVNET_SERUM3_PROGRAM_ID } from '../constants';
+import { MANGO_V4_ID } from '../constants';
 
 const DEVNET_SERUM3_MARKETS = new Map([
   ['BTC/USDC', 'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB'],
@@ -44,12 +44,17 @@ async function main() {
   const adminWallet = new Wallet(admin);
   console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
   const adminProvider = new AnchorProvider(connection, adminWallet, options);
-  const client = await MangoClient.connect(adminProvider, true);
+  const client = await MangoClient.connect(
+    adminProvider,
+    'devnet',
+    MANGO_V4_ID['devnet'],
+    false,
+  );
 
   // group
   console.log(`Creating Group...`);
   try {
-    await client.createGroup(0);
+    await client.createGroup(0, true);
   } catch (error) {
     console.log(error);
   }
@@ -61,7 +66,7 @@ async function main() {
   const btcDevnetMint = new PublicKey(DEVNET_MINTS.get('BTC')!);
   const btcDevnetOracle = new PublicKey(DEVNET_ORACLES.get('BTC')!);
   try {
-    await client.registerToken(
+    await client.tokenRegister(
       group,
       btcDevnetMint,
       btcDevnetOracle,
@@ -80,7 +85,7 @@ async function main() {
       1.4,
       0.02,
     );
-    await group.reload(client);
+    await group.reloadAll(client);
   } catch (error) {
     console.log(error);
   }
@@ -93,9 +98,10 @@ async function main() {
   } catch (error) {
     console.log(error);
   }
-  const usdcDevnetOracle = await client.getStubOracle(group, usdcDevnetMint);
+  const usdcDevnetOracle = await client.getStubOracle(group, usdcDevnetMint)[0];
+  console.log(`...created stub oracle ${usdcDevnetOracle.publicKey}`);
   try {
-    await client.registerToken(
+    await client.tokenRegister(
       group,
       usdcDevnetMint,
       usdcDevnetOracle.publicKey,
@@ -114,7 +120,7 @@ async function main() {
       1.4,
       0.02,
     );
-    await group.reload(client);
+    await group.reloadAll(client);
   } catch (error) {}
 
   // register token 2
@@ -122,7 +128,7 @@ async function main() {
   const solDevnetMint = new PublicKey(DEVNET_MINTS.get('SOL')!);
   const solDevnetOracle = new PublicKey(DEVNET_ORACLES.get('SOL')!);
   try {
-    await client.registerToken(
+    await client.tokenRegister(
       group,
       solDevnetMint,
       solDevnetOracle,
@@ -141,7 +147,7 @@ async function main() {
       1.4,
       0.02,
     );
-    await group.reload(client);
+    await group.reloadAll(client);
   } catch (error) {
     console.log(error);
   }
@@ -151,7 +157,7 @@ async function main() {
   const orcaDevnetMint = new PublicKey(DEVNET_MINTS.get('ORCA')!);
   const orcaDevnetOracle = new PublicKey(DEVNET_ORACLES.get('ORCA')!);
   try {
-    await client.registerToken(
+    await client.tokenRegister(
       group,
       orcaDevnetMint,
       orcaDevnetOracle,
@@ -170,7 +176,7 @@ async function main() {
       1.4,
       0.02,
     );
-    await group.reload(client);
+    await group.reloadAll(client);
   } catch (error) {
     console.log(error);
   }
@@ -190,7 +196,7 @@ async function main() {
   try {
     await client.serum3RegisterMarket(
       group,
-      DEVNET_SERUM3_PROGRAM_ID,
+
       serumMarketExternalPk,
       group.banksMap.get('BTC')!,
       group.banksMap.get('USDC')!,
@@ -200,7 +206,7 @@ async function main() {
   } catch (error) {
     console.log(error);
   }
-  const markets = await client.serum3GetMarket(
+  const markets = await client.serum3GetMarkets(
     group,
     group.banksMap.get('BTC')?.tokenIndex,
     group.banksMap.get('USDC')?.tokenIndex,
@@ -235,7 +241,7 @@ async function main() {
   } catch (error) {
     console.log(error);
   }
-  const perpMarkets = await client.perpGetMarket(
+  const perpMarkets = await client.perpGetMarkets(
     group,
     group.banksMap.get('BTC')?.tokenIndex,
     group.banksMap.get('USDC')?.tokenIndex,

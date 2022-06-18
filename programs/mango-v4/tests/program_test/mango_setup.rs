@@ -56,7 +56,7 @@ impl<'a> GroupWithTokensConfig<'a> {
             let oracle = create_stub_oracle_accounts.oracle;
             send_tx(
                 solana,
-                SetStubOracle {
+                SetStubOracleInstruction {
                     group,
                     admin,
                     mint: mint.pubkey,
@@ -69,7 +69,7 @@ impl<'a> GroupWithTokensConfig<'a> {
             let token_index = index as u16;
             let register_token_accounts = send_tx(
                 solana,
-                RegisterTokenInstruction {
+                TokenRegisterInstruction {
                     token_index,
                     decimals: mint.decimals,
                     util0: 0.40,

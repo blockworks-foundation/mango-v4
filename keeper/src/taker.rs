@@ -113,7 +113,7 @@ fn ensure_deposit(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> 
         }
 
         log::info!("Depositing {} {}", deposit_native, bank.name());
-        mango_client.deposit(bank.name(), desired_balance.to_num())?;
+        mango_client.token_deposit(bank.name(), desired_balance.to_num())?;
     }
 
     Ok(())

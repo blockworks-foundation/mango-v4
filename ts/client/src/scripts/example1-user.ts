@@ -8,7 +8,7 @@ import {
   Serum3Side,
 } from '../accounts/serum3';
 import { MangoClient } from '../client';
-import { DEVNET_SERUM3_PROGRAM_ID } from '../constants';
+import { MANGO_V4_ID } from '../constants';
 
 //
 // An example for users based on high level api i.e. the client
@@ -30,7 +30,12 @@ async function main() {
   );
   const userWallet = new Wallet(user);
   const userProvider = new AnchorProvider(connection, userWallet, options);
-  const client = await MangoClient.connect(userProvider, true);
+  const client = await MangoClient.connect(
+    userProvider,
+    'devnet',
+    MANGO_V4_ID['devnet'],
+    false,
+  );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
   // fetch group
@@ -56,15 +61,15 @@ async function main() {
   if (true) {
     // deposit and withdraw
     console.log(`Depositing...5 USDC`);
-    await client.deposit(group, mangoAccount, 'USDC', 5);
+    await client.tokenDeposit(group, mangoAccount, 'USDC', 5);
     await mangoAccount.reload(client);
 
     console.log(`Depositing...0.0005 BTC`);
-    await client.deposit(group, mangoAccount, 'BTC', 0.0005);
+    await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005);
     await mangoAccount.reload(client);
 
     console.log(`Withdrawing...1 USDC`);
-    await client.withdraw(group, mangoAccount, 'USDC', 1, false);
+    await client.tokenWithdraw(group, mangoAccount, 'USDC', 1, false);
     await mangoAccount.reload(client);
 
     // serum3
@@ -74,7 +79,7 @@ async function main() {
     await client.serum3PlaceOrder(
       group,
       mangoAccount,
-      DEVNET_SERUM3_PROGRAM_ID,
+
       'BTC/USDC',
       Serum3Side.bid,
       20,
@@ -90,7 +95,7 @@ async function main() {
     await client.serum3PlaceOrder(
       group,
       mangoAccount,
-      DEVNET_SERUM3_PROGRAM_ID,
+
       'BTC/USDC',
       Serum3Side.bid,
       90000,
@@ -106,7 +111,7 @@ async function main() {
     await client.serum3PlaceOrder(
       group,
       mangoAccount,
-      DEVNET_SERUM3_PROGRAM_ID,
+
       'BTC/USDC',
       Serum3Side.ask,
       30000,
@@ -120,7 +125,7 @@ async function main() {
     console.log(`Current own orders on OB...`);
     let orders = await client.getSerum3Orders(
       group,
-      DEVNET_SERUM3_PROGRAM_ID,
+
       'BTC/USDC',
     );
     for (const order of orders) {
@@ -131,7 +136,7 @@ async function main() {
       await client.serum3CancelOrder(
         group,
         mangoAccount,
-        DEVNET_SERUM3_PROGRAM_ID,
+
         'BTC/USDC',
         order.side === 'buy' ? Serum3Side.bid : Serum3Side.ask,
         order.orderId,
@@ -141,23 +146,30 @@ async function main() {
     console.log(`Current own orders on OB...`);
     orders = await client.getSerum3Orders(
       group,
-      DEVNET_SERUM3_PROGRAM_ID,
+
       'BTC/USDC',
     );
     for (const order of orders) {
       console.log(order);
     }
 
-    // console.log(`Close mango account...`);
-    // await client.closeMangoAccount(mangoAccount);
-
     console.log(`Settling funds...`);
     await client.serum3SettleFunds(
       group,
       mangoAccount,
-      DEVNET_SERUM3_PROGRAM_ID,
+
       'BTC/USDC',
     );
+
+    // try {
+    //   console.log(`Close OO...`);
+    //   await client.serum3CloseOpenOrders(group, mangoAccount, 'BTC/USDC');
+    // } catch (error) {
+    //   console.log(error);
+    // }
+
+    // console.log(`Close mango account...`);
+    // await client.closeMangoAccount(mangoAccount);
   }
 
   if (true) {
