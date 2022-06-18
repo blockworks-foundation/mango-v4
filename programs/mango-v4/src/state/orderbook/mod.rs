@@ -24,6 +24,7 @@ mod tests {
     fn new_bookside(book_side_type: BookSideType) -> BookSide {
         BookSide {
             book_side_type,
+            padding: [0u8; 3],
             bump_index: 0,
             free_list_len: 0,
             free_list_head: 0,
