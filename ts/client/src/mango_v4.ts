@@ -652,7 +652,7 @@ export type MangoV4 = {
           "name": "cpiDatas",
           "type": {
             "vec": {
-              "defined": "(u8,Vec<u8>)"
+              "defined": "CpiData"
             }
           }
         }
@@ -2553,6 +2553,22 @@ export type MangoV4 = {
           {
             "name": "amount",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CpiData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "accountStart",
+            "type": "u8"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
           }
         ]
       }
@@ -3885,7 +3901,7 @@ export const IDL: MangoV4 = {
           "name": "cpiDatas",
           "type": {
             "vec": {
-              "defined": "(u8,Vec<u8>)"
+              "defined": "CpiData"
             }
           }
         }
@@ -5786,6 +5802,22 @@ export const IDL: MangoV4 = {
           {
             "name": "amount",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CpiData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "accountStart",
+            "type": "u8"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
           }
         ]
       }

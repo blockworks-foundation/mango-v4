@@ -60,17 +60,23 @@ pub struct MarginTradeWithdraw {
     pub amount: u64,
 }
 
+#[derive(AnchorDeserialize, AnchorSerialize)]
+pub struct CpiData {
+    pub account_start: u8,
+    pub data: Vec<u8>,
+}
+
 /// - `withdraws` is a list of MarginTradeWithdraw requests.
 /// - `cpi_datas` is a list of bytes per cpi to call the target_program_id with.
 /// - `cpi_account_starts` is a list of index into the remaining accounts per cpi to call the target_program_id with.
 pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, MarginTrade<'info>>,
     withdraws: Vec<MarginTradeWithdraw>,
-    cpi_datas: Vec<(u8, Vec<u8>)>,
+    cpi_datas: Vec<CpiData>,
 ) -> Result<()> {
     require!(!cpi_datas.is_empty(), MangoError::SomeError);
     let num_of_cpis = cpi_datas.len();
-    let num_health_accounts = cpi_datas.get(0).unwrap().0 as usize;
+    let num_health_accounts = cpi_datas.get(0).unwrap().account_start as usize;
 
     let group = ctx.accounts.group.load()?;
     let mut account = ctx.accounts.account.load_mut()?;
@@ -245,15 +251,15 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
         })
         .collect::<Vec<_>>();
     let signers_ref = signers.iter().map(|v| &v[..]).collect::<Vec<_>>();
-    for (cpi_index, (cpi_account_start, cpi_data)) in cpi_datas.iter().enumerate() {
-        let cpi_account_start = *cpi_account_start as usize;
+    for (cpi_index, cpi_data) in cpi_datas.iter().enumerate() {
+        let cpi_account_start = cpi_data.account_start as usize;
         let cpi_program_id = *ctx.remaining_accounts[cpi_account_start].key;
         require_keys_neq!(cpi_program_id, crate::id(), MangoError::SomeError);
 
         let all_cpi_ais_end_index = if cpi_index == num_of_cpis - 1 {
             all_cpi_ams.len()
         } else {
-            cpi_datas[cpi_index + 1].0 as usize - num_health_accounts
+            cpi_datas[cpi_index + 1].account_start as usize - num_health_accounts
         };
 
         let all_cpi_ais_start_index = cpi_account_start - num_health_accounts;
@@ -263,7 +269,7 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
         let cpi_ix = Instruction {
             program_id: cpi_program_id,
             // todo future: optimise out these to_vecs
-            data: cpi_data.to_vec(),
+            data: cpi_data.data.to_vec(),
             accounts: cpi_ams.to_vec(),
         };
         solana_program::program::invoke_signed(&cpi_ix, &cpi_ais, &signers_ref)?;
