@@ -1129,7 +1129,7 @@ export class MangoClient {
     const cpiData = instruction.data;
 
     return await this.program.methods
-      .marginTrade(new BN(parsedHealthAccounts.length), withdraws, cpiData)
+      .marginTrade(withdraws, [new BN(parsedHealthAccounts.length), cpiData])
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,

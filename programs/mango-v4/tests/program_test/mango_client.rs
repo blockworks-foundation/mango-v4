@@ -318,12 +318,14 @@ impl<'keypair> ClientInstruction for MarginTradeInstruction<'keypair> {
         .await;
 
         let instruction = Self::Instruction {
-            num_health_accounts: health_check_metas.len(),
             withdraws: vec![MarginTradeWithdraw {
                 index: 1,
                 amount: self.withdraw_amount,
             }],
-            cpi_data: self.margin_trade_program_ix_cpi_data.clone(),
+            cpi_datas: vec![(
+                health_check_metas.len() as u8,
+                self.margin_trade_program_ix_cpi_data.clone(),
+            )],
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
