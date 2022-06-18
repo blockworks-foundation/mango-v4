@@ -38,16 +38,17 @@ pub struct BookSide {
     // pub meta_data: MetaData,
     // todo: do we want this type at this level?
     pub book_side_type: BookSideType,
-    pub bump_index: usize,
-    pub free_list_len: usize,
+    pub padding: [u8; 3],
+    pub bump_index: u32,
+    pub free_list_len: u32,
     pub free_list_head: NodeHandle,
     pub root_node: NodeHandle,
-    pub leaf_count: usize,
+    pub leaf_count: u32,
     pub nodes: [AnyNode; MAX_BOOK_NODES],
 }
 const_assert_eq!(
     std::mem::size_of::<BookSide>(),
-    8 + 8 * 2 + 4 + 4 + 8 + 88 * 1024
+    1 + 3 + 4 * 2 + 4 + 4 + 4 + 88 * 1024
 );
 const_assert_eq!(std::mem::size_of::<BookSide>() % 8, 0);
 
@@ -277,12 +278,12 @@ impl BookSide {
 
         if self.free_list_len == 0 {
             require!(
-                self.bump_index < self.nodes.len() && self.bump_index < (u32::MAX as usize),
+                (self.bump_index as usize) < self.nodes.len() && self.bump_index < u32::MAX,
                 MangoError::SomeError // todo
             );
 
-            self.nodes[self.bump_index] = *val;
-            let key = self.bump_index as u32;
+            self.nodes[self.bump_index as usize] = *val;
+            let key = self.bump_index;
             self.bump_index += 1;
             return Ok(key);
         }
@@ -391,7 +392,7 @@ impl BookSide {
     }
 
     pub fn is_full(&self) -> bool {
-        self.free_list_len <= 1 && self.bump_index >= self.nodes.len() - 1
+        self.free_list_len <= 1 && (self.bump_index as usize) >= self.nodes.len() - 1
     }
 
     /// When a node changes, the parents' child_earliest_expiry may need to be updated.

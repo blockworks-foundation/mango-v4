@@ -19,7 +19,7 @@ pub trait QueueHeader: bytemuck::Pod {
     fn set_count(&mut self, value: usize);
 
     fn incr_event_id(&mut self);
-    fn decr_event_id(&mut self, n: usize);
+    fn decr_event_id(&mut self, n: u64);
 }
 
 #[account(zero_copy)]
@@ -91,7 +91,7 @@ impl EventQueue {
         require!(desired_len <= self.header.count(), MangoError::SomeError);
         let len_diff = self.header.count() - desired_len;
         self.header.set_count(desired_len);
-        self.header.decr_event_id(len_diff);
+        self.header.decr_event_id(len_diff as u64);
         Ok(())
     }
 
@@ -125,35 +125,35 @@ impl<'a> Iterator for EventQueueIterator<'a> {
 #[zero_copy]
 #[derive(Pod)]
 pub struct EventQueueHeader {
-    head: usize,
-    count: usize,
-    pub seq_num: usize,
+    head: u32,
+    count: u32,
+    pub seq_num: u64,
 }
 
 impl QueueHeader for EventQueueHeader {
     type Item = AnyEvent;
 
     fn head(&self) -> usize {
-        self.head
+        self.head as usize
     }
     fn set_head(&mut self, value: usize) {
-        self.head = value;
+        self.head = value.try_into().unwrap();
     }
     fn count(&self) -> usize {
-        self.count
+        self.count as usize
     }
     fn set_count(&mut self, value: usize) {
-        self.count = value;
+        self.count = value.try_into().unwrap();
     }
     fn incr_event_id(&mut self) {
         self.seq_num += 1;
     }
-    fn decr_event_id(&mut self, n: usize) {
+    fn decr_event_id(&mut self, n: u64) {
         self.seq_num -= n;
     }
 }
 
-const_assert_eq!(std::mem::size_of::<EventQueue>(), 8 * 3 + 512 * 200);
+const_assert_eq!(std::mem::size_of::<EventQueue>(), 4 * 2 + 8 + 512 * 200);
 const_assert_eq!(std::mem::size_of::<EventQueue>() % 8, 0);
 
 const EVENT_SIZE: usize = 200;
@@ -184,7 +184,7 @@ pub struct FillEvent {
     pub market_fees_applied: bool,
     pub padding: [u8; 3],
     pub timestamp: u64,
-    pub seq_num: usize, // note: usize same as u64
+    pub seq_num: u64,
 
     pub maker: Pubkey,
     pub maker_order_id: i128,
@@ -212,7 +212,7 @@ impl FillEvent {
         maker_out: bool,
         maker_slot: u8,
         timestamp: u64,
-        seq_num: usize,
+        seq_num: u64,
         maker: Pubkey,
         maker_order_id: i128,
         maker_client_order_id: u64,
@@ -272,7 +272,7 @@ pub struct OutEvent {
     pub owner_slot: u8,
     padding0: [u8; 5],
     pub timestamp: u64,
-    pub seq_num: usize,
+    pub seq_num: u64,
     pub owner: Pubkey,
     pub quantity: i64,
     padding1: [u8; EVENT_SIZE - 64],
@@ -284,7 +284,7 @@ impl OutEvent {
         side: Side,
         owner_slot: u8,
         timestamp: u64,
-        seq_num: usize,
+        seq_num: u64,
         owner: Pubkey,
         quantity: i64,
     ) -> Self {
