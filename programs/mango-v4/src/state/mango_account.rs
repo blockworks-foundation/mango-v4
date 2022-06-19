@@ -189,6 +189,12 @@ impl MangoAccountTokens {
 pub struct Serum3Account {
     pub open_orders: Pubkey,
 
+    // tracks reserved funds in open orders account,
+    // used for bookkeeping of potentital loans which
+    // can be charged with loan origination fees
+    pub native_coin_reserved_cached: I80F48,
+    pub native_pc_reserved_cached: I80F48,
+
     pub market_index: Serum3MarketIndex,
 
     /// Store the base/quote token index, so health computations don't need
@@ -199,7 +205,7 @@ pub struct Serum3Account {
 
     pub reserved: [u8; 2],
 }
-const_assert_eq!(size_of::<Serum3Account>(), 40);
+const_assert_eq!(size_of::<Serum3Account>(), 32 + 16 * 2 + 2 * 3 + 2);
 const_assert_eq!(size_of::<Serum3Account>() % 8, 0);
 
 impl Serum3Account {
@@ -220,6 +226,8 @@ impl Default for Serum3Account {
             base_token_index: TokenIndex::MAX,
             quote_token_index: TokenIndex::MAX,
             reserved: Default::default(),
+            native_coin_reserved_cached: I80F48::ZERO,
+            native_pc_reserved_cached: I80F48::ZERO,
         }
     }
 }
@@ -296,6 +304,12 @@ impl MangoAccountSerum3 {
     pub fn find(&self, market_index: Serum3MarketIndex) -> Option<&Serum3Account> {
         self.values
             .iter()
+            .find(|p| p.is_active_for_market(market_index))
+    }
+
+    pub fn find_mut(&mut self, market_index: Serum3MarketIndex) -> Option<&mut Serum3Account> {
+        self.values
+            .iter_mut()
             .find(|p| p.is_active_for_market(market_index))
     }
 }

@@ -1,12 +1,58 @@
+use crate::accounts_zerocopy::*;
 use crate::error::MangoError;
+
+use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
+use checked_math as cm;
 use fixed::types::I80F48;
 use num_enum::IntoPrimitive;
 use num_enum::TryFromPrimitive;
 use serum_dex::instruction::NewOrderInstructionV3;
 use serum_dex::matching::Side;
+use serum_dex::state::OpenOrders;
+
+/// For loan origination fees bookkeeping purposes
+pub struct OpenOrdersSlim {
+    pub native_coin_free: u64,
+    pub native_coin_total: u64,
+    pub native_pc_free: u64,
+    pub native_pc_total: u64,
+}
+impl OpenOrdersSlim {
+    pub fn fromOO(oo: &OpenOrders) -> Self {
+        Self {
+            native_coin_free: oo.native_coin_free,
+            native_coin_total: oo.native_coin_total,
+            native_pc_free: oo.native_pc_free,
+            native_pc_total: oo.native_pc_total,
+        }
+    }
+}
+
+pub trait OpenOrdersReserved {
+    fn native_coin_reserved(&self) -> u64;
+    fn native_pc_reserved(&self) -> u64;
+}
+
+impl OpenOrdersReserved for OpenOrdersSlim {
+    fn native_coin_reserved(&self) -> u64 {
+        self.native_coin_total - self.native_coin_free
+    }
+    fn native_pc_reserved(&self) -> u64 {
+        self.native_pc_total - self.native_pc_free
+    }
+}
+
+impl OpenOrdersReserved for OpenOrders {
+    fn native_coin_reserved(&self) -> u64 {
+        self.native_coin_total - self.native_coin_free
+    }
+    fn native_pc_reserved(&self) -> u64 {
+        self.native_pc_total - self.native_pc_free
+    }
+}
 
 /// Copy paste a bunch of enums so that we could AnchorSerialize & AnchorDeserialize them
 
@@ -107,13 +153,14 @@ pub fn serum3_place_order(
     client_order_id: u64,
     limit: u16,
 ) -> Result<()> {
+    let serum_market = ctx.accounts.serum_market.load()?;
+
     //
     // Validation
     //
     {
         let account = ctx.accounts.account.load()?;
         require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
-        let serum_market = ctx.accounts.serum_market.load()?;
 
         // Validate open_orders
         require!(
@@ -173,7 +220,21 @@ pub fn serum3_place_order(
         client_order_id,
         limit,
     };
+
+    let oo_ai = &ctx.accounts.open_orders.to_account_info();
+    let open_orders = load_open_orders_ref(oo_ai)?;
+    let before_oo = OpenOrdersSlim::fromOO(&open_orders);
     cpi_place_order(ctx.accounts, order)?;
+
+    let after_oo = OpenOrdersSlim::fromOO(&open_orders);
+    let mut account = ctx.accounts.account.load_mut()?;
+    inc_maybe_loan(
+        serum_market.market_index,
+        &mut account,
+        &before_oo,
+        &after_oo,
+    );
+
     cpi_settle_funds(ctx.accounts)?;
 
     //
@@ -205,6 +266,31 @@ pub fn serum3_place_order(
     require!(health >= 0, MangoError::HealthMustBePositive);
 
     Ok(())
+}
+
+// if reserved has increased, then increase cached value by the increase in reserved
+pub fn inc_maybe_loan(
+    market_index: Serum3MarketIndex,
+    account: &mut MangoAccount,
+    before_oo: &OpenOrdersSlim,
+    after_oo: &OpenOrdersSlim,
+) {
+    let serum3_account = account.serum3.find_mut(market_index).unwrap();
+
+    if after_oo.native_coin_reserved() > before_oo.native_coin_reserved() {
+        let native_coin_reserved_increase = I80F48::from_num::<u64>(
+            after_oo.native_coin_reserved() - before_oo.native_coin_reserved(),
+        );
+        serum3_account.native_coin_reserved_cached =
+            cm!(serum3_account.native_coin_reserved_cached + native_coin_reserved_increase);
+    }
+
+    if after_oo.native_pc_reserved() > before_oo.native_pc_reserved() {
+        let reserved_pc_increase =
+            I80F48::from_num::<u64>(after_oo.native_pc_reserved() - before_oo.native_pc_reserved());
+        serum3_account.native_pc_reserved_cached =
+            cm!(serum3_account.native_pc_reserved_cached + reserved_pc_increase);
+    }
 }
 
 pub fn apply_vault_difference(
