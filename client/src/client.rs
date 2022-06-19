@@ -25,6 +25,7 @@ use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::sysvar;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer};
 
+// todo: might want to integrate geyser, websockets, or simple http polling for keeping data fresh
 pub struct MangoClient {
     pub rpc: RpcClient,
     pub cluster: Cluster,
