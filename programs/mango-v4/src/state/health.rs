@@ -295,16 +295,92 @@ pub fn compute_health_from_fixed_accounts(
 
 use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen]
+extern "C" {
+    // Use `js_namespace` here to bind `console.log(..)` instead of just
+    // `log(..)`
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
+macro_rules! console_log {
+    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct WasmAccounts {
+    accounts: Vec<WasmAccount>,
+}
+
+#[wasm_bindgen]
+impl WasmAccounts {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            accounts: vec![],
+        }
+    }
+
+    pub fn push(&mut self, account: WasmAccount) {
+        self.accounts.push(account);
+    }
+}
+
 #[wasm_bindgen(getter_with_clone)]
-pub struct Test {
+#[derive(Clone)]
+pub struct WasmAccount {
     pub data: Vec<u8>,
     pub key: Pubkey,
     pub owner: Pubkey,
 }
 
 #[wasm_bindgen]
-pub fn compute_health_wasm(arg: &Test) {
-    // todo obv
+impl WasmAccount {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            data: vec![],
+            key: Pubkey::default(),
+            owner: Pubkey::default(),
+        }
+    }
+}
+
+impl KeyedAccountReader for WasmAccount {
+    fn key(&self) -> &Pubkey {
+        &self.key
+    }
+}
+
+impl AccountReader for WasmAccount {
+    fn owner(&self) -> &Pubkey {
+        &self.owner
+    }
+
+    fn data(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+#[wasm_bindgen]
+pub fn compute_health_wasm(account: &WasmAccount, accounts: &WasmAccounts) -> f32 {
+    let account = account.load::<MangoAccount>().unwrap();
+    let active_token_len = account.tokens.iter_active().count();
+    let active_serum3_len = account.serum3.iter_active().count();
+    let active_perp_len = account.perps.iter_active_accounts().count();
+    let expected_ais = cm!(active_token_len * 2 // banks + oracles
+        + active_perp_len // PerpMarkets
+        + active_serum3_len); // open_orders
+    assert!(accounts.accounts.len() == expected_ais);
+
+    let retriever = FixedOrderAccountRetriever {
+        ais: accounts.accounts.clone(),
+        n_banks: active_token_len,
+        begin_perp: cm!(active_token_len * 2),
+        begin_serum3: cm!(active_token_len * 2 + active_perp_len),
+    };
+    let health_type = HealthType::Maint;
+    compute_health_detail(account, &retriever, health_type, true).unwrap().health(health_type).unwrap().to_num::<f32>()
 }
 
 /// Compute health with an arbitrary AccountRetriever
