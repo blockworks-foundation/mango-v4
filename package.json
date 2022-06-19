@@ -60,7 +60,8 @@
     "@project-serum/serum": "^0.13.65",
     "@solana/spl-token": "~0.1.8",
     "big.js": "^6.1.1",
-    "bs58": "^5.0.0"
+    "bs58": "^5.0.0",
+    "mango-v4": "link:programs/mango-v4/pkg"
   },
   "peerDependencies": {
     "@solana/spl-token-swap": "^0.2.0"

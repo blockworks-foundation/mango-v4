@@ -293,6 +293,20 @@ pub fn compute_health_from_fixed_accounts(
     compute_health_detail(account, &retriever, health_type, true)?.health(health_type)
 }
 
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen(getter_with_clone)]
+pub struct Test {
+    pub data: Vec<u8>,
+    pub key: Pubkey,
+    pub owner: Pubkey,
+}
+
+#[wasm_bindgen]
+pub fn compute_health_wasm(arg: &Test) {
+    // todo obv
+}
+
 /// Compute health with an arbitrary AccountRetriever
 pub fn compute_health(
     account: &MangoAccount,

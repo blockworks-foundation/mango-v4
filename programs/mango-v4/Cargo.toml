@@ -40,7 +40,7 @@ static_assertions = "1.1"
 switchboard-program = ">=0.2.0"
 switchboard-utils = ">=0.1.36"
 switchboard-v2 = "0.1.10"
-
+wasm-bindgen = { version = "0.2.81", features = [] }
 
 [dev-dependencies]
 solana-sdk = { version = "~1.9.13", default-features = false }
