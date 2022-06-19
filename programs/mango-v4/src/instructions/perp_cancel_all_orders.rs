@@ -34,8 +34,8 @@ pub fn perp_cancel_all_orders(ctx: Context<PerpCancelAllOrders>, limit: u8) -> R
     require!(mango_account.is_bankrupt == 0, MangoError::IsBankrupt);
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
-    let bids = &ctx.accounts.bids.to_account_info();
-    let asks = &ctx.accounts.asks.to_account_info();
+    let bids = ctx.accounts.bids.as_ref();
+    let asks = ctx.accounts.asks.as_ref();
     let mut book = Book::load_mut(bids, asks, &perp_market)?;
 
     book.cancel_all_order(&mut mango_account, &mut perp_market, limit, None)?;

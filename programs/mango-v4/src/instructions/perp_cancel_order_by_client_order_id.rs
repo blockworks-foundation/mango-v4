@@ -37,8 +37,8 @@ pub fn perp_cancel_order_by_client_order_id(
     require!(mango_account.is_bankrupt == 0, MangoError::IsBankrupt);
 
     let perp_market = ctx.accounts.perp_market.load_mut()?;
-    let bids = &ctx.accounts.bids.to_account_info();
-    let asks = &ctx.accounts.asks.to_account_info();
+    let bids = ctx.accounts.bids.as_ref();
+    let asks = ctx.accounts.asks.as_ref();
     let mut book = Book::load_mut(bids, asks, &perp_market)?;
 
     let (order_id, side) = mango_account

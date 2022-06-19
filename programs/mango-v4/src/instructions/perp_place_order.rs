@@ -84,8 +84,8 @@ pub fn perp_place_order(
 
     {
         let mut perp_market = ctx.accounts.perp_market.load_mut()?;
-        let bids = &ctx.accounts.bids.to_account_info();
-        let asks = &ctx.accounts.asks.to_account_info();
+        let bids = ctx.accounts.bids.as_ref();
+        let asks = ctx.accounts.asks.as_ref();
         let mut book = Book::load_mut(bids, asks, &perp_market)?;
 
         let mut event_queue = ctx.accounts.event_queue.load_mut()?;
