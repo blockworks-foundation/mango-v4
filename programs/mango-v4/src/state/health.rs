@@ -358,10 +358,11 @@ struct PerpInfo {
 impl PerpInfo {
     /// Total health contribution from perp balances
     ///
-    /// Due to isolation of perp markets, only positive quote positions can lead to
-    /// positive perp-based health. Users need to settle their perp pnl with other
-    /// perp market participants in order to realize their gains if they want to use
-    /// them as collateral.
+    /// Due to isolation of perp markets, users may never borrow against perp
+    /// positions without settling first: perp health is capped at zero.
+    ///
+    /// Users need to settle their perp pnl with other perp market participants
+    /// in order to realize their gains if they want to use them as collateral.
     ///
     /// This is because we don't trust the perp's base price to not suddenly jump to
     /// zero (if users could borrow against their perp balances they might now
@@ -377,12 +378,7 @@ impl PerpInfo {
         };
         // FUTURE: Allow v3-style "reliable" markets where we can return
         // `self.quote + weight * self.base` here
-        if self.quote.is_positive() {
-            let limited_base_health = cm!(weight * self.base).min(I80F48::ZERO);
-            cm!(self.quote + limited_base_health)
-        } else {
-            cm!(self.quote + weight * self.base).min(I80F48::ZERO)
-        }
+        cm!(self.quote + weight * self.base).min(I80F48::ZERO)
     }
 }
 
