@@ -995,7 +995,7 @@ export class MangoClient {
       filters.push({
         memcmp: {
           bytes: bs58.encode(bbuf),
-          offset: 428,
+          offset: 444,
         },
       });
     }
@@ -1006,7 +1006,7 @@ export class MangoClient {
       filters.push({
         memcmp: {
           bytes: bs58.encode(qbuf),
-          offset: 430,
+          offset: 446,
         },
       });
     }
