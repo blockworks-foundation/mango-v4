@@ -60,8 +60,8 @@ async function main() {
 
   if (true) {
     // deposit and withdraw
-    console.log(`Depositing...5 USDC`);
-    await client.tokenDeposit(group, mangoAccount, 'USDC', 5);
+    console.log(`Depositing...50 USDC`);
+    await client.tokenDeposit(group, mangoAccount, 'USDC', 50);
     await mangoAccount.reload(client);
 
     console.log(`Depositing...0.0005 BTC`);
