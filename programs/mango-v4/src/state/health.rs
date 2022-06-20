@@ -278,7 +278,6 @@ pub fn compute_health_from_fixed_accounts(
     let expected_ais = cm!(active_token_len * 2 // banks + oracles
         + active_perp_len // PerpMarkets
         + active_serum3_len); // open_orders
-    msg!("{} {}", ais.len(), expected_ais);
     require!(ais.len() == expected_ais, MangoError::SomeError);
 
     let retriever = FixedOrderAccountRetriever {
