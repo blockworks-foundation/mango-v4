@@ -1186,7 +1186,7 @@ export class MangoClient {
 
   /// private
 
-  private async buildHealthRemainingAccounts(
+  public async buildHealthRemainingAccounts(
     group: Group,
     mangoAccount: MangoAccount,
     banks?: Bank[] /** TODO for serum3PlaceOrder we are just ingoring this atm */,
