@@ -75,22 +75,28 @@ pub fn serum3_cancel_order(
     //
     // Cancel
     //
-    let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
-    let before_oo = OpenOrdersSlim::fromOO(&open_orders);
-    let order = serum_dex::instruction::CancelOrderInstructionV2 {
-        side: u8::try_from(side).unwrap().try_into().unwrap(),
-        order_id,
+    let before_oo = {
+        let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
+        let before_oo = OpenOrdersSlim::fromOO(&open_orders);
+        let order = serum_dex::instruction::CancelOrderInstructionV2 {
+            side: u8::try_from(side).unwrap().try_into().unwrap(),
+            order_id,
+        };
+        cpi_cancel_order(ctx.accounts, order)?;
+        before_oo
     };
-    cpi_cancel_order(ctx.accounts, order)?;
 
-    let after_oo = OpenOrdersSlim::fromOO(&open_orders);
-    let mut account = ctx.accounts.account.load_mut()?;
-    decrease_maybe_loan(
-        serum_market.market_index,
-        &mut account,
-        &before_oo,
-        &after_oo,
-    );
+    {
+        let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
+        let after_oo = OpenOrdersSlim::fromOO(&open_orders);
+        let mut account = ctx.accounts.account.load_mut()?;
+        decrease_maybe_loan(
+            serum_market.market_index,
+            &mut account,
+            &before_oo,
+            &after_oo,
+        );
+    };
 
     Ok(())
 }
@@ -106,16 +112,14 @@ pub fn decrease_maybe_loan(
     let serum3_account = account.serum3.find_mut(market_index).unwrap();
 
     if after_oo.native_coin_free > before_oo.native_coin_free {
-        let native_coin_free_increase =
-            I80F48::from_num::<u64>(after_oo.native_coin_free - before_oo.native_coin_free);
+        let native_coin_free_increase = after_oo.native_coin_free - before_oo.native_coin_free;
         serum3_account.native_coin_reserved_cached =
             cm!(serum3_account.native_coin_reserved_cached - native_coin_free_increase);
     }
 
     // pc
     if after_oo.native_pc_free > before_oo.native_pc_free {
-        let free_pc_increase =
-            I80F48::from_num::<u64>(after_oo.native_pc_free - before_oo.native_pc_free);
+        let free_pc_increase = after_oo.native_pc_free - before_oo.native_pc_free;
         serum3_account.native_pc_reserved_cached =
             cm!(serum3_account.native_pc_reserved_cached - free_pc_increase);
     }

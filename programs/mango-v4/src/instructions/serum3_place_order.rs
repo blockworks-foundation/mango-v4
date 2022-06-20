@@ -221,19 +221,26 @@ pub fn serum3_place_order(
         limit,
     };
 
-    let oo_ai = &ctx.accounts.open_orders.to_account_info();
-    let open_orders = load_open_orders_ref(oo_ai)?;
-    let before_oo = OpenOrdersSlim::fromOO(&open_orders);
-    cpi_place_order(ctx.accounts, order)?;
+    let before_oo = {
+        let oo_ai = &ctx.accounts.open_orders.as_ref();
+        let open_orders = load_open_orders_ref(oo_ai)?;
+        let before_oo = OpenOrdersSlim::fromOO(&open_orders);
+        cpi_place_order(ctx.accounts, order)?;
+        before_oo
+    };
 
-    let after_oo = OpenOrdersSlim::fromOO(&open_orders);
-    let mut account = ctx.accounts.account.load_mut()?;
-    inc_maybe_loan(
-        serum_market.market_index,
-        &mut account,
-        &before_oo,
-        &after_oo,
-    );
+    {
+        let oo_ai = &ctx.accounts.open_orders.as_ref();
+        let open_orders = load_open_orders_ref(oo_ai)?;
+        let after_oo = OpenOrdersSlim::fromOO(&open_orders);
+        let mut account = ctx.accounts.account.load_mut()?;
+        inc_maybe_loan(
+            serum_market.market_index,
+            &mut account,
+            &before_oo,
+            &after_oo,
+        );
+    }
 
     cpi_settle_funds(ctx.accounts)?;
 
@@ -278,16 +285,14 @@ pub fn inc_maybe_loan(
     let serum3_account = account.serum3.find_mut(market_index).unwrap();
 
     if after_oo.native_coin_reserved() > before_oo.native_coin_reserved() {
-        let native_coin_reserved_increase = I80F48::from_num::<u64>(
-            after_oo.native_coin_reserved() - before_oo.native_coin_reserved(),
-        );
+        let native_coin_reserved_increase =
+            after_oo.native_coin_reserved() - before_oo.native_coin_reserved();
         serum3_account.native_coin_reserved_cached =
             cm!(serum3_account.native_coin_reserved_cached + native_coin_reserved_increase);
     }
 
     if after_oo.native_pc_reserved() > before_oo.native_pc_reserved() {
-        let reserved_pc_increase =
-            I80F48::from_num::<u64>(after_oo.native_pc_reserved() - before_oo.native_pc_reserved());
+        let reserved_pc_increase = after_oo.native_pc_reserved() - before_oo.native_pc_reserved();
         serum3_account.native_pc_reserved_cached =
             cm!(serum3_account.native_pc_reserved_cached + reserved_pc_increase);
     }

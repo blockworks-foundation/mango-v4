@@ -66,8 +66,6 @@ pub struct Serum3SettleFunds<'info> {
 ///
 pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     let serum_market = ctx.accounts.serum_market.load()?;
-    let mut base_bank = ctx.accounts.base_bank.load_mut()?;
-    let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
 
     //
     // Validation
@@ -118,38 +116,46 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     //
     // Settle
     //
-    let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
-    cpi_settle_funds(ctx.accounts)?;
+    {
+        let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
+        cpi_settle_funds(ctx.accounts)?;
 
-    let after_oo = OpenOrdersSlim::fromOO(&open_orders);
-    let mut account = &mut ctx.accounts.account.load_mut()?;
+        let after_oo = OpenOrdersSlim::fromOO(&open_orders);
+        let mut account = &mut ctx.accounts.account.load_mut()?;
 
-    charge_maybe_fees(
-        serum_market.market_index,
-        &mut base_bank,
-        &mut quote_bank,
-        account,
-        &after_oo,
-    )?;
+        let mut base_bank = ctx.accounts.base_bank.load_mut()?;
+        let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
+        charge_maybe_fees(
+            serum_market.market_index,
+            &mut base_bank,
+            &mut quote_bank,
+            account,
+            &after_oo,
+        )?;
+    }
 
     //
     // After-order tracking
     //
-    ctx.accounts.base_vault.reload()?;
-    ctx.accounts.quote_vault.reload()?;
-    let after_base_vault = ctx.accounts.base_vault.amount;
-    let after_quote_vault = ctx.accounts.quote_vault.amount;
+    {
+        ctx.accounts.base_vault.reload()?;
+        ctx.accounts.quote_vault.reload()?;
+        let after_base_vault = ctx.accounts.base_vault.amount;
+        let after_quote_vault = ctx.accounts.quote_vault.amount;
 
-    // Charge the difference in vault balances to the user's account
-    apply_vault_difference(
-        ctx.accounts.account.load_mut()?,
-        base_bank,
-        after_base_vault,
-        before_base_vault,
-        quote_bank,
-        after_quote_vault,
-        before_quote_vault,
-    )?;
+        // Charge the difference in vault balances to the user's account
+        let mut base_bank = ctx.accounts.base_bank.load_mut()?;
+        let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
+        apply_vault_difference(
+            ctx.accounts.account.load_mut()?,
+            base_bank,
+            after_base_vault,
+            before_base_vault,
+            quote_bank,
+            after_quote_vault,
+            before_quote_vault,
+        )?;
+    }
 
     Ok(())
 }
@@ -164,11 +170,15 @@ pub fn charge_maybe_fees(
 ) -> Result<()> {
     let serum3_account = account.serum3.find_mut(market_index).unwrap();
 
-    let native_coin_reserved = I80F48::from_num::<u64>(after_oo.native_coin_reserved());
-    if serum3_account.native_coin_reserved_cached > native_coin_reserved {
-        let maybe_actualized_loan =
-            cm!(serum3_account.native_coin_reserved_cached - native_coin_reserved);
-        serum3_account.native_coin_reserved_cached = native_coin_reserved;
+    if serum3_account.native_coin_reserved_cached > after_oo.native_coin_reserved() {
+        let maybe_actualized_loan = I80F48::from_num::<u64>(
+            serum3_account
+                .native_coin_reserved_cached
+                .saturating_sub(after_oo.native_coin_reserved()),
+        );
+        require!(maybe_actualized_loan.is_positive(), MangoError::SomeError);
+
+        serum3_account.native_coin_reserved_cached = after_oo.native_coin_reserved();
 
         // loan origination fees
         let coin_token_account = account.tokens.get_mut(coin_bank.token_index)?;
@@ -176,19 +186,24 @@ pub fn charge_maybe_fees(
 
         if coin_token_native.is_negative() {
             let actualized_loan = coin_token_native.abs().min(maybe_actualized_loan);
-            let loan_origination_fee = actualized_loan * coin_bank.loan_origination_fee_rate;
+            // note: the withdraw has already happened while placing the order
+            // now that the loan is actually materialized (since the fill having taken place)
+            // charge the loan origination fee
             coin_bank
                 .borrow_mut()
-                .change_without_fee(coin_token_account, -loan_origination_fee)?;
-            coin_bank.borrow_mut().collected_fees_native += loan_origination_fee;
+                .charge_loan_origination_fee(coin_token_account, actualized_loan)?;
         }
     }
 
-    let native_pc_reserved = I80F48::from_num::<u64>(after_oo.native_pc_reserved());
-    if serum3_account.native_pc_reserved_cached > native_pc_reserved {
-        let maybe_actualized_loan =
-            cm!(serum3_account.native_pc_reserved_cached - native_pc_reserved);
-        serum3_account.native_pc_reserved_cached = native_pc_reserved;
+    if serum3_account.native_pc_reserved_cached > after_oo.native_pc_reserved() {
+        let maybe_actualized_loan = I80F48::from_num::<u64>(
+            serum3_account
+                .native_pc_reserved_cached
+                .saturating_sub(after_oo.native_pc_reserved()),
+        );
+        require!(maybe_actualized_loan.is_positive(), MangoError::SomeError);
+
+        serum3_account.native_pc_reserved_cached = after_oo.native_pc_reserved();
 
         // loan origination fees
         let pc_token_account = account.tokens.get_mut(pc_bank.token_index)?;
@@ -196,11 +211,12 @@ pub fn charge_maybe_fees(
 
         if pc_token_native.is_negative() {
             let actualized_loan = pc_token_native.abs().min(maybe_actualized_loan);
-            let loan_origination_fee = actualized_loan * pc_bank.loan_origination_fee_rate;
+            // note: the withdraw has already happened while placing the order
+            // now that the loan is actually materialized (since the fill having taken place)
+            // charge the loan origination fee
             pc_bank
                 .borrow_mut()
-                .change_without_fee(pc_token_account, -loan_origination_fee)?;
-            pc_bank.borrow_mut().collected_fees_native += loan_origination_fee;
+                .charge_loan_origination_fee(pc_token_account, actualized_loan)?;
         }
     }
 

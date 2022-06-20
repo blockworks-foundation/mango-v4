@@ -230,9 +230,4 @@ mod tests {
             )
         }
     }
-
-    #[test]
-    pub fn foo() {
-        dbg!((1u64 - 3u64) as i64);
-    }
 }
