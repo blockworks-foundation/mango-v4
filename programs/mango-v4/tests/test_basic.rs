@@ -85,6 +85,19 @@ async fn test_basic() -> Result<(), TransportError> {
     }
 
     //
+    // TEST: Compute the account health
+    //
+    send_tx(
+        solana,
+        ComputeHealthInstruction {
+            account,
+            health_type: HealthType::Init,
+        },
+    )
+    .await
+    .unwrap();
+
+    //
     // TEST: Withdraw funds
     //
     {

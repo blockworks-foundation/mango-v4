@@ -2059,3 +2059,47 @@ impl ClientInstruction for UpdateIndexInstruction {
         vec![]
     }
 }
+
+pub struct ComputeHealthInstruction {
+    pub account: Pubkey,
+    pub health_type: HealthType,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for ComputeHealthInstruction {
+    type Accounts = mango_v4::accounts::ComputeHealth;
+    type Instruction = mango_v4::instruction::ComputeHealth;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            health_type: self.health_type,
+        };
+
+        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            None,
+            false,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: account.group,
+            account: self.account,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![]
+    }
+}
