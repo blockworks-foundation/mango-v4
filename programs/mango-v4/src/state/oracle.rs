@@ -141,10 +141,24 @@ pub fn oracle_price(
             cm!(price * decimal_adj)
         }
         OracleType::SwitchboardV2 => {
-            let feed_result =
-                bytemuck::from_bytes::<AggregatorAccountData>(&data[8..]).get_result()?;
-            let decimal: f64 = feed_result.try_into()?;
-            let price = I80F48::from_num(decimal);
+            let feed = bytemuck::from_bytes::<AggregatorAccountData>(&data[8..]);
+            let feed_result = feed.get_result()?;
+            let price_decimal: f64 = feed_result.try_into()?;
+            let price = I80F48::from_num(price_decimal);
+
+            // Filter out bad prices
+            let std_deviation_decimal: f64 =
+                feed.latest_confirmed_round.std_deviation.try_into()?;
+            if I80F48::from_num(std_deviation_decimal) > oracle_conf_filter * price {
+                msg!(
+                    "Switchboard v2 std deviation too high; pubkey {} price: {} latest_confirmed_round.std_deviation: {}",
+                    acc_info.key(),
+                    price.to_num::<f64>(),
+                    std_deviation_decimal
+                );
+                return Err(MangoError::SomeError.into());
+            }
+
             let decimals = QUOTE_DECIMALS
                 .checked_sub(base_token_decimals as i8)
                 .unwrap();
@@ -154,6 +168,21 @@ pub fn oracle_price(
         OracleType::SwitchboardV1 => {
             let result = FastRoundResultAccountData::deserialize(data).unwrap();
             let price = I80F48::from_num(result.result.result);
+
+            // Filter out bad prices
+            let min_response = I80F48::from_num(result.result.min_response);
+            let max_response = I80F48::from_num(result.result.max_response);
+            if cm!(max_response - min_response) > oracle_conf_filter * price {
+                msg!(
+                    "Switchboard v1 min-max response gap too wide; pubkey {} price: {} min_response: {} max_response {}",
+                    acc_info.key(),
+                    price.to_num::<f64>(),
+                    min_response,
+                    max_response
+                );
+                return Err(MangoError::SomeError.into());
+            }
+
             let decimals = QUOTE_DECIMALS
                 .checked_sub(base_token_decimals as i8)
                 .unwrap();
