@@ -1,21 +1,24 @@
-import { ORCA_TOKEN_SWAP_ID_DEVNET } from '@orca-so/sdk';
-import { Connection, PublicKey } from '@solana/web3.js';
+import {
+  OrcaPoolToken,
+  ORCA_TOKEN_SWAP_ID_DEVNET,
+  PoolTokenCount,
+} from '@orca-so/sdk';
+import { orcaDevnetPoolConfigs } from '@orca-so/sdk/dist/constants/devnet/pools';
+import { OrcaPoolParams } from '@orca-so/sdk/dist/model/orca/pool/pool-types';
+import { OrcaPoolConfig as OrcaDevnetPoolConfig } from '@orca-so/sdk/dist/public/devnet/pools';
 import { BN } from '@project-serum/anchor';
 import {
   AccountInfo,
   AccountLayout,
-  u64,
   TOKEN_PROGRAM_ID,
+  u64,
 } from '@solana/spl-token';
-import { OrcaPoolToken, PoolTokenCount } from '@orca-so/sdk';
-import { orcaDevnetPoolConfigs } from '@orca-so/sdk/dist/constants/devnet/pools';
-import { OrcaPoolConfig as OrcaDevnetPoolConfig } from '@orca-so/sdk/dist/public/devnet/pools';
-import { OrcaPoolParams } from '@orca-so/sdk/dist/model/orca/pool/pool-types';
 import { TokenSwap } from '@solana/spl-token-swap';
+import { Connection, PublicKey } from '@solana/web3.js';
 
-import * as Tokens from './tokens';
 import { Bank } from '../../accounts/bank';
 import { toNativeDecimals, toUiDecimals } from '../../utils';
+import * as Tokens from './tokens';
 
 export { ORCA_TOKEN_SWAP_ID_DEVNET };
 
@@ -175,8 +178,8 @@ const deserializeAccount = (
   return accountInfo;
 };
 
-const ZERO = new u64(0);
-const ONE = new u64(1);
+const ZERO = new BN(0);
+const ONE = new BN(1);
 const ceilingDivision = (dividend: u64, divisor: u64): [u64, u64] => {
   let quotient = dividend.div(divisor);
   if (quotient.eq(ZERO)) {
