@@ -455,6 +455,13 @@ fn compute_health_detail(
 ) -> Result<HealthCache> {
     // token contribution from token accounts
     let mut token_infos = vec![];
+    fn find_token_info_index(infos: &[TokenInfo], token_index: TokenIndex) -> Result<usize> {
+        infos
+            .iter()
+            .position(|ti| ti.token_index == token_index)
+            .ok_or_else(|| error!(MangoError::SomeError))
+    }
+
     for (i, position) in account.tokens.iter_active().enumerate() {
         let (bank, oracle_price) =
             retriever.bank_and_oracle(&account.group, i, position.token_index)?;
@@ -488,14 +495,8 @@ fn compute_health_detail(
         }
 
         // find the TokenInfos for the market's base and quote tokens
-        let base_index = token_infos
-            .iter()
-            .position(|ti| ti.token_index == serum_account.base_token_index)
-            .ok_or_else(|| error!(MangoError::SomeError))?;
-        let quote_index = token_infos
-            .iter()
-            .position(|ti| ti.token_index == serum_account.quote_token_index)
-            .ok_or_else(|| error!(MangoError::SomeError))?;
+        let base_index = find_token_info_index(&token_infos,  serum_account.base_token_index)?;
+        let quote_index = find_token_info_index(&token_infos, serum_account.quote_token_index)?;
         let (base_info, quote_info) = if base_index < quote_index {
             let (l, r) = token_infos.split_at_mut(quote_index);
             (&mut l[base_index], &mut r[0])
@@ -534,10 +535,7 @@ fn compute_health_detail(
         let perp_market = retriever.perp_market(&account.group, i, perp_account.market_index)?;
 
         // find the TokenInfos for the market's base and quote tokens
-        let base_index = token_infos
-            .iter()
-            .position(|ti| ti.token_index == perp_market.base_token_index)
-            .ok_or_else(|| error!(MangoError::SomeError))?;
+        let base_index = find_token_info_index(&token_infos, perp_market.base_token_index)?;
         let base_info = &token_infos[base_index];
 
         let base_lot_size = I80F48::from(perp_market.base_lot_size);
