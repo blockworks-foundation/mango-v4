@@ -5,7 +5,7 @@ use crate::{
     error::MangoError,
     state::{
         orderbook::{bookside::BookSide, nodes::LeafNode},
-        EventQueue, MangoAccount, MangoAccountPerps, PerpMarket, FREE_ORDER_SLOT,
+        EventQueue, MangoAccount, MangoAccountPerpPositions, PerpMarket, FREE_ORDER_SLOT,
         MAX_PERP_OPEN_ORDERS,
     },
 };
@@ -155,7 +155,7 @@ impl<'a> Book<'a> {
         perp_market: &mut PerpMarket,
         event_queue: &mut EventQueue,
         oracle_price: I80F48,
-        mango_account_perps: &mut MangoAccountPerps,
+        mango_account_perps: &mut MangoAccountPerpPositions,
         mango_account_pk: &Pubkey,
         price_lots: i64,
         max_base_lots: i64,
@@ -437,7 +437,7 @@ impl<'a> Book<'a> {
 /// both the maker and taker fees.
 fn apply_fees(
     market: &mut PerpMarket,
-    mango_account_perps: &mut MangoAccountPerps,
+    mango_account_perps: &mut MangoAccountPerpPositions,
     total_quote_taken: i64,
 ) -> Result<()> {
     let taker_quote_native = I80F48::from_num(
