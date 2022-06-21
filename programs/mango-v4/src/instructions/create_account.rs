@@ -28,15 +28,18 @@ pub struct CreateAccount<'info> {
 
 pub fn create_account(ctx: Context<CreateAccount>, account_num: u8, name: String) -> Result<()> {
     let mut account = ctx.accounts.account.load_init()?;
-    // TODO: dont init on stack
-    *account = MangoAccount {
-        name: fill32_from_str(name)?,
-        group: ctx.accounts.group.key(),
-        owner: ctx.accounts.owner.key(),
-        account_num,
-        bump: *ctx.bumps.get("account").ok_or(MangoError::SomeError)?,
-        ..MangoAccount::default()
-    };
+
+    account.name = fill32_from_str(name)?;
+    account.group = ctx.accounts.group.key();
+    account.owner = ctx.accounts.owner.key();
+    account.account_num = account_num;
+    account.bump = *ctx.bumps.get("account").ok_or(MangoError::SomeError)?;
+    account.delegate = Pubkey::default();
+    account.tokens = MangoAccountTokens::default();
+    account.serum3 = MangoAccountSerum3::default();
+    account.perps = MangoAccountPerps::default();
+    account.being_liquidated = 0;
+    account.is_bankrupt = 0;
 
     Ok(())
 }
