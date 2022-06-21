@@ -17,7 +17,7 @@ use crate::state::*;
 // we could probably support 1 token (quote currency) + 15 active perp markets at the same time
 // It's a tradeoff between allowing users to trade on many markets with one account,
 // MangoAccount size and health compute needs.
-const MAX_TOKEN_ACCOUNTS: usize = 16;
+const MAX_TOKEN_POSITIONS: usize = 16;
 const MAX_SERUM3_ACCOUNTS: usize = 8;
 const MAX_PERP_ACCOUNTS: usize = 8;
 pub const MAX_PERP_OPEN_ORDERS: usize = 8;
@@ -26,14 +26,14 @@ pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 
 #[zero_copy]
 #[derive(Debug)]
-pub struct TokenAccount {
+pub struct TokenPosition {
     // TODO: Why did we have deposits and borrows as two different values
     //       if only one of them was allowed to be != 0 at a time?
     // todo: maybe we want to split collateral and lending?
     // todo: see https://github.com/blockworks-foundation/mango-v4/issues/1
     // todo: how does ftx do this?
     /// The deposit_index (if positive) or borrow_index (if negative) scaled position
-    pub indexed_value: I80F48,
+    pub indexed_position: I80F48,
 
     /// index into Group.tokens
     pub token_index: TokenIndex,
@@ -43,10 +43,10 @@ pub struct TokenAccount {
 
     pub reserved: [u8; 5],
 }
-const_assert_eq!(size_of::<TokenAccount>(), 24);
-const_assert_eq!(size_of::<TokenAccount>() % 8, 0);
+const_assert_eq!(size_of::<TokenPosition>(), 24);
+const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
 
-impl TokenAccount {
+impl TokenPosition {
     pub fn is_active(&self) -> bool {
         self.token_index != TokenIndex::MAX
     }
@@ -56,19 +56,19 @@ impl TokenAccount {
     }
 
     pub fn native(&self, bank: &Bank) -> I80F48 {
-        if self.indexed_value.is_positive() {
-            self.indexed_value * bank.deposit_index
+        if self.indexed_position.is_positive() {
+            self.indexed_position * bank.deposit_index
         } else {
-            self.indexed_value * bank.borrow_index
+            self.indexed_position * bank.borrow_index
         }
     }
 
     pub fn ui(&self, bank: &Bank, mint: &Mint) -> I80F48 {
-        if self.indexed_value.is_positive() {
-            (self.indexed_value * bank.deposit_index)
+        if self.indexed_position.is_positive() {
+            (self.indexed_position * bank.deposit_index)
                 / I80F48::from_num(10u64.pow(mint.decimals as u32))
         } else {
-            (self.indexed_value * bank.borrow_index)
+            (self.indexed_position * bank.borrow_index)
                 / I80F48::from_num(10u64.pow(mint.decimals as u32))
         }
     }
@@ -79,16 +79,16 @@ impl TokenAccount {
 }
 
 #[zero_copy]
-pub struct MangoAccountTokens {
-    pub values: [TokenAccount; MAX_TOKEN_ACCOUNTS],
+pub struct MangoAccountTokenPositions {
+    pub values: [TokenPosition; MAX_TOKEN_POSITIONS],
 }
 const_assert_eq!(
-    size_of::<MangoAccountTokens>(),
-    MAX_TOKEN_ACCOUNTS * size_of::<TokenAccount>()
+    size_of::<MangoAccountTokenPositions>(),
+    MAX_TOKEN_POSITIONS * size_of::<TokenPosition>()
 );
-const_assert_eq!(size_of::<MangoAccountTokens>() % 8, 0);
+const_assert_eq!(size_of::<MangoAccountTokenPositions>() % 8, 0);
 
-impl std::fmt::Debug for MangoAccountTokens {
+impl std::fmt::Debug for MangoAccountTokenPositions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MangoAccountTokens")
             .field(
@@ -97,52 +97,52 @@ impl std::fmt::Debug for MangoAccountTokens {
                     .values
                     .iter()
                     .filter(|value| value.is_active())
-                    .collect::<Vec<&TokenAccount>>(),
+                    .collect::<Vec<&TokenPosition>>(),
             )
             .finish()
     }
 }
 
-impl Default for MangoAccountTokens {
+impl Default for MangoAccountTokenPositions {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MangoAccountTokens {
+impl MangoAccountTokenPositions {
     pub fn new() -> Self {
         Self {
-            values: [TokenAccount {
-                indexed_value: I80F48::ZERO,
+            values: [TokenPosition {
+                indexed_position: I80F48::ZERO,
                 token_index: TokenIndex::MAX,
                 in_use_count: 0,
                 reserved: Default::default(),
-            }; MAX_TOKEN_ACCOUNTS],
+            }; MAX_TOKEN_POSITIONS],
         }
     }
 
-    pub fn get(&self, token_index: TokenIndex) -> Result<&TokenAccount> {
+    pub fn get(&self, token_index: TokenIndex) -> Result<&TokenPosition> {
         self.values
             .iter()
             .find(|p| p.is_active_for_token(token_index))
             .ok_or_else(|| error!(MangoError::SomeError)) // TODO: not found error
     }
 
-    pub fn get_mut(&mut self, token_index: TokenIndex) -> Result<&mut TokenAccount> {
+    pub fn get_mut(&mut self, token_index: TokenIndex) -> Result<&mut TokenPosition> {
         self.values
             .iter_mut()
             .find(|p| p.is_active_for_token(token_index))
             .ok_or_else(|| error!(MangoError::SomeError)) // TODO: not found error
     }
 
-    pub fn get_mut_raw(&mut self, raw_token_index: usize) -> &mut TokenAccount {
+    pub fn get_mut_raw(&mut self, raw_token_index: usize) -> &mut TokenPosition {
         &mut self.values[raw_token_index]
     }
 
     pub fn get_mut_or_create(
         &mut self,
         token_index: TokenIndex,
-    ) -> Result<(&mut TokenAccount, usize)> {
+    ) -> Result<(&mut TokenPosition, usize)> {
         // This function looks complex because of lifetimes.
         // Maybe there's a smart way to write it with double iter_mut()
         // that doesn't confuse the borrow checker.
@@ -153,8 +153,8 @@ impl MangoAccountTokens {
         if pos.is_none() {
             pos = self.values.iter().position(|p| !p.is_active());
             if let Some(i) = pos {
-                self.values[i] = TokenAccount {
-                    indexed_value: I80F48::ZERO,
+                self.values[i] = TokenPosition {
+                    indexed_position: I80F48::ZERO,
                     token_index,
                     in_use_count: 0,
                     reserved: Default::default(),
@@ -173,11 +173,11 @@ impl MangoAccountTokens {
         self.values[index].token_index = TokenIndex::MAX;
     }
 
-    pub fn iter_active(&self) -> impl Iterator<Item = &TokenAccount> {
+    pub fn iter_active(&self) -> impl Iterator<Item = &TokenPosition> {
         self.values.iter().filter(|p| p.is_active())
     }
 
-    pub fn find(&self, token_index: TokenIndex) -> Option<&TokenAccount> {
+    pub fn find(&self, token_index: TokenIndex) -> Option<&TokenPosition> {
         self.values
             .iter()
             .find(|p| p.is_active_for_token(token_index))
@@ -186,7 +186,7 @@ impl MangoAccountTokens {
 
 #[zero_copy]
 #[derive(Debug)]
-pub struct Serum3Account {
+pub struct Serum3Orders {
     pub open_orders: Pubkey,
 
     // tracks reserved funds in open orders account,
@@ -206,10 +206,10 @@ pub struct Serum3Account {
 
     pub reserved: [u8; 2],
 }
-const_assert_eq!(size_of::<Serum3Account>(), 32 + 8 * 2 + 2 * 3 + 2);
-const_assert_eq!(size_of::<Serum3Account>() % 8, 0);
+const_assert_eq!(size_of::<Serum3Orders>(), 32 + 8 * 2 + 2 * 3 + 2);
+const_assert_eq!(size_of::<Serum3Orders>() % 8, 0);
 
-impl Serum3Account {
+impl Serum3Orders {
     pub fn is_active(&self) -> bool {
         self.market_index != Serum3MarketIndex::MAX
     }
@@ -219,7 +219,7 @@ impl Serum3Account {
     }
 }
 
-impl Default for Serum3Account {
+impl Default for Serum3Orders {
     fn default() -> Self {
         Self {
             open_orders: Pubkey::default(),
@@ -234,16 +234,16 @@ impl Default for Serum3Account {
 }
 
 #[zero_copy]
-pub struct MangoAccountSerum3 {
-    pub values: [Serum3Account; MAX_SERUM3_ACCOUNTS],
+pub struct MangoAccountSerum3Orders {
+    pub values: [Serum3Orders; MAX_SERUM3_ACCOUNTS],
 }
 const_assert_eq!(
-    size_of::<MangoAccountSerum3>(),
-    MAX_SERUM3_ACCOUNTS * size_of::<Serum3Account>()
+    size_of::<MangoAccountSerum3Orders>(),
+    MAX_SERUM3_ACCOUNTS * size_of::<Serum3Orders>()
 );
-const_assert_eq!(size_of::<MangoAccountSerum3>() % 8, 0);
+const_assert_eq!(size_of::<MangoAccountSerum3Orders>() % 8, 0);
 
-impl std::fmt::Debug for MangoAccountSerum3 {
+impl std::fmt::Debug for MangoAccountSerum3Orders {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MangoAccountSerum3")
             .field(
@@ -252,33 +252,33 @@ impl std::fmt::Debug for MangoAccountSerum3 {
                     .values
                     .iter()
                     .filter(|value| value.is_active())
-                    .collect::<Vec<&Serum3Account>>(),
+                    .collect::<Vec<&Serum3Orders>>(),
             )
             .finish()
     }
 }
 
-impl Default for MangoAccountSerum3 {
+impl Default for MangoAccountSerum3Orders {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MangoAccountSerum3 {
+impl MangoAccountSerum3Orders {
     pub fn new() -> Self {
         Self {
-            values: [Serum3Account::default(); MAX_SERUM3_ACCOUNTS],
+            values: [Serum3Orders::default(); MAX_SERUM3_ACCOUNTS],
         }
     }
 
-    pub fn create(&mut self, market_index: Serum3MarketIndex) -> Result<&mut Serum3Account> {
+    pub fn create(&mut self, market_index: Serum3MarketIndex) -> Result<&mut Serum3Orders> {
         if self.find(market_index).is_some() {
             return err!(MangoError::SomeError); // exists already
         }
         if let Some(v) = self.values.iter_mut().find(|p| !p.is_active()) {
-            *v = Serum3Account {
+            *v = Serum3Orders {
                 market_index: market_index as Serum3MarketIndex,
-                ..Serum3Account::default()
+                ..Serum3Orders::default()
             };
             Ok(v)
         } else {
@@ -298,17 +298,17 @@ impl MangoAccountSerum3 {
         Ok(())
     }
 
-    pub fn iter_active(&self) -> impl Iterator<Item = &Serum3Account> {
+    pub fn iter_active(&self) -> impl Iterator<Item = &Serum3Orders> {
         self.values.iter().filter(|p| p.is_active())
     }
 
-    pub fn find(&self, market_index: Serum3MarketIndex) -> Option<&Serum3Account> {
+    pub fn find(&self, market_index: Serum3MarketIndex) -> Option<&Serum3Orders> {
         self.values
             .iter()
             .find(|p| p.is_active_for_market(market_index))
     }
 
-    pub fn find_mut(&mut self, market_index: Serum3MarketIndex) -> Option<&mut Serum3Account> {
+    pub fn find_mut(&mut self, market_index: Serum3MarketIndex) -> Option<&mut Serum3Orders> {
         self.values
             .iter_mut()
             .find(|p| p.is_active_for_market(market_index))
@@ -316,7 +316,7 @@ impl MangoAccountSerum3 {
 }
 
 #[zero_copy]
-pub struct PerpAccount {
+pub struct PerpPositions {
     pub market_index: PerpMarketIndex,
     pub reserved: [u8; 6],
 
@@ -343,7 +343,7 @@ pub struct PerpAccount {
     pub taker_quote_lots: i64,
 }
 
-impl std::fmt::Debug for PerpAccount {
+impl std::fmt::Debug for PerpPositions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PerpAccount")
             .field("market_index", &self.market_index)
@@ -356,10 +356,10 @@ impl std::fmt::Debug for PerpAccount {
             .finish()
     }
 }
-const_assert_eq!(size_of::<PerpAccount>(), 8 + 8 * 5 + 3 * 16);
-const_assert_eq!(size_of::<PerpAccount>() % 8, 0);
+const_assert_eq!(size_of::<PerpPositions>(), 8 + 8 * 5 + 3 * 16);
+const_assert_eq!(size_of::<PerpPositions>() % 8, 0);
 
-impl Default for PerpAccount {
+impl Default for PerpPositions {
     fn default() -> Self {
         Self {
             market_index: PerpMarketIndex::MAX,
@@ -376,7 +376,7 @@ impl Default for PerpAccount {
     }
 }
 
-impl PerpAccount {
+impl PerpPositions {
     /// Add taker trade after it has been matched but before it has been process on EventQueue
     pub fn add_taker_trade(&mut self, side: Side, base_lots: i64, quote_lots: i64) {
         match side {
@@ -432,8 +432,8 @@ impl PerpAccount {
 }
 
 #[zero_copy]
-pub struct MangoAccountPerps {
-    pub accounts: [PerpAccount; MAX_PERP_ACCOUNTS],
+pub struct MangoAccountPerpPositions {
+    pub accounts: [PerpPositions; MAX_PERP_ACCOUNTS],
 
     // TODO: possibly it's more convenient to store a single list of PerpOpenOrder structs?
     pub order_market: [PerpMarketIndex; MAX_PERP_OPEN_ORDERS],
@@ -442,12 +442,12 @@ pub struct MangoAccountPerps {
     pub client_order_id: [u64; MAX_PERP_OPEN_ORDERS],
 }
 const_assert_eq!(
-    size_of::<MangoAccountPerps>(),
-    MAX_PERP_ACCOUNTS * size_of::<PerpAccount>() + MAX_PERP_OPEN_ORDERS * (2 + 1 + 16 + 8)
+    size_of::<MangoAccountPerpPositions>(),
+    MAX_PERP_ACCOUNTS * size_of::<PerpPositions>() + MAX_PERP_OPEN_ORDERS * (2 + 1 + 16 + 8)
 );
-const_assert_eq!(size_of::<MangoAccountPerps>() % 8, 0);
+const_assert_eq!(size_of::<MangoAccountPerpPositions>() % 8, 0);
 
-impl std::fmt::Debug for MangoAccountPerps {
+impl std::fmt::Debug for MangoAccountPerpPositions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MangoAccountPerps")
             .field(
@@ -456,7 +456,7 @@ impl std::fmt::Debug for MangoAccountPerps {
                     .accounts
                     .iter()
                     .filter(|value| value.is_active())
-                    .collect::<Vec<&PerpAccount>>(),
+                    .collect::<Vec<&PerpPositions>>(),
             )
             .field(
                 "order_market",
@@ -496,10 +496,10 @@ impl std::fmt::Debug for MangoAccountPerps {
     }
 }
 
-impl MangoAccountPerps {
+impl MangoAccountPerpPositions {
     pub fn new() -> Self {
         Self {
-            accounts: [PerpAccount::default(); MAX_PERP_ACCOUNTS],
+            accounts: [PerpPositions::default(); MAX_PERP_ACCOUNTS],
             order_market: [FREE_ORDER_SLOT; MAX_PERP_OPEN_ORDERS],
             order_side: [Side::Bid; MAX_PERP_OPEN_ORDERS],
             order_id: [0; MAX_PERP_OPEN_ORDERS],
@@ -510,7 +510,7 @@ impl MangoAccountPerps {
     pub fn get_account_mut_or_create(
         &mut self,
         perp_market_index: PerpMarketIndex,
-    ) -> Result<(&mut PerpAccount, usize)> {
+    ) -> Result<(&mut PerpPositions, usize)> {
         let mut pos = self
             .accounts
             .iter()
@@ -518,7 +518,7 @@ impl MangoAccountPerps {
         if pos.is_none() {
             pos = self.accounts.iter().position(|p| !p.is_active());
             if let Some(i) = pos {
-                self.accounts[i] = PerpAccount {
+                self.accounts[i] = PerpPositions {
                     market_index: perp_market_index,
                     ..Default::default()
                 };
@@ -535,11 +535,11 @@ impl MangoAccountPerps {
         self.accounts[index].market_index = PerpMarketIndex::MAX;
     }
 
-    pub fn iter_active_accounts(&self) -> impl Iterator<Item = &PerpAccount> {
+    pub fn iter_active_accounts(&self) -> impl Iterator<Item = &PerpPositions> {
         self.accounts.iter().filter(|p| p.is_active())
     }
 
-    pub fn find_account(&self, market_index: PerpMarketIndex) -> Option<&PerpAccount> {
+    pub fn find_account(&self, market_index: PerpMarketIndex) -> Option<&PerpPositions> {
         self.accounts
             .iter()
             .find(|p| p.is_active_for_market(market_index))
@@ -682,7 +682,7 @@ impl MangoAccountPerps {
     }
 }
 
-impl Default for MangoAccountPerps {
+impl Default for MangoAccountPerpPositions {
     fn default() -> Self {
         Self::new()
     }
@@ -700,13 +700,13 @@ pub struct MangoAccount {
 
     // Maps token_index -> deposit/borrow account for each token
     // that is active on this MangoAccount.
-    pub tokens: MangoAccountTokens,
+    pub tokens: MangoAccountTokenPositions,
 
     // Maps serum_market_index -> open orders for each serum market
     // that is active on this MangoAccount.
-    pub serum3: MangoAccountSerum3,
+    pub serum3: MangoAccountSerum3Orders,
 
-    pub perps: MangoAccountPerps,
+    pub perps: MangoAccountPerpPositions,
 
     /// This account cannot open new positions or borrow until `init_health >= 0`
     pub being_liquidated: u8,
@@ -723,9 +723,9 @@ pub struct MangoAccount {
 const_assert_eq!(
     size_of::<MangoAccount>(),
     32 + 3 * 32
-        + size_of::<MangoAccountTokens>()
-        + size_of::<MangoAccountSerum3>()
-        + size_of::<MangoAccountPerps>()
+        + size_of::<MangoAccountTokenPositions>()
+        + size_of::<MangoAccountSerum3Orders>()
+        + size_of::<MangoAccountPerpPositions>()
         + 4
         + 4
 );
@@ -765,9 +765,9 @@ impl Default for MangoAccount {
             group: Pubkey::default(),
             owner: Pubkey::default(),
             delegate: Pubkey::default(),
-            tokens: MangoAccountTokens::new(),
-            serum3: MangoAccountSerum3::new(),
-            perps: MangoAccountPerps::new(),
+            tokens: MangoAccountTokenPositions::new(),
+            serum3: MangoAccountSerum3Orders::new(),
+            perps: MangoAccountPerpPositions::new(),
             being_liquidated: 0,
             is_bankrupt: 0,
             account_num: 0,

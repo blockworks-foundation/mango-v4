@@ -1,4 +1,4 @@
-use super::{OracleConfig, TokenAccount, TokenIndex};
+use super::{OracleConfig, TokenPosition, TokenIndex};
 use crate::error::MangoError;
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
@@ -126,7 +126,7 @@ impl Bank {
     /// fractional deposits can be relevant during liquidation, for example
     pub fn deposit(
         &mut self,
-        position: &mut TokenAccount,
+        position: &mut TokenPosition,
         mut native_amount: I80F48,
     ) -> Result<bool> {
         require!(native_amount >= 0, MangoError::SomeError);
@@ -136,24 +136,24 @@ impl Bank {
             let new_native_position = cm!(native_position + native_amount);
             let indexed_change = cm!(native_amount / self.borrow_index + I80F48::DELTA);
             // this is only correct if it's not positive, because it scales the whole amount by borrow_index
-            let new_indexed_value = cm!(position.indexed_value + indexed_change);
+            let new_indexed_value = cm!(position.indexed_position + indexed_change);
             if new_indexed_value.is_negative() {
                 // pay back borrows only, leaving a negative position
                 self.indexed_total_borrows = cm!(self.indexed_total_borrows - indexed_change);
-                position.indexed_value = new_indexed_value;
+                position.indexed_position = new_indexed_value;
                 return Ok(true);
             } else if new_native_position < I80F48::ONE && !position.is_in_use() {
                 // if there's less than one token deposited, zero the position
                 self.dust = cm!(self.dust + new_native_position);
                 self.indexed_total_borrows =
-                    cm!(self.indexed_total_borrows + position.indexed_value);
-                position.indexed_value = I80F48::ZERO;
+                    cm!(self.indexed_total_borrows + position.indexed_position);
+                position.indexed_position = I80F48::ZERO;
                 return Ok(false);
             }
 
             // pay back all borrows
-            self.indexed_total_borrows = cm!(self.indexed_total_borrows + position.indexed_value); // position.value is negative
-            position.indexed_value = I80F48::ZERO;
+            self.indexed_total_borrows = cm!(self.indexed_total_borrows + position.indexed_position); // position.value is negative
+            position.indexed_position = I80F48::ZERO;
             // deposit the rest
             native_amount = cm!(native_amount + native_position);
         }
@@ -164,7 +164,7 @@ impl Bank {
         // (amount/index + delta)*index >= amount is a better guarantee.
         let indexed_change = cm!(native_amount / self.deposit_index + I80F48::DELTA);
         self.indexed_total_deposits = cm!(self.indexed_total_deposits + indexed_change);
-        position.indexed_value = cm!(position.indexed_value + indexed_change);
+        position.indexed_position = cm!(position.indexed_position + indexed_change);
 
         Ok(true)
     }
@@ -176,7 +176,7 @@ impl Bank {
     /// fractional withdraws can be relevant during liquidation, for example
     pub fn withdraw_without_fee(
         &mut self,
-        position: &mut TokenAccount,
+        position: &mut TokenPosition,
         native_amount: I80F48,
     ) -> Result<bool> {
         self.withdraw_internal(position, native_amount, false)
@@ -189,7 +189,7 @@ impl Bank {
     /// fractional withdraws can be relevant during liquidation, for example
     pub fn withdraw_with_fee(
         &mut self,
-        position: &mut TokenAccount,
+        position: &mut TokenPosition,
         native_amount: I80F48,
     ) -> Result<bool> {
         self.withdraw_internal(position, native_amount, true)
@@ -197,7 +197,7 @@ impl Bank {
 
     fn withdraw_internal(
         &mut self,
-        position: &mut TokenAccount,
+        position: &mut TokenPosition,
         mut native_amount: I80F48,
         with_loan_origination_fee: bool,
     ) -> Result<bool> {
@@ -212,21 +212,21 @@ impl Bank {
                     // zero the account collecting the leftovers in `dust`
                     self.dust = cm!(self.dust + new_native_position);
                     self.indexed_total_deposits =
-                        cm!(self.indexed_total_deposits - position.indexed_value);
-                    position.indexed_value = I80F48::ZERO;
+                        cm!(self.indexed_total_deposits - position.indexed_position);
+                    position.indexed_position = I80F48::ZERO;
                     return Ok(false);
                 } else {
                     // withdraw some deposits leaving a positive balance
                     let indexed_change = cm!(native_amount / self.deposit_index);
                     self.indexed_total_deposits = cm!(self.indexed_total_deposits - indexed_change);
-                    position.indexed_value = cm!(position.indexed_value - indexed_change);
+                    position.indexed_position = cm!(position.indexed_position - indexed_change);
                     return Ok(true);
                 }
             }
 
             // withdraw all deposits
-            self.indexed_total_deposits = cm!(self.indexed_total_deposits - position.indexed_value);
-            position.indexed_value = I80F48::ZERO;
+            self.indexed_total_deposits = cm!(self.indexed_total_deposits - position.indexed_position);
+            position.indexed_position = I80F48::ZERO;
             // borrow the rest
             native_amount = -new_native_position;
         }
@@ -238,7 +238,7 @@ impl Bank {
         // add to borrows
         let indexed_change = cm!(native_amount / self.borrow_index);
         self.indexed_total_borrows = cm!(self.indexed_total_borrows + indexed_change);
-        position.indexed_value = cm!(position.indexed_value - indexed_change);
+        position.indexed_position = cm!(position.indexed_position - indexed_change);
 
         Ok(true)
     }
@@ -246,7 +246,7 @@ impl Bank {
     // charge only loan origination fee, assuming borrow has already happened
     pub fn charge_loan_origination_fee(
         &mut self,
-        position: &mut TokenAccount,
+        position: &mut TokenPosition,
         already_borrowed_native_amount: I80F48,
     ) -> Result<()> {
         let loan_origination_fee =
@@ -255,7 +255,7 @@ impl Bank {
 
         let indexed_change = cm!(loan_origination_fee / self.borrow_index);
         self.indexed_total_borrows = cm!(self.indexed_total_borrows + indexed_change);
-        position.indexed_value = cm!(position.indexed_value - indexed_change);
+        position.indexed_position = cm!(position.indexed_position - indexed_change);
 
         Ok(())
     }
@@ -263,7 +263,7 @@ impl Bank {
     /// Change a position without applying the loan origination fee
     pub fn change_without_fee(
         &mut self,
-        position: &mut TokenAccount,
+        position: &mut TokenPosition,
         native_amount: I80F48,
     ) -> Result<bool> {
         if native_amount >= 0 {
@@ -276,7 +276,7 @@ impl Bank {
     /// Change a position, while taking the loan origination fee into account
     pub fn change_with_fee(
         &mut self,
-        position: &mut TokenAccount,
+        position: &mut TokenPosition,
         native_amount: I80F48,
     ) -> Result<bool> {
         if native_amount >= 0 {
@@ -438,18 +438,18 @@ mod tests {
                     }
                 };
 
-                let mut account = TokenAccount {
-                    indexed_value: I80F48::ZERO,
+                let mut account = TokenPosition {
+                    indexed_position: I80F48::ZERO,
                     token_index: 0,
                     in_use_count: if is_in_use { 1 } else { 0 },
                     reserved: Default::default(),
                 };
 
-                account.indexed_value = indexed(I80F48::from_num(start), &bank);
+                account.indexed_position = indexed(I80F48::from_num(start), &bank);
                 if start >= 0.0 {
-                    bank.indexed_total_deposits = account.indexed_value;
+                    bank.indexed_total_deposits = account.indexed_position;
                 } else {
-                    bank.indexed_total_borrows = -account.indexed_value;
+                    bank.indexed_total_borrows = -account.indexed_position;
                 }
 
                 // get the rounded start value
@@ -478,14 +478,14 @@ mod tests {
                 let expected_indexed = indexed(expected_native, &bank);
 
                 // at most one epsilon error in the resulting indexed value
-                assert!((account.indexed_value - expected_indexed).abs() <= epsilon);
+                assert!((account.indexed_position - expected_indexed).abs() <= epsilon);
 
-                if account.indexed_value.is_positive() {
-                    assert_eq!(bank.indexed_total_deposits, account.indexed_value);
+                if account.indexed_position.is_positive() {
+                    assert_eq!(bank.indexed_total_deposits, account.indexed_position);
                     assert_eq!(bank.indexed_total_borrows, I80F48::ZERO);
                 } else {
                     assert_eq!(bank.indexed_total_deposits, I80F48::ZERO);
-                    assert_eq!(bank.indexed_total_borrows, -account.indexed_value);
+                    assert_eq!(bank.indexed_total_borrows, -account.indexed_position);
                 }
             }
         }
