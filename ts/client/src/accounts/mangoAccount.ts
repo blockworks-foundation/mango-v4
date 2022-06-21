@@ -2,6 +2,7 @@ import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
+import { nativeI80F48ToUi } from '../utils';
 import { Bank } from './bank';
 import { Group } from './group';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from './I80F48';
@@ -152,7 +153,7 @@ export class TokenAccount {
   }
 
   public ui(bank: Bank): number {
-    return this.native(bank).toNumber() / Math.pow(10, bank.mintDecimals);
+    return nativeI80F48ToUi(this.native(bank), bank.mintDecimals).toNumber();
   }
 
   public toString(group?: Group): String {

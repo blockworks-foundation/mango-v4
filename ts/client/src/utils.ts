@@ -5,6 +5,7 @@ import {
 } from '@solana/spl-token';
 import { AccountMeta, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
+import { I80F48 } from './accounts/I80F48';
 
 export const I64_MAX_BN = new BN('9223372036854775807').toTwos(64);
 
@@ -81,4 +82,8 @@ export function toU64(amount: number, decimals): BN {
   console.log('bn', bn);
 
   return new u64(bn);
+}
+
+export function nativeI80F48ToUi(amount: I80F48, decimals: number): I80F48 {
+  return amount.div(I80F48.fromNumber(Math.pow(10, decimals)));
 }

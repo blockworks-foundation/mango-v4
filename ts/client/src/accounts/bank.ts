@@ -1,9 +1,14 @@
 import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
-import { I80F48, I80F48Dto } from './I80F48';
+import { nativeI80F48ToUi } from '../utils';
+import { I80F48, I80F48Dto, ZERO_I80F48 } from './I80F48';
 
 export const QUOTE_DECIMALS = 6;
+
+type OracleConfig = {
+  confFilter: I80F48Dto;
+};
 
 export class Bank {
   public name: string;
@@ -11,6 +16,11 @@ export class Bank {
   public borrowIndex: I80F48;
   public indexedTotalDeposits: I80F48;
   public indexedTotalBorrows: I80F48;
+  public maxRate: I80F48;
+  public rate0: I80F48;
+  public rate1: I80F48;
+  public util0: I80F48;
+  public util1: I80F48;
 
   static from(
     publicKey: PublicKey,
@@ -20,6 +30,7 @@ export class Bank {
       mint: PublicKey;
       vault: PublicKey;
       oracle: PublicKey;
+      oracleConfig: OracleConfig;
       depositIndex: I80F48Dto;
       borrowIndex: I80F48Dto;
       indexedTotalDeposits: I80F48Dto;
@@ -50,6 +61,7 @@ export class Bank {
       obj.mint,
       obj.vault,
       obj.oracle,
+      obj.oracleConfig,
       obj.depositIndex,
       obj.borrowIndex,
       obj.indexedTotalDeposits,
@@ -81,6 +93,7 @@ export class Bank {
     public mint: PublicKey,
     public vault: PublicKey,
     public oracle: PublicKey,
+    oracleConfig: OracleConfig,
     depositIndex: I80F48Dto,
     borrowIndex: I80F48Dto,
     indexedTotalDeposits: I80F48Dto,
@@ -90,10 +103,10 @@ export class Bank {
     rate0: I80F48Dto,
     util1: I80F48Dto,
     rate1: I80F48Dto,
-    max_rate: I80F48Dto,
-    collected_fees_native: I80F48Dto,
-    loan_origination_fee_rate: I80F48Dto,
-    loan_fee_rate: I80F48Dto,
+    maxRate: I80F48Dto,
+    collectedFeesNative: I80F48Dto,
+    loanOriginationFeeRate: I80F48Dto,
+    loanFeeRate: I80F48Dto,
     maintAssetWeight: I80F48Dto,
     initAssetWeight: I80F48Dto,
     maintLiabWeight: I80F48Dto,
@@ -108,12 +121,84 @@ export class Bank {
     this.borrowIndex = I80F48.from(borrowIndex);
     this.indexedTotalDeposits = I80F48.from(indexedTotalDeposits);
     this.indexedTotalBorrows = I80F48.from(indexedTotalBorrows);
+    this.maxRate = I80F48.from(maxRate);
+    this.util0 = I80F48.from(util0);
+    this.rate0 = I80F48.from(rate0);
+    this.util1 = I80F48.from(util1);
+    this.rate1 = I80F48.from(rate1);
   }
 
   toString(): string {
     return `Bank ${
       this.tokenIndex
     } deposit index - ${this.depositIndex.toNumber()}, borrow index - ${this.borrowIndex.toNumber()}`;
+  }
+
+  nativeDeposits(): I80F48 {
+    return this.indexedTotalDeposits.mul(this.depositIndex);
+  }
+
+  nativeBorrows(): I80F48 {
+    return this.indexedTotalBorrows.mul(this.borrowIndex);
+  }
+
+  uiDeposits(): number {
+    return nativeI80F48ToUi(
+      this.indexedTotalDeposits.mul(this.depositIndex),
+      this.mintDecimals,
+    ).toNumber();
+  }
+
+  uiBorrows(): number {
+    return nativeI80F48ToUi(
+      this.indexedTotalBorrows.mul(this.borrowIndex),
+      this.mintDecimals,
+    ).toNumber();
+  }
+
+  getBorrowRate(): I80F48 {
+    const totalBorrows = this.nativeBorrows();
+    const totalDeposits = this.nativeDeposits();
+
+    if (totalDeposits.eq(ZERO_I80F48) && totalBorrows.eq(ZERO_I80F48)) {
+      return ZERO_I80F48;
+    }
+    if (totalDeposits.lte(totalBorrows)) {
+      return this.maxRate;
+    }
+
+    const utilization = totalBorrows.div(totalDeposits);
+    if (utilization.gt(this.util1)) {
+      const extraUtil = utilization.sub(this.util1);
+      const slope = this.maxRate
+        .sub(this.rate1)
+        .div(I80F48.fromNumber(1).sub(this.util1));
+      return this.rate1.add(slope.mul(extraUtil));
+    } else if (utilization.gt(this.util0)) {
+      const extraUtil = utilization.sub(this.util0);
+      const slope = this.maxRate
+        .sub(this.rate0)
+        .div(I80F48.fromNumber(1).sub(this.util0));
+      return this.rate0.add(slope.mul(extraUtil));
+    } else {
+      const slope = this.rate0.div(this.util0);
+      return slope.mul(utilization);
+    }
+  }
+
+  getDepositRate(): I80F48 {
+    const borrowRate = this.getBorrowRate();
+    const totalBorrows = this.nativeBorrows();
+    const totalDeposits = this.nativeDeposits();
+
+    if (totalDeposits.eq(ZERO_I80F48) && totalBorrows.eq(ZERO_I80F48)) {
+      return ZERO_I80F48;
+    } else if (totalDeposits.eq(ZERO_I80F48)) {
+      return this.maxRate;
+    }
+
+    const utilization = totalBorrows.div(totalDeposits);
+    return utilization.mul(borrowRate);
   }
 }
 

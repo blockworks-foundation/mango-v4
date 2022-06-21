@@ -8,8 +8,8 @@
     "email": "hello@blockworks.foundation",
     "url": "https://blockworks.foundation"
   },
-  "main": "dist/cjs/index.js",
-  "types": "dist/types/index.d.ts",
+  "main": "dist/cjs/src/index.js",
+  "types": "dist/types/src/index.d.ts",
   "sideEffects": false,
   "files": [
     "dist"
