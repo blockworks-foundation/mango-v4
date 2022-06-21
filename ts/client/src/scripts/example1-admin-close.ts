@@ -27,7 +27,6 @@ async function main() {
     adminProvider,
     'devnet',
     MANGO_V4_ID['devnet'],
-    false,
   );
 
   const group = await client.getGroupForAdmin(admin.publicKey);

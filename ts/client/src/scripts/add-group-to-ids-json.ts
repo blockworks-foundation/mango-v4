@@ -1,9 +1,10 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
+
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import idsJson from '../../ids.json';
 import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
+import { MANGO_V4_ID, SERUM3_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
 
 function replacer(key, value) {
@@ -15,6 +16,9 @@ function replacer(key, value) {
 }
 
 async function main() {
+  const groupName = 'devnet.microwavedcola';
+  const cluster = 'devnet';
+
   // build client and fetch group for admin
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
@@ -30,9 +34,8 @@ async function main() {
   const userProvider = new AnchorProvider(connection, userWallet, options);
   const client = await MangoClient.connect(
     userProvider,
-    'devnet',
-    MANGO_V4_ID['devnet'],
-    false,
+    cluster,
+    MANGO_V4_ID[cluster],
   );
   const admin = Keypair.fromSecretKey(
     Buffer.from(
@@ -54,31 +57,43 @@ async function main() {
 
   // build ids
   const toDump = new Id(
-    new Map(banks.map((tuple) => [tuple.name, tuple.publicKey])),
-    new Map(
-      stubOracles.map((tuple) => [
-        banksMapByMint.get(tuple.mint.toBase58())!.name,
-        tuple.publicKey,
-      ]),
-    ),
-    new Map(
-      mintInfos.map((tuple) => [
-        banksMapByMint.get(tuple.mint.toBase58())!.name,
-        tuple.publicKey,
-      ]),
-    ),
-    new Map(serum3Markets.map((tuple) => [tuple.name, tuple.publicKey])),
-    new Map(
-      serum3Markets.map((tuple) => [tuple.name, tuple.serumMarketExternal]),
-    ),
-    new Map(perpMarkets.map((tuple) => [tuple.name, tuple.publicKey])),
+    cluster,
+    groupName,
+    group.publicKey.toBase58(),
+    SERUM3_PROGRAM_ID[cluster].toBase58(),
+    MANGO_V4_ID[cluster].toBase58(),
+    banks.map((tuple) => ({
+      name: tuple.name,
+      publicKey: tuple.publicKey.toBase58(),
+    })),
+    stubOracles.map((tuple) => ({
+      name: banksMapByMint.get(tuple.mint.toBase58())!.name,
+      publicKey: tuple.publicKey.toBase58(),
+    })),
+    mintInfos.map((tuple) => ({
+      name: banksMapByMint.get(tuple.mint.toBase58())!.name,
+      publicKey: tuple.publicKey.toBase58(),
+    })),
+    serum3Markets.map((tuple) => ({
+      name: tuple.name,
+      publicKey: tuple.publicKey.toBase58(),
+      marketExternal: tuple.serumMarketExternal.toBase58(),
+    })),
+    perpMarkets.map((tuple) => ({
+      name: tuple.name,
+      publicKey: tuple.publicKey.toBase58(),
+    })),
   );
 
   // adds ids for group in existing ids.json
-  idsJson['devnet'][MANGO_V4_ID['devnet'].toBase58()] = {};
-  idsJson['devnet'][MANGO_V4_ID['devnet'].toBase58()][
-    group.publicKey.toBase58()
-  ] = toDump;
+  const existingGroup = idsJson.groups.find((group) => group.name == groupName);
+  if (existingGroup) {
+    console.log('Updating existing group with latest state...');
+  } else {
+    console.log('Group does not exist yet...');
+  }
+  idsJson.groups = idsJson.groups.filter((group) => group.name !== groupName);
+  idsJson.groups.push(toDump);
 
   // dump
   const file = `${process.cwd()}/ts/client/ids.json`;

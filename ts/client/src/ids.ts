@@ -1,47 +1,67 @@
 import { Cluster, PublicKey } from '@solana/web3.js';
 import ids from '../ids.json';
-import { MANGO_V4_ID } from './constants';
 
 export class Id {
   constructor(
-    public banks: Map<String, PublicKey>,
-    public stubOracles: Map<String, PublicKey>,
-    public mintInfos: Map<String, PublicKey>,
-    public serum3Markets: Map<String, PublicKey>,
-    public serum3MarketExternals: Map<String, PublicKey>,
-    public perpMarkets: Map<String, PublicKey>,
+    public cluster: Cluster,
+    public name: string,
+    public publicKey: string,
+    public serum3ProgramId: string,
+    public mangoProgramId: string,
+    public banks: { name: string; publicKey: string }[],
+    public stubOracles: { name: string; publicKey: string }[],
+    public mintInfos: { name: string; publicKey: string }[],
+    public serum3Markets: {
+      name: string;
+      publicKey: string;
+      marketExternal: string;
+    }[],
+    public perpMarkets: { name: string; publicKey: string }[],
   ) {}
 
   public getBanks(): PublicKey[] {
-    return Array.from(this.banks.values());
+    return Array.from(this.banks.map((bank) => new PublicKey(bank.publicKey)));
   }
 
   public getStubOracles(): PublicKey[] {
-    return Array.from(this.stubOracles.values());
+    return Array.from(
+      this.stubOracles.map((stubOracle) => new PublicKey(stubOracle.publicKey)),
+    );
   }
 
   public getMintInfos(): PublicKey[] {
-    return Array.from(this.mintInfos.values());
+    return Array.from(
+      this.mintInfos.map((mintInfo) => new PublicKey(mintInfo.publicKey)),
+    );
   }
 
   public getSerum3Markets(): PublicKey[] {
-    return Array.from(this.serum3Markets.values());
+    return Array.from(
+      this.serum3Markets.map(
+        (serum3Market) => new PublicKey(serum3Market.publicKey),
+      ),
+    );
   }
 
   public getPerpMarkets(): PublicKey[] {
-    return Array.from(this.perpMarkets.values());
+    return Array.from(
+      this.perpMarkets.map((perpMarket) => new PublicKey(perpMarket.publicKey)),
+    );
   }
 
-  static fromIds(cluster: Cluster, programId: PublicKey, group: PublicKey): Id {
-    let groupConfig =
-      ids['devnet'][MANGO_V4_ID['devnet'].toBase58()][group.toString()];
+  static fromIds(name: string): Id {
+    let groupConfig = ids.groups.find((id) => id['name'] === name);
     return new Id(
-      new Map(Object.entries(groupConfig['banks'])),
-      new Map(Object.entries(groupConfig['stubOracles'])),
-      new Map(Object.entries(groupConfig['mintInfos'])),
-      new Map(Object.entries(groupConfig['serum3Markets'])),
-      new Map(Object.entries(groupConfig['serum3MarketExternals'])),
-      new Map(Object.entries(groupConfig['perpMarkets'])),
+      groupConfig.cluster as Cluster,
+      name,
+      groupConfig.publicKey,
+      groupConfig.serum3ProgramId,
+      groupConfig.mangoProgramId,
+      groupConfig['banks'],
+      groupConfig['stubOracles'],
+      groupConfig['mintInfos'],
+      groupConfig['serum3Markets'],
+      groupConfig['perpMarkets'],
     );
   }
 }

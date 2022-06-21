@@ -48,7 +48,6 @@ async function main() {
     adminProvider,
     'devnet',
     MANGO_V4_ID['devnet'],
-    false,
   );
 
   // group
@@ -99,7 +98,9 @@ async function main() {
   } catch (error) {
     console.log(error);
   }
-  const usdcDevnetOracle = (await client.getStubOracle(group, usdcDevnetMint))[0];
+  const usdcDevnetOracle = (
+    await client.getStubOracle(group, usdcDevnetMint)
+  )[0];
   console.log(`...created stub oracle ${usdcDevnetOracle.publicKey}`);
   try {
     await client.tokenRegister(
