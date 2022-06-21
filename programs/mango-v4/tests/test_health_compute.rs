@@ -177,7 +177,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     }
 
     // TODO: actual explicit CU comparisons.
-    // On 2022-5-25 the final deposit costs 52252 CU and each new market increases it by roughly 4400 CU
+    // On 2022-6-21 the final deposit costs 54074 CU and each new market increases it by roughly 4500 CU
 
     Ok(())
 }
