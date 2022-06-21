@@ -2,7 +2,6 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
@@ -18,11 +17,9 @@ async function main() {
   );
   const userWallet = new Wallet(user);
   const userProvider = new AnchorProvider(connection, userWallet, options);
-  const client = await MangoClient.connect(
+  const client = await MangoClient.connectForGroupName(
     userProvider,
-    'devnet',
-    MANGO_V4_ID['devnet'],
-    true /* Use ids json instead of getProgramAccounts */,
+    'devnet.microwavedcola' /* Use ids json instead of getProgramAccounts */,
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 

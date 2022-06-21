@@ -28,7 +28,6 @@ const main = async () => {
     adminProvider,
     'devnet',
     MANGO_V4_ID['devnet'],
-    false,
   );
 
   const btcMint = new PublicKey('3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU');

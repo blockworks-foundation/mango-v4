@@ -35,6 +35,7 @@ import {
   Serum3Side,
 } from './accounts/serum3';
 import { SERUM3_PROGRAM_ID } from './constants';
+import { Id } from './ids';
 import {
   buildOrcaInstruction,
   ORCA_TOKEN_SWAP_ID_DEVNET,
@@ -53,7 +54,7 @@ export class MangoClient {
     public program: Program<MangoV4>,
     public programId: PublicKey,
     public cluster: Cluster,
-    public useIds: boolean,
+    public groupName?: string,
   ) {}
 
   /// public
@@ -1193,7 +1194,6 @@ export class MangoClient {
     provider: Provider,
     cluster: Cluster,
     programId: PublicKey,
-    useIds: boolean,
   ): MangoClient {
     // TODO: use IDL on chain or in repository? decide...
     // Alternatively we could fetch IDL from chain.
@@ -1204,7 +1204,29 @@ export class MangoClient {
       new Program<MangoV4>(idl as MangoV4, programId, provider),
       programId,
       cluster,
-      useIds,
+    );
+  }
+
+  static connectForGroupName(
+    provider: Provider,
+    groupName: string,
+  ): MangoClient {
+    // TODO: use IDL on chain or in repository? decide...
+    // Alternatively we could fetch IDL from chain.
+    // const idl = await Program.fetchIdl(MANGO_V4_ID, provider);
+    let idl = IDL;
+
+    const id = Id.fromIds(groupName);
+
+    return new MangoClient(
+      new Program<MangoV4>(
+        idl as MangoV4,
+        new PublicKey(id.publicKey),
+        provider,
+      ),
+      new PublicKey(id.publicKey),
+      id.cluster,
+      groupName,
     );
   }
 

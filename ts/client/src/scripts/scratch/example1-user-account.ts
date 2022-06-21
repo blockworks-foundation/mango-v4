@@ -29,7 +29,6 @@ async function main() {
     userProvider,
     'devnet',
     MANGO_V4_ID['devnet'],
-    false,
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 

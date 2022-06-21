@@ -1876,6 +1876,32 @@ export type MangoV4 = {
       "args": []
     },
     {
+      "name": "computeHealth",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "healthType",
+          "type": {
+            "defined": "HealthType"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "I80F48"
+      }
+    },
+    {
       "name": "benchmark",
       "accounts": [],
       "args": []
@@ -2268,12 +2294,21 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
+          },
+          {
             "name": "bumpIndex",
-            "type": "u64"
+            "type": "u32"
           },
           {
             "name": "freeListLen",
-            "type": "u64"
+            "type": "u32"
           },
           {
             "name": "freeListHead",
@@ -2285,7 +2320,7 @@ export type MangoV4 = {
           },
           {
             "name": "leafCount",
-            "type": "u64"
+            "type": "u32"
           },
           {
             "name": "nodes",
@@ -2661,6 +2696,14 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "previousNativeCoinReserved",
+            "type": "u64"
+          },
+          {
+            "name": "previousNativePcReserved",
+            "type": "u64"
+          },
+          {
             "name": "marketIndex",
             "type": "u16"
           },
@@ -2861,11 +2904,11 @@ export type MangoV4 = {
         "fields": [
           {
             "name": "head",
-            "type": "u64"
+            "type": "u32"
           },
           {
             "name": "count",
-            "type": "u64"
+            "type": "u32"
           },
           {
             "name": "seqNum",
@@ -5125,6 +5168,32 @@ export const IDL: MangoV4 = {
       "args": []
     },
     {
+      "name": "computeHealth",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "healthType",
+          "type": {
+            "defined": "HealthType"
+          }
+        }
+      ],
+      "returns": {
+        "defined": "I80F48"
+      }
+    },
+    {
       "name": "benchmark",
       "accounts": [],
       "args": []
@@ -5517,12 +5586,21 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
+          },
+          {
             "name": "bumpIndex",
-            "type": "u64"
+            "type": "u32"
           },
           {
             "name": "freeListLen",
-            "type": "u64"
+            "type": "u32"
           },
           {
             "name": "freeListHead",
@@ -5534,7 +5612,7 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "leafCount",
-            "type": "u64"
+            "type": "u32"
           },
           {
             "name": "nodes",
@@ -5910,6 +5988,14 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "previousNativeCoinReserved",
+            "type": "u64"
+          },
+          {
+            "name": "previousNativePcReserved",
+            "type": "u64"
+          },
+          {
             "name": "marketIndex",
             "type": "u16"
           },
@@ -6110,11 +6196,11 @@ export const IDL: MangoV4 = {
         "fields": [
           {
             "name": "head",
-            "type": "u64"
+            "type": "u32"
           },
           {
             "name": "count",
-            "type": "u64"
+            "type": "u32"
           },
           {
             "name": "seqNum",

@@ -1,7 +1,7 @@
 import { Market } from '@project-serum/serum';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
-import { MANGO_V4_ID, SERUM3_PROGRAM_ID } from '../constants';
+import { SERUM3_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
 import { Bank, MintInfo } from './bank';
 import { PerpMarket } from './perp';
@@ -44,12 +44,8 @@ export class Group {
   public async reloadAll(client: MangoClient) {
     let ids: Id | undefined = undefined;
 
-    if (client.useIds) {
-      ids = Id.fromIds(
-        client.cluster,
-        MANGO_V4_ID[client.cluster],
-        this.publicKey,
-      );
+    if (client.groupName) {
+      ids = Id.fromIds(client.groupName);
     }
 
     // console.time('group.reload');

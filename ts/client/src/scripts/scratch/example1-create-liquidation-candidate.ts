@@ -23,7 +23,6 @@ async function main() {
     user1Provider,
     'devnet',
     MANGO_V4_ID['devnet'],
-    false,
   );
   console.log(`user1 ${user1Wallet.publicKey.toBase58()}`);
 
@@ -64,7 +63,6 @@ async function main() {
     user2Provider,
     'devnet',
     MANGO_V4_ID['devnet'],
-    false,
   );
   console.log(`user2 ${user2Wallet.publicKey.toBase58()}`);
 
@@ -111,7 +109,6 @@ async function main() {
     adminProvider,
     'devnet',
     MANGO_V4_ID['devnet'],
-    false,
   );
   await client.setStubOracle(group, group.banksMap.get('USDC')?.oracle!, 0.5);
 
