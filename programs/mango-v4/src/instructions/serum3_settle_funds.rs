@@ -170,13 +170,13 @@ pub fn charge_maybe_fees(
 ) -> Result<()> {
     let serum3_account = account.serum3.find_mut(market_index).unwrap();
 
-    if serum3_account.previous_native_coin_reserved > after_oo.native_coin_reserved() {
-        let maybe_actualized_loan = I80F48::from_num::<u64>(
-            serum3_account
-                .previous_native_coin_reserved
-                .saturating_sub(after_oo.native_coin_reserved()),
-        );
+    let maybe_actualized_coin_loan = I80F48::from_num::<u64>(
+        serum3_account
+            .previous_native_coin_reserved
+            .saturating_sub(after_oo.native_coin_reserved()),
+    );
 
+    if maybe_actualized_coin_loan > 0 {
         serum3_account.previous_native_coin_reserved = after_oo.native_coin_reserved();
 
         // loan origination fees
@@ -184,7 +184,7 @@ pub fn charge_maybe_fees(
         let coin_token_native = coin_token_account.native(&coin_bank);
 
         if coin_token_native.is_negative() {
-            let actualized_loan = coin_token_native.abs().min(maybe_actualized_loan);
+            let actualized_loan = coin_token_native.abs().min(maybe_actualized_coin_loan);
             // note: the withdraw has already happened while placing the order
             // now that the loan is actually materialized (since the fill having taken place)
             // charge the loan origination fee
@@ -194,13 +194,13 @@ pub fn charge_maybe_fees(
         }
     }
 
-    if serum3_account.previous_native_pc_reserved > after_oo.native_pc_reserved() {
-        let maybe_actualized_loan = I80F48::from_num::<u64>(
-            serum3_account
-                .previous_native_pc_reserved
-                .saturating_sub(after_oo.native_pc_reserved()),
-        );
+    let maybe_actualized_pc_loan = I80F48::from_num::<u64>(
+        serum3_account
+            .previous_native_pc_reserved
+            .saturating_sub(after_oo.native_pc_reserved()),
+    );
 
+    if maybe_actualized_pc_loan > 0 {
         serum3_account.previous_native_pc_reserved = after_oo.native_pc_reserved();
 
         // loan origination fees
@@ -208,7 +208,7 @@ pub fn charge_maybe_fees(
         let pc_token_native = pc_token_account.native(&pc_bank);
 
         if pc_token_native.is_negative() {
-            let actualized_loan = pc_token_native.abs().min(maybe_actualized_loan);
+            let actualized_loan = pc_token_native.abs().min(maybe_actualized_pc_loan);
             // note: the withdraw has already happened while placing the order
             // now that the loan is actually materialized (since the fill having taken place)
             // charge the loan origination fee
