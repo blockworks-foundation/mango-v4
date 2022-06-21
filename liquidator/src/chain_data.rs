@@ -271,11 +271,11 @@ impl ChainData {
     pub fn account<'a>(&'a self, pubkey: &Pubkey) -> anyhow::Result<&'a AccountSharedData> {
         self.accounts
             .get(pubkey)
-            .ok_or(anyhow::anyhow!("account {} not found", pubkey))?
+            .ok_or_else(|| anyhow::anyhow!("account {} not found", pubkey))?
             .iter()
             .rev()
             .find(|w| self.is_account_write_live(w))
-            .ok_or(anyhow::anyhow!("account {} has no live data", pubkey))
+            .ok_or_else(|| anyhow::anyhow!("account {} has no live data", pubkey))
             .map(|w| &w.account)
     }
 }

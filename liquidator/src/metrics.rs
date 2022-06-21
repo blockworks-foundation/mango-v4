@@ -87,7 +87,7 @@ impl Metrics {
         let mut registry = self.registry.write().unwrap();
         let value = registry
             .entry(name)
-            .or_insert(Value::U64(Arc::new(atomic::AtomicU64::new(0))));
+            .or_insert_with(|| Value::U64(Arc::new(atomic::AtomicU64::new(0))));
         MetricU64 {
             value: match value {
                 Value::U64(v) => v.clone(),
@@ -100,7 +100,7 @@ impl Metrics {
         let mut registry = self.registry.write().unwrap();
         let value = registry
             .entry(name)
-            .or_insert(Value::I64(Arc::new(atomic::AtomicI64::new(0))));
+            .or_insert_with(|| Value::I64(Arc::new(atomic::AtomicI64::new(0))));
         MetricI64 {
             value: match value {
                 Value::I64(v) => v.clone(),
@@ -113,7 +113,7 @@ impl Metrics {
         let mut registry = self.registry.write().unwrap();
         let value = registry
             .entry(name)
-            .or_insert(Value::String(Arc::new(Mutex::new(String::new()))));
+            .or_insert_with(|| Value::String(Arc::new(Mutex::new(String::new()))));
         MetricString {
             value: match value {
                 Value::String(v) => v.clone(),

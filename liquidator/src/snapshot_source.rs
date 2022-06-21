@@ -44,7 +44,7 @@ impl AccountSnapshot {
                 account: a
                     .account
                     .decode()
-                    .ok_or(anyhow::anyhow!("could not decode account"))?,
+                    .ok_or_else(|| anyhow::anyhow!("could not decode account"))?,
             });
         }
         Ok(())
@@ -63,7 +63,7 @@ impl AccountSnapshot {
                     pubkey,
                     account: ui_account
                         .decode()
-                        .ok_or(anyhow::anyhow!("could not decode account"))?,
+                        .ok_or_else(|| anyhow::anyhow!("could not decode account"))?,
                 });
             }
         }

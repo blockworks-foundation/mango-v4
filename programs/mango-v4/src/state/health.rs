@@ -495,7 +495,7 @@ fn compute_health_detail(
         }
 
         // find the TokenInfos for the market's base and quote tokens
-        let base_index = find_token_info_index(&token_infos,  serum_account.base_token_index)?;
+        let base_index = find_token_info_index(&token_infos, serum_account.base_token_index)?;
         let quote_index = find_token_info_index(&token_infos, serum_account.quote_token_index)?;
         let (base_info, quote_info) = if base_index < quote_index {
             let (l, r) = token_infos.split_at_mut(quote_index);

@@ -30,7 +30,7 @@ impl AccountUpdate {
             .value
             .account
             .decode()
-            .ok_or(anyhow::anyhow!("could not decode account"))?;
+            .ok_or_else(|| anyhow::anyhow!("could not decode account"))?;
         Ok(AccountUpdate {
             pubkey,
             slot: rpc.context.slot,
