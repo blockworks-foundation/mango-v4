@@ -286,14 +286,14 @@ pub fn inc_maybe_loan(
     if after_oo.native_coin_reserved() > before_oo.native_coin_reserved() {
         let native_coin_reserved_increase =
             after_oo.native_coin_reserved() - before_oo.native_coin_reserved();
-        serum3_account.native_coin_reserved_cached =
-            cm!(serum3_account.native_coin_reserved_cached + native_coin_reserved_increase);
+        serum3_account.previous_native_coin_reserved =
+            cm!(serum3_account.previous_native_coin_reserved + native_coin_reserved_increase);
     }
 
     if after_oo.native_pc_reserved() > before_oo.native_pc_reserved() {
         let reserved_pc_increase = after_oo.native_pc_reserved() - before_oo.native_pc_reserved();
-        serum3_account.native_pc_reserved_cached =
-            cm!(serum3_account.native_pc_reserved_cached + reserved_pc_increase);
+        serum3_account.previous_native_pc_reserved =
+            cm!(serum3_account.previous_native_pc_reserved + reserved_pc_increase);
     }
 }
 

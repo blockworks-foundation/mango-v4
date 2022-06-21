@@ -112,15 +112,15 @@ pub fn decrease_maybe_loan(
 
     if after_oo.native_coin_free > before_oo.native_coin_free {
         let native_coin_free_increase = after_oo.native_coin_free - before_oo.native_coin_free;
-        serum3_account.native_coin_reserved_cached =
-            cm!(serum3_account.native_coin_reserved_cached - native_coin_free_increase);
+        serum3_account.previous_native_coin_reserved =
+            cm!(serum3_account.previous_native_coin_reserved - native_coin_free_increase);
     }
 
     // pc
     if after_oo.native_pc_free > before_oo.native_pc_free {
         let free_pc_increase = after_oo.native_pc_free - before_oo.native_pc_free;
-        serum3_account.native_pc_reserved_cached =
-            cm!(serum3_account.native_pc_reserved_cached - free_pc_increase);
+        serum3_account.previous_native_pc_reserved =
+            cm!(serum3_account.previous_native_pc_reserved - free_pc_increase);
     }
 }
 

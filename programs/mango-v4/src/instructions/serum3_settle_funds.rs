@@ -170,14 +170,14 @@ pub fn charge_maybe_fees(
 ) -> Result<()> {
     let serum3_account = account.serum3.find_mut(market_index).unwrap();
 
-    if serum3_account.native_coin_reserved_cached > after_oo.native_coin_reserved() {
+    if serum3_account.previous_native_coin_reserved > after_oo.native_coin_reserved() {
         let maybe_actualized_loan = I80F48::from_num::<u64>(
             serum3_account
-                .native_coin_reserved_cached
+                .previous_native_coin_reserved
                 .saturating_sub(after_oo.native_coin_reserved()),
         );
 
-        serum3_account.native_coin_reserved_cached = after_oo.native_coin_reserved();
+        serum3_account.previous_native_coin_reserved = after_oo.native_coin_reserved();
 
         // loan origination fees
         let coin_token_account = account.tokens.get_mut(coin_bank.token_index)?;
@@ -194,14 +194,14 @@ pub fn charge_maybe_fees(
         }
     }
 
-    if serum3_account.native_pc_reserved_cached > after_oo.native_pc_reserved() {
+    if serum3_account.previous_native_pc_reserved > after_oo.native_pc_reserved() {
         let maybe_actualized_loan = I80F48::from_num::<u64>(
             serum3_account
-                .native_pc_reserved_cached
+                .previous_native_pc_reserved
                 .saturating_sub(after_oo.native_pc_reserved()),
         );
 
-        serum3_account.native_pc_reserved_cached = after_oo.native_pc_reserved();
+        serum3_account.previous_native_pc_reserved = after_oo.native_pc_reserved();
 
         // loan origination fees
         let pc_token_account = account.tokens.get_mut(pc_bank.token_index)?;

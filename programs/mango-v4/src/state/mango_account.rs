@@ -192,8 +192,9 @@ pub struct Serum3Account {
     // tracks reserved funds in open orders account,
     // used for bookkeeping of potentital loans which
     // can be charged with loan origination fees
-    pub native_coin_reserved_cached: u64,
-    pub native_pc_reserved_cached: u64,
+    // e.g. serum3 settle funds ix
+    pub previous_native_coin_reserved: u64,
+    pub previous_native_pc_reserved: u64,
 
     pub market_index: Serum3MarketIndex,
 
@@ -226,8 +227,8 @@ impl Default for Serum3Account {
             base_token_index: TokenIndex::MAX,
             quote_token_index: TokenIndex::MAX,
             reserved: Default::default(),
-            native_coin_reserved_cached: 0,
-            native_pc_reserved_cached: 0,
+            previous_native_coin_reserved: 0,
+            previous_native_pc_reserved: 0,
         }
     }
 }
