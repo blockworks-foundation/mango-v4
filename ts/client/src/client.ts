@@ -6,6 +6,7 @@ import {
   initializeAccount,
   WRAPPED_SOL_MINT,
 } from '@project-serum/serum/lib/token-instructions';
+import { parsePriceData, PriceData } from '@pythnetwork/client';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import {
   AccountMeta,
@@ -249,6 +250,27 @@ export class MangoClient {
     ).map((tuple) => {
       return MintInfo.from(tuple.publicKey, tuple.account);
     });
+  }
+
+  public async getPricesForGroup(group: Group): Promise<void> {
+    if (group.banksMap.size === 0) {
+      await this.getBanksForGroup(group);
+    }
+
+    const banks = Array.from(group?.banksMap, ([, value]) => value);
+    const oracles = banks.map((b) => b.oracle);
+    const prices =
+      await this.program.provider.connection.getMultipleAccountsInfo(oracles);
+
+    for (const [index, price] of prices.entries()) {
+      if (banks[index].name === 'USDC') {
+        banks[index].price = 1;
+      } else {
+        console.log('parsePriceData(price.data)', parsePriceData(price.data));
+
+        banks[index].price = parsePriceData(price.data).previousPrice;
+      }
+    }
   }
 
   // Stub Oracle

@@ -77,6 +77,7 @@ export class Group {
     }
 
     this.banksMap = new Map(banks.map((bank) => [bank.name, bank]));
+    client.getPricesForGroup(this);
   }
 
   public async reloadMintInfos(client: MangoClient, ids?: Id) {

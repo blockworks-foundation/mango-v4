@@ -1,5 +1,6 @@
 import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
+import { PythHttpClient } from '@pythnetwork/client';
 import { PublicKey } from '@solana/web3.js';
 import { nativeI80F48ToUi } from '../utils';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from './I80F48';
@@ -21,6 +22,7 @@ export class Bank {
   public rate1: I80F48;
   public util0: I80F48;
   public util1: I80F48;
+  public price: number;
 
   static from(
     publicKey: PublicKey,
@@ -98,7 +100,7 @@ export class Bank {
     borrowIndex: I80F48Dto,
     indexedTotalDeposits: I80F48Dto,
     indexedTotalBorrows: I80F48Dto,
-    last_updated: BN,
+    lastUpdated: BN,
     util0: I80F48Dto,
     rate0: I80F48Dto,
     util1: I80F48Dto,
@@ -126,6 +128,7 @@ export class Bank {
     this.rate0 = I80F48.from(rate0);
     this.util1 = I80F48.from(util1);
     this.rate1 = I80F48.from(rate1);
+    this.price = undefined;
   }
 
   toString(): string {
@@ -199,6 +202,13 @@ export class Bank {
 
     const utilization = totalBorrows.div(totalDeposits);
     return utilization.mul(borrowRate);
+  }
+
+  async getOraclePrice(connection) {
+    const pythClient = new PythHttpClient(connection, this.oracle);
+    const data = await pythClient.getData();
+
+    return data.productPrice;
   }
 }
 
