@@ -1,4 +1,3 @@
-use crate::accounts_zerocopy::*;
 use crate::error::MangoError;
 
 use crate::serum3_cpi::load_open_orders_ref;
@@ -21,7 +20,7 @@ pub struct OpenOrdersSlim {
     pub native_pc_total: u64,
 }
 impl OpenOrdersSlim {
-    pub fn fromOO(oo: &OpenOrders) -> Self {
+    pub fn from_oo(oo: &OpenOrders) -> Self {
         Self {
             native_coin_free: oo.native_coin_free,
             native_coin_total: oo.native_coin_total,
@@ -224,14 +223,14 @@ pub fn serum3_place_order(
     let before_oo = {
         let oo_ai = &ctx.accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
-        OpenOrdersSlim::fromOO(&open_orders)
+        OpenOrdersSlim::from_oo(&open_orders)
     };
     cpi_place_order(ctx.accounts, order)?;
 
     {
         let oo_ai = &ctx.accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
-        let after_oo = OpenOrdersSlim::fromOO(&open_orders);
+        let after_oo = OpenOrdersSlim::from_oo(&open_orders);
         let mut account = ctx.accounts.account.load_mut()?;
         inc_maybe_loan(
             serum_market.market_index,

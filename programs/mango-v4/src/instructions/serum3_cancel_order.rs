@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use fixed::types::I80F48;
+
 use serum_dex::instruction::CancelOrderInstructionV2;
 
 use crate::error::*;
@@ -77,7 +77,7 @@ pub fn serum3_cancel_order(
     //
     let before_oo = {
         let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
-        OpenOrdersSlim::fromOO(&open_orders)
+        OpenOrdersSlim::from_oo(&open_orders)
     };
     let order = serum_dex::instruction::CancelOrderInstructionV2 {
         side: u8::try_from(side).unwrap().try_into().unwrap(),
@@ -87,7 +87,7 @@ pub fn serum3_cancel_order(
 
     {
         let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
-        let after_oo = OpenOrdersSlim::fromOO(&open_orders);
+        let after_oo = OpenOrdersSlim::from_oo(&open_orders);
         let mut account = ctx.accounts.account.load_mut()?;
         decrease_maybe_loan(
             serum_market.market_index,

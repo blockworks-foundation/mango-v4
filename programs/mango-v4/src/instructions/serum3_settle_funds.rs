@@ -1,8 +1,8 @@
-use std::{borrow::BorrowMut, cell::RefMut, ops::DerefMut};
+use std::borrow::BorrowMut;
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
-use checked_math as cm;
+
 use fixed::types::I80F48;
 
 use crate::error::*;
@@ -120,8 +120,8 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
         cpi_settle_funds(ctx.accounts)?;
 
-        let after_oo = OpenOrdersSlim::fromOO(&open_orders);
-        let mut account = &mut ctx.accounts.account.load_mut()?;
+        let after_oo = OpenOrdersSlim::from_oo(&open_orders);
+        let account = &mut ctx.accounts.account.load_mut()?;
 
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
@@ -144,8 +144,8 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         let after_quote_vault = ctx.accounts.quote_vault.amount;
 
         // Charge the difference in vault balances to the user's account
-        let mut base_bank = ctx.accounts.base_bank.load_mut()?;
-        let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
+        let base_bank = ctx.accounts.base_bank.load_mut()?;
+        let quote_bank = ctx.accounts.quote_bank.load_mut()?;
         apply_vault_difference(
             ctx.accounts.account.load_mut()?,
             base_bank,
@@ -165,7 +165,7 @@ pub fn charge_maybe_fees(
     market_index: Serum3MarketIndex,
     coin_bank: &mut Bank,
     pc_bank: &mut Bank,
-    mut account: &mut MangoAccount,
+    account: &mut MangoAccount,
     after_oo: &OpenOrdersSlim,
 ) -> Result<()> {
     let serum3_account = account.serum3.find_mut(market_index).unwrap();
