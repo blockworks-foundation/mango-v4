@@ -224,10 +224,9 @@ pub fn serum3_place_order(
     let before_oo = {
         let oo_ai = &ctx.accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
-        let before_oo = OpenOrdersSlim::fromOO(&open_orders);
-        cpi_place_order(ctx.accounts, order)?;
-        before_oo
+        OpenOrdersSlim::fromOO(&open_orders)
     };
+    cpi_place_order(ctx.accounts, order)?;
 
     {
         let oo_ai = &ctx.accounts.open_orders.as_ref();

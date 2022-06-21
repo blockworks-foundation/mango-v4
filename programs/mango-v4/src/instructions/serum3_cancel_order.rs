@@ -77,14 +77,13 @@ pub fn serum3_cancel_order(
     //
     let before_oo = {
         let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
-        let before_oo = OpenOrdersSlim::fromOO(&open_orders);
-        let order = serum_dex::instruction::CancelOrderInstructionV2 {
-            side: u8::try_from(side).unwrap().try_into().unwrap(),
-            order_id,
-        };
-        cpi_cancel_order(ctx.accounts, order)?;
-        before_oo
+        OpenOrdersSlim::fromOO(&open_orders)
     };
+    let order = serum_dex::instruction::CancelOrderInstructionV2 {
+        side: u8::try_from(side).unwrap().try_into().unwrap(),
+        order_id,
+    };
+    cpi_cancel_order(ctx.accounts, order)?;
 
     {
         let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;

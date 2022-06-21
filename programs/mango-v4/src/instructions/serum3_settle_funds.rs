@@ -176,7 +176,6 @@ pub fn charge_maybe_fees(
                 .native_coin_reserved_cached
                 .saturating_sub(after_oo.native_coin_reserved()),
         );
-        require!(maybe_actualized_loan.is_positive(), MangoError::SomeError);
 
         serum3_account.native_coin_reserved_cached = after_oo.native_coin_reserved();
 
@@ -201,7 +200,6 @@ pub fn charge_maybe_fees(
                 .native_pc_reserved_cached
                 .saturating_sub(after_oo.native_pc_reserved()),
         );
-        require!(maybe_actualized_loan.is_positive(), MangoError::SomeError);
 
         serum3_account.native_pc_reserved_cached = after_oo.native_pc_reserved();
 
