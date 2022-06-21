@@ -998,7 +998,7 @@ mod tests {
             },
             TestHealth1Case {
                 perp1: (-1, 100, 0, 0),
-                expected_health: 100.0 - 1.2 * 1.0 * base_lots_to_quote,
+                expected_health: 0.0,
                 ..Default::default()
             },
             TestHealth1Case {
@@ -1008,12 +1008,12 @@ mod tests {
             },
             TestHealth1Case {
                 perp1: (10, 100, 0, 0),
-                expected_health: 100.0, // no health gain from positive base pos above 0
+                expected_health: 0.0,
                 ..Default::default()
             },
             TestHealth1Case {
                 perp1: (30, -100, 0, 0),
-                expected_health: 0.0, // no health gain from positive base pos above 0
+                expected_health: 0.0,
                 ..Default::default()
             },
         ];
