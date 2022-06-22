@@ -1,7 +1,7 @@
 import { Group } from './accounts/group';
 import {
   MangoAccount,
-  TokenAccount,
+  TokenPosition,
   TokenAccountDto,
 } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
@@ -21,7 +21,7 @@ export {
   Group,
   StubOracle,
   MangoAccount,
-  TokenAccount,
+  TokenPosition as TokenAccount,
   TokenAccountDto,
   MangoClient,
   MANGO_V4_ID,

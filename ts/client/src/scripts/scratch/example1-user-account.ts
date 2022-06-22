@@ -1,7 +1,7 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
-import { TokenAccount } from '../../accounts/mangoAccount';
+import { TokenPosition } from '../../accounts/mangoAccount';
 import { MangoClient } from '../../client';
 import { MANGO_V4_ID } from '../../constants';
 
@@ -53,7 +53,7 @@ async function main() {
 
   // log users tokens
   for (const token of mangoAccount.tokens) {
-    if (token.tokenIndex == TokenAccount.TokenIndexUnset) continue;
+    if (token.tokenIndex == TokenPosition.TokenIndexUnset) continue;
     console.log(token.toString());
   }
 
