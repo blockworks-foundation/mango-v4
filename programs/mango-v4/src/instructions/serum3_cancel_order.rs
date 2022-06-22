@@ -22,8 +22,8 @@ pub struct Serum3CancelOrder<'info> {
     pub account: AccountLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
-    // Validated inline
     #[account(mut)]
+    /// CHECK: Validated inline by checking against the pubkey stored in the account
     pub open_orders: UncheckedAccount<'info>,
 
     #[account(
@@ -32,17 +32,21 @@ pub struct Serum3CancelOrder<'info> {
         has_one = serum_market_external,
     )]
     pub serum_market: AccountLoader<'info, Serum3Market>,
+    /// CHECK: The pubkey is checked and then it's passed to the serum cpi
     pub serum_program: UncheckedAccount<'info>,
     #[account(mut)]
+    /// CHECK: The pubkey is checked and then it's passed to the serum cpi
     pub serum_market_external: UncheckedAccount<'info>,
 
     // These accounts are forwarded directly to the serum cpi call
     // and are validated there.
-    #[account(mut)]
+    /// CHECK: Validated by the serum cpi call
     pub market_bids: UncheckedAccount<'info>,
     #[account(mut)]
+    /// CHECK: Validated by the serum cpi call
     pub market_asks: UncheckedAccount<'info>,
     #[account(mut)]
+    /// CHECK: Validated by the serum cpi call
     pub market_event_queue: UncheckedAccount<'info>,
 }
 

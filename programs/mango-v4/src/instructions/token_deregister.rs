@@ -34,6 +34,7 @@ pub struct TokenDeregister<'info> {
     pub mint_info: AccountLoader<'info, MintInfo>,
 
     #[account(mut)]
+    /// CHECK: target for account rent needs no checks
     pub sol_destination: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,

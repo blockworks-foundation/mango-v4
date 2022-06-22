@@ -47,6 +47,10 @@ pub struct Book<'a> {
 }
 
 impl<'a> Book<'a> {
+    pub fn new(bids: RefMut<'a, BookSide>, asks: RefMut<'a, BookSide>) -> Self {
+        Self { bids, asks }
+    }
+
     pub fn load_mut(
         bids_ai: &'a AccountInfo,
         asks_ai: &'a AccountInfo,
@@ -54,10 +58,10 @@ impl<'a> Book<'a> {
     ) -> std::result::Result<Self, Error> {
         require!(bids_ai.key == &perp_market.bids, MangoError::SomeError);
         require!(asks_ai.key == &perp_market.asks, MangoError::SomeError);
-        Ok(Self {
-            bids: bids_ai.load_mut::<BookSide>()?,
-            asks: asks_ai.load_mut::<BookSide>()?,
-        })
+        Ok(Self::new(
+            bids_ai.load_mut::<BookSide>()?,
+            asks_ai.load_mut::<BookSide>()?,
+        ))
     }
 
     pub fn get_bookside(&mut self, side: Side) -> &mut BookSide {

@@ -41,6 +41,7 @@ pub struct PerpCloseMarket<'info> {
     pub event_queue: AccountLoader<'info, EventQueue>,
 
     #[account(mut)]
+    /// CHECK: target for account rent needs no checks
     pub sol_destination: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,

@@ -15,7 +15,9 @@ pub struct Serum3RegisterMarket<'info> {
     pub admin: Signer<'info>,
 
     // TODO: limit?
+    /// CHECK: Can register a market for any serum program
     pub serum_program: UncheckedAccount<'info>,
+    /// CHECK: Can register any serum market
     pub serum_market_external: UncheckedAccount<'info>,
 
     #[account(
