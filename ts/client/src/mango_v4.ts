@@ -2151,19 +2151,19 @@ export type MangoV4 = {
           {
             "name": "tokens",
             "type": {
-              "defined": "MangoAccountTokens"
+              "defined": "MangoAccountTokenPositions"
             }
           },
           {
             "name": "serum3",
             "type": {
-              "defined": "MangoAccountSerum3"
+              "defined": "MangoAccountSerum3Orders"
             }
           },
           {
             "name": "perps",
             "type": {
-              "defined": "MangoAccountPerps"
+              "defined": "MangoAccountPerpPositions"
             }
           },
           {
@@ -2637,12 +2637,12 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "TokenAccount",
+      "name": "TokenPosition",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "indexedValue",
+            "name": "indexedPosition",
             "type": {
               "defined": "I80F48"
             }
@@ -2668,7 +2668,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "MangoAccountTokens",
+      "name": "MangoAccountTokenPositions",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2677,7 +2677,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 {
-                  "defined": "TokenAccount"
+                  "defined": "TokenPosition"
                 },
                 16
               ]
@@ -2687,7 +2687,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "Serum3Account",
+      "name": "Serum3Orders",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2728,7 +2728,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "MangoAccountSerum3",
+      "name": "MangoAccountSerum3Orders",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2737,7 +2737,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 {
-                  "defined": "Serum3Account"
+                  "defined": "Serum3Orders"
                 },
                 8
               ]
@@ -2747,7 +2747,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "PerpAccount",
+      "name": "PerpPositions",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2806,7 +2806,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "MangoAccountPerps",
+      "name": "MangoAccountPerpPositions",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2815,7 +2815,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 {
-                  "defined": "PerpAccount"
+                  "defined": "PerpPositions"
                 },
                 8
               ]
@@ -5443,19 +5443,19 @@ export const IDL: MangoV4 = {
           {
             "name": "tokens",
             "type": {
-              "defined": "MangoAccountTokens"
+              "defined": "MangoAccountTokenPositions"
             }
           },
           {
             "name": "serum3",
             "type": {
-              "defined": "MangoAccountSerum3"
+              "defined": "MangoAccountSerum3Orders"
             }
           },
           {
             "name": "perps",
             "type": {
-              "defined": "MangoAccountPerps"
+              "defined": "MangoAccountPerpPositions"
             }
           },
           {
@@ -5929,12 +5929,12 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "TokenAccount",
+      "name": "TokenPosition",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "indexedValue",
+            "name": "indexedPosition",
             "type": {
               "defined": "I80F48"
             }
@@ -5960,7 +5960,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "MangoAccountTokens",
+      "name": "MangoAccountTokenPositions",
       "type": {
         "kind": "struct",
         "fields": [
@@ -5969,7 +5969,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 {
-                  "defined": "TokenAccount"
+                  "defined": "TokenPosition"
                 },
                 16
               ]
@@ -5979,7 +5979,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "Serum3Account",
+      "name": "Serum3Orders",
       "type": {
         "kind": "struct",
         "fields": [
@@ -6020,7 +6020,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "MangoAccountSerum3",
+      "name": "MangoAccountSerum3Orders",
       "type": {
         "kind": "struct",
         "fields": [
@@ -6029,7 +6029,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 {
-                  "defined": "Serum3Account"
+                  "defined": "Serum3Orders"
                 },
                 8
               ]
@@ -6039,7 +6039,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "PerpAccount",
+      "name": "PerpPositions",
       "type": {
         "kind": "struct",
         "fields": [
@@ -6098,7 +6098,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "MangoAccountPerps",
+      "name": "MangoAccountPerpPositions",
       "type": {
         "kind": "struct",
         "fields": [
@@ -6107,7 +6107,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 {
-                  "defined": "PerpAccount"
+                  "defined": "PerpPositions"
                 },
                 8
               ]

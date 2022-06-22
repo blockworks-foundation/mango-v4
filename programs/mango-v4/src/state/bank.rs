@@ -1,4 +1,4 @@
-use super::{OracleConfig, TokenPosition, TokenIndex};
+use super::{OracleConfig, TokenIndex, TokenPosition};
 use crate::error::MangoError;
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
@@ -152,7 +152,8 @@ impl Bank {
             }
 
             // pay back all borrows
-            self.indexed_total_borrows = cm!(self.indexed_total_borrows + position.indexed_position); // position.value is negative
+            self.indexed_total_borrows =
+                cm!(self.indexed_total_borrows + position.indexed_position); // position.value is negative
             position.indexed_position = I80F48::ZERO;
             // deposit the rest
             native_amount = cm!(native_amount + native_position);
@@ -225,7 +226,8 @@ impl Bank {
             }
 
             // withdraw all deposits
-            self.indexed_total_deposits = cm!(self.indexed_total_deposits - position.indexed_position);
+            self.indexed_total_deposits =
+                cm!(self.indexed_total_deposits - position.indexed_position);
             position.indexed_position = I80F48::ZERO;
             // borrow the rest
             native_amount = -new_native_position;

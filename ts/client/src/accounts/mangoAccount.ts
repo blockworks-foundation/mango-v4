@@ -7,9 +7,9 @@ import { Bank } from './bank';
 import { Group } from './group';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from './I80F48';
 export class MangoAccount {
-  public tokens: TokenAccount[];
-  public serum3: Serum3Account[];
-  public perps: PerpAccount[];
+  public tokens: TokenPosition[];
+  public serum3: Serum3Orders[];
+  public perps: PerpPositions[];
   public name: string;
 
   static from(
@@ -62,20 +62,20 @@ export class MangoAccount {
     reserved: number[],
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
-    this.tokens = tokens.values.map((dto) => TokenAccount.from(dto));
-    this.serum3 = serum3.values.map((dto) => Serum3Account.from(dto));
-    this.perps = perps.accounts.map((dto) => PerpAccount.from(dto));
+    this.tokens = tokens.values.map((dto) => TokenPosition.from(dto));
+    this.serum3 = serum3.values.map((dto) => Serum3Orders.from(dto));
+    this.perps = perps.accounts.map((dto) => PerpPositions.from(dto));
   }
 
   async reload(client: MangoClient) {
     Object.assign(this, await client.getMangoAccount(this));
   }
 
-  findToken(tokenIndex: number): TokenAccount | undefined {
+  findToken(tokenIndex: number): TokenPosition | undefined {
     return this.tokens.find((ta) => ta.tokenIndex == tokenIndex);
   }
 
-  findSerum3Account(marketIndex: number): Serum3Account | undefined {
+  findSerum3Account(marketIndex: number): Serum3Orders | undefined {
     return this.serum3.find((sa) => sa.marketIndex == marketIndex);
   }
 
@@ -89,7 +89,7 @@ export class MangoAccount {
     return ta ? ta.ui(bank) : 0;
   }
 
-  tokens_active(): TokenAccount[] {
+  tokens_active(): TokenPosition[] {
     return this.tokens.filter((token) => token.isActive());
   }
 
@@ -98,7 +98,7 @@ export class MangoAccount {
       'tokens:' +
       JSON.stringify(
         this.tokens
-          .filter((token) => token.tokenIndex != TokenAccount.TokenIndexUnset)
+          .filter((token) => token.tokenIndex != TokenPosition.TokenIndexUnset)
           .map((token) => token.toString(group)),
         null,
         4,
@@ -107,7 +107,7 @@ export class MangoAccount {
       JSON.stringify(
         this.serum3.filter(
           (serum3) =>
-            serum3.marketIndex != Serum3Account.Serum3MarketIndexUnset,
+            serum3.marketIndex != Serum3Orders.Serum3MarketIndexUnset,
         ),
         null,
         4,
@@ -115,7 +115,7 @@ export class MangoAccount {
       '\nperps:' +
       JSON.stringify(
         this.perps.filter(
-          (perp) => perp.marketIndex != PerpAccount.PerpMarketIndexUnset,
+          (perp) => perp.marketIndex != PerpPositions.PerpMarketIndexUnset,
         ),
         null,
         4,
@@ -124,10 +124,10 @@ export class MangoAccount {
   }
 }
 
-export class TokenAccount {
+export class TokenPosition {
   static TokenIndexUnset: number = 65535;
   static from(dto: TokenAccountDto) {
-    return new TokenAccount(
+    return new TokenPosition(
       I80F48.from(dto.indexedValue),
       dto.tokenIndex,
       dto.inUseCount,
@@ -135,7 +135,7 @@ export class TokenAccount {
   }
 
   constructor(
-    public indexedValue: I80F48,
+    public indexedPosition: I80F48,
     public tokenIndex: number,
     public inUseCount: number,
   ) {}
@@ -145,10 +145,10 @@ export class TokenAccount {
   }
 
   public native(bank: Bank): I80F48 {
-    if (this.indexedValue.isPos()) {
-      return bank.depositIndex.mul(this.indexedValue);
+    if (this.indexedPosition.isPos()) {
+      return bank.depositIndex.mul(this.indexedPosition);
     } else {
-      return bank.borrowIndex.mul(this.indexedValue);
+      return bank.borrowIndex.mul(this.indexedPosition);
     }
   }
 
@@ -174,7 +174,7 @@ export class TokenAccount {
       ', inUseCount: ' +
       this.inUseCount +
       ', indexedValue: ' +
-      this.indexedValue.toNumber() +
+      this.indexedPosition.toNumber() +
       extra
     );
   }
@@ -189,10 +189,10 @@ export class TokenAccountDto {
   ) {}
 }
 
-export class Serum3Account {
+export class Serum3Orders {
   static Serum3MarketIndexUnset = 65535;
   static from(dto: Serum3AccountDto) {
-    return new Serum3Account(
+    return new Serum3Orders(
       dto.openOrders,
       dto.marketIndex,
       dto.baseTokenIndex,
@@ -218,10 +218,10 @@ export class Serum3AccountDto {
   ) {}
 }
 
-export class PerpAccount {
+export class PerpPositions {
   static PerpMarketIndexUnset = 65535;
   static from(dto: PerpAccountDto) {
-    return new PerpAccount(
+    return new PerpPositions(
       dto.marketIndex,
       dto.basePositionLots.toNumber(),
       dto.quotePositionNative.val.toNumber(),
