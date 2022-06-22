@@ -3,6 +3,9 @@ name = "client"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+doctest = false
+
 [dependencies]
 anchor-client = "0.24.2"
 anchor-lang = "0.24.2"
