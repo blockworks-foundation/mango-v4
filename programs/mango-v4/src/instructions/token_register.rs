@@ -52,6 +52,7 @@ pub struct TokenRegister<'info> {
     )]
     pub mint_info: AccountLoader<'info, MintInfo>,
 
+    /// CHECK: The oracle can be one of several different account types
     pub oracle: UncheckedAccount<'info>,
 
     // Creating an address lookup table needs a recent valid slot as an

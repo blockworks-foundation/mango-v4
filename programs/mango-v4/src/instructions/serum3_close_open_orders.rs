@@ -21,13 +21,17 @@ pub struct Serum3CloseOpenOrders<'info> {
         has_one = serum_market_external,
     )]
     pub serum_market: AccountLoader<'info, Serum3Market>,
+    /// CHECK: The pubkey is checked and then it's passed to the serum cpi
     pub serum_program: UncheckedAccount<'info>,
+    /// CHECK: The pubkey is checked and then it's passed to the serum cpi
     pub serum_market_external: UncheckedAccount<'info>,
 
     #[account(mut)]
+    /// CHECK: Validated inline by checking against the pubkey stored in the account
     pub open_orders: UncheckedAccount<'info>,
 
     #[account(mut)]
+    /// CHECK: target for account rent needs no checks
     pub sol_destination: UncheckedAccount<'info>,
 }
 
