@@ -5,7 +5,7 @@ import {
 } from '@orca-so/sdk';
 import { orcaDevnetPoolConfigs } from '@orca-so/sdk/dist/constants/devnet/pools';
 import { OrcaPoolParams } from '@orca-so/sdk/dist/model/orca/pool/pool-types';
-import { OrcaPoolConfig as OrcaDevnetPoolConfig } from '@orca-so/sdk/dist/public/devnet/pools';
+import { OrcaPoolConfig as OrcaDevnetPoolConfig } from '@orca-so/sdk/dist/public/devnet/pools/config';
 import { BN } from '@project-serum/anchor';
 import {
   AccountInfo,
