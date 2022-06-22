@@ -7,6 +7,8 @@ use fixed::types::I80F48;
 use crate::error::*;
 use crate::state::*;
 
+use crate::logs::DepositLog;
+
 #[derive(Accounts)]
 pub struct TokenDeposit<'info> {
     pub group: AccountLoader<'info, Group>,
@@ -89,6 +91,15 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     if !position_is_active {
         account.tokens.deactivate(position_index);
     }
+
+    // clarkeni TODO: add prices
+    emit!(DepositLog {
+        mango_account: ctx.accounts.account.key(),
+        signer: ctx.accounts.token_authority.key(),
+        token_index: token_index as u64,
+        quantity: amount,
+        // price: oracle_price.to_bits(),
+    });
 
     Ok(())
 }

@@ -6,6 +6,8 @@ use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 use fixed::types::I80F48;
 
+use crate::logs::{WithdrawLog, TokenBalanceLog};
+
 #[derive(Accounts)]
 pub struct TokenWithdraw<'info> {
     pub group: AccountLoader<'info, Group>,
@@ -63,11 +65,11 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
 
     let (position, position_index) = account.tokens.get_mut_or_create(token_index)?;
+    let mut bank = ctx.accounts.bank.load_mut()?;
 
     // The bank will also be passed in remainingAccounts. Use an explicit scope
     // to drop the &mut before we borrow it immutably again later.
     let position_is_active = {
-        let mut bank = ctx.accounts.bank.load_mut()?;
         let native_position = position.native(&bank);
 
         // Handle amount special case for withdrawing everything
@@ -119,6 +121,24 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     if !position_is_active {
         account.tokens.deactivate(position_index);
     }
+
+    // clarkeni TODO: add prices
+    emit!(WithdrawLog {
+        mango_account: ctx.accounts.account.key(),
+        signer: ctx.accounts.owner.key(),
+        token_index: token_index as u64,
+        quantity: amount,
+        // price: oracle_price.to_bits(),
+    });
+
+    emit!(TokenBalanceLog {
+        mango_account: ctx.accounts.account.key(),
+        token_index: token_index as u64,
+        indexed_value: position.indexed_value.to_bits(),
+        deposit_index: bank.deposit_index.to_bits(),
+        borrow_index: bank.borrow_index.to_bits(),
+        // price: oracle_price.to_bits(),
+    });
 
     Ok(())
 }

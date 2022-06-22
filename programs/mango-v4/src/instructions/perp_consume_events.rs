@@ -6,6 +6,8 @@ use crate::error::MangoError;
 use crate::state::EventQueue;
 use crate::state::{EventType, FillEvent, Group, MangoAccount, OutEvent, PerpMarket};
 
+use crate::logs::{emit_perp_balances, mango_emit_stack, FillLog};
+
 #[derive(Accounts)]
 pub struct PerpConsumeEvents<'info> {
     pub group: AccountLoader<'info, Group>,
@@ -57,6 +59,13 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         &mut perp_market,
                         fill,
                     )?;
+                    emit_perp_balances(
+                        fill.maker,
+                        perp_market.perp_market_index as u64,
+                        fill.price,
+                        &ma.perps.accounts[perp_market.perp_market_index as usize],
+                        &perp_market,
+                    );
                 } else {
                     let mut maker = match mango_account_ais.iter().find(|ai| ai.key == &fill.maker)
                     {
@@ -85,7 +94,42 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         &mut perp_market,
                         fill,
                     )?;
+                    emit_perp_balances(
+                        fill.maker,
+                        perp_market.perp_market_index as u64,
+                        fill.price,
+                        &maker.perps.accounts[perp_market.perp_market_index as usize],
+                        &perp_market,
+                    );
+                    emit_perp_balances(
+                        fill.taker,
+                        perp_market.perp_market_index as u64,
+                        fill.price,
+                        &taker.perps.accounts[perp_market.perp_market_index as usize],
+                        &perp_market,
+                    );
                 }
+                mango_emit_stack::<_, 512>(FillLog {
+                    mango_group: ctx.accounts.group.key(),
+                    market_index: perp_market.perp_market_index as u64,
+                    taker_side: fill.taker_side as u8,
+                    maker_slot: fill.maker_slot,
+                    market_fees_applied: fill.market_fees_applied,
+                    maker_out: fill.maker_out,
+                    timestamp: fill.timestamp,
+                    seq_num: fill.seq_num as u64,
+                    maker: fill.maker,
+                    maker_order_id: fill.maker_order_id,
+                    maker_client_order_id: fill.maker_client_order_id,
+                    maker_fee: fill.maker_fee.to_bits(),
+                    maker_timestamp: fill.maker_timestamp,
+                    taker: fill.taker,
+                    taker_order_id: fill.taker_order_id,
+                    taker_client_order_id: fill.taker_client_order_id,
+                    taker_fee: fill.taker_fee.to_bits(),
+                    price: fill.price,
+                    quantity: fill.quantity,
+                });
             }
             EventType::Out => {
                 let out: &OutEvent = cast_ref(event);

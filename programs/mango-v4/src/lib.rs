@@ -16,6 +16,7 @@ pub mod instructions;
 mod serum3_cpi;
 pub mod state;
 pub mod types;
+pub mod logs;
 
 use state::{
     HealthType, OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex,
