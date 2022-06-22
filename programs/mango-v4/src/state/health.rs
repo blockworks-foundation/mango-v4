@@ -345,16 +345,25 @@ impl Serum3Info {
         let quote_info = &token_infos[self.quote_index];
         let reserved = self.reserved;
 
-        // compute how much the health would increase if the reserved balance were
-        // applied to the passed token info
+        if reserved.is_zero() {
+            return I80F48::ZERO;
+        }
+
+        // How much the health would increase if the reserved balance were applied to the passed
+        // token info?
         let compute_health_effect = |token_info: &TokenInfo| {
-            let token_balance = cm!(token_info.balance + token_info.serum3_max_reserved);
-            let (asset_part, liab_part) = if token_balance >= reserved {
+            // This balance includes all possible reserved funds from markets that relate to the
+            // token, including this market itself: `reserved` is already included in `max_balance`.
+            let max_balance = cm!(token_info.balance + token_info.serum3_max_reserved);
+
+            // Assuming `reserved` was added to `max_balance` last (because that gives the smallest
+            // health effects): how much did health change because of it?
+            let (asset_part, liab_part) = if max_balance >= reserved {
                 (reserved, I80F48::ZERO)
-            } else if token_balance.is_negative() {
+            } else if max_balance.is_negative() {
                 (I80F48::ZERO, reserved)
             } else {
-                (token_balance, cm!(reserved - token_balance))
+                (max_balance, cm!(reserved - max_balance))
             };
 
             let asset_weight = token_info.asset_weight(health_type);
