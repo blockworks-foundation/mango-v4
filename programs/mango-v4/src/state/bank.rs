@@ -134,11 +134,13 @@ impl Bank {
 
         if native_position.is_negative() {
             let new_native_position = cm!(native_position + native_amount);
-            if !new_native_position.is_positive() {
+            let indexed_change = cm!(native_amount / self.borrow_index + I80F48::DELTA);
+            // this is only correct if it's not positive, because it scales the whole amount by borrow_index
+            let new_indexed_value = cm!(position.indexed_value + indexed_change);
+            if new_indexed_value.is_negative() {
                 // pay back borrows only, leaving a negative position
-                let indexed_change = cm!(native_amount / self.borrow_index + I80F48::DELTA);
                 self.indexed_total_borrows = cm!(self.indexed_total_borrows - indexed_change);
-                position.indexed_value = cm!(position.indexed_value + indexed_change);
+                position.indexed_value = new_indexed_value;
                 return Ok(true);
             } else if new_native_position < I80F48::ONE && !position.is_in_use() {
                 // if there's less than one token deposited, zero the position
@@ -393,6 +395,8 @@ mod tests {
             (-10.1, 10),
             (-10.1, 11),
             (-10.1, 50),
+            (-10.0, 10),
+            (-10.0, 11),
             (-2.0, 2),
             (-2.0, 3),
             (-0.1, 1),
@@ -402,6 +406,8 @@ mod tests {
             (10.1, -9),
             (10.1, -10),
             (10.1, -11),
+            (10.0, -10),
+            (10.0, -9),
             (1.0, -1),
             (0.1, -1),
             (0.0, -1),
