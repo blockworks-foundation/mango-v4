@@ -120,12 +120,12 @@ pub mod mango_v4 {
         instructions::token_withdraw(ctx, amount, allow_borrow)
     }
 
-    pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
-        ctx: Context<'key, 'accounts, 'remaining, 'info, MarginTrade<'info>>,
-        withdraws: Vec<MarginTradeWithdraw>,
+    pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan<'info>>,
+        withdraws: Vec<FlashLoanWithdraw>,
         cpi_datas: Vec<CpiData>,
     ) -> Result<()> {
-        instructions::margin_trade(ctx, withdraws, cpi_datas)
+        instructions::flash_loan(ctx, withdraws, cpi_datas)
     }
 
     ///

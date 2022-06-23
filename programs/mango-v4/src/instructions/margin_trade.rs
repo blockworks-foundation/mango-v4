@@ -9,7 +9,7 @@ use solana_program::instruction::Instruction;
 use std::cell::Ref;
 use std::collections::HashMap;
 
-/// The margin trade instruction
+/// The flash loan instruction
 ///
 /// In addition to these accounts, there must be a sequence of remaining_accounts:
 /// 1. health_accounts: accounts needed for health checking
@@ -22,7 +22,7 @@ use std::collections::HashMap;
 /// Every vault that is to be withdrawn from must appear in the `withdraws` instruction argument.
 /// The corresponding bank may be used as an authority for vault withdrawals.
 #[derive(Accounts)]
-pub struct MarginTrade<'info> {
+pub struct FlashLoan<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
@@ -52,7 +52,7 @@ struct AllowedVault {
 }
 
 #[derive(AnchorDeserialize, AnchorSerialize, Clone, Copy)]
-pub struct MarginTradeWithdraw {
+pub struct FlashLoanWithdraw {
     /// Account index of the vault to withdraw from in the target_accounts section.
     /// Meaning that the first account after target_program_id would have index 0.
     pub index: u8,
@@ -66,12 +66,12 @@ pub struct CpiData {
     pub data: Vec<u8>,
 }
 
-/// - `withdraws` is a list of MarginTradeWithdraw requests.
+/// - `withdraws` is a list of FlashLoanWithdraw requests.
 /// - `cpi_datas` is a list of bytes per cpi to call the target_program_id with.
 /// - `cpi_account_starts` is a list of index into the remaining accounts per cpi to call the target_program_id with.
-pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
-    ctx: Context<'key, 'accounts, 'remaining, 'info, MarginTrade<'info>>,
-    withdraws: Vec<MarginTradeWithdraw>,
+pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
+    ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan<'info>>,
+    withdraws: Vec<FlashLoanWithdraw>,
     cpi_datas: Vec<CpiData>,
 ) -> Result<()> {
     require!(!cpi_datas.is_empty(), MangoError::SomeError);

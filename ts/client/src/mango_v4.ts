@@ -616,7 +616,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "marginTrade",
+      "name": "flashLoan",
       "accounts": [
         {
           "name": "group",
@@ -644,7 +644,7 @@ export type MangoV4 = {
           "name": "withdraws",
           "type": {
             "vec": {
-              "defined": "MarginTradeWithdraw"
+              "defined": "FlashLoanWithdraw"
             }
           }
         },
@@ -2577,7 +2577,7 @@ export type MangoV4 = {
   ],
   "types": [
     {
-      "name": "MarginTradeWithdraw",
+      "name": "FlashLoanWithdraw",
       "type": {
         "kind": "struct",
         "fields": [
@@ -3274,7 +3274,7 @@ export type MangoV4 = {
     },
     {
       "code": 6004,
-      "name": "InvalidMarginTradeTargetCpiProgram",
+      "name": "InvalidFlashLoanTargetCpiProgram",
       "msg": ""
     },
     {
@@ -3908,7 +3908,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "marginTrade",
+      "name": "flashLoan",
       "accounts": [
         {
           "name": "group",
@@ -3936,7 +3936,7 @@ export const IDL: MangoV4 = {
           "name": "withdraws",
           "type": {
             "vec": {
-              "defined": "MarginTradeWithdraw"
+              "defined": "FlashLoanWithdraw"
             }
           }
         },
@@ -5869,7 +5869,7 @@ export const IDL: MangoV4 = {
   ],
   "types": [
     {
-      "name": "MarginTradeWithdraw",
+      "name": "FlashLoanWithdraw",
       "type": {
         "kind": "struct",
         "fields": [
@@ -6566,7 +6566,7 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6004,
-      "name": "InvalidMarginTradeTargetCpiProgram",
+      "name": "InvalidFlashLoanTargetCpiProgram",
       "msg": ""
     },
     {
