@@ -35,9 +35,9 @@ export class MangoAccount {
       obj.group,
       obj.owner,
       obj.delegate,
-      obj.tokens as { values: TokenAccountDto[] },
-      obj.serum3 as { values: Serum3AccountDto[] },
-      obj.perps as { accounts: PerpAccountDto[] },
+      obj.tokens as { values: TokenPositionDto[] },
+      obj.serum3 as { values: Serum3PositionDto[] },
+      obj.perps as { accounts: PerpPositionDto[] },
       obj.beingLiquidated,
       obj.isBankrupt,
       obj.accountNum,
@@ -52,9 +52,9 @@ export class MangoAccount {
     public group: PublicKey,
     public owner: PublicKey,
     public delegate: PublicKey,
-    tokens: { values: TokenAccountDto[] },
-    serum3: { values: Serum3AccountDto[] },
-    perps: { accounts: PerpAccountDto[] },
+    tokens: { values: TokenPositionDto[] },
+    serum3: { values: Serum3PositionDto[] },
+    perps: { accounts: PerpPositionDto[] },
     beingLiquidated: number,
     isBankrupt: number,
     accountNum: number,
@@ -125,7 +125,7 @@ export class MangoAccount {
 
 export class TokenPosition {
   static TokenIndexUnset: number = 65535;
-  static from(dto: TokenAccountDto) {
+  static from(dto: TokenPositionDto) {
     return new TokenPosition(
       I80F48.from(dto.indexedPosition),
       dto.tokenIndex,
@@ -179,7 +179,7 @@ export class TokenPosition {
   }
 }
 
-export class TokenAccountDto {
+export class TokenPositionDto {
   constructor(
     public indexedPosition: I80F48Dto,
     public tokenIndex: number,
@@ -190,7 +190,7 @@ export class TokenAccountDto {
 
 export class Serum3Orders {
   static Serum3MarketIndexUnset = 65535;
-  static from(dto: Serum3AccountDto) {
+  static from(dto: Serum3PositionDto) {
     return new Serum3Orders(
       dto.openOrders,
       dto.marketIndex,
@@ -207,7 +207,7 @@ export class Serum3Orders {
   ) {}
 }
 
-export class Serum3AccountDto {
+export class Serum3PositionDto {
   constructor(
     public openOrders: PublicKey,
     public marketIndex: number,
@@ -219,7 +219,7 @@ export class Serum3AccountDto {
 
 export class PerpPositions {
   static PerpMarketIndexUnset = 65535;
-  static from(dto: PerpAccountDto) {
+  static from(dto: PerpPositionDto) {
     return new PerpPositions(
       dto.marketIndex,
       dto.basePositionLots.toNumber(),
@@ -242,7 +242,7 @@ export class PerpPositions {
   ) {}
 }
 
-export class PerpAccountDto {
+export class PerpPositionDto {
   constructor(
     public marketIndex: number,
     public reserved: [],

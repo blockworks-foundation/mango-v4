@@ -1212,12 +1212,11 @@ export class MangoClient {
       ])
       .flat();
 
-    const banks = Array.from(group.banksMap.values());
-    const bankPks = banks.map((b) => b.publicKey.toString());
-    const bankIndex = bankPks.indexOf(inputBank.publicKey.toString());
+    const keys = instructions.map((ix) => ix.keys).flat();
+    const vaultIndex = keys.findIndex((k) => k.pubkey.equals(inputBank.vault));
 
     const withdraws: FlashLoanWithdraw[] = [
-      { index: 3, amount: toU64(amountIn, 9) },
+      { index: vaultIndex, amount: toU64(amountIn, inputBank.mintDecimals) },
     ];
 
     let cpiDatas = [];
@@ -1250,7 +1249,7 @@ export class MangoClient {
     );
 
     return await this.program.methods
-      .flashLoan(withdraws, [cpiDatas])
+      .flashLoan(withdraws, cpiDatas)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
