@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::accounts_zerocopy::*;
+use crate::logs::UpdateFundingLog;
 use crate::state::{oracle_price, Book, PerpMarket};
 
 #[derive(Accounts)]
@@ -35,6 +36,14 @@ pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
     )?;
 
     perp_market.update_funding(&book, oracle_price, now_ts as u64)?;
+
+    emit!(UpdateFundingLog {
+        mango_group: perp_market.group.key(),
+        market_index: perp_market.perp_market_index,
+        long_funding: perp_market.long_funding.to_bits(),
+        short_funding: perp_market.short_funding.to_bits(),
+        price: oracle_price.to_bits(),
+    });
 
     Ok(())
 }

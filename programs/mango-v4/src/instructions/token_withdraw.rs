@@ -6,7 +6,8 @@ use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 use fixed::types::I80F48;
 
-use crate::logs::{WithdrawLog, TokenBalanceLog};
+use crate::logs::{TokenBalanceLog, WithdrawLog};
+use crate::state::new_fixed_order_account_retriever;
 
 #[derive(Accounts)]
 pub struct TokenWithdraw<'info> {
@@ -105,11 +106,28 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         position_is_active
     };
 
+    let indexed_value = position.indexed_value;
+    drop(position);
+
+    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
+    let (_, oracle_price) = retriever.bank_and_oracle(
+        &ctx.accounts.group.key(),
+        retriever.account_index(ctx.accounts.bank.key())?,
+        token_index,
+    )?;
+    emit!(TokenBalanceLog {
+        mango_account: ctx.accounts.account.key(),
+        token_index: token_index,
+        indexed_value: indexed_value.to_bits(),
+        deposit_index: bank.deposit_index.to_bits(),
+        borrow_index: bank.borrow_index.to_bits(),
+        price: oracle_price.to_bits(),
+    });
+
     //
     // Health check
     //
-    let health =
-        compute_health_from_fixed_accounts(&account, HealthType::Init, ctx.remaining_accounts)?;
+    let health = compute_health(&account, HealthType::Init, &retriever)?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
 
@@ -122,22 +140,12 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         account.tokens.deactivate(position_index);
     }
 
-    // clarkeni TODO: add prices
     emit!(WithdrawLog {
         mango_account: ctx.accounts.account.key(),
         signer: ctx.accounts.owner.key(),
-        token_index: token_index as u64,
+        token_index: token_index,
         quantity: amount,
-        // price: oracle_price.to_bits(),
-    });
-
-    emit!(TokenBalanceLog {
-        mango_account: ctx.accounts.account.key(),
-        token_index: token_index as u64,
-        indexed_value: position.indexed_value.to_bits(),
-        deposit_index: bank.deposit_index.to_bits(),
-        borrow_index: bank.borrow_index.to_bits(),
-        // price: oracle_price.to_bits(),
+        price: oracle_price.to_bits(),
     });
 
     Ok(())

@@ -3,8 +3,8 @@ use anchor_lang::prelude::*;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::state::{
-    compute_health_from_fixed_accounts, oracle_price, Book, EventQueue, Group, HealthType,
-    MangoAccount, OrderType, PerpMarket, Side,
+    compute_health, new_fixed_order_account_retriever, oracle_price, Book, EventQueue, Group,
+    HealthType, MangoAccount, OrderType, PerpMarket, Side,
 };
 
 #[derive(Accounts)]
@@ -131,11 +131,8 @@ pub fn perp_place_order(
         )?;
     }
 
-    let health = compute_health_from_fixed_accounts(
-        &mango_account,
-        HealthType::Init,
-        ctx.remaining_accounts,
-    )?;
+    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &mango_account)?;
+    let health = compute_health(&mango_account, HealthType::Init, &retriever)?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
 

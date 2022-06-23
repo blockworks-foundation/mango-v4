@@ -35,6 +35,8 @@ pub trait AccountRetriever {
         account_index: usize,
         perp_market_index: PerpMarketIndex,
     ) -> Result<&PerpMarket>;
+
+    fn account_index(&self, key: Pubkey) -> Result<usize>;
 }
 
 /// Assumes the account infos needed for the health computation follow a strict order.
@@ -48,6 +50,29 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
     pub n_banks: usize,
     pub begin_perp: usize,
     pub begin_serum3: usize,
+}
+
+pub fn new_fixed_order_account_retriever<'a, 'info>(
+    ais: &'a [AccountInfo<'info>],
+    account: &MangoAccount,
+) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
+    let active_token_len = account.tokens.iter_active().count();
+    let active_serum3_len = account.serum3.iter_active().count();
+    let active_perp_len = account.perps.iter_active_accounts().count();
+    let expected_ais = cm!(active_token_len * 2 // banks + oracles
+        + active_perp_len // PerpMarkets
+        + active_serum3_len); // open_orders
+    require!(ais.len() == expected_ais, MangoError::SomeError);
+
+    Ok(FixedOrderAccountRetriever {
+        ais: ais
+            .into_iter()
+            .map(|ai| AccountInfoRef::borrow(ai))
+            .collect::<Result<Vec<_>>>()?,
+        n_banks: active_token_len,
+        begin_perp: cm!(active_token_len * 2),
+        begin_serum3: cm!(active_token_len * 2 + active_perp_len),
+    })
 }
 
 impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
@@ -88,6 +113,13 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
         let ai = &self.ais[cm!(self.begin_serum3 + account_index)];
         require!(key == ai.key(), MangoError::SomeError);
         serum3_cpi::load_open_orders(ai)
+    }
+
+    fn account_index(&self, key: Pubkey) -> Result<usize> {
+        self.ais
+            .iter()
+            .position(|account| account.key() == &key)
+            .ok_or_else(|| error!(MangoError::SomeError))
     }
 }
 
@@ -250,6 +282,13 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
             .ok_or_else(|| error!(MangoError::SomeError))?;
         serum3_cpi::load_open_orders(oo)
     }
+
+    fn account_index(&self, key: Pubkey) -> Result<usize> {
+        self.ais
+            .iter()
+            .position(|account| account.key() == &key)
+            .ok_or_else(|| error!(MangoError::SomeError))
+    }
 }
 
 /// There are two types of health, initial health used for opening new positions and maintenance
@@ -267,30 +306,13 @@ pub enum HealthType {
 /// Computes health for a mango account given a set of account infos
 ///
 /// These account infos must fit the fixed layout defined by FixedOrderAccountRetriever.
-pub fn compute_health_from_fixed_accounts(
-    account: &MangoAccount,
-    health_type: HealthType,
-    ais: &[AccountInfo],
-) -> Result<I80F48> {
-    let active_token_len = account.tokens.iter_active().count();
-    let active_serum3_len = account.serum3.iter_active().count();
-    let active_perp_len = account.perps.iter_active_accounts().count();
-    let expected_ais = cm!(active_token_len * 2 // banks + oracles
-        + active_perp_len // PerpMarkets
-        + active_serum3_len); // open_orders
-    require!(ais.len() == expected_ais, MangoError::SomeError);
-
-    let retriever = FixedOrderAccountRetriever {
-        ais: ais
-            .into_iter()
-            .map(|ai| AccountInfoRef::borrow(ai))
-            .collect::<Result<Vec<_>>>()?,
-        n_banks: active_token_len,
-        begin_perp: cm!(active_token_len * 2),
-        begin_serum3: cm!(active_token_len * 2 + active_perp_len),
-    };
-    compute_health_detail(account, &retriever, health_type, true)?.health(health_type)
-}
+// pub fn compute_health_from_fixed_accounts(
+//     account: &MangoAccount,
+//     health_type: HealthType,
+//     retriever: FixedOrderAccountRetriever<AccountInfoRef>,
+// ) -> Result<I80F48> {
+//     compute_health_detail(account, &retriever, health_type, true)?.health(health_type)
+// }
 
 /// Compute health with an arbitrary AccountRetriever
 pub fn compute_health(

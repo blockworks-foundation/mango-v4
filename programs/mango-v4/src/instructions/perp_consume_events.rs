@@ -111,13 +111,13 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                 }
                 mango_emit_stack::<_, 512>(FillLog {
                     mango_group: ctx.accounts.group.key(),
-                    market_index: perp_market.perp_market_index as u64,
+                    market_index: perp_market.perp_market_index,
                     taker_side: fill.taker_side as u8,
                     maker_slot: fill.maker_slot,
                     market_fees_applied: fill.market_fees_applied,
                     maker_out: fill.maker_out,
                     timestamp: fill.timestamp,
-                    seq_num: fill.seq_num as u64,
+                    seq_num: fill.seq_num,
                     maker: fill.maker,
                     maker_order_id: fill.maker_order_id,
                     maker_client_order_id: fill.maker_client_order_id,

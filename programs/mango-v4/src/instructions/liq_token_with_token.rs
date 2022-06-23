@@ -3,6 +3,7 @@ use fixed::types::I80F48;
 use std::cmp::min;
 
 use crate::error::*;
+use crate::logs::LiquidateTokenAndTokenLog;
 use crate::state::ScanningAccountRetriever;
 use crate::state::*;
 use crate::util::checked_math as cm;
@@ -136,6 +137,19 @@ pub fn liq_token_with_token(
             liab_transfer,
             asset_transfer
         );
+
+        emit!(LiquidateTokenAndTokenLog {
+            liqee: ctx.accounts.liqee.key(),
+            liqor: ctx.accounts.liqor.key(),
+            asset_token_index: asset_token_index,
+            liab_token_index: liab_token_index,
+            asset_transfer: asset_transfer.to_bits(),
+            liab_transfer: liab_transfer.to_bits(),
+            asset_price: asset_price.to_bits(),
+            liab_price: liab_price.to_bits(),
+            // bankruptcy: 
+            
+        });
     }
 
     // Check liqee health again

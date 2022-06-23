@@ -1,6 +1,8 @@
 use crate::accounts_zerocopy::*;
 use crate::error::MangoError;
-use crate::state::{compute_health_from_fixed_accounts, Bank, Group, HealthType, MangoAccount};
+use crate::state::{
+    compute_health, new_fixed_order_account_retriever, Bank, Group, HealthType, MangoAccount,
+};
 use crate::{group_seeds, Mango};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount};
@@ -114,8 +116,8 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     // Check pre-cpi health
     // NOTE: This health check isn't strictly necessary. It will be, later, when
     // we want to have reduce_only or be able to move an account out of bankruptcy.
-    let pre_cpi_health =
-        compute_health_from_fixed_accounts(&account, HealthType::Init, health_ais)?;
+    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
+    let pre_cpi_health = compute_health(&account, HealthType::Init, &retriever)?;
     require!(pre_cpi_health >= 0, MangoError::HealthMustBePositive);
     msg!("pre_cpi_health {:?}", pre_cpi_health);
 
@@ -303,8 +305,9 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
         adjust_for_post_cpi_vault_amounts(health_ais, all_cpi_ais, &used_vaults, &mut account)?;
 
     // Check post-cpi health
+    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
     let post_cpi_health =
-        compute_health_from_fixed_accounts(&account, HealthType::Init, health_ais)?;
+        compute_health(&account, HealthType::Init, &retriever)?;
     require!(post_cpi_health >= 0, MangoError::HealthMustBePositive);
     msg!("post_cpi_health {:?}", post_cpi_health);
 
