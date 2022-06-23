@@ -6,7 +6,7 @@ use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
 use mango_v4::instructions::{
-    CpiData, InterestRateParams, MarginTradeWithdraw, Serum3OrderType, Serum3SelfTradeBehavior,
+    CpiData, InterestRateParams, FlashLoanWithdraw, Serum3OrderType, Serum3SelfTradeBehavior,
     Serum3Side,
 };
 use solana_program::instruction::Instruction;
@@ -279,7 +279,7 @@ pub async fn account_position_f64(solana: &SolanaCookie, account: Pubkey, bank: 
 // ClientInstruction impl
 //
 
-pub struct MarginTradeInstruction<'keypair> {
+pub struct FlashLoanInstruction<'keypair> {
     pub account: Pubkey,
     pub owner: &'keypair Keypair,
     pub mango_token_bank: Pubkey,
@@ -291,9 +291,9 @@ pub struct MarginTradeInstruction<'keypair> {
     pub margin_trade_program_ix_cpi_data: Vec<u8>,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for MarginTradeInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::MarginTrade;
-    type Instruction = mango_v4::instruction::MarginTrade;
+impl<'keypair> ClientInstruction for FlashLoanInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::FlashLoan;
+    type Instruction = mango_v4::instruction::FlashLoan;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -319,7 +319,7 @@ impl<'keypair> ClientInstruction for MarginTradeInstruction<'keypair> {
         .await;
 
         let instruction = Self::Instruction {
-            withdraws: vec![MarginTradeWithdraw {
+            withdraws: vec![FlashLoanWithdraw {
                 index: 1,
                 amount: self.withdraw_amount,
             }],

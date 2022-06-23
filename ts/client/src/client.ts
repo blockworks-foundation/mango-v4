@@ -41,7 +41,7 @@ import {
   ORCA_TOKEN_SWAP_ID_DEVNET,
 } from './integrations/orca/index';
 import { IDL, MangoV4 } from './mango_v4';
-import { MarginTradeWithdraw } from './types';
+import { FlashLoanWithdraw } from './types';
 import {
   getAssociatedTokenAddress,
   I64_MAX_BN,
@@ -1146,13 +1146,13 @@ export class MangoClient {
     );
     const targetRemainingAccounts = instruction.keys;
 
-    const withdraws: MarginTradeWithdraw[] = [
+    const withdraws: FlashLoanWithdraw[] = [
       { index: 3, amount: toU64(amountIn, 9) },
     ];
     const cpiData = instruction.data;
 
     return await this.program.methods
-      .marginTrade(withdraws, [
+      .flashLoan(withdraws, [
         { accountStart: new BN(parsedHealthAccounts.length), data: cpiData },
       ])
       .accounts({
