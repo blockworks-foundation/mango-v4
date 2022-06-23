@@ -61,6 +61,49 @@
           "publicKey": "5ZwVhP5PYkKtx2H4WL2JxSvWL6AALFzwubwM5dsR5XHF"
         }
       ]
+    },
+    {
+      "cluster": "mainnet-beta",
+      "name": "mainnet-beta.microwavedcola",
+      "publicKey": "A9XhGqUUjV992cD36qWDY8wDiZnGuCaUWtSE3NGXjDCb",
+      "serum3ProgramId": "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin",
+      "mangoProgramId": "m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD",
+      "banks": [
+        {
+          "name": "USDC",
+          "publicKey": "BYq994HWWuXC1UC7ByTiDLQBsnBQQAzJaLvMCQU3priu"
+        },
+        {
+          "name": "BTC",
+          "publicKey": "96e336hgaPWbbHqPbpPcmr1pbTY1CALtFWkNk2tD4ZmK"
+        },
+        {
+          "name": "SOL",
+          "publicKey": "J3dxEFhJG1maNva8W9u4XzxCR1DQm6qfkgrkY29Ujrh3"
+        }
+      ],
+      "stubOracles": [
+        {
+          "name": "USDC",
+          "publicKey": "DcCuQDbDqHj7G5pBe7epuPQSwwvysm8GfJSa51MYqFXk"
+        }
+      ],
+      "mintInfos": [
+        {
+          "name": "USDC",
+          "publicKey": "42bXYX5sidUkrijuArv4D11g1aAm9947ht6qUB8Me5Q3"
+        },
+        {
+          "name": "BTC",
+          "publicKey": "4KZkrJQRvrVy8BWmbUKk7YWezMAsSb97ZMHFLUtj6Q5u"
+        },
+        {
+          "name": "SOL",
+          "publicKey": "EvjoLBh7ej78C1yA7jaLcHQfoGx3KkDBnZbrztSZFGmC"
+        }
+      ],
+      "serum3Markets": [],
+      "perpMarkets": []
     }
   ]
 }
