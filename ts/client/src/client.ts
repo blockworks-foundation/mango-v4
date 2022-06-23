@@ -1212,11 +1212,17 @@ export class MangoClient {
       ])
       .flat();
 
-    const keys = instructions.map((ix) => ix.keys).flat();
-    const vaultIndex = keys.findIndex((k) => k.pubkey.equals(inputBank.vault));
+    const vaultIndex = targetRemainingAccounts
+      .reverse()
+      .findIndex((k) => k.pubkey.equals(inputBank.vault));
+
+    targetRemainingAccounts.reverse();
 
     const withdraws: FlashLoanWithdraw[] = [
-      { index: vaultIndex, amount: toU64(amountIn, inputBank.mintDecimals) },
+      {
+        index: targetRemainingAccounts.length - vaultIndex - 1,
+        amount: toU64(amountIn, inputBank.mintDecimals),
+      },
     ];
 
     let cpiDatas = [];

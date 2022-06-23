@@ -36,6 +36,7 @@ pub struct FlashLoan<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+#[derive(Debug)]
 struct AllowedVault {
     /// index of the vault in cpi_ais
     vault_cpi_ai_index: usize,
@@ -51,7 +52,7 @@ struct AllowedVault {
     loan_amount: I80F48,
 }
 
-#[derive(AnchorDeserialize, AnchorSerialize, Clone, Copy)]
+#[derive(AnchorDeserialize, AnchorSerialize, Clone, Copy, Debug)]
 pub struct FlashLoanWithdraw {
     /// Account index of the vault to withdraw from in the target_accounts section.
     /// Index is counted after health accounts.
@@ -60,7 +61,7 @@ pub struct FlashLoanWithdraw {
     pub amount: u64,
 }
 
-#[derive(AnchorDeserialize, AnchorSerialize)]
+#[derive(AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct CpiData {
     pub account_start: u8,
     pub data: Vec<u8>,
@@ -231,6 +232,11 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
             token::approve(approve_ctx, vault_info.withdraw_amount)?;
         }
     }
+
+    msg!("withdraws {:#?}", withdraws);
+    msg!("cpi_datas {:#?}", cpi_datas);
+    msg!("allowed_vaults {:#?}", allowed_vaults);
+    msg!("used_vaults {:#?}", used_vaults);
 
     // get rid of Ref<> to avoid limiting the cpi call
     drop(allowed_banks);
