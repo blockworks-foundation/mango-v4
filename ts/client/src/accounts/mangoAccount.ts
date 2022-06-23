@@ -106,8 +106,7 @@ export class MangoAccount {
       '\nserum:' +
       JSON.stringify(
         this.serum3.filter(
-          (serum3) =>
-            serum3.marketIndex != Serum3Orders.Serum3MarketIndexUnset,
+          (serum3) => serum3.marketIndex != Serum3Orders.Serum3MarketIndexUnset,
         ),
         null,
         4,
@@ -128,7 +127,7 @@ export class TokenPosition {
   static TokenIndexUnset: number = 65535;
   static from(dto: TokenAccountDto) {
     return new TokenPosition(
-      I80F48.from(dto.indexedValue),
+      I80F48.from(dto.indexedPosition),
       dto.tokenIndex,
       dto.inUseCount,
     );
@@ -182,7 +181,7 @@ export class TokenPosition {
 
 export class TokenAccountDto {
   constructor(
-    public indexedValue: I80F48Dto,
+    public indexedPosition: I80F48Dto,
     public tokenIndex: number,
     public inUseCount: number,
     public reserved: number[],
