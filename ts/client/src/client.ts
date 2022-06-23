@@ -6,7 +6,7 @@ import {
   initializeAccount,
   WRAPPED_SOL_MINT,
 } from '@project-serum/serum/lib/token-instructions';
-import { parsePriceData, PriceData } from '@pythnetwork/client';
+import { parsePriceData } from '@pythnetwork/client';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import {
   AccountMeta,
@@ -122,6 +122,7 @@ export class MangoClient {
     const groups = (await this.program.account.group.all(filters)).map(
       (tuple) => Group.from(tuple.publicKey, tuple.account),
     );
+    console.log(groups);
     await groups[0].reloadAll(this);
     return groups[0];
   }
@@ -1221,10 +1222,10 @@ export class MangoClient {
     return new MangoClient(
       new Program<MangoV4>(
         idl as MangoV4,
-        new PublicKey(id.publicKey),
+        new PublicKey(id.mangoProgramId),
         provider,
       ),
-      new PublicKey(id.publicKey),
+      new PublicKey(id.mangoProgramId),
       id.cluster,
       groupName,
     );
