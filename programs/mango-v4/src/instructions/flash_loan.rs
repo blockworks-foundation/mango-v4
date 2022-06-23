@@ -54,7 +54,7 @@ struct AllowedVault {
 #[derive(AnchorDeserialize, AnchorSerialize, Clone, Copy)]
 pub struct FlashLoanWithdraw {
     /// Account index of the vault to withdraw from in the target_accounts section.
-    /// Meaning that the first account after target_program_id would have index 0.
+    /// Index is counted after health accounts.
     pub index: u8,
     /// Requested withdraw amount.
     pub amount: u64,
@@ -119,7 +119,7 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
     require!(pre_cpi_health >= 0, MangoError::HealthMustBePositive);
     msg!("pre_cpi_health {:?}", pre_cpi_health);
 
-    let all_cpi_ais = &ctx.remaining_accounts[num_health_accounts + 1..];
+    let all_cpi_ais = &ctx.remaining_accounts[num_health_accounts..];
     let mut all_cpi_ams = all_cpi_ais
         .iter()
         .flat_map(|item| item.to_account_metas(None))
@@ -262,7 +262,7 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
             cpi_datas[cpi_index + 1].account_start as usize - num_health_accounts
         };
 
-        let all_cpi_ais_start_index = cpi_account_start - num_health_accounts;
+        let all_cpi_ais_start_index = cpi_account_start - num_health_accounts + 1;
 
         let cpi_ais = &all_cpi_ais[all_cpi_ais_start_index..all_cpi_ais_end_index];
         let cpi_ams = &all_cpi_ams[all_cpi_ais_start_index..all_cpi_ais_end_index];

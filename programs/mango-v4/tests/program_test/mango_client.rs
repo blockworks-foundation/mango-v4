@@ -320,7 +320,7 @@ impl<'keypair> ClientInstruction for FlashLoanInstruction<'keypair> {
 
         let instruction = Self::Instruction {
             withdraws: vec![FlashLoanWithdraw {
-                index: 1,
+                index: 2,
                 amount: self.withdraw_amount,
             }],
             cpi_datas: vec![CpiData {
