@@ -6,7 +6,7 @@ use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
 use mango_v4::instructions::{
-    CpiData, InterestRateParams, FlashLoanWithdraw, Serum3OrderType, Serum3SelfTradeBehavior,
+    CpiData, FlashLoanWithdraw, InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior,
     Serum3Side,
 };
 use solana_program::instruction::Instruction;
