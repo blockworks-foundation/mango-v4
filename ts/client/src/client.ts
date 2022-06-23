@@ -1249,9 +1249,7 @@ export class MangoClient {
     );
 
     return await this.program.methods
-      .flashLoan(withdraws, [
-        { accountStart: new BN(parsedHealthAccounts.length), data: cpiDatas },
-      ])
+      .flashLoan(withdraws, [cpiDatas])
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
