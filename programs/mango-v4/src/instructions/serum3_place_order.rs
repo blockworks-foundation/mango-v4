@@ -275,8 +275,7 @@ pub fn serum3_place_order(
     //
     let account = ctx.accounts.account.load()?;
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
-    let health =
-        compute_health(&account, HealthType::Init, &retriever)?;
+    let health = compute_health(&account, HealthType::Init, &retriever)?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
 

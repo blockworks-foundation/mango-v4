@@ -3,8 +3,8 @@ use anchor_lang::prelude::*;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::state::{
-    compute_health, new_fixed_order_account_retriever, oracle_price, Book, BookSide, EventQueue, Group,
-    HealthType, MangoAccount, OrderType, PerpMarket, Side,
+    compute_health, new_fixed_order_account_retriever, oracle_price, Book, BookSide, EventQueue,
+    Group, HealthType, MangoAccount, OrderType, PerpMarket, Side,
 };
 
 #[derive(Accounts)]

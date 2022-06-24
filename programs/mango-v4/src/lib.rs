@@ -13,10 +13,10 @@ pub mod accounts_zerocopy;
 pub mod address_lookup_table;
 pub mod error;
 pub mod instructions;
+pub mod logs;
 mod serum3_cpi;
 pub mod state;
 pub mod types;
-pub mod logs;
 
 use state::{
     HealthType, OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex,

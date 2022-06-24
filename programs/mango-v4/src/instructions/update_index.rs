@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::logs::UpdateIndexLog;
-use crate::state::{Bank};
+use crate::state::Bank;
 
 #[derive(Accounts)]
 pub struct UpdateIndex<'info> {

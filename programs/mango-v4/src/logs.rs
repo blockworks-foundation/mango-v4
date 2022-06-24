@@ -1,4 +1,4 @@
-use crate::state::{PerpPositions, PerpMarket};
+use crate::state::{PerpMarket, PerpPositions};
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 use std::io::Write;
@@ -79,21 +79,21 @@ pub struct PerpBalanceLog {
 #[event]
 pub struct TokenBalanceLog {
     pub mango_account: Pubkey,
-    pub token_index: u16,    // IDL doesn't support usize
+    pub token_index: u16,       // IDL doesn't support usize
     pub indexed_position: i128, // on client convert i128 to I80F48 easily by passing in the BN to I80F48 ctor
-    pub deposit_index: i128, // I80F48
-    pub borrow_index: i128,  // I80F48
-    pub price: i128,         // I80F48
+    pub deposit_index: i128,    // I80F48
+    pub borrow_index: i128,     // I80F48
+    pub price: i128,            // I80F48
 }
 
 #[event]
 pub struct TokenBalancesLog {
     pub mango_accounts: Vec<Pubkey>,
-    pub token_indexes: Vec<u16>,    // IDL doesn't support usize
+    pub token_indexes: Vec<u16>,      // IDL doesn't support usize
     pub indexed_positions: Vec<i128>, // on client convert i128 to I80F48 easily by passing in the BN to I80F48 ctor
-    pub deposit_indexes: Vec<i128>, // I80F48
-    pub borrow_indexes: Vec<i128>,  // I80F48
-    pub prices: Vec<i128>,         // I80F48
+    pub deposit_indexes: Vec<i128>,   // I80F48
+    pub borrow_indexes: Vec<i128>,    // I80F48
+    pub prices: Vec<i128>,            // I80F48
 }
 
 #[event]
@@ -165,7 +165,7 @@ pub struct UpdateIndexLog {
     pub token_index: u16,
     pub deposit_index: i128, // I80F48
     pub borrow_index: i128,  // I80F48
-    // pub price: i128, // I80F48
+                             // pub price: i128, // I80F48
 }
 
 #[event]
