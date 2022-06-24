@@ -15,6 +15,7 @@ pub struct PerpCreateMarket<'info> {
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
 
+    /// CHECK: The oracle can be one of several different account types
     pub oracle: UncheckedAccount<'info>,
 
     #[account(

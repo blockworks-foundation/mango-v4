@@ -143,7 +143,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     {
         send_tx(
             solana,
-            MarginTradeInstruction {
+            FlashLoanInstruction {
                 account,
                 owner,
                 mango_token_bank: bank,
@@ -193,7 +193,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     {
         send_tx(
             solana,
-            MarginTradeInstruction {
+            FlashLoanInstruction {
                 account,
                 owner,
                 mango_token_bank: bank,
@@ -237,7 +237,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     {
         send_tx(
             solana,
-            MarginTradeInstruction {
+            FlashLoanInstruction {
                 account,
                 owner,
                 mango_token_bank: bank,
@@ -283,7 +283,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     {
         send_tx(
             solana,
-            MarginTradeInstruction {
+            FlashLoanInstruction {
                 account,
                 owner,
                 mango_token_bank: bank,

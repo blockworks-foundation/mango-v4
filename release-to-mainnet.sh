@@ -2,7 +2,7 @@
 
 set -e pipefail
 
-WALLET_WITH_FUNDS=~/.config/solana/mango-devnet.json
+WALLET_WITH_FUNDS=~/.config/solana/mango-mainnet.json
 PROGRAM_ID=m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD
 
 # TODO fix need for --skip-lint
@@ -19,16 +19,16 @@ cp -v ./target/types/mango_v4.ts ./ts/client/src/mango_v4.ts
 
 if [[ -z "${NO_DEPLOY}" ]]; then
     # publish program
-    solana --url https://mango.devnet.rpcpool.com program deploy --program-id $PROGRAM_ID  \
+    solana --url $CLUSTER_URL program deploy --program-id $PROGRAM_ID  \
         -k $WALLET_WITH_FUNDS target/deploy/mango_v4.so
 
-    # # publish idl
-    # anchor idl upgrade --provider.cluster https://mango.devnet.rpcpool.com --provider.wallet $WALLET_WITH_FUNDS \
-    #     --filepath target/idl/mango_v4.json $PROGRAM_ID
+    # publish idl
+    anchor idl upgrade --provider.cluster $CLUSTER_URL --provider.wallet $WALLET_WITH_FUNDS \
+        --filepath target/idl/mango_v4.json $PROGRAM_ID
 else
     echo "Skipping deployment..."
 fi
 
 
-# # build npm package
-# (cd ./ts/client && tsc)
+# build npm package
+(cd ./ts/client && tsc)

@@ -126,10 +126,15 @@ pub fn pubkey_from_u64_array(d: [u64; 4]) -> Pubkey {
 }
 
 pub struct InitOpenOrders<'info> {
+    /// CHECK: cpi
     pub program: AccountInfo<'info>,
+    /// CHECK: cpi
     pub market: AccountInfo<'info>,
+    /// CHECK: cpi
     pub open_orders: AccountInfo<'info>,
+    /// CHECK: cpi
     pub open_orders_authority: AccountInfo<'info>,
+    /// CHECK: cpi
     pub rent: AccountInfo<'info>,
 }
 
@@ -162,10 +167,15 @@ impl<'info> InitOpenOrders<'info> {
 }
 
 pub struct CloseOpenOrders<'info> {
+    /// CHECK: cpi
     pub program: AccountInfo<'info>,
+    /// CHECK: cpi
     pub market: AccountInfo<'info>,
+    /// CHECK: cpi
     pub open_orders: AccountInfo<'info>,
+    /// CHECK: cpi
     pub open_orders_authority: AccountInfo<'info>,
+    /// CHECK: cpi
     pub sol_destination: AccountInfo<'info>,
 }
 
@@ -198,15 +208,25 @@ impl<'info> CloseOpenOrders<'info> {
 }
 
 pub struct SettleFunds<'info> {
+    /// CHECK: cpi
     pub program: AccountInfo<'info>,
+    /// CHECK: cpi
     pub market: AccountInfo<'info>,
+    /// CHECK: cpi
     pub open_orders: AccountInfo<'info>,
+    /// CHECK: cpi
     pub open_orders_authority: AccountInfo<'info>,
+    /// CHECK: cpi
     pub base_vault: AccountInfo<'info>,
+    /// CHECK: cpi
     pub quote_vault: AccountInfo<'info>,
+    /// CHECK: cpi
     pub user_base_wallet: AccountInfo<'info>,
+    /// CHECK: cpi
     pub user_quote_wallet: AccountInfo<'info>,
+    /// CHECK: cpi
     pub vault_signer: AccountInfo<'info>,
+    /// CHECK: cpi
     pub token_program: AccountInfo<'info>,
 }
 
@@ -252,19 +272,31 @@ impl<'a> SettleFunds<'a> {
 }
 
 pub struct PlaceOrder<'info> {
+    /// CHECK: cpi
     pub program: AccountInfo<'info>,
+    /// CHECK: cpi
     pub market: AccountInfo<'info>,
+    /// CHECK: cpi
     pub request_queue: AccountInfo<'info>,
+    /// CHECK: cpi
     pub event_queue: AccountInfo<'info>,
+    /// CHECK: cpi
     pub bids: AccountInfo<'info>,
+    /// CHECK: cpi
     pub asks: AccountInfo<'info>,
+    /// CHECK: cpi
     pub base_vault: AccountInfo<'info>,
+    /// CHECK: cpi
     pub quote_vault: AccountInfo<'info>,
+    /// CHECK: cpi
     pub token_program: AccountInfo<'info>,
 
+    /// CHECK: cpi
     pub open_orders: AccountInfo<'info>,
+    /// CHECK: cpi
     pub order_payer_token_account: AccountInfo<'info>,
-    // must cover the open_orders and the order_payer_token_account
+    /// must cover the open_orders and the order_payer_token_account
+    /// CHECK: cpi
     pub user_authority: AccountInfo<'info>,
 }
 
@@ -317,13 +349,20 @@ impl<'a> PlaceOrder<'a> {
 }
 
 pub struct CancelOrder<'info> {
+    /// CHECK: cpi
     pub program: AccountInfo<'info>,
+    /// CHECK: cpi
     pub market: AccountInfo<'info>,
+    /// CHECK: cpi
     pub event_queue: AccountInfo<'info>,
+    /// CHECK: cpi
     pub bids: AccountInfo<'info>,
+    /// CHECK: cpi
     pub asks: AccountInfo<'info>,
 
+    /// CHECK: cpi
     pub open_orders: AccountInfo<'info>,
+    /// CHECK: cpi
     pub open_orders_authority: AccountInfo<'info>,
 }
 

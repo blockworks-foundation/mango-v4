@@ -6,8 +6,13 @@ import {
   initializeAccount,
   WRAPPED_SOL_MINT,
 } from '@project-serum/serum/lib/token-instructions';
-import { parsePriceData, PriceData } from '@pythnetwork/client';
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { parsePriceData } from '@pythnetwork/client';
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountInstruction,
+  createTransferInstruction,
+  TOKEN_PROGRAM_ID,
+} from '@solana/spl-token';
 import {
   AccountMeta,
   Cluster,
@@ -36,12 +41,12 @@ import {
 } from './accounts/serum3';
 import { SERUM3_PROGRAM_ID } from './constants';
 import { Id } from './ids';
-import {
-  buildOrcaInstruction,
-  ORCA_TOKEN_SWAP_ID_DEVNET,
-} from './integrations/orca/index';
+// import {
+//   buildOrcaInstruction,
+//   ORCA_TOKEN_SWAP_ID_DEVNET,
+// } from './integrations/orca/index';
 import { IDL, MangoV4 } from './mango_v4';
-import { MarginTradeWithdraw } from './types';
+import { FlashLoanWithdraw } from './types';
 import {
   getAssociatedTokenAddress,
   I64_MAX_BN,
@@ -122,6 +127,7 @@ export class MangoClient {
     const groups = (await this.program.account.group.all(filters)).map(
       (tuple) => Group.from(tuple.publicKey, tuple.account),
     );
+    console.log(groups);
     await groups[0].reloadAll(this);
     return groups[0];
   }
@@ -267,8 +273,6 @@ export class MangoClient {
       if (banks[index].name === 'USDC') {
         banks[index].price = 1;
       } else {
-        console.log('parsePriceData(price.data)', parsePriceData(price.data));
-
         banks[index].price = parsePriceData(price.data).previousPrice;
       }
     }
@@ -1135,41 +1139,131 @@ export class MangoClient {
         } as AccountMeta),
     );
 
-    const targetProgramId = ORCA_TOKEN_SWAP_ID_DEVNET;
-
-    const { instruction, signers } = await buildOrcaInstruction(
-      targetProgramId,
-      inputBank,
-      outputBank,
-      toU64(amountIn, 9),
-      toU64(minimumAmountOut, 6),
+    /*
+     *
+     * Find or create associated token account
+     *
+     */
+    let tokenAccountPk = await getAssociatedTokenAddress(
+      inputBank.mint,
+      mangoAccount.owner,
     );
-    const targetRemainingAccounts = instruction.keys;
+    const tokenAccExists =
+      await this.program.provider.connection.getAccountInfo(tokenAccountPk);
 
-    const withdraws: MarginTradeWithdraw[] = [
-      { index: 3, amount: toU64(amountIn, 9) },
+    let preInstructions = [];
+    if (!tokenAccExists) {
+      preInstructions.push(
+        createAssociatedTokenAccountInstruction(
+          mangoAccount.owner,
+          tokenAccountPk,
+          mangoAccount.owner,
+          inputBank.mint,
+          TOKEN_PROGRAM_ID,
+          ASSOCIATED_TOKEN_PROGRAM_ID,
+        ),
+      );
+    }
+
+    /*
+     *
+     * Borrow a token and transfer to wallet then transfer back
+     *
+     */
+    // TODO don't hard code decimal #
+    const decimals = 6;
+    const nativeAmount = toU64(amountIn, decimals);
+    const instructions: TransactionInstruction[] = [];
+    const transferIx = createTransferInstruction(
+      inputBank.vault,
+      tokenAccountPk,
+      inputBank.publicKey,
+      nativeAmount,
+      [],
+      TOKEN_PROGRAM_ID,
+    );
+    const inputBankKey = transferIx.keys[2];
+    transferIx.keys[2] = { ...inputBankKey, isWritable: true, isSigner: false };
+    instructions.push(transferIx);
+
+    const transferIx2 = createTransferInstruction(
+      tokenAccountPk,
+      inputBank.vault,
+      mangoAccount.owner,
+      nativeAmount,
+      [],
+      TOKEN_PROGRAM_ID,
+    );
+    instructions.push(transferIx2);
+
+    /*
+     *
+     * Build data objects for margin trade instructions
+     *
+     */
+    const targetRemainingAccounts = instructions
+      .map((ix) => [
+        {
+          pubkey: ix.programId,
+          isWritable: false,
+          isSigner: false,
+        } as AccountMeta,
+        ...ix.keys,
+      ])
+      .flat();
+
+    const vaultIndex = targetRemainingAccounts
+      .reverse()
+      .findIndex((k) => k.pubkey.equals(inputBank.vault));
+
+    targetRemainingAccounts.reverse();
+
+    const withdraws: FlashLoanWithdraw[] = [
+      {
+        index: targetRemainingAccounts.length - vaultIndex - 1,
+        amount: toU64(amountIn, inputBank.mintDecimals),
+      },
     ];
-    const cpiData = instruction.data;
+
+    let cpiDatas = [];
+    for (const [index, ix] of instructions.entries()) {
+      if (index === 0) {
+        cpiDatas.push({
+          accountStart: new BN(parsedHealthAccounts.length),
+          data: ix.data,
+        });
+      } else {
+        cpiDatas.push({
+          accountStart: cpiDatas[index - 1].accountStart.add(
+            new BN(instructions[index - 1].keys.length + 1),
+          ),
+          data: ix.data,
+        });
+      }
+    }
+
+    console.log('instruction1', transferIx);
+    console.log('instruction2', transferIx2);
+
+    console.log('cpiDatas', cpiDatas);
+    console.log(
+      'targetRemainingAccounts',
+      targetRemainingAccounts.map((t) => ({
+        ...t,
+        pubkey: t.pubkey.toString(),
+      })),
+    );
 
     return await this.program.methods
-      .marginTrade(withdraws, [
-        { accountStart: new BN(parsedHealthAccounts.length), data: cpiData },
-      ])
+      .flashLoan(withdraws, cpiDatas)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
-      .remainingAccounts([
-        ...parsedHealthAccounts,
-        {
-          pubkey: targetProgramId,
-          isWritable: false,
-          isSigner: false,
-        } as AccountMeta,
-        ...targetRemainingAccounts,
-      ])
-      .signers(signers)
+      .remainingAccounts([...parsedHealthAccounts, ...targetRemainingAccounts])
+      .preInstructions(preInstructions)
+      .signers([])
       .rpc({ skipPreflight: true });
   }
 
@@ -1221,10 +1315,10 @@ export class MangoClient {
     return new MangoClient(
       new Program<MangoV4>(
         idl as MangoV4,
-        new PublicKey(id.publicKey),
+        new PublicKey(id.mangoProgramId),
         provider,
       ),
-      new PublicKey(id.publicKey),
+      new PublicKey(id.mangoProgramId),
       id.cluster,
       groupName,
     );

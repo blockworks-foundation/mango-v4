@@ -45,7 +45,7 @@ pub fn liq_token_with_token(
     require!(liqee.is_bankrupt == 0, MangoError::IsBankrupt);
 
     // Initial liqee health check
-    let mut liqee_health_cache = health_cache_for_liqee(&liqee, &account_retriever)?;
+    let mut liqee_health_cache = new_health_cache(&liqee, &account_retriever)?;
     let init_health = liqee_health_cache.health(HealthType::Init)?;
     if liqee.being_liquidated != 0 {
         if init_health > I80F48::ZERO {

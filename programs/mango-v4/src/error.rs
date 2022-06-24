@@ -13,7 +13,7 @@ pub enum MangoError {
     #[msg("")]
     UnknownOracleType,
     #[msg("")]
-    InvalidMarginTradeTargetCpiProgram,
+    InvalidFlashLoanTargetCpiProgram,
     #[msg("")]
     HealthMustBePositive,
     #[msg("The account is bankrupt")]

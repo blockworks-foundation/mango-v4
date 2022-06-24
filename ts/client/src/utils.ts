@@ -1,7 +1,6 @@
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
-  u64,
 } from '@solana/spl-token';
 import { AccountMeta, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
@@ -81,7 +80,7 @@ export function toU64(amount: number, decimals): BN {
   const bn = toNativeDecimals(amount, decimals).toString();
   console.log('bn', bn);
 
-  return new u64(bn);
+  return new BN(bn);
 }
 
 export function nativeI80F48ToUi(amount: I80F48, decimals: number): I80F48 {

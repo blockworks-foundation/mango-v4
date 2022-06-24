@@ -20,7 +20,9 @@ pub struct Serum3CreateOpenOrders<'info> {
         has_one = serum_market_external,
     )]
     pub serum_market: AccountLoader<'info, Serum3Market>,
+    /// CHECK: The pubkey is checked and then it's passed to the serum cpi
     pub serum_program: UncheckedAccount<'info>,
+    /// CHECK: The pubkey is checked and then it's passed to the serum cpi
     pub serum_market_external: UncheckedAccount<'info>,
 
     // initialized by this instruction via cpi to serum
@@ -33,6 +35,7 @@ pub struct Serum3CreateOpenOrders<'info> {
         // 12 is the padding serum uses for accounts ("serum" prefix, "padding" postfix)
         space = 12 + std::mem::size_of::<serum_dex::state::OpenOrders>(),
     )]
+    /// CHECK: Newly created by serum cpi call
     pub open_orders: UncheckedAccount<'info>,
 
     pub owner: Signer<'info>,

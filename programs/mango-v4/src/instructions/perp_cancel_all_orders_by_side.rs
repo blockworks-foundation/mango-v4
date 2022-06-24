@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::error::MangoError;
-use crate::state::{Book, Group, MangoAccount, PerpMarket, Side};
+use crate::state::{Book, BookSide, Group, MangoAccount, PerpMarket, Side};
 
 #[derive(Accounts)]
 pub struct PerpCancelAllOrdersBySide<'info> {
@@ -22,9 +22,9 @@ pub struct PerpCancelAllOrdersBySide<'info> {
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]
-    pub asks: UncheckedAccount<'info>,
+    pub asks: AccountLoader<'info, BookSide>,
     #[account(mut)]
-    pub bids: UncheckedAccount<'info>,
+    pub bids: AccountLoader<'info, BookSide>,
 
     pub owner: Signer<'info>,
 }
@@ -38,9 +38,9 @@ pub fn perp_cancel_all_orders_by_side(
     require!(mango_account.is_bankrupt == 0, MangoError::IsBankrupt);
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
-    let bids = ctx.accounts.bids.as_ref();
-    let asks = ctx.accounts.asks.as_ref();
-    let mut book = Book::load_mut(bids, asks, &perp_market)?;
+    let bids = ctx.accounts.bids.load_mut()?;
+    let asks = ctx.accounts.asks.load_mut()?;
+    let mut book = Book::new(bids, asks);
 
     book.cancel_all_order(&mut mango_account, &mut perp_market, limit, side_option)?;
 

@@ -13,7 +13,7 @@ use solana_program::instruction::Instruction;
 use std::cell::Ref;
 use std::collections::HashMap;
 
-/// The margin trade instruction
+/// The flash loan instruction
 ///
 /// In addition to these accounts, there must be a sequence of remaining_accounts:
 /// 1. health_accounts: accounts needed for health checking
@@ -26,7 +26,7 @@ use std::collections::HashMap;
 /// Every vault that is to be withdrawn from must appear in the `withdraws` instruction argument.
 /// The corresponding bank may be used as an authority for vault withdrawals.
 #[derive(Accounts)]
-pub struct MarginTrade<'info> {
+pub struct FlashLoan<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
@@ -40,6 +40,7 @@ pub struct MarginTrade<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+#[derive(Debug)]
 struct AllowedVault {
     /// index of the vault in cpi_ais
     vault_cpi_ai_index: usize,
@@ -55,27 +56,27 @@ struct AllowedVault {
     loan_amount: I80F48,
 }
 
-#[derive(AnchorDeserialize, AnchorSerialize, Clone, Copy)]
-pub struct MarginTradeWithdraw {
+#[derive(AnchorDeserialize, AnchorSerialize, Clone, Copy, Debug)]
+pub struct FlashLoanWithdraw {
     /// Account index of the vault to withdraw from in the target_accounts section.
-    /// Meaning that the first account after target_program_id would have index 0.
+    /// Index is counted after health accounts.
     pub index: u8,
     /// Requested withdraw amount.
     pub amount: u64,
 }
 
-#[derive(AnchorDeserialize, AnchorSerialize)]
+#[derive(AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct CpiData {
     pub account_start: u8,
     pub data: Vec<u8>,
 }
 
-/// - `withdraws` is a list of MarginTradeWithdraw requests.
+/// - `withdraws` is a list of FlashLoanWithdraw requests.
 /// - `cpi_datas` is a list of bytes per cpi to call the target_program_id with.
 /// - `cpi_account_starts` is a list of index into the remaining accounts per cpi to call the target_program_id with.
-pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
-    ctx: Context<'key, 'accounts, 'remaining, 'info, MarginTrade<'info>>,
-    withdraws: Vec<MarginTradeWithdraw>,
+pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
+    ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan<'info>>,
+    withdraws: Vec<FlashLoanWithdraw>,
     cpi_datas: Vec<CpiData>,
 ) -> Result<()> {
     require!(!cpi_datas.is_empty(), MangoError::SomeError);
@@ -123,7 +124,7 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
     require!(pre_cpi_health >= 0, MangoError::HealthMustBePositive);
     msg!("pre_cpi_health {:?}", pre_cpi_health);
 
-    let all_cpi_ais = &ctx.remaining_accounts[num_health_accounts + 1..];
+    let all_cpi_ais = &ctx.remaining_accounts[num_health_accounts..];
     let mut all_cpi_ams = all_cpi_ais
         .iter()
         .flat_map(|item| item.to_account_metas(None))
@@ -241,6 +242,11 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
         }
     }
 
+    msg!("withdraws {:#?}", withdraws);
+    msg!("cpi_datas {:#?}", cpi_datas);
+    msg!("allowed_vaults {:#?}", allowed_vaults);
+    msg!("used_vaults {:#?}", used_vaults);
+
     // get rid of Ref<> to avoid limiting the cpi call
     drop(allowed_banks);
     drop(group);
@@ -271,7 +277,7 @@ pub fn margin_trade<'key, 'accounts, 'remaining, 'info>(
             cpi_datas[cpi_index + 1].account_start as usize - num_health_accounts
         };
 
-        let all_cpi_ais_start_index = cpi_account_start - num_health_accounts;
+        let all_cpi_ais_start_index = cpi_account_start - num_health_accounts + 1;
 
         let cpi_ais = &all_cpi_ais[all_cpi_ais_start_index..all_cpi_ais_end_index];
         let cpi_ams = &all_cpi_ams[all_cpi_ais_start_index..all_cpi_ais_end_index];

@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::state::{
-    compute_health, new_fixed_order_account_retriever, oracle_price, Book, EventQueue, Group,
+    compute_health_from_fixed_accounts, oracle_price, Book, BookSide, EventQueue, Group,
     HealthType, MangoAccount, OrderType, PerpMarket, Side,
 };
 
@@ -28,12 +28,13 @@ pub struct PerpPlaceOrder<'info> {
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]
-    pub asks: UncheckedAccount<'info>,
+    pub asks: AccountLoader<'info, BookSide>,
     #[account(mut)]
-    pub bids: UncheckedAccount<'info>,
+    pub bids: AccountLoader<'info, BookSide>,
     #[account(mut)]
     pub event_queue: AccountLoader<'info, EventQueue>,
 
+    /// CHECK: The oracle can be one of several different account types and the pubkey is checked above
     pub oracle: UncheckedAccount<'info>,
 
     pub owner: Signer<'info>,
@@ -84,9 +85,9 @@ pub fn perp_place_order(
 
     {
         let mut perp_market = ctx.accounts.perp_market.load_mut()?;
-        let bids = ctx.accounts.bids.as_ref();
-        let asks = ctx.accounts.asks.as_ref();
-        let mut book = Book::load_mut(bids, asks, &perp_market)?;
+        let bids = ctx.accounts.bids.load_mut()?;
+        let asks = ctx.accounts.asks.load_mut()?;
+        let mut book = Book::new(bids, asks);
 
         let mut event_queue = ctx.accounts.event_queue.load_mut()?;
 
@@ -131,8 +132,11 @@ pub fn perp_place_order(
         )?;
     }
 
-    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &mango_account)?;
-    let health = compute_health(&mango_account, HealthType::Init, &retriever)?;
+    let health = compute_health_from_fixed_accounts(
+        &mango_account,
+        HealthType::Init,
+        ctx.remaining_accounts,
+    )?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
 
