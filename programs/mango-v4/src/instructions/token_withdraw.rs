@@ -107,7 +107,6 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     };
 
     let indexed_position = position.indexed_position;
-    drop(position);
 
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
     let (_, oracle_price) = retriever.bank_and_oracle(

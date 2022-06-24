@@ -72,7 +72,6 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     token::transfer(ctx.accounts.transfer_ctx(), amount)?;
 
     let indexed_position = position.indexed_position;
-    drop(position);
 
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
     let (_, oracle_price) = retriever.bank_and_oracle(
