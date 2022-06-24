@@ -163,26 +163,26 @@ pub fn liq_token_with_token(
             asset_token_index,
             liab_token_index,
         ];
-        let indexed_values = vec![
+        let indexed_positions = vec![
             liqee
                 .tokens
                 .get_mut(asset_token_index)?
-                .indexed_value
+                .indexed_position
                 .to_bits(),
             liqee
                 .tokens
                 .get_mut(liab_token_index)?
-                .indexed_value
+                .indexed_position
                 .to_bits(),
             liqor
                 .tokens
                 .get_mut(asset_token_index)?
-                .indexed_value
+                .indexed_position
                 .to_bits(),
             liqor
                 .tokens
                 .get_mut(liab_token_index)?
-                .indexed_value
+                .indexed_position
                 .to_bits(),
         ];
         let deposit_indexes = vec![
@@ -211,7 +211,7 @@ pub fn liq_token_with_token(
         emit!(TokenBalancesLog {
             mango_accounts,
             token_indexes,
-            indexed_values,
+            indexed_positions,
             deposit_indexes,
             borrow_indexes,
             prices,

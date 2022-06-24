@@ -1,4 +1,4 @@
-use crate::state::{PerpAccount, PerpMarket};
+use crate::state::{PerpPositions, PerpMarket};
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 use std::io::Write;
@@ -47,16 +47,16 @@ pub fn emit_perp_balances(
     mango_account: Pubkey,
     market_index: u64,
     price: i64,
-    pa: &PerpAccount,
+    pp: &PerpPositions,
     pm: &PerpMarket,
 ) {
     mango_emit_stack::<_, 256>(PerpBalanceLog {
         mango_account: mango_account,
         market_index: market_index,
-        base_position: pa.base_position_lots,
-        quote_position: pa.quote_position_native.to_bits(),
-        long_settled_funding: pa.long_settled_funding.to_bits(),
-        short_settled_funding: pa.short_settled_funding.to_bits(),
+        base_position: pp.base_position_lots,
+        quote_position: pp.quote_position_native.to_bits(),
+        long_settled_funding: pp.long_settled_funding.to_bits(),
+        short_settled_funding: pp.short_settled_funding.to_bits(),
         price,
         long_funding: pm.long_funding.to_bits(),
         short_funding: pm.short_funding.to_bits(),
@@ -80,7 +80,7 @@ pub struct PerpBalanceLog {
 pub struct TokenBalanceLog {
     pub mango_account: Pubkey,
     pub token_index: u16,    // IDL doesn't support usize
-    pub indexed_value: i128, // on client convert i128 to I80F48 easily by passing in the BN to I80F48 ctor
+    pub indexed_position: i128, // on client convert i128 to I80F48 easily by passing in the BN to I80F48 ctor
     pub deposit_index: i128, // I80F48
     pub borrow_index: i128,  // I80F48
     pub price: i128,         // I80F48
@@ -90,7 +90,7 @@ pub struct TokenBalanceLog {
 pub struct TokenBalancesLog {
     pub mango_accounts: Vec<Pubkey>,
     pub token_indexes: Vec<u16>,    // IDL doesn't support usize
-    pub indexed_values: Vec<i128>, // on client convert i128 to I80F48 easily by passing in the BN to I80F48 ctor
+    pub indexed_positions: Vec<i128>, // on client convert i128 to I80F48 easily by passing in the BN to I80F48 ctor
     pub deposit_indexes: Vec<i128>, // I80F48
     pub borrow_indexes: Vec<i128>,  // I80F48
     pub prices: Vec<i128>,         // I80F48
@@ -100,8 +100,8 @@ pub struct TokenBalancesLog {
 pub struct MarginTradeLog {
     pub mango_account: Pubkey,
     pub token_indexes: Vec<u16>,
-    pub pre_indexed_values: Vec<i128>,
-    pub post_indexed_values: Vec<i128>,
+    pub pre_indexed_positions: Vec<i128>,
+    pub post_indexed_positions: Vec<i128>,
 }
 
 #[event]
