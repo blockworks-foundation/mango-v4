@@ -62,7 +62,7 @@ async function main() {
       inputToken: 'USDC',
       amountIn: 0.001,
       outputToken: 'SOL',
-      minimumAmountOut: 0.1,
+      slippage: 1,
     });
     console.log(
       `sig https://explorer.solana.com/address/${sig}?cluster=devnet`,

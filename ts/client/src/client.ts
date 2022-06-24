@@ -1221,12 +1221,30 @@ export class MangoClient {
       forceFetch: false, // false is the default value => will use cache if not older than routeCacheDuration
     });
 
+    console.log('routes', routes);
+
+    const routesInfosWithoutRaydium = routes.routesInfos.filter((r) => {
+      if (r.marketInfos.length > 1) {
+        for (const mkt of r.marketInfos) {
+          if (mkt.amm.label === 'Raydium' || mkt.amm.label === 'Serum')
+            return false;
+        }
+      }
+      return true;
+    });
+    console.log('routesInfosWithoutRaydium', routesInfosWithoutRaydium);
+
+    const selectedRoute = routesInfosWithoutRaydium[0];
+
+    console.log('outAmount', selectedRoute.outAmount);
+    console.log('outAmountWithSlippage', selectedRoute.outAmountWithSlippage);
+
     console.log(
-      `route found: ${routes.routesInfos[0].marketInfos[0].amm.label}. generating jup transaction`,
+      `route found: ${selectedRoute.marketInfos[0].amm.label}. generating jup transaction`,
     );
 
     const { transactions } = await jupiter.exchange({
-      routeInfo: routes.routesInfos[0],
+      routeInfo: selectedRoute,
     });
     console.log('Jupiter Transactions:', transactions);
     const { setupTransaction, swapTransaction } = transactions;
@@ -1246,7 +1264,7 @@ export class MangoClient {
       outputBank.vault,
       mangoAccount.owner,
       [],
-      nativeInputAmount,
+      selectedRoute.outAmountWithSlippage,
     );
     instructions.push(transferIx2);
 
@@ -1268,11 +1286,9 @@ export class MangoClient {
       .map((x) => x.pubkey.toString())
       .lastIndexOf(inputBank.vault.toString());
 
-    targetRemainingAccounts.reverse();
-
     const withdraws: FlashLoanWithdraw[] = [
       {
-        index: targetRemainingAccounts.length - vaultIndex - 1,
+        index: vaultIndex,
         amount: toU64(amountIn, inputBank.mintDecimals),
       },
     ];
