@@ -50,6 +50,14 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
     pub begin_serum3: usize,
 }
 
+impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
+    fn bank(&self, group: &Pubkey, account_index: usize) -> Result<&Bank> {
+        let bank = self.ais[account_index].load::<Bank>()?;
+        require!(&bank.group == group, MangoError::SomeError);
+        Ok(bank)
+    }
+}
+
 impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
     fn bank_and_oracle(
         &self,
@@ -57,8 +65,7 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
         account_index: usize,
         token_index: TokenIndex,
     ) -> Result<(&Bank, I80F48)> {
-        let bank = self.ais[account_index].load::<Bank>()?;
-        require!(&bank.group == group, MangoError::SomeError);
+        let bank = self.bank(group, account_index)?;
         require!(bank.token_index == token_index, MangoError::SomeError);
         let oracle = &self.ais[cm!(self.n_banks + account_index)];
         require!(&bank.oracle == oracle.key(), MangoError::SomeError);
