@@ -142,6 +142,19 @@ pub mod mango_v4 {
         instructions::flash_loan(ctx, withdraws, cpi_datas)
     }
 
+    pub fn flash_loan2_begin<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan2Begin<'info>>,
+        loan_amounts: Vec<u64>,
+    ) -> Result<()> {
+        instructions::flash_loan2_begin(ctx, loan_amounts)
+    }
+
+    pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan2End<'info>>,
+    ) -> Result<()> {
+        instructions::flash_loan2_end(ctx)
+    }
+
     ///
     /// Serum
     ///
