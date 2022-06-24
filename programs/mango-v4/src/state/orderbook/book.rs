@@ -5,7 +5,7 @@ use crate::{
     error::MangoError,
     state::{
         orderbook::{bookside::BookSide, nodes::LeafNode},
-        EventQueue, MangoAccount, MangoAccountPerps, PerpMarket, FREE_ORDER_SLOT,
+        EventQueue, MangoAccount, MangoAccountPerpPositions, PerpMarket, FREE_ORDER_SLOT,
         MAX_PERP_OPEN_ORDERS,
     },
 };
@@ -47,6 +47,10 @@ pub struct Book<'a> {
 }
 
 impl<'a> Book<'a> {
+    pub fn new(bids: RefMut<'a, BookSide>, asks: RefMut<'a, BookSide>) -> Self {
+        Self { bids, asks }
+    }
+
     pub fn load_mut(
         bids_ai: &'a AccountInfo,
         asks_ai: &'a AccountInfo,
@@ -54,10 +58,10 @@ impl<'a> Book<'a> {
     ) -> std::result::Result<Self, Error> {
         require!(bids_ai.key == &perp_market.bids, MangoError::SomeError);
         require!(asks_ai.key == &perp_market.asks, MangoError::SomeError);
-        Ok(Self {
-            bids: bids_ai.load_mut::<BookSide>()?,
-            asks: asks_ai.load_mut::<BookSide>()?,
-        })
+        Ok(Self::new(
+            bids_ai.load_mut::<BookSide>()?,
+            asks_ai.load_mut::<BookSide>()?,
+        ))
     }
 
     pub fn get_bookside(&mut self, side: Side) -> &mut BookSide {
@@ -155,7 +159,7 @@ impl<'a> Book<'a> {
         perp_market: &mut PerpMarket,
         event_queue: &mut EventQueue,
         oracle_price: I80F48,
-        mango_account_perps: &mut MangoAccountPerps,
+        mango_account_perps: &mut MangoAccountPerpPositions,
         mango_account_pk: &Pubkey,
         price_lots: i64,
         max_base_lots: i64,
@@ -437,7 +441,7 @@ impl<'a> Book<'a> {
 /// both the maker and taker fees.
 fn apply_fees(
     market: &mut PerpMarket,
-    mango_account_perps: &mut MangoAccountPerps,
+    mango_account_perps: &mut MangoAccountPerpPositions,
     total_quote_taken: i64,
 ) -> Result<()> {
     let taker_quote_native = I80F48::from_num(

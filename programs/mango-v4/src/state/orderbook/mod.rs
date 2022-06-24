@@ -15,7 +15,7 @@ pub mod queue;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::{MangoAccountPerps, PerpMarket, FREE_ORDER_SLOT};
+    use crate::state::{MangoAccountPerpPositions, PerpMarket, FREE_ORDER_SLOT};
     use bytemuck::Zeroable;
     use fixed::types::I80F48;
     use solana_program::pubkey::Pubkey;
@@ -99,7 +99,7 @@ mod tests {
 
         let mut new_order =
             |book: &mut Book, event_queue: &mut EventQueue, side, price, now_ts| -> i128 {
-                let mut account_perps = MangoAccountPerps::new();
+                let mut account_perps = MangoAccountPerpPositions::new();
 
                 let quantity = 1;
                 let tif = 100;
@@ -193,8 +193,8 @@ mod tests {
         market.maker_fee = I80F48::from_num(-0.001f64);
         market.taker_fee = I80F48::from_num(0.01f64);
 
-        let mut maker = MangoAccountPerps::new();
-        let mut taker = MangoAccountPerps::new();
+        let mut maker = MangoAccountPerpPositions::new();
+        let mut taker = MangoAccountPerpPositions::new();
         let maker_pk = Pubkey::new_unique();
         let taker_pk = Pubkey::new_unique();
         let now_ts = 1000000;

@@ -1,8 +1,8 @@
 import { Group } from './accounts/group';
 import {
   MangoAccount,
-  TokenAccount,
-  TokenAccountDto,
+  TokenPosition,
+  TokenPositionDto,
 } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
 import { MangoClient } from './client';
@@ -16,13 +16,13 @@ export {
   Serum3Side,
 } from './accounts/serum3';
 export * from './constants';
-export * from './integrations/orca/index';
+// export * from './integrations/orca/index';
 export {
   Group,
   StubOracle,
   MangoAccount,
-  TokenAccount,
-  TokenAccountDto,
+  TokenPosition as TokenAccount,
+  TokenPositionDto,
   MangoClient,
   MANGO_V4_ID,
 };

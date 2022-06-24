@@ -21,6 +21,7 @@ pub struct Serum3DeregisterMarket<'info> {
     pub serum_market: AccountLoader<'info, Serum3Market>,
 
     #[account(mut)]
+    /// CHECK: target for account rent needs no checks
     pub sol_destination: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,

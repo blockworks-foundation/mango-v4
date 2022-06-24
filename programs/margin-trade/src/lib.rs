@@ -54,6 +54,7 @@ impl anchor_lang::Id for MarginTrade {
 #[derive(Accounts)]
 
 pub struct MarginTradeCtx<'info> {
+    /// CHECK: Used as authority for withdraw_account
     pub withdraw_account_owner: UncheckedAccount<'info>,
 
     #[account(mut)]
@@ -62,8 +63,7 @@ pub struct MarginTradeCtx<'info> {
     #[account(mut)]
     pub deposit_account: Account<'info, TokenAccount>,
 
-    // todo: can we do better than UncheckedAccount?
-    /// CHECK
+    /// CHECK: Used as authority for deposit_account
     pub deposit_account_owner: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,

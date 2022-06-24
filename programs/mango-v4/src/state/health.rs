@@ -303,38 +303,13 @@ pub enum HealthType {
     Maint,
 }
 
-/// Computes health for a mango account given a set of account infos
-///
-/// These account infos must fit the fixed layout defined by FixedOrderAccountRetriever.
-// pub fn compute_health_from_fixed_accounts(
-//     account: &MangoAccount,
-//     health_type: HealthType,
-//     retriever: FixedOrderAccountRetriever<AccountInfoRef>,
-// ) -> Result<I80F48> {
-//     compute_health_detail(account, &retriever, health_type, true)?.health(health_type)
-// }
-
 /// Compute health with an arbitrary AccountRetriever
 pub fn compute_health(
     account: &MangoAccount,
     health_type: HealthType,
     retriever: &impl AccountRetriever,
 ) -> Result<I80F48> {
-    compute_health_detail(account, retriever, health_type, true)?.health(health_type)
-}
-
-/// Compute health for a liqee.
-///
-/// This has the advantage of returning a HealthCache, allowing for health
-/// to be recomputed after token balance changes due to liquidation.
-///
-/// However, this only works if the serum3 open orders accounts have been
-/// fully settled (like via serum3_liq_force_cancel_orders).
-pub fn health_cache_for_liqee(
-    account: &MangoAccount,
-    retriever: &impl AccountRetriever,
-) -> Result<HealthCache> {
-    compute_health_detail(account, retriever, HealthType::Init, false)
+    new_health_cache(account, retriever)?.health(health_type)
 }
 
 struct TokenInfo {
@@ -346,6 +321,8 @@ struct TokenInfo {
     oracle_price: I80F48, // native/native
     // in health-reference-token native units
     balance: I80F48,
+    // in health-reference-token native units
+    serum3_max_reserved: I80F48,
 }
 
 impl TokenInfo {
@@ -363,6 +340,51 @@ impl TokenInfo {
             HealthType::Init => self.init_liab_weight,
             HealthType::Maint => self.maint_liab_weight,
         }
+    }
+}
+
+struct Serum3Info {
+    reserved: I80F48,
+    base_index: usize,
+    quote_index: usize,
+}
+
+impl Serum3Info {
+    #[inline(always)]
+    fn health_contribution(&self, health_type: HealthType, token_infos: &[TokenInfo]) -> I80F48 {
+        let base_info = &token_infos[self.base_index];
+        let quote_info = &token_infos[self.quote_index];
+        let reserved = self.reserved;
+
+        if reserved.is_zero() {
+            return I80F48::ZERO;
+        }
+
+        // How much the health would increase if the reserved balance were applied to the passed
+        // token info?
+        let compute_health_effect = |token_info: &TokenInfo| {
+            // This balance includes all possible reserved funds from markets that relate to the
+            // token, including this market itself: `reserved` is already included in `max_balance`.
+            let max_balance = cm!(token_info.balance + token_info.serum3_max_reserved);
+
+            // Assuming `reserved` was added to `max_balance` last (because that gives the smallest
+            // health effects): how much did health change because of it?
+            let (asset_part, liab_part) = if max_balance >= reserved {
+                (reserved, I80F48::ZERO)
+            } else if max_balance.is_negative() {
+                (I80F48::ZERO, reserved)
+            } else {
+                (max_balance, cm!(reserved - max_balance))
+            };
+
+            let asset_weight = token_info.asset_weight(health_type);
+            let liab_weight = token_info.liab_weight(health_type);
+            cm!(asset_weight * asset_part + liab_weight * liab_part)
+        };
+
+        let reserved_as_base = compute_health_effect(base_info);
+        let reserved_as_quote = compute_health_effect(quote_info);
+        reserved_as_base.min(reserved_as_quote)
     }
 }
 
@@ -406,6 +428,7 @@ impl PerpInfo {
 
 pub struct HealthCache {
     token_infos: Vec<TokenInfo>,
+    serum3_infos: Vec<Serum3Info>,
     perp_infos: Vec<PerpInfo>,
 }
 
@@ -414,6 +437,10 @@ impl HealthCache {
         let mut health = I80F48::ZERO;
         for token_info in self.token_infos.iter() {
             let contrib = health_contribution(health_type, token_info, token_info.balance)?;
+            health = cm!(health + contrib);
+        }
+        for serum3_info in self.serum3_infos.iter() {
+            let contrib = serum3_info.health_contribution(health_type, &self.token_infos);
             health = cm!(health + contrib);
         }
         for perp_info in self.perp_infos.iter() {
@@ -451,29 +478,10 @@ fn health_contribution(
     Ok(cm!(balance * weight))
 }
 
-/// Compute health contribution of two tokens - pure convenience
-#[inline(always)]
-fn pair_health(
-    health_type: HealthType,
-    info1: &TokenInfo,
-    balance1: I80F48,
-    info2: &TokenInfo,
-) -> Result<I80F48> {
-    let health1 = health_contribution(health_type, info1, balance1)?;
-    let health2 = health_contribution(health_type, info2, info2.balance)?;
-    Ok(cm!(health1 + health2))
-}
-
-/// The HealthInfo returned from this function is specialized for the health_type
-/// unless called with allow_serum3=false.
-///
-/// The reason is that the health type used can affect the way funds reserved for
-/// orders get distributed to the token balances.
-fn compute_health_detail(
+/// Generate a HealthCache for an account and its health accounts.
+pub fn new_health_cache(
     account: &MangoAccount,
     retriever: &impl AccountRetriever,
-    health_type: HealthType,
-    allow_serum3: bool,
 ) -> Result<HealthCache> {
     // token contribution from token accounts
     let mut token_infos = vec![];
@@ -500,21 +508,15 @@ fn compute_health_detail(
             init_liab_weight: bank.init_liab_weight,
             oracle_price,
             balance: cm!(native * oracle_price),
+            serum3_max_reserved: I80F48::ZERO,
         });
     }
 
-    // token contribution from serum accounts
+    // Fill the TokenInfo balance with free funds in serum3 oo accounts, and fill
+    // the serum3_max_reserved with their reserved funds. Also build Serum3Infos.
+    let mut serum3_infos = vec![];
     for (i, serum_account) in account.serum3.iter_active().enumerate() {
         let oo = retriever.serum_oo(i, &serum_account.open_orders)?;
-        if !allow_serum3 {
-            require!(
-                oo.native_coin_total == 0
-                    && oo.native_pc_total == 0
-                    && oo.referrer_rebates_accrued == 0,
-                MangoError::SomeError
-            );
-            continue;
-        }
 
         // find the TokenInfos for the market's base and quote tokens
         let base_index = find_token_info_index(&token_infos, serum_account.base_token_index)?;
@@ -533,22 +535,19 @@ fn compute_health_detail(
         base_info.balance = cm!(base_info.balance + base_free * base_info.oracle_price);
         quote_info.balance = cm!(quote_info.balance + quote_free * quote_info.oracle_price);
 
-        // for the amounts that are reserved for orders, compute the worst case for health
-        // by checking if everything-is-base or everything-is-quote produces worse
-        // outcomes
+        // add the reserved amount to both sides, to have the worst-case covered
         let reserved_base = I80F48::from_num(cm!(oo.native_coin_total - oo.native_coin_free));
         let reserved_quote = I80F48::from_num(cm!(oo.native_pc_total - oo.native_pc_free));
         let reserved_balance =
             cm!(reserved_base * base_info.oracle_price + reserved_quote * quote_info.oracle_price);
-        let all_in_base = cm!(base_info.balance + reserved_balance);
-        let all_in_quote = cm!(quote_info.balance + reserved_balance);
-        if pair_health(health_type, base_info, all_in_base, quote_info)?
-            < pair_health(health_type, quote_info, all_in_quote, base_info)?
-        {
-            base_info.balance = all_in_base;
-        } else {
-            quote_info.balance = all_in_quote;
-        }
+        base_info.serum3_max_reserved = cm!(base_info.serum3_max_reserved + reserved_balance);
+        quote_info.serum3_max_reserved = cm!(quote_info.serum3_max_reserved + reserved_balance);
+
+        serum3_infos.push(Serum3Info {
+            reserved: reserved_balance,
+            base_index,
+            quote_index,
+        });
     }
 
     // health contribution from perp accounts
@@ -638,6 +637,7 @@ fn compute_health_detail(
 
     Ok(HealthCache {
         token_infos,
+        serum3_infos,
         perp_infos,
     })
 }
@@ -910,7 +910,9 @@ mod tests {
     struct TestHealth1Case {
         token1: i64,
         token2: i64,
+        token3: i64,
         oo_1_2: (u64, u64),
+        oo_1_3: (u64, u64),
         perp1: (i64, i64, i64, i64),
         expected_health: f64,
     }
@@ -920,6 +922,7 @@ mod tests {
 
         let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
         let (mut bank2, mut oracle2) = mock_bank_and_oracle(group, 4, 5.0, 0.5, 0.3);
+        let (mut bank3, mut oracle3) = mock_bank_and_oracle(group, 5, 10.0, 0.5, 0.3);
         bank1
             .data()
             .change_without_fee(
@@ -934,14 +937,29 @@ mod tests {
                 I80F48::from(testcase.token2),
             )
             .unwrap();
+        bank3
+            .data()
+            .change_without_fee(
+                account.tokens.get_mut_or_create(5).unwrap().0,
+                I80F48::from(testcase.token3),
+            )
+            .unwrap();
 
         let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
-        let serum3account = account.serum3.create(2).unwrap();
-        serum3account.open_orders = oo1.pubkey;
-        serum3account.base_token_index = 4;
-        serum3account.quote_token_index = 1;
+        let serum3account1 = account.serum3.create(2).unwrap();
+        serum3account1.open_orders = oo1.pubkey;
+        serum3account1.base_token_index = 4;
+        serum3account1.quote_token_index = 1;
         oo1.data().native_pc_total = testcase.oo_1_2.0;
         oo1.data().native_coin_total = testcase.oo_1_2.1;
+
+        let mut oo2 = TestAccount::<OpenOrders>::new_zeroed();
+        let serum3account2 = account.serum3.create(3).unwrap();
+        serum3account2.open_orders = oo2.pubkey;
+        serum3account2.base_token_index = 5;
+        serum3account2.quote_token_index = 1;
+        oo2.data().native_pc_total = testcase.oo_1_3.0;
+        oo2.data().native_coin_total = testcase.oo_1_3.1;
 
         let mut perp1 = TestAccount::<PerpMarket>::new_zeroed();
         perp1.data().group = group;
@@ -963,10 +981,13 @@ mod tests {
         let ais = vec![
             bank1.as_account_info(),
             bank2.as_account_info(),
+            bank3.as_account_info(),
             oracle1.as_account_info(),
             oracle2.as_account_info(),
+            oracle3.as_account_info(),
             perp1.as_account_info(),
             oo1.as_account_info(),
+            oo2.as_account_info(),
         ];
 
         let retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
@@ -992,7 +1013,7 @@ mod tests {
         let base_price = 5.0;
         let base_lots_to_quote = 10.0 * base_price;
         let testcases = vec![
-            TestHealth1Case {
+            TestHealth1Case { // 0
                 token1: 100,
                 token2: -10,
                 oo_1_2: (20, 15),
@@ -1004,8 +1025,9 @@ mod tests {
                     - 10.0 * base_price * 1.5
                     // for perp (scenario: bids execute)
                     + (3.0 + 7.0) * base_lots_to_quote * 0.8 + (-131.0 - 7.0 * base_lots_to_quote),
+                ..Default::default()
             },
-            TestHealth1Case {
+            TestHealth1Case { // 1
                 token1: -100,
                 token2: 10,
                 oo_1_2: (20, 15),
@@ -1017,25 +1039,88 @@ mod tests {
                     + (10.0 * base_price + (20.0 + 15.0 * base_price)) * 0.5
                     // for perp (scenario: asks execute)
                     + (-10.0 - 11.0) * base_lots_to_quote * 1.2 + (-131.0 + 11.0 * base_lots_to_quote),
+                ..Default::default()
             },
             TestHealth1Case {
+                // 2
                 perp1: (-1, 100, 0, 0),
                 expected_health: 0.0,
                 ..Default::default()
             },
             TestHealth1Case {
+                // 3
                 perp1: (1, -100, 0, 0),
                 expected_health: -100.0 + 0.8 * 1.0 * base_lots_to_quote,
                 ..Default::default()
             },
             TestHealth1Case {
+                // 4
                 perp1: (10, 100, 0, 0),
                 expected_health: 0.0,
                 ..Default::default()
             },
             TestHealth1Case {
+                // 5
                 perp1: (30, -100, 0, 0),
                 expected_health: 0.0,
+                ..Default::default()
+            },
+            TestHealth1Case { // 6, reserved oo funds
+                token1: -100,
+                token2: -10,
+                token3: -10,
+                oo_1_2: (1, 1),
+                oo_1_3: (1, 1),
+                expected_health:
+                    // tokens
+                    -100.0 * 1.2 - 10.0 * 5.0 * 1.5 - 10.0 * 10.0 * 1.5
+                    // oo_1_2 (-> token1)
+                    + (1.0 + 5.0) * 1.2
+                    // oo_1_3 (-> token1)
+                    + (1.0 + 10.0) * 1.2,
+                ..Default::default()
+            },
+            TestHealth1Case { // 7, reserved oo funds cross the zero balance level
+                token1: -14,
+                token2: -10,
+                token3: -10,
+                oo_1_2: (1, 1),
+                oo_1_3: (1, 1),
+                expected_health:
+                    // tokens
+                    -14.0 * 1.2 - 10.0 * 5.0 * 1.5 - 10.0 * 10.0 * 1.5
+                    // oo_1_2 (-> token1)
+                    + 3.0 * 1.2 + 3.0 * 0.8
+                    // oo_1_3 (-> token1)
+                    + 8.0 * 1.2 + 3.0 * 0.8,
+                ..Default::default()
+            },
+            TestHealth1Case { // 8, reserved oo funds in a non-quote currency
+                token1: -100,
+                token2: -100,
+                token3: -1,
+                oo_1_2: (0, 0),
+                oo_1_3: (10, 1),
+                expected_health:
+                    // tokens
+                    -100.0 * 1.2 - 100.0 * 5.0 * 1.5 - 10.0 * 1.5
+                    // oo_1_3 (-> token3)
+                    + 10.0 * 1.5 + 10.0 * 0.5,
+                ..Default::default()
+            },
+            TestHealth1Case { // 9, like 8 but oo_1_2 flips the oo_1_3 target
+                token1: -100,
+                token2: -100,
+                token3: -1,
+                oo_1_2: (100, 0),
+                oo_1_3: (10, 1),
+                expected_health:
+                    // tokens
+                    -100.0 * 1.2 - 100.0 * 5.0 * 1.5 - 10.0 * 1.5
+                    // oo_1_2 (-> token1)
+                    + 80.0 * 1.2 + 20.0 * 0.8
+                    // oo_1_3 (-> token1)
+                    + 20.0 * 0.8,
                 ..Default::default()
             },
         ];

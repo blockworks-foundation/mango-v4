@@ -71,7 +71,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     // Transfer the actual tokens
     token::transfer(ctx.accounts.transfer_ctx(), amount)?;
 
-    let indexed_value = position.indexed_value;
+    let indexed_position = position.indexed_position;
     drop(position);
 
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
@@ -83,7 +83,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     emit!(TokenBalanceLog {
         mango_account: ctx.accounts.account.key(),
         token_index: token_index,
-        indexed_value: indexed_value.to_bits(),
+        indexed_position: indexed_position.to_bits(),
         deposit_index: bank.deposit_index.to_bits(),
         borrow_index: bank.borrow_index.to_bits(),
         price: oracle_price.to_bits(),

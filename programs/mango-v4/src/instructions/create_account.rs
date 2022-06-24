@@ -35,9 +35,9 @@ pub fn create_account(ctx: Context<CreateAccount>, account_num: u8, name: String
     account.account_num = account_num;
     account.bump = *ctx.bumps.get("account").ok_or(MangoError::SomeError)?;
     account.delegate = Pubkey::default();
-    account.tokens = MangoAccountTokens::default();
-    account.serum3 = MangoAccountSerum3::default();
-    account.perps = MangoAccountPerps::default();
+    account.tokens = MangoAccountTokenPositions::default();
+    account.serum3 = MangoAccountSerum3Orders::default();
+    account.perps = MangoAccountPerpPositions::default();
     account.being_liquidated = 0;
     account.is_bankrupt = 0;
 

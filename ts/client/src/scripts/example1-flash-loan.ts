@@ -1,16 +1,9 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
-import { TokenPosition } from '../../accounts/mangoAccount';
-import { MangoClient } from '../../client';
-import { MANGO_V4_ID } from '../../constants';
+import { MangoClient } from '../client';
+import { MANGO_V4_ID } from '../constants';
 
-//
-// An example for users based on high level api i.e. the client
-// Create
-// process.env.USER_KEYPAIR - mango account owner keypair path
-// process.env.ADMIN_KEYPAIR - group admin keypair path (useful for automatically finding the group)
-//
 async function main() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
@@ -38,7 +31,7 @@ async function main() {
       JSON.parse(fs.readFileSync(process.env.ADMIN_KEYPAIR!, 'utf-8')),
     ),
   );
-  const group = await client.getGroupForAdmin(admin.publicKey);
+  const group = await client.getGroupForAdmin(admin.publicKey, 0);
   console.log(`Found group ${group.publicKey.toBase58()}`);
 
   // create + fetch account
@@ -50,11 +43,32 @@ async function main() {
     'my_mango_account',
   );
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
+  console.log(mangoAccount.toString());
 
-  // log users tokens
-  for (const token of mangoAccount.tokens) {
-    if (token.tokenIndex == TokenPosition.TokenIndexUnset) continue;
-    console.log(token.toString());
+  if (false) {
+    // deposit and withdraw
+    console.log(`Depositing...50 USDC`);
+    await client.tokenDeposit(group, mangoAccount, 'USDC', 50);
+    await mangoAccount.reload(client);
+
+    console.log(`Depositing...0.0005 BTC`);
+    await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005);
+    await mangoAccount.reload(client);
+  }
+  try {
+    const sig = await client.marginTrade({
+      group: group,
+      mangoAccount: mangoAccount,
+      inputToken: 'USDC',
+      amountIn: 0.001,
+      outputToken: 'SOL',
+      minimumAmountOut: 0.1,
+    });
+    console.log(
+      `sig https://explorer.solana.com/address/${sig}?cluster=devnet`,
+    );
+  } catch (error) {
+    console.log(error);
   }
 
   process.exit();
