@@ -63,7 +63,6 @@ pub fn emit_perp_balances(
     });
 }
 
-// Done
 #[event]
 pub struct PerpBalanceLog {
     pub mango_account: Pubkey,
@@ -80,34 +79,49 @@ pub struct PerpBalanceLog {
 #[event]
 pub struct TokenBalanceLog {
     pub mango_account: Pubkey,
-    pub token_index: u16, // IDL doesn't support usize
+    pub token_index: u16,    // IDL doesn't support usize
     pub indexed_value: i128, // on client convert i128 to I80F48 easily by passing in the BN to I80F48 ctor
     pub deposit_index: i128, // I80F48
     pub borrow_index: i128,  // I80F48
-    pub price: i128,    // I80F48
+    pub price: i128,         // I80F48
 }
 
-// Done
+#[event]
+pub struct TokenBalancesLog {
+    pub mango_accounts: Vec<Pubkey>,
+    pub token_indexes: Vec<u16>,    // IDL doesn't support usize
+    pub indexed_values: Vec<i128>, // on client convert i128 to I80F48 easily by passing in the BN to I80F48 ctor
+    pub deposit_indexes: Vec<i128>, // I80F48
+    pub borrow_indexes: Vec<i128>,  // I80F48
+    pub prices: Vec<i128>,         // I80F48
+}
+
+#[event]
+pub struct MarginTradeLog {
+    pub mango_account: Pubkey,
+    pub token_indexes: Vec<u16>,
+    pub pre_indexed_values: Vec<i128>,
+    pub post_indexed_values: Vec<i128>,
+}
+
 #[event]
 pub struct WithdrawLog {
     pub mango_account: Pubkey,
     pub signer: Pubkey,
     pub token_index: u16,
     pub quantity: u64,
-    pub price: i128,    // I80F48
+    pub price: i128, // I80F48
 }
 
-// Done
 #[event]
 pub struct DepositLog {
     pub mango_account: Pubkey,
     pub signer: Pubkey,
     pub token_index: u16,
     pub quantity: u64,
-    pub price: i128,    // I80F48
+    pub price: i128, // I80F48
 }
 
-// Done
 #[event]
 pub struct FillLog {
     pub mango_group: Pubkey,
@@ -136,27 +150,24 @@ pub struct FillLog {
     pub quantity: i64, // number of base lots
 }
 
-// Done
 #[event]
 pub struct UpdateFundingLog {
     pub mango_group: Pubkey,
     pub market_index: u16,
     pub long_funding: i128,  // I80F48
     pub short_funding: i128, // I80F48
-    pub price: i128, // I80F48
+    pub price: i128,         // I80F48
 }
 
-// Done
 #[event]
 pub struct UpdateIndexLog {
     pub mango_group: Pubkey,
     pub token_index: u16,
-    pub deposit_index: i128,  // I80F48
-    pub borrow_index: i128, // I80F48
+    pub deposit_index: i128, // I80F48
+    pub borrow_index: i128,  // I80F48
     // pub price: i128, // I80F48
 }
 
-// Done
 #[event]
 pub struct LiquidateTokenAndTokenLog {
     pub liqee: Pubkey,
@@ -167,7 +178,7 @@ pub struct LiquidateTokenAndTokenLog {
     pub liab_transfer: i128,  // I80F48
     pub asset_price: i128,    // I80F48
     pub liab_price: i128,     // I80F48
-    // pub bankruptcy: bool,
+                              // pub bankruptcy: bool,
 }
 
 #[event]
@@ -181,78 +192,5 @@ pub struct OpenOrdersBalanceLog {
     pub quote_total: u64,
     pub quote_free: u64,
     pub referrer_rebates_accrued: u64,
-    pub price: i128,    // I80F48
+    pub price: i128, // I80F48
 }
-
-// #[event]
-// pub struct SettlePnlLog {
-//     pub mango_group: Pubkey,
-//     pub mango_account_a: Pubkey,
-//     pub mango_account_b: Pubkey,
-//     pub market_index: u64,
-//     pub settlement: i128, // I80F48
-// }
-
-// #[event]
-// pub struct SettleFeesLog {
-//     pub mango_group: Pubkey,
-//     pub mango_account: Pubkey,
-//     pub market_index: u64,
-//     pub settlement: i128, // I80F48
-// }
-
-// #[event]
-// pub struct LiquidateTokenAndPerpLog {
-//     pub mango_group: Pubkey,
-//     pub liqee: Pubkey,
-//     pub liqor: Pubkey,
-//     pub asset_index: u64,
-//     pub liab_index: u64,
-//     pub asset_type: u8,
-//     pub liab_type: u8,
-//     pub asset_price: i128,    // I80F48
-//     pub liab_price: i128,     // I80F48
-//     pub asset_transfer: i128, // I80F48
-//     pub liab_transfer: i128,  // I80F48
-//     pub bankruptcy: bool,
-// }
-
-// #[event]
-// pub struct LiquidatePerpMarketLog {
-//     pub mango_group: Pubkey,
-//     pub liqee: Pubkey,
-//     pub liqor: Pubkey,
-//     pub market_index: u64,
-//     pub price: i128, // I80F48
-//     pub base_transfer: i64,
-//     pub quote_transfer: i128, // I80F48
-//     pub bankruptcy: bool,
-// }
-
-// #[event]
-// pub struct PerpBankruptcyLog {
-//     pub mango_group: Pubkey,
-//     pub liqee: Pubkey,
-//     pub liqor: Pubkey,
-//     pub liab_index: u64,
-//     pub insurance_transfer: u64,
-//     pub socialized_loss: i128,     // I80F48
-//     pub cache_long_funding: i128,  // I80F48
-//     pub cache_short_funding: i128, // I80F48
-// }
-
-// #[event]
-// pub struct TokenBankruptcyLog {
-//     pub mango_group: Pubkey,
-//     pub liqee: Pubkey,
-//     pub liqor: Pubkey,
-//     pub liab_index: u64,
-//     pub insurance_transfer: u64,
-//     /// This is in native units for the liab token NOT static units
-//     pub socialized_loss: i128, // I80F48
-//     pub percentage_loss: i128,     // I80F48
-//     pub cache_deposit_index: i128, // I80F48
-// }
-
-
-
