@@ -120,6 +120,11 @@ export type MangoV4 = {
                 "kind": "arg",
                 "type": "u16",
                 "path": "token_index"
+              },
+              {
+                "kind": "arg",
+                "type": "u64",
+                "path": "bank_num"
               }
             ]
           }
@@ -144,6 +149,11 @@ export type MangoV4 = {
                 "kind": "arg",
                 "type": "u16",
                 "path": "token_index"
+              },
+              {
+                "kind": "arg",
+                "type": "u64",
+                "path": "bank_num"
               }
             ]
           }
@@ -205,6 +215,10 @@ export type MangoV4 = {
           "type": "u16"
         },
         {
+          "name": "bankNum",
+          "type": "u64"
+        },
+        {
           "name": "name",
           "type": "string"
         },
@@ -264,16 +278,6 @@ export type MangoV4 = {
           "isSigner": true
         },
         {
-          "name": "bank",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "vault",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "mintInfo",
           "isMut": true,
           "isSigner": false
@@ -289,14 +293,19 @@ export type MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "tokenIndex",
+          "type": "u16"
+        }
+      ]
     },
     {
       "name": "updateIndex",
       "accounts": [
         {
-          "name": "bank",
-          "isMut": true,
+          "name": "mintInfo",
+          "isMut": false,
           "isSigner": false
         }
       ],
@@ -1969,6 +1978,18 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "indexedDeposits",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "indexedBorrows",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "lastUpdated",
             "type": "i64"
           },
@@ -2076,6 +2097,10 @@ export type MangoV4 = {
                 4
               ]
             }
+          },
+          {
+            "name": "bankNum",
+            "type": "u64"
           }
         ]
       }
@@ -2208,12 +2233,22 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "bank",
-            "type": "publicKey"
+            "name": "banks",
+            "type": {
+              "array": [
+                "publicKey",
+                6
+              ]
+            }
           },
           {
-            "name": "vault",
-            "type": "publicKey"
+            "name": "vaults",
+            "type": {
+              "array": [
+                "publicKey",
+                6
+              ]
+            }
           },
           {
             "name": "oracle",
@@ -3412,6 +3447,11 @@ export const IDL: MangoV4 = {
                 "kind": "arg",
                 "type": "u16",
                 "path": "token_index"
+              },
+              {
+                "kind": "arg",
+                "type": "u64",
+                "path": "bank_num"
               }
             ]
           }
@@ -3436,6 +3476,11 @@ export const IDL: MangoV4 = {
                 "kind": "arg",
                 "type": "u16",
                 "path": "token_index"
+              },
+              {
+                "kind": "arg",
+                "type": "u64",
+                "path": "bank_num"
               }
             ]
           }
@@ -3497,6 +3542,10 @@ export const IDL: MangoV4 = {
           "type": "u16"
         },
         {
+          "name": "bankNum",
+          "type": "u64"
+        },
+        {
           "name": "name",
           "type": "string"
         },
@@ -3556,16 +3605,6 @@ export const IDL: MangoV4 = {
           "isSigner": true
         },
         {
-          "name": "bank",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "vault",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "mintInfo",
           "isMut": true,
           "isSigner": false
@@ -3581,14 +3620,19 @@ export const IDL: MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "tokenIndex",
+          "type": "u16"
+        }
+      ]
     },
     {
       "name": "updateIndex",
       "accounts": [
         {
-          "name": "bank",
-          "isMut": true,
+          "name": "mintInfo",
+          "isMut": false,
           "isSigner": false
         }
       ],
@@ -5261,6 +5305,18 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "indexedDeposits",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "indexedBorrows",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "lastUpdated",
             "type": "i64"
           },
@@ -5368,6 +5424,10 @@ export const IDL: MangoV4 = {
                 4
               ]
             }
+          },
+          {
+            "name": "bankNum",
+            "type": "u64"
           }
         ]
       }
@@ -5500,12 +5560,22 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "bank",
-            "type": "publicKey"
+            "name": "banks",
+            "type": {
+              "array": [
+                "publicKey",
+                6
+              ]
+            }
           },
           {
-            "name": "vault",
-            "type": "publicKey"
+            "name": "vaults",
+            "type": {
+              "array": [
+                "publicKey",
+                6
+              ]
+            }
           },
           {
             "name": "oracle",

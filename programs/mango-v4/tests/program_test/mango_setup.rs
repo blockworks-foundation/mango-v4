@@ -19,6 +19,7 @@ pub struct Token {
     pub oracle: Pubkey,
     pub bank: Pubkey,
     pub vault: Pubkey,
+    pub mint_info: Pubkey,
 }
 
 pub struct GroupWithTokens {
@@ -95,6 +96,7 @@ impl<'a> GroupWithTokensConfig<'a> {
             .unwrap();
             let bank = register_token_accounts.bank;
             let vault = register_token_accounts.vault;
+            let mint_info = register_token_accounts.mint_info;
 
             tokens.push(Token {
                 index: token_index,
@@ -102,6 +104,7 @@ impl<'a> GroupWithTokensConfig<'a> {
                 oracle,
                 bank,
                 vault,
+                mint_info
             });
         }
 

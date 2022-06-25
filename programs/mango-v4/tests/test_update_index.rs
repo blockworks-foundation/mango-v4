@@ -103,6 +103,7 @@ async fn test_update_index() -> Result<(), TransportError> {
     send_tx(
         solana,
         UpdateIndexInstruction {
+            mint_info: tokens[0].mint_info,
             bank: tokens[0].bank,
         },
     )
@@ -110,6 +111,8 @@ async fn test_update_index() -> Result<(), TransportError> {
     .unwrap();
 
     let bank_after_update_index = solana.get_account::<Bank>(tokens[0].bank).await;
+    dbg!(bank_after_update_index);
+    dbg!(bank_after_update_index);
     assert!(bank_before_update_index.deposit_index < bank_after_update_index.deposit_index);
     assert!(bank_before_update_index.borrow_index < bank_after_update_index.borrow_index);
 

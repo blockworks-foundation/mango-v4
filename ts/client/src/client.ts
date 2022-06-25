@@ -158,6 +158,7 @@ export class MangoClient {
     return await this.program.methods
       .tokenRegister(
         tokenIndex,
+        new BN(0),
         name,
         {
           confFilter: {
@@ -192,16 +193,20 @@ export class MangoClient {
 
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
     return await this.program.methods
-      .tokenDeregister()
+      .tokenDeregister(bank.tokenIndex)
       .accounts({
         group: group.publicKey,
         admin: adminPk,
-        bank: bank.publicKey,
-        vault: bank.vault,
         mintInfo: group.mintInfosMap.get(bank.tokenIndex)?.publicKey,
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
       })
+      .remainingAccounts(
+        [bank.publicKey, bank.vault].map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: true, isSigner: false } as AccountMeta),
+        ),
+      )
       .rpc();
   }
 
@@ -1346,7 +1351,9 @@ export class MangoClient {
     const mintInfos = [...new Set(tokenIndices)].map(
       (tokenIndex) => group.mintInfosMap.get(tokenIndex)!,
     );
-    healthRemainingAccounts.push(...mintInfos.map((mintInfo) => mintInfo.bank));
+    healthRemainingAccounts.push(
+      ...mintInfos.map((mintInfo) => mintInfo.firstBank()),
+    );
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.oracle),
     );

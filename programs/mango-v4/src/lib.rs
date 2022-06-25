@@ -42,6 +42,7 @@ pub mod mango_v4 {
     pub fn token_register(
         ctx: Context<TokenRegister>,
         token_index: TokenIndex,
+        bank_num: u64,
         name: String,
         oracle_config: OracleConfig,
         interest_rate_params: InterestRateParams,
@@ -56,6 +57,7 @@ pub mod mango_v4 {
         instructions::token_register(
             ctx,
             token_index,
+            bank_num,
             name,
             oracle_config,
             interest_rate_params,
@@ -69,8 +71,11 @@ pub mod mango_v4 {
         )
     }
 
-    pub fn token_deregister(ctx: Context<TokenDeregister>) -> Result<()> {
-        instructions::token_deregister(ctx)
+    pub fn token_deregister<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, TokenDeregister<'info>>,
+        token_index: TokenIndex,
+    ) -> Result<()> {
+        instructions::token_deregister(ctx, token_index)
     }
 
     pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {

@@ -6,7 +6,10 @@ use std::{
 
 use fixed::types::I80F48;
 use futures::Future;
-use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::{
+    instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side},
+    state::Bank,
+};
 
 use tokio::time;
 
@@ -86,7 +89,13 @@ fn ensure_oo(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> {
 fn ensure_deposit(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> {
     let mango_account = mango_client.get_account()?.1;
 
-    for (_, bank) in mango_client.banks_cache.values() {
+    let banks: Vec<Bank> = mango_client
+        .banks_cache
+        .values()
+        .map(|vec| vec.get(0).unwrap().1)
+        .collect::<Vec<Bank>>();
+
+    for bank in banks {
         let mint = &mango_client.mint_infos_cache.get(&bank.mint).unwrap().2;
         let desired_balance = I80F48::from_num(10_000 * 10u64.pow(mint.decimals as u32));
 
@@ -94,9 +103,9 @@ fn ensure_deposit(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> 
 
         let deposit_native = match token_account_opt {
             Some(token_account) => {
-                let native = token_account.native(bank);
+                let native = token_account.native(&bank);
 
-                let ui = token_account.ui(bank, mint);
+                let ui = token_account.ui(&bank, mint);
                 log::info!("Current balance {} {}", ui, bank.name());
 
                 if native < I80F48::ZERO {

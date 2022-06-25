@@ -217,8 +217,8 @@ export class MintInfo {
     publicKey: PublicKey,
     obj: {
       mint: PublicKey;
-      bank: PublicKey;
-      vault: PublicKey;
+      banks: PublicKey[];
+      vaults: PublicKey[];
       oracle: PublicKey;
       addressLookupTable: PublicKey;
       tokenIndex: number;
@@ -230,8 +230,8 @@ export class MintInfo {
     return new MintInfo(
       publicKey,
       obj.mint,
-      obj.bank,
-      obj.vault,
+      obj.banks,
+      obj.vaults,
       obj.oracle,
       obj.tokenIndex,
     );
@@ -240,9 +240,16 @@ export class MintInfo {
   constructor(
     public publicKey: PublicKey,
     public mint: PublicKey,
-    public bank: PublicKey,
-    public vault: PublicKey,
+    public banks: PublicKey[],
+    public vaults: PublicKey[],
     public oracle: PublicKey,
     public tokenIndex: number,
   ) {}
+
+  public firstBank() {
+    return this.banks[0];
+  }
+  public firstVault() {
+    return this.vaults[0];
+  }
 }
