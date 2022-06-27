@@ -82,7 +82,7 @@ pub fn token_add_bank(
 
     let existing_bank = ctx.accounts.existing_bank.load()?;
     let mut bank = ctx.accounts.bank.load_init()?;
-    *bank = Bank::from_existing_bank(&existing_bank, bank_num);
+    *bank = Bank::from_existing_bank(&existing_bank, ctx.accounts.vault.key(), bank_num);
 
     // TODO: ALTs are unavailable
     // let alt_previous_size =
@@ -99,7 +99,7 @@ pub fn token_add_bank(
         .unwrap();
     require_eq!(bank_num as usize, free_slot);
     mint_info.banks[free_slot] = ctx.accounts.bank.key();
-    mint_info.vaults[free_slot] = ctx.accounts.bank.key();
+    mint_info.vaults[free_slot] = ctx.accounts.vault.key();
 
     // TODO: ALTs are unavailable
     /*

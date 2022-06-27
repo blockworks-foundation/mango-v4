@@ -94,6 +94,20 @@ impl<'a> GroupWithTokensConfig<'a> {
             )
             .await
             .unwrap();
+            let _ = send_tx(
+                solana,
+                TokenAddBankInstruction {
+                    token_index,
+                    bank_num: 1,
+                    group,
+                    admin,
+                    mint: mint.pubkey,
+                    address_lookup_table,
+                    payer,
+                },
+            )
+            .await
+            .unwrap();
             let bank = register_token_accounts.bank;
             let vault = register_token_accounts.vault;
             let mint_info = register_token_accounts.mint_info;
