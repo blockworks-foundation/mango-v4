@@ -513,6 +513,114 @@ impl<'keypair> ClientInstruction for FlashLoan2EndInstruction<'keypair> {
     }
 }
 
+pub struct FlashLoan3BeginInstruction {
+    pub group: Pubkey,
+    pub mango_token_bank: Pubkey,
+    pub mango_token_vault: Pubkey,
+    pub target_token_account: Pubkey,
+    pub withdraw_amount: u64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for FlashLoan3BeginInstruction {
+    type Accounts = mango_v4::accounts::FlashLoan3Begin;
+    type Instruction = mango_v4::instruction::FlashLoan3Begin;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            token_program: Token::id(),
+            instructions: solana_program::sysvar::instructions::id(),
+        };
+
+        let instruction = Self::Instruction {
+            loan_amounts: vec![self.withdraw_amount],
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.mango_token_bank,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.mango_token_vault,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.target_token_account,
+            is_writable: true,
+            is_signer: false,
+        });
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![]
+    }
+}
+
+pub struct FlashLoan3EndInstruction<'keypair> {
+    pub account: Pubkey,
+    pub owner: &'keypair Keypair,
+    pub mango_token_bank: Pubkey,
+    pub mango_token_vault: Pubkey,
+    pub target_token_account: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for FlashLoan3EndInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::FlashLoan3End;
+    type Instruction = mango_v4::instruction::FlashLoan3End;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            Some(self.mango_token_bank),
+            true,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            account: self.account,
+            owner: self.owner.pubkey(),
+            token_program: Token::id(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.mango_token_vault,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.target_token_account,
+            is_writable: true,
+            is_signer: false,
+        });
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.owner]
+    }
+}
+
 pub struct TokenWithdrawInstruction<'keypair> {
     pub amount: u64,
     pub allow_borrow: bool,
