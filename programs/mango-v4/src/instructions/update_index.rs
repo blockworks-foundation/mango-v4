@@ -70,10 +70,11 @@ pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
 
 fn check_banks(all_banks: &[AccountInfo], mint_info: &MintInfo) -> Result<()> {
     for (idx, ai) in all_banks.iter().enumerate() {
-        match ai.load::<Bank>() {    
+        match ai.load::<Bank>() {
             Ok(bank) => {
                 if mint_info.token_index != bank.token_index
                     || mint_info.group != bank.group
+                    // todo: just below check should be enough, above 2 checks are superfluous and defensive
                     || mint_info.banks[idx] != ai.key()
                 {
                     return Err(error!(MangoError::SomeError));

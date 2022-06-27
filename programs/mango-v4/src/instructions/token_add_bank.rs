@@ -18,7 +18,8 @@ pub struct TokenAddBank<'info> {
     pub mint: Account<'info, Mint>,
 
     #[account(
-        constraint = existing_bank.load()?.token_index == token_index
+        constraint = existing_bank.load()?.token_index == token_index,
+        has_one = group
     )]
     pub existing_bank: AccountLoader<'info, Bank>,
 
@@ -48,8 +49,6 @@ pub struct TokenAddBank<'info> {
         bump
     )]
     pub mint_info: AccountLoader<'info, MintInfo>,
-
-    pub oracle: UncheckedAccount<'info>,
 
     // Creating an address lookup table needs a recent valid slot as an
     // input argument. That makes creating ALTs from governance instructions

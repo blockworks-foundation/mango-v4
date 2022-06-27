@@ -103,7 +103,7 @@ pub fn token_register(
 ) -> Result<()> {
     // TODO: Error if mint is already configured (technically, init of vault will fail)
 
-require_eq!(bank_num,0);
+    require_eq!(bank_num, 0);
 
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {

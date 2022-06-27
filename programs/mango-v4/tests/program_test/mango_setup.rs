@@ -104,7 +104,7 @@ impl<'a> GroupWithTokensConfig<'a> {
                 oracle,
                 bank,
                 vault,
-                mint_info
+                mint_info,
             });
         }
 

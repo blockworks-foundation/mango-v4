@@ -17,6 +17,7 @@ pub struct TokenDeregister<'info> {
     // match mint info to bank
     #[account(
         mut,
+        has_one = group,
         constraint = mint_info.load()?.token_index == token_index,
         close = sol_destination
     )]
@@ -33,8 +34,8 @@ pub fn token_deregister<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, TokenDeregister<'info>>,
     token_index: TokenIndex,
 ) -> Result<()> {
+    let mint_info = ctx.accounts.mint_info.load()?;
     {
-        let mint_info = ctx.accounts.mint_info.load()?;
         let total_banks = mint_info
             .banks
             .iter()
@@ -46,16 +47,24 @@ pub fn token_deregister<'key, 'accounts, 'remaining, 'info>(
     let group = ctx.accounts.group.load()?;
     let group_seeds = group_seeds!(group);
 
+    // todo: use itertools::chunks(2)
     for i in (0..ctx.remaining_accounts.len()).step_by(2) {
         let vault_ai = &ctx.remaining_accounts[i + 1];
         let bank_ai = &ctx.remaining_accounts[i];
 
+        require_eq!(bank_ai.key(), mint_info.banks[i / 2]);
+        require_eq!(vault_ai.key(), mint_info.vaults[i / 2]);
+
+        // todo: these checks might be superfluous, after above 2 checks
         {
             let bank = bank_ai.load::<Bank>()?;
-            require_keys_eq!(bank.vault, vault_ai.key());
+            require_keys_eq!(bank.group, ctx.accounts.group.key());
             require_eq!(bank.token_index, token_index);
+            require_keys_eq!(bank.vault, vault_ai.key());
         }
 
+        // note: vault seems to need closing before bank, weird solana oddity
+        // todo: add test to see if we can even close more than one bank in same ix
         // close vault
         let cpi_accounts = CloseAccount {
             account: vault_ai.to_account_info(),

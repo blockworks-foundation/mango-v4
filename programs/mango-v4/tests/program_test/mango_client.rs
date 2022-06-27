@@ -2066,7 +2066,9 @@ impl ClientInstruction for UpdateIndexInstruction {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
-        let accounts = Self::Accounts {mint_info: self.mint_info};
+        let accounts = Self::Accounts {
+            mint_info: self.mint_info,
+        };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
         instruction.accounts.push(AccountMeta {
