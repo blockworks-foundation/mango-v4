@@ -622,11 +622,104 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
     }
 }
 
+pub struct TokenAddBankInstruction<'keypair> {
+    pub token_index: TokenIndex,
+    pub bank_num: u64,
+
+    pub group: Pubkey,
+    pub admin: &'keypair Keypair,
+    pub mint: Pubkey,
+    pub address_lookup_table: Pubkey,
+    pub payer: &'keypair Keypair,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for TokenAddBankInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::TokenAddBank;
+    type Instruction = mango_v4::instruction::TokenAddBank;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            token_index: self.token_index,
+            bank_num: self.bank_num,
+        };
+
+        let existing_bank = Pubkey::find_program_address(
+            &[
+                self.group.as_ref(),
+                b"Bank".as_ref(),
+                &self.token_index.to_le_bytes(),
+                &0u64.to_le_bytes(),
+            ],
+            &program_id,
+        )
+        .0;
+        let bank = Pubkey::find_program_address(
+            &[
+                self.group.as_ref(),
+                b"Bank".as_ref(),
+                &self.token_index.to_le_bytes(),
+                &self.bank_num.to_le_bytes(),
+            ],
+            &program_id,
+        )
+        .0;
+        let vault = Pubkey::find_program_address(
+            &[
+                self.group.as_ref(),
+                b"Vault".as_ref(),
+                &self.token_index.to_le_bytes(),
+                &self.bank_num.to_le_bytes(),
+            ],
+            &program_id,
+        )
+        .0;
+        let mint_info = Pubkey::find_program_address(
+            &[
+                self.group.as_ref(),
+                b"MintInfo".as_ref(),
+                self.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            mint: self.mint,
+            existing_bank,
+            bank,
+            vault,
+            mint_info,
+            // TODO: ALTs are unavailable
+            //address_lookup_table: self.address_lookup_table,
+            payer: self.payer.pubkey(),
+            token_program: Token::id(),
+            system_program: System::id(),
+            // TODO: ALTs are unavailable
+            //address_lookup_table_program: mango_v4::address_lookup_table::id(),
+            rent: sysvar::rent::Rent::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.admin, self.payer]
+    }
+}
+
 pub struct TokenDeregisterInstruction<'keypair> {
     pub admin: &'keypair Keypair,
     pub payer: &'keypair Keypair,
     pub group: Pubkey,
-    pub mint: Pubkey,
+    pub mint_info: Pubkey,
+    pub banks: Vec<Pubkey>,
+    pub vaults: Vec<Pubkey>,
     pub token_index: TokenIndex,
     pub sol_destination: Pubkey,
 }
@@ -644,55 +737,40 @@ impl<'keypair> ClientInstruction for TokenDeregisterInstruction<'keypair> {
             token_index: self.token_index,
         };
 
-        let bank = Pubkey::find_program_address(
-            &[
-                self.group.as_ref(),
-                b"Bank".as_ref(),
-                &self.token_index.to_le_bytes(),
-                &0u64.to_le_bytes(),
-            ],
-            &program_id,
-        )
-        .0;
-        let vault = Pubkey::find_program_address(
-            &[
-                self.group.as_ref(),
-                b"Vault".as_ref(),
-                &self.token_index.to_le_bytes(),
-                &0u64.to_le_bytes(),
-            ],
-            &program_id,
-        )
-        .0;
-        let mint_info = Pubkey::find_program_address(
-            &[
-                self.group.as_ref(),
-                b"MintInfo".as_ref(),
-                self.mint.as_ref(),
-            ],
-            &program_id,
-        )
-        .0;
-
         let accounts = Self::Accounts {
             admin: self.admin.pubkey(),
             group: self.group,
-            mint_info,
+            mint_info: self.mint_info,
             sol_destination: self.sol_destination,
             token_program: Token::id(),
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
-        instruction.accounts.push(AccountMeta {
-            pubkey: bank,
-            is_signer: false,
-            is_writable: true,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: vault,
-            is_signer: false,
-            is_writable: true,
-        });
+
+        let mut ams = self
+            .banks
+            .iter()
+            .zip(self.vaults.iter())
+            .filter(|(bank, _)| **bank != Pubkey::default())
+            .map(|(bank, vault)| {
+                vec![
+                    AccountMeta {
+                        pubkey: *bank,
+                        is_signer: false,
+                        is_writable: true,
+                    },
+                    AccountMeta {
+                        pubkey: *vault,
+                        is_signer: false,
+                        is_writable: true,
+                    },
+                ]
+            })
+            .flat_map(|vec| vec.into_iter())
+            .collect::<Vec<_>>();
+        dbg!(ams.clone());
+        instruction.accounts.append(&mut ams);
+
         (accounts, instruction)
     }
 
@@ -2054,7 +2132,7 @@ impl ClientInstruction for BenchmarkInstruction {
 }
 pub struct UpdateIndexInstruction {
     pub mint_info: Pubkey,
-    pub bank: Pubkey,
+    pub banks: Vec<Pubkey>,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for UpdateIndexInstruction {
@@ -2071,11 +2149,17 @@ impl ClientInstruction for UpdateIndexInstruction {
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.bank,
-            is_signer: false,
-            is_writable: true,
-        });
+        let mut bank_ams = self
+            .banks
+            .iter()
+            .filter(|bank| **bank != Pubkey::default())
+            .map(|bank| AccountMeta {
+                pubkey: *bank,
+                is_signer: false,
+                is_writable: true,
+            })
+            .collect::<Vec<_>>();
+        instruction.accounts.append(&mut bank_ams);
 
         (accounts, instruction)
     }

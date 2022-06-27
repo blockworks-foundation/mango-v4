@@ -71,6 +71,14 @@ pub mod mango_v4 {
         )
     }
 
+    pub fn token_add_bank(
+        ctx: Context<TokenAddBank>,
+        token_index: TokenIndex,
+        bank_num: u64,
+    ) -> Result<()> {
+        instructions::token_add_bank(ctx, token_index, bank_num)
+    }
+
     pub fn token_deregister<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, TokenDeregister<'info>>,
         token_index: TokenIndex,

@@ -1,5 +1,6 @@
 pub use benchmark::*;
 pub use close_account::*;
+pub use close_bank::*;
 pub use close_group::*;
 pub use close_stub_oracle::*;
 pub use compute_health::*;
@@ -36,6 +37,7 @@ pub use update_index::*;
 
 mod benchmark;
 mod close_account;
+mod close_bank;
 mod close_group;
 mod close_stub_oracle;
 mod compute_health;

@@ -119,12 +119,12 @@ impl std::fmt::Debug for Bank {
 }
 
 impl Bank {
-    pub fn from_existing_bank(existing_bank: &Bank, bank_num: u64) -> Self {
+    pub fn from_existing_bank(existing_bank: &Bank, vault: Pubkey, bank_num: u64) -> Self {
         Self {
             name: existing_bank.name,
             group: existing_bank.group,
             mint: existing_bank.mint,
-            vault: existing_bank.vault,
+            vault,
             oracle: existing_bank.oracle,
             oracle_config: existing_bank.oracle_config,
             deposit_index: existing_bank.deposit_index,

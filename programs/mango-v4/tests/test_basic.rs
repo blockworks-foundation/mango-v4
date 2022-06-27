@@ -143,7 +143,10 @@ async fn test_basic() -> Result<(), TransportError> {
         solana,
         UpdateIndexInstruction {
             mint_info: tokens[0].mint_info,
-            bank,
+            banks: {
+                let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
+                mint_info.banks.to_vec()
+            },
         },
     )
     .await
@@ -182,7 +185,15 @@ async fn test_basic() -> Result<(), TransportError> {
             admin,
             payer,
             group,
-            mint: bank_data.mint,
+            mint_info: tokens[0].mint_info,
+            banks: {
+                let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
+                mint_info.banks.to_vec()
+            },
+            vaults: {
+                let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
+                mint_info.vaults.to_vec()
+            },
             token_index: bank_data.token_index,
             sol_destination: payer.pubkey(),
         },
