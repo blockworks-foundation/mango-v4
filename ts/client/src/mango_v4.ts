@@ -265,6 +265,144 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "tokenAddBank",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "existingBank",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Bank"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "arg",
+                "type": "u64",
+                "path": "bank_num"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Vault"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "arg",
+                "type": "u64",
+                "path": "bank_num"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mintInfo",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "MintInfo"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "bankNum",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "tokenDeregister",
       "accounts": [
         {
@@ -3588,6 +3726,144 @@ export const IDL: MangoV4 = {
         {
           "name": "liquidationFee",
           "type": "f32"
+        }
+      ]
+    },
+    {
+      "name": "tokenAddBank",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "existingBank",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Bank"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "arg",
+                "type": "u64",
+                "path": "bank_num"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Vault"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "arg",
+                "type": "u64",
+                "path": "bank_num"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mintInfo",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "MintInfo"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "bankNum",
+          "type": "u64"
         }
       ]
     },
