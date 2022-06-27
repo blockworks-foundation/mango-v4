@@ -96,6 +96,7 @@ async fn get_mint_info_by_token_index(
             account.group.as_ref(),
             b"Bank".as_ref(),
             &token_index.to_le_bytes(),
+            &0u64.to_le_bytes(),
         ],
         &mango_v4::id(),
     )
@@ -153,7 +154,7 @@ async fn derive_health_check_remaining_account_metas(
         // let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
         // banks.push(addresses[mint_info.address_lookup_table_bank_index as usize]);
         // oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
-        banks.push(mint_info.bank);
+        banks.push(mint_info.first_bank());
         oracles.push(mint_info.oracle);
     }
 
@@ -212,7 +213,7 @@ async fn derive_liquidation_remaining_account_metas(
         //     writable_bank,
         // ));
         // oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
-        banks.push((mint_info.bank, writable_bank));
+        banks.push((mint_info.first_bank(), writable_bank));
         oracles.push(mint_info.oracle);
     }
 
@@ -409,7 +410,7 @@ impl<'keypair> ClientInstruction for TokenWithdrawInstruction<'keypair> {
         let health_check_metas = derive_health_check_remaining_account_metas(
             &account_loader,
             &account,
-            Some(mint_info.bank),
+            Some(mint_info.first_bank()),
             false,
             None,
         )
@@ -419,8 +420,8 @@ impl<'keypair> ClientInstruction for TokenWithdrawInstruction<'keypair> {
             group: account.group,
             account: self.account,
             owner: self.owner.pubkey(),
-            bank: mint_info.bank,
-            vault: mint_info.vault,
+            bank: mint_info.first_bank(),
+            vault: mint_info.first_vault(),
             token_account: self.token_account,
             token_program: Token::id(),
         };
@@ -473,7 +474,7 @@ impl<'keypair> ClientInstruction for TokenDepositInstruction<'keypair> {
         let health_check_metas = derive_health_check_remaining_account_metas(
             &account_loader,
             &account,
-            Some(mint_info.bank),
+            Some(mint_info.first_bank()),
             false,
             None,
         )
@@ -482,8 +483,8 @@ impl<'keypair> ClientInstruction for TokenDepositInstruction<'keypair> {
         let accounts = Self::Accounts {
             group: account.group,
             account: self.account,
-            bank: mint_info.bank,
-            vault: mint_info.vault,
+            bank: mint_info.first_bank(),
+            vault: mint_info.first_vault(),
             token_account: self.token_account,
             token_authority: self.token_authority.pubkey(),
             token_program: Token::id(),
@@ -534,6 +535,7 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
         let instruction = Self::Instruction {
             name: "some_ticker".to_string(),
             token_index: self.token_index,
+            bank_num: 0,
             oracle_config: OracleConfig {
                 conf_filter: I80F48::from_num::<f32>(0.10),
             },
@@ -558,6 +560,7 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
                 self.group.as_ref(),
                 b"Bank".as_ref(),
                 &self.token_index.to_le_bytes(),
+                &0u64.to_le_bytes(),
             ],
             &program_id,
         )
@@ -567,6 +570,7 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
                 self.group.as_ref(),
                 b"Vault".as_ref(),
                 &self.token_index.to_le_bytes(),
+                &0u64.to_le_bytes(),
             ],
             &program_id,
         )
@@ -618,31 +622,46 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
     }
 }
 
-pub struct TokenDeregisterInstruction<'keypair> {
-    pub admin: &'keypair Keypair,
-    pub payer: &'keypair Keypair,
-    pub group: Pubkey,
-    pub mint: Pubkey,
+pub struct TokenAddBankInstruction<'keypair> {
     pub token_index: TokenIndex,
-    pub sol_destination: Pubkey,
+    pub bank_num: u64,
+
+    pub group: Pubkey,
+    pub admin: &'keypair Keypair,
+    pub mint: Pubkey,
+    pub address_lookup_table: Pubkey,
+    pub payer: &'keypair Keypair,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for TokenDeregisterInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::TokenDeregister;
-    type Instruction = mango_v4::instruction::TokenDeregister;
-
+impl<'keypair> ClientInstruction for TokenAddBankInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::TokenAddBank;
+    type Instruction = mango_v4::instruction::TokenAddBank;
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
-    ) -> (Self::Accounts, Instruction) {
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction {};
+        let instruction = Self::Instruction {
+            token_index: self.token_index,
+            bank_num: self.bank_num,
+        };
 
+        let existing_bank = Pubkey::find_program_address(
+            &[
+                self.group.as_ref(),
+                b"Bank".as_ref(),
+                &self.token_index.to_le_bytes(),
+                &0u64.to_le_bytes(),
+            ],
+            &program_id,
+        )
+        .0;
         let bank = Pubkey::find_program_address(
             &[
                 self.group.as_ref(),
                 b"Bank".as_ref(),
                 &self.token_index.to_le_bytes(),
+                &self.bank_num.to_le_bytes(),
             ],
             &program_id,
         )
@@ -652,6 +671,7 @@ impl<'keypair> ClientInstruction for TokenDeregisterInstruction<'keypair> {
                 self.group.as_ref(),
                 b"Vault".as_ref(),
                 &self.token_index.to_le_bytes(),
+                &self.bank_num.to_le_bytes(),
             ],
             &program_id,
         )
@@ -667,16 +687,90 @@ impl<'keypair> ClientInstruction for TokenDeregisterInstruction<'keypair> {
         .0;
 
         let accounts = Self::Accounts {
-            admin: self.admin.pubkey(),
             group: self.group,
+            admin: self.admin.pubkey(),
+            mint: self.mint,
+            existing_bank,
             bank,
             vault,
             mint_info,
+            // TODO: ALTs are unavailable
+            //address_lookup_table: self.address_lookup_table,
+            payer: self.payer.pubkey(),
+            token_program: Token::id(),
+            system_program: System::id(),
+            // TODO: ALTs are unavailable
+            //address_lookup_table_program: mango_v4::address_lookup_table::id(),
+            rent: sysvar::rent::Rent::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.admin, self.payer]
+    }
+}
+
+pub struct TokenDeregisterInstruction<'keypair> {
+    pub admin: &'keypair Keypair,
+    pub payer: &'keypair Keypair,
+    pub group: Pubkey,
+    pub mint_info: Pubkey,
+    pub banks: Vec<Pubkey>,
+    pub vaults: Vec<Pubkey>,
+    pub token_index: TokenIndex,
+    pub sol_destination: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for TokenDeregisterInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::TokenDeregister;
+    type Instruction = mango_v4::instruction::TokenDeregister;
+
+    async fn to_instruction(
+        &self,
+        _loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            token_index: self.token_index,
+        };
+
+        let accounts = Self::Accounts {
+            admin: self.admin.pubkey(),
+            group: self.group,
+            mint_info: self.mint_info,
             sol_destination: self.sol_destination,
             token_program: Token::id(),
         };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+
+        let mut ams = self
+            .banks
+            .iter()
+            .zip(self.vaults.iter())
+            .filter(|(bank, _)| **bank != Pubkey::default())
+            .map(|(bank, vault)| {
+                vec![
+                    AccountMeta {
+                        pubkey: *bank,
+                        is_signer: false,
+                        is_writable: true,
+                    },
+                    AccountMeta {
+                        pubkey: *vault,
+                        is_signer: false,
+                        is_writable: true,
+                    },
+                ]
+            })
+            .flat_map(|vec| vec.into_iter())
+            .collect::<Vec<_>>();
+        dbg!(ams.clone());
+        instruction.accounts.append(&mut ams);
+
         (accounts, instruction)
     }
 
@@ -1267,10 +1361,10 @@ impl<'keypair> ClientInstruction for Serum3PlaceOrderInstruction<'keypair> {
             group: account.group,
             account: self.account,
             open_orders,
-            quote_bank: quote_info.bank,
-            quote_vault: quote_info.vault,
-            base_bank: base_info.bank,
-            base_vault: base_info.vault,
+            quote_bank: quote_info.first_bank(),
+            quote_vault: quote_info.first_vault(),
+            base_bank: base_info.first_bank(),
+            base_vault: base_info.first_vault(),
             serum_market: self.serum_market,
             serum_program: serum_market.serum_program,
             serum_market_external: serum_market.serum_market_external,
@@ -1472,10 +1566,10 @@ impl<'keypair> ClientInstruction for Serum3SettleFundsInstruction<'keypair> {
             group: account.group,
             account: self.account,
             open_orders,
-            quote_bank: quote_info.bank,
-            quote_vault: quote_info.vault,
-            base_bank: base_info.bank,
-            base_vault: base_info.vault,
+            quote_bank: quote_info.first_bank(),
+            quote_vault: quote_info.first_vault(),
+            base_bank: base_info.first_bank(),
+            base_vault: base_info.first_vault(),
             serum_market: self.serum_market,
             serum_program: serum_market.serum_program,
             serum_market_external: serum_market.serum_market_external,
@@ -1558,10 +1652,10 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
             group: account.group,
             account: self.account,
             open_orders,
-            quote_bank: quote_info.bank,
-            quote_vault: quote_info.vault,
-            base_bank: base_info.bank,
-            base_vault: base_info.vault,
+            quote_bank: quote_info.first_bank(),
+            quote_vault: quote_info.first_vault(),
+            base_bank: base_info.first_bank(),
+            base_vault: base_info.first_vault(),
             serum_market: self.serum_market,
             serum_program: serum_market.serum_program,
             serum_market_external: serum_market.serum_market_external,
@@ -2037,7 +2131,8 @@ impl ClientInstruction for BenchmarkInstruction {
     }
 }
 pub struct UpdateIndexInstruction {
-    pub bank: Pubkey,
+    pub mint_info: Pubkey,
+    pub banks: Vec<Pubkey>,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for UpdateIndexInstruction {
@@ -2049,9 +2144,23 @@ impl ClientInstruction for UpdateIndexInstruction {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
-        let accounts = Self::Accounts { bank: self.bank };
+        let accounts = Self::Accounts {
+            mint_info: self.mint_info,
+        };
 
-        let instruction = make_instruction(program_id, &accounts, instruction);
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut bank_ams = self
+            .banks
+            .iter()
+            .filter(|bank| **bank != Pubkey::default())
+            .map(|bank| AccountMeta {
+                pubkey: *bank,
+                is_signer: false,
+                is_writable: true,
+            })
+            .collect::<Vec<_>>();
+        instruction.accounts.append(&mut bank_ams);
+
         (accounts, instruction)
     }
 

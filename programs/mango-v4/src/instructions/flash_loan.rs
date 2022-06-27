@@ -209,7 +209,11 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
 
                     am.is_signer = true;
                     // this is the data we'll need later to build the PDA account signer seeds
-                    bank_signer_data.push((bank.token_index.to_le_bytes(), [bank.bump]));
+                    bank_signer_data.push((
+                        bank.token_index.to_le_bytes(),
+                        bank.bank_num.to_le_bytes(),
+                        [bank.bump],
+                    ));
                 }
             }
         }
@@ -247,11 +251,12 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
     let group_key = ctx.accounts.group.key();
     let signers = bank_signer_data
         .iter()
-        .map(|(token_index, bump)| {
+        .map(|(token_index, bank_num, bump)| {
             [
                 group_key.as_ref(),
                 b"Bank".as_ref(),
                 &token_index[..],
+                &bank_num[..],
                 &bump[..],
             ]
         })

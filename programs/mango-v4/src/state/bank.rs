@@ -5,6 +5,7 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 use static_assertions::const_assert_eq;
+
 use std::mem::size_of;
 
 pub const DAY: I80F48 = I80F48!(86400);
@@ -29,6 +30,10 @@ pub struct Bank {
     /// total deposits/borrows, for utilization
     pub indexed_total_deposits: I80F48,
     pub indexed_total_borrows: I80F48,
+
+    /// deposits/borrows for this bank
+    pub indexed_deposits: I80F48,
+    pub indexed_borrows: I80F48,
 
     pub last_updated: i64,
     pub util0: I80F48,
@@ -66,10 +71,15 @@ pub struct Bank {
     pub mint_decimals: u8,
 
     pub reserved: [u8; 4],
+
+    pub bank_num: u64,
     // TODO: add space for an oracle which services interest rate for the bank's mint
     // interest rate tied to oracle might help reduce spreads between deposits and borrows
 }
-const_assert_eq!(size_of::<Bank>(), 16 + 32 * 4 + 8 + 16 * 19 + 2 + 1 + 1 + 4);
+const_assert_eq!(
+    size_of::<Bank>(),
+    16 + 32 * 4 + 8 + 16 * 21 + 2 + 1 + 1 + 4 + 8
+);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
 impl std::fmt::Debug for Bank {
@@ -80,10 +90,13 @@ impl std::fmt::Debug for Bank {
             .field("mint", &self.mint)
             .field("vault", &self.vault)
             .field("oracle", &self.oracle)
+            .field("oracle_config", &self.oracle_config)
             .field("deposit_index", &self.deposit_index)
             .field("borrow_index", &self.borrow_index)
             .field("indexed_total_deposits", &self.indexed_total_deposits)
             .field("indexed_total_borrows", &self.indexed_total_borrows)
+            .field("indexed_deposits", &self.indexed_deposits)
+            .field("indexed_borrows", &self.indexed_borrows)
             .field("last_updated", &self.last_updated)
             .field("util0", &self.util0)
             .field("rate0", &self.rate0)
@@ -106,6 +119,43 @@ impl std::fmt::Debug for Bank {
 }
 
 impl Bank {
+    pub fn from_existing_bank(existing_bank: &Bank, vault: Pubkey, bank_num: u64) -> Self {
+        Self {
+            name: existing_bank.name,
+            group: existing_bank.group,
+            mint: existing_bank.mint,
+            vault: vault,
+            oracle: existing_bank.oracle,
+            oracle_config: existing_bank.oracle_config,
+            deposit_index: existing_bank.deposit_index,
+            borrow_index: existing_bank.borrow_index,
+            indexed_total_deposits: existing_bank.indexed_total_deposits,
+            indexed_total_borrows: existing_bank.indexed_total_borrows,
+            indexed_deposits: I80F48::ZERO,
+            indexed_borrows: I80F48::ZERO,
+            last_updated: existing_bank.last_updated,
+            util0: existing_bank.util0,
+            rate0: existing_bank.rate0,
+            util1: existing_bank.util1,
+            rate1: existing_bank.rate1,
+            max_rate: existing_bank.max_rate,
+            collected_fees_native: existing_bank.collected_fees_native,
+            loan_origination_fee_rate: existing_bank.loan_origination_fee_rate,
+            loan_fee_rate: existing_bank.loan_fee_rate,
+            maint_asset_weight: existing_bank.maint_asset_weight,
+            init_asset_weight: existing_bank.init_asset_weight,
+            maint_liab_weight: existing_bank.maint_liab_weight,
+            init_liab_weight: existing_bank.init_liab_weight,
+            liquidation_fee: existing_bank.liquidation_fee,
+            dust: I80F48::ZERO,
+            token_index: existing_bank.token_index,
+            bump: existing_bank.bump,
+            mint_decimals: existing_bank.mint_decimals,
+            reserved: Default::default(),
+            bank_num,
+        }
+    }
+
     pub fn name(&self) -> &str {
         std::str::from_utf8(&self.name)
             .unwrap()
@@ -118,6 +168,14 @@ impl Bank {
 
     pub fn native_total_deposits(&self) -> I80F48 {
         self.deposit_index * self.indexed_total_deposits
+    }
+
+    pub fn native_borrows(&self) -> I80F48 {
+        self.borrow_index * self.indexed_borrows
+    }
+
+    pub fn native_deposits(&self) -> I80F48 {
+        self.deposit_index * self.indexed_deposits
     }
 
     /// Returns whether the position is active
@@ -139,21 +197,20 @@ impl Bank {
             let new_indexed_value = cm!(position.indexed_position + indexed_change);
             if new_indexed_value.is_negative() {
                 // pay back borrows only, leaving a negative position
-                self.indexed_total_borrows = cm!(self.indexed_total_borrows - indexed_change);
-                position.indexed_position = new_indexed_value;
+                let indexed_change = cm!(native_amount / self.borrow_index + I80F48::DELTA);
+                self.indexed_borrows = cm!(self.indexed_borrows - indexed_change);
+                position.indexed_position = cm!(position.indexed_position + indexed_change);
                 return Ok(true);
             } else if new_native_position < I80F48::ONE && !position.is_in_use() {
                 // if there's less than one token deposited, zero the position
                 self.dust = cm!(self.dust + new_native_position);
-                self.indexed_total_borrows =
-                    cm!(self.indexed_total_borrows + position.indexed_position);
+                self.indexed_borrows = cm!(self.indexed_borrows + position.indexed_position);
                 position.indexed_position = I80F48::ZERO;
                 return Ok(false);
             }
 
             // pay back all borrows
-            self.indexed_total_borrows =
-                cm!(self.indexed_total_borrows + position.indexed_position); // position.value is negative
+            self.indexed_borrows = cm!(self.indexed_borrows + position.indexed_position); // position.value is negative
             position.indexed_position = I80F48::ZERO;
             // deposit the rest
             native_amount = cm!(native_amount + native_position);
@@ -164,7 +221,7 @@ impl Bank {
         // we want to ensure that users can withdraw the same amount they have deposited, so
         // (amount/index + delta)*index >= amount is a better guarantee.
         let indexed_change = cm!(native_amount / self.deposit_index + I80F48::DELTA);
-        self.indexed_total_deposits = cm!(self.indexed_total_deposits + indexed_change);
+        self.indexed_deposits = cm!(self.indexed_deposits + indexed_change);
         position.indexed_position = cm!(position.indexed_position + indexed_change);
 
         Ok(true)
@@ -212,22 +269,20 @@ impl Bank {
                 if new_native_position < I80F48::ONE && !position.is_in_use() {
                     // zero the account collecting the leftovers in `dust`
                     self.dust = cm!(self.dust + new_native_position);
-                    self.indexed_total_deposits =
-                        cm!(self.indexed_total_deposits - position.indexed_position);
+                    self.indexed_deposits = cm!(self.indexed_deposits - position.indexed_position);
                     position.indexed_position = I80F48::ZERO;
                     return Ok(false);
                 } else {
                     // withdraw some deposits leaving a positive balance
                     let indexed_change = cm!(native_amount / self.deposit_index);
-                    self.indexed_total_deposits = cm!(self.indexed_total_deposits - indexed_change);
+                    self.indexed_deposits = cm!(self.indexed_deposits - indexed_change);
                     position.indexed_position = cm!(position.indexed_position - indexed_change);
                     return Ok(true);
                 }
             }
 
             // withdraw all deposits
-            self.indexed_total_deposits =
-                cm!(self.indexed_total_deposits - position.indexed_position);
+            self.indexed_deposits = cm!(self.indexed_deposits - position.indexed_position);
             position.indexed_position = I80F48::ZERO;
             // borrow the rest
             native_amount = -new_native_position;
@@ -239,7 +294,7 @@ impl Bank {
 
         // add to borrows
         let indexed_change = cm!(native_amount / self.borrow_index);
-        self.indexed_total_borrows = cm!(self.indexed_total_borrows + indexed_change);
+        self.indexed_borrows = cm!(self.indexed_borrows + indexed_change);
         position.indexed_position = cm!(position.indexed_position - indexed_change);
 
         Ok(true)
@@ -256,7 +311,7 @@ impl Bank {
         self.collected_fees_native = cm!(self.collected_fees_native + loan_origination_fee);
 
         let indexed_change = cm!(loan_origination_fee / self.borrow_index);
-        self.indexed_total_borrows = cm!(self.indexed_total_borrows + indexed_change);
+        self.indexed_borrows = cm!(self.indexed_borrows + indexed_change);
         position.indexed_position = cm!(position.indexed_position - indexed_change);
 
         Ok(())
@@ -290,26 +345,27 @@ impl Bank {
 
     // Borrows continously expose insurance fund to risk, collect fees from borrowers
     pub fn charge_loan_fee(&mut self, diff_ts: I80F48) {
-        let native_total_borrows_old = self.native_total_borrows();
-        self.indexed_total_borrows =
-            cm!((self.indexed_total_borrows
-                * (I80F48::ONE + self.loan_fee_rate * (diff_ts / YEAR))));
-        self.collected_fees_native = cm!(
-            self.collected_fees_native + self.native_total_borrows() - native_total_borrows_old
-        );
+        let native_borrows_old = self.native_borrows();
+        self.indexed_borrows =
+            cm!((self.indexed_borrows * (I80F48::ONE + self.loan_fee_rate * (diff_ts / YEAR))));
+        self.collected_fees_native =
+            cm!(self.collected_fees_native + self.native_borrows() - native_borrows_old);
     }
 
-    pub fn update_index(&mut self, now_ts: i64) -> Result<()> {
-        let diff_ts = I80F48::from_num(now_ts - self.last_updated);
-        self.last_updated = now_ts;
+    pub fn compute_index(
+        &mut self,
+        indexed_total_deposits: I80F48,
+        indexed_total_borrows: I80F48,
+        diff_ts: I80F48,
+    ) -> Result<(I80F48, I80F48)> {
+        // compute index based on utilization
+        let native_total_deposits = self.deposit_index * indexed_total_deposits;
+        let native_total_borrows = self.borrow_index * indexed_total_borrows;
 
-        self.charge_loan_fee(diff_ts);
-
-        // Update index based on utilization
-        let utilization = if self.native_total_deposits() == I80F48::ZERO {
+        let utilization = if native_total_deposits == I80F48::ZERO {
             I80F48::ZERO
         } else {
-            cm!(self.native_total_borrows() / self.native_total_deposits())
+            cm!(native_total_borrows / native_total_deposits)
         };
 
         let interest_rate = self.compute_interest_rate(utilization);
@@ -317,15 +373,20 @@ impl Bank {
         let borrow_interest: I80F48 = cm!(interest_rate * diff_ts);
         let deposit_interest = cm!(borrow_interest * utilization);
 
+        // msg!("utilization {}", utilization);
+        // msg!("interest_rate {}", interest_rate);
+        // msg!("borrow_interest {}", borrow_interest);
+        // msg!("deposit_interest {}", deposit_interest);
+
         if borrow_interest <= I80F48::ZERO || deposit_interest <= I80F48::ZERO {
-            return Ok(());
+            return Ok((self.deposit_index, self.borrow_index));
         }
 
-        self.borrow_index = cm!((self.borrow_index * borrow_interest) / YEAR + self.borrow_index);
-        self.deposit_index =
+        let borrow_index = cm!((self.borrow_index * borrow_interest) / YEAR + self.borrow_index);
+        let deposit_index =
             cm!((self.deposit_index * deposit_interest) / YEAR + self.deposit_index);
 
-        Ok(())
+        Ok((deposit_index, borrow_index))
     }
 
     /// returns the current interest rate in APR
@@ -375,6 +436,7 @@ macro_rules! bank_seeds {
             $bank.group.as_ref(),
             b"Bank".as_ref(),
             $bank.token_index.to_le_bytes(),
+            &bank.bank_num.to_le_bytes(),
             &[$bank.bump],
         ]
     };
@@ -449,9 +511,9 @@ mod tests {
 
                 account.indexed_position = indexed(I80F48::from_num(start), &bank);
                 if start >= 0.0 {
-                    bank.indexed_total_deposits = account.indexed_position;
+                    bank.indexed_deposits = account.indexed_position;
                 } else {
-                    bank.indexed_total_borrows = -account.indexed_position;
+                    bank.indexed_borrows = -account.indexed_position;
                 }
 
                 // get the rounded start value
@@ -483,11 +545,11 @@ mod tests {
                 assert!((account.indexed_position - expected_indexed).abs() <= epsilon);
 
                 if account.indexed_position.is_positive() {
-                    assert_eq!(bank.indexed_total_deposits, account.indexed_position);
-                    assert_eq!(bank.indexed_total_borrows, I80F48::ZERO);
+                    assert_eq!(bank.indexed_deposits, account.indexed_position);
+                    assert_eq!(bank.indexed_borrows, I80F48::ZERO);
                 } else {
-                    assert_eq!(bank.indexed_total_deposits, I80F48::ZERO);
-                    assert_eq!(bank.indexed_total_borrows, -account.indexed_position);
+                    assert_eq!(bank.indexed_deposits, I80F48::ZERO);
+                    assert_eq!(bank.indexed_borrows, -account.indexed_position);
                 }
             }
         }

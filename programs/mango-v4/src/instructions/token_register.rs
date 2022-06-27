@@ -9,10 +9,10 @@ use crate::error::*;
 use crate::state::*;
 use crate::util::fill16_from_str;
 
-const INDEX_START: I80F48 = I80F48!(1_000_000);
+pub const INDEX_START: I80F48 = I80F48!(1_000_000);
 
 #[derive(Accounts)]
-#[instruction(token_index: TokenIndex)]
+#[instruction(token_index: TokenIndex, bank_num: u64)]
 pub struct TokenRegister<'info> {
     #[account(
         has_one = admin,
@@ -25,7 +25,7 @@ pub struct TokenRegister<'info> {
     #[account(
         init,
         // using the token_index in this seed guards against reusing it
-        seeds = [group.key().as_ref(), b"Bank".as_ref(), &token_index.to_le_bytes()],
+        seeds = [group.key().as_ref(), b"Bank".as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<Bank>(),
@@ -34,7 +34,7 @@ pub struct TokenRegister<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"Vault".as_ref(), &token_index.to_le_bytes()],
+        seeds = [group.key().as_ref(), b"Vault".as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
         bump,
         token::authority = group,
         token::mint = mint,
@@ -90,6 +90,7 @@ pub struct InterestRateParams {
 pub fn token_register(
     ctx: Context<TokenRegister>,
     token_index: TokenIndex,
+    bank_num: u64,
     name: String,
     oracle_config: OracleConfig,
     interest_rate_params: InterestRateParams,
@@ -103,6 +104,8 @@ pub fn token_register(
 ) -> Result<()> {
     // TODO: Error if mint is already configured (technically, init of vault will fail)
 
+    require_eq!(bank_num, 0);
+
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
         name: fill16_from_str(name)?,
@@ -115,6 +118,8 @@ pub fn token_register(
         borrow_index: INDEX_START,
         indexed_total_deposits: I80F48::ZERO,
         indexed_total_borrows: I80F48::ZERO,
+        indexed_deposits: I80F48::ZERO,
+        indexed_borrows: I80F48::ZERO,
         last_updated: Clock::get()?.unix_timestamp,
         // TODO: add a require! verifying relation between the parameters
         util0: I80F48::from_num(interest_rate_params.util0),
@@ -133,8 +138,9 @@ pub fn token_register(
         dust: I80F48::ZERO,
         token_index,
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
-        reserved: Default::default(),
         mint_decimals: ctx.accounts.mint.decimals,
+        bank_num: 0,
+        reserved: Default::default(),
     };
 
     // TODO: ALTs are unavailable
@@ -147,8 +153,8 @@ pub fn token_register(
     *mint_info = MintInfo {
         group: ctx.accounts.group.key(),
         mint: ctx.accounts.mint.key(),
-        bank: ctx.accounts.bank.key(),
-        vault: ctx.accounts.vault.key(),
+        banks: Default::default(),
+        vaults: Default::default(),
         oracle: ctx.accounts.oracle.key(),
         address_lookup_table,
         token_index,
@@ -156,6 +162,9 @@ pub fn token_register(
         address_lookup_table_oracle_index: alt_previous_size as u8 + 1,
         reserved: Default::default(),
     };
+
+    mint_info.banks[0] = ctx.accounts.bank.key();
+    mint_info.vaults[0] = ctx.accounts.vault.key();
 
     // TODO: ALTs are unavailable
     /*

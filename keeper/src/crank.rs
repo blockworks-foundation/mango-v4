@@ -4,7 +4,7 @@ use crate::MangoClient;
 
 use anchor_lang::__private::bytemuck::cast_ref;
 use futures::Future;
-use mango_v4::state::{Bank, EventQueue, EventType, FillEvent, OutEvent, PerpMarket};
+use mango_v4::state::{EventQueue, EventType, FillEvent, OutEvent, PerpMarket, TokenIndex};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
@@ -18,7 +18,12 @@ pub async fn runner(
     let handles1 = mango_client
         .banks_cache
         .values()
-        .map(|(pk, bank)| loop_update_index(mango_client.clone(), *pk, *bank))
+        .map(|banks_for_a_token| {
+            loop_update_index(
+                mango_client.clone(),
+                banks_for_a_token.get(0).unwrap().1.token_index,
+            )
+        })
         .collect::<Vec<_>>();
 
     let handles2 = mango_client
@@ -43,31 +48,54 @@ pub async fn runner(
     Ok(())
 }
 
-pub async fn loop_update_index(mango_client: Arc<MangoClient>, pk: Pubkey, bank: Bank) {
+pub async fn loop_update_index(mango_client: Arc<MangoClient>, token_index: TokenIndex) {
     let mut interval = time::interval(Duration::from_secs(5));
     loop {
         interval.tick().await;
 
         let client = mango_client.clone();
+
         let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+            let mint_info = client.get_mint_info(&token_index);
+            let banks_for_a_token = client.banks_cache_by_token_index.get(&token_index).unwrap();
+            let token_name = banks_for_a_token.get(0).unwrap().1.name();
+
+            let bank_pubkeys_for_a_token = banks_for_a_token
+                .into_iter()
+                .map(|bank| bank.0)
+                .collect::<Vec<Pubkey>>();
+
             let sig_result = client
                 .program()
                 .request()
-                .instruction(Instruction {
-                    program_id: mango_v4::id(),
-                    accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                        &mango_v4::accounts::UpdateIndex { bank: pk },
-                        None,
-                    ),
-                    data: anchor_lang::InstructionData::data(
-                        &mango_v4::instruction::UpdateIndex {},
-                    ),
+                .instruction({
+                    let mut ix = Instruction {
+                        program_id: mango_v4::id(),
+                        accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                            &mango_v4::accounts::UpdateIndex { mint_info },
+                            None,
+                        ),
+                        data: anchor_lang::InstructionData::data(
+                            &mango_v4::instruction::UpdateIndex {},
+                        ),
+                    };
+                    let mut foo = bank_pubkeys_for_a_token
+                        .iter()
+                        .map(|bank_pubkey| AccountMeta {
+                            pubkey: *bank_pubkey,
+                            is_signer: false,
+                            is_writable: false,
+                        })
+                        .collect::<Vec<_>>();
+                    ix.accounts.append(&mut foo);
+                    ix
                 })
                 .send();
+
             if let Err(e) = sig_result {
                 log::error!("{:?}", e)
             } else {
-                log::info!("update_index {} {:?}", bank.name(), sig_result.unwrap())
+                log::info!("update_index {} {:?}", token_name, sig_result.unwrap())
             }
 
             Ok(())

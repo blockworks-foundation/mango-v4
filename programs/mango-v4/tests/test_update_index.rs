@@ -1,6 +1,6 @@
 #![cfg(feature = "test-bpf")]
 
-use mango_v4::state::Bank;
+use mango_v4::state::{Bank, MintInfo};
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, transport::TransportError};
 
@@ -103,13 +103,19 @@ async fn test_update_index() -> Result<(), TransportError> {
     send_tx(
         solana,
         UpdateIndexInstruction {
-            bank: tokens[0].bank,
+            mint_info: tokens[0].mint_info,
+            banks: {
+                let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
+                mint_info.banks.to_vec()
+            },
         },
     )
     .await
     .unwrap();
 
     let bank_after_update_index = solana.get_account::<Bank>(tokens[0].bank).await;
+    dbg!(bank_after_update_index);
+    dbg!(bank_after_update_index);
     assert!(bank_before_update_index.deposit_index < bank_after_update_index.deposit_index);
     assert!(bank_before_update_index.borrow_index < bank_after_update_index.borrow_index);
 
