@@ -78,8 +78,12 @@ pub fn token_deregister<'key, 'accounts, 'remaining, 'info>(
             &[group_seeds],
         ))?;
         vault_ai.exit(ctx.program_id)?;
+    }
 
-        // close bank
+    // Close banks in a second step, because the cpi calls above don't like when someone
+    // else touches sol_destination.lamports in between.
+    for i in (0..ctx.remaining_accounts.len()).step_by(2) {
+        let bank_ai = &ctx.remaining_accounts[i];
         let bank_al: AccountLoader<Bank> = AccountLoader::try_from(bank_ai)?;
         bank_al.close(ctx.accounts.sol_destination.to_account_info())?;
     }
