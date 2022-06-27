@@ -40,6 +40,7 @@ pub struct Serum3CancelOrder<'info> {
 
     // These accounts are forwarded directly to the serum cpi call
     // and are validated there.
+    #[account(mut)]
     /// CHECK: Validated by the serum cpi call
     pub market_bids: UncheckedAccount<'info>,
     #[account(mut)]

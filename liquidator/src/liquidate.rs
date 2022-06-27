@@ -53,9 +53,9 @@ pub fn compute_health_(
         .unwrap();
 
         banks.push((
-            mint_info.bank,
+            mint_info.first_bank(),
             chain_data
-                .account(&mint_info.bank)
+                .account(&mint_info.first_bank())
                 .expect("chain data is missing bank"),
         ));
         oracles.push((
@@ -150,7 +150,8 @@ pub fn process_accounts<'a>(
                     let mint_info_pk = mint_infos.get(&token.token_index).expect("always Ok");
                     let mint_info =
                         load_mango_account_from_chain::<MintInfo>(chain_data, mint_info_pk)?;
-                    let bank = load_mango_account_from_chain::<Bank>(chain_data, &mint_info.bank)?;
+                    let bank =
+                        load_mango_account_from_chain::<Bank>(chain_data, &mint_info.first_bank())?;
                     let oracle = chain_data.account(&mint_info.oracle)?;
                     let price = oracle_price(
                         &KeyedAccountSharedData::new(mint_info.oracle, oracle.clone()),

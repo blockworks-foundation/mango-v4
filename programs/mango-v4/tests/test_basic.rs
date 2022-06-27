@@ -139,6 +139,18 @@ async fn test_basic() -> Result<(), TransportError> {
     //
 
     // withdraw whatever is remaining, can't close bank vault without this
+    send_tx(
+        solana,
+        UpdateIndexInstruction {
+            mint_info: tokens[0].mint_info,
+            banks: {
+                let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
+                mint_info.banks.to_vec()
+            },
+        },
+    )
+    .await
+    .unwrap();
     let bank_data: Bank = solana.get_account(bank).await;
     send_tx(
         solana,
@@ -173,7 +185,15 @@ async fn test_basic() -> Result<(), TransportError> {
             admin,
             payer,
             group,
-            mint: bank_data.mint,
+            mint_info: tokens[0].mint_info,
+            banks: {
+                let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
+                mint_info.banks.to_vec()
+            },
+            vaults: {
+                let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
+                mint_info.vaults.to_vec()
+            },
             token_index: bank_data.token_index,
             sol_destination: payer.pubkey(),
         },

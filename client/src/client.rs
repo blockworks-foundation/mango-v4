@@ -36,8 +36,8 @@ pub struct MangoClient {
     pub group: Pubkey,
     // TODO: future: this may not scale if there's thousands of mints, probably some function
     // wrapping getMultipleAccounts is needed (or bettew: we provide this data as a service)
-    pub banks_cache: HashMap<String, (Pubkey, Bank)>,
-    pub banks_cache_by_token_index: HashMap<TokenIndex, (Pubkey, Bank)>,
+    pub banks_cache: HashMap<String, Vec<(Pubkey, Bank)>>,
+    pub banks_cache_by_token_index: HashMap<TokenIndex, Vec<(Pubkey, Bank)>>,
     pub mint_infos_cache: HashMap<Pubkey, (Pubkey, MintInfo, Mint)>,
     pub mint_infos_cache_by_token_index: HashMap<TokenIndex, (Pubkey, MintInfo, Mint)>,
     pub serum3_markets_cache: HashMap<String, (Pubkey, Serum3Market)>,
@@ -160,8 +160,14 @@ impl MangoClient {
             encoding: None,
         })])?;
         for (k, v) in bank_tuples {
-            banks_cache.insert(v.name().to_owned(), (k, v));
-            banks_cache_by_token_index.insert(v.token_index, (k, v));
+            banks_cache
+                .entry(v.name().to_owned())
+                .or_insert_with(|| Vec::new())
+                .push((k, v));
+            banks_cache_by_token_index
+                .entry(v.token_index)
+                .or_insert_with(|| Vec::new())
+                .push((k, v));
         }
 
         // mintinfo cache
@@ -243,6 +249,13 @@ impl MangoClient {
         })
     }
 
+    pub fn get_mint_info(&self, token_index: &TokenIndex) -> Pubkey {
+        self.mint_infos_cache_by_token_index
+            .get(token_index)
+            .unwrap()
+            .0
+    }
+
     pub fn client(&self) -> Client {
         Client::new_with_options(
             self.cluster.clone(),
@@ -302,7 +315,7 @@ impl MangoClient {
             // let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
             // banks.push(addresses[mint_info.address_lookup_table_bank_index as usize]);
             // oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
-            banks.push(mint_info.bank);
+            banks.push(mint_info.first_bank());
             oracles.push(mint_info.oracle);
         }
         if let Some(affected_bank) = affected_bank {
@@ -387,7 +400,7 @@ impl MangoClient {
             // let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
             // banks.push(addresses[mint_info.address_lookup_table_bank_index as usize]);
             // oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
-            banks.push((mint_info.bank, writable_bank));
+            banks.push((mint_info.first_bank(), writable_bank));
             oracles.push(mint_info.oracle);
         }
 
@@ -431,7 +444,7 @@ impl MangoClient {
         token_name: &str,
         amount: u64,
     ) -> Result<Signature, anchor_client::ClientError> {
-        let bank = self.banks_cache.get(token_name).unwrap();
+        let bank = self.banks_cache.get(token_name).unwrap().get(0).unwrap();
         let mint_info: MintInfo = self.mint_infos_cache.get(&bank.1.mint).unwrap().1;
 
         let health_check_metas =
@@ -471,7 +484,7 @@ impl MangoClient {
         &self,
         token_name: &str,
     ) -> Result<pyth_sdk_solana::Price, anyhow::Error> {
-        let bank = self.banks_cache.get(token_name).unwrap().1;
+        let bank = self.banks_cache.get(token_name).unwrap().get(0).unwrap().1;
 
         let data = self
             .program()
@@ -652,10 +665,10 @@ impl MangoClient {
                             group: self.group(),
                             account: self.mango_account_cache.0,
                             open_orders,
-                            quote_bank: quote_info.bank,
-                            quote_vault: quote_info.vault,
-                            base_bank: base_info.bank,
-                            base_vault: base_info.vault,
+                            quote_bank: quote_info.first_bank(),
+                            quote_vault: quote_info.first_vault(),
+                            base_bank: base_info.first_bank(),
+                            base_vault: base_info.first_vault(),
                             serum_market: serum3_market.0,
                             serum_program: serum3_market.1.serum_program,
                             serum_market_external: serum3_market.1.serum_market_external,
@@ -730,10 +743,10 @@ impl MangoClient {
                         group: self.group(),
                         account: self.mango_account_cache.0,
                         open_orders,
-                        quote_bank: quote_info.bank,
-                        quote_vault: quote_info.vault,
-                        base_bank: base_info.bank,
-                        base_vault: base_info.vault,
+                        quote_bank: quote_info.first_bank(),
+                        quote_vault: quote_info.first_vault(),
+                        base_bank: base_info.first_bank(),
+                        base_vault: base_info.first_vault(),
                         serum_market: serum3_market.0,
                         serum_program: serum3_market.1.serum_program,
                         serum_market_external: serum3_market.1.serum_market_external,
