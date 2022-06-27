@@ -19,7 +19,8 @@ pub struct TokenAddBank<'info> {
 
     #[account(
         constraint = existing_bank.load()?.token_index == token_index,
-        has_one = group
+        has_one = group,
+        has_one = mint,
     )]
     pub existing_bank: AccountLoader<'info, Bank>,
 
