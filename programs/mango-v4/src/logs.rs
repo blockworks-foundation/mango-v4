@@ -1,46 +1,5 @@
 use crate::state::{PerpMarket, PerpPositions};
 use anchor_lang::prelude::*;
-use anchor_lang::Discriminator;
-use std::io::Write;
-
-/// Log to Program Log with a prologue so transaction scraper knows following line is valid mango log
-///
-/// Warning: This stores intermediate results on the stack, which must have 2*N+ free bytes.
-/// This function will panic if the generated event does not fit the buffer of size N.
-pub fn mango_emit_stack<T: AnchorSerialize + Discriminator, const N: usize>(event: T) {
-    let mut data_buf = [0u8; N];
-    let mut out_buf = [0u8; N];
-
-    mango_emit_buffers(event, &mut data_buf[..], &mut out_buf[..])
-}
-
-/// Log to Program Log with a prologue so transaction scraper knows following line is valid mango log
-///
-/// This function will write intermediate data to data_buf and out_buf. The buffers must be
-/// large enough to hold this data, or the function will panic.
-pub fn mango_emit_buffers<T: AnchorSerialize + Discriminator>(
-    event: T,
-    data_buf: &mut [u8],
-    out_buf: &mut [u8],
-) {
-    let mut data_writer = std::io::Cursor::new(data_buf);
-    data_writer
-        .write_all(&<T as Discriminator>::discriminator())
-        .unwrap();
-    borsh::to_writer(&mut data_writer, &event).unwrap();
-    let data_len = data_writer.position() as usize;
-
-    let out_len = base64::encode_config_slice(
-        &data_writer.into_inner()[0..data_len],
-        base64::STANDARD,
-        out_buf,
-    );
-
-    let msg_bytes = &out_buf[0..out_len];
-    let msg_str = unsafe { std::str::from_utf8_unchecked(&msg_bytes) };
-
-    msg!(msg_str);
-}
 
 /// Warning: This function needs 512+ bytes free on the stack
 pub fn emit_perp_balances(
@@ -50,7 +9,7 @@ pub fn emit_perp_balances(
     pp: &PerpPositions,
     pm: &PerpMarket,
 ) {
-    mango_emit_stack::<_, 256>(PerpBalanceLog {
+    emit!(PerpBalanceLog {
         mango_account: mango_account,
         market_index: market_index,
         base_position: pp.base_position_lots,
@@ -84,16 +43,6 @@ pub struct TokenBalanceLog {
     pub deposit_index: i128,    // I80F48
     pub borrow_index: i128,     // I80F48
     pub price: i128,            // I80F48
-}
-
-#[event]
-pub struct TokenBalancesLog {
-    pub mango_accounts: Vec<Pubkey>,
-    pub token_indexes: Vec<u16>,      // IDL doesn't support usize
-    pub indexed_positions: Vec<i128>, // on client convert i128 to I80F48 easily by passing in the BN to I80F48 ctor
-    pub deposit_indexes: Vec<i128>,   // I80F48
-    pub borrow_indexes: Vec<i128>,    // I80F48
-    pub prices: Vec<i128>,            // I80F48
 }
 
 #[event]

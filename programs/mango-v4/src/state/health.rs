@@ -35,8 +35,6 @@ pub trait AccountRetriever {
         account_index: usize,
         perp_market_index: PerpMarketIndex,
     ) -> Result<&PerpMarket>;
-
-    fn account_index(&self, key: Pubkey) -> Result<usize>;
 }
 
 /// Assumes the account infos needed for the health computation follow a strict order.
@@ -113,13 +111,6 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
         let ai = &self.ais[cm!(self.begin_serum3 + account_index)];
         require!(key == ai.key(), MangoError::SomeError);
         serum3_cpi::load_open_orders(ai)
-    }
-
-    fn account_index(&self, key: Pubkey) -> Result<usize> {
-        self.ais
-            .iter()
-            .position(|account| account.key() == &key)
-            .ok_or_else(|| error!(MangoError::SomeError))
     }
 }
 
@@ -281,13 +272,6 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
             .find(|ai| ai.key == key)
             .ok_or_else(|| error!(MangoError::SomeError))?;
         serum3_cpi::load_open_orders(oo)
-    }
-
-    fn account_index(&self, key: Pubkey) -> Result<usize> {
-        self.ais
-            .iter()
-            .position(|account| account.key() == &key)
-            .ok_or_else(|| error!(MangoError::SomeError))
     }
 }
 

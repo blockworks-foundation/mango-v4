@@ -139,6 +139,10 @@ impl MangoAccountTokenPositions {
         &mut self.values[raw_token_index]
     }
 
+    pub fn get_raw(&self, raw_token_index: usize) -> &TokenPosition {
+        &self.values[raw_token_index]
+    }
+
     pub fn get_mut_or_create(
         &mut self,
         token_index: TokenIndex,

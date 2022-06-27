@@ -1,6 +1,6 @@
 use crate::accounts_zerocopy::*;
 use crate::error::MangoError;
-use crate::logs::{MarginTradeLog, TokenBalancesLog};
+use crate::logs::{MarginTradeLog, TokenBalanceLog};
 use crate::state::{
     compute_health, new_fixed_order_account_retriever, AccountRetriever, Bank, Group, HealthType,
     MangoAccount,
@@ -134,8 +134,6 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
         MangoError::SomeError
     );
 
-    // Store the indexed value before the margin trade for logging purposes
-    let mut pre_indexed_positions = Vec::new();
     // Check that each group-owned token account is the vault of one of the allowed banks,
     // and track its balance.
     let mut used_vaults = all_cpi_ais
@@ -159,9 +157,6 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
 
             // Every group-owned token account must be a vault of one of the banks.
             if let Some(&(bank_index, raw_token_index)) = allowed_vaults.get(&ai.key) {
-                let position = account.tokens.get_mut_raw(raw_token_index);
-                pre_indexed_positions.push(position.indexed_position.to_bits());
-
                 return Some(Ok((
                     ai.key,
                     AllowedVault {
@@ -181,6 +176,13 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
             Some(Err(error!(MangoError::SomeError)))
         })
         .collect::<Result<HashMap<_, _>>>()?;
+
+    // Store the indexed value before the margin trade for logging purposes
+    let mut pre_indexed_positions = Vec::new();
+    for (_, info) in used_vaults.iter() {
+        let position = account.tokens.get_raw(info.raw_token_index);
+        pre_indexed_positions.push(position.indexed_position.to_bits());
+    }
 
     // Find banks for used vaults in cpi_ais and collect signer seeds for them.
     // Also update withdraw_amount and loan_amount.
@@ -329,42 +331,30 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
     }
 
     // Token balances logging
-    // TODO: this needs to be reviewed - check account indexing logic
-    let mut mango_accounts = Vec::with_capacity(used_vaults.len());
     let mut token_indexes = Vec::with_capacity(used_vaults.len());
     let mut post_indexed_positions = Vec::with_capacity(used_vaults.len());
-    let mut deposit_indexes = Vec::with_capacity(used_vaults.len());
-    let mut borrow_indexes = Vec::with_capacity(used_vaults.len());
-    let mut prices = Vec::with_capacity(used_vaults.len());
     for (_, info) in used_vaults.iter() {
-        mango_accounts.push(ctx.accounts.account.key());
-        token_indexes.push(info.raw_token_index as u16);
+        let bank = health_ais[info.bank_health_ai_index].load_mut::<Bank>()?;
+        token_indexes.push(bank.token_index as u16);
 
         let position = account.tokens.get_mut_raw(info.raw_token_index);
         post_indexed_positions.push(position.indexed_position.to_bits());
 
-        let bank = health_ais[info.bank_health_ai_index].load_mut::<Bank>()?;
-
-        deposit_indexes.push(bank.deposit_index.to_bits());
-        borrow_indexes.push(bank.borrow_index.to_bits());
-
         let (_, oracle_price) = retriever.bank_and_oracle(
             &ctx.accounts.group.key(),
-            retriever.account_index(health_ais[info.bank_health_ai_index].key())?,
-            info.raw_token_index as u16,
+            info.bank_health_ai_index,
+            bank.token_index,
         )?;
-        prices.push(oracle_price.to_bits());
-    }
 
-    // TODO: Is there a better way to get around the borrow checker than cloning here?
-    emit!(TokenBalancesLog {
-        mango_accounts,
-        token_indexes: token_indexes.clone(),
-        indexed_positions: post_indexed_positions.clone(),
-        deposit_indexes,
-        borrow_indexes,
-        prices,
-    });
+        emit!(TokenBalanceLog {
+            mango_account: ctx.accounts.account.key(),
+            token_index: bank.token_index as u16,
+            indexed_position: position.indexed_position.to_bits(),
+            deposit_index: bank.deposit_index.to_bits(),
+            borrow_index: bank.borrow_index.to_bits(),
+            price: oracle_price.to_bits(),
+        });
+    }
 
     emit!(MarginTradeLog {
         mango_account: ctx.accounts.account.key(),
