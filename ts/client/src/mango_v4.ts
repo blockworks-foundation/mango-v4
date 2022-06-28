@@ -274,6 +274,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "dustVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "mintInfo",
           "isMut": true,
           "isSigner": false
@@ -3562,6 +3567,11 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dustVault",
           "isMut": true,
           "isSigner": false
         },

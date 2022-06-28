@@ -193,6 +193,7 @@ export class MangoClient {
         admin: adminPk,
         bank: bank.publicKey,
         vault: bank.vault,
+        dustVault: getAssociatedTokenAddress(bank.mint, adminPk),
         mintInfo: group.mintInfosMap.get(bank.tokenIndex)?.publicKey,
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,

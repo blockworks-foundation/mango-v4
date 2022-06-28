@@ -37,62 +37,39 @@ async function main() {
 
   // close stub oracle
   const usdcDevnetMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
-  try {
-    const usdcDevnetOracle = await client.getStubOracle(
-      group,
-      usdcDevnetMint,
-    )[0];
-    let sig = await client.closeStubOracle(group, usdcDevnetOracle.publicKey);
-    console.log(
-      `Closed USDC stub oracle, sig https://explorer.solana.com/address/${sig}`,
-    );
-  } catch (error) {
-    console.error(error);
-  }
+  const usdcDevnetOracle = await client.getStubOracle(group, usdcDevnetMint)[0];
+  sig = await client.closeStubOracle(group, usdcDevnetOracle.publicKey);
+  console.log(
+    `Closed USDC stub oracle, sig https://explorer.solana.com/address/${sig}`,
+  );
 
   // close all bank
   for (const bank of group.banksMap.values()) {
-    try {
-      sig = await client.tokenDeregister(group, bank.name);
-      console.log(
-        `Removed token ${bank.name}, sig https://explorer.solana.com/address/${sig}`,
-      );
-    } catch (error) {
-      console.error(error);
-    }
+    sig = await client.tokenDeregister(group, bank.name);
+    console.log(
+      `Removed token ${bank.name}, sig https://explorer.solana.com/address/${sig}`,
+    );
   }
 
   // deregister all serum markets
   for (const market of group.serum3MarketsMap.values()) {
-    try {
-      sig = await client.serum3deregisterMarket(group, market.name);
-      console.log(
-        `Deregistered serum market ${market.name}, sig https://explorer.solana.com/address/${sig}`,
-      );
-    } catch (error) {
-      console.error(error);
-    }
+    sig = await client.serum3deregisterMarket(group, market.name);
+    console.log(
+      `Deregistered serum market ${market.name}, sig https://explorer.solana.com/address/${sig}`,
+    );
   }
 
   // close all perp markets
   for (const market of group.perpMarketsMap.values()) {
-    try {
-      sig = await client.perpCloseMarket(group, market.name);
-      console.log(
-        `Closed perp market ${market.name}, sig https://explorer.solana.com/address/${sig}`,
-      );
-    } catch (error) {
-      console.error(error);
-    }
+    sig = await client.perpCloseMarket(group, market.name);
+    console.log(
+      `Closed perp market ${market.name}, sig https://explorer.solana.com/address/${sig}`,
+    );
   }
 
   // finally, close the group
-  try {
-    sig = await client.closeGroup(group);
-    console.log(`Closed group, sig https://explorer.solana.com/address/${sig}`);
-  } catch (error) {
-    console.error(error);
-  }
+  sig = await client.closeGroup(group);
+  console.log(`Closed group, sig https://explorer.solana.com/address/${sig}`);
 
   process.exit();
 }
