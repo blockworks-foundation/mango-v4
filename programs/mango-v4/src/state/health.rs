@@ -73,6 +73,14 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
     })
 }
 
+impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
+    fn bank(&self, group: &Pubkey, account_index: usize) -> Result<&Bank> {
+        let bank = self.ais[account_index].load::<Bank>()?;
+        require!(&bank.group == group, MangoError::SomeError);
+        Ok(bank)
+    }
+}
+
 impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
     fn bank_and_oracle(
         &self,
@@ -80,8 +88,7 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
         account_index: usize,
         token_index: TokenIndex,
     ) -> Result<(&Bank, I80F48)> {
-        let bank = self.ais[account_index].load::<Bank>()?;
-        require!(&bank.group == group, MangoError::SomeError);
+        let bank = self.bank(group, account_index)?;
         require!(bank.token_index == token_index, MangoError::SomeError);
         let oracle = &self.ais[cm!(self.n_banks + account_index)];
         require!(&bank.oracle == oracle.key(), MangoError::SomeError);
@@ -285,6 +292,34 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
 pub enum HealthType {
     Init,
     Maint,
+}
+
+/// Computes health for a mango account given a set of account infos
+///
+/// These account infos must fit the fixed layout defined by FixedOrderAccountRetriever.
+pub fn compute_health_from_fixed_accounts(
+    account: &MangoAccount,
+    health_type: HealthType,
+    ais: &[AccountInfo],
+) -> Result<I80F48> {
+    let active_token_len = account.tokens.iter_active().count();
+    let active_serum3_len = account.serum3.iter_active().count();
+    let active_perp_len = account.perps.iter_active_accounts().count();
+    let expected_ais = cm!(active_token_len * 2 // banks + oracles
+        + active_perp_len // PerpMarkets
+        + active_serum3_len); // open_orders
+    require!(ais.len() == expected_ais, MangoError::SomeError);
+
+    let retriever = FixedOrderAccountRetriever {
+        ais: ais
+            .into_iter()
+            .map(|ai| AccountInfoRef::borrow(ai))
+            .collect::<Result<Vec<_>>>()?,
+        n_banks: active_token_len,
+        begin_perp: cm!(active_token_len * 2),
+        begin_serum3: cm!(active_token_len * 2 + active_perp_len),
+    };
+    new_health_cache(account, &retriever)?.health(health_type)
 }
 
 /// Compute health with an arbitrary AccountRetriever

@@ -15,8 +15,10 @@ use solana_sdk::signature::{Keypair, Signer};
 use solana_sdk::transport::TransportError;
 
 use std::str::FromStr;
+use std::sync::Arc;
 
 use super::solana::SolanaCookie;
+use super::utils::clone_keypair;
 use mango_v4::state::*;
 
 #[async_trait::async_trait(?Send)]
@@ -47,6 +49,47 @@ pub async fn send_tx<CI: ClientInstruction>(
         .process_transaction(&instructions, Some(&signers[..]))
         .await?;
     Ok(accounts)
+}
+
+/// Build a transaction from multiple instructions
+pub struct ClientTransaction {
+    solana: Arc<SolanaCookie>,
+    instructions: Vec<instruction::Instruction>,
+    signers: Vec<Keypair>,
+}
+
+impl<'a> ClientTransaction {
+    pub fn new(solana: &Arc<SolanaCookie>) -> Self {
+        Self {
+            solana: solana.clone(),
+            instructions: vec![],
+            signers: vec![],
+        }
+    }
+
+    pub async fn add_instruction<CI: ClientInstruction>(&mut self, ix: CI) -> CI::Accounts {
+        let solana: &SolanaCookie = &self.solana;
+        let (accounts, instruction) = ix.to_instruction(solana).await;
+        self.instructions.push(instruction);
+        self.signers
+            .extend(ix.signers().iter().map(|k| clone_keypair(k)));
+        accounts
+    }
+
+    pub fn add_instruction_direct(&mut self, ix: instruction::Instruction) {
+        self.instructions.push(ix);
+    }
+
+    pub fn add_signer(&mut self, keypair: &Keypair) {
+        self.signers.push(clone_keypair(keypair));
+    }
+
+    pub async fn send(&self) -> std::result::Result<(), TransportError> {
+        let signer_refs = self.signers.iter().map(|k| k).collect::<Vec<&Keypair>>();
+        self.solana
+            .process_transaction(&self.instructions, Some(&signer_refs[..]))
+            .await
+    }
 }
 
 #[async_trait::async_trait(?Send)]
@@ -360,6 +403,213 @@ impl<'keypair> ClientInstruction for FlashLoanInstruction<'keypair> {
         instruction.accounts.push(AccountMeta {
             pubkey: spl_token::ID,
             is_writable: false,
+            is_signer: false,
+        });
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.owner]
+    }
+}
+
+pub struct FlashLoan2BeginInstruction<'keypair> {
+    pub group: Pubkey,
+    pub mango_token_bank: Pubkey,
+    pub mango_token_vault: Pubkey,
+    pub withdraw_amount: u64,
+    pub temporary_vault_authority: &'keypair Keypair,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for FlashLoan2BeginInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::FlashLoan2Begin;
+    type Instruction = mango_v4::instruction::FlashLoan2Begin;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            temporary_vault_authority: self.temporary_vault_authority.pubkey(),
+            token_program: Token::id(),
+            instructions: solana_program::sysvar::instructions::id(),
+        };
+
+        let instruction = Self::Instruction {
+            loan_amounts: vec![self.withdraw_amount],
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.mango_token_bank,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.mango_token_vault,
+            is_writable: true,
+            is_signer: false,
+        });
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.temporary_vault_authority]
+    }
+}
+
+pub struct FlashLoan2EndInstruction<'keypair> {
+    pub account: Pubkey,
+    pub owner: &'keypair Keypair,
+    pub mango_token_bank: Pubkey,
+    pub mango_token_vault: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for FlashLoan2EndInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::FlashLoan2End;
+    type Instruction = mango_v4::instruction::FlashLoan2End;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            Some(self.mango_token_bank),
+            true,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: account.group,
+            account: self.account,
+            owner: self.owner.pubkey(),
+            token_program: Token::id(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.mango_token_vault,
+            is_writable: true,
+            is_signer: false,
+        });
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.owner]
+    }
+}
+
+pub struct FlashLoan3BeginInstruction {
+    pub group: Pubkey,
+    pub mango_token_bank: Pubkey,
+    pub mango_token_vault: Pubkey,
+    pub target_token_account: Pubkey,
+    pub withdraw_amount: u64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for FlashLoan3BeginInstruction {
+    type Accounts = mango_v4::accounts::FlashLoan3Begin;
+    type Instruction = mango_v4::instruction::FlashLoan3Begin;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            token_program: Token::id(),
+            instructions: solana_program::sysvar::instructions::id(),
+        };
+
+        let instruction = Self::Instruction {
+            loan_amounts: vec![self.withdraw_amount],
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.mango_token_bank,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.mango_token_vault,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.target_token_account,
+            is_writable: true,
+            is_signer: false,
+        });
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![]
+    }
+}
+
+pub struct FlashLoan3EndInstruction<'keypair> {
+    pub account: Pubkey,
+    pub owner: &'keypair Keypair,
+    pub mango_token_bank: Pubkey,
+    pub mango_token_vault: Pubkey,
+    pub target_token_account: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for FlashLoan3EndInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::FlashLoan3End;
+    type Instruction = mango_v4::instruction::FlashLoan3End;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            Some(self.mango_token_bank),
+            true,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            account: self.account,
+            owner: self.owner.pubkey(),
+            token_program: Token::id(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.mango_token_vault,
+            is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.target_token_account,
+            is_writable: true,
             is_signer: false,
         });
 
