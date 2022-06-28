@@ -194,6 +194,7 @@ async fn test_basic() -> Result<(), TransportError> {
                 let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
                 mint_info.vaults.to_vec()
             },
+            dust_vault: payer_mint0_account,
             token_index: bank_data.token_index,
             sol_destination: payer.pubkey(),
         },

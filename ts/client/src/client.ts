@@ -124,7 +124,6 @@ export class MangoClient {
     const groups = (await this.program.account.group.all(filters)).map(
       (tuple) => Group.from(tuple.publicKey, tuple.account),
     );
-    console.log(groups);
     await groups[0].reloadAll(this);
     return groups[0];
   }
@@ -187,14 +186,34 @@ export class MangoClient {
     tokenName: string,
   ): Promise<TransactionSignature> {
     const bank = group.banksMap.get(tokenName)!;
-
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
+
+    const dustVaultPk = await getAssociatedTokenAddress(bank.mint, adminPk);
+    const ai = await this.program.provider.connection.getAccountInfo(
+      dustVaultPk,
+    );
+    if (!ai) {
+      const tx = new Transaction();
+      tx.add(
+        Token.createAssociatedTokenAccountInstruction(
+          ASSOCIATED_TOKEN_PROGRAM_ID,
+          TOKEN_PROGRAM_ID,
+          bank.mint,
+          dustVaultPk,
+          adminPk,
+          adminPk,
+        ),
+      );
+      await this.program.provider.sendAndConfirm(tx);
+    }
+
     return await this.program.methods
       .tokenDeregister(bank.tokenIndex)
       .accounts({
         group: group.publicKey,
         admin: adminPk,
         mintInfo: group.mintInfosMap.get(bank.tokenIndex)?.publicKey,
+        dustVault: dustVaultPk,
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
       })

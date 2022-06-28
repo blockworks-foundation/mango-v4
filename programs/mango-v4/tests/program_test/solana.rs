@@ -196,15 +196,13 @@ impl SolanaCookie {
 
     #[allow(dead_code)]
     pub async fn get_account_opt<T: AccountDeserialize>(&self, address: Pubkey) -> Option<T> {
-        let account = self
-            .context
+        self.context
             .borrow_mut()
             .banks_client
             .get_account(address)
             .await
             .unwrap()
             .unwrap();
-        println!("{:#?}", account.owner);
 
         let data = self.get_account_data(address).await?;
         let mut data_slice: &[u8] = &data;

@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, CloseAccount, Token};
+use anchor_spl::token::{self, CloseAccount, Token, TokenAccount};
 
 use crate::{accounts_zerocopy::LoadZeroCopyRef, state::*};
 use anchor_lang::AccountsClose;
@@ -22,6 +22,9 @@ pub struct TokenDeregister<'info> {
         close = sol_destination
     )]
     pub mint_info: AccountLoader<'info, MintInfo>,
+
+    #[account(mut)]
+    pub dust_vault: Account<'info, TokenAccount>,
 
     #[account(mut)]
     /// CHECK: target for account rent needs no checks
@@ -48,10 +51,12 @@ pub fn token_deregister<'key, 'accounts, 'remaining, 'info>(
     let group = ctx.accounts.group.load()?;
     let group_seeds = group_seeds!(group);
 
+    let dust_vault_ai = &ctx.accounts.dust_vault;
+
     // todo: use itertools::chunks(2)
     for i in (0..ctx.remaining_accounts.len()).step_by(2) {
-        let vault_ai = &ctx.remaining_accounts[i + 1];
         let bank_ai = &ctx.remaining_accounts[i];
+        let vault_ai = &ctx.remaining_accounts[i + 1];
 
         require_eq!(bank_ai.key(), mint_info.banks[i / 2]);
         require_eq!(vault_ai.key(), mint_info.vaults[i / 2]);
@@ -64,9 +69,24 @@ pub fn token_deregister<'key, 'accounts, 'remaining, 'info>(
             require_keys_eq!(bank.vault, vault_ai.key());
         }
 
+        // transfer dust to another token account
+        let amount = Account::<TokenAccount>::try_from(vault_ai).unwrap().amount;
+        if amount > 0 {
+            token::transfer(
+                {
+                    let accounts = token::Transfer {
+                        from: vault_ai.to_account_info(),
+                        to: dust_vault_ai.to_account_info(),
+                        authority: ctx.accounts.group.to_account_info(),
+                    };
+                    CpiContext::new(ctx.accounts.token_program.to_account_info(), accounts)
+                        .with_signer(&[group_seeds])
+                },
+                amount,
+            )?;
+        }
+
         // note: vault seems to need closing before bank, weird solana oddity
-        // todo: add test to see if we can even close more than one bank in same ix
-        // close vault
         let cpi_accounts = CloseAccount {
             account: vault_ai.to_account_info(),
             destination: ctx.accounts.sol_destination.to_account_info(),
