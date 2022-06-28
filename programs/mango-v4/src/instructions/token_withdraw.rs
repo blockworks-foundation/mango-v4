@@ -108,9 +108,19 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     let indexed_position = position.indexed_position;
 
+    // If the position becomes inactive above the raw token index will change
+    let final_raw_token_index = ctx
+        .remaining_accounts
+        .iter()
+        .position(|account| account.key() == ctx.accounts.bank.key())
+        .ok_or_else(|| error!(MangoError::SomeError));
+
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
-    let (bank, oracle_price) =
-        retriever.bank_and_oracle(&ctx.accounts.group.key(), raw_token_index, token_index)?;
+    let (bank, oracle_price) = retriever.bank_and_oracle(
+        &ctx.accounts.group.key(),
+        final_raw_token_index?,
+        token_index,
+    )?;
     emit!(TokenBalanceLog {
         mango_account: ctx.accounts.account.key(),
         token_index: token_index,
