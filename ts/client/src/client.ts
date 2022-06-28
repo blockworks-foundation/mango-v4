@@ -122,7 +122,6 @@ export class MangoClient {
     const groups = (await this.program.account.group.all(filters)).map(
       (tuple) => Group.from(tuple.publicKey, tuple.account),
     );
-    console.log(groups);
     await groups[0].reloadAll(this);
     return groups[0];
   }
@@ -186,6 +185,7 @@ export class MangoClient {
     const bank = group.banksMap.get(tokenName)!;
 
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
+
     return await this.program.methods
       .tokenDeregister()
       .accounts({
@@ -193,7 +193,7 @@ export class MangoClient {
         admin: adminPk,
         bank: bank.publicKey,
         vault: bank.vault,
-        dustVault: getAssociatedTokenAddress(bank.mint, adminPk),
+        dustVault: await getAssociatedTokenAddress(bank.mint, adminPk),
         mintInfo: group.mintInfosMap.get(bank.tokenIndex)?.publicKey,
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
@@ -269,8 +269,6 @@ export class MangoClient {
       if (banks[index].name === 'USDC') {
         banks[index].price = 1;
       } else {
-        console.log('parsePriceData(price.data)', parsePriceData(price.data));
-
         banks[index].price = parsePriceData(price.data).previousPrice;
       }
     }
@@ -329,23 +327,23 @@ export class MangoClient {
     group: Group,
     mintPk?: PublicKey,
   ): Promise<StubOracle[]> {
-    const filters = [
-      {
-        memcmp: {
-          bytes: group.publicKey.toBase58(),
-          offset: 8,
-        },
-      },
-    ];
+    const filters = [];
 
-    if (mintPk) {
-      filters.push({
-        memcmp: {
-          bytes: mintPk.toBase58(),
-          offset: 40,
-        },
-      });
-    }
+    // filters.push({
+    //   memcmp: {
+    //     bytes: group.publicKey.toBase58(),
+    //     offset: 8,
+    //   },
+    // });
+
+    // if (mintPk) {
+    //   filters.push({
+    //     memcmp: {
+    //       bytes: mintPk.toBase58(),
+    //       offset: 40,
+    //     },
+    //   });
+    // }
 
     return (await this.program.account.stubOracle.all(filters)).map((pa) =>
       StubOracle.from(pa.publicKey, pa.account),

@@ -1,8 +1,14 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  Token,
+  TOKEN_PROGRAM_ID,
+} from '@solana/spl-token';
+import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
+import { getAssociatedTokenAddress } from '../utils';
 
 const MAINNET_MINTS = new Map([
   ['USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'],
@@ -36,15 +42,40 @@ async function main() {
   let sig;
 
   // close stub oracle
-  const usdcDevnetMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
-  const usdcDevnetOracle = await client.getStubOracle(group, usdcDevnetMint)[0];
-  sig = await client.closeStubOracle(group, usdcDevnetOracle.publicKey);
-  console.log(
-    `Closed USDC stub oracle, sig https://explorer.solana.com/address/${sig}`,
+  // const usdcMainnetMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
+  // const usdcMainnetOracle = await client.getStubOracle(
+  //   group,
+  //   usdcMainnetMint,
+  // )[0];
+  // console.log(usdcMainnetOracle);
+  // sig = await client.closeStubOracle(group, usdcMainnetOracle.publicKey);
+  // sig = await client.closeStubOracle(
+  //   group,
+  //   new PublicKey('A9XhGqUUjV992cD36qWDY8wDiZnGuCaUWtSE3NGXjDCb'),
+  // );
+  // console.log(
+  //   `Closed USDC stub oracle, sig https://explorer.solana.com/address/${sig}`,
+  // );
+
+  let tx = new Transaction();
+  tx.add(
+    Token.createAssociatedTokenAccountInstruction(
+      ASSOCIATED_TOKEN_PROGRAM_ID,
+      TOKEN_PROGRAM_ID,
+      new PublicKey('So11111111111111111111111111111111111111112'),
+      await getAssociatedTokenAddress(
+        new PublicKey('So11111111111111111111111111111111111111112'),
+        admin.publicKey,
+      ),
+      admin.publicKey,
+      admin.publicKey,
+    ),
   );
+  await client.program.provider.sendAndConfirm(tx);
 
   // close all bank
   for (const bank of group.banksMap.values()) {
+    console.log(`Removing token ${bank.name}...`);
     sig = await client.tokenDeregister(group, bank.name);
     console.log(
       `Removed token ${bank.name}, sig https://explorer.solana.com/address/${sig}`,
