@@ -119,10 +119,12 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
     // Check pre-cpi health
     // NOTE: This health check isn't strictly necessary. It will be, later, when
     // we want to have reduce_only or be able to move an account out of bankruptcy.
-    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
-    let pre_cpi_health = compute_health(&account, HealthType::Init, &retriever)?;
-    require!(pre_cpi_health >= 0, MangoError::HealthMustBePositive);
-    msg!("pre_cpi_health {:?}", pre_cpi_health);
+    {
+        let retriever = new_fixed_order_account_retriever(health_ais, &account)?;
+        let pre_cpi_health = compute_health(&account, HealthType::Init, &retriever)?;
+        require!(pre_cpi_health >= 0, MangoError::HealthMustBePositive);
+        msg!("pre_cpi_health {:?}", pre_cpi_health);
+    }
 
     let all_cpi_ais = &ctx.remaining_accounts[num_health_accounts..];
     let mut all_cpi_ams = all_cpi_ais
@@ -325,30 +327,23 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
         adjust_for_post_cpi_vault_amounts(health_ais, all_cpi_ais, &used_vaults, &mut account)?;
 
     // Check post-cpi health
-    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
+    let retriever = new_fixed_order_account_retriever(health_ais, &account)?;
     let post_cpi_health = compute_health(&account, HealthType::Init, &retriever)?;
     require!(post_cpi_health >= 0, MangoError::HealthMustBePositive);
     msg!("post_cpi_health {:?}", post_cpi_health);
-
-    // Deactivate inactive token accounts after health check
-    for raw_token_index in inactive_tokens {
-        account.tokens.deactivate(raw_token_index);
-    }
 
     // Token balances logging
     let mut token_indexes = Vec::with_capacity(used_vaults.len());
     let mut post_indexed_positions = Vec::with_capacity(used_vaults.len());
     for (_, info) in used_vaults.iter() {
-        let bank = health_ais[info.bank_health_ai_index].load_mut::<Bank>()?;
-        token_indexes.push(bank.token_index as u16);
-
-        let position = account.tokens.get_mut_raw(info.raw_token_index);
+        let position = account.tokens.get_raw(info.raw_token_index);
         post_indexed_positions.push(position.indexed_position.to_bits());
+        token_indexes.push(position.token_index as u16);
 
-        let (_, oracle_price) = retriever.bank_and_oracle(
+        let (bank, oracle_price) = retriever.bank_and_oracle(
             &ctx.accounts.group.key(),
             info.bank_health_ai_index,
-            bank.token_index,
+            position.token_index,
         )?;
 
         emit!(TokenBalanceLog {
@@ -367,6 +362,11 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
         pre_indexed_positions,
         post_indexed_positions,
     });
+
+    // Deactivate inactive token accounts at the end
+    for raw_token_index in inactive_tokens {
+        account.tokens.deactivate(raw_token_index);
+    }
 
     Ok(())
 }
