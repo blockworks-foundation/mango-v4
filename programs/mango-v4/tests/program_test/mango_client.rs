@@ -13,6 +13,7 @@ use solana_program::instruction::Instruction;
 use solana_sdk::instruction;
 use solana_sdk::signature::{Keypair, Signer};
 use solana_sdk::transport::TransportError;
+use spl_associated_token_account::get_associated_token_address;
 
 use std::str::FromStr;
 
@@ -623,6 +624,7 @@ pub struct TokenDeregisterInstruction<'keypair> {
     pub payer: &'keypair Keypair,
     pub group: Pubkey,
     pub mint: Pubkey,
+    pub dust_vault: Pubkey,
     pub token_index: TokenIndex,
     pub sol_destination: Pubkey,
 }
@@ -671,6 +673,7 @@ impl<'keypair> ClientInstruction for TokenDeregisterInstruction<'keypair> {
             group: self.group,
             bank,
             vault,
+            dust_vault: self.dust_vault,
             mint_info,
             sol_destination: self.sol_destination,
             token_program: Token::id(),

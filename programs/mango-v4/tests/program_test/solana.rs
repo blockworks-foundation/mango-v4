@@ -13,6 +13,7 @@ use solana_sdk::{
     signature::{Keypair, Signer},
     transaction::Transaction,
 };
+use spl_associated_token_account::{create_associated_token_account, get_associated_token_address};
 use spl_token::*;
 
 pub struct SolanaCookie {
@@ -132,6 +133,24 @@ impl SolanaCookie {
             .await
             .unwrap();
         key.pubkey()
+    }
+
+    #[allow(dead_code)]
+    pub async fn create_associated_token_account(
+        &self,
+        payer: &Keypair,
+        owner: &Keypair,
+        mint: &Pubkey,
+    ) -> Pubkey {
+        let ixs = &[create_associated_token_account(
+            &self.context.borrow().payer.pubkey(),
+            &owner.pubkey(),
+            mint,
+        )];
+
+        self.process_transaction(ixs, Some(&[payer])).await.unwrap();
+
+        get_associated_token_address(&owner.pubkey(), mint)
     }
 
     #[allow(dead_code)]

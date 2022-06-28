@@ -167,6 +167,13 @@ async fn test_basic() -> Result<(), TransportError> {
 
     // deregister bank - closes bank, mint info, and bank vault
     let bank_data: Bank = solana.get_account(bank).await;
+    // let dust_vault = solana
+    //     .create_associated_token_account(
+    //         &Keypair::from_base58_string(&solana.context.borrow().payer.to_base58_string()),
+    //         admin,
+    //         &bank_data.mint,
+    //     )
+    //     .await;
     send_tx(
         solana,
         TokenDeregisterInstruction {
@@ -174,6 +181,7 @@ async fn test_basic() -> Result<(), TransportError> {
             payer,
             group,
             mint: bank_data.mint,
+            dust_vault: payer_mint0_account,
             token_index: bank_data.token_index,
             sol_destination: payer.pubkey(),
         },

@@ -25,6 +25,9 @@ pub struct TokenDeregister<'info> {
     #[account(mut)]
     pub vault: Account<'info, TokenAccount>,
 
+    #[account(mut)]
+    pub dust_vault: Account<'info, TokenAccount>,
+
     // match mint info to bank
     #[account(
         mut,
@@ -39,6 +42,18 @@ pub struct TokenDeregister<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+impl<'info> TokenDeregister<'info> {
+    pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
+        let program = self.token_program.to_account_info();
+        let accounts = token::Transfer {
+            from: self.vault.to_account_info(),
+            to: self.dust_vault.to_account_info(),
+            authority: self.group.to_account_info(),
+        };
+        CpiContext::new(program, accounts)
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn token_deregister(ctx: Context<TokenDeregister>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
@@ -49,6 +64,13 @@ pub fn token_deregister(ctx: Context<TokenDeregister>) -> Result<()> {
         authority: ctx.accounts.group.to_account_info(),
     };
     let cpi_program = ctx.accounts.token_program.to_account_info();
+
+    let vault_ta = Account::<TokenAccount>::try_from(ctx.accounts.vault.as_ref())?;
+    token::transfer(
+        ctx.accounts.transfer_ctx().with_signer(&[group_seeds]),
+        vault_ta.amount,
+    )?;
+
     token::close_account(CpiContext::new_with_signer(
         cpi_program,
         cpi_accounts,
