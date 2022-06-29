@@ -89,6 +89,16 @@ export class MangoAccount {
     return ta ? ta.ui(bank) : 0;
   }
 
+  deposits(bank: Bank): number {
+    const ta = this.findToken(bank.tokenIndex);
+    return ta ? ta.uiDeposits(bank) : 0;
+  }
+
+  borrows(bank: Bank): number {
+    const ta = this.findToken(bank.tokenIndex);
+    return ta ? ta.uiBorrows(bank) : 0;
+  }
+
   tokens_active(): TokenPosition[] {
     return this.tokens.filter((token) => token.isActive());
   }
@@ -153,6 +163,20 @@ export class TokenPosition {
 
   public ui(bank: Bank): number {
     return nativeI80F48ToUi(this.native(bank), bank.mintDecimals).toNumber();
+  }
+
+  public uiDeposits(bank: Bank): number {
+    return nativeI80F48ToUi(
+      bank.depositIndex.mul(this.indexedPosition),
+      bank.mintDecimals,
+    ).toNumber();
+  }
+
+  public uiBorrows(bank: Bank): number {
+    return nativeI80F48ToUi(
+      bank.borrowIndex.mul(this.indexedPosition),
+      bank.mintDecimals,
+    ).toNumber();
   }
 
   public toString(group?: Group): String {

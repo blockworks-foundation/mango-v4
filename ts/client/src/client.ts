@@ -553,7 +553,7 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-      .rpc();
+      .rpc({ skipPreflight: true });
   }
 
   // Serum
