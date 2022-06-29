@@ -1,7 +1,7 @@
 use crate::accounts_zerocopy::*;
 use crate::error::MangoError;
 use crate::group_seeds;
-use crate::logs::{FlashLoanLog, TokenBalanceLog};
+use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
 use crate::state::{
     compute_health, compute_health_from_fixed_accounts, new_fixed_order_account_retriever,
     AccountRetriever, Bank, Group, HealthType, MangoAccount, TokenIndex,
@@ -245,14 +245,29 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
     // Check pre-cpi health
     // NOTE: This health check isn't strictly necessary. It will be, later, when
     // we want to have reduce_only or be able to move an account out of bankruptcy.
-    let pre_cpi_health =
-        compute_health_from_fixed_accounts(&account, HealthType::Init, health_ais)?;
+    let retriever = new_fixed_order_account_retriever(health_ais, &account)?;
+    let pre_cpi_health = compute_health(&account, HealthType::Init, &retriever)?;
     require!(pre_cpi_health >= 0, MangoError::HealthMustBePositive);
     msg!("pre_cpi_health {:?}", pre_cpi_health);
 
+    // Prices for logging
+    let mut prices = vec![];
+    for change in &changes {
+        let (_, oracle_price) = retriever.bank_and_oracle(
+            &account.group,
+            change.bank_index,
+            change.raw_token_index as TokenIndex,
+        )?;
+
+        prices.push(oracle_price);
+    }
+    // Drop retriever as mut bank below uses health_ais
+    drop(retriever);
+
     // Apply the vault diffs to the bank positions
     let mut deactivated_token_positions = vec![];
-    for change in &changes {
+    let mut token_loan_details = Vec::with_capacity(changes.len());
+    for (change, price) in changes.iter().zip(prices.iter()) {
         let mut bank = health_ais[change.bank_index].load_mut::<Bank>()?;
         let position = account.tokens.get_mut_raw(change.raw_token_index);
         let native = position.native(&bank);
@@ -275,24 +290,16 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
 
         bank.flash_loan_approved_amount = 0;
         bank.flash_loan_vault_initial = u64::MAX;
-    }
 
-    // Check post-cpi health
-    let retriever = new_fixed_order_account_retriever(health_ais, &account)?;
-    let post_cpi_health = compute_health(&account, HealthType::Init, &retriever)?;
-    require!(post_cpi_health >= 0, MangoError::HealthMustBePositive);
-    msg!("post_cpi_health {:?}", post_cpi_health);
-
-    // Token balance logging
-    let mut token_indexes = vec![];
-    for change in &changes {
-        let (bank, oracle_price) = retriever.bank_and_oracle(
-            &account.group,
-            change.bank_index,
-            change.raw_token_index as TokenIndex,
-        )?;
-
-        let position = account.tokens.get_mut_raw(change.raw_token_index);
+        token_loan_details.push(FlashLoanTokenDetail {
+            token_index: position.token_index,
+            change_amount: change.amount.to_bits(),
+            loan: loan.to_bits(),
+            loan_origination_fee: loan_origination_fee.to_bits(),
+            deposit_index: bank.deposit_index.to_bits(),
+            borrow_index: bank.borrow_index.to_bits(),
+            price: price.to_bits(),
+        });
 
         emit!(TokenBalanceLog {
             mango_account: ctx.accounts.account.key(),
@@ -300,17 +307,20 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
             indexed_position: position.indexed_position.to_bits(),
             deposit_index: bank.deposit_index.to_bits(),
             borrow_index: bank.borrow_index.to_bits(),
-            price: oracle_price.to_bits(),
+            price: price.to_bits(),
         });
-
-        token_indexes.push(position.token_index);
     }
 
     emit!(FlashLoanLog {
         mango_account: ctx.accounts.account.key(),
-        token_indexes,
-        changes: changes.iter().map(|c| c.amount.to_bits()).collect(),
+        token_loan_details: token_loan_details
     });
+
+    // Check post-cpi health
+    let post_cpi_health =
+        compute_health_from_fixed_accounts(&account, HealthType::Init, health_ais)?;
+    require!(post_cpi_health >= 0, MangoError::HealthMustBePositive);
+    msg!("post_cpi_health {:?}", post_cpi_health);
 
     // Deactivate inactive token accounts after health check
     for raw_token_index in deactivated_token_positions {
