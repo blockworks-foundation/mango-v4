@@ -102,7 +102,7 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
         match ai.load::<Bank>() {
             Ok(bank) => {
                 require!(bank.group == account.group, MangoError::SomeError);
-                let (_, raw_token_index) = account.tokens.get_mut_or_create(bank.token_index)?;
+                let (_, raw_token_index, _) = account.tokens.get_mut_or_create(bank.token_index)?;
                 allowed_vaults.insert(bank.vault, (i, raw_token_index));
                 allowed_banks.insert(ai.key, bank);
             }

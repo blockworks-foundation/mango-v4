@@ -65,7 +65,8 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     let mut account = ctx.accounts.account.load_mut()?;
     require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
 
-    let (position, raw_token_index) = account.tokens.get_mut_or_create(token_index)?;
+    let (position, raw_token_index, active_token_index) =
+        account.tokens.get_mut_or_create(token_index)?;
 
     // The bank will also be passed in remainingAccounts. Use an explicit scope
     // to drop the &mut before we borrow it immutably again later.
@@ -108,19 +109,9 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     let indexed_position = position.indexed_position;
 
-    // If the position becomes inactive above the raw token index will change
-    let final_raw_token_index = ctx
-        .remaining_accounts
-        .iter()
-        .position(|account| account.key() == ctx.accounts.bank.key())
-        .ok_or_else(|| error!(MangoError::SomeError));
-
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
-    let (bank, oracle_price) = retriever.bank_and_oracle(
-        &ctx.accounts.group.key(),
-        final_raw_token_index?,
-        token_index,
-    )?;
+    let (bank, oracle_price) =
+        retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
     emit!(TokenBalanceLog {
         mango_account: ctx.accounts.account.key(),
         token_index: token_index,

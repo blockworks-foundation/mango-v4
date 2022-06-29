@@ -62,7 +62,8 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     let mut account = ctx.accounts.account.load_mut()?;
     require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
 
-    let (position, raw_token_index) = account.tokens.get_mut_or_create(token_index)?;
+    let (position, raw_token_index, active_token_index) =
+        account.tokens.get_mut_or_create(token_index)?;
 
     let position_is_active = {
         let mut bank = ctx.accounts.bank.load_mut()?;
@@ -76,7 +77,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
 
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
     let (bank, oracle_price) =
-        retriever.bank_and_oracle(&ctx.accounts.group.key(), raw_token_index, token_index)?;
+        retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
     emit!(TokenBalanceLog {
         mango_account: ctx.accounts.account.key(),
         token_index: token_index,
