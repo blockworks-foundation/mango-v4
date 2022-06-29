@@ -1,6 +1,6 @@
 #![cfg(feature = "test-bpf")]
 
-use mango_v4::state::{Bank, MintInfo};
+use mango_v4::state::*;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, transport::TransportError};
 
@@ -51,7 +51,8 @@ async fn test_update_index() -> Result<(), TransportError> {
                 amount: 10000,
                 account: deposit_account,
                 token_account,
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -77,7 +78,8 @@ async fn test_update_index() -> Result<(), TransportError> {
             amount: 100000,
             account: withdraw_account,
             token_account: payer_mint_accounts[1],
-            token_authority: payer,
+            token_authority: payer.clone(),
+            bank_index: 0,
         },
     )
     .await
@@ -91,6 +93,7 @@ async fn test_update_index() -> Result<(), TransportError> {
             account: withdraw_account,
             owner,
             token_account: context.users[0].token_accounts[0],
+            bank_index: 0,
         },
     )
     .await
@@ -100,14 +103,10 @@ async fn test_update_index() -> Result<(), TransportError> {
 
     solana.advance_clock().await;
 
-    let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
-
     send_tx(
         solana,
         UpdateIndexInstruction {
             mint_info: tokens[0].mint_info,
-            banks: mint_info.banks.to_vec(),
-            oracle: mint_info.oracle,
         },
     )
     .await

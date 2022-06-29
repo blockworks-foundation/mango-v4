@@ -57,7 +57,8 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
                 amount: 10000,
                 account: vault_account,
                 token_account,
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -112,7 +113,8 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
             amount: deposit_amount,
             account,
             token_account: payer_mint_accounts[1],
-            token_authority: payer,
+            token_authority: payer.clone(),
+            bank_index: 0,
         },
     )
     .await
@@ -179,6 +181,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
             account,
             owner,
             token_account: payer_mint_accounts[1],
+            bank_index: 0,
         }
     )
     .await
@@ -207,6 +210,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
             account,
             owner,
             token_account: payer_mint_accounts[1],
+            bank_index: 0,
         },
     )
     .await
@@ -262,7 +266,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
                 amount: 100000,
                 account: vault_account,
                 token_account,
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -293,7 +298,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
             amount: deposit1_amount,
             account,
             token_account: payer_mint_accounts[2],
-            token_authority: payer,
+            token_authority: payer.clone(),
+            bank_index: 0,
         },
     )
     .await
@@ -304,7 +310,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
             amount: deposit2_amount,
             account,
             token_account: payer_mint_accounts[3],
-            token_authority: payer,
+            token_authority: payer.clone(),
+            bank_index: 0,
         },
     )
     .await
@@ -320,6 +327,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
             account,
             owner,
             token_account: payer_mint_accounts[0],
+            bank_index: 0,
         },
     )
     .await
@@ -332,6 +340,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
             account,
             owner,
             token_account: payer_mint_accounts[1],
+            bank_index: 0,
         },
     )
     .await
@@ -365,6 +374,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
             liqor_owner: owner,
             asset_token_index: collateral_token2.index,
             liab_token_index: borrow_token2.index,
+            asset_bank_index: 0,
+            liab_bank_index: 0,
             max_liab_transfer: I80F48::from_num(10000.0),
         },
     )
@@ -381,7 +392,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         0
     );
     let liqee: MangoAccount = solana.get_account(account).await;
-    assert_eq!(liqee.being_liquidated, 1);
+    assert!(liqee.being_liquidated());
+    assert!(!liqee.is_bankrupt());
 
     //
     // TEST: liquidate the remaining borrow2 against collateral1,
@@ -396,6 +408,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
             asset_token_index: collateral_token1.index,
             liab_token_index: borrow_token2.index,
             max_liab_transfer: I80F48::from_num(10000.0),
+            asset_bank_index: 0,
+            liab_bank_index: 0,
         },
     )
     .await
@@ -411,7 +425,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         1000 - 32
     );
     let liqee: MangoAccount = solana.get_account(account).await;
-    assert_eq!(liqee.being_liquidated, 1);
+    assert!(liqee.being_liquidated());
+    assert!(!liqee.is_bankrupt());
 
     //
     // TEST: liquidate borrow1 with collateral1, but place a limit
@@ -425,6 +440,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
             asset_token_index: collateral_token1.index,
             liab_token_index: borrow_token1.index,
             max_liab_transfer: I80F48::from_num(10.0),
+            asset_bank_index: 0,
+            liab_bank_index: 0,
         },
     )
     .await
@@ -440,7 +457,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         1000 - 32 - 21
     );
     let liqee: MangoAccount = solana.get_account(account).await;
-    assert_eq!(liqee.being_liquidated, 1);
+    assert!(liqee.being_liquidated());
+    assert!(!liqee.is_bankrupt());
 
     //
     // TEST: liquidate borrow1 with collateral1, making the account healthy again
@@ -454,6 +472,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
             asset_token_index: collateral_token1.index,
             liab_token_index: borrow_token1.index,
             max_liab_transfer: I80F48::from_num(10000.0),
+            asset_bank_index: 0,
+            liab_bank_index: 0,
         },
     )
     .await
@@ -472,7 +492,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         1000 - 32 - 535 - 1
     );
     let liqee: MangoAccount = solana.get_account(account).await;
-    assert_eq!(liqee.being_liquidated, 0);
+    assert!(!liqee.being_liquidated());
+    assert!(!liqee.is_bankrupt());
 
     Ok(())
 }

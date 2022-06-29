@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 use fixed::types::I80F48;
+use fixed_macro::types::I80F48;
 use serum_dex::state::OpenOrders;
 
 use std::collections::HashMap;
@@ -10,6 +11,8 @@ use crate::error::MangoError;
 use crate::serum3_cpi;
 use crate::state::{oracle_price, Bank, MangoAccount, PerpMarket, PerpMarketIndex, TokenIndex};
 use crate::util::checked_math as cm;
+
+const BANKRUPTCY_DUST_THRESHOLD: I80F48 = I80F48!(0.000001);
 
 /// This trait abstracts how to find accounts needed for the health computation.
 ///
@@ -492,6 +495,29 @@ impl HealthCache {
             .ok_or_else(|| error!(MangoError::SomeError))?;
         entry.balance = cm!(entry.balance + change * entry.oracle_price);
         Ok(())
+    }
+
+    pub fn has_liquidatable_assets(&self) -> bool {
+        let spot_liquidatable = self.token_infos.iter().any(|ti| {
+            ti.balance > BANKRUPTCY_DUST_THRESHOLD || ti.serum3_max_reserved.is_positive()
+        });
+        let perp_liquidatable = self
+            .perp_infos
+            .iter()
+            .any(|p| p.base != 0 || p.quote > BANKRUPTCY_DUST_THRESHOLD);
+        spot_liquidatable || perp_liquidatable
+    }
+
+    pub fn has_borrows(&self) -> bool {
+        let spot_borrows = self
+            .token_infos
+            .iter()
+            .any(|ti| ti.balance < -BANKRUPTCY_DUST_THRESHOLD);
+        let perp_borrows = self
+            .perp_infos
+            .iter()
+            .any(|p| p.quote.is_negative() || p.base != 0);
+        spot_borrows || perp_borrows
     }
 }
 

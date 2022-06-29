@@ -53,7 +53,8 @@ async fn test_delegate() -> Result<(), TransportError> {
             amount: 100,
             account,
             token_account: payer_mint0_account,
-            token_authority: payer,
+            token_authority: payer.clone(),
+            bank_index: 0,
         },
     )
     .await
@@ -108,6 +109,7 @@ async fn test_delegate() -> Result<(), TransportError> {
                 account,
                 owner: delegate,
                 token_account: payer_mint0_account,
+                bank_index: 0,
             },
         )
         .await;
@@ -127,6 +129,7 @@ async fn test_delegate() -> Result<(), TransportError> {
                 account,
                 owner,
                 token_account: payer_mint0_account,
+                bank_index: 0,
             },
         )
         .await

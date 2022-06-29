@@ -302,6 +302,20 @@ pub mod mango_v4 {
         )
     }
 
+    pub fn liq_token_bankruptcy(
+        ctx: Context<LiqTokenBankruptcy>,
+        //asset_token_index: TokenIndex,
+        liab_token_index: TokenIndex,
+        //max_liab_transfer: I80F48,
+    ) -> Result<()> {
+        instructions::liq_token_bankruptcy(
+            ctx,
+            //asset_token_index,
+            liab_token_index,
+            //max_liab_transfer,
+        )
+    }
+
     ///
     /// Perps
     ///

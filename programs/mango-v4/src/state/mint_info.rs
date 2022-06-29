@@ -2,9 +2,9 @@ use anchor_lang::prelude::*;
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
-use crate::{accounts_zerocopy::LoadZeroCopyRef, error::MangoError};
+use crate::error::MangoError;
 
-use super::{Bank, TokenIndex};
+use super::TokenIndex;
 
 pub const MAX_BANKS: usize = 6;
 
@@ -47,29 +47,19 @@ impl MintInfo {
         self.vaults[0]
     }
 
-    pub fn verify_banks_ais(&self, all_bank_ais: &[AccountInfo]) -> Result<()> {
-        let total_banks = self
-            .banks
+    pub fn num_banks(&self) -> usize {
+        self.banks
             .iter()
-            .filter(|bank| *bank != &Pubkey::default())
-            .count();
-        require_eq!(total_banks, all_bank_ais.len());
+            .position(|&b| b == Pubkey::default())
+            .unwrap_or(MAX_BANKS)
+    }
 
-        for (idx, ai) in all_bank_ais.iter().enumerate() {
-            match ai.load::<Bank>() {
-                Ok(bank) => {
-                    if self.token_index != bank.token_index
-                        || self.group != bank.group
-                        // todo: just below check should be enough, above 2 checks are superfluous and defensive
-                        || self.banks[idx] != ai.key()
-                    {
-                        return Err(error!(MangoError::SomeError));
-                    }
-                }
-                Err(error) => return Err(error),
-            }
-        }
+    pub fn banks(&self) -> &[Pubkey] {
+        &self.banks[..self.num_banks()]
+    }
 
+    pub fn verify_banks_ais(&self, all_bank_ais: &[AccountInfo]) -> Result<()> {
+        require!(all_bank_ais.iter().map(|ai| ai.key).eq(self.banks().iter()), MangoError::SomeError);
         Ok(())
     }
 }

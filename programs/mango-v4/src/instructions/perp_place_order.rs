@@ -79,7 +79,7 @@ pub fn perp_place_order(
     limit: u8,
 ) -> Result<()> {
     let mut mango_account = ctx.accounts.account.load_mut()?;
-    require!(mango_account.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!mango_account.is_bankrupt(), MangoError::IsBankrupt);
     let mango_account_pk = ctx.accounts.account.key();
 
     {

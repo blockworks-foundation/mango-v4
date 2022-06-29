@@ -59,7 +59,8 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
                 amount: deposit_amount,
                 account,
                 token_account,
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -169,7 +170,8 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
                 amount: 10,
                 account,
                 token_account: payer_mint_accounts[0],
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -226,7 +228,8 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
             amount: 1000,
             account,
             token_account: payer_mint_accounts[0],
-            token_authority: payer,
+            token_authority: payer.clone(),
+            bank_index: 0,
         },
     )
     .await
@@ -323,7 +326,8 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 amount: 10,
                 account,
                 token_account: payer_mint_accounts[0],
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
