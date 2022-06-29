@@ -1,7 +1,11 @@
 use crate::accounts_zerocopy::*;
 use crate::error::MangoError;
 use crate::group_seeds;
-use crate::state::{compute_health_from_fixed_accounts, Bank, Group, HealthType, MangoAccount};
+use crate::logs::{FlashLoanLog, TokenBalanceLog};
+use crate::state::{
+    compute_health, compute_health_from_fixed_accounts, new_fixed_order_account_retriever,
+    AccountRetriever, Bank, Group, HealthType, MangoAccount, TokenIndex,
+};
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
@@ -248,7 +252,7 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
 
     // Apply the vault diffs to the bank positions
     let mut deactivated_token_positions = vec![];
-    for change in changes {
+    for change in &changes {
         let mut bank = health_ais[change.bank_index].load_mut::<Bank>()?;
         let position = account.tokens.get_mut_raw(change.raw_token_index);
         let native = position.native(&bank);
@@ -274,10 +278,39 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
     }
 
     // Check post-cpi health
-    let post_cpi_health =
-        compute_health_from_fixed_accounts(&account, HealthType::Init, health_ais)?;
+    let retriever = new_fixed_order_account_retriever(health_ais, &account)?;
+    let post_cpi_health = compute_health(&account, HealthType::Init, &retriever)?;
     require!(post_cpi_health >= 0, MangoError::HealthMustBePositive);
     msg!("post_cpi_health {:?}", post_cpi_health);
+
+    // Token balance logging
+    let mut token_indexes = vec![];
+    for change in &changes {
+        let (bank, oracle_price) = retriever.bank_and_oracle(
+            &account.group,
+            change.bank_index,
+            change.raw_token_index as TokenIndex,
+        )?;
+
+        let position = account.tokens.get_mut_raw(change.raw_token_index);
+
+        emit!(TokenBalanceLog {
+            mango_account: ctx.accounts.account.key(),
+            token_index: bank.token_index as u16,
+            indexed_position: position.indexed_position.to_bits(),
+            deposit_index: bank.deposit_index.to_bits(),
+            borrow_index: bank.borrow_index.to_bits(),
+            price: oracle_price.to_bits(),
+        });
+
+        token_indexes.push(position.token_index);
+    }
+
+    emit!(FlashLoanLog {
+        mango_account: ctx.accounts.account.key(),
+        token_indexes,
+        changes: changes.iter().map(|c| c.amount.to_bits()).collect(),
+    });
 
     // Deactivate inactive token accounts after health check
     for raw_token_index in deactivated_token_positions {

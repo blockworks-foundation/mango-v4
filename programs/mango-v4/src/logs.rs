@@ -54,6 +54,13 @@ pub struct MarginTradeLog {
 }
 
 #[event]
+pub struct FlashLoanLog {
+    pub mango_account: Pubkey,
+    pub token_indexes: Vec<u16>,
+    pub changes: Vec<i128>,
+}
+
+#[event]
 pub struct WithdrawLog {
     pub mango_account: Pubkey,
     pub signer: Pubkey,
