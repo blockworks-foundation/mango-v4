@@ -723,10 +723,10 @@ pub struct MangoAccount {
     pub perps: MangoAccountPerpPositions,
 
     /// This account cannot open new positions or borrow until `init_health >= 0`
-    pub being_liquidated: u8,
+    being_liquidated: u8,
 
     /// This account cannot do anything except go through `resolve_bankruptcy`
-    pub is_bankrupt: u8,
+    is_bankrupt: u8,
 
     pub account_num: u8,
     pub bump: u8,
@@ -769,6 +769,22 @@ impl MangoAccount {
         std::str::from_utf8(&self.name)
             .unwrap()
             .trim_matches(char::from(0))
+    }
+
+    pub fn is_bankrupt(&self) -> bool {
+        self.is_bankrupt != 0
+    }
+
+    pub fn set_bankrupt(&mut self, b: bool) {
+        self.is_bankrupt = if b { 1 } else { 0 };
+    }
+
+    pub fn being_liquidated(&self) -> bool {
+        self.being_liquidated != 0
+    }
+
+    pub fn set_being_liquidated(&mut self, b: bool) {
+        self.being_liquidated = if b { 1 } else { 0 };
     }
 }
 

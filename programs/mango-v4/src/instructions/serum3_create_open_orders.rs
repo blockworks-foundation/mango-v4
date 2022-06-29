@@ -52,7 +52,7 @@ pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result
 
     let serum_market = ctx.accounts.serum_market.load()?;
     let mut account = ctx.accounts.account.load_mut()?;
-    require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!account.is_bankrupt(), MangoError::IsBankrupt);
     let serum_account = account.serum3.create(serum_market.market_index)?;
     serum_account.open_orders = ctx.accounts.open_orders.key();
     serum_account.base_token_index = serum_market.base_token_index;

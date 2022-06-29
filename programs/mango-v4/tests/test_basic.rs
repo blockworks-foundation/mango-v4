@@ -63,7 +63,8 @@ async fn test_basic() -> Result<(), TransportError> {
                 amount: deposit_amount,
                 account,
                 token_account: payer_mint0_account,
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -111,6 +112,7 @@ async fn test_basic() -> Result<(), TransportError> {
                 account,
                 owner,
                 token_account: payer_mint0_account,
+                bank_index: 0,
             },
         )
         .await
@@ -141,10 +143,6 @@ async fn test_basic() -> Result<(), TransportError> {
         solana,
         UpdateIndexInstruction {
             mint_info: tokens[0].mint_info,
-            banks: {
-                let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
-                mint_info.banks.to_vec()
-            },
         },
     )
     .await
@@ -158,6 +156,7 @@ async fn test_basic() -> Result<(), TransportError> {
             account,
             owner,
             token_account: payer_mint0_account,
+            bank_index: 0,
         },
     )
     .await

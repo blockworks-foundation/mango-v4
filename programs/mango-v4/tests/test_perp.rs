@@ -70,7 +70,8 @@ async fn test_perp() -> Result<(), TransportError> {
                 amount: deposit_amount,
                 account: account_0,
                 token_account: payer_mint_accounts[0],
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -82,7 +83,8 @@ async fn test_perp() -> Result<(), TransportError> {
                 amount: deposit_amount,
                 account: account_0,
                 token_account: payer_mint_accounts[1],
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -98,7 +100,8 @@ async fn test_perp() -> Result<(), TransportError> {
                 amount: deposit_amount,
                 account: account_1,
                 token_account: payer_mint_accounts[0],
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -110,7 +113,8 @@ async fn test_perp() -> Result<(), TransportError> {
                 amount: deposit_amount,
                 account: account_1,
                 token_account: payer_mint_accounts[1],
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await

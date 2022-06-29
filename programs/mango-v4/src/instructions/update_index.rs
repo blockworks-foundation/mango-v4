@@ -16,12 +16,7 @@ pub struct UpdateIndex<'info> {
 pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
     let mint_info = ctx.accounts.mint_info.load()?;
 
-    let total_banks = mint_info
-        .banks
-        .iter()
-        .filter(|bank| *bank != &Pubkey::default())
-        .count();
-
+    let total_banks = mint_info.num_banks();
     require_eq!(total_banks, ctx.remaining_accounts.len());
     let all_banks = ctx.remaining_accounts;
     check_banks(all_banks, &mint_info)?;

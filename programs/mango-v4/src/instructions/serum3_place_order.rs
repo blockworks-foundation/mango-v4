@@ -168,7 +168,7 @@ pub fn serum3_place_order(
     //
     {
         let account = ctx.accounts.account.load()?;
-        require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
+        require!(!account.is_bankrupt(), MangoError::IsBankrupt);
 
         // Validate open_orders
         require!(

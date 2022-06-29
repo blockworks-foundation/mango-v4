@@ -34,7 +34,7 @@ pub fn perp_cancel_order_by_client_order_id(
     client_order_id: u64,
 ) -> Result<()> {
     let mut mango_account = ctx.accounts.account.load_mut()?;
-    require!(mango_account.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!mango_account.is_bankrupt(), MangoError::IsBankrupt);
 
     let perp_market = ctx.accounts.perp_market.load_mut()?;
     let bids = ctx.accounts.bids.load_mut()?;

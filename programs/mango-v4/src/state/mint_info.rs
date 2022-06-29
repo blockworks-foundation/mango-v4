@@ -44,4 +44,15 @@ impl MintInfo {
     pub fn first_vault(&self) -> Pubkey {
         self.vaults[0]
     }
+
+    pub fn num_banks(&self) -> usize {
+        self.banks
+            .iter()
+            .position(|&b| b == Pubkey::default())
+            .unwrap_or(MAX_BANKS)
+    }
+
+    pub fn banks(&self) -> &[Pubkey] {
+        &self.banks[..self.num_banks()]
+    }
 }

@@ -40,11 +40,7 @@ pub fn token_deregister<'key, 'accounts, 'remaining, 'info>(
 ) -> Result<()> {
     let mint_info = ctx.accounts.mint_info.load()?;
     {
-        let total_banks = mint_info
-            .banks
-            .iter()
-            .filter(|bank| *bank != &Pubkey::default())
-            .count();
+        let total_banks = mint_info.num_banks();
         require_eq!(total_banks * 2, ctx.remaining_accounts.len());
     }
 

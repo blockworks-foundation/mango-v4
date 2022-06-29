@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
 
+use crate::error::*;
 use crate::state::*;
 
 #[derive(Accounts)]
@@ -32,9 +33,9 @@ pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
     }
 
     let account = ctx.accounts.account.load()?;
-    require_eq!(account.being_liquidated, 0);
+    require!(!account.being_liquidated(), MangoError::SomeError);
+    require!(!account.is_bankrupt(), MangoError::SomeError);
     require_eq!(account.delegate, Pubkey::default());
-    require_eq!(account.is_bankrupt, 0);
     for ele in account.tokens.values {
         require_eq!(ele.is_active(), false);
     }

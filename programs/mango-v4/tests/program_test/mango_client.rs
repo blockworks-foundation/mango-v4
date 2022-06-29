@@ -13,7 +13,6 @@ use solana_program::instruction::Instruction;
 use solana_sdk::instruction;
 use solana_sdk::signature::{Keypair, Signer};
 use solana_sdk::transport::TransportError;
-use spl_associated_token_account::get_associated_token_address;
 
 use std::str::FromStr;
 use std::sync::Arc;
@@ -233,7 +232,9 @@ async fn derive_liquidation_remaining_account_metas(
     liqee: &MangoAccount,
     liqor: &MangoAccount,
     asset_token_index: TokenIndex,
+    asset_bank_index: usize,
     liab_token_index: TokenIndex,
+    liab_bank_index: usize,
 ) -> Vec<AccountMeta> {
     let mut banks = vec![];
     let mut oracles = vec![];
@@ -245,7 +246,13 @@ async fn derive_liquidation_remaining_account_metas(
         .unique();
     for token_index in token_indexes {
         let mint_info = get_mint_info_by_token_index(account_loader, liqee, token_index).await;
-        let writable_bank = token_index == asset_token_index || token_index == liab_token_index;
+        let (bank_index, writable_bank) = if token_index == asset_token_index {
+            (asset_bank_index, true)
+        } else if token_index == liab_token_index {
+            (liab_bank_index, true)
+        } else {
+            (0, false)
+        };
         // TODO: ALTs are unavailable
         // let lookup_table = account_loader
         //     .load_bytes(&mint_info.address_lookup_table)
@@ -257,7 +264,7 @@ async fn derive_liquidation_remaining_account_metas(
         //     writable_bank,
         // ));
         // oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
-        banks.push((mint_info.first_bank(), writable_bank));
+        banks.push((mint_info.banks[bank_index], writable_bank));
         oracles.push(mint_info.oracle);
     }
 
@@ -629,6 +636,7 @@ pub struct TokenWithdrawInstruction<'keypair> {
     pub account: Pubkey,
     pub owner: &'keypair Keypair,
     pub token_account: Pubkey,
+    pub bank_index: usize,
 }
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for TokenWithdrawInstruction<'keypair> {
@@ -661,7 +669,7 @@ impl<'keypair> ClientInstruction for TokenWithdrawInstruction<'keypair> {
         let health_check_metas = derive_health_check_remaining_account_metas(
             &account_loader,
             &account,
-            Some(mint_info.first_bank()),
+            Some(mint_info.banks[self.bank_index]),
             false,
             None,
         )
@@ -671,8 +679,8 @@ impl<'keypair> ClientInstruction for TokenWithdrawInstruction<'keypair> {
             group: account.group,
             account: self.account,
             owner: self.owner.pubkey(),
-            bank: mint_info.first_bank(),
-            vault: mint_info.first_vault(),
+            bank: mint_info.banks[self.bank_index],
+            vault: mint_info.vaults[self.bank_index],
             token_account: self.token_account,
             token_program: Token::id(),
         };
@@ -688,15 +696,16 @@ impl<'keypair> ClientInstruction for TokenWithdrawInstruction<'keypair> {
     }
 }
 
-pub struct TokenDepositInstruction<'keypair> {
+pub struct TokenDepositInstruction {
     pub amount: u64,
 
     pub account: Pubkey,
     pub token_account: Pubkey,
-    pub token_authority: &'keypair Keypair,
+    pub token_authority: Keypair,
+    pub bank_index: usize,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for TokenDepositInstruction<'keypair> {
+impl ClientInstruction for TokenDepositInstruction {
     type Accounts = mango_v4::accounts::TokenDeposit;
     type Instruction = mango_v4::instruction::TokenDeposit;
     async fn to_instruction(
@@ -725,7 +734,7 @@ impl<'keypair> ClientInstruction for TokenDepositInstruction<'keypair> {
         let health_check_metas = derive_health_check_remaining_account_metas(
             &account_loader,
             &account,
-            Some(mint_info.first_bank()),
+            Some(mint_info.banks[self.bank_index]),
             false,
             None,
         )
@@ -734,8 +743,8 @@ impl<'keypair> ClientInstruction for TokenDepositInstruction<'keypair> {
         let accounts = Self::Accounts {
             group: account.group,
             account: self.account,
-            bank: mint_info.first_bank(),
-            vault: mint_info.first_vault(),
+            bank: mint_info.banks[self.bank_index],
+            vault: mint_info.vaults[self.bank_index],
             token_account: self.token_account,
             token_authority: self.token_authority.pubkey(),
             token_program: Token::id(),
@@ -748,7 +757,7 @@ impl<'keypair> ClientInstruction for TokenDepositInstruction<'keypair> {
     }
 
     fn signers(&self) -> Vec<&Keypair> {
-        vec![self.token_authority]
+        vec![&self.token_authority]
     }
 }
 
@@ -879,7 +888,6 @@ pub struct TokenAddBankInstruction<'keypair> {
 
     pub group: Pubkey,
     pub admin: &'keypair Keypair,
-    pub mint: Pubkey,
     pub address_lookup_table: Pubkey,
     pub payer: &'keypair Keypair,
 }
@@ -889,7 +897,7 @@ impl<'keypair> ClientInstruction for TokenAddBankInstruction<'keypair> {
     type Instruction = mango_v4::instruction::TokenAddBank;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -927,12 +935,12 @@ impl<'keypair> ClientInstruction for TokenAddBankInstruction<'keypair> {
             &program_id,
         )
         .0;
+
+        let existing_bank_data: Bank = account_loader.load(&existing_bank).await.unwrap();
+        let mint = existing_bank_data.mint;
+
         let mint_info = Pubkey::find_program_address(
-            &[
-                self.group.as_ref(),
-                b"MintInfo".as_ref(),
-                self.mint.as_ref(),
-            ],
+            &[self.group.as_ref(), b"MintInfo".as_ref(), mint.as_ref()],
             &program_id,
         )
         .0;
@@ -940,7 +948,7 @@ impl<'keypair> ClientInstruction for TokenAddBankInstruction<'keypair> {
         let accounts = Self::Accounts {
             group: self.group,
             admin: self.admin.pubkey(),
-            mint: self.mint,
+            mint: mint,
             existing_bank,
             bank,
             vault,
@@ -1939,7 +1947,9 @@ pub struct LiqTokenWithTokenInstruction<'keypair> {
     pub liqor_owner: &'keypair Keypair,
 
     pub asset_token_index: TokenIndex,
+    pub asset_bank_index: usize,
     pub liab_token_index: TokenIndex,
+    pub liab_bank_index: usize,
     pub max_liab_transfer: I80F48,
 }
 #[async_trait::async_trait(?Send)]
@@ -1964,7 +1974,9 @@ impl<'keypair> ClientInstruction for LiqTokenWithTokenInstruction<'keypair> {
             &liqee,
             &liqor,
             self.asset_token_index,
+            self.asset_bank_index,
             self.liab_token_index,
+            self.liab_bank_index,
         )
         .await;
 
@@ -1976,6 +1988,74 @@ impl<'keypair> ClientInstruction for LiqTokenWithTokenInstruction<'keypair> {
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.liqor_owner]
+    }
+}
+
+pub struct LiqTokenBankruptcyInstruction<'keypair> {
+    pub liqee: Pubkey,
+    pub liqor: Pubkey,
+    pub liqor_owner: &'keypair Keypair,
+
+    //pub asset_token_index: TokenIndex,
+    pub liab_token_index: TokenIndex,
+    //pub max_liab_transfer: I80F48,
+    pub liab_mint_info: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for LiqTokenBankruptcyInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::LiqTokenBankruptcy;
+    type Instruction = mango_v4::instruction::LiqTokenBankruptcy;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            //asset_token_index: self.asset_token_index,
+            liab_token_index: self.liab_token_index,
+            //max_liab_transfer: self.max_liab_transfer,
+        };
+
+        let liab_mint_info: MintInfo = account_loader.load(&self.liab_mint_info).await.unwrap();
+        let liqee: MangoAccount = account_loader.load(&self.liqee).await.unwrap();
+        let liqor: MangoAccount = account_loader.load(&self.liqor).await.unwrap();
+        let health_check_metas = derive_liquidation_remaining_account_metas(
+            &account_loader,
+            &liqee,
+            &liqor,
+            self.liab_token_index, //self.asset_token_index,
+            0,
+            self.liab_token_index,
+            0, // TODO: this might matter if the insurance fund gets involved?
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: liqee.group,
+            liqee: self.liqee,
+            liqor: self.liqor,
+            liqor_owner: self.liqor_owner.pubkey(),
+            liab_mint_info: self.liab_mint_info,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        let mut bank_ams = liab_mint_info
+            .banks()
+            .iter()
+            .map(|bank| AccountMeta {
+                pubkey: *bank,
+                is_signer: false,
+                is_writable: true,
+            })
+            .collect::<Vec<_>>();
+        instruction.accounts.append(&mut bank_ams);
         instruction.accounts.extend(health_check_metas.into_iter());
 
         (accounts, instruction)
@@ -2386,7 +2466,6 @@ impl ClientInstruction for BenchmarkInstruction {
 }
 pub struct UpdateIndexInstruction {
     pub mint_info: Pubkey,
-    pub banks: Vec<Pubkey>,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for UpdateIndexInstruction {
@@ -2394,7 +2473,7 @@ impl ClientInstruction for UpdateIndexInstruction {
     type Instruction = mango_v4::instruction::UpdateIndex;
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -2402,11 +2481,12 @@ impl ClientInstruction for UpdateIndexInstruction {
             mint_info: self.mint_info,
         };
 
+        let mint_info: MintInfo = loader.load(&self.mint_info).await.unwrap();
+
         let mut instruction = make_instruction(program_id, &accounts, instruction);
-        let mut bank_ams = self
-            .banks
+        let mut bank_ams = mint_info
+            .banks()
             .iter()
-            .filter(|bank| **bank != Pubkey::default())
             .map(|bank| AccountMeta {
                 pubkey: *bank,
                 is_signer: false,

@@ -35,7 +35,7 @@ pub fn perp_cancel_all_orders_by_side(
     limit: u8,
 ) -> Result<()> {
     let mut mango_account = ctx.accounts.account.load_mut()?;
-    require!(mango_account.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!mango_account.is_bankrupt(), MangoError::IsBankrupt);
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
     let bids = ctx.accounts.bids.load_mut()?;

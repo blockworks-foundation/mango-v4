@@ -161,7 +161,7 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
     let group_seeds = group_seeds!(group);
 
     let mut account = ctx.accounts.account.load_mut()?;
-    require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!account.is_bankrupt(), MangoError::IsBankrupt);
 
     // Find index at which vaults start
     let vaults_index = ctx

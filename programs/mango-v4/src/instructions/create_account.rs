@@ -38,8 +38,8 @@ pub fn create_account(ctx: Context<CreateAccount>, account_num: u8, name: String
     account.tokens = MangoAccountTokenPositions::default();
     account.serum3 = MangoAccountSerum3Orders::default();
     account.perps = MangoAccountPerpPositions::default();
-    account.being_liquidated = 0;
-    account.is_bankrupt = 0;
+    account.set_being_liquidated(false);
+    account.set_bankrupt(false);
 
     Ok(())
 }

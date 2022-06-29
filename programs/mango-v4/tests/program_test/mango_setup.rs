@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use anchor_lang::prelude::*;
+use mango_v4::state::AccountRetriever;
 use solana_sdk::signature::Keypair;
 
 use super::mango_client::*;
@@ -18,6 +19,7 @@ pub struct Token {
     pub mint: MintCookie,
     pub oracle: Pubkey,
     pub bank: Pubkey,
+    pub bank1: Pubkey,
     pub vault: Pubkey,
     pub mint_info: Pubkey,
 }
@@ -94,14 +96,13 @@ impl<'a> GroupWithTokensConfig<'a> {
             )
             .await
             .unwrap();
-            let _ = send_tx(
+            let add_bank_accounts = send_tx(
                 solana,
                 TokenAddBankInstruction {
                     token_index,
                     bank_num: 1,
                     group,
                     admin,
-                    mint: mint.pubkey,
                     address_lookup_table,
                     payer,
                 },
@@ -117,6 +118,7 @@ impl<'a> GroupWithTokensConfig<'a> {
                 mint: mint.clone(),
                 oracle,
                 bank,
+                bank1: add_bank_accounts.bank,
                 vault,
                 mint_info,
             });
