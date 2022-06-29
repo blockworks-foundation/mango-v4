@@ -13,6 +13,7 @@ use solana_program::instruction::Instruction;
 use solana_sdk::instruction;
 use solana_sdk::signature::{Keypair, Signer};
 use solana_sdk::transport::TransportError;
+use spl_associated_token_account::get_associated_token_address;
 
 use std::str::FromStr;
 use std::sync::Arc;
@@ -970,6 +971,7 @@ pub struct TokenDeregisterInstruction<'keypair> {
     pub mint_info: Pubkey,
     pub banks: Vec<Pubkey>,
     pub vaults: Vec<Pubkey>,
+    pub dust_vault: Pubkey,
     pub token_index: TokenIndex,
     pub sol_destination: Pubkey,
 }
@@ -991,6 +993,7 @@ impl<'keypair> ClientInstruction for TokenDeregisterInstruction<'keypair> {
             admin: self.admin.pubkey(),
             group: self.group,
             mint_info: self.mint_info,
+            dust_vault: self.dust_vault,
             sol_destination: self.sol_destination,
             token_program: Token::id(),
         };
@@ -1018,7 +1021,6 @@ impl<'keypair> ClientInstruction for TokenDeregisterInstruction<'keypair> {
             })
             .flat_map(|vec| vec.into_iter())
             .collect::<Vec<_>>();
-        dbg!(ams.clone());
         instruction.accounts.append(&mut ams);
 
         (accounts, instruction)
