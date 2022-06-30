@@ -124,7 +124,6 @@ export class MangoClient {
     const groups = (await this.program.account.group.all(filters)).map(
       (tuple) => Group.from(tuple.publicKey, tuple.account),
     );
-    console.log(groups);
     await groups[0].reloadAll(this);
     return groups[0];
   }
@@ -187,14 +186,34 @@ export class MangoClient {
     tokenName: string,
   ): Promise<TransactionSignature> {
     const bank = group.banksMap.get(tokenName)!;
-
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
+
+    const dustVaultPk = await getAssociatedTokenAddress(bank.mint, adminPk);
+    const ai = await this.program.provider.connection.getAccountInfo(
+      dustVaultPk,
+    );
+    if (!ai) {
+      const tx = new Transaction();
+      tx.add(
+        Token.createAssociatedTokenAccountInstruction(
+          ASSOCIATED_TOKEN_PROGRAM_ID,
+          TOKEN_PROGRAM_ID,
+          bank.mint,
+          dustVaultPk,
+          adminPk,
+          adminPk,
+        ),
+      );
+      await this.program.provider.sendAndConfirm(tx);
+    }
+
     return await this.program.methods
       .tokenDeregister(bank.tokenIndex)
       .accounts({
         group: group.publicKey,
         admin: adminPk,
         mintInfo: group.mintInfosMap.get(bank.tokenIndex)?.publicKey,
+        dustVault: dustVaultPk,
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
       })
@@ -534,7 +553,7 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-      .rpc();
+      .rpc({ skipPreflight: true });
   }
 
   // Serum
@@ -1206,7 +1225,9 @@ export class MangoClient {
     const inputBankKey = transferIx.keys[2];
     transferIx.keys[2] = { ...inputBankKey, isWritable: true, isSigner: false };
     instructions.push(transferIx);
-    console.log('loading jup');
+
+    // TODO: move out of client and into ui
+    // Start Jupiter
 
     const jupiter = await Jupiter.load({
       connection: this.program.provider.connection,
@@ -1216,8 +1237,6 @@ export class MangoClient {
       routeCacheDuration: 10_000, // Will not refetch data on computeRoutes for up to 10 seconds
     });
 
-    console.log('computing routes');
-
     const routes = await jupiter.computeRoutes({
       inputMint: inputBank.mint, // Mint address of the input token
       outputMint: outputBank.mint, // Mint address of the output token
@@ -1225,8 +1244,6 @@ export class MangoClient {
       slippage, // The slippage in % terms
       forceFetch: false, // false is the default value => will use cache if not older than routeCacheDuration
     });
-
-    console.log('routes', routes);
 
     const routesInfosWithoutRaydium = routes.routesInfos.filter((r) => {
       if (r.marketInfos.length > 1) {
@@ -1237,12 +1254,8 @@ export class MangoClient {
       }
       return true;
     });
-    console.log('routesInfosWithoutRaydium', routesInfosWithoutRaydium);
 
     const selectedRoute = routesInfosWithoutRaydium[0];
-
-    console.log('outAmount', selectedRoute.outAmount);
-    console.log('outAmountWithSlippage', selectedRoute.outAmountWithSlippage);
 
     console.log(
       `route found: ${selectedRoute.marketInfos[0].amm.label}. generating jup transaction`,
@@ -1262,6 +1275,8 @@ export class MangoClient {
         instructions.push(ix);
       }
     }
+
+    // End Jupiter
 
     const transferIx2 = Token.createTransferInstruction(
       TOKEN_PROGRAM_ID,
@@ -1348,6 +1363,188 @@ export class MangoClient {
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .remainingAccounts([...parsedHealthAccounts, ...targetRemainingAccounts])
+      .rpc({ skipPreflight: true });
+  }
+
+  public async marginTrade3({
+    group,
+    mangoAccount,
+    inputToken,
+    amountIn,
+    outputToken,
+    slippage = 0.5,
+  }: {
+    group: Group;
+    mangoAccount: MangoAccount;
+    inputToken: string;
+    amountIn: number;
+    outputToken: string;
+    slippage: number;
+  }): Promise<TransactionSignature> {
+    const inputBank = group.banksMap.get(inputToken);
+    const outputBank = group.banksMap.get(outputToken);
+
+    if (!inputBank || !outputBank) throw new Error('Invalid token');
+
+    const healthRemainingAccounts: PublicKey[] =
+      await this.buildHealthRemainingAccounts(group, mangoAccount, [
+        inputBank,
+        outputBank,
+      ]);
+    const parsedHealthAccounts = healthRemainingAccounts.map(
+      (pk) =>
+        ({
+          pubkey: pk,
+          isWritable:
+            pk.equals(inputBank.publicKey) || pk.equals(outputBank.publicKey)
+              ? true
+              : false,
+          isSigner: false,
+        } as AccountMeta),
+    );
+
+    /*
+     * Find or create associated token accounts
+     */
+    let inputTokenAccountPk = await getAssociatedTokenAddress(
+      inputBank.mint,
+      mangoAccount.owner,
+    );
+    const inputTokenAccExists =
+      await this.program.provider.connection.getAccountInfo(
+        inputTokenAccountPk,
+      );
+    let preInstructions = [];
+    if (!inputTokenAccExists) {
+      preInstructions.push(
+        Token.createAssociatedTokenAccountInstruction(
+          mangoAccount.owner,
+          inputTokenAccountPk,
+          mangoAccount.owner,
+          inputBank.mint,
+          TOKEN_PROGRAM_ID,
+          ASSOCIATED_TOKEN_PROGRAM_ID,
+        ),
+      );
+    }
+
+    let outputTokenAccountPk = await getAssociatedTokenAddress(
+      outputBank.mint,
+      mangoAccount.owner,
+    );
+    const outputTokenAccExists =
+      await this.program.provider.connection.getAccountInfo(
+        outputTokenAccountPk,
+      );
+    if (!outputTokenAccExists) {
+      preInstructions.push(
+        Token.createAssociatedTokenAccountInstruction(
+          mangoAccount.owner,
+          outputTokenAccountPk,
+          mangoAccount.owner,
+          outputBank.mint,
+          TOKEN_PROGRAM_ID,
+          ASSOCIATED_TOKEN_PROGRAM_ID,
+        ),
+      );
+    }
+
+    const nativeInputAmount = toU64(
+      amountIn,
+      inputBank.mintDecimals,
+    ).toNumber();
+    const instructions: TransactionInstruction[] = [];
+
+    // TODO: move out of client and into ui
+    // Start Jupiter
+
+    const jupiter = await Jupiter.load({
+      connection: this.program.provider.connection,
+      cluster: 'mainnet-beta',
+      user: mangoAccount.owner, // or public key
+      // platformFeeAndAccounts:  NO_PLATFORM_FEE,
+      routeCacheDuration: 10_000, // Will not refetch data on computeRoutes for up to 10 seconds
+    });
+
+    const routes = await jupiter.computeRoutes({
+      inputMint: inputBank.mint, // Mint address of the input token
+      outputMint: outputBank.mint, // Mint address of the output token
+      inputAmount: nativeInputAmount, // raw input amount of tokens
+      slippage, // The slippage in % terms
+      forceFetch: false, // false is the default value => will use cache if not older than routeCacheDuration
+    });
+
+    const routesInfosWithoutRaydium = routes.routesInfos.filter((r) => {
+      if (r.marketInfos.length > 1) {
+        for (const mkt of r.marketInfos) {
+          if (mkt.amm.label === 'Raydium' || mkt.amm.label === 'Serum')
+            return false;
+        }
+      }
+      return true;
+    });
+    const selectedRoute = routesInfosWithoutRaydium[0];
+
+    const { transactions } = await jupiter.exchange({
+      routeInfo: selectedRoute,
+    });
+    const { setupTransaction, swapTransaction } = transactions;
+
+    for (const ix of swapTransaction.instructions) {
+      if (
+        ix.programId.toBase58() ===
+        'JUP2jxvXaqu7NQY1GmNF4m1vodw12LVXYxbFL2uJvfo'
+      ) {
+        instructions.push(ix);
+      }
+    }
+
+    // End Jupiter
+
+    if (setupTransaction) {
+      await this.program.provider.sendAndConfirm(setupTransaction);
+    } else if (preInstructions.length) {
+      const tx = new Transaction();
+      for (const ix of preInstructions) {
+        tx.add(ix);
+      }
+      console.log('preInstructions', preInstructions);
+
+      await this.program.provider.sendAndConfirm(tx);
+    }
+
+    const bankAccounts = {
+      isWritable: true,
+      pubkey: inputBank.publicKey,
+      isSigner: false,
+    };
+    const bankVaults = {
+      isWritable: true,
+      pubkey: inputBank.vault,
+      isSigner: false,
+    };
+    const aTokenAccounts = {
+      isWritable: true,
+      pubkey: inputTokenAccountPk,
+      isSigner: true,
+    };
+
+    const flashLoanEndIx = await this.program.methods
+      .flashLoan3End()
+      .accounts({
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .remainingAccounts([...parsedHealthAccounts, bankVaults, aTokenAccounts])
+      .instruction();
+
+    return await this.program.methods
+      .flashLoan3Begin([toU64(amountIn, inputBank.mintDecimals)])
+      .accounts({
+        group: group.publicKey,
+      })
+      .remainingAccounts([bankAccounts, bankVaults, aTokenAccounts])
+      .postInstructions([...instructions, flashLoanEndIx])
       .rpc({ skipPreflight: true });
   }
 
