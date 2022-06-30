@@ -733,6 +733,11 @@ pub struct MangoAccount {
 
     // pub info: [u8; INFO_LEN], // TODO: Info could be in a separate PDA?
     pub reserved: [u8; 4],
+
+    // Cumulative deposits - withdraws (using USD prices at the time of the deposit/withdraw)
+    pub net_deposits: f32,
+    // Cumulative settles on perp positions
+    pub net_settled: f32,
 }
 const_assert_eq!(
     size_of::<MangoAccount>(),
@@ -742,6 +747,7 @@ const_assert_eq!(
         + size_of::<MangoAccountPerpPositions>()
         + 4
         + 4
+        + 2 * 4 // net_deposits and net_settled
 );
 const_assert_eq!(size_of::<MangoAccount>() % 8, 0);
 
@@ -787,6 +793,8 @@ impl Default for MangoAccount {
             account_num: 0,
             bump: 0,
             reserved: Default::default(),
+            net_deposits: 0.0,
+            net_settled: 0.0,
         }
     }
 }
