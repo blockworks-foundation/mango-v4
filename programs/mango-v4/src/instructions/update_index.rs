@@ -2,19 +2,21 @@ use anchor_lang::prelude::*;
 
 use crate::logs::UpdateIndexLog;
 use crate::{
-    accounts_zerocopy::{LoadMutZeroCopyRef, LoadZeroCopyRef},
+    accounts_zerocopy::{AccountInfoRef, LoadMutZeroCopyRef, LoadZeroCopyRef},
     error::MangoError,
-    state::{Bank, MintInfo},
+    state::{oracle_price, Bank, MintInfo},
 };
 use checked_math as cm;
 use fixed::types::I80F48;
 #[derive(Accounts)]
 pub struct UpdateIndex<'info> {
     pub mint_info: AccountLoader<'info, MintInfo>,
+    pub oracle: UncheckedAccount<'info>,
 }
 
 pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
     let mint_info = ctx.accounts.mint_info.load()?;
+    require_keys_eq!(mint_info.oracle.key(), ctx.accounts.oracle.key());
 
     let total_banks = mint_info
         .banks
@@ -35,7 +37,7 @@ pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
     }
 
     let now_ts = Clock::get()?.unix_timestamp;
-    let (diff_ts, deposit_index, borrow_index) = {
+    let (diff_ts, deposit_index, borrow_index, oracle_conf_filter, base_token_decimals) = {
         let mut some_bank = all_banks[0].load_mut::<Bank>()?;
 
         // TODO: should we enforce a minimum window between 2 update_index ix calls?
@@ -44,7 +46,13 @@ pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
         let (deposit_index, borrow_index) =
             some_bank.compute_index(indexed_total_deposits, indexed_total_borrows, diff_ts)?;
 
-        (diff_ts, deposit_index, borrow_index)
+        (
+            diff_ts,
+            deposit_index,
+            borrow_index,
+            some_bank.oracle_config.conf_filter,
+            some_bank.mint_decimals,
+        )
     };
 
     msg!("indexed_total_deposits {}", indexed_total_deposits);
@@ -64,16 +72,21 @@ pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
 
         bank.deposit_index = deposit_index;
         bank.borrow_index = borrow_index;
-
-        // clarkeni TODO: add prices
-        emit!(UpdateIndexLog {
-            mango_group: bank.group.key(),
-            token_index: bank.token_index,
-            deposit_index: bank.deposit_index.to_bits(),
-            borrow_index: bank.borrow_index.to_bits(),
-            // price: oracle_price.to_bits(),
-        });
     }
+
+    let price = oracle_price(
+        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        oracle_conf_filter,
+        base_token_decimals,
+    )?;
+
+    emit!(UpdateIndexLog {
+        mango_group: mint_info.group.key(),
+        token_index: mint_info.token_index,
+        deposit_index: deposit_index.to_bits(),
+        borrow_index: borrow_index.to_bits(),
+        price: price.to_bits(),
+    });
 
     Ok(())
 }

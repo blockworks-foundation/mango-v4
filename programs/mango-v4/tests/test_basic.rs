@@ -138,15 +138,15 @@ async fn test_basic() -> Result<(), TransportError> {
     // TEST: Close account and de register bank
     //
 
+    let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
+
     // withdraw whatever is remaining, can't close bank vault without this
     send_tx(
         solana,
         UpdateIndexInstruction {
             mint_info: tokens[0].mint_info,
-            banks: {
-                let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
-                mint_info.banks.to_vec()
-            },
+            banks: mint_info.banks.to_vec(),
+            oracle: mint_info.oracle,
         },
     )
     .await

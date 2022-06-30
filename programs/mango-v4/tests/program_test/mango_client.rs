@@ -13,8 +13,6 @@ use solana_program::instruction::Instruction;
 use solana_sdk::instruction;
 use solana_sdk::signature::{Keypair, Signer};
 use solana_sdk::transport::TransportError;
-use spl_associated_token_account::get_associated_token_address;
-
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -2384,6 +2382,7 @@ impl ClientInstruction for BenchmarkInstruction {
 }
 pub struct UpdateIndexInstruction {
     pub mint_info: Pubkey,
+    pub oracle: Pubkey,
     pub banks: Vec<Pubkey>,
 }
 #[async_trait::async_trait(?Send)]
@@ -2398,6 +2397,7 @@ impl ClientInstruction for UpdateIndexInstruction {
         let instruction = Self::Instruction {};
         let accounts = Self::Accounts {
             mint_info: self.mint_info,
+            oracle: self.oracle,
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
