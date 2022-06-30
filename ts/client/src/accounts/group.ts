@@ -41,6 +41,12 @@ export class Group {
     );
   }
 
+  public findSerum3Market(marketIndex: number): Serum3Market | undefined {
+    return Array.from(this.serum3MarketsMap.values()).find(
+      (serum3Market) => serum3Market.marketIndex === marketIndex,
+    );
+  }
+
   public async reloadAll(client: MangoClient) {
     let ids: Id | undefined = undefined;
 
@@ -52,7 +58,7 @@ export class Group {
     await Promise.all([
       this.reloadBanks(client, ids),
       this.reloadMintInfos(client, ids),
-      this.reloadSerum3Markets(client, ids).then,
+      this.reloadSerum3Markets(client, ids),
       this.reloadPerpMarkets(client, ids),
     ]);
     // requires reloadSerum3Markets to have finished loading
@@ -62,6 +68,7 @@ export class Group {
 
   public async reloadBanks(client: MangoClient, ids?: Id) {
     let banks: Bank[];
+
     if (ids) {
       banks = (
         await client.program.account.bank.fetchMultiple(ids.getBanks())

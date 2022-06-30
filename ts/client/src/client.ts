@@ -51,6 +51,8 @@ import {
   toU64,
 } from './utils';
 
+// TODO: replace ui values with native as input wherever possible
+// TODO: replace token/market names with token or market indices
 export class MangoClient {
   constructor(
     public program: Program<MangoV4>,
@@ -438,11 +440,13 @@ export class MangoClient {
   }
 
   public async closeMangoAccount(
+    group: Group,
     mangoAccount: MangoAccount,
   ): Promise<TransactionSignature> {
     return await this.program.methods
       .closeAccount()
       .accounts({
+        group: group.publicKey,
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         solDestination: mangoAccount.owner,
@@ -521,6 +525,9 @@ export class MangoClient {
       .rpc({ skipPreflight: true });
   }
 
+  /**
+   * @deprecated
+   */
   public async tokenWithdraw(
     group: Group,
     mangoAccount: MangoAccount,
@@ -540,6 +547,41 @@ export class MangoClient {
 
     return await this.program.methods
       .tokenWithdraw(toNativeDecimals(amount, bank.mintDecimals), allowBorrow)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        bank: bank.publicKey,
+        vault: bank.vault,
+        tokenAccount: tokenAccountPk,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .rpc({ skipPreflight: true });
+  }
+
+  public async tokenWithdraw2(
+    group: Group,
+    mangoAccount: MangoAccount,
+    tokenName: string,
+    nativeAmount: number,
+    allowBorrow: boolean,
+  ) {
+    const bank = group.banksMap.get(tokenName)!;
+
+    const tokenAccountPk = await getAssociatedTokenAddress(
+      bank.mint,
+      mangoAccount.owner,
+    );
+
+    const healthRemainingAccounts: PublicKey[] =
+      await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
+
+    return await this.program.methods
+      .tokenWithdraw(new BN(nativeAmount), allowBorrow)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -961,12 +1003,13 @@ export class MangoClient {
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .preInstructions([
+        // TODO: try to pick up sizes of bookside and eventqueue from IDL, so we can stay in sync with program
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: 8 + 90152,
+          space: 8 + 90136,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              90160,
+              90144,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,
@@ -974,10 +1017,10 @@ export class MangoClient {
         }),
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: 8 + 90152,
+          space: 8 + 90136,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              90160,
+              90144,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,
@@ -985,10 +1028,10 @@ export class MangoClient {
         }),
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: 8 + 102424,
+          space: 8 + 102416,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              102432,
+              102424,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,
@@ -1607,7 +1650,7 @@ export class MangoClient {
 
   /// private
 
-  private async buildHealthRemainingAccounts(
+  public async buildHealthRemainingAccounts(
     group: Group,
     mangoAccount: MangoAccount,
     banks?: Bank[] /** TODO for serum3PlaceOrder we are just ingoring this atm */,

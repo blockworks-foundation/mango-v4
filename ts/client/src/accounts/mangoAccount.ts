@@ -99,37 +99,44 @@ export class MangoAccount {
     return ta ? ta.uiBorrows(bank) : 0;
   }
 
-  tokens_active(): TokenPosition[] {
+  tokensActive(): TokenPosition[] {
     return this.tokens.filter((token) => token.isActive());
   }
 
+  serum3Active(): Serum3Orders[] {
+    return this.serum3.filter((serum3) => serum3.isActive());
+  }
+
+  perpActive(): PerpPositions[] {
+    return this.perps.filter((perp) => perp.isActive());
+  }
+
   toString(group?: Group): string {
-    return (
-      'tokens:' +
-      JSON.stringify(
-        this.tokens
-          .filter((token) => token.tokenIndex != TokenPosition.TokenIndexUnset)
-          .map((token) => token.toString(group)),
-        null,
-        4,
-      ) +
-      '\nserum:' +
-      JSON.stringify(
-        this.serum3.filter(
-          (serum3) => serum3.marketIndex != Serum3Orders.Serum3MarketIndexUnset,
-        ),
-        null,
-        4,
-      ) +
-      '\nperps:' +
-      JSON.stringify(
-        this.perps.filter(
-          (perp) => perp.marketIndex != PerpPositions.PerpMarketIndexUnset,
-        ),
-        null,
-        4,
-      )
-    );
+    let res = '';
+    res = res + ' name: ' + this.name;
+
+    res =
+      this.tokensActive().length > 0
+        ? res +
+          '\n tokens:' +
+          JSON.stringify(
+            this.tokensActive().map((token) => token.toString(group)),
+            null,
+            4,
+          )
+        : res + '';
+
+    res =
+      this.serum3Active().length > 0
+        ? res + '\n serum:' + JSON.stringify(this.serum3Active(), null, 4)
+        : res + '';
+
+    res =
+      this.perpActive().length > 0
+        ? res + '\n perps:' + JSON.stringify(this.perpActive(), null, 4)
+        : res + '';
+
+    return res;
   }
 }
 
@@ -229,6 +236,10 @@ export class Serum3Orders {
     public baseTokenIndex: number,
     public quoteTokenIndex: number,
   ) {}
+
+  public isActive(): boolean {
+    return this.marketIndex !== Serum3Orders.Serum3MarketIndexUnset;
+  }
 }
 
 export class Serum3PositionDto {
@@ -264,6 +275,10 @@ export class PerpPositions {
     public takerBaseLots: number,
     public takerQuoteLots: number,
   ) {}
+
+  isActive(): boolean {
+    return this.marketIndex != PerpPositions.PerpMarketIndexUnset;
+  }
 }
 
 export class PerpPositionDto {
