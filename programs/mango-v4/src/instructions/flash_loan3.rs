@@ -14,25 +14,28 @@ use fixed::types::I80F48;
 
 /// Sets up mango vaults for flash loan
 ///
-/// In addition to these accounts, there must be a sequence of remaining_accounts:
-/// 1. N banks
-/// 2. N vaults, matching the banks
-/// 3. N token accounts, where loaned funds are transfered
+/// In addition to these accounts, there must be remaining_accounts:
+/// 1. N banks (writable)
+/// 2. N vaults (writable), matching the banks
+/// 3. N token accounts (writable), in the same order as the vaults,
+///    the loaned funds are transfered into these
 #[derive(Accounts)]
 pub struct FlashLoan3Begin<'info> {
     pub group: AccountLoader<'info, Group>,
     pub token_program: Program<'info, Token>,
 
+    /// Instructions Sysvar for instruction introspection
     #[account(address = tx_instructions::ID)]
     pub instructions: UncheckedAccount<'info>,
 }
 
 /// Finalizes a flash loan
 ///
-/// In addition to these accounts, there must be a sequence of remaining_accounts:
-/// 1. health accounts
-/// 2. N vaults, matching what was in FlashLoan3Begin
-/// 3. N token accounts, matching what was in FlashLoan3Begin
+/// In addition to these accounts, there must be remaining_accounts:
+/// 1. health accounts, and every bank that also appeared in FlashLoan3Begin must be writable
+/// 2. N vaults (writable), matching what was in FlashLoan3Begin
+/// 3. N token accounts (writable), matching what was in FlashLoan3Begin;
+///    the `owner` must have authority to transfer tokens out of them
 #[derive(Accounts)]
 pub struct FlashLoan3End<'info> {
     #[account(
@@ -44,6 +47,8 @@ pub struct FlashLoan3End<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+/// The `loan_amounts` argument lists the amount to be loaned from each bank/vault and
+/// the order matches the order of bank accounts.
 pub fn flash_loan3_begin<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan3Begin<'info>>,
     loan_amounts: Vec<u64>,
