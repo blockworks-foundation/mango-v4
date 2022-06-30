@@ -1,7 +1,11 @@
 use crate::accounts_zerocopy::*;
 use crate::error::MangoError;
 use crate::group_seeds;
-use crate::state::{compute_health_from_fixed_accounts, Bank, Group, HealthType, MangoAccount};
+use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
+use crate::state::{
+    compute_health, compute_health_from_fixed_accounts, new_fixed_order_account_retriever,
+    AccountRetriever, Bank, Group, HealthType, MangoAccount, TokenIndex,
+};
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
@@ -212,7 +216,7 @@ pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
         require_neq!(bank.flash_loan_vault_initial, u64::MAX);
 
         // Create the token position now, so we can compute the pre-health with fixed order health accounts
-        let (_, raw_token_index) = account.tokens.get_mut_or_create(bank.token_index)?;
+        let (_, raw_token_index, _) = account.tokens.get_mut_or_create(bank.token_index)?;
 
         // Transfer any excess over the inital balance of the token account back
         // into the vault. Compute the total change in the vault balance.
@@ -246,14 +250,29 @@ pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
     // Check pre-cpi health
     // NOTE: This health check isn't strictly necessary. It will be, later, when
     // we want to have reduce_only or be able to move an account out of bankruptcy.
-    let pre_cpi_health =
-        compute_health_from_fixed_accounts(&account, HealthType::Init, health_ais)?;
+    let retriever = new_fixed_order_account_retriever(health_ais, &account)?;
+    let pre_cpi_health = compute_health(&account, HealthType::Init, &retriever)?;
     require!(pre_cpi_health >= 0, MangoError::HealthMustBePositive);
     msg!("pre_cpi_health {:?}", pre_cpi_health);
 
+    // Prices for logging
+    let mut prices = vec![];
+    for change in &changes {
+        let (_, oracle_price) = retriever.bank_and_oracle(
+            &account.group,
+            change.bank_index,
+            change.raw_token_index as TokenIndex,
+        )?;
+
+        prices.push(oracle_price);
+    }
+    // Drop retriever as mut bank below uses health_ais
+    drop(retriever);
+
     // Apply the vault diffs to the bank positions
     let mut deactivated_token_positions = vec![];
-    for change in changes {
+    let mut token_loan_details = Vec::with_capacity(changes.len());
+    for (change, price) in changes.iter().zip(prices.iter()) {
         let mut bank = health_ais[change.bank_index].load_mut::<Bank>()?;
         let position = account.tokens.get_mut_raw(change.raw_token_index);
         let native = position.native(&bank);
@@ -276,7 +295,31 @@ pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
 
         bank.flash_loan_approved_amount = 0;
         bank.flash_loan_vault_initial = u64::MAX;
+
+        token_loan_details.push(FlashLoanTokenDetail {
+            token_index: position.token_index,
+            change_amount: change.amount.to_bits(),
+            loan: loan.to_bits(),
+            loan_origination_fee: loan_origination_fee.to_bits(),
+            deposit_index: bank.deposit_index.to_bits(),
+            borrow_index: bank.borrow_index.to_bits(),
+            price: price.to_bits(),
+        });
+
+        emit!(TokenBalanceLog {
+            mango_account: ctx.accounts.account.key(),
+            token_index: bank.token_index as u16,
+            indexed_position: position.indexed_position.to_bits(),
+            deposit_index: bank.deposit_index.to_bits(),
+            borrow_index: bank.borrow_index.to_bits(),
+            price: price.to_bits(),
+        });
     }
+
+    emit!(FlashLoanLog {
+        mango_account: ctx.accounts.account.key(),
+        token_loan_details: token_loan_details
+    });
 
     // Check post-cpi health
     let post_cpi_health =

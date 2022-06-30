@@ -50,6 +50,29 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
     pub begin_serum3: usize,
 }
 
+pub fn new_fixed_order_account_retriever<'a, 'info>(
+    ais: &'a [AccountInfo<'info>],
+    account: &MangoAccount,
+) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
+    let active_token_len = account.tokens.iter_active().count();
+    let active_serum3_len = account.serum3.iter_active().count();
+    let active_perp_len = account.perps.iter_active_accounts().count();
+    let expected_ais = cm!(active_token_len * 2 // banks + oracles
+        + active_perp_len // PerpMarkets
+        + active_serum3_len); // open_orders
+    require!(ais.len() == expected_ais, MangoError::SomeError);
+
+    Ok(FixedOrderAccountRetriever {
+        ais: ais
+            .into_iter()
+            .map(|ai| AccountInfoRef::borrow(ai))
+            .collect::<Result<Vec<_>>>()?,
+        n_banks: active_token_len,
+        begin_perp: cm!(active_token_len * 2),
+        begin_serum3: cm!(active_token_len * 2 + active_perp_len),
+    })
+}
+
 impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
     fn bank(&self, group: &Pubkey, account_index: usize) -> Result<&Bank> {
         let bank = self.ais[account_index].load::<Bank>()?;

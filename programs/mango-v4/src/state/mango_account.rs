@@ -139,30 +139,44 @@ impl MangoAccountTokenPositions {
         &mut self.values[raw_token_index]
     }
 
+    pub fn get_raw(&self, raw_token_index: usize) -> &TokenPosition {
+        &self.values[raw_token_index]
+    }
+
+    /// Creates or retrieves a TokenPosition for the token_index.
+    /// Returns:
+    /// - the position
+    /// - the raw index into the token positions list (for use with get_raw)
+    /// - the active index, for use with FixedOrderAccountRetriever
     pub fn get_mut_or_create(
         &mut self,
         token_index: TokenIndex,
-    ) -> Result<(&mut TokenPosition, usize)> {
-        // This function looks complex because of lifetimes.
-        // Maybe there's a smart way to write it with double iter_mut()
-        // that doesn't confuse the borrow checker.
-        let mut pos = self
-            .values
-            .iter()
-            .position(|p| p.is_active_for_token(token_index));
-        if pos.is_none() {
-            pos = self.values.iter().position(|p| !p.is_active());
-            if let Some(i) = pos {
-                self.values[i] = TokenPosition {
+    ) -> Result<(&mut TokenPosition, usize, usize)> {
+        let mut active_index = 0;
+        let mut match_or_free = None;
+        for (raw_index, position) in self.values.iter().enumerate() {
+            if position.is_active_for_token(token_index) {
+                // Can't return early because of lifetimes
+                match_or_free = Some((raw_index, active_index));
+                break;
+            }
+            if position.is_active() {
+                active_index += 1;
+            } else if match_or_free.is_none() {
+                match_or_free = Some((raw_index, active_index));
+            }
+        }
+        if let Some((raw_index, bank_index)) = match_or_free {
+            let v = &mut self.values[raw_index];
+            if !v.is_active_for_token(token_index) {
+                *v = TokenPosition {
                     indexed_position: I80F48::ZERO,
                     token_index,
                     in_use_count: 0,
                     reserved: Default::default(),
                 };
             }
-        }
-        if let Some(i) = pos {
-            Ok((&mut self.values[i], i))
+            Ok((v, raw_index, bank_index))
         } else {
             err!(MangoError::SomeError) // TODO: No free space
         }

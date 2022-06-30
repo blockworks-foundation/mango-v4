@@ -6,6 +6,9 @@ use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 use fixed::types::I80F48;
 
+use crate::logs::{TokenBalanceLog, WithdrawLog};
+use crate::state::new_fixed_order_account_retriever;
+
 #[derive(Accounts)]
 pub struct TokenWithdraw<'info> {
     pub group: AccountLoader<'info, Group>,
@@ -62,7 +65,8 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     let mut account = ctx.accounts.account.load_mut()?;
     require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
 
-    let (position, position_index) = account.tokens.get_mut_or_create(token_index)?;
+    let (position, raw_token_index, active_token_index) =
+        account.tokens.get_mut_or_create(token_index)?;
 
     // The bank will also be passed in remainingAccounts. Use an explicit scope
     // to drop the &mut before we borrow it immutably again later.
@@ -103,11 +107,24 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         position_is_active
     };
 
+    let indexed_position = position.indexed_position;
+
+    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
+    let (bank, oracle_price) =
+        retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
+    emit!(TokenBalanceLog {
+        mango_account: ctx.accounts.account.key(),
+        token_index: token_index,
+        indexed_position: indexed_position.to_bits(),
+        deposit_index: bank.deposit_index.to_bits(),
+        borrow_index: bank.borrow_index.to_bits(),
+        price: oracle_price.to_bits(),
+    });
+
     //
     // Health check
     //
-    let health =
-        compute_health_from_fixed_accounts(&account, HealthType::Init, ctx.remaining_accounts)?;
+    let health = compute_health(&account, HealthType::Init, &retriever)?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
 
@@ -117,8 +134,16 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     // deactivated.
     //
     if !position_is_active {
-        account.tokens.deactivate(position_index);
+        account.tokens.deactivate(raw_token_index);
     }
+
+    emit!(WithdrawLog {
+        mango_account: ctx.accounts.account.key(),
+        signer: ctx.accounts.owner.key(),
+        token_index: token_index,
+        quantity: amount,
+        price: oracle_price.to_bits(),
+    });
 
     Ok(())
 }

@@ -3,6 +3,7 @@ use fixed::types::I80F48;
 use std::cmp::min;
 
 use crate::error::*;
+use crate::logs::{LiquidateTokenAndTokenLog, TokenBalanceLog};
 use crate::state::ScanningAccountRetriever;
 use crate::state::*;
 use crate::util::checked_math as cm;
@@ -136,6 +137,71 @@ pub fn liq_token_with_token(
             liab_transfer,
             asset_transfer
         );
+
+        emit!(LiquidateTokenAndTokenLog {
+            liqee: ctx.accounts.liqee.key(),
+            liqor: ctx.accounts.liqor.key(),
+            asset_token_index: asset_token_index,
+            liab_token_index: liab_token_index,
+            asset_transfer: asset_transfer.to_bits(),
+            liab_transfer: liab_transfer.to_bits(),
+            asset_price: asset_price.to_bits(),
+            liab_price: liab_price.to_bits(),
+            // bankruptcy:
+        });
+
+        // liqee asset
+        emit!(TokenBalanceLog {
+            mango_account: ctx.accounts.liqee.key(),
+            token_index: asset_token_index,
+            indexed_position: liqee
+                .tokens
+                .get_mut(asset_token_index)?
+                .indexed_position
+                .to_bits(),
+            deposit_index: asset_bank.deposit_index.to_bits(),
+            borrow_index: asset_bank.borrow_index.to_bits(),
+            price: asset_price.to_bits(),
+        });
+        // liqee liab
+        emit!(TokenBalanceLog {
+            mango_account: ctx.accounts.liqee.key(),
+            token_index: liab_token_index,
+            indexed_position: liqee
+                .tokens
+                .get_mut(liab_token_index)?
+                .indexed_position
+                .to_bits(),
+            deposit_index: liab_bank.deposit_index.to_bits(),
+            borrow_index: liab_bank.borrow_index.to_bits(),
+            price: liab_price.to_bits(),
+        });
+        // liqor asset
+        emit!(TokenBalanceLog {
+            mango_account: ctx.accounts.liqor.key(),
+            token_index: asset_token_index,
+            indexed_position: liqor
+                .tokens
+                .get_mut(asset_token_index)?
+                .indexed_position
+                .to_bits(),
+            deposit_index: asset_bank.deposit_index.to_bits(),
+            borrow_index: asset_bank.borrow_index.to_bits(),
+            price: asset_price.to_bits(),
+        });
+        // liqor liab
+        emit!(TokenBalanceLog {
+            mango_account: ctx.accounts.liqor.key(),
+            token_index: liab_token_index,
+            indexed_position: liqor
+                .tokens
+                .get_mut(liab_token_index)?
+                .indexed_position
+                .to_bits(),
+            deposit_index: liab_bank.deposit_index.to_bits(),
+            borrow_index: liab_bank.borrow_index.to_bits(),
+            price: liab_price.to_bits(),
+        });
     }
 
     // Check liqee health again

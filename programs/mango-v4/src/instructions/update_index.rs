@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+use crate::logs::UpdateIndexLog;
 use crate::{
     accounts_zerocopy::{LoadMutZeroCopyRef, LoadZeroCopyRef},
     error::MangoError,
@@ -63,6 +64,15 @@ pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
 
         bank.deposit_index = deposit_index;
         bank.borrow_index = borrow_index;
+
+        // clarkeni TODO: add prices
+        emit!(UpdateIndexLog {
+            mango_group: bank.group.key(),
+            token_index: bank.token_index,
+            deposit_index: bank.deposit_index.to_bits(),
+            borrow_index: bank.borrow_index.to_bits(),
+            // price: oracle_price.to_bits(),
+        });
     }
 
     Ok(())

@@ -1,6 +1,10 @@
 use crate::accounts_zerocopy::*;
 use crate::error::MangoError;
-use crate::state::{compute_health_from_fixed_accounts, Bank, Group, HealthType, MangoAccount};
+use crate::logs::{MarginTradeLog, TokenBalanceLog};
+use crate::state::{
+    compute_health, new_fixed_order_account_retriever, AccountRetriever, Bank, Group, HealthType,
+    MangoAccount,
+};
 use crate::{group_seeds, Mango};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount};
@@ -98,7 +102,7 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
         match ai.load::<Bank>() {
             Ok(bank) => {
                 require!(bank.group == account.group, MangoError::SomeError);
-                let (_, raw_token_index) = account.tokens.get_mut_or_create(bank.token_index)?;
+                let (_, raw_token_index, _) = account.tokens.get_mut_or_create(bank.token_index)?;
                 allowed_vaults.insert(bank.vault, (i, raw_token_index));
                 allowed_banks.insert(ai.key, bank);
             }
@@ -115,10 +119,12 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
     // Check pre-cpi health
     // NOTE: This health check isn't strictly necessary. It will be, later, when
     // we want to have reduce_only or be able to move an account out of bankruptcy.
-    let pre_cpi_health =
-        compute_health_from_fixed_accounts(&account, HealthType::Init, health_ais)?;
-    require!(pre_cpi_health >= 0, MangoError::HealthMustBePositive);
-    msg!("pre_cpi_health {:?}", pre_cpi_health);
+    {
+        let retriever = new_fixed_order_account_retriever(health_ais, &account)?;
+        let pre_cpi_health = compute_health(&account, HealthType::Init, &retriever)?;
+        require!(pre_cpi_health >= 0, MangoError::HealthMustBePositive);
+        msg!("pre_cpi_health {:?}", pre_cpi_health);
+    }
 
     let all_cpi_ais = &ctx.remaining_accounts[num_health_accounts..];
     let mut all_cpi_ams = all_cpi_ais
@@ -172,6 +178,13 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
             Some(Err(error!(MangoError::SomeError)))
         })
         .collect::<Result<HashMap<_, _>>>()?;
+
+    // Store the indexed value before the margin trade for logging purposes
+    let mut pre_indexed_positions = Vec::new();
+    for (_, info) in used_vaults.iter() {
+        let position = account.tokens.get_raw(info.raw_token_index);
+        pre_indexed_positions.push(position.indexed_position.to_bits());
+    }
 
     // Find banks for used vaults in cpi_ais and collect signer seeds for them.
     // Also update withdraw_amount and loan_amount.
@@ -314,12 +327,43 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
         adjust_for_post_cpi_vault_amounts(health_ais, all_cpi_ais, &used_vaults, &mut account)?;
 
     // Check post-cpi health
-    let post_cpi_health =
-        compute_health_from_fixed_accounts(&account, HealthType::Init, health_ais)?;
+    let retriever = new_fixed_order_account_retriever(health_ais, &account)?;
+    let post_cpi_health = compute_health(&account, HealthType::Init, &retriever)?;
     require!(post_cpi_health >= 0, MangoError::HealthMustBePositive);
     msg!("post_cpi_health {:?}", post_cpi_health);
 
-    // Deactivate inactive token accounts after health check
+    // Token balances logging
+    let mut token_indexes = Vec::with_capacity(used_vaults.len());
+    let mut post_indexed_positions = Vec::with_capacity(used_vaults.len());
+    for (_, info) in used_vaults.iter() {
+        let position = account.tokens.get_raw(info.raw_token_index);
+        post_indexed_positions.push(position.indexed_position.to_bits());
+        token_indexes.push(position.token_index as u16);
+
+        let (bank, oracle_price) = retriever.bank_and_oracle(
+            &ctx.accounts.group.key(),
+            info.bank_health_ai_index,
+            position.token_index,
+        )?;
+
+        emit!(TokenBalanceLog {
+            mango_account: ctx.accounts.account.key(),
+            token_index: bank.token_index as u16,
+            indexed_position: position.indexed_position.to_bits(),
+            deposit_index: bank.deposit_index.to_bits(),
+            borrow_index: bank.borrow_index.to_bits(),
+            price: oracle_price.to_bits(),
+        });
+    }
+
+    emit!(MarginTradeLog {
+        mango_account: ctx.accounts.account.key(),
+        token_indexes,
+        pre_indexed_positions,
+        post_indexed_positions,
+    });
+
+    // Deactivate inactive token accounts at the end
     for raw_token_index in inactive_tokens {
         account.tokens.deactivate(raw_token_index);
     }

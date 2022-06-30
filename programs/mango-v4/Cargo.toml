@@ -41,7 +41,6 @@ switchboard-program = ">=0.2.0"
 switchboard-utils = ">=0.1.36"
 switchboard-v2 = "0.1.10"
 
-
 [dev-dependencies]
 solana-sdk = { version = "~1.9.13", default-features = false }
 solana-program-test = "~1.9.13"

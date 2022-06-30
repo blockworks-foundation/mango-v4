@@ -7,6 +7,8 @@ use fixed::types::I80F48;
 use crate::error::*;
 use crate::state::*;
 
+use crate::logs::{DepositLog, TokenBalanceLog};
+
 #[derive(Accounts)]
 pub struct TokenDeposit<'info> {
     pub group: AccountLoader<'info, Group>,
@@ -60,9 +62,9 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     let mut account = ctx.accounts.account.load_mut()?;
     require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
 
-    let (position, position_index) = account.tokens.get_mut_or_create(token_index)?;
+    let (position, raw_token_index, active_token_index) =
+        account.tokens.get_mut_or_create(token_index)?;
 
-    // Update the bank and position
     let position_is_active = {
         let mut bank = ctx.accounts.bank.load_mut()?;
         bank.deposit(position, I80F48::from(amount))?
@@ -71,13 +73,26 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     // Transfer the actual tokens
     token::transfer(ctx.accounts.transfer_ctx(), amount)?;
 
+    let indexed_position = position.indexed_position;
+
+    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
+    let (bank, oracle_price) =
+        retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
+    emit!(TokenBalanceLog {
+        mango_account: ctx.accounts.account.key(),
+        token_index: token_index,
+        indexed_position: indexed_position.to_bits(),
+        deposit_index: bank.deposit_index.to_bits(),
+        borrow_index: bank.borrow_index.to_bits(),
+        price: oracle_price.to_bits(),
+    });
+
     //
     // Health computation
     // TODO: This will be used to disable is_bankrupt or being_liquidated
     //       when health recovers sufficiently
     //
-    let health =
-        compute_health_from_fixed_accounts(&account, HealthType::Init, ctx.remaining_accounts)?;
+    let health = compute_health(&account, HealthType::Init, &retriever)?;
     msg!("health: {}", health);
 
     //
@@ -87,8 +102,16 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     // Deposits can deactivate a position if they cancel out a previous borrow.
     //
     if !position_is_active {
-        account.tokens.deactivate(position_index);
+        account.tokens.deactivate(raw_token_index);
     }
+
+    emit!(DepositLog {
+        mango_account: ctx.accounts.account.key(),
+        signer: ctx.accounts.token_authority.key(),
+        token_index: token_index,
+        quantity: amount,
+        price: oracle_price.to_bits(),
+    });
 
     Ok(())
 }

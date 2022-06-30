@@ -14,7 +14,8 @@ pub struct ComputeHealth<'info> {
 
 pub fn compute_health(ctx: Context<ComputeHealth>, health_type: HealthType) -> Result<I80F48> {
     let account = ctx.accounts.account.load()?;
-    let health = compute_health_from_fixed_accounts(&account, health_type, ctx.remaining_accounts)?;
+    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
+    let health = crate::state::compute_health(&account, health_type, &retriever)?;
     msg!("health: {}", health);
 
     Ok(health)
