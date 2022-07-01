@@ -27,9 +27,11 @@ pub struct Bank {
     pub deposit_index: I80F48,
     pub borrow_index: I80F48,
 
-    /// total deposits/borrows, for utilization
-    pub indexed_total_deposits: I80F48,
-    pub indexed_total_borrows: I80F48,
+    /// total deposits/borrows, only updated during UpdateIndex
+    /// TODO: These values could be dropped from the bank, they're written in UpdateIndex
+    ///       and never read.
+    pub cached_indexed_total_deposits: I80F48,
+    pub cached_indexed_total_borrows: I80F48,
 
     /// deposits/borrows for this bank
     pub indexed_deposits: I80F48,
@@ -96,8 +98,14 @@ impl std::fmt::Debug for Bank {
             .field("oracle_config", &self.oracle_config)
             .field("deposit_index", &self.deposit_index)
             .field("borrow_index", &self.borrow_index)
-            .field("indexed_total_deposits", &self.indexed_total_deposits)
-            .field("indexed_total_borrows", &self.indexed_total_borrows)
+            .field(
+                "cached_indexed_total_deposits",
+                &self.cached_indexed_total_deposits,
+            )
+            .field(
+                "cached_indexed_total_borrows",
+                &self.cached_indexed_total_borrows,
+            )
             .field("indexed_deposits", &self.indexed_deposits)
             .field("indexed_borrows", &self.indexed_borrows)
             .field("last_updated", &self.last_updated)
@@ -137,8 +145,8 @@ impl Bank {
             oracle_config: existing_bank.oracle_config,
             deposit_index: existing_bank.deposit_index,
             borrow_index: existing_bank.borrow_index,
-            indexed_total_deposits: existing_bank.indexed_total_deposits,
-            indexed_total_borrows: existing_bank.indexed_total_borrows,
+            cached_indexed_total_deposits: existing_bank.cached_indexed_total_deposits,
+            cached_indexed_total_borrows: existing_bank.cached_indexed_total_borrows,
             indexed_deposits: I80F48::ZERO,
             indexed_borrows: I80F48::ZERO,
             last_updated: existing_bank.last_updated,
@@ -170,14 +178,6 @@ impl Bank {
         std::str::from_utf8(&self.name)
             .unwrap()
             .trim_matches(char::from(0))
-    }
-
-    pub fn native_total_borrows(&self) -> I80F48 {
-        self.borrow_index * self.indexed_total_borrows
-    }
-
-    pub fn native_total_deposits(&self) -> I80F48 {
-        self.deposit_index * self.indexed_total_deposits
     }
 
     pub fn native_borrows(&self) -> I80F48 {

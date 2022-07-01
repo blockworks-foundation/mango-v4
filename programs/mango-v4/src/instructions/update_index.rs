@@ -56,8 +56,8 @@ pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
     for ai in all_banks.iter() {
         let mut bank = ai.load_mut::<Bank>()?;
 
-        bank.indexed_total_deposits = indexed_total_deposits;
-        bank.indexed_total_borrows = indexed_total_borrows;
+        bank.cached_indexed_total_deposits = indexed_total_deposits;
+        bank.cached_indexed_total_borrows = indexed_total_borrows;
 
         bank.last_updated = now_ts;
         bank.charge_loan_fee(diff_ts);
