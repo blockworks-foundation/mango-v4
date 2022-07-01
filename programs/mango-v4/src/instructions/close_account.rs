@@ -5,9 +5,12 @@ use crate::state::*;
 
 #[derive(Accounts)]
 pub struct CloseAccount<'info> {
+    pub group: AccountLoader<'info, Group>,
+
     #[account(
         mut,
         has_one = owner,
+        has_one = group,
         close = sol_destination
     )]
     pub account: AccountLoader<'info, MangoAccount>,
@@ -21,6 +24,13 @@ pub struct CloseAccount<'info> {
 }
 
 pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
+    let group = ctx.accounts.group.load()?;
+
+    // don't perform checks if group is just testing
+    if group.testing == 1 {
+        return Ok(());
+    }
+
     let account = ctx.accounts.account.load()?;
     require_eq!(account.being_liquidated, 0);
     require_eq!(account.delegate, Pubkey::default());

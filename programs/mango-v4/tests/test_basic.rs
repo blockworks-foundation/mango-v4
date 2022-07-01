@@ -169,6 +169,7 @@ async fn test_basic() -> Result<(), TransportError> {
     send_tx(
         solana,
         CloseAccountInstruction {
+            group,
             account,
             owner,
             sol_destination: payer.pubkey(),
