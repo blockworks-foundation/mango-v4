@@ -522,6 +522,11 @@ export type MangoV4 = {
       "name": "closeAccount",
       "accounts": [
         {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "account",
           "isMut": true,
           "isSigner": false
@@ -2217,13 +2222,13 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "indexedTotalDeposits",
+            "name": "cachedIndexedTotalDeposits",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "indexedTotalBorrows",
+            "name": "cachedIndexedTotalBorrows",
             "type": {
               "defined": "I80F48"
             }
@@ -2931,6 +2936,42 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "FlashLoanTokenDetail",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "changeAmount",
+            "type": "i128"
+          },
+          {
+            "name": "loan",
+            "type": "i128"
+          },
+          {
+            "name": "loanOriginationFee",
+            "type": "i128"
+          },
+          {
+            "name": "depositIndex",
+            "type": "i128"
+          },
+          {
+            "name": "borrowIndex",
+            "type": "i128"
+          },
+          {
+            "name": "price",
+            "type": "i128"
+          }
+        ]
+      }
+    },
+    {
       "name": "TokenPosition",
       "type": {
         "kind": "struct",
@@ -3543,6 +3584,453 @@ export type MangoV4 = {
           }
         ]
       }
+    }
+  ],
+  "events": [
+    {
+      "name": "PerpBalanceLog",
+      "fields": [
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "basePosition",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quotePosition",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "longSettledFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "shortSettledFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "longFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "shortFunding",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenBalanceLog",
+      "fields": [
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "indexedPosition",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "depositIndex",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "borrowIndex",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "MarginTradeLog",
+      "fields": [
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndexes",
+          "type": {
+            "vec": "u16"
+          },
+          "index": false
+        },
+        {
+          "name": "preIndexedPositions",
+          "type": {
+            "vec": "i128"
+          },
+          "index": false
+        },
+        {
+          "name": "postIndexedPositions",
+          "type": {
+            "vec": "i128"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FlashLoanLog",
+      "fields": [
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenLoanDetails",
+          "type": {
+            "vec": {
+              "defined": "FlashLoanTokenDetail"
+            }
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "WithdrawLog",
+      "fields": [
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "signer",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quantity",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "DepositLog",
+      "fields": [
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "signer",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quantity",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FillLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "takerSide",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "makerSlot",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "marketFeesApplied",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "makerOut",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "makerOrderId",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "makerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "makerFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "makerTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "taker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "takerOrderId",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "takerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quantity",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UpdateFundingLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "longFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "shortFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UpdateIndexLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "depositIndex",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "borrowIndex",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "LiquidateTokenAndTokenLog",
+      "fields": [
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OpenOrdersBalanceLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "baseTotal",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "baseFree",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "quoteTotal",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "quoteFree",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "referrerRebatesAccrued",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -4108,6 +4596,11 @@ export const IDL: MangoV4 = {
       "name": "closeAccount",
       "accounts": [
         {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "account",
           "isMut": true,
           "isSigner": false
@@ -5803,13 +6296,13 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "indexedTotalDeposits",
+            "name": "cachedIndexedTotalDeposits",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "indexedTotalBorrows",
+            "name": "cachedIndexedTotalBorrows",
             "type": {
               "defined": "I80F48"
             }
@@ -6517,6 +7010,42 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "FlashLoanTokenDetail",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "changeAmount",
+            "type": "i128"
+          },
+          {
+            "name": "loan",
+            "type": "i128"
+          },
+          {
+            "name": "loanOriginationFee",
+            "type": "i128"
+          },
+          {
+            "name": "depositIndex",
+            "type": "i128"
+          },
+          {
+            "name": "borrowIndex",
+            "type": "i128"
+          },
+          {
+            "name": "price",
+            "type": "i128"
+          }
+        ]
+      }
+    },
+    {
       "name": "TokenPosition",
       "type": {
         "kind": "struct",
@@ -7129,6 +7658,453 @@ export const IDL: MangoV4 = {
           }
         ]
       }
+    }
+  ],
+  "events": [
+    {
+      "name": "PerpBalanceLog",
+      "fields": [
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "basePosition",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quotePosition",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "longSettledFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "shortSettledFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "longFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "shortFunding",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenBalanceLog",
+      "fields": [
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "indexedPosition",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "depositIndex",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "borrowIndex",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "MarginTradeLog",
+      "fields": [
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndexes",
+          "type": {
+            "vec": "u16"
+          },
+          "index": false
+        },
+        {
+          "name": "preIndexedPositions",
+          "type": {
+            "vec": "i128"
+          },
+          "index": false
+        },
+        {
+          "name": "postIndexedPositions",
+          "type": {
+            "vec": "i128"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FlashLoanLog",
+      "fields": [
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenLoanDetails",
+          "type": {
+            "vec": {
+              "defined": "FlashLoanTokenDetail"
+            }
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "WithdrawLog",
+      "fields": [
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "signer",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quantity",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "DepositLog",
+      "fields": [
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "signer",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quantity",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FillLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "takerSide",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "makerSlot",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "marketFeesApplied",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "makerOut",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "seqNum",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "maker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "makerOrderId",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "makerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "makerFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "makerTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "taker",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "takerOrderId",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "takerClientOrderId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quantity",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UpdateFundingLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "longFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "shortFunding",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UpdateIndexLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "depositIndex",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "borrowIndex",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "LiquidateTokenAndTokenLog",
+      "fields": [
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OpenOrdersBalanceLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "baseTotal",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "baseFree",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "quoteTotal",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "quoteFree",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "referrerRebatesAccrued",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [

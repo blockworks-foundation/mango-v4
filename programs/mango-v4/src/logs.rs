@@ -1,6 +1,6 @@
 use crate::state::{PerpMarket, PerpPositions};
 use anchor_lang::prelude::*;
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::BorshSerialize;
 
 /// Warning: This function needs 512+ bytes free on the stack
 pub fn emit_perp_balances(
@@ -54,7 +54,7 @@ pub struct MarginTradeLog {
     pub post_indexed_positions: Vec<i128>,
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct FlashLoanTokenDetail {
     pub token_index: u16,
     pub change_amount: i128,

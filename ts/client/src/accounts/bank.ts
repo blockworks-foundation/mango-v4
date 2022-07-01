@@ -15,8 +15,8 @@ export class Bank {
   public name: string;
   public depositIndex: I80F48;
   public borrowIndex: I80F48;
-  public indexedTotalDeposits: I80F48;
-  public indexedTotalBorrows: I80F48;
+  public cachedIndexedTotalDeposits: I80F48;
+  public cachedIndexedTotalBorrows: I80F48;
   public maxRate: I80F48;
   public rate0: I80F48;
   public rate1: I80F48;
@@ -35,8 +35,8 @@ export class Bank {
       oracleConfig: OracleConfig;
       depositIndex: I80F48Dto;
       borrowIndex: I80F48Dto;
-      indexedTotalDeposits: I80F48Dto;
-      indexedTotalBorrows: I80F48Dto;
+      cachedIndexedTotalDeposits: I80F48Dto;
+      cachedIndexedTotalBorrows: I80F48Dto;
       lastUpdated: BN;
       util0: I80F48Dto;
       rate0: I80F48Dto;
@@ -66,8 +66,8 @@ export class Bank {
       obj.oracleConfig,
       obj.depositIndex,
       obj.borrowIndex,
-      obj.indexedTotalDeposits,
-      obj.indexedTotalBorrows,
+      obj.cachedIndexedTotalDeposits,
+      obj.cachedIndexedTotalBorrows,
       obj.lastUpdated,
       obj.util0,
       obj.rate0,
@@ -121,8 +121,8 @@ export class Bank {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.depositIndex = I80F48.from(depositIndex);
     this.borrowIndex = I80F48.from(borrowIndex);
-    this.indexedTotalDeposits = I80F48.from(indexedTotalDeposits);
-    this.indexedTotalBorrows = I80F48.from(indexedTotalBorrows);
+    this.cachedIndexedTotalDeposits = I80F48.from(indexedTotalDeposits);
+    this.cachedIndexedTotalBorrows = I80F48.from(indexedTotalBorrows);
     this.maxRate = I80F48.from(maxRate);
     this.util0 = I80F48.from(util0);
     this.rate0 = I80F48.from(rate0);
@@ -138,23 +138,23 @@ export class Bank {
   }
 
   nativeDeposits(): I80F48 {
-    return this.indexedTotalDeposits.mul(this.depositIndex);
+    return this.cachedIndexedTotalDeposits.mul(this.depositIndex);
   }
 
   nativeBorrows(): I80F48 {
-    return this.indexedTotalBorrows.mul(this.borrowIndex);
+    return this.cachedIndexedTotalBorrows.mul(this.borrowIndex);
   }
 
   uiDeposits(): number {
     return nativeI80F48ToUi(
-      this.indexedTotalDeposits.mul(this.depositIndex),
+      this.cachedIndexedTotalDeposits.mul(this.depositIndex),
       this.mintDecimals,
     ).toNumber();
   }
 
   uiBorrows(): number {
     return nativeI80F48ToUi(
-      this.indexedTotalBorrows.mul(this.borrowIndex),
+      this.cachedIndexedTotalBorrows.mul(this.borrowIndex),
       this.mintDecimals,
     ).toNumber();
   }
