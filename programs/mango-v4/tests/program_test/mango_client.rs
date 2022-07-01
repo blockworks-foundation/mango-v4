@@ -1297,6 +1297,7 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
 }
 
 pub struct CloseAccountInstruction<'keypair> {
+    pub group: Pubkey,
     pub account: Pubkey,
     pub owner: &'keypair Keypair,
     pub sol_destination: Pubkey,
@@ -1313,6 +1314,7 @@ impl<'keypair> ClientInstruction for CloseAccountInstruction<'keypair> {
         let instruction = Self::Instruction {};
 
         let accounts = Self::Accounts {
+            group: self.group,
             owner: self.owner.pubkey(),
             account: self.account,
             sol_destination: self.sol_destination,
