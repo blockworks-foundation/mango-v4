@@ -219,7 +219,17 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         &mut self,
         token_index1: TokenIndex,
         token_index2: TokenIndex,
-    ) -> Result<(&mut Bank, &mut Bank, I80F48, I80F48)> {
+    ) -> Result<(&mut Bank, I80F48, Option<(&mut Bank, I80F48)>)> {
+        let n_banks = self.n_banks();
+        if token_index1 == token_index2 {
+            let index = self.bank_index(token_index1)?;
+            let (bank_part, oracle_part) = self.ais.split_at_mut(index + 1);
+            let bank = bank_part[index].load_mut_fully_unchecked::<Bank>()?;
+            let oracle = &oracle_part[n_banks - 1];
+            require!(&bank.oracle == oracle.key, MangoError::SomeError);
+            let price = oracle_price(oracle, bank.oracle_config.conf_filter, bank.mint_decimals)?;
+            return Ok((bank, price, None));
+        }
         let index1 = self.bank_index(token_index1)?;
         let index2 = self.bank_index(token_index2)?;
         let (first, second, swap) = if index1 < index2 {
@@ -227,7 +237,6 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         } else {
             (index2, index1, true)
         };
-        let n_banks = self.n_banks();
 
         // split_at_mut after the first bank and after the second bank
         let (first_bank_part, second_part) = self.ais.split_at_mut(first + 1);
@@ -244,9 +253,9 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         let price1 = oracle_price(oracle1, bank1.oracle_config.conf_filter, mint_decimals1)?;
         let price2 = oracle_price(oracle2, bank2.oracle_config.conf_filter, mint_decimals2)?;
         if swap {
-            Ok((bank2, bank1, price2, price1))
+            Ok((bank2, price2, Some((bank1, price1))))
         } else {
-            Ok((bank1, bank2, price1, price2))
+            Ok((bank1, price1, Some((bank2, price2))))
         }
     }
 
@@ -940,7 +949,8 @@ mod tests {
         assert_eq!(retriever.perp_index_map.len(), 1);
 
         {
-            let (b1, b2, o1, o2) = retriever.banks_mut_and_oracles(1, 4).unwrap();
+            let (b1, o1, opt_b2o2) = retriever.banks_mut_and_oracles(1, 4).unwrap();
+            let (b2, o2) = opt_b2o2.unwrap();
             assert_eq!(b1.token_index, 1);
             assert_eq!(o1, I80F48::ONE);
             assert_eq!(b2.token_index, 4);
@@ -948,11 +958,19 @@ mod tests {
         }
 
         {
-            let (b1, b2, o1, o2) = retriever.banks_mut_and_oracles(4, 1).unwrap();
+            let (b1, o1, opt_b2o2) = retriever.banks_mut_and_oracles(4, 1).unwrap();
+            let (b2, o2) = opt_b2o2.unwrap();
             assert_eq!(b1.token_index, 4);
             assert_eq!(o1, 5 * I80F48::ONE);
             assert_eq!(b2.token_index, 1);
             assert_eq!(o2, I80F48::ONE);
+        }
+
+        {
+            let (b1, o1, opt_b2o2) = retriever.banks_mut_and_oracles(4, 4).unwrap();
+            assert!(opt_b2o2.is_none());
+            assert_eq!(b1.token_index, 4);
+            assert_eq!(o1, 5 * I80F48::ONE);
         }
 
         retriever.banks_mut_and_oracles(4, 2).unwrap_err();

@@ -26,7 +26,7 @@ async fn test_position_lifetime() -> Result<()> {
     // SETUP: Create a group and accounts
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,

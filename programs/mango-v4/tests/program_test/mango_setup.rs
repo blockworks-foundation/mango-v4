@@ -25,6 +25,7 @@ pub struct Token {
 
 pub struct GroupWithTokens {
     pub group: Pubkey,
+    pub insurance_vault: Pubkey,
     pub tokens: Vec<Token>,
 }
 
@@ -35,10 +36,18 @@ impl<'a> GroupWithTokensConfig<'a> {
             payer,
             mints,
         } = self;
-        let group = send_tx(solana, CreateGroupInstruction { admin, payer })
-            .await
-            .unwrap()
-            .group;
+        let create_group_accounts = send_tx(
+            solana,
+            CreateGroupInstruction {
+                admin,
+                payer,
+                insurance_mint: mints[0].pubkey,
+            },
+        )
+        .await
+        .unwrap();
+        let group = create_group_accounts.group;
+        let insurance_vault = create_group_accounts.insurance_vault;
 
         let address_lookup_table = solana.create_address_lookup_table(admin, payer).await;
 
@@ -123,6 +132,10 @@ impl<'a> GroupWithTokensConfig<'a> {
             });
         }
 
-        GroupWithTokens { group, tokens }
+        GroupWithTokens {
+            group,
+            insurance_vault,
+            tokens,
+        }
     }
 }

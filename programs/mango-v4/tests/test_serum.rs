@@ -26,7 +26,7 @@ async fn test_serum() -> Result<(), TransportError> {
     // SETUP: Create a group and an account
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,

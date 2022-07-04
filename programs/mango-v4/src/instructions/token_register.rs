@@ -106,6 +106,14 @@ pub fn token_register(
 
     require_eq!(bank_num, 0);
 
+    // Require token 0 to be in the insurance token
+    if token_index == QUOTE_TOKEN_INDEX {
+        require_keys_eq!(
+            ctx.accounts.group.load()?.insurance_mint,
+            ctx.accounts.mint.key()
+        );
+    }
+
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
         name: fill16_from_str(name)?,

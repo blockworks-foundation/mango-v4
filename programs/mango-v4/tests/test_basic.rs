@@ -27,7 +27,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // SETUP: Create a group, account, register a token (mint0)
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,

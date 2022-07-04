@@ -68,8 +68,9 @@ pub fn liq_token_with_token(
         //
         // This must happen _after_ the health computation, since immutable borrows of
         // the bank are not allowed at the same time.
-        let (asset_bank, liab_bank, asset_price, liab_price) =
+        let (asset_bank, asset_price, opt_liab_bank_and_price) =
             account_retriever.banks_mut_and_oracles(asset_token_index, liab_token_index)?;
+        let (liab_bank, liab_price) = opt_liab_bank_and_price.unwrap();
 
         let liqee_assets_native = liqee
             .tokens

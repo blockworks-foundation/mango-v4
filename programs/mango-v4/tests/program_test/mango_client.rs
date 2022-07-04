@@ -314,6 +314,12 @@ pub async fn account_position(solana: &SolanaCookie, account: Pubkey, bank: Pubk
     native.round().to_num::<i64>()
 }
 
+pub async fn account_position_closed(solana: &SolanaCookie, account: Pubkey, bank: Pubkey) -> bool {
+    let account_data: MangoAccount = solana.get_account(account).await;
+    let bank_data: Bank = solana.get_account(bank).await;
+    account_data.tokens.find(bank_data.token_index).is_none()
+}
+
 pub async fn account_position_f64(solana: &SolanaCookie, account: Pubkey, bank: Pubkey) -> f64 {
     let account_data: MangoAccount = solana.get_account(account).await;
     let bank_data: Bank = solana.get_account(bank).await;
@@ -1181,6 +1187,7 @@ impl<'keypair> ClientInstruction for CloseStubOracleInstruction<'keypair> {
 pub struct CreateGroupInstruction<'keypair> {
     pub admin: &'keypair Keypair,
     pub payer: &'keypair Keypair,
+    pub insurance_mint: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for CreateGroupInstruction<'keypair> {
@@ -1206,11 +1213,21 @@ impl<'keypair> ClientInstruction for CreateGroupInstruction<'keypair> {
         )
         .0;
 
+        let insurance_vault = Pubkey::find_program_address(
+            &[group.as_ref(), b"InsuranceVault".as_ref()],
+            &program_id,
+        )
+        .0;
+
         let accounts = Self::Accounts {
             group,
             admin: self.admin.pubkey(),
+            insurance_mint: self.insurance_mint,
+            insurance_vault,
             payer: self.payer.pubkey(),
+            token_program: Token::id(),
             system_program: System::id(),
+            rent: sysvar::rent::Rent::id(),
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);
@@ -2049,9 +2066,8 @@ pub struct LiqTokenBankruptcyInstruction<'keypair> {
     pub liqor: Pubkey,
     pub liqor_owner: &'keypair Keypair,
 
-    //pub asset_token_index: TokenIndex,
     pub liab_token_index: TokenIndex,
-    //pub max_liab_transfer: I80F48,
+    pub max_liab_transfer: I80F48,
     pub liab_mint_info: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
@@ -2064,9 +2080,8 @@ impl<'keypair> ClientInstruction for LiqTokenBankruptcyInstruction<'keypair> {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            //asset_token_index: self.asset_token_index,
             liab_token_index: self.liab_token_index,
-            //max_liab_transfer: self.max_liab_transfer,
+            max_liab_transfer: self.max_liab_transfer,
         };
 
         let liab_mint_info: MintInfo = account_loader.load(&self.liab_mint_info).await.unwrap();
@@ -2076,12 +2091,31 @@ impl<'keypair> ClientInstruction for LiqTokenBankruptcyInstruction<'keypair> {
             &account_loader,
             &liqee,
             &liqor,
-            self.liab_token_index, //self.asset_token_index,
+            QUOTE_TOKEN_INDEX,
             0,
             self.liab_token_index,
-            0, // TODO: this might matter if the insurance fund gets involved?
+            0,
         )
         .await;
+
+        let group: Group = account_loader.load(&liqee.group).await.unwrap();
+
+        let quote_mint_info = Pubkey::find_program_address(
+            &[
+                liqee.group.as_ref(),
+                b"MintInfo".as_ref(),
+                group.insurance_mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let quote_mint_info: MintInfo = account_loader.load(&quote_mint_info).await.unwrap();
+
+        let insurance_vault = Pubkey::find_program_address(
+            &[liqee.group.as_ref(), b"InsuranceVault".as_ref()],
+            &program_id,
+        )
+        .0;
 
         let accounts = Self::Accounts {
             group: liqee.group,
@@ -2089,6 +2123,9 @@ impl<'keypair> ClientInstruction for LiqTokenBankruptcyInstruction<'keypair> {
             liqor: self.liqor,
             liqor_owner: self.liqor_owner.pubkey(),
             liab_mint_info: self.liab_mint_info,
+            quote_vault: quote_mint_info.first_vault(),
+            insurance_vault,
+            token_program: Token::id(),
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);

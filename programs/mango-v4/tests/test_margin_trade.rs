@@ -34,7 +34,7 @@ async fn test_margin_trade1() -> Result<(), BanksClientError> {
     // SETUP: Create a group, account, register a token (mint0)
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -350,7 +350,7 @@ async fn test_margin_trade2() -> Result<(), BanksClientError> {
     // SETUP: Create a group, account, register a token (mint0)
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -611,7 +611,7 @@ async fn test_margin_trade3() -> Result<(), BanksClientError> {
     // SETUP: Create a group, account, register a token (mint0)
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
