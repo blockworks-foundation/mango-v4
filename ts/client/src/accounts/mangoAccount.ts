@@ -3,7 +3,7 @@ import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
 import { nativeI80F48ToUi } from '../utils';
-import { Bank } from './bank';
+import { Bank, QUOTE_DECIMALS } from './bank';
 import { Group } from './group';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from './I80F48';
 export class MangoAccount {
@@ -91,6 +91,16 @@ export class MangoAccount {
     return ta ? ta.native(bank) : ZERO_I80F48;
   }
 
+  getInNativeUsdcUnits(bank: Bank): I80F48 {
+    const ta = this.findToken(bank.tokenIndex);
+    return ta
+      ? ta
+          .native(bank)
+          .mul(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
+          .div(I80F48.fromNumber(Math.pow(10, bank.mintDecimals)))
+      : ZERO_I80F48;
+  }
+
   getNativeDeposits(bank: Bank): I80F48 {
     const native = this.getNative(bank);
     return native.gte(ZERO_I80F48) ? native : ZERO_I80F48;
@@ -168,13 +178,11 @@ export class MangoAccount {
     tokenName: string,
   ): Promise<I80F48> {
     const bank = group.banksMap.get(tokenName);
-
     const initHealth = (this.accountData as MangoAccountData).initHealth;
-
-    const newInitHealth = initHealth.sub(
-      this.getNativeDeposits(bank).mul(bank.price).mul(bank.initAssetWeight),
-    );
-
+    const inUsdcUnits = this.getInNativeUsdcUnits(bank)
+      .mul(bank.price)
+      .mul(bank.initAssetWeight);
+    const newInitHealth = initHealth.sub(inUsdcUnits);
     return newInitHealth.div(bank.price.mul(bank.initLiabWeight));
   }
 
