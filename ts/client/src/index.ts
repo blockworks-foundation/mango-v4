@@ -15,6 +15,7 @@ export {
   Serum3SelfTradeBehavior,
   Serum3Side,
 } from './accounts/serum3';
+export * from './accounts/bank';
 export * from './constants';
 export * from './utils';
 
