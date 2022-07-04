@@ -10,7 +10,7 @@ pub struct Serum3CancelAllOrders<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = owner,
+        constraint = account.load()?.owner == owner.key() || account.load()?.delegate == owner.key(),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,

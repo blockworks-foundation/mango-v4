@@ -72,6 +72,39 @@ pub mod mango_v4 {
     }
 
     #[allow(clippy::too_many_arguments)]
+    pub fn token_edit(
+        ctx: Context<TokenEdit>,
+        token_index: TokenIndex,
+        bank_num: u64,
+        oracle_opt: Option<Pubkey>,
+        oracle_config_opt: Option<OracleConfig>,
+        interest_rate_params_opt: Option<InterestRateParams>,
+        loan_fee_rate_opt: Option<f32>,
+        loan_origination_fee_rate_opt: Option<f32>,
+        maint_asset_weight_opt: Option<f32>,
+        init_asset_weight_opt: Option<f32>,
+        maint_liab_weight_opt: Option<f32>,
+        init_liab_weight_opt: Option<f32>,
+        liquidation_fee_opt: Option<f32>,
+    ) -> Result<()> {
+        instructions::token_edit(
+            ctx,
+            token_index,
+            bank_num,
+            oracle_opt,
+            oracle_config_opt,
+            interest_rate_params_opt,
+            loan_fee_rate_opt,
+            loan_origination_fee_rate_opt,
+            maint_asset_weight_opt,
+            init_asset_weight_opt,
+            maint_liab_weight_opt,
+            init_liab_weight_opt,
+            liquidation_fee_opt,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn token_add_bank(
         ctx: Context<TokenAddBank>,
         token_index: TokenIndex,
@@ -99,7 +132,14 @@ pub mod mango_v4 {
         instructions::create_account(ctx, account_num, name)
     }
 
-    // TODO set delegate
+    pub fn edit_account(
+        ctx: Context<EditAccount>,
+        account_num: u8,
+        name_opt: Option<String>,
+        delegate_opt: Option<Pubkey>,
+    ) -> Result<()> {
+        instructions::edit_account(ctx, account_num, name_opt, delegate_opt)
+    }
 
     pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
         instructions::close_account(ctx)
@@ -181,6 +221,11 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::serum3_register_market(ctx, market_index, name)
     }
+
+    // note:
+    // pub fn serum3_edit_market - doesn't exist since a mango serum3 market only contains the properties
+    // registered base and quote token pairs, and serum3 external market its pointing to, and none of them
+    // should be edited once set on creation
 
     pub fn serum3_deregister_market(ctx: Context<Serum3DeregisterMarket>) -> Result<()> {
         instructions::serum3_deregister_market(ctx)
@@ -306,6 +351,45 @@ pub mod mango_v4 {
             max_funding,
             min_funding,
             impact_quantity,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn perp_edit_market(
+        ctx: Context<PerpEditMarket>,
+        perp_market_index: PerpMarketIndex,
+        oracle_opt: Option<Pubkey>,
+        oracle_config_opt: Option<OracleConfig>,
+        base_token_index_opt: Option<TokenIndex>,
+        base_token_decimals_opt: Option<u8>,
+        maint_asset_weight_opt: Option<f32>,
+        init_asset_weight_opt: Option<f32>,
+        maint_liab_weight_opt: Option<f32>,
+        init_liab_weight_opt: Option<f32>,
+        liquidation_fee_opt: Option<f32>,
+        maker_fee_opt: Option<f32>,
+        taker_fee_opt: Option<f32>,
+        min_funding_opt: Option<f32>,
+        max_funding_opt: Option<f32>,
+        impact_quantity_opt: Option<i64>,
+    ) -> Result<()> {
+        instructions::perp_edit_market(
+            ctx,
+            perp_market_index,
+            oracle_opt,
+            oracle_config_opt,
+            base_token_index_opt,
+            base_token_decimals_opt,
+            maint_asset_weight_opt,
+            init_asset_weight_opt,
+            maint_liab_weight_opt,
+            init_liab_weight_opt,
+            liquidation_fee_opt,
+            maker_fee_opt,
+            taker_fee_opt,
+            min_funding_opt,
+            max_funding_opt,
+            impact_quantity_opt,
         )
     }
 

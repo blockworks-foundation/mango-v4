@@ -14,9 +14,10 @@ pub struct PerpPlaceOrder<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = owner,
+        constraint = account.load()?.owner == owner.key() || account.load()?.delegate == owner.key(),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
+    pub owner: Signer<'info>,
 
     #[account(
         mut,
@@ -36,8 +37,6 @@ pub struct PerpPlaceOrder<'info> {
 
     /// CHECK: The oracle can be one of several different account types and the pubkey is checked above
     pub oracle: UncheckedAccount<'info>,
-
-    pub owner: Signer<'info>,
 }
 
 // TODO

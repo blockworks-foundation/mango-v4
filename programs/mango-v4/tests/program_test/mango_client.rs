@@ -52,6 +52,19 @@ pub async fn send_tx<CI: ClientInstruction>(
     Ok(accounts)
 }
 
+pub async fn send_tx_expecting_failure<CI: ClientInstruction>(
+    solana: &SolanaCookie,
+    ix: CI,
+) -> std::result::Result<(), TransportError> {
+    let (_, instruction) = ix.to_instruction(solana).await;
+    let signers = ix.signers();
+    let instructions = vec![instruction];
+    solana
+        .process_transaction(&instructions, Some(&signers[..]))
+        .await?;
+    Ok(())
+}
+
 /// Build a transaction from multiple instructions
 pub struct ClientTransaction {
     solana: Arc<SolanaCookie>,
@@ -1293,6 +1306,54 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
 
     fn signers(&self) -> Vec<&Keypair> {
         vec![self.owner, self.payer]
+    }
+}
+
+pub struct EditAccountInstruction<'keypair> {
+    pub account_num: u8,
+    pub group: Pubkey,
+    pub owner: &'keypair Keypair,
+    pub name: String,
+    pub delegate: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for EditAccountInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::EditAccount;
+    type Instruction = mango_v4::instruction::EditAccount;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = mango_v4::instruction::EditAccount {
+            account_num: self.account_num,
+            name_opt: Option::from(self.name.to_string()),
+            delegate_opt: Option::from(self.delegate),
+        };
+
+        let account = Pubkey::find_program_address(
+            &[
+                self.group.as_ref(),
+                b"MangoAccount".as_ref(),
+                self.owner.pubkey().as_ref(),
+                &self.account_num.to_le_bytes(),
+            ],
+            &program_id,
+        )
+        .0;
+
+        let accounts = mango_v4::accounts::EditAccount {
+            group: self.group,
+            account,
+            owner: self.owner.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.owner]
     }
 }
 
