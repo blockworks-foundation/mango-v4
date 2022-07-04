@@ -4,6 +4,16 @@ import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 
+//
+// An example for admins based on high level api i.e. the client
+// Depoys a new mango group to devnet, registers 4 tokens, and 1 serum3 spot market
+//
+// process.env.ADMIN_KEYPAIR - group admin keypair path
+// to create a new admin keypair:
+// * solana-keygen new --outfile ~/.config/solana/admin.json
+// * solana airdrop 1  -k ~/.config/solana/admin.json
+//
+
 const DEVNET_SERUM3_MARKETS = new Map([
   ['BTC/USDC', 'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB'],
   ['SOL/USDC', '5xWpt56U1NCuHoAEtpLeUrQcxDkEpNfScjfLFaRzLPgR'],
@@ -20,15 +30,6 @@ const DEVNET_ORACLES = new Map([
   ['ORCA', 'A1WttWF7X3Rg6ZRpB2YQUFHCRh1kiXV8sKKLV3S9neJV'],
 ]);
 
-//
-// An example for admins based on high level api i.e. the client
-// Depoys a new mango group to devnet, registers 2 tokens, and 1 serum3 spot market
-//
-// process.env.ADMIN_KEYPAIR - group admin keypair path
-// to create a new admin keypair:
-// * solana-keygen new --outfile ~/.config/solana/admin.json
-// * solana airdrop 1  -k ~/.config/solana/admin.json
-//
 async function main() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(

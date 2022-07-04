@@ -17,6 +17,9 @@ import { toUiDecimals } from '../utils';
 // process.env.USER_KEYPAIR - mango account owner keypair path
 // process.env.ADMIN_KEYPAIR - group admin keypair path (useful for automatically finding the group)
 //
+// This script deposits some tokens, places some serum orders, cancels them, places some perp orders
+//
+
 async function main() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(

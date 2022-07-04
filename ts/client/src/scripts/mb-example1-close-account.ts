@@ -4,6 +4,9 @@ import fs from 'fs';
 import { Serum3Side } from '../accounts/serum3';
 import { MangoClient } from '../client';
 
+//
+// (untested?) script which closes a mango account cleanly, first closes all positions, withdraws all tokens and then closes it
+//
 async function main() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(process.env.CLUSTER_URL, options);

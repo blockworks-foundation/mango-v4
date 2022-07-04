@@ -5,6 +5,10 @@ import { Serum3Side } from '../accounts/serum3';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 
+//
+// script which shows how to close a mango account cleanly i.e. close all active positions, withdraw all tokens, etc.
+//
+
 // note: either use finalized or expect closing certain things to fail and having to runs scrript multiple times
 async function main() {
   const options = AnchorProvider.defaultOptions();
