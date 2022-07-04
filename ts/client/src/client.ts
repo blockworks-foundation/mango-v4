@@ -293,7 +293,9 @@ export class MangoClient {
       if (banks[index].name === 'USDC') {
         banks[index].price = 1;
       } else {
-        banks[index].price = parsePriceData(price.data).previousPrice;
+        const parsedPriceData = parsePriceData(price.data);
+        banks[index].price =
+          parsedPriceData.price || parsedPriceData.previousPrice;
       }
     }
   }
