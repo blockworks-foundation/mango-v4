@@ -60,7 +60,7 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
     let expected_ais = cm!(active_token_len * 2 // banks + oracles
         + active_perp_len // PerpMarkets
         + active_serum3_len); // open_orders
-    require!(ais.len() == expected_ais, MangoError::SomeError);
+    require_eq!(ais.len(), expected_ais, MangoError::SomeError);
 
     Ok(FixedOrderAccountRetriever {
         ais: ais

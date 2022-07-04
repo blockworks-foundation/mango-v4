@@ -86,6 +86,8 @@ async function main() {
     })),
   );
 
+  console.log(toDump);
+
   // adds ids for group in existing ids.json
   const existingGroup = idsJson.groups.find((group) => group.name == groupName);
   if (existingGroup) {

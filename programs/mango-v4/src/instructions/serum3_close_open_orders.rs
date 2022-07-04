@@ -57,6 +57,8 @@ pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<(
     // close OO
     //
     cpi_close_open_orders(ctx.accounts)?;
+
+    // TODO: decrement in_use_count on the base token and quote token
     account.serum3.deactivate(serum_market.market_index)?;
 
     Ok(())

@@ -70,16 +70,16 @@
       "mangoProgramId": "m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD",
       "banks": [
         {
-          "name": "USDC",
-          "publicKey": "BYq994HWWuXC1UC7ByTiDLQBsnBQQAzJaLvMCQU3priu"
+          "name": "SOL",
+          "publicKey": "6XDZbWax9imnCEaKokorQtwRY7dGj9HnZNk612ibZu4v"
         },
         {
           "name": "BTC",
-          "publicKey": "96e336hgaPWbbHqPbpPcmr1pbTY1CALtFWkNk2tD4ZmK"
+          "publicKey": "9pJ3V2WvGWtWomiUsRLHvMguoZ9SUCWwZxfvaqdRDq44"
         },
         {
-          "name": "SOL",
-          "publicKey": "J3dxEFhJG1maNva8W9u4XzxCR1DQm6qfkgrkY29Ujrh3"
+          "name": "USDC",
+          "publicKey": "41gvXTAYM4xckLYqxPXWwjpr6WM3GZEytM9QZSGKqfjX"
         }
       ],
       "stubOracles": [
@@ -90,16 +90,16 @@
       ],
       "mintInfos": [
         {
-          "name": "USDC",
-          "publicKey": "42bXYX5sidUkrijuArv4D11g1aAm9947ht6qUB8Me5Q3"
-        },
-        {
           "name": "BTC",
           "publicKey": "4KZkrJQRvrVy8BWmbUKk7YWezMAsSb97ZMHFLUtj6Q5u"
         },
         {
           "name": "SOL",
           "publicKey": "EvjoLBh7ej78C1yA7jaLcHQfoGx3KkDBnZbrztSZFGmC"
+        },
+        {
+          "name": "USDC",
+          "publicKey": "42bXYX5sidUkrijuArv4D11g1aAm9947ht6qUB8Me5Q3"
         }
       ],
       "serum3Markets": [],
