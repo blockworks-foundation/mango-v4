@@ -265,7 +265,7 @@ async function main() {
     group.reloadBanks(client);
     console.log(`end btc bank ${group.banksMap.get('BTC').toString()}`);
 
-    await mangoAccount.reload(client);
+    await mangoAccount.reload(client, group);
     console.log(`end balance \n${mangoAccount.toString(group)}`);
   }
 }

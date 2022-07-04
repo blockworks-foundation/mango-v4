@@ -82,7 +82,7 @@ async function main() {
     }
 
     // we closed a serum account, this changes the health accounts we are passing in for future ixs
-    await mangoAccount.reload(client);
+    await mangoAccount.reload(client, group);
 
     // withdraw all tokens
     for (const token of mangoAccount.tokensActive()) {
@@ -109,7 +109,7 @@ async function main() {
     }
 
     // reload and print current positions
-    await mangoAccount.reload(client);
+    await mangoAccount.reload(client, group);
     console.log(`...mangoAccount ${mangoAccount.publicKey}`);
     console.log(mangoAccount.toString());
 

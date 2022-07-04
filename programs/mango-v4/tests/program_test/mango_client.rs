@@ -2423,22 +2423,20 @@ impl ClientInstruction for UpdateIndexInstruction {
     }
 }
 
-pub struct ComputeHealthInstruction {
+pub struct ComputeAccountDataInstruction {
     pub account: Pubkey,
     pub health_type: HealthType,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for ComputeHealthInstruction {
-    type Accounts = mango_v4::accounts::ComputeHealth;
-    type Instruction = mango_v4::instruction::ComputeHealth;
+impl ClientInstruction for ComputeAccountDataInstruction {
+    type Accounts = mango_v4::accounts::ComputeAccountData;
+    type Instruction = mango_v4::instruction::ComputeAccountData;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction {
-            health_type: self.health_type,
-        };
+        let instruction = Self::Instruction {};
 
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
 

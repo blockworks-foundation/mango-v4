@@ -1,9 +1,11 @@
 import { Market } from '@project-serum/serum';
+import { parsePriceData, PriceData } from '@pythnetwork/client';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
 import { Bank, MintInfo } from './bank';
+import { I80F48, ONE_I80F48 } from './I80F48';
 import { PerpMarket } from './perp';
 import { Serum3Market } from './serum3';
 
@@ -21,6 +23,7 @@ export class Group {
       new Map(),
       new Map(),
       new Map(),
+      new Map(),
     );
   }
 
@@ -33,6 +36,7 @@ export class Group {
     public serum3MarketExternalsMap: Map<string, Market>,
     public perpMarketsMap: Map<string, PerpMarket>,
     public mintInfosMap: Map<number, MintInfo>,
+    public oraclesMap: Map<string, PriceData>,
   ) {}
 
   public findBank(tokenIndex: number): Bank | undefined {
@@ -61,8 +65,13 @@ export class Group {
       this.reloadSerum3Markets(client, ids),
       this.reloadPerpMarkets(client, ids),
     ]);
-    // requires reloadSerum3Markets to have finished loading
-    await this.reloadSerum3ExternalMarkets(client, ids);
+
+    await Promise.all([
+      // requires reloadBanks to have finished loading
+      this.reloadBankPrices(client, ids),
+      // requires reloadSerum3Markets to have finished loading
+      this.reloadSerum3ExternalMarkets(client, ids),
+    ]);
     // console.timeEnd('group.reload');
   }
 
@@ -80,7 +89,6 @@ export class Group {
     }
 
     this.banksMap = new Map(banks.map((bank) => [bank.name, bank]));
-    client.getPricesForGroup(this);
   }
 
   public async reloadMintInfos(client: MangoClient, ids?: Id) {
@@ -158,5 +166,40 @@ export class Group {
     this.perpMarketsMap = new Map(
       perpMarkets.map((perpMarket) => [perpMarket.name, perpMarket]),
     );
+  }
+
+  public async reloadBankPrices(client: MangoClient, ids?: Id): Promise<void> {
+    const banks = Array.from(this?.banksMap, ([, value]) => value);
+    const oracles = banks.map((b) => b.oracle);
+    console.log(oracles.toString());
+    const prices =
+      await client.program.provider.connection.getMultipleAccountsInfo(oracles);
+
+    for (const [index, price] of prices.entries()) {
+      if (banks[index].name === 'USDC') {
+        banks[index].price = ONE_I80F48;
+      } else {
+        banks[index].price = I80F48.fromNumber(
+          parsePriceData(price.data).previousPrice,
+        );
+      }
+    }
+  }
+
+  toString(): string {
+    let res = 'Group\n';
+    res = res + ' pk: ' + this.publicKey.toString();
+
+    res =
+      res +
+      '\n mintInfos:' +
+      Array.from(this.mintInfosMap.entries())
+        .map(
+          (mintInfoTuple) =>
+            '  \n' + mintInfoTuple[0] + ') ' + mintInfoTuple[1].toString(),
+        )
+        .join(', ');
+
+    return res;
   }
 }

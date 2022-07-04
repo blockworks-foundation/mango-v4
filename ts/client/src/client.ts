@@ -7,7 +7,6 @@ import {
   initializeAccount,
   WRAPPED_SOL_MINT,
 } from '@project-serum/serum/lib/token-instructions';
-import { parsePriceData } from '@pythnetwork/client';
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   Token,
@@ -31,7 +30,7 @@ import bs58 from 'bs58';
 import { Bank, MintInfo } from './accounts/bank';
 import { Group } from './accounts/group';
 import { I80F48 } from './accounts/I80F48';
-import { MangoAccount } from './accounts/mangoAccount';
+import { MangoAccount, MangoAccountData } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
 import { OrderType, PerpMarket, Side } from './accounts/perp';
 import {
@@ -282,25 +281,6 @@ export class MangoClient {
     });
   }
 
-  public async getPricesForGroup(group: Group): Promise<void> {
-    if (group.banksMap.size === 0) {
-      await this.getBanksForGroup(group);
-    }
-
-    const banks = Array.from(group?.banksMap, ([, value]) => value);
-    const oracles = banks.map((b) => b.oracle);
-    const prices =
-      await this.program.provider.connection.getMultipleAccountsInfo(oracles);
-
-    for (const [index, price] of prices.entries()) {
-      if (banks[index].name === 'USDC') {
-        banks[index].price = 1;
-      } else {
-        banks[index].price = parsePriceData(price.data).previousPrice;
-      }
-    }
-  }
-
   // Stub Oracle
 
   public async createStubOracle(
@@ -452,6 +432,32 @@ export class MangoClient {
         solDestination: mangoAccount.owner,
       })
       .rpc();
+  }
+
+  public async computeAccountData(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): Promise<MangoAccountData> {
+    const healthRemainingAccounts: PublicKey[] =
+      await this.buildHealthRemainingAccounts(group, mangoAccount);
+
+    const res = await this.program.methods
+      .computeAccountData()
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .simulate();
+
+    return MangoAccountData.from(
+      res.events.find((event) => (event.name = 'MangoAccountData')).data as any,
+    );
   }
 
   public async tokenDeposit(

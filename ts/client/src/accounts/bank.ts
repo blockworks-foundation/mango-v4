@@ -1,6 +1,5 @@
 import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
-import { PythHttpClient } from '@pythnetwork/client';
 import { PublicKey } from '@solana/web3.js';
 import { nativeI80F48ToUi } from '../utils';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from './I80F48';
@@ -22,7 +21,12 @@ export class Bank {
   public rate1: I80F48;
   public util0: I80F48;
   public util1: I80F48;
-  public price: number;
+  public price: I80F48;
+  public initAssetWeight: I80F48;
+  public maintAssetWeight: I80F48;
+  public initLiabWeight: I80F48;
+  public maintLiabWeight: I80F48;
+  public liquidationFee: I80F48;
 
   static from(
     publicKey: PublicKey,
@@ -128,6 +132,11 @@ export class Bank {
     this.rate0 = I80F48.from(rate0);
     this.util1 = I80F48.from(util1);
     this.rate1 = I80F48.from(rate1);
+    this.maintAssetWeight = I80F48.from(maintAssetWeight);
+    this.initAssetWeight = I80F48.from(initAssetWeight);
+    this.maintLiabWeight = I80F48.from(maintLiabWeight);
+    this.initLiabWeight = I80F48.from(initLiabWeight);
+    this.liquidationFee = I80F48.from(liquidationFee);
     this.price = undefined;
   }
 
@@ -203,13 +212,6 @@ export class Bank {
     const utilization = totalBorrows.div(totalDeposits);
     return utilization.mul(borrowRate);
   }
-
-  async getOraclePrice(connection) {
-    const pythClient = new PythHttpClient(connection, this.oracle);
-    const data = await pythClient.getData();
-
-    return data.productPrice;
-  }
 }
 
 export class MintInfo {
@@ -246,10 +248,27 @@ export class MintInfo {
     public tokenIndex: number,
   ) {}
 
-  public firstBank() {
+  public firstBank(): PublicKey {
     return this.banks[0];
   }
-  public firstVault() {
+  public firstVault(): PublicKey {
     return this.vaults[0];
+  }
+
+  toString(): string {
+    let res =
+      'mint ' +
+      this.mint.toBase58() +
+      '\n oracle ' +
+      this.oracle.toBase58() +
+      '\n banks ' +
+      this.banks
+        .filter((pk) => pk.toBase58() !== PublicKey.default.toBase58())
+        .toString() +
+      '\n vaults ' +
+      this.vaults
+        .filter((pk) => pk.toBase58() !== PublicKey.default.toBase58())
+        .toString();
+    return res;
   }
 }

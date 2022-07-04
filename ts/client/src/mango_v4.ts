@@ -2141,7 +2141,7 @@ export type MangoV4 = {
       "args": []
     },
     {
-      "name": "computeHealth",
+      "name": "computeAccountData",
       "accounts": [
         {
           "name": "group",
@@ -2154,17 +2154,7 @@ export type MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "healthType",
-          "type": {
-            "defined": "HealthType"
-          }
-        }
-      ],
-      "returns": {
-        "defined": "I80F48"
-      }
+      "args": []
     },
     {
       "name": "benchmark",
@@ -2875,6 +2865,66 @@ export type MangoV4 = {
     }
   ],
   "types": [
+    {
+      "name": "Equity",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokens",
+            "type": {
+              "vec": {
+                "defined": "TokenEquity"
+              }
+            }
+          },
+          {
+            "name": "perps",
+            "type": {
+              "vec": {
+                "defined": "PerpEquity"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenEquity",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "value",
+            "type": {
+              "defined": "I80F48"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PerpEquity",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "perpMarketIndex",
+            "type": "u16"
+          },
+          {
+            "name": "value",
+            "type": {
+              "defined": "I80F48"
+            }
+          }
+        ]
+      }
+    },
     {
       "name": "FlashLoanWithdraw",
       "type": {
@@ -3587,6 +3637,32 @@ export type MangoV4 = {
     }
   ],
   "events": [
+    {
+      "name": "MangoAccountData",
+      "fields": [
+        {
+          "name": "initHealth",
+          "type": {
+            "defined": "I80F48"
+          },
+          "index": false
+        },
+        {
+          "name": "maintHealth",
+          "type": {
+            "defined": "I80F48"
+          },
+          "index": false
+        },
+        {
+          "name": "equity",
+          "type": {
+            "defined": "Equity"
+          },
+          "index": false
+        }
+      ]
+    },
     {
       "name": "PerpBalanceLog",
       "fields": [
@@ -6215,7 +6291,7 @@ export const IDL: MangoV4 = {
       "args": []
     },
     {
-      "name": "computeHealth",
+      "name": "computeAccountData",
       "accounts": [
         {
           "name": "group",
@@ -6228,17 +6304,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "healthType",
-          "type": {
-            "defined": "HealthType"
-          }
-        }
-      ],
-      "returns": {
-        "defined": "I80F48"
-      }
+      "args": []
     },
     {
       "name": "benchmark",
@@ -6949,6 +7015,66 @@ export const IDL: MangoV4 = {
     }
   ],
   "types": [
+    {
+      "name": "Equity",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokens",
+            "type": {
+              "vec": {
+                "defined": "TokenEquity"
+              }
+            }
+          },
+          {
+            "name": "perps",
+            "type": {
+              "vec": {
+                "defined": "PerpEquity"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenEquity",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "value",
+            "type": {
+              "defined": "I80F48"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PerpEquity",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "perpMarketIndex",
+            "type": "u16"
+          },
+          {
+            "name": "value",
+            "type": {
+              "defined": "I80F48"
+            }
+          }
+        ]
+      }
+    },
     {
       "name": "FlashLoanWithdraw",
       "type": {
@@ -7661,6 +7787,32 @@ export const IDL: MangoV4 = {
     }
   ],
   "events": [
+    {
+      "name": "MangoAccountData",
+      "fields": [
+        {
+          "name": "initHealth",
+          "type": {
+            "defined": "I80F48"
+          },
+          "index": false
+        },
+        {
+          "name": "maintHealth",
+          "type": {
+            "defined": "I80F48"
+          },
+          "index": false
+        },
+        {
+          "name": "equity",
+          "type": {
+            "defined": "Equity"
+          },
+          "index": false
+        }
+      ]
+    },
     {
       "name": "PerpBalanceLog",
       "fields": [

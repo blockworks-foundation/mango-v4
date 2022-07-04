@@ -87,7 +87,7 @@ async fn test_basic() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        ComputeHealthInstruction {
+        ComputeAccountDataInstruction {
             account,
             health_type: HealthType::Init,
         },

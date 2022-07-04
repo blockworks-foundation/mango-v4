@@ -9,6 +9,7 @@ import {
 } from '../accounts/serum3';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
+import { toUiDecimals } from '../utils';
 
 //
 // An example for users based on high level api i.e. the client
@@ -44,7 +45,7 @@ async function main() {
     ),
   );
   const group = await client.getGroupForAdmin(admin.publicKey, 0);
-  console.log(`Found group ${group.publicKey.toBase58()}`);
+  console.log(group.toString());
 
   // create + fetch account
   console.log(`Creating mangoaccount...`);
@@ -57,19 +58,28 @@ async function main() {
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString());
 
+  await mangoAccount.reloadAccountData(client, group);
+
   if (true) {
     // deposit and withdraw
     console.log(`Depositing...50 USDC`);
     await client.tokenDeposit(group, mangoAccount, 'USDC', 50);
-    await mangoAccount.reload(client);
+    await mangoAccount.reload(client, group);
 
     console.log(`Depositing...0.0005 BTC`);
     await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005);
-    await mangoAccount.reload(client);
+    await mangoAccount.reload(client, group);
 
-    console.log(`Withdrawing...1 USDC`);
-    await client.tokenWithdraw(group, mangoAccount, 'USDC', 1, false);
-    await mangoAccount.reload(client);
+    console.log(`Withdrawing...0.1 ORCA`);
+    await client.tokenWithdraw2(
+      group,
+      mangoAccount,
+      'ORCA',
+      0.1 * Math.pow(10, group.banksMap.get('ORCA').mintDecimals),
+      true,
+    );
+    await mangoAccount.reload(client, group);
+    console.log(mangoAccount.toString());
 
     // serum3
     console.log(
@@ -88,7 +98,7 @@ async function main() {
       Date.now(),
       10,
     );
-    await mangoAccount.reload(client);
+    await mangoAccount.reload(client, group);
 
     console.log(`Placing serum3 bid way above midprice...`);
     await client.serum3PlaceOrder(
@@ -104,7 +114,7 @@ async function main() {
       Date.now(),
       10,
     );
-    await mangoAccount.reload(client);
+    await mangoAccount.reload(client, group);
 
     console.log(`Placing serum3 ask way below midprice...`);
     await client.serum3PlaceOrder(
@@ -159,16 +169,50 @@ async function main() {
 
       'BTC/USDC',
     );
+  }
 
-    // try {
-    //   console.log(`Close OO...`);
-    //   await client.serum3CloseOpenOrders(group, mangoAccount, 'BTC/USDC');
-    // } catch (error) {
-    //   console.log(error);
-    // }
-
-    // console.log(`Close mango account...`);
-    // await client.closeMangoAccount(mangoAccount);
+  if (true) {
+    await mangoAccount.reload(client, group);
+    console.log(
+      'mangoAccount.getEquity() ' +
+        toUiDecimals(mangoAccount.getEquity().toNumber()),
+    );
+    console.log(
+      'mangoAccount.getCollateralValue() ' +
+        toUiDecimals(mangoAccount.getCollateralValue().toNumber()),
+    );
+    console.log(
+      'mangoAccount.getAssetsVal() ' +
+        toUiDecimals(mangoAccount.getAssetsVal().toNumber()),
+    );
+    console.log(
+      'mangoAccount.getLiabsVal() ' +
+        toUiDecimals(mangoAccount.getLiabsVal().toNumber()),
+    );
+    console.log(
+      "mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL') " +
+        toUiDecimals(
+          (
+            await mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL')
+          ).toNumber(),
+        ),
+    );
+    console.log(
+      "mangoAccount.getSerum3MarketMarginAvailable(group, 'BTC/USDC') " +
+        toUiDecimals(
+          mangoAccount
+            .getSerum3MarketMarginAvailable(group, 'BTC/USDC')
+            .toNumber(),
+        ),
+    );
+    console.log(
+      "mangoAccount.getPerpMarketMarginAvailable(group, 'BTC-PERP') " +
+        toUiDecimals(
+          mangoAccount
+            .getPerpMarketMarginAvailable(group, 'BTC-PERP')
+            .toNumber(),
+        ),
+    );
   }
 
   if (true) {
@@ -178,7 +222,7 @@ async function main() {
       await client.perpPlaceOrder(
         group,
         mangoAccount,
-        'BTC/USDC',
+        'BTC-PERP',
         Side.bid,
         30000,
         0.000001,
@@ -196,7 +240,7 @@ async function main() {
     await client.perpPlaceOrder(
       group,
       mangoAccount,
-      'BTC/USDC',
+      'BTC-PERP',
       Side.ask,
       30000,
       0.000001,
@@ -212,7 +256,7 @@ async function main() {
       console.log(
         `Waiting for self trade to consume (note: make sure keeper crank is running)...`,
       );
-      await mangoAccount.reload(client);
+      await mangoAccount.reload(client, group);
       console.log(mangoAccount.toString());
     }
   }

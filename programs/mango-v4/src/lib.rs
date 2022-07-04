@@ -12,15 +12,14 @@ use instructions::*;
 pub mod accounts_zerocopy;
 pub mod address_lookup_table;
 pub mod error;
+pub mod events;
 pub mod instructions;
 pub mod logs;
 mod serum3_cpi;
 pub mod state;
 pub mod types;
 
-use state::{
-    HealthType, OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex,
-};
+use state::{OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex};
 
 declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
 
@@ -383,8 +382,8 @@ pub mod mango_v4 {
 
     // resolve_banktruptcy
 
-    pub fn compute_health(ctx: Context<ComputeHealth>, health_type: HealthType) -> Result<I80F48> {
-        instructions::compute_health(ctx, health_type)
+    pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
+        instructions::compute_account_data(ctx)
     }
 
     ///

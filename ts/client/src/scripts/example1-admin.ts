@@ -225,7 +225,7 @@ async function main() {
       group,
       btcDevnetOracle,
       0,
-      'BTC/USDC',
+      'BTC-PERP',
       0.1,
       0,
       6,
