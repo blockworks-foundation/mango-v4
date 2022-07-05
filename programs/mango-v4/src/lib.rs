@@ -24,7 +24,6 @@ use state::{
 
 declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
 
-
 /*
 dd TODOs
 1. oracle peg order
@@ -42,7 +41,6 @@ dd TODOs
 12. net deposit limits
 13. keep track globally everytime new OpenOrders is created so we can know when we have closed all of them
  */
-
 
 #[program]
 pub mod mango_v4 {
