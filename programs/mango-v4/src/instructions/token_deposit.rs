@@ -65,9 +65,10 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     let (position, raw_token_index, active_token_index) =
         account.tokens.get_mut_or_create(token_index)?;
 
-    let position_is_active = {
+    let (position_is_active, amount_i80f48) = {
         let mut bank = ctx.accounts.bank.load_mut()?;
-        bank.deposit(position, I80F48::from(amount))?
+        let amount_i80f48 = I80F48::from(amount);
+        (bank.deposit(position, amount_i80f48)?, amount_i80f48)
     };
 
     // Transfer the actual tokens
@@ -80,9 +81,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
         retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
 
     // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
-    let quote_decimals_factor = I80F48::from_num(10u64.pow(QUOTE_DECIMALS as u32));
-    account.net_deposits +=
-        (I80F48::from(amount) * oracle_price / quote_decimals_factor).to_num::<f32>();
+    account.net_deposits += (amount_i80f48 * oracle_price * QUOTE_DECIMALS_FACTOR).to_num::<f32>();
 
     emit!(TokenBalanceLog {
         mango_account: ctx.accounts.account.key(),

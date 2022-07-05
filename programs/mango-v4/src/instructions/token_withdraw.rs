@@ -114,8 +114,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
 
     // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
-    let quote_decimals_factor = I80F48::from_num(10u64.pow(QUOTE_DECIMALS as u32));
-    account.net_deposits -= (amount_i80f48 * oracle_price / quote_decimals_factor).to_num::<f32>();
+    account.net_deposits -= (amount_i80f48 * oracle_price * QUOTE_DECIMALS_FACTOR).to_num::<f32>();
 
     emit!(TokenBalanceLog {
         mango_account: ctx.accounts.account.key(),
