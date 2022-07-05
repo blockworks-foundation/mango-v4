@@ -14,6 +14,7 @@ use super::{Book, OracleConfig};
 pub type PerpMarketIndex = u16;
 
 #[account(zero_copy)]
+#[derive(Debug)]
 pub struct PerpMarket {
     pub name: [u8; 16],
 

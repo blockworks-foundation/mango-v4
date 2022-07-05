@@ -9,6 +9,7 @@ pub struct CloseAccount<'info> {
 
     #[account(
         mut,
+        // note: should never be the delegate
         has_one = owner,
         has_one = group,
         close = sol_destination

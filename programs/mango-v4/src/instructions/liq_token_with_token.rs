@@ -15,9 +15,9 @@ pub struct LiqTokenWithToken<'info> {
     #[account(
         mut,
         has_one = group,
+        constraint = liqor.load()?.owner == liqor_owner.key() || liqor.load()?.delegate == liqor_owner.key(),
     )]
     pub liqor: AccountLoader<'info, MangoAccount>,
-    #[account(address = liqor.load()?.owner)]
     pub liqor_owner: Signer<'info>,
 
     #[account(

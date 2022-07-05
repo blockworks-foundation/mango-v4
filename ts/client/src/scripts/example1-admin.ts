@@ -255,6 +255,116 @@ async function main() {
   );
   console.log(`...created perp market ${perpMarkets[0].publicKey}`);
 
+  //
+  // edit
+  //
+
+  console.log(`Editing USDC...`);
+  try {
+    let sig = await client.tokenEdit(
+      group,
+      'USDC',
+      btcDevnetOracle,
+      0.1,
+      0.3,
+      0.08,
+      0.81,
+      0.91,
+      0.75,
+      0.0007,
+      1.7,
+      0.9,
+      0.7,
+      1.3,
+      1.5,
+      0.04,
+    );
+    console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    await group.reloadAll(client);
+    console.log(group.banksMap.get('USDC').toString());
+  } catch (error) {
+    throw error;
+  }
+  console.log(`Resetting USDC...`);
+  try {
+    let sig = await client.tokenEdit(
+      group,
+      'USDC',
+      usdcDevnetOracle.publicKey,
+      0.1,
+      0.4,
+      0.07,
+      0.8,
+      0.9,
+      1.5,
+      0.0005,
+      1.5,
+      0.8,
+      0.6,
+      1.2,
+      1.4,
+      0.02,
+    );
+    console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    await group.reloadAll(client);
+    console.log(group.banksMap.get('USDC').toString());
+  } catch (error) {
+    throw error;
+  }
+
+  console.log(`Editing perp market...`);
+  try {
+    let sig = await client.perpEditMarket(
+      group,
+      'BTC-PERP',
+      btcDevnetOracle,
+      0.2,
+      1,
+      6,
+      0.9,
+      0.9,
+      1.035,
+      1.06,
+      0.013,
+      0.0003,
+      0.1,
+      0.07,
+      0.07,
+      1001,
+    );
+    console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    await group.reloadAll(client);
+    console.log(group.perpMarketsMap.get('BTC-PERP').toString());
+  } catch (error) {
+    console.log(error);
+  }
+  console.log(`Resetting perp market...`);
+  try {
+    let sig = await client.perpEditMarket(
+      group,
+      'BTC-PERP',
+      btcDevnetOracle,
+      0.1,
+      0,
+      6,
+      1,
+      0.95,
+      1.025,
+      1.05,
+      0.012,
+      0.0002,
+      0.0,
+      0.05,
+      0.05,
+      100,
+    );
+    console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    await group.reloadAll(client);
+    console.log(group.perpMarketsMap.get('BTC-PERP').toString());
+  } catch (error) {
+    console.log(error);
+  }
+
   process.exit();
 }
 

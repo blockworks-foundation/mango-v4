@@ -770,6 +770,10 @@ impl MangoAccount {
             .unwrap()
             .trim_matches(char::from(0))
     }
+
+    pub fn is_owner_or_delegate(&self, ix_signer: Pubkey) -> bool {
+        self.owner == ix_signer || self.delegate == ix_signer
+    }
 }
 
 impl Default for MangoAccount {

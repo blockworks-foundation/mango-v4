@@ -151,7 +151,6 @@ export class MangoClient {
     initLiabWeight: number,
     liquidationFee: number,
   ): Promise<TransactionSignature> {
-    const bn = I80F48.fromNumber(oracleConfFilter).getData();
     return await this.program.methods
       .tokenRegister(
         tokenIndex,
@@ -180,6 +179,60 @@ export class MangoClient {
         rent: SYSVAR_RENT_PUBKEY,
       })
       .rpc();
+  }
+
+  public async tokenEdit(
+    group: Group,
+    tokenName: string,
+    oracle: PublicKey,
+    oracleConfFilter: number,
+    util0: number,
+    rate0: number,
+    util1: number,
+    rate1: number,
+    maxRate: number,
+    loanFeeRate: number,
+    loanOriginationFeeRate: number,
+    maintAssetWeight: number,
+    initAssetWeight: number,
+    maintLiabWeight: number,
+    initLiabWeight: number,
+    liquidationFee: number,
+  ): Promise<TransactionSignature> {
+    const bank = group.banksMap.get(tokenName)!;
+    const mintInfo = group.mintInfosMap.get(bank.tokenIndex)!;
+
+    return await this.program.methods
+      .tokenEdit(
+        new BN(0),
+        oracle,
+        {
+          confFilter: {
+            val: I80F48.fromNumber(oracleConfFilter).getData(),
+          },
+        } as any, // future: nested custom types dont typecheck, fix if possible?
+        { util0, rate0, util1, rate1, maxRate },
+        loanFeeRate,
+        loanOriginationFeeRate,
+        maintAssetWeight,
+        initAssetWeight,
+        maintLiabWeight,
+        initLiabWeight,
+        liquidationFee,
+      )
+      .accounts({
+        group: group.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        mintInfo: mintInfo.publicKey,
+      })
+      .remainingAccounts([
+        {
+          pubkey: bank.publicKey,
+          isWritable: true,
+          isSigner: false,
+        } as AccountMeta,
+      ])
+      .rpc({ skipPreflight: true });
   }
 
   public async tokenDeregister(
@@ -384,6 +437,20 @@ export class MangoClient {
         group: group.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
+  }
+
+  public async editMangoAccount(
+    group: Group,
+    name?: string,
+    delegate?: PublicKey,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .editAccount(name, delegate)
+      .accounts({
+        group: group.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .rpc();
   }
@@ -1045,6 +1112,55 @@ export class MangoClient {
         }),
       ])
       .signers([bids, asks, eventQueue])
+      .rpc();
+  }
+
+  async perpEditMarket(
+    group: Group,
+    perpMarketName: string,
+    oracle: PublicKey,
+    oracleConfFilter: number,
+    baseTokenIndex: number,
+    baseTokenDecimals: number,
+    maintAssetWeight: number,
+    initAssetWeight: number,
+    maintLiabWeight: number,
+    initLiabWeight: number,
+    liquidationFee: number,
+    makerFee: number,
+    takerFee: number,
+    minFunding: number,
+    maxFunding: number,
+    impactQuantity: number,
+  ): Promise<TransactionSignature> {
+    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+
+    return await this.program.methods
+      .perpEditMarket(
+        oracle,
+        {
+          confFilter: {
+            val: I80F48.fromNumber(oracleConfFilter).getData(),
+          },
+        } as any, // future: nested custom types dont typecheck, fix if possible?
+        baseTokenIndex,
+        baseTokenDecimals,
+        maintAssetWeight,
+        initAssetWeight,
+        maintLiabWeight,
+        initLiabWeight,
+        liquidationFee,
+        makerFee,
+        takerFee,
+        minFunding,
+        maxFunding,
+        new BN(impactQuantity),
+      )
+      .accounts({
+        group: group.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        perpMarket: perpMarket.publicKey,
+      })
       .rpc();
   }
 

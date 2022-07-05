@@ -10,9 +10,10 @@ pub struct PerpCancelOrderByClientOrderId<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = owner,
+        constraint = account.load()?.is_owner_or_delegate(owner.key()),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
+    pub owner: Signer<'info>,
 
     #[account(
         mut,
@@ -25,8 +26,6 @@ pub struct PerpCancelOrderByClientOrderId<'info> {
     pub asks: AccountLoader<'info, BookSide>,
     #[account(mut)]
     pub bids: AccountLoader<'info, BookSide>,
-
-    pub owner: Signer<'info>,
 }
 
 pub fn perp_cancel_order_by_client_order_id(

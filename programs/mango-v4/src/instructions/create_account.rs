@@ -17,7 +17,6 @@ pub struct CreateAccount<'info> {
         space = 8 + std::mem::size_of::<MangoAccount>(),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
-
     pub owner: Signer<'info>,
 
     #[account(mut)]
