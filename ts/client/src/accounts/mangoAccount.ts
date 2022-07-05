@@ -3,9 +3,9 @@ import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
 import { nativeI80F48ToUi } from '../utils';
-import { Bank } from './bank';
+import { Bank, QUOTE_DECIMALS } from './bank';
 import { Group } from './group';
-import { I80F48, I80F48Dto, ZERO_I80F48 } from './I80F48';
+import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from './I80F48';
 export class MangoAccount {
   public tokens: TokenPosition[];
   public serum3: Serum3Orders[];
@@ -43,6 +43,7 @@ export class MangoAccount {
       obj.accountNum,
       obj.bump,
       obj.reserved,
+      {},
     );
   }
 
@@ -60,6 +61,7 @@ export class MangoAccount {
     accountNum: number,
     bump: number,
     reserved: number[],
+    public accountData: {},
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.tokens = tokens.values.map((dto) => TokenPosition.from(dto));
@@ -67,8 +69,13 @@ export class MangoAccount {
     this.perps = perps.accounts.map((dto) => PerpPositions.from(dto));
   }
 
-  async reload(client: MangoClient) {
+  async reload(client: MangoClient, group: Group) {
     Object.assign(this, await client.getMangoAccount(this));
+    await this.reloadAccountData(client, group);
+  }
+
+  async reloadAccountData(client: MangoClient, group: Group) {
+    this.accountData = await client.computeAccountData(group, this);
   }
 
   findToken(tokenIndex: number): TokenPosition | undefined {
@@ -82,6 +89,26 @@ export class MangoAccount {
   getNative(bank: Bank): I80F48 {
     const ta = this.findToken(bank.tokenIndex);
     return ta ? ta.native(bank) : ZERO_I80F48;
+  }
+
+  getInNativeUsdcUnits(bank: Bank): I80F48 {
+    const ta = this.findToken(bank.tokenIndex);
+    return ta
+      ? ta
+          .native(bank)
+          .mul(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
+          .div(I80F48.fromNumber(Math.pow(10, bank.mintDecimals)))
+      : ZERO_I80F48;
+  }
+
+  getNativeDeposits(bank: Bank): I80F48 {
+    const native = this.getNative(bank);
+    return native.gte(ZERO_I80F48) ? native : ZERO_I80F48;
+  }
+
+  getNativeBorrows(bank: Bank): I80F48 {
+    const native = this.getNative(bank);
+    return native.lte(ZERO_I80F48) ? native : ZERO_I80F48;
   }
 
   getUi(bank: Bank): number {
@@ -99,37 +126,138 @@ export class MangoAccount {
     return ta ? ta.uiBorrows(bank) : 0;
   }
 
-  tokens_active(): TokenPosition[] {
+  /**
+   * Sum of all the assets i.e. token deposits, borrows, total assets in spot open orders, (perps positions is todo) in terms of quote value.
+   */
+  getEquity(): I80F48 {
+    const equity = (this.accountData as MangoAccountData).equity;
+    let total_equity = equity.tokens.reduce(
+      (a, b) => a.add(b.value),
+      ZERO_I80F48,
+    );
+    return total_equity;
+  }
+
+  /**
+   * The amount of native quote you could withdraw against your existing assets.
+   */
+  getCollateralValue(): I80F48 {
+    return (this.accountData as MangoAccountData).initHealth;
+  }
+
+  /**
+   * Similar to getEquity, but only the sum of all positive assets.
+   */
+  getAssetsVal(): I80F48 {
+    const equity = (this.accountData as MangoAccountData).equity;
+    let total_equity = equity.tokens.reduce(
+      (a, b) => (b.value.gt(ZERO_I80F48) ? a.add(b.value) : a),
+      ZERO_I80F48,
+    );
+    return total_equity;
+  }
+
+  /**
+   * Similar to getEquity, but only the sum of all negative assets. Note: return value would be negative.
+   */
+  getLiabsVal(): I80F48 {
+    const equity = (this.accountData as MangoAccountData).equity;
+    let total_equity = equity.tokens.reduce(
+      (a, b) => (b.value.lt(ZERO_I80F48) ? a.add(b.value) : a),
+      ZERO_I80F48,
+    );
+    return total_equity;
+  }
+
+  /**
+   * The amount of given native token you can borrow, considering all existing assets as collateral except the deposits for this token.
+   * The existing native deposits need to be added to get the full amount that could be withdrawn.
+   */
+  async getMaxWithdrawWithBorrowForToken(
+    group: Group,
+    tokenName: string,
+  ): Promise<I80F48> {
+    const bank = group.banksMap.get(tokenName);
+    const initHealth = (this.accountData as MangoAccountData).initHealth;
+    const inUsdcUnits = this.getInNativeUsdcUnits(bank)
+      .mul(bank.price)
+      .mul(bank.initAssetWeight);
+    const newInitHealth = initHealth.sub(inUsdcUnits);
+    return newInitHealth.div(bank.price.mul(bank.initLiabWeight));
+  }
+
+  /**
+   * The remaining native quote margin available for given market.
+   *
+   * TODO: this is a very bad estimation atm.
+   * It assumes quote asset is always USDC,
+   * it assumes that there are no interaction effects,
+   * it assumes that there are no existing borrows for either of the tokens in the market.
+   */
+  getSerum3MarketMarginAvailable(group: Group, marketName: string): I80F48 {
+    const initHealth = (this.accountData as MangoAccountData).initHealth;
+    const serum3Market = group.serum3MarketsMap.get(marketName)!;
+    const marketAssetWeight = group.findBank(
+      serum3Market.baseTokenIndex,
+    ).initAssetWeight;
+    return initHealth.div(ONE_I80F48.sub(marketAssetWeight));
+  }
+
+  /**
+   * The remaining native quote margin available for given market.
+   *
+   * TODO: this is a very bad estimation atm.
+   * It assumes quote asset is always USDC,
+   * it assumes that there are no interaction effects,
+   * it assumes that there are no existing borrows for either of the tokens in the market.
+   */
+  getPerpMarketMarginAvailable(group: Group, marketName: string): I80F48 {
+    const initHealth = (this.accountData as MangoAccountData).initHealth;
+    const perpMarket = group.perpMarketsMap.get(marketName)!;
+    const marketAssetWeight = perpMarket.initAssetWeight;
+    return initHealth.div(ONE_I80F48.sub(marketAssetWeight));
+  }
+
+  tokensActive(): TokenPosition[] {
     return this.tokens.filter((token) => token.isActive());
   }
 
+  serum3Active(): Serum3Orders[] {
+    return this.serum3.filter((serum3) => serum3.isActive());
+  }
+
+  perpActive(): PerpPositions[] {
+    return this.perps.filter((perp) => perp.isActive());
+  }
+
   toString(group?: Group): string {
-    return (
-      'tokens:' +
-      JSON.stringify(
-        this.tokens
-          .filter((token) => token.tokenIndex != TokenPosition.TokenIndexUnset)
-          .map((token) => token.toString(group)),
-        null,
-        4,
-      ) +
-      '\nserum:' +
-      JSON.stringify(
-        this.serum3.filter(
-          (serum3) => serum3.marketIndex != Serum3Orders.Serum3MarketIndexUnset,
-        ),
-        null,
-        4,
-      ) +
-      '\nperps:' +
-      JSON.stringify(
-        this.perps.filter(
-          (perp) => perp.marketIndex != PerpPositions.PerpMarketIndexUnset,
-        ),
-        null,
-        4,
-      )
-    );
+    let res = 'MangoAccount';
+    res = res + '\n pk: ' + this.publicKey.toString();
+    res = res + '\n name: ' + this.name;
+    res = res + '\n delegate: ' + this.delegate;
+
+    res =
+      this.tokensActive().length > 0
+        ? res +
+          '\n tokens:' +
+          JSON.stringify(
+            this.tokensActive().map((token) => token.toString(group)),
+            null,
+            4,
+          )
+        : res + '';
+
+    res =
+      this.serum3Active().length > 0
+        ? res + '\n serum:' + JSON.stringify(this.serum3Active(), null, 4)
+        : res + '';
+
+    res =
+      this.perpActive().length > 0
+        ? res + '\n perps:' + JSON.stringify(this.perpActive(), null, 4)
+        : res + '';
+
+    return res;
   }
 }
 
@@ -229,6 +357,10 @@ export class Serum3Orders {
     public baseTokenIndex: number,
     public quoteTokenIndex: number,
   ) {}
+
+  public isActive(): boolean {
+    return this.marketIndex !== Serum3Orders.Serum3MarketIndexUnset;
+  }
 }
 
 export class Serum3PositionDto {
@@ -264,6 +396,10 @@ export class PerpPositions {
     public takerBaseLots: number,
     public takerQuoteLots: number,
   ) {}
+
+  isActive(): boolean {
+    return this.marketIndex != PerpPositions.PerpMarketIndexUnset;
+  }
 }
 
 export class PerpPositionDto {
@@ -277,4 +413,69 @@ export class PerpPositionDto {
     public takerBaseLots: BN,
     public takerQuoteLots: BN,
   ) {}
+}
+
+export class HealthType {
+  static maint = { maint: {} };
+  static init = { init: {} };
+}
+
+export class MangoAccountData {
+  constructor(
+    public initHealth: I80F48,
+    public maintHealth: I80F48,
+    public equity: Equity,
+  ) {}
+
+  static from(event: {
+    initHealth: I80F48Dto;
+    maintHealth: I80F48Dto;
+    equity: {
+      tokens: [{ tokenIndex: number; value: I80F48Dto }];
+      perps: [{ perpMarketIndex: number; value: I80F48Dto }];
+    };
+    initHealthLiabs: I80F48Dto;
+    tokenAssets: any;
+  }) {
+    return new MangoAccountData(
+      I80F48.from(event.initHealth),
+      I80F48.from(event.maintHealth),
+      Equity.from(event.equity),
+    );
+  }
+}
+
+export class Equity {
+  public constructor(
+    public tokens: TokenEquity[],
+    public perps: PerpEquity[],
+  ) {}
+
+  static from(dto: EquityDto): Equity {
+    return new Equity(
+      dto.tokens.map(
+        (token) => new TokenEquity(token.tokenIndex, I80F48.from(token.value)),
+      ),
+      dto.perps.map(
+        (perpAccount) =>
+          new PerpEquity(
+            perpAccount.perpMarketIndex,
+            I80F48.from(perpAccount.value),
+          ),
+      ),
+    );
+  }
+}
+
+export class TokenEquity {
+  public constructor(public tokenIndex: number, public value: I80F48) {}
+}
+
+export class PerpEquity {
+  public constructor(public perpMarketIndex: number, public value: I80F48) {}
+}
+
+export class EquityDto {
+  tokens: { tokenIndex: number; value: I80F48Dto }[];
+  perps: { perpMarketIndex: number; value: I80F48Dto }[];
 }

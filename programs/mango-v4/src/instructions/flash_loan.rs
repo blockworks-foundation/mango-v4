@@ -32,7 +32,7 @@ pub struct FlashLoan<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = owner,
+        constraint = account.load()?.is_owner_or_delegate(owner.key()),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
 

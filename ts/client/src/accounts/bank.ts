@@ -1,6 +1,5 @@
 import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
-import { PythHttpClient } from '@pythnetwork/client';
 import { PublicKey } from '@solana/web3.js';
 import { nativeI80F48ToUi } from '../utils';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from './I80F48';
@@ -15,14 +14,19 @@ export class Bank {
   public name: string;
   public depositIndex: I80F48;
   public borrowIndex: I80F48;
-  public indexedTotalDeposits: I80F48;
-  public indexedTotalBorrows: I80F48;
+  public cachedIndexedTotalDeposits: I80F48;
+  public cachedIndexedTotalBorrows: I80F48;
   public maxRate: I80F48;
   public rate0: I80F48;
   public rate1: I80F48;
   public util0: I80F48;
   public util1: I80F48;
-  public price: number;
+  public price: I80F48;
+  public initAssetWeight: I80F48;
+  public maintAssetWeight: I80F48;
+  public initLiabWeight: I80F48;
+  public maintLiabWeight: I80F48;
+  public liquidationFee: I80F48;
 
   static from(
     publicKey: PublicKey,
@@ -35,8 +39,8 @@ export class Bank {
       oracleConfig: OracleConfig;
       depositIndex: I80F48Dto;
       borrowIndex: I80F48Dto;
-      indexedTotalDeposits: I80F48Dto;
-      indexedTotalBorrows: I80F48Dto;
+      cachedIndexedTotalDeposits: I80F48Dto;
+      cachedIndexedTotalBorrows: I80F48Dto;
       lastUpdated: BN;
       util0: I80F48Dto;
       rate0: I80F48Dto;
@@ -66,8 +70,8 @@ export class Bank {
       obj.oracleConfig,
       obj.depositIndex,
       obj.borrowIndex,
-      obj.indexedTotalDeposits,
-      obj.indexedTotalBorrows,
+      obj.cachedIndexedTotalDeposits,
+      obj.cachedIndexedTotalBorrows,
       obj.lastUpdated,
       obj.util0,
       obj.rate0,
@@ -121,40 +125,75 @@ export class Bank {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.depositIndex = I80F48.from(depositIndex);
     this.borrowIndex = I80F48.from(borrowIndex);
-    this.indexedTotalDeposits = I80F48.from(indexedTotalDeposits);
-    this.indexedTotalBorrows = I80F48.from(indexedTotalBorrows);
+    this.cachedIndexedTotalDeposits = I80F48.from(indexedTotalDeposits);
+    this.cachedIndexedTotalBorrows = I80F48.from(indexedTotalBorrows);
     this.maxRate = I80F48.from(maxRate);
     this.util0 = I80F48.from(util0);
     this.rate0 = I80F48.from(rate0);
     this.util1 = I80F48.from(util1);
     this.rate1 = I80F48.from(rate1);
+    this.maintAssetWeight = I80F48.from(maintAssetWeight);
+    this.initAssetWeight = I80F48.from(initAssetWeight);
+    this.maintLiabWeight = I80F48.from(maintLiabWeight);
+    this.initLiabWeight = I80F48.from(initLiabWeight);
+    this.liquidationFee = I80F48.from(liquidationFee);
     this.price = undefined;
   }
 
   toString(): string {
-    return `Bank ${
-      this.tokenIndex
-    } deposit index - ${this.depositIndex.toNumber()}, borrow index - ${this.borrowIndex.toNumber()}`;
+    return (
+      'Bank ' +
+      '\n token index -' +
+      this.tokenIndex +
+      '\n deposit index -' +
+      this.depositIndex.toNumber() +
+      '\n borrow index -' +
+      this.borrowIndex.toNumber() +
+      '\n cachedIndexedTotalDeposits -' +
+      this.cachedIndexedTotalDeposits.toNumber() +
+      '\n cachedIndexedTotalBorrows -' +
+      this.cachedIndexedTotalBorrows.toNumber() +
+      '\n maxRate -' +
+      this.maxRate.toNumber() +
+      '\n util0 -' +
+      this.util0.toNumber() +
+      '\n rate0 -' +
+      this.rate0.toNumber() +
+      '\n util1 -' +
+      this.util1.toNumber() +
+      '\n rate1 -' +
+      this.rate1.toNumber() +
+      '\n maintAssetWeight -' +
+      this.maintAssetWeight.toNumber() +
+      '\n initAssetWeight -' +
+      this.initAssetWeight.toNumber() +
+      '\n maintLiabWeight -' +
+      this.maintLiabWeight.toNumber() +
+      '\n initLiabWeight -' +
+      this.initLiabWeight.toNumber() +
+      '\n liquidationFee -' +
+      this.liquidationFee.toNumber()
+    );
   }
 
   nativeDeposits(): I80F48 {
-    return this.indexedTotalDeposits.mul(this.depositIndex);
+    return this.cachedIndexedTotalDeposits.mul(this.depositIndex);
   }
 
   nativeBorrows(): I80F48 {
-    return this.indexedTotalBorrows.mul(this.borrowIndex);
+    return this.cachedIndexedTotalBorrows.mul(this.borrowIndex);
   }
 
   uiDeposits(): number {
     return nativeI80F48ToUi(
-      this.indexedTotalDeposits.mul(this.depositIndex),
+      this.cachedIndexedTotalDeposits.mul(this.depositIndex),
       this.mintDecimals,
     ).toNumber();
   }
 
   uiBorrows(): number {
     return nativeI80F48ToUi(
-      this.indexedTotalBorrows.mul(this.borrowIndex),
+      this.cachedIndexedTotalBorrows.mul(this.borrowIndex),
       this.mintDecimals,
     ).toNumber();
   }
@@ -203,13 +242,6 @@ export class Bank {
     const utilization = totalBorrows.div(totalDeposits);
     return utilization.mul(borrowRate);
   }
-
-  async getOraclePrice(connection) {
-    const pythClient = new PythHttpClient(connection, this.oracle);
-    const data = await pythClient.getData();
-
-    return data.productPrice;
-  }
 }
 
 export class MintInfo {
@@ -246,10 +278,27 @@ export class MintInfo {
     public tokenIndex: number,
   ) {}
 
-  public firstBank() {
+  public firstBank(): PublicKey {
     return this.banks[0];
   }
-  public firstVault() {
+  public firstVault(): PublicKey {
     return this.vaults[0];
+  }
+
+  toString(): string {
+    let res =
+      'mint ' +
+      this.mint.toBase58() +
+      '\n oracle ' +
+      this.oracle.toBase58() +
+      '\n banks ' +
+      this.banks
+        .filter((pk) => pk.toBase58() !== PublicKey.default.toBase58())
+        .toString() +
+      '\n vaults ' +
+      this.vaults
+        .filter((pk) => pk.toBase58() !== PublicKey.default.toBase58())
+        .toString();
+    return res;
   }
 }

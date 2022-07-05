@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
+
 use fixed::types::I80F48;
 use serum_dex::state::OpenOrders;
+
 use std::collections::HashMap;
 
 use crate::accounts_zerocopy::*;
@@ -60,7 +62,7 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
     let expected_ais = cm!(active_token_len * 2 // banks + oracles
         + active_perp_len // PerpMarkets
         + active_serum3_len); // open_orders
-    require!(ais.len() == expected_ais, MangoError::SomeError);
+    require_eq!(ais.len(), expected_ais, MangoError::SomeError);
 
     Ok(FixedOrderAccountRetriever {
         ais: ais
@@ -244,15 +246,8 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
             Ok((bank1, bank2, price1, price2))
         }
     }
-}
 
-impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
-    fn bank_and_oracle(
-        &self,
-        _group: &Pubkey,
-        _account_index: usize,
-        token_index: TokenIndex,
-    ) -> Result<(&Bank, I80F48)> {
+    pub fn scanned_bank_and_oracle(&self, token_index: TokenIndex) -> Result<(&Bank, I80F48)> {
         let index = self.bank_index(token_index)?;
         let bank = self.ais[index].load_fully_unchecked::<Bank>()?;
         let oracle = &self.ais[cm!(self.n_banks() + index)];
@@ -263,22 +258,41 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
         ))
     }
 
+    pub fn scanned_perp_market(&self, perp_market_index: PerpMarketIndex) -> Result<&PerpMarket> {
+        let index = self.perp_market_index(perp_market_index)?;
+        self.ais[index].load_fully_unchecked::<PerpMarket>()
+    }
+
+    pub fn scanned_serum_oo(&self, key: &Pubkey) -> Result<&OpenOrders> {
+        let oo = self.ais[self.begin_serum3()..]
+            .iter()
+            .find(|ai| ai.key == key)
+            .ok_or_else(|| error!(MangoError::SomeError))?;
+        serum3_cpi::load_open_orders(oo)
+    }
+}
+
+impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
+    fn bank_and_oracle(
+        &self,
+        _group: &Pubkey,
+        _account_index: usize,
+        token_index: TokenIndex,
+    ) -> Result<(&Bank, I80F48)> {
+        self.scanned_bank_and_oracle(token_index)
+    }
+
     fn perp_market(
         &self,
         _group: &Pubkey,
         _account_index: usize,
         perp_market_index: PerpMarketIndex,
     ) -> Result<&PerpMarket> {
-        let index = self.perp_market_index(perp_market_index)?;
-        self.ais[index].load_fully_unchecked::<PerpMarket>()
+        self.scanned_perp_market(perp_market_index)
     }
 
     fn serum_oo(&self, _account_index: usize, key: &Pubkey) -> Result<&OpenOrders> {
-        let oo = self.ais[self.begin_serum3()..]
-            .iter()
-            .find(|ai| ai.key == key)
-            .ok_or_else(|| error!(MangoError::SomeError))?;
-        serum3_cpi::load_open_orders(oo)
+        self.scanned_serum_oo(key)
     }
 }
 
@@ -439,6 +453,7 @@ impl PerpInfo {
             (HealthType::Maint, true) => self.maint_liab_weight,
             (HealthType::Maint, false) => self.maint_asset_weight,
         };
+
         // FUTURE: Allow v3-style "reliable" markets where we can return
         // `self.quote + weight * self.base` here
         cm!(self.quote + weight * self.base).min(I80F48::ZERO)
@@ -569,6 +584,7 @@ pub fn new_health_cache(
         });
     }
 
+    // TODO: also account for perp funding in health
     // health contribution from perp accounts
     let mut perp_infos = Vec::with_capacity(account.perps.iter_active_accounts().count());
     for (i, perp_account) in account.perps.iter_active_accounts().enumerate() {
@@ -576,6 +592,7 @@ pub fn new_health_cache(
 
         // find the TokenInfos for the market's base and quote tokens
         let base_index = find_token_info_index(&token_infos, perp_market.base_token_index)?;
+        // TODO: base_index could be unset
         let base_info = &token_infos[base_index];
 
         let base_lot_size = I80F48::from(perp_market.base_lot_size);

@@ -10,9 +10,10 @@ pub struct Serum3CreateOpenOrders<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = owner,
+        constraint = account.load()?.is_owner_or_delegate(owner.key()),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
+    pub owner: Signer<'info>,
 
     #[account(
         has_one = group,
@@ -37,8 +38,6 @@ pub struct Serum3CreateOpenOrders<'info> {
     )]
     /// CHECK: Newly created by serum cpi call
     pub open_orders: UncheckedAccount<'info>,
-
-    pub owner: Signer<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,

@@ -12,15 +12,14 @@ use instructions::*;
 pub mod accounts_zerocopy;
 pub mod address_lookup_table;
 pub mod error;
+pub mod events;
 pub mod instructions;
 pub mod logs;
 mod serum3_cpi;
 pub mod state;
 pub mod types;
 
-use state::{
-    HealthType, OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex,
-};
+use state::{OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex};
 
 declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
 
@@ -93,6 +92,37 @@ pub mod mango_v4 {
     }
 
     #[allow(clippy::too_many_arguments)]
+    pub fn token_edit(
+        ctx: Context<TokenEdit>,
+        bank_num: u64,
+        oracle_opt: Option<Pubkey>,
+        oracle_config_opt: Option<OracleConfig>,
+        interest_rate_params_opt: Option<InterestRateParams>,
+        loan_fee_rate_opt: Option<f32>,
+        loan_origination_fee_rate_opt: Option<f32>,
+        maint_asset_weight_opt: Option<f32>,
+        init_asset_weight_opt: Option<f32>,
+        maint_liab_weight_opt: Option<f32>,
+        init_liab_weight_opt: Option<f32>,
+        liquidation_fee_opt: Option<f32>,
+    ) -> Result<()> {
+        instructions::token_edit(
+            ctx,
+            bank_num,
+            oracle_opt,
+            oracle_config_opt,
+            interest_rate_params_opt,
+            loan_fee_rate_opt,
+            loan_origination_fee_rate_opt,
+            maint_asset_weight_opt,
+            init_asset_weight_opt,
+            maint_liab_weight_opt,
+            init_liab_weight_opt,
+            liquidation_fee_opt,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn token_add_bank(
         ctx: Context<TokenAddBank>,
         token_index: TokenIndex,
@@ -120,7 +150,13 @@ pub mod mango_v4 {
         instructions::create_account(ctx, account_num, name)
     }
 
-    // TODO set delegate
+    pub fn edit_account(
+        ctx: Context<EditAccount>,
+        name_opt: Option<String>,
+        delegate_opt: Option<Pubkey>,
+    ) -> Result<()> {
+        instructions::edit_account(ctx, name_opt, delegate_opt)
+    }
 
     pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
         instructions::close_account(ctx)
@@ -202,6 +238,11 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::serum3_register_market(ctx, market_index, name)
     }
+
+    // note:
+    // pub fn serum3_edit_market - doesn't exist since a mango serum3 market only contains the properties
+    // registered base and quote token pairs, and serum3 external market its pointing to, and none of them
+    // should be edited once set on creation
 
     pub fn serum3_deregister_market(ctx: Context<Serum3DeregisterMarket>) -> Result<()> {
         instructions::serum3_deregister_market(ctx)
@@ -330,6 +371,43 @@ pub mod mango_v4 {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub fn perp_edit_market(
+        ctx: Context<PerpEditMarket>,
+        oracle_opt: Option<Pubkey>,
+        oracle_config_opt: Option<OracleConfig>,
+        base_token_index_opt: Option<TokenIndex>,
+        base_token_decimals_opt: Option<u8>,
+        maint_asset_weight_opt: Option<f32>,
+        init_asset_weight_opt: Option<f32>,
+        maint_liab_weight_opt: Option<f32>,
+        init_liab_weight_opt: Option<f32>,
+        liquidation_fee_opt: Option<f32>,
+        maker_fee_opt: Option<f32>,
+        taker_fee_opt: Option<f32>,
+        min_funding_opt: Option<f32>,
+        max_funding_opt: Option<f32>,
+        impact_quantity_opt: Option<i64>,
+    ) -> Result<()> {
+        instructions::perp_edit_market(
+            ctx,
+            oracle_opt,
+            oracle_config_opt,
+            base_token_index_opt,
+            base_token_decimals_opt,
+            maint_asset_weight_opt,
+            init_asset_weight_opt,
+            maint_liab_weight_opt,
+            init_liab_weight_opt,
+            liquidation_fee_opt,
+            maker_fee_opt,
+            taker_fee_opt,
+            min_funding_opt,
+            max_funding_opt,
+            impact_quantity_opt,
+        )
+    }
+
     pub fn perp_close_market(ctx: Context<PerpCloseMarket>) -> Result<()> {
         instructions::perp_close_market(ctx)
     }
@@ -403,8 +481,8 @@ pub mod mango_v4 {
 
     // resolve_banktruptcy
 
-    pub fn compute_health(ctx: Context<ComputeHealth>, health_type: HealthType) -> Result<I80F48> {
-        instructions::compute_health(ctx, health_type)
+    pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
+        instructions::compute_account_data(ctx)
     }
 
     ///

@@ -4,6 +4,7 @@ import {
 } from '@solana/spl-token';
 import { AccountMeta, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
+import { QUOTE_DECIMALS } from './accounts/bank';
 import { I80F48 } from './accounts/I80F48';
 
 export const I64_MAX_BN = new BN('9223372036854775807').toTwos(64);
@@ -72,7 +73,11 @@ export function toNativeDecimals(amount: number, decimals: number): BN {
   return new BN(Math.trunc(amount * Math.pow(10, decimals)));
 }
 
-export function toUiDecimals(amount: number, decimals: number): number {
+export function toUiDecimals(
+  amount: I80F48 | number,
+  decimals = QUOTE_DECIMALS,
+): number {
+  amount = amount instanceof I80F48 ? amount.toNumber() : amount;
   return amount / Math.pow(10, decimals);
 }
 
