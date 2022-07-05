@@ -1,6 +1,5 @@
 #![cfg(feature = "test-bpf")]
 
-use fixed::types::I80F48;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, signature::Signer, transport::TransportError};
 

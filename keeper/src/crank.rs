@@ -58,7 +58,9 @@ pub async fn loop_update_index(mango_client: Arc<MangoClient>, token_index: Toke
         let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
             let mint_info = client.get_mint_info(&token_index);
             let banks_for_a_token = client.banks_cache_by_token_index.get(&token_index).unwrap();
-            let token_name = banks_for_a_token.get(0).unwrap().1.name();
+            let some_bank = banks_for_a_token.get(0).unwrap().1;
+            let token_name = some_bank.name();
+            let oracle = some_bank.oracle;
 
             let bank_pubkeys_for_a_token = banks_for_a_token
                 .into_iter()
@@ -72,7 +74,7 @@ pub async fn loop_update_index(mango_client: Arc<MangoClient>, token_index: Toke
                     let mut ix = Instruction {
                         program_id: mango_v4::id(),
                         accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                            &mango_v4::accounts::UpdateIndex { mint_info },
+                            &mango_v4::accounts::UpdateIndex { mint_info, oracle },
                             None,
                         ),
                         data: anchor_lang::InstructionData::data(

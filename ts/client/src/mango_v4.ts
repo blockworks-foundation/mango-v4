@@ -540,6 +540,11 @@ export type MangoV4 = {
           "name": "mintInfo",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": []
@@ -4240,6 +4245,11 @@ export type MangoV4 = {
         },
         {
           "name": "borrowIndex",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
           "type": "i128",
           "index": false
         }
@@ -4922,6 +4932,11 @@ export const IDL: MangoV4 = {
           "name": "mintInfo",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": []
@@ -8622,6 +8637,11 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "borrowIndex",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
           "type": "i128",
           "index": false
         }

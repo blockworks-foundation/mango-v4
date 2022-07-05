@@ -100,14 +100,14 @@ async fn test_update_index() -> Result<(), TransportError> {
 
     solana.advance_clock().await;
 
+    let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
+
     send_tx(
         solana,
         UpdateIndexInstruction {
             mint_info: tokens[0].mint_info,
-            banks: {
-                let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
-                mint_info.banks.to_vec()
-            },
+            banks: mint_info.banks.to_vec(),
+            oracle: mint_info.oracle,
         },
     )
     .await

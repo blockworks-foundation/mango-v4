@@ -132,7 +132,7 @@ pub struct UpdateIndexLog {
     pub token_index: u16,
     pub deposit_index: i128, // I80F48
     pub borrow_index: i128,  // I80F48
-                             // pub price: i128, // I80F48
+    pub price: i128,         // I80F48
 }
 
 #[event]
