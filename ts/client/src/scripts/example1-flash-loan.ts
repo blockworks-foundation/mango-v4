@@ -4,6 +4,10 @@ import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 
+//
+// (unfinished?) script which shows how to use the flash loan 1 ix
+//
+
 async function main() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
@@ -49,11 +53,11 @@ async function main() {
     // deposit and withdraw
     console.log(`Depositing...50 USDC`);
     await client.tokenDeposit(group, mangoAccount, 'USDC', 50);
-    await mangoAccount.reload(client);
+    await mangoAccount.reload(client, group);
 
     console.log(`Depositing...0.0005 BTC`);
     await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005);
-    await mangoAccount.reload(client);
+    await mangoAccount.reload(client, group);
   }
   try {
     const sig = await client.marginTrade({

@@ -48,7 +48,7 @@ async function main() {
   let token = 'BTC';
   console.log(`Depositing...${amount} 'BTC'`);
   await user1Client.tokenDeposit(group, user1MangoAccount, token, amount);
-  await user1MangoAccount.reload(user1Client);
+  await user1MangoAccount.reload(user1Client, group);
   console.log(`${user1MangoAccount.toString(group)}`);
 
   // user 2
@@ -77,7 +77,7 @@ async function main() {
   /// user2 deposits some collateral and borrows BTC
   console.log(`Depositing...${300} 'USDC'`);
   await user2Client.tokenDeposit(group, user2MangoAccount, 'USDC', 300);
-  await user2MangoAccount.reload(user2Client);
+  await user2MangoAccount.reload(user2Client, group);
   console.log(`${user2MangoAccount.toString(group)}`);
   amount = amount / 10;
   while (true) {
@@ -95,7 +95,7 @@ async function main() {
       break;
     }
   }
-  await user2MangoAccount.reload(user2Client);
+  await user2MangoAccount.reload(user2Client, group);
   console.log(`${user2MangoAccount.toString(group)}`);
 
   /// Reduce usdc price

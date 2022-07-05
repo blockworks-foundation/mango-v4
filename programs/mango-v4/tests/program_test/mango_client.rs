@@ -1294,7 +1294,55 @@ impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
     }
 }
 
+pub struct EditAccountInstruction<'keypair> {
+    pub account_num: u8,
+    pub group: Pubkey,
+    pub owner: &'keypair Keypair,
+    pub name: String,
+    pub delegate: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for EditAccountInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::EditAccount;
+    type Instruction = mango_v4::instruction::EditAccount;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = mango_v4::instruction::EditAccount {
+            name_opt: Option::from(self.name.to_string()),
+            delegate_opt: Option::from(self.delegate),
+        };
+
+        let account = Pubkey::find_program_address(
+            &[
+                self.group.as_ref(),
+                b"MangoAccount".as_ref(),
+                self.owner.pubkey().as_ref(),
+                &self.account_num.to_le_bytes(),
+            ],
+            &program_id,
+        )
+        .0;
+
+        let accounts = mango_v4::accounts::EditAccount {
+            group: self.group,
+            account,
+            owner: self.owner.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.owner]
+    }
+}
+
 pub struct CloseAccountInstruction<'keypair> {
+    pub group: Pubkey,
     pub account: Pubkey,
     pub owner: &'keypair Keypair,
     pub sol_destination: Pubkey,
@@ -1311,6 +1359,7 @@ impl<'keypair> ClientInstruction for CloseAccountInstruction<'keypair> {
         let instruction = Self::Instruction {};
 
         let accounts = Self::Accounts {
+            group: self.group,
             owner: self.owner.pubkey(),
             account: self.account,
             sol_destination: self.sol_destination,
@@ -2421,22 +2470,20 @@ impl ClientInstruction for UpdateIndexInstruction {
     }
 }
 
-pub struct ComputeHealthInstruction {
+pub struct ComputeAccountDataInstruction {
     pub account: Pubkey,
     pub health_type: HealthType,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for ComputeHealthInstruction {
-    type Accounts = mango_v4::accounts::ComputeHealth;
-    type Instruction = mango_v4::instruction::ComputeHealth;
+impl ClientInstruction for ComputeAccountDataInstruction {
+    type Accounts = mango_v4::accounts::ComputeAccountData;
+    type Instruction = mango_v4::instruction::ComputeAccountData;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction {
-            health_type: self.health_type,
-        };
+        let instruction = Self::Instruction {};
 
         let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
 

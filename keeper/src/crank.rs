@@ -81,15 +81,15 @@ pub async fn loop_update_index(mango_client: Arc<MangoClient>, token_index: Toke
                             &mango_v4::instruction::UpdateIndex {},
                         ),
                     };
-                    let mut foo = bank_pubkeys_for_a_token
+                    let mut banks = bank_pubkeys_for_a_token
                         .iter()
                         .map(|bank_pubkey| AccountMeta {
                             pubkey: *bank_pubkey,
                             is_signer: false,
-                            is_writable: false,
+                            is_writable: true,
                         })
                         .collect::<Vec<_>>();
-                    ix.accounts.append(&mut foo);
+                    ix.accounts.append(&mut banks);
                     ix
                 })
                 .send();

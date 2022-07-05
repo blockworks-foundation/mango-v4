@@ -4,6 +4,10 @@ import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 
+//
+// Script which depoys a new mango group, and registers 3 tokens
+//
+
 const MAINNET_MINTS = new Map([
   ['USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'],
   ['BTC', '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E'],
