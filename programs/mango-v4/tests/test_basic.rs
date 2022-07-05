@@ -79,9 +79,7 @@ async fn test_basic() -> Result<(), TransportError> {
             deposit_amount as i64
         );
         let bank_data: Bank = solana.get_account(bank).await;
-        assert!(
-            bank_data.native_total_deposits() - I80F48::from_num(deposit_amount) < dust_threshold
-        );
+        assert!(bank_data.native_deposits() - I80F48::from_num(deposit_amount) < dust_threshold);
 
         let account_data: MangoAccount = solana.get_account(account).await;
         // Assumes oracle price of 1
