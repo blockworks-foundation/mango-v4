@@ -13,6 +13,10 @@ import { QUOTE_DECIMALS } from '../accounts/bank';
 import { MangoClient } from '../client';
 import { getAssociatedTokenAddress } from '../utils';
 
+//
+// example script which shows usage of flash loan 3 ix using a jupiter swap
+//
+
 // NOTE: we assume that ATA for source and target already exist for wallet
 async function main() {
   const options = AnchorProvider.defaultOptions();

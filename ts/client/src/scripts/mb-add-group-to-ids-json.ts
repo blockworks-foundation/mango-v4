@@ -7,6 +7,10 @@ import { MangoClient } from '../client';
 import { MANGO_V4_ID, SERUM3_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
 
+//
+// script to add a group to ids json
+//
+
 function replacer(key, value) {
   if (value instanceof Map) {
     return Object.fromEntries(value);

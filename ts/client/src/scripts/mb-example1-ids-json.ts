@@ -4,6 +4,10 @@ import fs from 'fs';
 import { MangoClient } from '../client';
 import { toUiDecimals } from '../utils';
 
+//
+// example script shows usage of ids json (saves havint to do gpa)
+//
+
 async function main() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(process.env.CLUSTER_URL, options);

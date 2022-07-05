@@ -265,6 +265,96 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "tokenEdit",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "mintInfo",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "bankNum",
+          "type": "u64"
+        },
+        {
+          "name": "oracleOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "oracleConfigOpt",
+          "type": {
+            "option": {
+              "defined": "OracleConfig"
+            }
+          }
+        },
+        {
+          "name": "interestRateParamsOpt",
+          "type": {
+            "option": {
+              "defined": "InterestRateParams"
+            }
+          }
+        },
+        {
+          "name": "loanFeeRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "loanOriginationFeeRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maintAssetWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "initAssetWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maintLiabWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "initLiabWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "liquidationFeeOpt",
+          "type": {
+            "option": "f32"
+          }
+        }
+      ]
+    },
+    {
       "name": "tokenAddBank",
       "accounts": [
         {
@@ -515,6 +605,40 @@ export type MangoV4 = {
         {
           "name": "name",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "editAccount",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
+          }
+        },
+        {
+          "name": "delegateOpt",
+          "type": {
+            "option": "publicKey"
+          }
         }
       ]
     },
@@ -1047,6 +1171,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "serumMarket",
           "isMut": false,
           "isSigner": false
@@ -1084,11 +1213,6 @@ export type MangoV4 = {
               }
             ]
           }
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
         },
         {
           "name": "payer",
@@ -1788,6 +1912,114 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "perpEditMarket",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "oracleOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "oracleConfigOpt",
+          "type": {
+            "option": {
+              "defined": "OracleConfig"
+            }
+          }
+        },
+        {
+          "name": "baseTokenIndexOpt",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "baseTokenDecimalsOpt",
+          "type": {
+            "option": "u8"
+          }
+        },
+        {
+          "name": "maintAssetWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "initAssetWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maintLiabWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "initLiabWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "liquidationFeeOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "makerFeeOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "takerFeeOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "minFundingOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maxFundingOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "impactQuantityOpt",
+          "type": {
+            "option": "i64"
+          }
+        }
+      ]
+    },
+    {
       "name": "perpCloseMarket",
       "accounts": [
         {
@@ -1847,6 +2079,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "perpMarket",
           "isMut": true,
           "isSigner": false
@@ -1870,11 +2107,6 @@ export type MangoV4 = {
           "name": "oracle",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
         }
       ],
       "args": [
@@ -1930,6 +2162,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "perpMarket",
           "isMut": true,
           "isSigner": false
@@ -1943,11 +2180,6 @@ export type MangoV4 = {
           "name": "bids",
           "isMut": true,
           "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
         }
       ],
       "args": [
@@ -1971,6 +2203,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "perpMarket",
           "isMut": true,
           "isSigner": false
@@ -1984,11 +2221,6 @@ export type MangoV4 = {
           "name": "bids",
           "isMut": true,
           "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
         }
       ],
       "args": [
@@ -2012,6 +2244,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "perpMarket",
           "isMut": true,
           "isSigner": false
@@ -2025,11 +2262,6 @@ export type MangoV4 = {
           "name": "bids",
           "isMut": true,
           "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
         }
       ],
       "args": [
@@ -2053,6 +2285,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "perpMarket",
           "isMut": true,
           "isSigner": false
@@ -2066,11 +2303,6 @@ export type MangoV4 = {
           "name": "bids",
           "isMut": true,
           "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
         }
       ],
       "args": [
@@ -4415,6 +4647,96 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "tokenEdit",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "mintInfo",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "bankNum",
+          "type": "u64"
+        },
+        {
+          "name": "oracleOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "oracleConfigOpt",
+          "type": {
+            "option": {
+              "defined": "OracleConfig"
+            }
+          }
+        },
+        {
+          "name": "interestRateParamsOpt",
+          "type": {
+            "option": {
+              "defined": "InterestRateParams"
+            }
+          }
+        },
+        {
+          "name": "loanFeeRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "loanOriginationFeeRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maintAssetWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "initAssetWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maintLiabWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "initLiabWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "liquidationFeeOpt",
+          "type": {
+            "option": "f32"
+          }
+        }
+      ]
+    },
+    {
       "name": "tokenAddBank",
       "accounts": [
         {
@@ -4665,6 +4987,40 @@ export const IDL: MangoV4 = {
         {
           "name": "name",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "editAccount",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "nameOpt",
+          "type": {
+            "option": "string"
+          }
+        },
+        {
+          "name": "delegateOpt",
+          "type": {
+            "option": "publicKey"
+          }
         }
       ]
     },
@@ -5197,6 +5553,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "serumMarket",
           "isMut": false,
           "isSigner": false
@@ -5234,11 +5595,6 @@ export const IDL: MangoV4 = {
               }
             ]
           }
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
         },
         {
           "name": "payer",
@@ -5938,6 +6294,114 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "perpEditMarket",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "oracleOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "oracleConfigOpt",
+          "type": {
+            "option": {
+              "defined": "OracleConfig"
+            }
+          }
+        },
+        {
+          "name": "baseTokenIndexOpt",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "baseTokenDecimalsOpt",
+          "type": {
+            "option": "u8"
+          }
+        },
+        {
+          "name": "maintAssetWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "initAssetWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maintLiabWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "initLiabWeightOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "liquidationFeeOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "makerFeeOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "takerFeeOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "minFundingOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "maxFundingOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "impactQuantityOpt",
+          "type": {
+            "option": "i64"
+          }
+        }
+      ]
+    },
+    {
       "name": "perpCloseMarket",
       "accounts": [
         {
@@ -5997,6 +6461,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "perpMarket",
           "isMut": true,
           "isSigner": false
@@ -6020,11 +6489,6 @@ export const IDL: MangoV4 = {
           "name": "oracle",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
         }
       ],
       "args": [
@@ -6080,6 +6544,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "perpMarket",
           "isMut": true,
           "isSigner": false
@@ -6093,11 +6562,6 @@ export const IDL: MangoV4 = {
           "name": "bids",
           "isMut": true,
           "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
         }
       ],
       "args": [
@@ -6121,6 +6585,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "perpMarket",
           "isMut": true,
           "isSigner": false
@@ -6134,11 +6603,6 @@ export const IDL: MangoV4 = {
           "name": "bids",
           "isMut": true,
           "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
         }
       ],
       "args": [
@@ -6162,6 +6626,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "perpMarket",
           "isMut": true,
           "isSigner": false
@@ -6175,11 +6644,6 @@ export const IDL: MangoV4 = {
           "name": "bids",
           "isMut": true,
           "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
         }
       ],
       "args": [
@@ -6203,6 +6667,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "perpMarket",
           "isMut": true,
           "isSigner": false
@@ -6216,11 +6685,6 @@ export const IDL: MangoV4 = {
           "name": "bids",
           "isMut": true,
           "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
         }
       ],
       "args": [

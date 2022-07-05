@@ -234,6 +234,7 @@ export class MangoAccount {
     let res = 'MangoAccount';
     res = res + '\n pk: ' + this.publicKey.toString();
     res = res + '\n name: ' + this.name;
+    res = res + '\n delegate: ' + this.delegate;
 
     res =
       this.tokensActive().length > 0

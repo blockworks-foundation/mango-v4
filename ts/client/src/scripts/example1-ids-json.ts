@@ -3,6 +3,9 @@ import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
 
+//
+// script which shows example usage of ids json (saves having to do gpa)
+//
 async function main() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
