@@ -126,6 +126,28 @@ export class PerpMarket {
     const quoteUnit = Math.pow(10, QUOTE_DECIMALS);
     return new BN(uiQuote * quoteUnit).div(this.quoteLotSize);
   }
+
+  toString(): string {
+    return (
+      'PerpMarket ' +
+      '\n perpMarketIndex -' +
+      this.perpMarketIndex +
+      '\n maintAssetWeight -' +
+      this.maintAssetWeight.toNumber() +
+      '\n initAssetWeight -' +
+      this.initAssetWeight.toNumber() +
+      '\n maintLiabWeight -' +
+      this.maintLiabWeight.toNumber() +
+      '\n initLiabWeight -' +
+      this.initLiabWeight.toNumber() +
+      '\n liquidationFee -' +
+      this.liquidationFee.toNumber() +
+      '\n makerFee -' +
+      this.makerFee.toNumber() +
+      '\n takerFee -' +
+      this.takerFee.toNumber()
+    );
+  }
 }
 
 export class Side {

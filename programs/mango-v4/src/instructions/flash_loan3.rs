@@ -40,10 +40,11 @@ pub struct FlashLoan3Begin<'info> {
 pub struct FlashLoan3End<'info> {
     #[account(
         mut,
-        has_one = owner,
+        constraint = account.load()?.is_owner_or_delegate(owner.key()),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
+
     pub token_program: Program<'info, Token>,
 }
 

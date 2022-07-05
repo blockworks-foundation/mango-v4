@@ -6,6 +6,7 @@ use std::mem::size_of;
 pub type TokenIndex = u16;
 
 #[account(zero_copy)]
+#[derive(Debug)]
 pub struct Group {
     // Relying on Anchor's discriminator be sufficient for our versioning needs?
     // pub meta_data: MetaData,

@@ -7,7 +7,6 @@ import {
   initializeAccount,
   WRAPPED_SOL_MINT,
 } from '@project-serum/serum/lib/token-instructions';
-import { parsePriceData } from '@pythnetwork/client';
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   Token,
@@ -31,7 +30,7 @@ import bs58 from 'bs58';
 import { Bank, MintInfo } from './accounts/bank';
 import { Group } from './accounts/group';
 import { I80F48 } from './accounts/I80F48';
-import { MangoAccount } from './accounts/mangoAccount';
+import { MangoAccount, MangoAccountData } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
 import { OrderType, PerpMarket, Side } from './accounts/perp';
 import {
@@ -51,6 +50,8 @@ import {
   toU64,
 } from './utils';
 
+// TODO: replace ui values with native as input wherever possible
+// TODO: replace token/market names with token or market indices
 export class MangoClient {
   constructor(
     public program: Program<MangoV4>,
@@ -150,7 +151,6 @@ export class MangoClient {
     initLiabWeight: number,
     liquidationFee: number,
   ): Promise<TransactionSignature> {
-    const bn = I80F48.fromNumber(oracleConfFilter).getData();
     return await this.program.methods
       .tokenRegister(
         tokenIndex,
@@ -179,6 +179,60 @@ export class MangoClient {
         rent: SYSVAR_RENT_PUBKEY,
       })
       .rpc();
+  }
+
+  public async tokenEdit(
+    group: Group,
+    tokenName: string,
+    oracle: PublicKey,
+    oracleConfFilter: number,
+    util0: number,
+    rate0: number,
+    util1: number,
+    rate1: number,
+    maxRate: number,
+    loanFeeRate: number,
+    loanOriginationFeeRate: number,
+    maintAssetWeight: number,
+    initAssetWeight: number,
+    maintLiabWeight: number,
+    initLiabWeight: number,
+    liquidationFee: number,
+  ): Promise<TransactionSignature> {
+    const bank = group.banksMap.get(tokenName)!;
+    const mintInfo = group.mintInfosMap.get(bank.tokenIndex)!;
+
+    return await this.program.methods
+      .tokenEdit(
+        new BN(0),
+        oracle,
+        {
+          confFilter: {
+            val: I80F48.fromNumber(oracleConfFilter).getData(),
+          },
+        } as any, // future: nested custom types dont typecheck, fix if possible?
+        { util0, rate0, util1, rate1, maxRate },
+        loanFeeRate,
+        loanOriginationFeeRate,
+        maintAssetWeight,
+        initAssetWeight,
+        maintLiabWeight,
+        initLiabWeight,
+        liquidationFee,
+      )
+      .accounts({
+        group: group.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        mintInfo: mintInfo.publicKey,
+      })
+      .remainingAccounts([
+        {
+          pubkey: bank.publicKey,
+          isWritable: true,
+          isSigner: false,
+        } as AccountMeta,
+      ])
+      .rpc({ skipPreflight: true });
   }
 
   public async tokenDeregister(
@@ -278,25 +332,6 @@ export class MangoClient {
     ).map((tuple) => {
       return MintInfo.from(tuple.publicKey, tuple.account);
     });
-  }
-
-  public async getPricesForGroup(group: Group): Promise<void> {
-    if (group.banksMap.size === 0) {
-      await this.getBanksForGroup(group);
-    }
-
-    const banks = Array.from(group?.banksMap, ([, value]) => value);
-    const oracles = banks.map((b) => b.oracle);
-    const prices =
-      await this.program.provider.connection.getMultipleAccountsInfo(oracles);
-
-    for (const [index, price] of prices.entries()) {
-      if (banks[index].name === 'USDC') {
-        banks[index].price = 1;
-      } else {
-        banks[index].price = parsePriceData(price.data).previousPrice;
-      }
-    }
   }
 
   // Stub Oracle
@@ -406,6 +441,20 @@ export class MangoClient {
       .rpc();
   }
 
+  public async editMangoAccount(
+    group: Group,
+    name?: string,
+    delegate?: PublicKey,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .editAccount(name, delegate)
+      .accounts({
+        group: group.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
+  }
+
   public async getMangoAccount(mangoAccount: MangoAccount) {
     return MangoAccount.from(
       mangoAccount.publicKey,
@@ -438,16 +487,44 @@ export class MangoClient {
   }
 
   public async closeMangoAccount(
+    group: Group,
     mangoAccount: MangoAccount,
   ): Promise<TransactionSignature> {
     return await this.program.methods
       .closeAccount()
       .accounts({
+        group: group.publicKey,
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         solDestination: mangoAccount.owner,
       })
       .rpc();
+  }
+
+  public async computeAccountData(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): Promise<MangoAccountData> {
+    const healthRemainingAccounts: PublicKey[] =
+      await this.buildHealthRemainingAccounts(group, mangoAccount);
+
+    const res = await this.program.methods
+      .computeAccountData()
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .simulate();
+
+    return MangoAccountData.from(
+      res.events.find((event) => (event.name = 'MangoAccountData')).data as any,
+    );
   }
 
   public async tokenDeposit(
@@ -521,6 +598,9 @@ export class MangoClient {
       .rpc({ skipPreflight: true });
   }
 
+  /**
+   * @deprecated
+   */
   public async tokenWithdraw(
     group: Group,
     mangoAccount: MangoAccount,
@@ -540,6 +620,41 @@ export class MangoClient {
 
     return await this.program.methods
       .tokenWithdraw(toNativeDecimals(amount, bank.mintDecimals), allowBorrow)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        bank: bank.publicKey,
+        vault: bank.vault,
+        tokenAccount: tokenAccountPk,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .rpc({ skipPreflight: true });
+  }
+
+  public async tokenWithdraw2(
+    group: Group,
+    mangoAccount: MangoAccount,
+    tokenName: string,
+    nativeAmount: number,
+    allowBorrow: boolean,
+  ) {
+    const bank = group.banksMap.get(tokenName)!;
+
+    const tokenAccountPk = await getAssociatedTokenAddress(
+      bank.mint,
+      mangoAccount.owner,
+    );
+
+    const healthRemainingAccounts: PublicKey[] =
+      await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
+
+    return await this.program.methods
+      .tokenWithdraw(new BN(nativeAmount), allowBorrow)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -961,12 +1076,13 @@ export class MangoClient {
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .preInstructions([
+        // TODO: try to pick up sizes of bookside and eventqueue from IDL, so we can stay in sync with program
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: 8 + 90152,
+          space: 8 + 90136,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              90160,
+              90144,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,
@@ -974,10 +1090,10 @@ export class MangoClient {
         }),
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: 8 + 90152,
+          space: 8 + 90136,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              90160,
+              90144,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,
@@ -985,10 +1101,10 @@ export class MangoClient {
         }),
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: 8 + 102424,
+          space: 8 + 102416,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              102432,
+              102424,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,
@@ -996,6 +1112,55 @@ export class MangoClient {
         }),
       ])
       .signers([bids, asks, eventQueue])
+      .rpc();
+  }
+
+  async perpEditMarket(
+    group: Group,
+    perpMarketName: string,
+    oracle: PublicKey,
+    oracleConfFilter: number,
+    baseTokenIndex: number,
+    baseTokenDecimals: number,
+    maintAssetWeight: number,
+    initAssetWeight: number,
+    maintLiabWeight: number,
+    initLiabWeight: number,
+    liquidationFee: number,
+    makerFee: number,
+    takerFee: number,
+    minFunding: number,
+    maxFunding: number,
+    impactQuantity: number,
+  ): Promise<TransactionSignature> {
+    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+
+    return await this.program.methods
+      .perpEditMarket(
+        oracle,
+        {
+          confFilter: {
+            val: I80F48.fromNumber(oracleConfFilter).getData(),
+          },
+        } as any, // future: nested custom types dont typecheck, fix if possible?
+        baseTokenIndex,
+        baseTokenDecimals,
+        maintAssetWeight,
+        initAssetWeight,
+        maintLiabWeight,
+        initLiabWeight,
+        liquidationFee,
+        makerFee,
+        takerFee,
+        minFunding,
+        maxFunding,
+        new BN(impactQuantity),
+      )
+      .accounts({
+        group: group.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        perpMarket: perpMarket.publicKey,
+      })
       .rpc();
   }
 
@@ -1607,7 +1772,7 @@ export class MangoClient {
 
   /// private
 
-  private async buildHealthRemainingAccounts(
+  public async buildHealthRemainingAccounts(
     group: Group,
     mangoAccount: MangoAccount,
     banks?: Bank[] /** TODO for serum3PlaceOrder we are just ingoring this atm */,

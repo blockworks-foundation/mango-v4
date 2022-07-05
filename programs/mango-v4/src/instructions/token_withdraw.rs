@@ -16,6 +16,7 @@ pub struct TokenWithdraw<'info> {
     #[account(
         mut,
         has_one = group,
+        // note: should never be the delegate
         has_one = owner,
     )]
     pub account: AccountLoader<'info, MangoAccount>,

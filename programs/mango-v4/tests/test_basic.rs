@@ -96,7 +96,7 @@ async fn test_basic() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        ComputeHealthInstruction {
+        ComputeAccountDataInstruction {
             account,
             health_type: HealthType::Init,
         },
@@ -136,7 +136,7 @@ async fn test_basic() -> Result<(), TransportError> {
         );
         let bank_data: Bank = solana.get_account(bank).await;
         assert!(
-            bank_data.native_total_deposits() - I80F48::from_num(start_amount - withdraw_amount)
+            bank_data.native_deposits() - I80F48::from_num(start_amount - withdraw_amount)
                 < dust_threshold
         );
 
@@ -153,15 +153,15 @@ async fn test_basic() -> Result<(), TransportError> {
     // TEST: Close account and de register bank
     //
 
+    let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
+
     // withdraw whatever is remaining, can't close bank vault without this
     send_tx(
         solana,
         UpdateIndexInstruction {
             mint_info: tokens[0].mint_info,
-            banks: {
-                let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
-                mint_info.banks.to_vec()
-            },
+            banks: mint_info.banks.to_vec(),
+            oracle: mint_info.oracle,
         },
     )
     .await
@@ -170,7 +170,7 @@ async fn test_basic() -> Result<(), TransportError> {
     send_tx(
         solana,
         TokenWithdrawInstruction {
-            amount: bank_data.native_total_deposits().to_num(),
+            amount: bank_data.native_deposits().to_num(),
             allow_borrow: false,
             account,
             owner,
@@ -184,6 +184,7 @@ async fn test_basic() -> Result<(), TransportError> {
     send_tx(
         solana,
         CloseAccountInstruction {
+            group,
             account,
             owner,
             sol_destination: payer.pubkey(),
