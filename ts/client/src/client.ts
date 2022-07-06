@@ -20,6 +20,7 @@ import {
   PublicKey,
   Signer,
   SystemProgram,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
   Transaction,
   TransactionInstruction,
@@ -331,27 +332,6 @@ export class MangoClient {
     ).map((tuple) => {
       return MintInfo.from(tuple.publicKey, tuple.account);
     });
-  }
-
-  public async getPricesForGroup(group: Group): Promise<void> {
-    if (group.banksMap.size === 0) {
-      await this.getBanksForGroup(group);
-    }
-
-    const banks = Array.from(group?.banksMap, ([, value]) => value);
-    const oracles = banks.map((b) => b.oracle);
-    const prices =
-      await this.program.provider.connection.getMultipleAccountsInfo(oracles);
-
-    for (const [index, price] of prices.entries()) {
-      if (banks[index].name === 'USDC') {
-        banks[index].price = 1;
-      } else {
-        const parsedPriceData = parsePriceData(price.data);
-        banks[index].price =
-          parsedPriceData.price || parsedPriceData.previousPrice;
-      }
-    }
   }
 
   // Stub Oracle
@@ -1312,14 +1292,14 @@ export class MangoClient {
     inputToken,
     amountIn,
     outputToken,
-    slippage = 0.5,
+    userDefinedInstructions,
   }: {
     group: Group;
     mangoAccount: MangoAccount;
     inputToken: string;
     amountIn: number;
     outputToken: string;
-    slippage: number;
+    userDefinedInstructions: TransactionInstruction[];
   }): Promise<TransactionSignature> {
     const inputBank = group.banksMap.get(inputToken);
     const outputBank = group.banksMap.get(outputToken);
@@ -1390,8 +1370,7 @@ export class MangoClient {
     }
 
     /*
-     * Transfer input token to users wallet, then swap with the Jupiter route,
-     * and finally transfer output token from users wallet back to the mango vault
+     * Transfer input token to users wallet, then concat the passed in instructions
      */
     const nativeInputAmount = toU64(
       amountIn,
@@ -1411,57 +1390,7 @@ export class MangoClient {
     transferIx.keys[2] = { ...inputBankKey, isWritable: true, isSigner: false };
     instructions.push(transferIx);
 
-    // TODO: move out of client and into ui
-    // Start Jupiter
-
-    // const jupiter = await Jupiter.load({
-    //   connection: this.program.provider.connection,
-    //   cluster: 'mainnet-beta',
-    //   user: mangoAccount.owner, // or public key
-    //   // platformFeeAndAccounts:  NO_PLATFORM_FEE,
-    //   routeCacheDuration: 10_000, // Will not refetch data on computeRoutes for up to 10 seconds
-    // });
-
-    // const routes = await jupiter.computeRoutes({
-    //   inputMint: inputBank.mint, // Mint address of the input token
-    //   outputMint: outputBank.mint, // Mint address of the output token
-    //   inputAmount: nativeInputAmount, // raw input amount of tokens
-    //   slippage, // The slippage in % terms
-    //   forceFetch: false, // false is the default value => will use cache if not older than routeCacheDuration
-    // });
-
-    // const routesInfosWithoutRaydium = routes.routesInfos.filter((r) => {
-    //   if (r.marketInfos.length > 1) {
-    //     for (const mkt of r.marketInfos) {
-    //       if (mkt.amm.label === 'Raydium' || mkt.amm.label === 'Serum')
-    //         return false;
-    //     }
-    //   }
-    //   return true;
-    // });
-
-    // const selectedRoute = routesInfosWithoutRaydium[0];
-
-    // console.log(
-    //   `route found: ${selectedRoute.marketInfos[0].amm.label}. generating jup transaction`,
-    // );
-
-    // const { transactions } = await jupiter.exchange({
-    //   routeInfo: selectedRoute,
-    // });
-    // console.log('Jupiter Transactions:', transactions);
-    // const { setupTransaction, swapTransaction } = transactions;
-
-    // for (const ix of swapTransaction.instructions) {
-    //   if (
-    //     ix.programId.toBase58() ===
-    //     'JUP2jxvXaqu7NQY1GmNF4m1vodw12LVXYxbFL2uJvfo'
-    //   ) {
-    //     instructions.push(ix);
-    //   }
-    // }
-
-    // End Jupiter
+    instructions.concat(userDefinedInstructions);
 
     const transferIx2 = Token.createTransferInstruction(
       TOKEN_PROGRAM_ID,
@@ -1469,13 +1398,12 @@ export class MangoClient {
       outputBank.vault,
       mangoAccount.owner,
       [],
-      // selectedRoute.outAmountWithSlippage,
-      0, // todo: use this for testing, uncomment above for use with Jup
+      0, // todo: use this for testing, this should be the amount to transfer back
     );
     instructions.push(transferIx2);
 
     /*
-     * Build data objects for margin trade instructions
+     * Create object of amounts that will be withdrawn from bank vaults
      */
     const targetRemainingAccounts = instructions
       .map((ix) => [
@@ -1499,6 +1427,9 @@ export class MangoClient {
       },
     ];
 
+    /*
+     * Build cpi data objects for instructions
+     */
     let cpiDatas = [];
     for (const [index, ix] of instructions.entries()) {
       if (index === 0) {
@@ -1516,28 +1447,11 @@ export class MangoClient {
       }
     }
 
-    console.log(
-      'instructions',
-      instructions.map((i) => ({ ...i, programId: i.programId.toString() })),
-    );
-    console.log('cpiDatas', cpiDatas);
-    console.log(
-      'targetRemainingAccounts',
-      targetRemainingAccounts.map((t) => ({
-        ...t,
-        pubkey: t.pubkey.toString(),
-      })),
-    );
-
-    // if (setupTransaction) {
-    //   await this.program.provider.sendAndConfirm(setupTransaction);
-    // } else
     if (preInstructions.length) {
       const tx = new Transaction();
       for (const ix of preInstructions) {
         tx.add(ix);
       }
-      console.log('preInstructions', preInstructions);
 
       await this.program.provider.sendAndConfirm(tx);
     }
@@ -1559,14 +1473,14 @@ export class MangoClient {
     inputToken,
     amountIn,
     outputToken,
-    slippage = 0.5,
+    userDefinedInstructions,
   }: {
     group: Group;
     mangoAccount: MangoAccount;
     inputToken: string;
     amountIn: number;
     outputToken: string;
-    slippage: number;
+    userDefinedInstructions: TransactionInstruction[];
   }): Promise<TransactionSignature> {
     const inputBank = group.banksMap.get(inputToken);
     const outputBank = group.banksMap.get(outputToken);
@@ -1582,13 +1496,11 @@ export class MangoClient {
       (pk) =>
         ({
           pubkey: pk,
-          isWritable:
-            pk.equals(inputBank.publicKey) || pk.equals(outputBank.publicKey)
-              ? true
-              : false,
+          isWritable: false,
           isSigner: false,
         } as AccountMeta),
     );
+    console.log('1');
 
     /*
      * Find or create associated token accounts
@@ -1635,62 +1547,8 @@ export class MangoClient {
         ),
       );
     }
+    console.log('2');
 
-    const nativeInputAmount = toU64(
-      amountIn,
-      inputBank.mintDecimals,
-    ).toNumber();
-    const instructions: TransactionInstruction[] = [];
-
-    // TODO: move out of client and into ui
-    // Start Jupiter
-
-    // const jupiter = await Jupiter.load({
-    //   connection: this.program.provider.connection,
-    //   cluster: 'mainnet-beta',
-    //   user: mangoAccount.owner, // or public key
-    //   // platformFeeAndAccounts:  NO_PLATFORM_FEE,
-    //   routeCacheDuration: 10_000, // Will not refetch data on computeRoutes for up to 10 seconds
-    // });
-
-    // const routes = await jupiter.computeRoutes({
-    //   inputMint: inputBank.mint, // Mint address of the input token
-    //   outputMint: outputBank.mint, // Mint address of the output token
-    //   inputAmount: nativeInputAmount, // raw input amount of tokens
-    //   slippage, // The slippage in % terms
-    //   forceFetch: false, // false is the default value => will use cache if not older than routeCacheDuration
-    // });
-
-    // const routesInfosWithoutRaydium = routes.routesInfos.filter((r) => {
-    //   if (r.marketInfos.length > 1) {
-    //     for (const mkt of r.marketInfos) {
-    //       if (mkt.amm.label === 'Raydium' || mkt.amm.label === 'Serum')
-    //         return false;
-    //     }
-    //   }
-    //   return true;
-    // });
-    // const selectedRoute = routesInfosWithoutRaydium[0];
-
-    // const { transactions } = await jupiter.exchange({
-    //   routeInfo: selectedRoute,
-    // });
-    // const { setupTransaction, swapTransaction } = transactions;
-
-    // for (const ix of swapTransaction.instructions) {
-    //   if (
-    //     ix.programId.toBase58() ===
-    //     'JUP2jxvXaqu7NQY1GmNF4m1vodw12LVXYxbFL2uJvfo'
-    //   ) {
-    //     instructions.push(ix);
-    //   }
-    // }
-
-    // End Jupiter
-
-    // if (setupTransaction) {
-    //   await this.program.provider.sendAndConfirm(setupTransaction);
-    // } else
     if (preInstructions.length) {
       const tx = new Transaction();
       for (const ix of preInstructions) {
@@ -1700,21 +1558,37 @@ export class MangoClient {
 
       await this.program.provider.sendAndConfirm(tx);
     }
+    console.log('3');
 
-    const bankAccounts = {
-      isWritable: true,
+    const sourceBankAccounts = {
       pubkey: inputBank.publicKey,
+      isWritable: true,
       isSigner: false,
     };
-    const bankVaults = {
+    const targetBankAccount = {
+      pubkey: outputBank.publicKey,
       isWritable: true,
+      isSigner: false,
+    };
+    const sourceBankVault = {
       pubkey: inputBank.vault,
+      isWritable: true,
       isSigner: false,
     };
-    const aTokenAccounts = {
+    const targetBankVault = {
+      pubkey: outputBank.vault,
       isWritable: true,
+      isSigner: false,
+    };
+    const sourceATA = {
       pubkey: inputTokenAccountPk,
-      isSigner: true,
+      isWritable: true,
+      isSigner: false,
+    };
+    const targetATA = {
+      pubkey: outputTokenAccountPk,
+      isWritable: false,
+      isSigner: false,
     };
 
     const flashLoanEndIx = await this.program.methods
@@ -1723,17 +1597,43 @@ export class MangoClient {
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
-      .remainingAccounts([...parsedHealthAccounts, bankVaults, aTokenAccounts])
+      .remainingAccounts([
+        ...parsedHealthAccounts,
+        sourceBankVault,
+        targetBankVault,
+        sourceATA,
+        {
+          isWritable: true,
+          pubkey: outputTokenAccountPk,
+          isSigner: false,
+        },
+      ])
       .instruction();
+    console.log('4');
+
+    // userDefinedInstructions.push(flashLoanEndIx);
 
     return await this.program.methods
-      .flashLoan3Begin([toU64(amountIn, inputBank.mintDecimals)])
+      .flashLoan3Begin([
+        toNativeDecimals(amountIn, inputBank.mintDecimals),
+        new BN(
+          0,
+        ) /* we don't care about borrowing the target amount, this is just a dummy */,
+      ])
       .accounts({
         group: group.publicKey,
+        instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       })
-      .remainingAccounts([bankAccounts, bankVaults, aTokenAccounts])
-      .postInstructions([...instructions, flashLoanEndIx])
-      .rpc({ skipPreflight: true });
+      .remainingAccounts([
+        sourceBankAccounts,
+        targetBankAccount,
+        sourceBankVault,
+        targetBankVault,
+        sourceATA,
+        targetATA,
+      ])
+      .postInstructions([flashLoanEndIx])
+      .rpc();
   }
 
   /// liquidations

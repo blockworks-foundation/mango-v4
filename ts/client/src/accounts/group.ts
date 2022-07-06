@@ -171,7 +171,6 @@ export class Group {
   public async reloadBankPrices(client: MangoClient, ids?: Id): Promise<void> {
     const banks = Array.from(this?.banksMap, ([, value]) => value);
     const oracles = banks.map((b) => b.oracle);
-    console.log(oracles.toString());
     const prices =
       await client.program.provider.connection.getMultipleAccountsInfo(oracles);
 

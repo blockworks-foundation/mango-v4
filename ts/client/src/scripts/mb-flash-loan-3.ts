@@ -13,6 +13,13 @@ import { QUOTE_DECIMALS } from '../accounts/bank';
 import { MangoClient } from '../client';
 import { getAssociatedTokenAddress } from '../utils';
 
+const CLUSTER_URL =
+  process.env.CLUSTER_URL ||
+  'https://mango.rpcpool.com/946ef7337da3f5b8d3e4a34e7f88';
+const MANGO_MAINNET_PAYER_KEYPAIR =
+  process.env.MANGO_MAINNET_PAYER_KEYPAIR ||
+  '/Users/tylershipe/.config/solana/deploy.json';
+
 //
 // example script which shows usage of flash loan 3 ix using a jupiter swap
 //
@@ -20,14 +27,12 @@ import { getAssociatedTokenAddress } from '../utils';
 // NOTE: we assume that ATA for source and target already exist for wallet
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.CLUSTER_URL, options);
+  const connection = new Connection(CLUSTER_URL, options);
 
   // load user key
   const user = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(
-        fs.readFileSync(process.env.MANGO_MAINNET_PAYER_KEYPAIR!, 'utf-8'),
-      ),
+      JSON.parse(fs.readFileSync(MANGO_MAINNET_PAYER_KEYPAIR!, 'utf-8')),
     ),
   );
   const userWallet = new Wallet(user);
@@ -41,9 +46,7 @@ async function main() {
   // load admin key
   const admin = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(
-        fs.readFileSync(process.env.MANGO_MAINNET_PAYER_KEYPAIR!, 'utf-8'),
-      ),
+      JSON.parse(fs.readFileSync(MANGO_MAINNET_PAYER_KEYPAIR!, 'utf-8')),
     ),
   );
   console.log(`Admin ${admin.publicKey.toBase58()}`);
