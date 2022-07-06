@@ -2,7 +2,7 @@ import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
 import { getFeeRates, getFeeTier } from '@project-serum/serum';
 import { Order } from '@project-serum/serum/lib/market';
 import {
-  accountClose,
+  closeAccount,
   initializeAccount,
   WRAPPED_SOL_MINT,
 } from '@project-serum/serum/lib/token-instructions';
@@ -553,7 +553,7 @@ export class MangoClient {
       const lamports = Math.round(amount * LAMPORTS_PER_SOL) + 1e7;
 
       preInstructions = [
-        SystemProgram.accountCreate({
+        SystemProgram.createAccount({
           fromPubkey: mangoAccount.owner,
           newAccountPubkey: wrappedSolAccount.publicKey,
           lamports,
@@ -567,7 +567,7 @@ export class MangoClient {
         }),
       ];
       postInstructions = [
-        accountClose({
+        closeAccount({
           source: wrappedSolAccount.publicKey,
           destination: mangoAccount.owner,
           owner: mangoAccount.owner,
@@ -1080,7 +1080,7 @@ export class MangoClient {
       })
       .preInstructions([
         // TODO: try to pick up sizes of bookside and eventqueue from IDL, so we can stay in sync with program
-        SystemProgram.accountCreate({
+        SystemProgram.createAccount({
           programId: this.program.programId,
           space: 8 + 90136,
           lamports:
@@ -1091,7 +1091,7 @@ export class MangoClient {
             .publicKey,
           newAccountPubkey: bids.publicKey,
         }),
-        SystemProgram.accountCreate({
+        SystemProgram.createAccount({
           programId: this.program.programId,
           space: 8 + 90136,
           lamports:
@@ -1102,7 +1102,7 @@ export class MangoClient {
             .publicKey,
           newAccountPubkey: asks.publicKey,
         }),
-        SystemProgram.accountCreate({
+        SystemProgram.createAccount({
           programId: this.program.programId,
           space: 8 + 102416,
           lamports:
