@@ -23,21 +23,6 @@ use state::{OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, T
 
 declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
 
-/*
-dd TODOs
-1. oracle peg order
-    we really need to figure out a passive liquidity solution
-2. make liquidation possible with passive liquidity (?)
-3. remove FIFO component in liquidation
-4. add delay to taker orders
-5. rewards for perps (?)
-6. add origination fees for serum limit orders
-7. socialize loss on perps should only hit the opposite side of this contract
-8. deposit should also update the bank first
-9. interest rate should be based on oracle
-10. decentralized incentives to run the keeper
- */
-
 #[program]
 pub mod mango_v4 {
 
