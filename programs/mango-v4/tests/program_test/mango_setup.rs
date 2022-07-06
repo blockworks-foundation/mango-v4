@@ -18,12 +18,14 @@ pub struct Token {
     pub mint: MintCookie,
     pub oracle: Pubkey,
     pub bank: Pubkey,
+    pub bank1: Pubkey,
     pub vault: Pubkey,
     pub mint_info: Pubkey,
 }
 
 pub struct GroupWithTokens {
     pub group: Pubkey,
+    pub insurance_vault: Pubkey,
     pub tokens: Vec<Token>,
 }
 
@@ -34,10 +36,18 @@ impl<'a> GroupWithTokensConfig<'a> {
             payer,
             mints,
         } = self;
-        let group = send_tx(solana, CreateGroupInstruction { admin, payer })
-            .await
-            .unwrap()
-            .group;
+        let create_group_accounts = send_tx(
+            solana,
+            CreateGroupInstruction {
+                admin,
+                payer,
+                insurance_mint: mints[0].pubkey,
+            },
+        )
+        .await
+        .unwrap();
+        let group = create_group_accounts.group;
+        let insurance_vault = create_group_accounts.insurance_vault;
 
         let address_lookup_table = solana.create_address_lookup_table(admin, payer).await;
 
@@ -94,14 +104,13 @@ impl<'a> GroupWithTokensConfig<'a> {
             )
             .await
             .unwrap();
-            let _ = send_tx(
+            let add_bank_accounts = send_tx(
                 solana,
                 TokenAddBankInstruction {
                     token_index,
                     bank_num: 1,
                     group,
                     admin,
-                    mint: mint.pubkey,
                     address_lookup_table,
                     payer,
                 },
@@ -117,11 +126,16 @@ impl<'a> GroupWithTokensConfig<'a> {
                 mint: mint.clone(),
                 oracle,
                 bank,
+                bank1: add_bank_accounts.bank,
                 vault,
                 mint_info,
             });
         }
 
-        GroupWithTokens { group, tokens }
+        GroupWithTokens {
+            group,
+            insurance_vault,
+            tokens,
+        }
     }
 }

@@ -167,7 +167,7 @@ pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan3End<'info>>,
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_mut()?;
-    require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!account.is_bankrupt(), MangoError::IsBankrupt);
 
     // Find index at which vaults start
     let vaults_index = ctx

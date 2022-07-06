@@ -50,7 +50,7 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
     //
     {
         let account = ctx.accounts.account.load()?;
-        require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
+        require!(!account.is_bankrupt(), MangoError::IsBankrupt);
 
         let serum_market = ctx.accounts.serum_market.load()?;
 

@@ -2,9 +2,9 @@ use anchor_lang::prelude::*;
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
-use crate::{accounts_zerocopy::LoadZeroCopyRef, error::MangoError};
+use crate::error::MangoError;
 
-use super::{Bank, TokenIndex};
+use super::TokenIndex;
 
 pub const MAX_BANKS: usize = 6;
 
@@ -15,25 +15,28 @@ pub const MAX_BANKS: usize = 6;
 #[account(zero_copy)]
 #[derive(Debug)]
 pub struct MintInfo {
-    // TODO: none of these pubkeys are needed, remove?
+    // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
+
+    // ABI: Clients rely on this being at offset 40
+    pub token_index: TokenIndex,
+
+    pub padding: [u8; 6],
     pub mint: Pubkey,
     pub banks: [Pubkey; MAX_BANKS],
     pub vaults: [Pubkey; MAX_BANKS],
     pub oracle: Pubkey,
     pub address_lookup_table: Pubkey,
 
-    pub token_index: TokenIndex,
-
     // describe what address map relevant accounts are found on
     pub address_lookup_table_bank_index: u8,
     pub address_lookup_table_oracle_index: u8,
 
-    pub reserved: [u8; 4],
+    pub reserved: [u8; 6],
 }
 const_assert_eq!(
     size_of::<MintInfo>(),
-    MAX_BANKS * 2 * 32 + 4 * 32 + 2 + 2 + 4
+    MAX_BANKS * 2 * 32 + 4 * 32 + 2 + 6 + 2 + 6
 );
 const_assert_eq!(size_of::<MintInfo>() % 8, 0);
 
@@ -47,29 +50,22 @@ impl MintInfo {
         self.vaults[0]
     }
 
-    pub fn verify_banks_ais(&self, all_bank_ais: &[AccountInfo]) -> Result<()> {
-        let total_banks = self
-            .banks
+    pub fn num_banks(&self) -> usize {
+        self.banks
             .iter()
-            .filter(|bank| *bank != &Pubkey::default())
-            .count();
-        require_eq!(total_banks, all_bank_ais.len());
+            .position(|&b| b == Pubkey::default())
+            .unwrap_or(MAX_BANKS)
+    }
 
-        for (idx, ai) in all_bank_ais.iter().enumerate() {
-            match ai.load::<Bank>() {
-                Ok(bank) => {
-                    if self.token_index != bank.token_index
-                        || self.group != bank.group
-                        // todo: just below check should be enough, above 2 checks are superfluous and defensive
-                        || self.banks[idx] != ai.key()
-                    {
-                        return Err(error!(MangoError::SomeError));
-                    }
-                }
-                Err(error) => return Err(error),
-            }
-        }
+    pub fn banks(&self) -> &[Pubkey] {
+        &self.banks[..self.num_banks()]
+    }
 
+    pub fn verify_banks_ais(&self, all_bank_ais: &[AccountInfo]) -> Result<()> {
+        require!(
+            all_bank_ais.iter().map(|ai| ai.key).eq(self.banks().iter()),
+            MangoError::SomeError
+        );
         Ok(())
     }
 }

@@ -24,7 +24,7 @@ async fn test_delegate() -> Result<(), TransportError> {
     // SETUP: Create a group, register a token (mint0), create an account
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -53,7 +53,8 @@ async fn test_delegate() -> Result<(), TransportError> {
             amount: 100,
             account,
             token_account: payer_mint0_account,
-            token_authority: payer,
+            token_authority: payer.clone(),
+            bank_index: 0,
         },
     )
     .await
@@ -108,6 +109,7 @@ async fn test_delegate() -> Result<(), TransportError> {
                 account,
                 owner: delegate,
                 token_account: payer_mint0_account,
+                bank_index: 0,
             },
         )
         .await;
@@ -127,6 +129,7 @@ async fn test_delegate() -> Result<(), TransportError> {
                 account,
                 owner,
                 token_account: payer_mint0_account,
+                bank_index: 0,
             },
         )
         .await

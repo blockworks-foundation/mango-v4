@@ -13,9 +13,11 @@ pub const YEAR: I80F48 = I80F48!(31536000);
 
 #[account(zero_copy)]
 pub struct Bank {
+    // ABI: Clients rely on this being at offset 8
+    pub group: Pubkey,
+
     pub name: [u8; 16],
 
-    pub group: Pubkey,
     pub mint: Pubkey,
     pub vault: Pubkey,
     pub oracle: Pubkey,
@@ -34,6 +36,14 @@ pub struct Bank {
     pub cached_indexed_total_borrows: I80F48,
 
     /// deposits/borrows for this bank
+    ///
+    /// Note that these may become negative. It's perfectly fine for users to borrow one one bank
+    /// (increasing indexed_borrows there) and paying back on another (possibly decreasing indexed_borrows
+    /// below zero).
+    ///
+    /// The vault amount is not deducable from these values.
+    ///
+    /// These become meaningful when summed over all banks (like in update_index).
     pub indexed_deposits: I80F48,
     pub indexed_borrows: I80F48,
 
@@ -200,14 +210,28 @@ impl Bank {
         require!(native_amount >= 0, MangoError::SomeError);
         let native_position = position.native(self);
 
+        // Adding DELTA to amount/index helps because (amount/index)*index <= amount, but
+        // we want to ensure that users can withdraw the same amount they have deposited, so
+        // (amount/index + delta)*index >= amount is a better guarantee.
+        // Additionally, we require that we don't adjust values if
+        // (native / index) * index == native, because we sometimes call this function with
+        // values that are products of index.
+        let div_rounding_up = |native: I80F48, index: I80F48| {
+            let indexed = cm!(native / index);
+            if cm!(indexed * index) < native {
+                cm!(indexed + I80F48::DELTA)
+            } else {
+                indexed
+            }
+        };
+
         if native_position.is_negative() {
             let new_native_position = cm!(native_position + native_amount);
-            let indexed_change = cm!(native_amount / self.borrow_index + I80F48::DELTA);
+            let indexed_change = div_rounding_up(native_amount, self.borrow_index);
             // this is only correct if it's not positive, because it scales the whole amount by borrow_index
             let new_indexed_value = cm!(position.indexed_position + indexed_change);
             if new_indexed_value.is_negative() {
                 // pay back borrows only, leaving a negative position
-                let indexed_change = cm!(native_amount / self.borrow_index + I80F48::DELTA);
                 self.indexed_borrows = cm!(self.indexed_borrows - indexed_change);
                 position.indexed_position = cm!(position.indexed_position + indexed_change);
                 return Ok(true);
@@ -227,10 +251,7 @@ impl Bank {
         }
 
         // add to deposits
-        // Adding DELTA to amount/index helps because (amount/index)*index <= amount, but
-        // we want to ensure that users can withdraw the same amount they have deposited, so
-        // (amount/index + delta)*index >= amount is a better guarantee.
-        let indexed_change = cm!(native_amount / self.deposit_index + I80F48::DELTA);
+        let indexed_change = div_rounding_up(native_amount, self.deposit_index);
         self.indexed_deposits = cm!(self.indexed_deposits + indexed_change);
         position.indexed_position = cm!(position.indexed_position + indexed_change);
 

@@ -302,6 +302,14 @@ pub mod mango_v4 {
         )
     }
 
+    pub fn liq_token_bankruptcy(
+        ctx: Context<LiqTokenBankruptcy>,
+        liab_token_index: TokenIndex,
+        max_liab_transfer: I80F48,
+    ) -> Result<()> {
+        instructions::liq_token_bankruptcy(ctx, liab_token_index, max_liab_transfer)
+    }
+
     ///
     /// Perps
     ///
@@ -314,7 +322,6 @@ pub mod mango_v4 {
         oracle_config: OracleConfig,
         base_token_index_opt: Option<TokenIndex>,
         base_token_decimals: u8,
-        quote_token_index: TokenIndex,
         quote_lot_size: i64,
         base_lot_size: i64,
         maint_asset_weight: f32,
@@ -335,7 +342,6 @@ pub mod mango_v4 {
             oracle_config,
             base_token_index_opt,
             base_token_decimals,
-            quote_token_index,
             quote_lot_size,
             base_lot_size,
             maint_asset_weight,

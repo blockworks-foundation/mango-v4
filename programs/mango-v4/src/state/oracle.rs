@@ -71,7 +71,9 @@ pub enum OracleType {
 
 #[account(zero_copy)]
 pub struct StubOracle {
+    // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
+    // ABI: Clients rely on this being at offset 40
     pub mint: Pubkey,
     pub price: I80F48,
     pub last_updated: i64,

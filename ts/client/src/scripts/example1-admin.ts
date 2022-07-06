@@ -53,15 +53,16 @@ async function main() {
 
   // group
   console.log(`Creating Group...`);
+  const insuranceMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
-    await client.createGroup(0, true);
+    await client.createGroup(0, true, insuranceMint);
   } catch (error) {
     console.log(error);
   }
   const group = await client.getGroupForAdmin(admin.publicKey);
   console.log(`...registered group ${group.publicKey}`);
 
-  // register token 0
+  // register token 1
   console.log(`Registering BTC...`);
   const btcDevnetMint = new PublicKey(DEVNET_MINTS.get('BTC')!);
   const btcDevnetOracle = new PublicKey(DEVNET_ORACLES.get('BTC')!);
@@ -71,7 +72,7 @@ async function main() {
       btcDevnetMint,
       btcDevnetOracle,
       0.1,
-      0,
+      1, // tokenIndex
       'BTC',
       0.4,
       0.07,
@@ -91,7 +92,7 @@ async function main() {
     console.log(error);
   }
 
-  // stub oracle + register token 1
+  // stub oracle + register token 0
   console.log(`Registering USDC...`);
   const usdcDevnetMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
@@ -109,7 +110,7 @@ async function main() {
       usdcDevnetMint,
       usdcDevnetOracle.publicKey,
       0.1,
-      1,
+      0, // tokenIndex
       'USDC',
       0.4,
       0.07,
@@ -228,7 +229,7 @@ async function main() {
       0,
       'BTC-PERP',
       0.1,
-      0,
+      1,
       6,
       1,
       10,
@@ -251,7 +252,6 @@ async function main() {
   const perpMarkets = await client.perpGetMarkets(
     group,
     group.banksMap.get('BTC')?.tokenIndex,
-    group.banksMap.get('USDC')?.tokenIndex,
   );
   console.log(`...created perp market ${perpMarkets[0].publicKey}`);
 
@@ -319,7 +319,7 @@ async function main() {
       'BTC-PERP',
       btcDevnetOracle,
       0.2,
-      1,
+      0,
       6,
       0.9,
       0.9,
@@ -345,7 +345,7 @@ async function main() {
       'BTC-PERP',
       btcDevnetOracle,
       0.1,
-      0,
+      1,
       6,
       1,
       0.95,

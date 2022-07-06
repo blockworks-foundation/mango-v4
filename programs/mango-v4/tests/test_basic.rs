@@ -27,7 +27,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // SETUP: Create a group, account, register a token (mint0)
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -63,7 +63,8 @@ async fn test_basic() -> Result<(), TransportError> {
                 amount: deposit_amount,
                 account,
                 token_account: payer_mint0_account,
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -111,6 +112,7 @@ async fn test_basic() -> Result<(), TransportError> {
                 account,
                 owner,
                 token_account: payer_mint0_account,
+                bank_index: 0,
             },
         )
         .await
@@ -136,15 +138,11 @@ async fn test_basic() -> Result<(), TransportError> {
     // TEST: Close account and de register bank
     //
 
-    let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
-
     // withdraw whatever is remaining, can't close bank vault without this
     send_tx(
         solana,
         UpdateIndexInstruction {
             mint_info: tokens[0].mint_info,
-            banks: mint_info.banks.to_vec(),
-            oracle: mint_info.oracle,
         },
     )
     .await
@@ -158,6 +156,7 @@ async fn test_basic() -> Result<(), TransportError> {
             account,
             owner,
             token_account: payer_mint0_account,
+            bank_index: 0,
         },
     )
     .await

@@ -12,4 +12,4 @@ anchor build --skip-lint
 # update types in ts client package
 cp -v ./target/types/mango_v4.ts ./ts/client/src/mango_v4.ts
 
-(cd ./ts/client && tsc)
+(cd ./ts/client && yarn tsc)

@@ -15,7 +15,7 @@ pub struct LiqTokenWithToken<'info> {
     #[account(
         mut,
         has_one = group,
-        constraint = liqor.load()?.owner == liqor_owner.key() || liqor.load()?.delegate == liqor_owner.key(),
+        constraint = liqor.load()?.is_owner_or_delegate(liqor_owner.key()),
     )]
     pub liqor: AccountLoader<'info, MangoAccount>,
     pub liqor_owner: Signer<'info>,
@@ -39,24 +39,24 @@ pub fn liq_token_with_token(
     let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)?;
 
     let mut liqor = ctx.accounts.liqor.load_mut()?;
-    require!(liqor.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!liqor.is_bankrupt(), MangoError::IsBankrupt);
 
     let mut liqee = ctx.accounts.liqee.load_mut()?;
-    require!(liqee.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!liqee.is_bankrupt(), MangoError::IsBankrupt);
 
     // Initial liqee health check
     let mut liqee_health_cache = new_health_cache(&liqee, &account_retriever)?;
     let init_health = liqee_health_cache.health(HealthType::Init)?;
-    if liqee.being_liquidated != 0 {
+    if liqee.being_liquidated() {
         if init_health > I80F48::ZERO {
-            liqee.being_liquidated = 0;
+            liqee.set_being_liquidated(false);
             msg!("Liqee init_health above zero");
             return Ok(());
         }
     } else {
         let maint_health = liqee_health_cache.health(HealthType::Maint)?;
         require!(maint_health < I80F48::ZERO, MangoError::SomeError);
-        liqee.being_liquidated = 1;
+        liqee.set_being_liquidated(true);
     }
 
     //
@@ -68,8 +68,9 @@ pub fn liq_token_with_token(
         //
         // This must happen _after_ the health computation, since immutable borrows of
         // the bank are not allowed at the same time.
-        let (asset_bank, liab_bank, asset_price, liab_price) =
+        let (asset_bank, asset_price, opt_liab_bank_and_price) =
             account_retriever.banks_mut_and_oracles(asset_token_index, liab_token_index)?;
+        let (liab_bank, liab_price) = opt_liab_bank_and_price.unwrap();
 
         let liqee_assets_native = liqee
             .tokens
@@ -207,13 +208,13 @@ pub fn liq_token_with_token(
     // Check liqee health again
     let maint_health = liqee_health_cache.health(HealthType::Maint)?;
     if maint_health < I80F48::ZERO {
-        // TODO: bankruptcy check?
+        liqee.set_bankrupt(!liqee_health_cache.has_liquidatable_assets());
     } else {
         let init_health = liqee_health_cache.health(HealthType::Init)?;
 
         // this is equivalent to one native USDC or 1e-6 USDC
         // This is used as threshold to flip flag instead of 0 because of dust issues
-        liqee.being_liquidated = if init_health < -I80F48::ONE { 1 } else { 0 };
+        liqee.set_being_liquidated(init_health < -I80F48::ONE);
     }
 
     // Check liqor's health

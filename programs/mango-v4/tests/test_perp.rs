@@ -24,7 +24,7 @@ async fn test_perp() -> Result<(), TransportError> {
     // SETUP: Create a group and an account
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -70,7 +70,8 @@ async fn test_perp() -> Result<(), TransportError> {
                 amount: deposit_amount,
                 account: account_0,
                 token_account: payer_mint_accounts[0],
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -82,7 +83,8 @@ async fn test_perp() -> Result<(), TransportError> {
                 amount: deposit_amount,
                 account: account_0,
                 token_account: payer_mint_accounts[1],
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -98,7 +100,8 @@ async fn test_perp() -> Result<(), TransportError> {
                 amount: deposit_amount,
                 account: account_1,
                 token_account: payer_mint_accounts[0],
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -110,7 +113,8 @@ async fn test_perp() -> Result<(), TransportError> {
                 amount: deposit_amount,
                 account: account_1,
                 token_account: payer_mint_accounts[1],
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -150,7 +154,6 @@ async fn test_perp() -> Result<(), TransportError> {
             perp_market_index: 0,
             base_token_index: tokens[0].index,
             base_token_decimals: tokens[0].mint.decimals,
-            quote_token_index: tokens[1].index,
             quote_lot_size: 10,
             base_lot_size: 100,
             maint_asset_weight: 0.975,
