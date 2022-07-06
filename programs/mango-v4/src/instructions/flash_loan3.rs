@@ -158,6 +158,7 @@ pub fn flash_loan3_begin<'key, 'accounts, 'remaining, 'info>(
 }
 
 struct TokenVaultChange {
+    token_index: TokenIndex,
     bank_index: usize,
     raw_token_index: usize,
     amount: I80F48,
@@ -244,6 +245,7 @@ pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
         }
 
         changes.push(TokenVaultChange {
+            token_index: bank.token_index,
             bank_index: i,
             raw_token_index,
             amount: change,
@@ -264,11 +266,8 @@ pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
     // Prices for logging
     let mut prices = vec![];
     for change in &changes {
-        let (_, oracle_price) = retriever.bank_and_oracle(
-            &account.group,
-            change.bank_index,
-            change.raw_token_index as TokenIndex,
-        )?;
+        let (_, oracle_price) =
+            retriever.bank_and_oracle(&account.group, change.bank_index, change.token_index)?;
 
         prices.push(oracle_price);
     }
