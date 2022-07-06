@@ -25,7 +25,7 @@ pub struct CreateAccount<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn create_account(ctx: Context<CreateAccount>, account_num: u8, name: String) -> Result<()> {
+pub fn account_create(ctx: Context<CreateAccount>, account_num: u8, name: String) -> Result<()> {
     let mut account = ctx.accounts.account.load_init()?;
 
     account.name = fill32_from_str(name)?;

@@ -13,7 +13,7 @@ pub struct UpdateIndex<'info> {
     pub oracle: UncheckedAccount<'info>,
 }
 
-pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
+pub fn token_update_index(ctx: Context<UpdateIndex>) -> Result<()> {
     let mint_info = ctx.accounts.mint_info.load()?;
     require_keys_eq!(mint_info.oracle.key(), ctx.accounts.oracle.key());
 

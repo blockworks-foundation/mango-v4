@@ -1054,7 +1054,7 @@ pub struct SetStubOracleInstruction<'keypair> {
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for SetStubOracleInstruction<'keypair> {
     type Accounts = mango_v4::accounts::SetStubOracle;
-    type Instruction = mango_v4::instruction::SetStubOracle;
+    type Instruction = mango_v4::instruction::StubOracleSet;
 
     async fn to_instruction(
         &self,
@@ -1100,7 +1100,7 @@ pub struct CreateStubOracle<'keypair> {
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for CreateStubOracle<'keypair> {
     type Accounts = mango_v4::accounts::CreateStubOracle;
-    type Instruction = mango_v4::instruction::CreateStubOracle;
+    type Instruction = mango_v4::instruction::StubOracleCreate;
 
     async fn to_instruction(
         &self,
@@ -1148,7 +1148,7 @@ pub struct CloseStubOracleInstruction<'keypair> {
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for CloseStubOracleInstruction<'keypair> {
     type Accounts = mango_v4::accounts::CloseStubOracle;
-    type Instruction = mango_v4::instruction::CloseStubOracle;
+    type Instruction = mango_v4::instruction::StubOracleClose;
 
     async fn to_instruction(
         &self,
@@ -1192,7 +1192,7 @@ pub struct CreateGroupInstruction<'keypair> {
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for CreateGroupInstruction<'keypair> {
     type Accounts = mango_v4::accounts::CreateGroup;
-    type Instruction = mango_v4::instruction::CreateGroup;
+    type Instruction = mango_v4::instruction::GroupCreate;
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
@@ -1247,7 +1247,7 @@ pub struct CloseGroupInstruction<'keypair> {
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for CloseGroupInstruction<'keypair> {
     type Accounts = mango_v4::accounts::CloseGroup;
-    type Instruction = mango_v4::instruction::CloseGroup;
+    type Instruction = mango_v4::instruction::GroupClose;
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
@@ -1281,13 +1281,13 @@ pub struct CreateAccountInstruction<'keypair> {
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for CreateAccountInstruction<'keypair> {
     type Accounts = mango_v4::accounts::CreateAccount;
-    type Instruction = mango_v4::instruction::CreateAccount;
+    type Instruction = mango_v4::instruction::AccountCreate;
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = mango_v4::instruction::CreateAccount {
+        let instruction = mango_v4::instruction::AccountCreate {
             account_num: self.account_num,
             name: "my_mango_account".to_string(),
         };
@@ -1330,13 +1330,13 @@ pub struct EditAccountInstruction<'keypair> {
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for EditAccountInstruction<'keypair> {
     type Accounts = mango_v4::accounts::EditAccount;
-    type Instruction = mango_v4::instruction::EditAccount;
+    type Instruction = mango_v4::instruction::AccountEdit;
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = mango_v4::instruction::EditAccount {
+        let instruction = mango_v4::instruction::AccountEdit {
             name_opt: Option::from(self.name.to_string()),
             delegate_opt: Option::from(self.delegate),
         };
@@ -1376,7 +1376,7 @@ pub struct CloseAccountInstruction<'keypair> {
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for CloseAccountInstruction<'keypair> {
     type Accounts = mango_v4::accounts::CloseAccount;
-    type Instruction = mango_v4::instruction::CloseAccount;
+    type Instruction = mango_v4::instruction::AccountClose;
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
@@ -2551,7 +2551,7 @@ pub struct UpdateIndexInstruction {
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for UpdateIndexInstruction {
     type Accounts = mango_v4::accounts::UpdateIndex;
-    type Instruction = mango_v4::instruction::UpdateIndex;
+    type Instruction = mango_v4::instruction::TokenUpdateIndex;
     async fn to_instruction(
         &self,
         loader: impl ClientAccountLoader + 'async_trait,

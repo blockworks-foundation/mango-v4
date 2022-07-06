@@ -18,7 +18,7 @@ pub struct EditAccount<'info> {
     pub owner: Signer<'info>,
 }
 
-pub fn edit_account(
+pub fn account_edit(
     ctx: Context<EditAccount>,
     name_opt: Option<String>,
     // note: can also be used to unset by using the default pubkey here as a param
