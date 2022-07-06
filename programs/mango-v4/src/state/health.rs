@@ -518,10 +518,9 @@ impl HealthCache {
     }
 
     pub fn has_borrows(&self) -> bool {
-        let spot_borrows = self
-            .token_infos
-            .iter()
-            .any(|ti| ti.balance < -BANKRUPTCY_DUST_THRESHOLD);
+        // AUDIT: Can we really guarantee that liquidation/bankruptcy resolution always leaves
+        //        non-negative balances?
+        let spot_borrows = self.token_infos.iter().any(|ti| ti.balance.is_negative());
         let perp_borrows = self
             .perp_infos
             .iter()

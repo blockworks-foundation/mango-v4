@@ -24,9 +24,9 @@ pub struct LiqTokenBankruptcy<'info> {
     #[account(
         mut,
         has_one = group,
+        constraint = liqor.load()?.is_owner_or_delegate(liqor_owner.key()),
     )]
     pub liqor: AccountLoader<'info, MangoAccount>,
-    #[account(address = liqor.load()?.owner)]
     pub liqor_owner: Signer<'info>,
 
     #[account(
@@ -160,8 +160,9 @@ pub fn liq_token_bankruptcy(
                 liqor.tokens.deactivate(liqor_liab_raw_token_index);
             }
         } else {
-            // This happens when asset_token_index == liab_token_index: the insurance fund
-            // deposits directly into liqee, without a fee or the liqor indirection
+            // For liab_token_index == QUOTE_TOKEN_INDEX: the insurance fund deposits directly into liqee,
+            // without a fee or the liqor being involved
+            require_eq!(liab_token_index, QUOTE_TOKEN_INDEX);
             require_eq!(liab_price_adjusted, I80F48::ONE);
             require_eq!(insurance_transfer_i80f48, liab_transfer);
         }
@@ -177,8 +178,10 @@ pub fn liq_token_bankruptcy(
             indexed_total_deposits = cm!(indexed_total_deposits + bank.indexed_deposits);
         }
 
-        // TODO: what if loss is greater than entire deposits?
-        // total_indexed_deposits * (deposit_index - new_deposit_index) = remaining_liab_loss
+        // This is the solution to:
+        //   total_indexed_deposits * (deposit_index - new_deposit_index) = remaining_liab_loss
+        // AUDIT: Could it happen that remaining_liab_loss > total_indexed_deposits * deposit_index?
+        //        Probably not.
         let new_deposit_index =
             cm!(liab_deposit_index - remaining_liab_loss / indexed_total_deposits);
 

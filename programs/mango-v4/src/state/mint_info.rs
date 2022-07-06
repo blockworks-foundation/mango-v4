@@ -59,7 +59,10 @@ impl MintInfo {
     }
 
     pub fn verify_banks_ais(&self, all_bank_ais: &[AccountInfo]) -> Result<()> {
-        require!(all_bank_ais.iter().map(|ai| ai.key).eq(self.banks().iter()), MangoError::SomeError);
+        require!(
+            all_bank_ais.iter().map(|ai| ai.key).eq(self.banks().iter()),
+            MangoError::SomeError
+        );
         Ok(())
     }
 }

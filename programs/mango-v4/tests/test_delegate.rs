@@ -24,7 +24,7 @@ async fn test_delegate() -> Result<(), TransportError> {
     // SETUP: Create a group, register a token (mint0), create an account
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
