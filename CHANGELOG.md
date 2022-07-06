@@ -4,7 +4,7 @@ Update this for each mainnet deployment.
 
 ## not on mainnet
 - Account data was rearranged to put fields that are often used with gPA first
-- The `GroupCreate` instruction now requires an `insurance_mint` account, which is
+- The `CreateGroup` instruction now requires an `insurance_mint` account, which is
   used as the mint for the `insurance_vault` token account it creates. Pass the
   USDC mint address.
 - The token with `token_index` zero is now required to be the `insurance_mint`.
@@ -18,3 +18,9 @@ Update this for each mainnet deployment.
 - New instructions: `AccountEdit`, `TokenEdit`, `PerpEditMarket` for reconfiguring.
 - The `delegate` field on `MangoAccount` is now used and many instructions can be
   called by the account delegate.
+
+- Renamed instructions:
+  - create/close_group -> group_create/close
+  - create/edit/close_account -> account_create/edit/close
+  - update_index -> token_update_index
+  - create/set_stub_oracle -> stub_oracle_create/set
