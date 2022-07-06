@@ -6,6 +6,7 @@ use fixed::types::I80F48;
 
 use crate::error::*;
 use crate::state::*;
+use crate::util::checked_math as cm;
 
 use crate::logs::{DepositLog, TokenBalanceLog};
 
@@ -65,9 +66,10 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     let (position, raw_token_index, active_token_index) =
         account.tokens.get_mut_or_create(token_index)?;
 
+    let amount_i80f48 = I80F48::from(amount);
     let position_is_active = {
         let mut bank = ctx.accounts.bank.load_mut()?;
-        bank.deposit(position, I80F48::from(amount))?
+        bank.deposit(position, amount_i80f48)?
     };
 
     // Transfer the actual tokens
@@ -78,6 +80,10 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
     let (bank, oracle_price) =
         retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
+
+    // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
+    account.net_deposits += cm!(amount_i80f48 * oracle_price * QUOTE_NATIVE_TO_UI).to_num::<f32>();
+
     emit!(TokenBalanceLog {
         mango_account: ctx.accounts.account.key(),
         token_index: token_index,

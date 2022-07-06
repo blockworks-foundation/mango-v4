@@ -8,6 +8,7 @@ use fixed::types::I80F48;
 
 use crate::logs::{TokenBalanceLog, WithdrawLog};
 use crate::state::new_fixed_order_account_retriever;
+use crate::util::checked_math as cm;
 
 #[derive(Accounts)]
 pub struct TokenWithdraw<'info> {
@@ -71,7 +72,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     // The bank will also be passed in remainingAccounts. Use an explicit scope
     // to drop the &mut before we borrow it immutably again later.
-    let position_is_active = {
+    let (position_is_active, amount_i80f48) = {
         let mut bank = ctx.accounts.bank.load_mut()?;
         let native_position = position.native(&bank);
 
@@ -105,7 +106,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             amount,
         )?;
 
-        position_is_active
+        (position_is_active, amount_i80f48)
     };
 
     let indexed_position = position.indexed_position;
@@ -113,6 +114,10 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
     let (bank, oracle_price) =
         retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
+
+    // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
+    account.net_deposits -= cm!(amount_i80f48 * oracle_price * QUOTE_NATIVE_TO_UI).to_num::<f32>();
+
     emit!(TokenBalanceLog {
         mango_account: ctx.accounts.account.key(),
         token_index: token_index,

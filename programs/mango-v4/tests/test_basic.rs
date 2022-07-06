@@ -81,6 +81,13 @@ async fn test_basic() -> Result<(), TransportError> {
         );
         let bank_data: Bank = solana.get_account(bank).await;
         assert!(bank_data.native_deposits() - I80F48::from_num(deposit_amount) < dust_threshold);
+
+        let account_data: MangoAccount = solana.get_account(account).await;
+        // Assumes oracle price of 1
+        assert_eq!(
+            account_data.net_deposits,
+            (I80F48::from_num(deposit_amount) * QUOTE_NATIVE_TO_UI).to_num::<f32>()
+        );
     }
 
     //
@@ -131,6 +138,13 @@ async fn test_basic() -> Result<(), TransportError> {
         assert!(
             bank_data.native_deposits() - I80F48::from_num(start_amount - withdraw_amount)
                 < dust_threshold
+        );
+
+        let account_data: MangoAccount = solana.get_account(account).await;
+        // Assumes oracle price of 1
+        assert_eq!(
+            account_data.net_deposits,
+            (I80F48::from_num(start_amount - withdraw_amount) * QUOTE_NATIVE_TO_UI).to_num::<f32>()
         );
     }
 
