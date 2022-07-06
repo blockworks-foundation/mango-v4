@@ -568,7 +568,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "updateIndex",
+      "name": "tokenUpdateIndex",
       "accounts": [
         {
           "name": "mintInfo",
@@ -2810,6 +2810,14 @@ export type MangoV4 = {
                 4
               ]
             }
+          },
+          {
+            "name": "netDeposits",
+            "type": "f32"
+          },
+          {
+            "name": "netSettled",
+            "type": "f32"
           }
         ]
       }
@@ -5096,7 +5104,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "updateIndex",
+      "name": "tokenUpdateIndex",
       "accounts": [
         {
           "name": "mintInfo",
@@ -7338,6 +7346,14 @@ export const IDL: MangoV4 = {
                 4
               ]
             }
+          },
+          {
+            "name": "netDeposits",
+            "type": "f32"
+          },
+          {
+            "name": "netSettled",
+            "type": "f32"
           }
         ]
       }
