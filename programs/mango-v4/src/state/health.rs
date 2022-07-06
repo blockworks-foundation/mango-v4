@@ -94,9 +94,9 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
         token_index: TokenIndex,
     ) -> Result<(&Bank, I80F48)> {
         let bank = self.bank(group, account_index)?;
-        require!(bank.token_index == token_index, MangoError::SomeError);
+        require_eq!(bank.token_index, token_index, MangoError::SomeError);
         let oracle = &self.ais[cm!(self.n_banks + account_index)];
-        require!(&bank.oracle == oracle.key(), MangoError::SomeError);
+        require_keys_eq!(bank.oracle, *oracle.key(), MangoError::SomeError);
         Ok((
             bank,
             oracle_price(oracle, bank.oracle_config.conf_filter, bank.mint_decimals)?,
