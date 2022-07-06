@@ -734,9 +734,12 @@ pub struct MangoAccount {
     // pub info: [u8; INFO_LEN], // TODO: Info could be in a separate PDA?
     pub reserved: [u8; 4],
 
-    // Cumulative deposits - withdraws (using USD prices at the time of the deposit/withdraw)
+    // Cumulative (deposits - withdraws)
+    // using USD prices at the time of the deposit/withdraw
+    // in UI USD units
     pub net_deposits: f32,
     // Cumulative settles on perp positions
+    // TODO: unimplemented
     pub net_settled: f32,
 }
 const_assert_eq!(

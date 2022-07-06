@@ -85,7 +85,7 @@ async fn test_basic() -> Result<(), TransportError> {
         // Assumes oracle price of 1
         assert_eq!(
             account_data.net_deposits,
-            (I80F48::from_num(deposit_amount) * QUOTE_DECIMALS_FACTOR).to_num::<f32>()
+            (I80F48::from_num(deposit_amount) * QUOTE_NATIVE_TO_UI).to_num::<f32>()
         );
     }
 
@@ -142,8 +142,7 @@ async fn test_basic() -> Result<(), TransportError> {
         // Assumes oracle price of 1
         assert_eq!(
             account_data.net_deposits,
-            (I80F48::from_num(start_amount - withdraw_amount) * QUOTE_DECIMALS_FACTOR)
-                .to_num::<f32>()
+            (I80F48::from_num(start_amount - withdraw_amount) * QUOTE_NATIVE_TO_UI).to_num::<f32>()
         );
     }
 

@@ -8,6 +8,7 @@ use fixed::types::I80F48;
 
 use crate::logs::{TokenBalanceLog, WithdrawLog};
 use crate::state::new_fixed_order_account_retriever;
+use crate::util::checked_math as cm;
 
 #[derive(Accounts)]
 pub struct TokenWithdraw<'info> {
@@ -115,7 +116,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
 
     // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
-    account.net_deposits -= (amount_i80f48 * oracle_price * QUOTE_DECIMALS_FACTOR).to_num::<f32>();
+    account.net_deposits -= cm!(amount_i80f48 * oracle_price * QUOTE_NATIVE_TO_UI).to_num::<f32>();
 
     emit!(TokenBalanceLog {
         mango_account: ctx.accounts.account.key(),
