@@ -40,7 +40,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     // deposit some funds, to the vaults aren't empty
     let vault_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 2,
             group,
             owner,
@@ -95,7 +95,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     //
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -249,7 +249,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     // deposit some funds, to the vaults aren't empty
     let vault_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 2,
             group,
             owner,
@@ -279,7 +279,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     //
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,

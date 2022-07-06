@@ -34,7 +34,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
     let account_0 = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -47,7 +47,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
     let account_1 = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 1,
             group,
             owner,

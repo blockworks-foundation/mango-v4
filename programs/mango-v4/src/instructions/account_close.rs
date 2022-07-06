@@ -5,7 +5,7 @@ use crate::error::*;
 use crate::state::*;
 
 #[derive(Accounts)]
-pub struct CloseAccount<'info> {
+pub struct AccountClose<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
@@ -25,7 +25,7 @@ pub struct CloseAccount<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-pub fn account_close(ctx: Context<CloseAccount>) -> Result<()> {
+pub fn account_close(ctx: Context<AccountClose>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
     // don't perform checks if group is just testing

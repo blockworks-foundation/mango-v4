@@ -123,7 +123,7 @@ pub mod mango_v4 {
     }
 
     pub fn account_create(
-        ctx: Context<CreateAccount>,
+        ctx: Context<AccountCreate>,
         account_num: u8,
         name: String,
     ) -> Result<()> {
@@ -131,14 +131,14 @@ pub mod mango_v4 {
     }
 
     pub fn account_edit(
-        ctx: Context<EditAccount>,
+        ctx: Context<AccountEdit>,
         name_opt: Option<String>,
         delegate_opt: Option<Pubkey>,
     ) -> Result<()> {
         instructions::account_edit(ctx, name_opt, delegate_opt)
     }
 
-    pub fn account_close(ctx: Context<CloseAccount>) -> Result<()> {
+    pub fn account_close(ctx: Context<AccountClose>) -> Result<()> {
         instructions::account_close(ctx)
     }
 

@@ -35,7 +35,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -99,7 +99,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -210,7 +210,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,

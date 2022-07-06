@@ -38,7 +38,7 @@ async fn test_group_address_lookup_tables() -> Result<()> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,

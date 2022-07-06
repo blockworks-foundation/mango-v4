@@ -34,7 +34,7 @@ async fn test_update_index() -> Result<(), TransportError> {
     // deposit some funds, to the vaults aren't empty
     let deposit_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -61,7 +61,7 @@ async fn test_update_index() -> Result<(), TransportError> {
 
     let withdraw_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 1,
             group,
             owner,
