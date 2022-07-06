@@ -155,7 +155,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // withdraw whatever is remaining, can't close bank vault without this
     send_tx(
         solana,
-        UpdateIndexInstruction {
+        TokenUpdateIndexInstruction {
             mint_info: tokens[0].mint_info,
         },
     )
@@ -230,7 +230,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // close group
     send_tx(
         solana,
-        CloseGroupInstruction {
+        GroupCloseInstruction {
             group,
             admin,
             sol_destination: payer.pubkey(),

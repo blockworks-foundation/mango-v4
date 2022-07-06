@@ -1184,14 +1184,14 @@ impl<'keypair> ClientInstruction for StubOracleCloseInstruction<'keypair> {
     }
 }
 
-pub struct CreateGroupInstruction<'keypair> {
+pub struct GroupCreateInstruction<'keypair> {
     pub admin: &'keypair Keypair,
     pub payer: &'keypair Keypair,
     pub insurance_mint: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for CreateGroupInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::CreateGroup;
+impl<'keypair> ClientInstruction for GroupCreateInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::GroupCreate;
     type Instruction = mango_v4::instruction::GroupCreate;
     async fn to_instruction(
         &self,
@@ -1239,14 +1239,14 @@ impl<'keypair> ClientInstruction for CreateGroupInstruction<'keypair> {
     }
 }
 
-pub struct CloseGroupInstruction<'keypair> {
+pub struct GroupCloseInstruction<'keypair> {
     pub admin: &'keypair Keypair,
     pub group: Pubkey,
     pub sol_destination: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for CloseGroupInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::CloseGroup;
+impl<'keypair> ClientInstruction for GroupCloseInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::GroupClose;
     type Instruction = mango_v4::instruction::GroupClose;
     async fn to_instruction(
         &self,
@@ -2545,12 +2545,12 @@ impl ClientInstruction for BenchmarkInstruction {
         vec![]
     }
 }
-pub struct UpdateIndexInstruction {
+pub struct TokenUpdateIndexInstruction {
     pub mint_info: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for UpdateIndexInstruction {
-    type Accounts = mango_v4::accounts::UpdateIndex;
+impl ClientInstruction for TokenUpdateIndexInstruction {
+    type Accounts = mango_v4::accounts::TokenUpdateIndex;
     type Instruction = mango_v4::instruction::TokenUpdateIndex;
     async fn to_instruction(
         &self,

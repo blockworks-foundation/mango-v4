@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
 
 #[derive(Accounts)]
-pub struct CloseGroup<'info> {
+pub struct GroupClose<'info> {
     #[account(
         mut,
         constraint = group.load()?.testing == 1,
@@ -21,7 +21,7 @@ pub struct CloseGroup<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-pub fn group_close(_ctx: Context<CloseGroup>) -> Result<()> {
+pub fn group_close(_ctx: Context<GroupClose>) -> Result<()> {
     // TODO: checks
     Ok(())
 }

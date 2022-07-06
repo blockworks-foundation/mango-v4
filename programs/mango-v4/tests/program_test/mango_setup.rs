@@ -38,7 +38,7 @@ impl<'a> GroupWithTokensConfig<'a> {
         } = self;
         let create_group_accounts = send_tx(
             solana,
-            CreateGroupInstruction {
+            GroupCreateInstruction {
                 admin,
                 payer,
                 insurance_mint: mints[0].pubkey,

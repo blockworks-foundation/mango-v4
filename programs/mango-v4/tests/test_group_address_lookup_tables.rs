@@ -31,7 +31,7 @@ async fn test_group_address_lookup_tables() -> Result<()> {
     // SETUP: Create a group
     //
 
-    let group = send_tx(solana, CreateGroupInstruction { admin, payer })
+    let group = send_tx(solana, GroupCreateInstruction { admin, payer })
         .await
         .unwrap()
         .group;

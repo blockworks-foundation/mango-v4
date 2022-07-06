@@ -105,7 +105,7 @@ async fn test_update_index() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        UpdateIndexInstruction {
+        TokenUpdateIndexInstruction {
             mint_info: tokens[0].mint_info,
         },
     )

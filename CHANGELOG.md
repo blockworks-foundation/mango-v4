@@ -4,7 +4,7 @@ Update this for each mainnet deployment.
 
 ## not on mainnet
 - Account data was rearranged to put fields that are often used with gPA first
-- The `CreateGroup` instruction now requires an `insurance_mint` account, which is
+- The `GroupCreate` instruction now requires an `insurance_mint` account, which is
   used as the mint for the `insurance_vault` token account it creates. Pass the
   USDC mint address.
 - The token with `token_index` zero is now required to be the `insurance_mint`.
