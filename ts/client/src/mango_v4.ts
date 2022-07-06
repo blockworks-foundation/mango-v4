@@ -35,12 +35,46 @@ export type MangoV4 = {
           "isSigner": true
         },
         {
+          "name": "insuranceMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "InsuranceVault"
+              }
+            ]
+          }
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
         },
         {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
           "isMut": false,
           "isSigner": false
         }
@@ -1770,6 +1804,63 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "liqTokenBankruptcy",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liabMintInfo",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "quoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "liabTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "maxLiabTransfer",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
+    },
+    {
       "name": "perpCreateMarket",
       "accounts": [
         {
@@ -2606,6 +2697,18 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "insuranceVault",
+            "type": "publicKey"
+          },
+          {
+            "name": "insuranceMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "groupNum",
+            "type": "u32"
+          },
+          {
             "name": "bump",
             "type": "u8"
           },
@@ -2614,17 +2717,13 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
+            "name": "padding2",
             "type": {
               "array": [
                 "u8",
                 2
               ]
             }
-          },
-          {
-            "name": "groupNum",
-            "type": "u32"
           },
           {
             "name": "reserved",
@@ -4427,12 +4526,46 @@ export const IDL: MangoV4 = {
           "isSigner": true
         },
         {
+          "name": "insuranceMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "InsuranceVault"
+              }
+            ]
+          }
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
         },
         {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
           "isMut": false,
           "isSigner": false
         }
@@ -6162,6 +6295,63 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "liqTokenBankruptcy",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liabMintInfo",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "quoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "liabTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "maxLiabTransfer",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
+    },
+    {
       "name": "perpCreateMarket",
       "accounts": [
         {
@@ -6998,6 +7188,18 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "insuranceVault",
+            "type": "publicKey"
+          },
+          {
+            "name": "insuranceMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "groupNum",
+            "type": "u32"
+          },
+          {
             "name": "bump",
             "type": "u8"
           },
@@ -7006,17 +7208,13 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
+            "name": "padding2",
             "type": {
               "array": [
                 "u8",
                 2
               ]
             }
-          },
-          {
-            "name": "groupNum",
-            "type": "u32"
           },
           {
             "name": "reserved",
