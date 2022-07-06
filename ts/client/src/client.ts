@@ -1,4 +1,3 @@
-import { Jupiter } from '@jup-ag/core';
 import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
 import { getFeeRates, getFeeTier } from '@project-serum/serum';
 import { Order } from '@project-serum/serum/lib/market';
@@ -332,6 +331,27 @@ export class MangoClient {
     ).map((tuple) => {
       return MintInfo.from(tuple.publicKey, tuple.account);
     });
+  }
+
+  public async getPricesForGroup(group: Group): Promise<void> {
+    if (group.banksMap.size === 0) {
+      await this.getBanksForGroup(group);
+    }
+
+    const banks = Array.from(group?.banksMap, ([, value]) => value);
+    const oracles = banks.map((b) => b.oracle);
+    const prices =
+      await this.program.provider.connection.getMultipleAccountsInfo(oracles);
+
+    for (const [index, price] of prices.entries()) {
+      if (banks[index].name === 'USDC') {
+        banks[index].price = 1;
+      } else {
+        const parsedPriceData = parsePriceData(price.data);
+        banks[index].price =
+          parsedPriceData.price || parsedPriceData.previousPrice;
+      }
+    }
   }
 
   // Stub Oracle
@@ -1394,52 +1414,52 @@ export class MangoClient {
     // TODO: move out of client and into ui
     // Start Jupiter
 
-    const jupiter = await Jupiter.load({
-      connection: this.program.provider.connection,
-      cluster: 'mainnet-beta',
-      user: mangoAccount.owner, // or public key
-      // platformFeeAndAccounts:  NO_PLATFORM_FEE,
-      routeCacheDuration: 10_000, // Will not refetch data on computeRoutes for up to 10 seconds
-    });
+    // const jupiter = await Jupiter.load({
+    //   connection: this.program.provider.connection,
+    //   cluster: 'mainnet-beta',
+    //   user: mangoAccount.owner, // or public key
+    //   // platformFeeAndAccounts:  NO_PLATFORM_FEE,
+    //   routeCacheDuration: 10_000, // Will not refetch data on computeRoutes for up to 10 seconds
+    // });
 
-    const routes = await jupiter.computeRoutes({
-      inputMint: inputBank.mint, // Mint address of the input token
-      outputMint: outputBank.mint, // Mint address of the output token
-      inputAmount: nativeInputAmount, // raw input amount of tokens
-      slippage, // The slippage in % terms
-      forceFetch: false, // false is the default value => will use cache if not older than routeCacheDuration
-    });
+    // const routes = await jupiter.computeRoutes({
+    //   inputMint: inputBank.mint, // Mint address of the input token
+    //   outputMint: outputBank.mint, // Mint address of the output token
+    //   inputAmount: nativeInputAmount, // raw input amount of tokens
+    //   slippage, // The slippage in % terms
+    //   forceFetch: false, // false is the default value => will use cache if not older than routeCacheDuration
+    // });
 
-    const routesInfosWithoutRaydium = routes.routesInfos.filter((r) => {
-      if (r.marketInfos.length > 1) {
-        for (const mkt of r.marketInfos) {
-          if (mkt.amm.label === 'Raydium' || mkt.amm.label === 'Serum')
-            return false;
-        }
-      }
-      return true;
-    });
+    // const routesInfosWithoutRaydium = routes.routesInfos.filter((r) => {
+    //   if (r.marketInfos.length > 1) {
+    //     for (const mkt of r.marketInfos) {
+    //       if (mkt.amm.label === 'Raydium' || mkt.amm.label === 'Serum')
+    //         return false;
+    //     }
+    //   }
+    //   return true;
+    // });
 
-    const selectedRoute = routesInfosWithoutRaydium[0];
+    // const selectedRoute = routesInfosWithoutRaydium[0];
 
-    console.log(
-      `route found: ${selectedRoute.marketInfos[0].amm.label}. generating jup transaction`,
-    );
+    // console.log(
+    //   `route found: ${selectedRoute.marketInfos[0].amm.label}. generating jup transaction`,
+    // );
 
-    const { transactions } = await jupiter.exchange({
-      routeInfo: selectedRoute,
-    });
-    console.log('Jupiter Transactions:', transactions);
-    const { setupTransaction, swapTransaction } = transactions;
+    // const { transactions } = await jupiter.exchange({
+    //   routeInfo: selectedRoute,
+    // });
+    // console.log('Jupiter Transactions:', transactions);
+    // const { setupTransaction, swapTransaction } = transactions;
 
-    for (const ix of swapTransaction.instructions) {
-      if (
-        ix.programId.toBase58() ===
-        'JUP2jxvXaqu7NQY1GmNF4m1vodw12LVXYxbFL2uJvfo'
-      ) {
-        instructions.push(ix);
-      }
-    }
+    // for (const ix of swapTransaction.instructions) {
+    //   if (
+    //     ix.programId.toBase58() ===
+    //     'JUP2jxvXaqu7NQY1GmNF4m1vodw12LVXYxbFL2uJvfo'
+    //   ) {
+    //     instructions.push(ix);
+    //   }
+    // }
 
     // End Jupiter
 
@@ -1449,7 +1469,8 @@ export class MangoClient {
       outputBank.vault,
       mangoAccount.owner,
       [],
-      selectedRoute.outAmountWithSlippage,
+      // selectedRoute.outAmountWithSlippage,
+      0, // todo: use this for testing, uncomment above for use with Jup
     );
     instructions.push(transferIx2);
 
@@ -1508,9 +1529,10 @@ export class MangoClient {
       })),
     );
 
-    if (setupTransaction) {
-      await this.program.provider.sendAndConfirm(setupTransaction);
-    } else if (preInstructions.length) {
+    // if (setupTransaction) {
+    //   await this.program.provider.sendAndConfirm(setupTransaction);
+    // } else
+    if (preInstructions.length) {
       const tx = new Transaction();
       for (const ix of preInstructions) {
         tx.add(ix);
@@ -1623,52 +1645,53 @@ export class MangoClient {
     // TODO: move out of client and into ui
     // Start Jupiter
 
-    const jupiter = await Jupiter.load({
-      connection: this.program.provider.connection,
-      cluster: 'mainnet-beta',
-      user: mangoAccount.owner, // or public key
-      // platformFeeAndAccounts:  NO_PLATFORM_FEE,
-      routeCacheDuration: 10_000, // Will not refetch data on computeRoutes for up to 10 seconds
-    });
+    // const jupiter = await Jupiter.load({
+    //   connection: this.program.provider.connection,
+    //   cluster: 'mainnet-beta',
+    //   user: mangoAccount.owner, // or public key
+    //   // platformFeeAndAccounts:  NO_PLATFORM_FEE,
+    //   routeCacheDuration: 10_000, // Will not refetch data on computeRoutes for up to 10 seconds
+    // });
 
-    const routes = await jupiter.computeRoutes({
-      inputMint: inputBank.mint, // Mint address of the input token
-      outputMint: outputBank.mint, // Mint address of the output token
-      inputAmount: nativeInputAmount, // raw input amount of tokens
-      slippage, // The slippage in % terms
-      forceFetch: false, // false is the default value => will use cache if not older than routeCacheDuration
-    });
+    // const routes = await jupiter.computeRoutes({
+    //   inputMint: inputBank.mint, // Mint address of the input token
+    //   outputMint: outputBank.mint, // Mint address of the output token
+    //   inputAmount: nativeInputAmount, // raw input amount of tokens
+    //   slippage, // The slippage in % terms
+    //   forceFetch: false, // false is the default value => will use cache if not older than routeCacheDuration
+    // });
 
-    const routesInfosWithoutRaydium = routes.routesInfos.filter((r) => {
-      if (r.marketInfos.length > 1) {
-        for (const mkt of r.marketInfos) {
-          if (mkt.amm.label === 'Raydium' || mkt.amm.label === 'Serum')
-            return false;
-        }
-      }
-      return true;
-    });
-    const selectedRoute = routesInfosWithoutRaydium[0];
+    // const routesInfosWithoutRaydium = routes.routesInfos.filter((r) => {
+    //   if (r.marketInfos.length > 1) {
+    //     for (const mkt of r.marketInfos) {
+    //       if (mkt.amm.label === 'Raydium' || mkt.amm.label === 'Serum')
+    //         return false;
+    //     }
+    //   }
+    //   return true;
+    // });
+    // const selectedRoute = routesInfosWithoutRaydium[0];
 
-    const { transactions } = await jupiter.exchange({
-      routeInfo: selectedRoute,
-    });
-    const { setupTransaction, swapTransaction } = transactions;
+    // const { transactions } = await jupiter.exchange({
+    //   routeInfo: selectedRoute,
+    // });
+    // const { setupTransaction, swapTransaction } = transactions;
 
-    for (const ix of swapTransaction.instructions) {
-      if (
-        ix.programId.toBase58() ===
-        'JUP2jxvXaqu7NQY1GmNF4m1vodw12LVXYxbFL2uJvfo'
-      ) {
-        instructions.push(ix);
-      }
-    }
+    // for (const ix of swapTransaction.instructions) {
+    //   if (
+    //     ix.programId.toBase58() ===
+    //     'JUP2jxvXaqu7NQY1GmNF4m1vodw12LVXYxbFL2uJvfo'
+    //   ) {
+    //     instructions.push(ix);
+    //   }
+    // }
 
     // End Jupiter
 
-    if (setupTransaction) {
-      await this.program.provider.sendAndConfirm(setupTransaction);
-    } else if (preInstructions.length) {
+    // if (setupTransaction) {
+    //   await this.program.provider.sendAndConfirm(setupTransaction);
+    // } else
+    if (preInstructions.length) {
       const tx = new Transaction();
       for (const ix of preInstructions) {
         tx.add(ix);
