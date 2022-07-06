@@ -3,7 +3,7 @@ export type MangoV4 = {
   "name": "mango_v4",
   "instructions": [
     {
-      "name": "createGroup",
+      "name": "groupCreate",
       "accounts": [
         {
           "name": "group",
@@ -91,7 +91,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "closeGroup",
+      "name": "groupClose",
       "accounts": [
         {
           "name": "group",
@@ -584,7 +584,7 @@ export type MangoV4 = {
       "args": []
     },
     {
-      "name": "createAccount",
+      "name": "accountCreate",
       "accounts": [
         {
           "name": "group",
@@ -648,7 +648,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "editAccount",
+      "name": "accountEdit",
       "accounts": [
         {
           "name": "group",
@@ -682,7 +682,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "closeAccount",
+      "name": "accountClose",
       "accounts": [
         {
           "name": "group",
@@ -713,7 +713,7 @@ export type MangoV4 = {
       "args": []
     },
     {
-      "name": "createStubOracle",
+      "name": "stubOracleCreate",
       "accounts": [
         {
           "name": "group",
@@ -776,7 +776,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "closeStubOracle",
+      "name": "stubOracleClose",
       "accounts": [
         {
           "name": "group",
@@ -807,7 +807,7 @@ export type MangoV4 = {
       "args": []
     },
     {
-      "name": "setStubOracle",
+      "name": "stubOracleSet",
       "accounts": [
         {
           "name": "group",
@@ -4531,7 +4531,7 @@ export const IDL: MangoV4 = {
   "name": "mango_v4",
   "instructions": [
     {
-      "name": "createGroup",
+      "name": "groupCreate",
       "accounts": [
         {
           "name": "group",
@@ -4619,7 +4619,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "closeGroup",
+      "name": "groupClose",
       "accounts": [
         {
           "name": "group",
@@ -5112,7 +5112,7 @@ export const IDL: MangoV4 = {
       "args": []
     },
     {
-      "name": "createAccount",
+      "name": "accountCreate",
       "accounts": [
         {
           "name": "group",
@@ -5176,7 +5176,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "editAccount",
+      "name": "accountEdit",
       "accounts": [
         {
           "name": "group",
@@ -5210,7 +5210,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "closeAccount",
+      "name": "accountClose",
       "accounts": [
         {
           "name": "group",
@@ -5241,7 +5241,7 @@ export const IDL: MangoV4 = {
       "args": []
     },
     {
-      "name": "createStubOracle",
+      "name": "stubOracleCreate",
       "accounts": [
         {
           "name": "group",
@@ -5304,7 +5304,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "closeStubOracle",
+      "name": "stubOracleClose",
       "accounts": [
         {
           "name": "group",
@@ -5335,7 +5335,7 @@ export const IDL: MangoV4 = {
       "args": []
     },
     {
-      "name": "setStubOracle",
+      "name": "stubOracleSet",
       "accounts": [
         {
           "name": "group",

@@ -55,7 +55,7 @@ async function main() {
   console.log(`Creating Group...`);
   const insuranceMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
-    await client.createGroup(0, true, insuranceMint);
+    await client.groupCreate(0, true, insuranceMint);
   } catch (error) {
     console.log(error);
   }
@@ -96,7 +96,7 @@ async function main() {
   console.log(`Registering USDC...`);
   const usdcDevnetMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
-    await client.createStubOracle(group, usdcDevnetMint, 1.0);
+    await client.stubOracleCreate(group, usdcDevnetMint, 1.0);
   } catch (error) {
     console.log(error);
   }

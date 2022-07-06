@@ -41,7 +41,7 @@ async function main() {
   // group
   console.log(`Creating Group...`);
   try {
-    await client.createGroup(0, true);
+    await client.groupCreate(0, true);
   } catch (error) {
     console.log(error);
   }
@@ -82,7 +82,7 @@ async function main() {
   console.log(`Creating USDC stub oracle...`);
   const usdcMainnetMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
   try {
-    await client.createStubOracle(group, usdcMainnetMint, 1.0);
+    await client.stubOracleCreate(group, usdcMainnetMint, 1.0);
   } catch (error) {
     console.log(error);
   }

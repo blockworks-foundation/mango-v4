@@ -110,7 +110,7 @@ async function main() {
     'devnet',
     MANGO_V4_ID['devnet'],
   );
-  await client.setStubOracle(group, group.banksMap.get('USDC')?.oracle!, 0.5);
+  await client.stubOracleSet(group, group.banksMap.get('USDC')?.oracle!, 0.5);
 
   process.exit();
 }
