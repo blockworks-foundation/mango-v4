@@ -1954,10 +1954,6 @@ export type MangoV4 = {
           "type": "u8"
         },
         {
-          "name": "quoteTokenIndex",
-          "type": "u16"
-        },
-        {
           "name": "quoteLotSize",
           "type": "i64"
         },
@@ -2497,6 +2493,10 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
             "name": "name",
             "type": {
               "array": [
@@ -2504,10 +2504,6 @@ export type MangoV4 = {
                 16
               ]
             }
-          },
-          {
-            "name": "group",
-            "type": "publicKey"
           },
           {
             "name": "mint",
@@ -2697,16 +2693,25 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "groupNum",
+            "type": "u32"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
             "name": "insuranceVault",
             "type": "publicKey"
           },
           {
             "name": "insuranceMint",
             "type": "publicKey"
-          },
-          {
-            "name": "groupNum",
-            "type": "u32"
           },
           {
             "name": "bump",
@@ -2721,7 +2726,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                2
+                6
               ]
             }
           },
@@ -2743,6 +2748,14 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
             "name": "name",
             "type": {
               "array": [
@@ -2750,14 +2763,6 @@ export type MangoV4 = {
                 32
               ]
             }
-          },
-          {
-            "name": "group",
-            "type": "publicKey"
-          },
-          {
-            "name": "owner",
-            "type": "publicKey"
           },
           {
             "name": "delegate",
@@ -2819,6 +2824,19 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "tokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          },
+          {
             "name": "mint",
             "type": "publicKey"
           },
@@ -2849,10 +2867,6 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "tokenIndex",
-            "type": "u16"
-          },
-          {
             "name": "addressLookupTableBankIndex",
             "type": "u8"
           },
@@ -2865,7 +2879,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                4
+                6
               ]
             }
           }
@@ -2992,6 +3006,27 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
+            "name": "baseTokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "perpMarketIndex",
+            "type": "u16"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
             "name": "name",
             "type": {
               "array": [
@@ -2999,10 +3034,6 @@ export type MangoV4 = {
                 16
               ]
             }
-          },
-          {
-            "name": "group",
-            "type": "publicKey"
           },
           {
             "name": "oracle",
@@ -3131,16 +3162,13 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "perpMarketIndex",
-            "type": "u16"
-          },
-          {
-            "name": "baseTokenIndex",
-            "type": "u16"
-          },
-          {
-            "name": "quoteTokenIndex",
-            "type": "u16"
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
           }
         ]
       }
@@ -3151,6 +3179,27 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
+            "name": "baseTokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "quoteTokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
             "name": "name",
             "type": {
               "array": [
@@ -3158,10 +3207,6 @@ export type MangoV4 = {
                 16
               ]
             }
-          },
-          {
-            "name": "group",
-            "type": "publicKey"
           },
           {
             "name": "serumProgram",
@@ -3176,14 +3221,6 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "baseTokenIndex",
-            "type": "u16"
-          },
-          {
-            "name": "quoteTokenIndex",
-            "type": "u16"
-          },
-          {
             "name": "bump",
             "type": "u8"
           },
@@ -3192,7 +3229,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                1
+                5
               ]
             }
           }
@@ -6445,10 +6482,6 @@ export const IDL: MangoV4 = {
           "type": "u8"
         },
         {
-          "name": "quoteTokenIndex",
-          "type": "u16"
-        },
-        {
           "name": "quoteLotSize",
           "type": "i64"
         },
@@ -6988,6 +7021,10 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
             "name": "name",
             "type": {
               "array": [
@@ -6995,10 +7032,6 @@ export const IDL: MangoV4 = {
                 16
               ]
             }
-          },
-          {
-            "name": "group",
-            "type": "publicKey"
           },
           {
             "name": "mint",
@@ -7188,16 +7221,25 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "groupNum",
+            "type": "u32"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
             "name": "insuranceVault",
             "type": "publicKey"
           },
           {
             "name": "insuranceMint",
             "type": "publicKey"
-          },
-          {
-            "name": "groupNum",
-            "type": "u32"
           },
           {
             "name": "bump",
@@ -7212,7 +7254,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                2
+                6
               ]
             }
           },
@@ -7234,6 +7276,14 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
             "name": "name",
             "type": {
               "array": [
@@ -7241,14 +7291,6 @@ export const IDL: MangoV4 = {
                 32
               ]
             }
-          },
-          {
-            "name": "group",
-            "type": "publicKey"
-          },
-          {
-            "name": "owner",
-            "type": "publicKey"
           },
           {
             "name": "delegate",
@@ -7310,6 +7352,19 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "tokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          },
+          {
             "name": "mint",
             "type": "publicKey"
           },
@@ -7340,10 +7395,6 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "tokenIndex",
-            "type": "u16"
-          },
-          {
             "name": "addressLookupTableBankIndex",
             "type": "u8"
           },
@@ -7356,7 +7407,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                4
+                6
               ]
             }
           }
@@ -7483,6 +7534,27 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
+            "name": "baseTokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "perpMarketIndex",
+            "type": "u16"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
             "name": "name",
             "type": {
               "array": [
@@ -7490,10 +7562,6 @@ export const IDL: MangoV4 = {
                 16
               ]
             }
-          },
-          {
-            "name": "group",
-            "type": "publicKey"
           },
           {
             "name": "oracle",
@@ -7622,16 +7690,13 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "perpMarketIndex",
-            "type": "u16"
-          },
-          {
-            "name": "baseTokenIndex",
-            "type": "u16"
-          },
-          {
-            "name": "quoteTokenIndex",
-            "type": "u16"
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
           }
         ]
       }
@@ -7642,6 +7707,27 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
+            "name": "baseTokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "quoteTokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
             "name": "name",
             "type": {
               "array": [
@@ -7649,10 +7735,6 @@ export const IDL: MangoV4 = {
                 16
               ]
             }
-          },
-          {
-            "name": "group",
-            "type": "publicKey"
           },
           {
             "name": "serumProgram",
@@ -7667,14 +7749,6 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "baseTokenIndex",
-            "type": "u16"
-          },
-          {
-            "name": "quoteTokenIndex",
-            "type": "u16"
-          },
-          {
             "name": "bump",
             "type": "u8"
           },
@@ -7683,7 +7757,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                1
+                5
               ]
             }
           }

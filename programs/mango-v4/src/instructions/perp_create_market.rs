@@ -50,7 +50,6 @@ pub fn perp_create_market(
     oracle_config: OracleConfig,
     base_token_index_opt: Option<TokenIndex>,
     base_token_decimals: u8,
-    quote_token_index: TokenIndex,
     quote_lot_size: i64,
     base_lot_size: i64,
     maint_asset_weight: f32,
@@ -96,7 +95,8 @@ pub fn perp_create_market(
         base_token_decimals,
         perp_market_index,
         base_token_index: base_token_index_opt.ok_or(TokenIndex::MAX).unwrap(),
-        quote_token_index,
+        padding: Default::default(),
+        reserved: Default::default(),
     };
 
     let mut bids = ctx.accounts.bids.load_init()?;

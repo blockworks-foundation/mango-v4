@@ -15,25 +15,28 @@ pub const MAX_BANKS: usize = 6;
 #[account(zero_copy)]
 #[derive(Debug)]
 pub struct MintInfo {
-    // TODO: none of these pubkeys are needed, remove?
+    // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
+
+    // ABI: Clients rely on this being at offset 40
+    pub token_index: TokenIndex,
+
+    pub padding: [u8; 6],
     pub mint: Pubkey,
     pub banks: [Pubkey; MAX_BANKS],
     pub vaults: [Pubkey; MAX_BANKS],
     pub oracle: Pubkey,
     pub address_lookup_table: Pubkey,
 
-    pub token_index: TokenIndex,
-
     // describe what address map relevant accounts are found on
     pub address_lookup_table_bank_index: u8,
     pub address_lookup_table_oracle_index: u8,
 
-    pub reserved: [u8; 4],
+    pub reserved: [u8; 6],
 }
 const_assert_eq!(
     size_of::<MintInfo>(),
-    MAX_BANKS * 2 * 32 + 4 * 32 + 2 + 2 + 4
+    MAX_BANKS * 2 * 32 + 4 * 32 + 2 + 6 + 2 + 6
 );
 const_assert_eq!(size_of::<MintInfo>() % 8, 0);
 

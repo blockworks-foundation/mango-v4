@@ -13,9 +13,11 @@ pub const YEAR: I80F48 = I80F48!(31536000);
 
 #[account(zero_copy)]
 pub struct Bank {
+    // ABI: Clients rely on this being at offset 8
+    pub group: Pubkey,
+
     pub name: [u8; 16],
 
-    pub group: Pubkey,
     pub mint: Pubkey,
     pub vault: Pubkey,
     pub oracle: Pubkey,

@@ -704,10 +704,13 @@ impl Default for MangoAccountPerpPositions {
 
 #[account(zero_copy)]
 pub struct MangoAccount {
-    pub name: [u8; 32],
-
+    // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
+
+    // ABI: Clients rely on this being at offset 40
     pub owner: Pubkey,
+
+    pub name: [u8; 32],
 
     // Alternative authority/signer of transactions for a mango account
     pub delegate: Pubkey,

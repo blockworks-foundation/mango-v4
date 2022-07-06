@@ -869,7 +869,6 @@ mod tests {
         perp1.data().group = group;
         perp1.data().perp_market_index = 9;
         perp1.data().base_token_index = 4;
-        perp1.data().quote_token_index = 1;
         perp1.data().init_asset_weight = I80F48::from_num(1.0 - 0.2f64);
         perp1.data().init_liab_weight = I80F48::from_num(1.0 + 0.2f64);
         perp1.data().maint_asset_weight = I80F48::from_num(1.0 - 0.1f64);
@@ -1044,7 +1043,6 @@ mod tests {
         perp1.data().group = group;
         perp1.data().perp_market_index = 9;
         perp1.data().base_token_index = 4;
-        perp1.data().quote_token_index = 1;
         perp1.data().init_asset_weight = I80F48::from_num(1.0 - 0.2f64);
         perp1.data().init_liab_weight = I80F48::from_num(1.0 + 0.2f64);
         perp1.data().maint_asset_weight = I80F48::from_num(1.0 - 0.1f64);

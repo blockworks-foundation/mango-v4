@@ -67,6 +67,7 @@ export class MangoClient {
   public async createGroup(
     groupNum: number,
     testing: boolean,
+    insuranceMintPk: PublicKey,
   ): Promise<TransactionSignature> {
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
     return await this.program.methods
@@ -74,6 +75,7 @@ export class MangoClient {
       .accounts({
         admin: adminPk,
         payer: adminPk,
+        insuranceMint: insuranceMintPk,
       })
       .rpc();
   }
@@ -117,7 +119,7 @@ export class MangoClient {
       filters.push({
         memcmp: {
           bytes: bs58.encode(bbuf),
-          offset: 44,
+          offset: 40,
         },
       });
     }
@@ -286,7 +288,7 @@ export class MangoClient {
         {
           memcmp: {
             bytes: group.publicKey.toBase58(),
-            offset: 24,
+            offset: 8,
           },
         },
       ])
@@ -325,7 +327,7 @@ export class MangoClient {
         {
           memcmp: {
             bytes: bs58.encode(tokenIndexBuf),
-            offset: 200,
+            offset: 40,
           },
         },
       ])
@@ -443,6 +445,7 @@ export class MangoClient {
 
   public async editMangoAccount(
     group: Group,
+    mangoAccount: MangoAccount,
     name?: string,
     delegate?: PublicKey,
   ): Promise<TransactionSignature> {
@@ -450,6 +453,7 @@ export class MangoClient {
       .editAccount(name, delegate)
       .accounts({
         group: group.publicKey,
+        account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .rpc();
@@ -471,13 +475,13 @@ export class MangoClient {
         {
           memcmp: {
             bytes: group.publicKey.toBase58(),
-            offset: 40,
+            offset: 8,
           },
         },
         {
           memcmp: {
             bytes: ownerPk.toBase58(),
-            offset: 72,
+            offset: 40,
           },
         },
       ])
@@ -724,7 +728,7 @@ export class MangoClient {
       {
         memcmp: {
           bytes: group.publicKey.toBase58(),
-          offset: 24,
+          offset: 8,
         },
       },
     ];
@@ -735,7 +739,7 @@ export class MangoClient {
       filters.push({
         memcmp: {
           bytes: bs58.encode(bbuf),
-          offset: 122,
+          offset: 40,
         },
       });
     }
@@ -746,7 +750,7 @@ export class MangoClient {
       filters.push({
         memcmp: {
           bytes: bs58.encode(qbuf),
-          offset: 124,
+          offset: 42,
         },
       });
     }
@@ -1052,7 +1056,6 @@ export class MangoClient {
         } as any, // future: nested custom types dont typecheck, fix if possible?
         baseTokenIndex,
         baseTokenDecimals,
-        quoteTokenIndex,
         new BN(quoteLotSize),
         new BN(baseLotSize),
         maintAssetWeight,
@@ -1188,7 +1191,6 @@ export class MangoClient {
   public async perpGetMarkets(
     group: Group,
     baseTokenIndex?: number,
-    quoteTokenIndex?: number,
   ): Promise<PerpMarket[]> {
     const bumpfbuf = Buffer.alloc(1);
     bumpfbuf.writeUInt8(255);
@@ -1197,7 +1199,7 @@ export class MangoClient {
       {
         memcmp: {
           bytes: group.publicKey.toBase58(),
-          offset: 24,
+          offset: 8,
         },
       },
     ];
@@ -1208,18 +1210,7 @@ export class MangoClient {
       filters.push({
         memcmp: {
           bytes: bs58.encode(bbuf),
-          offset: 444,
-        },
-      });
-    }
-
-    if (quoteTokenIndex) {
-      const qbuf = Buffer.alloc(2);
-      qbuf.writeUInt16LE(quoteTokenIndex);
-      filters.push({
-        memcmp: {
-          bytes: bs58.encode(qbuf),
-          offset: 446,
+          offset: 40,
         },
       });
     }
