@@ -174,7 +174,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        SetStubOracleInstruction {
+        StubOracleSetInstruction {
             group,
             admin,
             mint: borrow_token1.mint.pubkey,
@@ -487,7 +487,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        SetStubOracleInstruction {
+        StubOracleSetInstruction {
             group,
             admin,
             mint: borrow_token2.mint.pubkey,

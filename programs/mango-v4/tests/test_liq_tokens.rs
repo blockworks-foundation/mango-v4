@@ -161,7 +161,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        SetStubOracleInstruction {
+        StubOracleSetInstruction {
             group,
             admin,
             mint: base_token.mint.pubkey,
@@ -351,7 +351,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        SetStubOracleInstruction {
+        StubOracleSetInstruction {
             group,
             admin,
             mint: borrow_token1.mint.pubkey,

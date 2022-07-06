@@ -1044,7 +1044,7 @@ impl<'keypair> ClientInstruction for TokenDeregisterInstruction<'keypair> {
     }
 }
 
-pub struct SetStubOracleInstruction<'keypair> {
+pub struct StubOracleSetInstruction<'keypair> {
     pub mint: Pubkey,
     pub group: Pubkey,
     pub admin: &'keypair Keypair,
@@ -1052,8 +1052,8 @@ pub struct SetStubOracleInstruction<'keypair> {
     pub price: &'static str,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for SetStubOracleInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::SetStubOracle;
+impl<'keypair> ClientInstruction for StubOracleSetInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::StubOracleSet;
     type Instruction = mango_v4::instruction::StubOracleSet;
 
     async fn to_instruction(
@@ -1091,15 +1091,15 @@ impl<'keypair> ClientInstruction for SetStubOracleInstruction<'keypair> {
     }
 }
 
-pub struct CreateStubOracle<'keypair> {
+pub struct StubOracleCreate<'keypair> {
     pub group: Pubkey,
     pub mint: Pubkey,
     pub admin: &'keypair Keypair,
     pub payer: &'keypair Keypair,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for CreateStubOracle<'keypair> {
-    type Accounts = mango_v4::accounts::CreateStubOracle;
+impl<'keypair> ClientInstruction for StubOracleCreate<'keypair> {
+    type Accounts = mango_v4::accounts::StubOracleCreate;
     type Instruction = mango_v4::instruction::StubOracleCreate;
 
     async fn to_instruction(
@@ -1139,15 +1139,15 @@ impl<'keypair> ClientInstruction for CreateStubOracle<'keypair> {
     }
 }
 
-pub struct CloseStubOracleInstruction<'keypair> {
+pub struct StubOracleCloseInstruction<'keypair> {
     pub group: Pubkey,
     pub mint: Pubkey,
     pub admin: &'keypair Keypair,
     pub sol_destination: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for CloseStubOracleInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::CloseStubOracle;
+impl<'keypair> ClientInstruction for StubOracleCloseInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::StubOracleClose;
     type Instruction = mango_v4::instruction::StubOracleClose;
 
     async fn to_instruction(

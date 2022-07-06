@@ -4,7 +4,7 @@ use anchor_spl::token::Token;
 use crate::state::*;
 
 #[derive(Accounts)]
-pub struct CloseStubOracle<'info> {
+pub struct StubOracleClose<'info> {
     #[account(
         constraint = group.load()?.testing == 1,
         has_one = admin,
@@ -27,6 +27,6 @@ pub struct CloseStubOracle<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-pub fn stub_oracle_close(_ctx: Context<CloseStubOracle>) -> Result<()> {
+pub fn stub_oracle_close(_ctx: Context<StubOracleClose>) -> Result<()> {
     Ok(())
 }

@@ -217,7 +217,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // close stub oracle
     send_tx(
         solana,
-        CloseStubOracleInstruction {
+        StubOracleCloseInstruction {
             group,
             mint: bank_data.mint,
             admin,

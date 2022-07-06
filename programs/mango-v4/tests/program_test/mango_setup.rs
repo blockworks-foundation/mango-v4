@@ -55,7 +55,7 @@ impl<'a> GroupWithTokensConfig<'a> {
         for (index, mint) in mints.iter().enumerate() {
             let create_stub_oracle_accounts = send_tx(
                 solana,
-                CreateStubOracle {
+                StubOracleCreate {
                     group,
                     mint: mint.pubkey,
                     admin,
@@ -67,7 +67,7 @@ impl<'a> GroupWithTokensConfig<'a> {
             let oracle = create_stub_oracle_accounts.oracle;
             send_tx(
                 solana,
-                SetStubOracleInstruction {
+                StubOracleSetInstruction {
                     group,
                     admin,
                     mint: mint.pubkey,
