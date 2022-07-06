@@ -30,12 +30,12 @@ pub mod mango_v4 {
 
     use super::*;
 
-    pub fn create_group(ctx: Context<CreateGroup>, group_num: u32, testing: u8) -> Result<()> {
-        instructions::create_group(ctx, group_num, testing)
+    pub fn group_create(ctx: Context<GroupCreate>, group_num: u32, testing: u8) -> Result<()> {
+        instructions::group_create(ctx, group_num, testing)
     }
 
-    pub fn close_group(ctx: Context<CloseGroup>) -> Result<()> {
-        instructions::close_group(ctx)
+    pub fn group_close(ctx: Context<GroupClose>) -> Result<()> {
+        instructions::group_close(ctx)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -118,28 +118,28 @@ pub mod mango_v4 {
         instructions::token_deregister(ctx, token_index)
     }
 
-    pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
-        instructions::update_index(ctx)
+    pub fn token_update_index(ctx: Context<TokenUpdateIndex>) -> Result<()> {
+        instructions::token_update_index(ctx)
     }
 
-    pub fn create_account(
-        ctx: Context<CreateAccount>,
+    pub fn account_create(
+        ctx: Context<AccountCreate>,
         account_num: u8,
         name: String,
     ) -> Result<()> {
-        instructions::create_account(ctx, account_num, name)
+        instructions::account_create(ctx, account_num, name)
     }
 
-    pub fn edit_account(
-        ctx: Context<EditAccount>,
+    pub fn account_edit(
+        ctx: Context<AccountEdit>,
         name_opt: Option<String>,
         delegate_opt: Option<Pubkey>,
     ) -> Result<()> {
-        instructions::edit_account(ctx, name_opt, delegate_opt)
+        instructions::account_edit(ctx, name_opt, delegate_opt)
     }
 
-    pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
-        instructions::close_account(ctx)
+    pub fn account_close(ctx: Context<AccountClose>) -> Result<()> {
+        instructions::account_close(ctx)
     }
 
     // todo:
@@ -147,16 +147,16 @@ pub mod mango_v4 {
     // because generic anchor clients won't know how to deal with it
     // and it's tricky to use in typescript generally
     // lets do an interface pass later
-    pub fn create_stub_oracle(ctx: Context<CreateStubOracle>, price: I80F48) -> Result<()> {
-        instructions::create_stub_oracle(ctx, price)
+    pub fn stub_oracle_create(ctx: Context<StubOracleCreate>, price: I80F48) -> Result<()> {
+        instructions::stub_oracle_create(ctx, price)
     }
 
-    pub fn close_stub_oracle(ctx: Context<CloseStubOracle>) -> Result<()> {
-        instructions::close_stub_oracle(ctx)
+    pub fn stub_oracle_close(ctx: Context<StubOracleClose>) -> Result<()> {
+        instructions::stub_oracle_close(ctx)
     }
 
-    pub fn set_stub_oracle(ctx: Context<SetStubOracle>, price: I80F48) -> Result<()> {
-        instructions::set_stub_oracle(ctx, price)
+    pub fn stub_oracle_set(ctx: Context<StubOracleSet>, price: I80F48) -> Result<()> {
+        instructions::stub_oracle_set(ctx, price)
     }
 
     pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {

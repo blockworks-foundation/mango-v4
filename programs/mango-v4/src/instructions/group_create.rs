@@ -6,7 +6,7 @@ use crate::state::*;
 
 #[derive(Accounts)]
 #[instruction(group_num: u32)]
-pub struct CreateGroup<'info> {
+pub struct GroupCreate<'info> {
     #[account(
         init,
         seeds = [b"Group".as_ref(), admin.key().as_ref(), &group_num.to_le_bytes()],
@@ -38,7 +38,7 @@ pub struct CreateGroup<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn create_group(ctx: Context<CreateGroup>, group_num: u32, testing: u8) -> Result<()> {
+pub fn group_create(ctx: Context<GroupCreate>, group_num: u32, testing: u8) -> Result<()> {
     let mut group = ctx.accounts.group.load_init()?;
     group.admin = ctx.accounts.admin.key();
     group.insurance_vault = ctx.accounts.insurance_vault.key();

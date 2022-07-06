@@ -36,7 +36,7 @@ async fn test_position_lifetime() -> Result<()> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -49,7 +49,7 @@ async fn test_position_lifetime() -> Result<()> {
 
     let funding_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 1,
             group,
             owner,

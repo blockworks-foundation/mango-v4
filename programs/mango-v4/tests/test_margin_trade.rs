@@ -51,7 +51,7 @@ async fn test_margin_trade1() -> Result<(), BanksClientError> {
 
     let provider_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 1,
             group,
             owner,
@@ -93,7 +93,7 @@ async fn test_margin_trade1() -> Result<(), BanksClientError> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -367,7 +367,7 @@ async fn test_margin_trade2() -> Result<(), BanksClientError> {
 
     let provider_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 1,
             group,
             owner,
@@ -409,7 +409,7 @@ async fn test_margin_trade2() -> Result<(), BanksClientError> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -628,7 +628,7 @@ async fn test_margin_trade3() -> Result<(), BanksClientError> {
 
     let provider_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 1,
             group,
             owner,
@@ -670,7 +670,7 @@ async fn test_margin_trade3() -> Result<(), BanksClientError> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,

@@ -8,12 +8,12 @@ use crate::{
 use checked_math as cm;
 use fixed::types::I80F48;
 #[derive(Accounts)]
-pub struct UpdateIndex<'info> {
+pub struct TokenUpdateIndex<'info> {
     pub mint_info: AccountLoader<'info, MintInfo>,
     pub oracle: UncheckedAccount<'info>,
 }
 
-pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
+pub fn token_update_index(ctx: Context<TokenUpdateIndex>) -> Result<()> {
     let mint_info = ctx.accounts.mint_info.load()?;
     require_keys_eq!(mint_info.oracle.key(), ctx.accounts.oracle.key());
 

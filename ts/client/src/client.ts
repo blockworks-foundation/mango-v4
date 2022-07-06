@@ -64,14 +64,14 @@ export class MangoClient {
 
   // Group
 
-  public async createGroup(
+  public async groupCreate(
     groupNum: number,
     testing: boolean,
     insuranceMintPk: PublicKey,
   ): Promise<TransactionSignature> {
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
     return await this.program.methods
-      .createGroup(groupNum, testing ? 1 : 0)
+      .groupCreate(groupNum, testing ? 1 : 0)
       .accounts({
         admin: adminPk,
         payer: adminPk,
@@ -80,10 +80,10 @@ export class MangoClient {
       .rpc();
   }
 
-  public async closeGroup(group: Group): Promise<TransactionSignature> {
+  public async groupClose(group: Group): Promise<TransactionSignature> {
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
     return await this.program.methods
-      .closeGroup()
+      .groupClose()
       .accounts({
         group: group.publicKey,
         admin: adminPk,
@@ -338,13 +338,13 @@ export class MangoClient {
 
   // Stub Oracle
 
-  public async createStubOracle(
+  public async stubOracleCreate(
     group: Group,
     mintPk: PublicKey,
     price: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .createStubOracle({ val: I80F48.fromNumber(price).getData() })
+      .stubOracleCreate({ val: I80F48.fromNumber(price).getData() })
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -354,12 +354,12 @@ export class MangoClient {
       .rpc();
   }
 
-  public async closeStubOracle(
+  public async stubOracleClose(
     group: Group,
     oracle: PublicKey,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .closeStubOracle()
+      .stubOracleClose()
       .accounts({
         group: group.publicKey,
         oracle: oracle,
@@ -369,13 +369,13 @@ export class MangoClient {
       .rpc();
   }
 
-  public async setStubOracle(
+  public async stubOracleSet(
     group: Group,
     oraclePk: PublicKey,
     price: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .setStubOracle({ val: I80F48.fromNumber(price).getData() })
+      .stubOracleSet({ val: I80F48.fromNumber(price).getData() })
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -434,7 +434,7 @@ export class MangoClient {
     name?: string,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .createAccount(accountNumber, name ?? '')
+      .accountCreate(accountNumber, name ?? '')
       .accounts({
         group: group.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -450,7 +450,7 @@ export class MangoClient {
     delegate?: PublicKey,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .editAccount(name, delegate)
+      .accountEdit(name, delegate)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -495,7 +495,7 @@ export class MangoClient {
     mangoAccount: MangoAccount,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .closeAccount()
+      .accountClose()
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,

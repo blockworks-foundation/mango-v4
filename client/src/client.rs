@@ -103,7 +103,7 @@ impl MangoClient {
                 .instruction(Instruction {
                     program_id: mango_v4::id(),
                     accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                        &mango_v4::accounts::CreateAccount {
+                        &mango_v4::accounts::AccountCreate {
                             group,
                             owner: payer.pubkey(),
                             account: {
@@ -124,7 +124,7 @@ impl MangoClient {
                         None,
                     ),
                     data: anchor_lang::InstructionData::data(
-                        &mango_v4::instruction::CreateAccount {
+                        &mango_v4::instruction::AccountCreate {
                             account_num,
                             name: mango_account_name.to_owned(),
                         },

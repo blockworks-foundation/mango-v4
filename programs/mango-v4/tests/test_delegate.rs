@@ -35,7 +35,7 @@ async fn test_delegate() -> Result<(), TransportError> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -66,7 +66,7 @@ async fn test_delegate() -> Result<(), TransportError> {
     {
         send_tx(
             solana,
-            EditAccountInstruction {
+            AccountEditInstruction {
                 delegate: delegate.pubkey(),
                 account_num: 0,
                 group,
@@ -84,7 +84,7 @@ async fn test_delegate() -> Result<(), TransportError> {
     {
         let res = send_tx(
             solana,
-            EditAccountInstruction {
+            AccountEditInstruction {
                 delegate: delegate.pubkey(),
                 account_num: 0,
                 group,
@@ -136,7 +136,7 @@ async fn test_delegate() -> Result<(), TransportError> {
         .unwrap();
         let res = send_tx(
             solana,
-            CloseAccountInstruction {
+            AccountCloseInstruction {
                 group,
                 account,
                 owner: delegate,

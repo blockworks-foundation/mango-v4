@@ -44,7 +44,7 @@ async function main() {
   const usdcDevnetOracle = (
     await client.getStubOracle(group, usdcDevnetMint)
   )[0];
-  sig = await client.closeStubOracle(group, usdcDevnetOracle.publicKey);
+  sig = await client.stubOracleClose(group, usdcDevnetOracle.publicKey);
   console.log(
     `Closed USDC stub oracle, sig https://explorer.solana.com/tx/${sig}?cluster=devnet`,
   );
@@ -75,7 +75,7 @@ async function main() {
 
   // finally, close the group
 
-  sig = await client.closeGroup(group);
+  sig = await client.groupClose(group);
   console.log(
     `Closed group, sig https://explorer.solana.com/tx/${sig}?cluster=devnet`,
   );

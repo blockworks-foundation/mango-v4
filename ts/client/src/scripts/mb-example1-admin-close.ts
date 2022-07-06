@@ -44,7 +44,7 @@ async function main() {
   const usdcMainnetBetaOracle = (
     await client.getStubOracle(group, usdcMainnetBetaMint)
   )[0];
-  sig = await client.closeStubOracle(group, usdcMainnetBetaOracle.publicKey);
+  sig = await client.stubOracleClose(group, usdcMainnetBetaOracle.publicKey);
   console.log(
     `Closed USDC stub oracle, sig https://explorer.solana.com/tx/${sig}`,
   );
@@ -74,7 +74,7 @@ async function main() {
   }
 
   // finally, close the group
-  sig = await client.closeGroup(group);
+  sig = await client.groupClose(group);
   console.log(`Closed group, sig https://explorer.solana.com/tx/${sig}`);
 
   process.exit();

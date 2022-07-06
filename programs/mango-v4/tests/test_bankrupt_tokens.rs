@@ -42,7 +42,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     // deposit some funds, to the vaults aren't empty
     let vault_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 2,
             group,
             owner,
@@ -87,7 +87,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     //
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -174,7 +174,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        SetStubOracleInstruction {
+        StubOracleSetInstruction {
             group,
             admin,
             mint: borrow_token1.mint.pubkey,
@@ -355,7 +355,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     // deposit some funds, to the vaults aren't empty
     let vault_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 2,
             group,
             owner,
@@ -400,7 +400,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     //
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -487,7 +487,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        SetStubOracleInstruction {
+        StubOracleSetInstruction {
             group,
             admin,
             mint: borrow_token2.mint.pubkey,

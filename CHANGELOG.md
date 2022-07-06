@@ -15,6 +15,12 @@ Update this for each mainnet deployment.
   argument. The USDC/insurance mint is always used as quote currency for perps.
 - The `UpdateIndex` instruction now requires the `oracle` account to be passed
   for logging purposes.
-- New instructions: `EditAccount`, `TokenEdit`, `PerpEditMarket` for reconfiguring.
+- New instructions: `AccountEdit`, `TokenEdit`, `PerpEditMarket` for reconfiguring.
 - The `delegate` field on `MangoAccount` is now used and many instructions can be
   called by the account delegate.
+
+- Renamed instructions:
+  - create/close_group -> group_create/close
+  - create/edit/close_account -> account_create/edit/close
+  - update_index -> token_update_index
+  - create/set_stub_oracle -> stub_oracle_create/set

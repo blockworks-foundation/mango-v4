@@ -5,7 +5,7 @@ use crate::state::*;
 use crate::util::fill32_from_str;
 
 #[derive(Accounts)]
-pub struct EditAccount<'info> {
+pub struct AccountEdit<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
@@ -18,8 +18,8 @@ pub struct EditAccount<'info> {
     pub owner: Signer<'info>,
 }
 
-pub fn edit_account(
-    ctx: Context<EditAccount>,
+pub fn account_edit(
+    ctx: Context<AccountEdit>,
     name_opt: Option<String>,
     // note: can also be used to unset by using the default pubkey here as a param
     delegate_opt: Option<Pubkey>,
