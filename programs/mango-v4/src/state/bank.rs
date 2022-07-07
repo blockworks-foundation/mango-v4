@@ -1,5 +1,4 @@
 use super::{OracleConfig, TokenIndex, TokenPosition};
-use crate::error::MangoError;
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
@@ -207,7 +206,7 @@ impl Bank {
         position: &mut TokenPosition,
         mut native_amount: I80F48,
     ) -> Result<bool> {
-        require!(native_amount >= 0, MangoError::SomeError);
+        require_gte!(native_amount, 0);
         let native_position = position.native(self);
 
         // Adding DELTA to amount/index helps because (amount/index)*index <= amount, but
@@ -290,7 +289,7 @@ impl Bank {
         mut native_amount: I80F48,
         with_loan_origination_fee: bool,
     ) -> Result<bool> {
-        require!(native_amount >= 0, MangoError::SomeError);
+        require_gte!(native_amount, 0);
         let native_position = position.native(self);
 
         if native_position.is_positive() {

@@ -58,7 +58,7 @@ impl<'info> TokenWithdraw<'info> {
 //       right index for the mint.
 // TODO: https://github.com/blockworks-foundation/mango-v4/commit/15961ec81c7e9324b37d79d0e2a1650ce6bd981d comments
 pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
-    require!(amount > 0, MangoError::SomeError);
+    require_msg!(amount > 0, "withdraw amount must be positive");
 
     let group = ctx.accounts.group.load()?;
     let token_index = ctx.accounts.bank.load()?.token_index;
@@ -130,7 +130,8 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     //
     // Health check
     //
-    let health = compute_health(&account, HealthType::Init, &retriever)?;
+    let health = compute_health(&account, HealthType::Init, &retriever)
+        .context("post-withdraw init health")?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
 
