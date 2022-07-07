@@ -55,7 +55,7 @@ impl<'info> TokenDeposit<'info> {
 //       That would save a lot of computation that needs to go into finding the
 //       right index for the mint.
 pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
-    require!(amount > 0, MangoError::SomeError);
+    require_msg!(amount > 0, "deposit amount must be positive");
 
     let token_index = ctx.accounts.bank.load()?.token_index;
 
@@ -98,7 +98,8 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     // TODO: This will be used to disable is_bankrupt or being_liquidated
     //       when health recovers sufficiently
     //
-    let health = compute_health(&account, HealthType::Init, &retriever)?;
+    let health = compute_health(&account, HealthType::Init, &retriever)
+        .context("post-deposit init health")?;
     msg!("health: {}", health);
 
     //

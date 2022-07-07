@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
 
-use crate::error::MangoError;
+use crate::error::*;
 
 use super::TokenIndex;
 
@@ -62,9 +62,11 @@ impl MintInfo {
     }
 
     pub fn verify_banks_ais(&self, all_bank_ais: &[AccountInfo]) -> Result<()> {
-        require!(
+        require_msg!(
             all_bank_ais.iter().map(|ai| ai.key).eq(self.banks().iter()),
-            MangoError::SomeError
+            "the passed banks {:?} don't match banks in mint_info {:?}",
+            all_bank_ais.iter().map(|ai| ai.key).collect::<Vec<_>>(),
+            self.banks()
         );
         Ok(())
     }

@@ -129,7 +129,7 @@ impl MangoAccountTokenPositions {
             .iter()
             .enumerate()
             .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| (p, raw_index)))
-            .ok_or_else(|| error!(MangoError::SomeError)) // TODO: not found error
+            .ok_or_else(|| error_msg!("position for token index {} not found", token_index))
     }
 
     /// Returns
@@ -140,7 +140,7 @@ impl MangoAccountTokenPositions {
             .iter_mut()
             .enumerate()
             .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| (p, raw_index)))
-            .ok_or_else(|| error!(MangoError::SomeError)) // TODO: not found error
+            .ok_or_else(|| error_msg!("position for token index {} not found", token_index))
     }
 
     pub fn get_mut_raw(&mut self, raw_token_index: usize) -> &mut TokenPosition {
@@ -186,7 +186,8 @@ impl MangoAccountTokenPositions {
             }
             Ok((v, raw_index, bank_index))
         } else {
-            err!(MangoError::SomeError) // TODO: No free space
+            err!(MangoError::NoFreeTokenPositionIndex)
+                .context(format!("when looking for token index {}", token_index))
         }
     }
 
@@ -295,7 +296,7 @@ impl MangoAccountSerum3Orders {
 
     pub fn create(&mut self, market_index: Serum3MarketIndex) -> Result<&mut Serum3Orders> {
         if self.find(market_index).is_some() {
-            return err!(MangoError::SomeError); // exists already
+            return err!(MangoError::Serum3OpenOrdersExistAlready);
         }
         if let Some(v) = self.values.iter_mut().find(|p| !p.is_active()) {
             *v = Serum3Orders {
@@ -304,7 +305,7 @@ impl MangoAccountSerum3Orders {
             };
             Ok(v)
         } else {
-            err!(MangoError::SomeError) // no space
+            err!(MangoError::NoFreeSerum3OpenOrdersIndex)
         }
     }
 
@@ -313,7 +314,10 @@ impl MangoAccountSerum3Orders {
             .values
             .iter()
             .position(|p| p.is_active_for_market(market_index))
-            .ok_or(MangoError::SomeError)?;
+            .ok_or(error_msg!(
+                "serum3 open orders index {} not found",
+                market_index
+            ))?;
 
         self.values[index].market_index = Serum3MarketIndex::MAX;
 
@@ -549,7 +553,7 @@ impl MangoAccountPerpPositions {
         if let Some(i) = pos {
             Ok((&mut self.accounts[i], i))
         } else {
-            err!(MangoError::SomeError) // TODO: No free space
+            err!(MangoError::NoFreePerpPositionIndex)
         }
     }
 
@@ -595,10 +599,7 @@ impl MangoAccountPerpPositions {
     }
 
     pub fn remove_order(&mut self, slot: usize, quantity: i64) -> Result<()> {
-        require!(
-            self.order_market[slot] != FREE_ORDER_SLOT,
-            MangoError::SomeError
-        );
+        require_neq!(self.order_market[slot], FREE_ORDER_SLOT);
         let order_side = self.order_side[slot];
         let perp_market_index = self.order_market[slot];
         let perp_account = self.get_account_mut_or_create(perp_market_index).unwrap().0;

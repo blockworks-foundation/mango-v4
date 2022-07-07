@@ -83,7 +83,7 @@ pub fn liq_token_bankruptcy(
     require!(!liqor.is_bankrupt(), MangoError::IsBankrupt);
 
     let mut liqee = ctx.accounts.liqee.load_mut()?;
-    require!(liqee.is_bankrupt(), MangoError::SomeError);
+    require!(liqee.is_bankrupt(), MangoError::IsNotBankrupt);
 
     let liab_bank = bank_ais[0].load::<Bank>()?;
     let liab_deposit_index = liab_bank.deposit_index;
