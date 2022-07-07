@@ -1449,7 +1449,6 @@ export class MangoClient {
           isSigner: false,
         } as AccountMeta),
     );
-    console.log('1');
 
     /*
      * Find or create associated token accounts
@@ -1496,7 +1495,6 @@ export class MangoClient {
         ),
       );
     }
-    console.log('2');
 
     if (preInstructions.length) {
       const tx = new Transaction();
@@ -1507,7 +1505,6 @@ export class MangoClient {
 
       await this.program.provider.sendAndConfirm(tx);
     }
-    console.log('3');
 
     const inputBankAccount = {
       pubkey: inputBank.publicKey,
@@ -1558,11 +1555,8 @@ export class MangoClient {
         },
       ])
       .instruction();
-    console.log('4');
 
-    // userDefinedInstructions.push(flashLoanEndIx);
-
-    const x = await this.program.methods
+    const flashLoanBeginIx = await this.program.methods
       .flashLoan3Begin([
         toNativeDecimals(amountIn, inputBank.mintDecimals),
         new BN(
@@ -1583,11 +1577,8 @@ export class MangoClient {
       ])
       .instruction();
 
-    console.log('begin', x);
-    console.log('end', flashLoanEndIx);
-
     const tx = new Transaction();
-    tx.add(x);
+    tx.add(flashLoanBeginIx);
     for (const i of userDefinedInstructions) {
       tx.add(i);
     }
