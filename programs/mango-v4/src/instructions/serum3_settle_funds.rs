@@ -149,17 +149,19 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         let after_quote_vault = ctx.accounts.quote_vault.amount;
 
         // Charge the difference in vault balances to the user's account
-        let base_bank = ctx.accounts.base_bank.load_mut()?;
-        let quote_bank = ctx.accounts.quote_bank.load_mut()?;
+        let mut account = ctx.accounts.account.load_mut()?;
+        let mut base_bank = ctx.accounts.base_bank.load_mut()?;
+        let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
         apply_vault_difference(
-            ctx.accounts.account.load_mut()?,
-            base_bank,
+            &mut account,
+            &mut base_bank,
             after_base_vault,
             before_base_vault,
-            quote_bank,
+            &mut quote_bank,
             after_quote_vault,
             before_quote_vault,
-        )?;
+        )?
+        .deactivate_inactive_token_accounts(&mut account);
     }
 
     Ok(())
