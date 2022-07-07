@@ -195,7 +195,7 @@ pub fn charge_maybe_fees(
             // charge the loan origination fee
             coin_bank
                 .borrow_mut()
-                .charge_loan_origination_fee(coin_token_account, actualized_loan)?;
+                .withdraw_loan_origination_fee(coin_token_account, actualized_loan)?;
         }
     }
 
@@ -219,7 +219,7 @@ pub fn charge_maybe_fees(
             // charge the loan origination fee
             pc_bank
                 .borrow_mut()
-                .charge_loan_origination_fee(pc_token_account, actualized_loan)?;
+                .withdraw_loan_origination_fee(pc_token_account, actualized_loan)?;
         }
     }
 
