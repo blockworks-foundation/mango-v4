@@ -1509,32 +1509,32 @@ export class MangoClient {
     }
     console.log('3');
 
-    const sourceBankAccounts = {
+    const inputBankAccount = {
       pubkey: inputBank.publicKey,
       isWritable: true,
       isSigner: false,
     };
-    const targetBankAccount = {
+    const outputBankAccount = {
       pubkey: outputBank.publicKey,
       isWritable: true,
       isSigner: false,
     };
-    const sourceBankVault = {
+    const inputBankVault = {
       pubkey: inputBank.vault,
       isWritable: true,
       isSigner: false,
     };
-    const targetBankVault = {
+    const outputBankVault = {
       pubkey: outputBank.vault,
       isWritable: true,
       isSigner: false,
     };
-    const sourceATA = {
+    const inputATA = {
       pubkey: inputTokenAccountPk,
       isWritable: true,
       isSigner: false,
     };
-    const targetATA = {
+    const outputATA = {
       pubkey: outputTokenAccountPk,
       isWritable: false,
       isSigner: false,
@@ -1548,9 +1548,9 @@ export class MangoClient {
       })
       .remainingAccounts([
         ...parsedHealthAccounts,
-        sourceBankVault,
-        targetBankVault,
-        sourceATA,
+        inputBankVault,
+        outputBankVault,
+        inputATA,
         {
           isWritable: true,
           pubkey: outputTokenAccountPk,
@@ -1574,12 +1574,12 @@ export class MangoClient {
         instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       })
       .remainingAccounts([
-        sourceBankAccounts,
-        targetBankAccount,
-        sourceBankVault,
-        targetBankVault,
-        sourceATA,
-        targetATA,
+        inputBankAccount,
+        outputBankAccount,
+        inputBankVault,
+        outputBankVault,
+        inputATA,
+        outputATA,
       ])
       .instruction();
 
