@@ -16,7 +16,8 @@ export {
   Serum3Side,
 } from './accounts/serum3';
 export * from './constants';
-// export * from './integrations/orca/index';
+export * from './utils';
+
 export {
   Group,
   StubOracle,
