@@ -74,11 +74,11 @@ pub async fn loop_update_index(mango_client: Arc<MangoClient>, token_index: Toke
                     let mut ix = Instruction {
                         program_id: mango_v4::id(),
                         accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                            &mango_v4::accounts::UpdateIndex { mint_info, oracle },
+                            &mango_v4::accounts::TokenUpdateIndex { mint_info, oracle },
                             None,
                         ),
                         data: anchor_lang::InstructionData::data(
-                            &mango_v4::instruction::UpdateIndex {},
+                            &mango_v4::instruction::TokenUpdateIndex {},
                         ),
                     };
                     let mut banks = bank_pubkeys_for_a_token
