@@ -387,10 +387,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         account_position(solana, account, borrow_token2.bank).await,
         -50 + 19
     );
-    assert_eq!(
-        account_position(solana, account, collateral_token2.bank).await,
-        0
-    );
+    assert!(account_position_closed(solana, account, collateral_token2.bank).await,);
     let liqee: MangoAccount = solana.get_account(account).await;
     assert!(liqee.being_liquidated());
     assert!(!liqee.is_bankrupt());
@@ -416,10 +413,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     .unwrap();
 
     // the asset cost for 50-19=31 borrow2 is 31 * 1.04 = 32.24
-    assert_eq!(
-        account_position(solana, account, borrow_token2.bank).await,
-        0
-    );
+    assert!(account_position_closed(solana, account, borrow_token2.bank).await);
     assert_eq!(
         account_position(solana, account, collateral_token1.bank).await,
         1000 - 32
