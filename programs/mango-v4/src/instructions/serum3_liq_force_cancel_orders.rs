@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
-use fixed::types::I80F48;
 
 use crate::error::*;
+use crate::instructions::apply_vault_difference;
 use crate::state::*;
 
 #[derive(Accounts)]
@@ -139,23 +139,19 @@ pub fn serum3_liq_force_cancel_orders(
     let after_quote_vault = ctx.accounts.quote_vault.amount;
 
     // Charge the difference in vault balances to the user's account
-    {
-        let mut account = ctx.accounts.account.load_mut()?;
-
-        let mut base_bank = ctx.accounts.base_bank.load_mut()?;
-        let base_position = account.tokens.get_mut(base_bank.token_index)?.0;
-        base_bank.deposit(
-            base_position,
-            I80F48::from(after_base_vault) - I80F48::from(before_base_vault),
-        )?;
-
-        let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-        let quote_position = account.tokens.get_mut(quote_bank.token_index)?.0;
-        quote_bank.deposit(
-            quote_position,
-            I80F48::from(after_quote_vault) - I80F48::from(before_quote_vault),
-        )?;
-    }
+    let mut account = ctx.accounts.account.load_mut()?;
+    let mut base_bank = ctx.accounts.base_bank.load_mut()?;
+    let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
+    apply_vault_difference(
+        &mut account,
+        &mut base_bank,
+        after_base_vault,
+        before_base_vault,
+        &mut quote_bank,
+        after_quote_vault,
+        before_quote_vault,
+    )?
+    .deactivate_inactive_token_accounts(&mut account);
 
     Ok(())
 }
