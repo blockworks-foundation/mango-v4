@@ -318,11 +318,11 @@ pub fn apply_vault_difference(
     // charged if an order executes and the loan materializes? Otherwise MMs that place
     // an order without having the funds will be charged for each place_order!
 
-    let base_position = account.tokens.get_mut(base_bank.token_index)?;
+    let base_position = account.tokens.get_mut(base_bank.token_index)?.0;
     let base_change = I80F48::from(after_base_vault) - I80F48::from(before_base_vault);
     base_bank.change_with_fee(base_position, base_change)?;
 
-    let quote_position = account.tokens.get_mut(quote_bank.token_index)?;
+    let quote_position = account.tokens.get_mut(quote_bank.token_index)?.0;
     let quote_change = I80F48::from(after_quote_vault) - I80F48::from(before_quote_vault);
     quote_bank.change_with_fee(quote_position, quote_change)?;
 

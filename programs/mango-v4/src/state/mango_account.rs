@@ -128,10 +128,15 @@ impl MangoAccountTokenPositions {
             .ok_or_else(|| error!(MangoError::SomeError)) // TODO: not found error
     }
 
-    pub fn get_mut(&mut self, token_index: TokenIndex) -> Result<&mut TokenPosition> {
+    /// Returns
+    /// - the position
+    /// - the raw index into the token positions list (for use with get_raw/deactivate)
+    pub fn get_mut(&mut self, token_index: TokenIndex) -> Result<(&mut TokenPosition, usize)> {
         self.values
             .iter_mut()
-            .find(|p| p.is_active_for_token(token_index))
+            .enumerate()
+            .find(|(_, p)| p.is_active_for_token(token_index))
+            .map(|(raw_index, p)| (p, raw_index))
             .ok_or_else(|| error!(MangoError::SomeError)) // TODO: not found error
     }
 

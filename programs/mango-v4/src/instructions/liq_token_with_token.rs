@@ -116,7 +116,7 @@ pub fn liq_token_with_token(
         let asset_transfer = cm!(liab_transfer * liab_price_adjusted / asset_price);
 
         // Apply the balance changes to the liqor and liqee accounts
-        liab_bank.deposit(liqee.tokens.get_mut(liab_token_index)?, liab_transfer)?;
+        liab_bank.deposit(liqee.tokens.get_mut(liab_token_index)?.0, liab_transfer)?;
         liab_bank.withdraw_with_fee(
             liqor.tokens.get_mut_or_create(liab_token_index)?.0,
             liab_transfer,
@@ -127,7 +127,7 @@ pub fn liq_token_with_token(
             asset_transfer,
         )?;
         asset_bank
-            .withdraw_without_fee(liqee.tokens.get_mut(asset_token_index)?, asset_transfer)?;
+            .withdraw_without_fee(liqee.tokens.get_mut(asset_token_index)?.0, asset_transfer)?;
 
         // Update the health cache
         liqee_health_cache.adjust_token_balance(liab_token_index, liab_transfer)?;
@@ -158,6 +158,7 @@ pub fn liq_token_with_token(
             indexed_position: liqee
                 .tokens
                 .get_mut(asset_token_index)?
+                .0
                 .indexed_position
                 .to_bits(),
             deposit_index: asset_bank.deposit_index.to_bits(),
@@ -171,6 +172,7 @@ pub fn liq_token_with_token(
             indexed_position: liqee
                 .tokens
                 .get_mut(liab_token_index)?
+                .0
                 .indexed_position
                 .to_bits(),
             deposit_index: liab_bank.deposit_index.to_bits(),
@@ -184,6 +186,7 @@ pub fn liq_token_with_token(
             indexed_position: liqor
                 .tokens
                 .get_mut(asset_token_index)?
+                .0
                 .indexed_position
                 .to_bits(),
             deposit_index: asset_bank.deposit_index.to_bits(),
@@ -197,6 +200,7 @@ pub fn liq_token_with_token(
             indexed_position: liqor
                 .tokens
                 .get_mut(liab_token_index)?
+                .0
                 .indexed_position
                 .to_bits(),
             deposit_index: liab_bank.deposit_index.to_bits(),
