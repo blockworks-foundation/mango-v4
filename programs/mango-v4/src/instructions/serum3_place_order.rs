@@ -260,24 +260,30 @@ pub fn serum3_place_order(
     let after_quote_vault = ctx.accounts.quote_vault.amount;
 
     // Charge the difference in vault balances to the user's account
-    apply_vault_difference(
-        ctx.accounts.account.load_mut()?,
-        ctx.accounts.base_bank.load_mut()?,
-        after_base_vault,
-        before_base_vault,
-        ctx.accounts.quote_bank.load_mut()?,
-        after_quote_vault,
-        before_quote_vault,
-    )?;
+    let mut account = ctx.accounts.account.load_mut()?;
+    let vault_difference_result = {
+        let mut base_bank = ctx.accounts.base_bank.load_mut()?;
+        let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
+        apply_vault_difference(
+            &mut account,
+            &mut base_bank,
+            after_base_vault,
+            before_base_vault,
+            &mut quote_bank,
+            after_quote_vault,
+            before_quote_vault,
+        )?
+    };
 
     //
     // Health check
     //
-    let account = ctx.accounts.account.load()?;
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
     let health = compute_health(&account, HealthType::Init, &retriever)?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
+
+    vault_difference_result.deactivate_inactive_token_accounts(&mut account);
 
     Ok(())
 }
@@ -305,28 +311,51 @@ pub fn inc_maybe_loan(
     }
 }
 
+pub struct VaultDifferenceResult {
+    base_raw_index: usize,
+    base_active: bool,
+    quote_raw_index: usize,
+    quote_active: bool,
+}
+
+impl VaultDifferenceResult {
+    pub fn deactivate_inactive_token_accounts(&self, account: &mut MangoAccount) {
+        if !self.base_active {
+            account.tokens.deactivate(self.base_raw_index);
+        }
+        if !self.quote_active {
+            account.tokens.deactivate(self.quote_raw_index);
+        }
+    }
+}
+
 pub fn apply_vault_difference(
-    mut account: std::cell::RefMut<MangoAccount>,
-    mut base_bank: std::cell::RefMut<Bank>,
+    account: &mut MangoAccount,
+    base_bank: &mut Bank,
     after_base_vault: u64,
     before_base_vault: u64,
-    mut quote_bank: std::cell::RefMut<Bank>,
+    quote_bank: &mut Bank,
     after_quote_vault: u64,
     before_quote_vault: u64,
-) -> Result<()> {
+) -> Result<VaultDifferenceResult> {
     // TODO: Applying the loan origination fee here may be too early: it should only be
     // charged if an order executes and the loan materializes? Otherwise MMs that place
     // an order without having the funds will be charged for each place_order!
 
-    let base_position = account.tokens.get_mut(base_bank.token_index)?;
+    let (base_position, base_raw_index) = account.tokens.get_mut(base_bank.token_index)?;
     let base_change = I80F48::from(after_base_vault) - I80F48::from(before_base_vault);
-    base_bank.change_with_fee(base_position, base_change)?;
+    let base_active = base_bank.change_with_fee(base_position, base_change)?;
 
-    let quote_position = account.tokens.get_mut(quote_bank.token_index)?;
+    let (quote_position, quote_raw_index) = account.tokens.get_mut(quote_bank.token_index)?;
     let quote_change = I80F48::from(after_quote_vault) - I80F48::from(before_quote_vault);
-    quote_bank.change_with_fee(quote_position, quote_change)?;
+    let quote_active = quote_bank.change_with_fee(quote_position, quote_change)?;
 
-    Ok(())
+    Ok(VaultDifferenceResult {
+        base_raw_index,
+        base_active,
+        quote_raw_index,
+        quote_active,
+    })
 }
 
 fn cpi_place_order(ctx: &Serum3PlaceOrder, order: NewOrderInstructionV3) -> Result<()> {

@@ -87,8 +87,7 @@ pub fn liq_token_bankruptcy(
 
     let liab_bank = bank_ais[0].load::<Bank>()?;
     let liab_deposit_index = liab_bank.deposit_index;
-    let (liqee_liab, liqee_raw_token_index, _) =
-        liqee.tokens.get_mut_or_create(liab_token_index)?;
+    let (liqee_liab, liqee_raw_token_index) = liqee.tokens.get_mut(liab_token_index)?;
     let mut remaining_liab_loss = -liqee_liab.native(&liab_bank);
     require_gt!(remaining_liab_loss, I80F48::ZERO);
     drop(liab_bank);

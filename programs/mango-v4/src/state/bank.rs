@@ -320,7 +320,9 @@ impl Bank {
         }
 
         if with_loan_origination_fee {
-            self.charge_loan_origination_fee(position, native_amount)?;
+            let loan_origination_fee = cm!(self.loan_origination_fee_rate * native_amount);
+            self.collected_fees_native = cm!(self.collected_fees_native + loan_origination_fee);
+            native_amount = cm!(native_amount + loan_origination_fee);
         }
 
         // add to borrows
@@ -331,21 +333,17 @@ impl Bank {
         Ok(true)
     }
 
-    // charge only loan origination fee, assuming borrow has already happened
-    pub fn charge_loan_origination_fee(
+    // withdraw the loan origination fee for a borrow that happenend earlier
+    pub fn withdraw_loan_origination_fee(
         &mut self,
         position: &mut TokenPosition,
         already_borrowed_native_amount: I80F48,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let loan_origination_fee =
             cm!(self.loan_origination_fee_rate * already_borrowed_native_amount);
         self.collected_fees_native = cm!(self.collected_fees_native + loan_origination_fee);
 
-        let indexed_change = cm!(loan_origination_fee / self.borrow_index);
-        self.indexed_borrows = cm!(self.indexed_borrows + indexed_change);
-        position.indexed_position = cm!(position.indexed_position - indexed_change);
-
-        Ok(())
+        self.withdraw_internal(position, loan_origination_fee, false)
     }
 
     /// Change a position without applying the loan origination fee
