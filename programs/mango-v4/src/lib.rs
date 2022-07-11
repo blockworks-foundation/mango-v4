@@ -15,6 +15,7 @@ pub mod error;
 pub mod events;
 pub mod instructions;
 pub mod logs;
+pub mod mango_account_loader;
 mod serum3_cpi;
 pub mod state;
 pub mod types;
