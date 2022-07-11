@@ -648,25 +648,26 @@ mod tests {
         bank.borrow_index = I80F48::from_num(1.0);
         bank.bank_rate_last_updated = 0;
 
-        let compute_new_avg_utilization_runner = |bank:&mut Bank, utilization: I80F48, now_ts: i64| {
-            bank.avg_utilization = bank.compute_new_avg_utilization(
-                I80F48::ONE,
-                utilization,
-                I80F48::from_num(now_ts),
-            );
-            bank.bank_rate_last_updated = now_ts;
-        };
+        let compute_new_avg_utilization_runner =
+            |bank: &mut Bank, utilization: I80F48, now_ts: i64| {
+                bank.avg_utilization = bank.compute_new_avg_utilization(
+                    I80F48::ONE,
+                    utilization,
+                    I80F48::from_num(now_ts),
+                );
+                bank.bank_rate_last_updated = now_ts;
+            };
 
         compute_new_avg_utilization_runner(&mut bank, I80F48::ZERO, 0);
         assert_eq!(bank.avg_utilization, I80F48::ZERO);
 
         compute_new_avg_utilization_runner(&mut bank, I80F48::from_num(0.5), 10);
-        assert!((bank.avg_utilization-I80F48::from_num(0.5)).abs() < 0.0001);
+        assert!((bank.avg_utilization - I80F48::from_num(0.5)).abs() < 0.0001);
 
         compute_new_avg_utilization_runner(&mut bank, I80F48::from_num(0.8), 15);
-        assert!((bank.avg_utilization-I80F48::from_num(0.6)).abs() < 0.0001);
+        assert!((bank.avg_utilization - I80F48::from_num(0.6)).abs() < 0.0001);
 
         compute_new_avg_utilization_runner(&mut bank, I80F48::ONE, 20);
-        assert!((bank.avg_utilization-I80F48::from_num(0.7)).abs() < 0.0001);
+        assert!((bank.avg_utilization - I80F48::from_num(0.7)).abs() < 0.0001);
     }
 }
