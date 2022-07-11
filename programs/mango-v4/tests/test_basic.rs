@@ -155,7 +155,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // withdraw whatever is remaining, can't close bank vault without this
     send_tx(
         solana,
-        TokenUpdateIndexInstruction {
+        TokenUpdateIndexAndRateInstruction {
             mint_info: tokens[0].mint_info,
         },
     )
@@ -179,7 +179,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // close account
     send_tx(
         solana,
-        AccountCloseInstruction {
+        CloseAccountInstruction {
             group,
             account,
             owner,
@@ -217,7 +217,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // close stub oracle
     send_tx(
         solana,
-        StubOracleCloseInstruction {
+        CloseStubOracleInstruction {
             group,
             mint: bank_data.mint,
             admin,
@@ -230,7 +230,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // close group
     send_tx(
         solana,
-        GroupCloseInstruction {
+        CloseGroupInstruction {
             group,
             admin,
             sol_destination: payer.pubkey(),

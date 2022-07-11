@@ -73,6 +73,7 @@ pub fn token_edit(
 
         if let Some(ref interest_rate_params) = interest_rate_params_opt {
             // TODO: add a require! verifying relation between the parameters
+            bank.adjustment_factor = I80F48::from_num(interest_rate_params.adjustment_factor);
             bank.util0 = I80F48::from_num(interest_rate_params.util0);
             bank.rate0 = I80F48::from_num(interest_rate_params.rate0);
             bank.util1 = I80F48::from_num(interest_rate_params.util1);

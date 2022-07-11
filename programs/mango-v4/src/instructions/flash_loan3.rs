@@ -115,7 +115,7 @@ pub fn flash_loan3_begin<'key, 'accounts, 'remaining, 'info>(
             let ix = match tx_instructions::load_instruction_at_checked(index, ixs) {
                 Ok(ix) => ix,
                 Err(ProgramError::InvalidArgument) => break, // past the last instruction
-                Err(e) => Err(e)?,
+                Err(e) => return Err(e.into()),
             };
 
             // Check that the mango program key is not used
@@ -129,9 +129,9 @@ pub fn flash_loan3_begin<'key, 'accounts, 'remaining, 'info>(
                 found_end = true;
 
                 // must be the FlashLoan3End instruction
-                require_msg!(
-                    &ix.data[0..8] == &[163, 231, 155, 56, 201, 68, 84, 148],
-                    "the next Mango instruction after FlashLoan3Begin must be FlashLoan3End"
+                require!(
+                    ix.data[0..8] == [163, 231, 155, 56, 201, 68, 84, 148],
+                    MangoError::SomeError
                 );
 
                 // check that the same vaults are passed

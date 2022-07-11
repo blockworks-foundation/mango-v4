@@ -83,6 +83,7 @@ impl<'a> GroupWithTokensConfig<'a> {
                 TokenRegisterInstruction {
                     token_index,
                     decimals: mint.decimals,
+                    adjustment_factor: 0.01,
                     util0: 0.40,
                     rate0: 0.07,
                     util1: 0.80,

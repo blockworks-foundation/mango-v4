@@ -7,8 +7,10 @@ use static_assertions::const_assert_eq;
 
 use std::mem::size_of;
 
-pub const DAY: I80F48 = I80F48!(86400);
-pub const YEAR: I80F48 = I80F48!(31536000);
+pub const HOUR: i64 = 3600;
+pub const DAY: i64 = 86400;
+pub const DAY_I80F48: I80F48 = I80F48!(86400);
+pub const YEAR_I80F48: I80F48 = I80F48!(31536000);
 
 #[account(zero_copy)]
 pub struct Bank {
@@ -28,8 +30,8 @@ pub struct Bank {
     pub deposit_index: I80F48,
     pub borrow_index: I80F48,
 
-    /// total deposits/borrows, only updated during UpdateIndex
-    /// TODO: These values could be dropped from the bank, they're written in UpdateIndex
+    /// total deposits/borrows, only updated during UpdateIndexAndRate
+    /// TODO: These values could be dropped from the bank, they're written in UpdateIndexAndRate
     ///       and never read.
     pub cached_indexed_total_deposits: I80F48,
     pub cached_indexed_total_borrows: I80F48,
@@ -42,11 +44,16 @@ pub struct Bank {
     ///
     /// The vault amount is not deducable from these values.
     ///
-    /// These become meaningful when summed over all banks (like in update_index).
+    /// These become meaningful when summed over all banks (like in update_index_and_rate).
     pub indexed_deposits: I80F48,
     pub indexed_borrows: I80F48,
 
-    pub last_updated: i64,
+    pub index_last_updated: i64,
+    pub bank_rate_last_updated: i64,
+
+    pub avg_utilization: I80F48,
+
+    pub adjustment_factor: I80F48,
     pub util0: I80F48,
     pub rate0: I80F48,
     pub util1: I80F48,
@@ -92,7 +99,7 @@ pub struct Bank {
 }
 const_assert_eq!(
     size_of::<Bank>(),
-    16 + 32 * 4 + 8 + 16 * 21 + 2 * 8 + 2 + 1 + 1 + 4 + 8
+    16 + 32 * 4 + 8 * 2 + 16 * 23 + 2 * 8 + 2 + 1 + 1 + 4 + 8
 );
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
@@ -117,7 +124,9 @@ impl std::fmt::Debug for Bank {
             )
             .field("indexed_deposits", &self.indexed_deposits)
             .field("indexed_borrows", &self.indexed_borrows)
-            .field("last_updated", &self.last_updated)
+            .field("index_last_updated", &self.index_last_updated)
+            .field("bank_rate_last_updated", &self.bank_rate_last_updated)
+            .field("avg_utilization", &self.avg_utilization)
             .field("util0", &self.util0)
             .field("rate0", &self.rate0)
             .field("util1", &self.util1)
@@ -158,7 +167,10 @@ impl Bank {
             cached_indexed_total_borrows: existing_bank.cached_indexed_total_borrows,
             indexed_deposits: I80F48::ZERO,
             indexed_borrows: I80F48::ZERO,
-            last_updated: existing_bank.last_updated,
+            index_last_updated: existing_bank.index_last_updated,
+            bank_rate_last_updated: existing_bank.bank_rate_last_updated,
+            avg_utilization: existing_bank.avg_utilization,
+            adjustment_factor: existing_bank.adjustment_factor,
             util0: existing_bank.util0,
             rate0: existing_bank.rate0,
             util1: existing_bank.util1,
@@ -375,31 +387,32 @@ impl Bank {
     pub fn charge_loan_fee(&mut self, diff_ts: I80F48) {
         let native_borrows_old = self.native_borrows();
         self.indexed_borrows =
-            cm!((self.indexed_borrows * (I80F48::ONE + self.loan_fee_rate * (diff_ts / YEAR))));
+            cm!((self.indexed_borrows
+                * (I80F48::ONE + self.loan_fee_rate * (diff_ts / YEAR_I80F48))));
         self.collected_fees_native =
             cm!(self.collected_fees_native + self.native_borrows() - native_borrows_old);
     }
 
     pub fn compute_index(
-        &mut self,
+        &self,
         indexed_total_deposits: I80F48,
         indexed_total_borrows: I80F48,
         diff_ts: I80F48,
     ) -> Result<(I80F48, I80F48)> {
         // compute index based on utilization
-        let native_total_deposits = self.deposit_index * indexed_total_deposits;
-        let native_total_borrows = self.borrow_index * indexed_total_borrows;
+        let native_total_deposits = cm!(self.deposit_index * indexed_total_deposits);
+        let native_total_borrows = cm!(self.borrow_index * indexed_total_borrows);
 
-        let utilization = if native_total_deposits == I80F48::ZERO {
+        let instantaneous_utilization = if native_total_deposits == I80F48::ZERO {
             I80F48::ZERO
         } else {
             cm!(native_total_borrows / native_total_deposits)
         };
 
-        let interest_rate = self.compute_interest_rate(utilization);
+        let borrow_interest_rate = self.compute_interest_rate(instantaneous_utilization);
 
-        let borrow_interest: I80F48 = cm!(interest_rate * diff_ts);
-        let deposit_interest = cm!(borrow_interest * utilization);
+        let borrow_interest: I80F48 = cm!(borrow_interest_rate * diff_ts);
+        let deposit_interest = cm!(borrow_interest * instantaneous_utilization);
 
         // msg!("utilization {}", utilization);
         // msg!("interest_rate {}", interest_rate);
@@ -410,9 +423,10 @@ impl Bank {
             return Ok((self.deposit_index, self.borrow_index));
         }
 
-        let borrow_index = cm!((self.borrow_index * borrow_interest) / YEAR + self.borrow_index);
+        let borrow_index =
+            cm!((self.borrow_index * borrow_interest) / YEAR_I80F48 + self.borrow_index);
         let deposit_index =
-            cm!((self.deposit_index * deposit_interest) / YEAR + self.deposit_index);
+            cm!((self.deposit_index * deposit_interest) / YEAR_I80F48 + self.deposit_index);
 
         Ok((deposit_index, borrow_index))
     }
@@ -441,7 +455,6 @@ impl Bank {
         rate1: I80F48,
         max_rate: I80F48,
     ) -> I80F48 {
-        // TODO: daffy: use optimal interest from oracle
         if utilization <= util0 {
             let slope = cm!(rate0 / util0);
             cm!(slope * utilization)
@@ -454,6 +467,50 @@ impl Bank {
             let slope = cm!((max_rate - rate1) / (I80F48::ONE - util1));
             cm!(rate1 + slope * extra_util)
         }
+    }
+
+    // compute new avg utilization
+    pub fn compute_new_avg_utilization(
+        &self,
+        indexed_total_deposits: I80F48,
+        indexed_total_borrows: I80F48,
+        now_ts: I80F48,
+    ) -> I80F48 {
+        if now_ts == I80F48::ZERO {
+            return I80F48::ZERO;
+        }
+
+        let native_total_deposits = self.deposit_index * indexed_total_deposits;
+        let native_total_borrows = self.borrow_index * indexed_total_borrows;
+        let instantaneous_utilization = if native_total_deposits == I80F48::ZERO {
+            I80F48::ZERO
+        } else {
+            cm!(native_total_borrows / native_total_deposits)
+        };
+
+        // combine old and new with relevant factors to form new avg_utilization
+        // scaling factor for previous avg_utilization is old_ts/new_ts
+        // scaling factor for instantaneous utilization is (new_ts - old_ts) / new_ts
+        let bank_rate_last_updated_i80f48 = I80F48::from_num(self.bank_rate_last_updated);
+        (self.avg_utilization * bank_rate_last_updated_i80f48
+            + instantaneous_utilization * (now_ts - bank_rate_last_updated_i80f48))
+            / now_ts
+    }
+
+    // computes new optimal rates and max rate
+    pub fn compute_rates(&self) -> (I80F48, I80F48, I80F48) {
+        // since we have 3 interest rate legs, consider the middle point of the middle leg as the optimal util
+        let optimal_util = (self.util0 + self.util1) / 2;
+        // use avg_utilization and not instantaneous_utilization so that rates cannot be manupulated easily
+        let util_diff = self.avg_utilization - optimal_util;
+        // move rates up when utilization is above optimal utilization, and vice versa
+        let adjustment = I80F48::ONE + self.adjustment_factor * util_diff;
+        // irrespective of which leg current utilization is in, update all rates
+        (
+            cm!(self.rate0 * adjustment),
+            cm!(self.rate1 * adjustment),
+            cm!(self.max_rate * adjustment),
+        )
     }
 }
 
@@ -582,5 +639,34 @@ mod tests {
             }
         }
         Ok(())
+    }
+
+    #[test]
+    fn test_compute_new_avg_utilization() {
+        let mut bank = Bank::zeroed();
+        bank.deposit_index = I80F48::from_num(1.0);
+        bank.borrow_index = I80F48::from_num(1.0);
+        bank.bank_rate_last_updated = 0;
+
+        let compute_new_avg_utilization_runner = |bank:&mut Bank, utilization: I80F48, now_ts: i64| {
+            bank.avg_utilization = bank.compute_new_avg_utilization(
+                I80F48::ONE,
+                utilization,
+                I80F48::from_num(now_ts),
+            );
+            bank.bank_rate_last_updated = now_ts;
+        };
+
+        compute_new_avg_utilization_runner(&mut bank, I80F48::ZERO, 0);
+        assert_eq!(bank.avg_utilization, I80F48::ZERO);
+
+        compute_new_avg_utilization_runner(&mut bank, I80F48::from_num(0.5), 10);
+        assert!((bank.avg_utilization-I80F48::from_num(0.5)).abs() < 0.0001);
+
+        compute_new_avg_utilization_runner(&mut bank, I80F48::from_num(0.8), 15);
+        assert!((bank.avg_utilization-I80F48::from_num(0.6)).abs() < 0.0001);
+
+        compute_new_avg_utilization_runner(&mut bank, I80F48::ONE, 20);
+        assert!((bank.avg_utilization-I80F48::from_num(0.7)).abs() < 0.0001);
     }
 }

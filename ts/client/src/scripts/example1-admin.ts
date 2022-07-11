@@ -74,6 +74,7 @@ async function main() {
       0.1,
       1, // tokenIndex
       'BTC',
+      0.01,
       0.4,
       0.07,
       0.8,
@@ -112,6 +113,7 @@ async function main() {
       0.1,
       0, // tokenIndex
       'USDC',
+      0.01,
       0.4,
       0.07,
       0.8,
@@ -140,6 +142,7 @@ async function main() {
       0.1,
       2, // tokenIndex
       'SOL',
+      0.01,
       0.4,
       0.07,
       0.8,
@@ -170,6 +173,7 @@ async function main() {
       0.1,
       3, // tokenIndex
       'ORCA',
+      0.01,
       0.4,
       0.07,
       0.8,
@@ -266,6 +270,7 @@ async function main() {
       'USDC',
       btcDevnetOracle,
       0.1,
+      0.01,
       0.3,
       0.08,
       0.81,
@@ -292,6 +297,7 @@ async function main() {
       'USDC',
       usdcDevnetOracle.publicKey,
       0.1,
+      0.01,
       0.4,
       0.07,
       0.8,
