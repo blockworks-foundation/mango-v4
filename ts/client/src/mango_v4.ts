@@ -3,7 +3,7 @@ export type MangoV4 = {
   "name": "mango_v4",
   "instructions": [
     {
-      "name": "createGroup",
+      "name": "groupCreate",
       "accounts": [
         {
           "name": "group",
@@ -91,7 +91,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "closeGroup",
+      "name": "groupClose",
       "accounts": [
         {
           "name": "group",
@@ -568,7 +568,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "updateIndexAndRate",
+      "name": "tokenUpdateIndexAndRate",
       "accounts": [
         {
           "name": "mintInfo",
@@ -579,12 +579,17 @@ export type MangoV4 = {
           "name": "oracle",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "instructions",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": []
     },
     {
-      "name": "createAccount",
+      "name": "accountCreate",
       "accounts": [
         {
           "name": "group",
@@ -648,7 +653,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "editAccount",
+      "name": "accountEdit",
       "accounts": [
         {
           "name": "group",
@@ -682,7 +687,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "closeAccount",
+      "name": "accountClose",
       "accounts": [
         {
           "name": "group",
@@ -713,7 +718,7 @@ export type MangoV4 = {
       "args": []
     },
     {
-      "name": "createStubOracle",
+      "name": "stubOracleCreate",
       "accounts": [
         {
           "name": "group",
@@ -776,7 +781,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "closeStubOracle",
+      "name": "stubOracleClose",
       "accounts": [
         {
           "name": "group",
@@ -807,7 +812,7 @@ export type MangoV4 = {
       "args": []
     },
     {
-      "name": "setStubOracle",
+      "name": "stubOracleSet",
       "accounts": [
         {
           "name": "group",
@@ -4413,6 +4418,11 @@ export type MangoV4 = {
           "index": false
         },
         {
+          "name": "avgUtilization",
+          "type": "i128",
+          "index": false
+        },
+        {
           "name": "price",
           "type": "i128",
           "index": false
@@ -4430,11 +4440,6 @@ export type MangoV4 = {
         {
           "name": "tokenIndex",
           "type": "u16",
-          "index": false
-        },
-        {
-          "name": "avgUtilization",
-          "type": "i128",
           "index": false
         },
         {
@@ -4559,7 +4564,7 @@ export type MangoV4 = {
     {
       "code": 6001,
       "name": "MathError",
-      "msg": ""
+      "msg": "checked math error"
     },
     {
       "code": 6002,
@@ -4569,7 +4574,7 @@ export type MangoV4 = {
     {
       "code": 6003,
       "name": "UnknownOracleType",
-      "msg": ""
+      "msg": "oracle type cannot be determined"
     },
     {
       "code": 6004,
@@ -4579,12 +4584,37 @@ export type MangoV4 = {
     {
       "code": 6005,
       "name": "HealthMustBePositive",
-      "msg": ""
+      "msg": "health must be positive"
     },
     {
       "code": 6006,
       "name": "IsBankrupt",
-      "msg": "The account is bankrupt"
+      "msg": "the account is bankrupt"
+    },
+    {
+      "code": 6007,
+      "name": "IsNotBankrupt",
+      "msg": "the account is not bankrupt"
+    },
+    {
+      "code": 6008,
+      "name": "NoFreeTokenPositionIndex",
+      "msg": "no free token position index"
+    },
+    {
+      "code": 6009,
+      "name": "NoFreeSerum3OpenOrdersIndex",
+      "msg": "no free serum3 open orders index"
+    },
+    {
+      "code": 6010,
+      "name": "NoFreePerpPositionIndex",
+      "msg": "no free perp position index"
+    },
+    {
+      "code": 6011,
+      "name": "Serum3OpenOrdersExistAlready",
+      "msg": "serum3 open orders exist already"
     }
   ]
 };
@@ -4594,7 +4624,7 @@ export const IDL: MangoV4 = {
   "name": "mango_v4",
   "instructions": [
     {
-      "name": "createGroup",
+      "name": "groupCreate",
       "accounts": [
         {
           "name": "group",
@@ -4682,7 +4712,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "closeGroup",
+      "name": "groupClose",
       "accounts": [
         {
           "name": "group",
@@ -5159,7 +5189,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "updateIndexAndRate",
+      "name": "tokenUpdateIndexAndRate",
       "accounts": [
         {
           "name": "mintInfo",
@@ -5170,12 +5200,17 @@ export const IDL: MangoV4 = {
           "name": "oracle",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "instructions",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": []
     },
     {
-      "name": "createAccount",
+      "name": "accountCreate",
       "accounts": [
         {
           "name": "group",
@@ -5239,7 +5274,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "editAccount",
+      "name": "accountEdit",
       "accounts": [
         {
           "name": "group",
@@ -5273,7 +5308,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "closeAccount",
+      "name": "accountClose",
       "accounts": [
         {
           "name": "group",
@@ -5304,7 +5339,7 @@ export const IDL: MangoV4 = {
       "args": []
     },
     {
-      "name": "createStubOracle",
+      "name": "stubOracleCreate",
       "accounts": [
         {
           "name": "group",
@@ -5367,7 +5402,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "closeStubOracle",
+      "name": "stubOracleClose",
       "accounts": [
         {
           "name": "group",
@@ -5398,7 +5433,7 @@ export const IDL: MangoV4 = {
       "args": []
     },
     {
-      "name": "setStubOracle",
+      "name": "stubOracleSet",
       "accounts": [
         {
           "name": "group",
@@ -9004,6 +9039,11 @@ export const IDL: MangoV4 = {
           "index": false
         },
         {
+          "name": "avgUtilization",
+          "type": "i128",
+          "index": false
+        },
+        {
           "name": "price",
           "type": "i128",
           "index": false
@@ -9021,11 +9061,6 @@ export const IDL: MangoV4 = {
         {
           "name": "tokenIndex",
           "type": "u16",
-          "index": false
-        },
-        {
-          "name": "avgUtilization",
-          "type": "i128",
           "index": false
         },
         {
@@ -9150,7 +9185,7 @@ export const IDL: MangoV4 = {
     {
       "code": 6001,
       "name": "MathError",
-      "msg": ""
+      "msg": "checked math error"
     },
     {
       "code": 6002,
@@ -9160,7 +9195,7 @@ export const IDL: MangoV4 = {
     {
       "code": 6003,
       "name": "UnknownOracleType",
-      "msg": ""
+      "msg": "oracle type cannot be determined"
     },
     {
       "code": 6004,
@@ -9170,12 +9205,37 @@ export const IDL: MangoV4 = {
     {
       "code": 6005,
       "name": "HealthMustBePositive",
-      "msg": ""
+      "msg": "health must be positive"
     },
     {
       "code": 6006,
       "name": "IsBankrupt",
-      "msg": "The account is bankrupt"
+      "msg": "the account is bankrupt"
+    },
+    {
+      "code": 6007,
+      "name": "IsNotBankrupt",
+      "msg": "the account is not bankrupt"
+    },
+    {
+      "code": 6008,
+      "name": "NoFreeTokenPositionIndex",
+      "msg": "no free token position index"
+    },
+    {
+      "code": 6009,
+      "name": "NoFreeSerum3OpenOrdersIndex",
+      "msg": "no free serum3 open orders index"
+    },
+    {
+      "code": 6010,
+      "name": "NoFreePerpPositionIndex",
+      "msg": "no free perp position index"
+    },
+    {
+      "code": 6011,
+      "name": "Serum3OpenOrdersExistAlready",
+      "msg": "serum3 open orders exist already"
     }
   ]
 };
