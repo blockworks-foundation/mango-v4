@@ -179,7 +179,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // close account
     send_tx(
         solana,
-        CloseAccountInstruction {
+        AccountCloseInstruction {
             group,
             account,
             owner,
@@ -217,7 +217,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // close stub oracle
     send_tx(
         solana,
-        CloseStubOracleInstruction {
+        StubOracleCloseInstruction {
             group,
             mint: bank_data.mint,
             admin,
@@ -230,7 +230,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // close group
     send_tx(
         solana,
-        CloseGroupInstruction {
+        GroupCloseInstruction {
             group,
             admin,
             sol_destination: payer.pubkey(),
