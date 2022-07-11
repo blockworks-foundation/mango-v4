@@ -46,7 +46,7 @@ pub fn liq_token_with_token(
 
     // Initial liqee health check
     let mut liqee_health_cache = new_health_cache(&liqee, &account_retriever)?;
-    let init_health = liqee_health_cache.health(HealthType::Init)?;
+    let init_health = liqee_health_cache.health(HealthType::Init);
     if liqee.being_liquidated() {
         if init_health > I80F48::ZERO {
             liqee.set_being_liquidated(false);
@@ -54,7 +54,7 @@ pub fn liq_token_with_token(
             return Ok(());
         }
     } else {
-        let maint_health = liqee_health_cache.health(HealthType::Maint)?;
+        let maint_health = liqee_health_cache.health(HealthType::Maint);
         require!(maint_health < I80F48::ZERO, MangoError::SomeError);
         liqee.set_being_liquidated(true);
     }
@@ -211,11 +211,11 @@ pub fn liq_token_with_token(
     }
 
     // Check liqee health again
-    let maint_health = liqee_health_cache.health(HealthType::Maint)?;
+    let maint_health = liqee_health_cache.health(HealthType::Maint);
     if maint_health < I80F48::ZERO {
         liqee.set_bankrupt(!liqee_health_cache.has_liquidatable_assets());
     } else {
-        let init_health = liqee_health_cache.health(HealthType::Init)?;
+        let init_health = liqee_health_cache.health(HealthType::Init);
 
         // this is equivalent to one native USDC or 1e-6 USDC
         // This is used as threshold to flip flag instead of 0 because of dust issues
