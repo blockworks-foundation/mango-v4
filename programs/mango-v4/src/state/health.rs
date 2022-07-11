@@ -398,7 +398,7 @@ pub fn compute_health_from_fixed_accounts(
         begin_perp: cm!(active_token_len * 2),
         begin_serum3: cm!(active_token_len * 2 + active_perp_len),
     };
-    new_health_cache(account, &retriever)?.health(health_type)
+    Ok(new_health_cache(account, &retriever)?.health(health_type))
 }
 
 /// Compute health with an arbitrary AccountRetriever
@@ -407,7 +407,7 @@ pub fn compute_health(
     health_type: HealthType,
     retriever: &impl AccountRetriever,
 ) -> Result<I80F48> {
-    new_health_cache(account, retriever)?.health(health_type)
+    Ok(new_health_cache(account, retriever)?.health(health_type))
 }
 
 struct TokenInfo {
@@ -438,6 +438,16 @@ impl TokenInfo {
             HealthType::Init => self.init_liab_weight,
             HealthType::Maint => self.maint_liab_weight,
         }
+    }
+
+    #[inline(always)]
+    fn health_contribution(&self, health_type: HealthType) -> I80F48 {
+        let weight = if self.balance.is_negative() {
+            self.liab_weight(health_type)
+        } else {
+            self.asset_weight(health_type)
+        };
+        cm!(self.balance * weight)
     }
 }
 
@@ -532,21 +542,13 @@ pub struct HealthCache {
 }
 
 impl HealthCache {
-    pub fn health(&self, health_type: HealthType) -> Result<I80F48> {
+    pub fn health(&self, health_type: HealthType) -> I80F48 {
         let mut health = I80F48::ZERO;
-        for token_info in self.token_infos.iter() {
-            let contrib = health_contribution(health_type, token_info, token_info.balance)?;
+        let sum = |contrib| {
             health = cm!(health + contrib);
-        }
-        for serum3_info in self.serum3_infos.iter() {
-            let contrib = serum3_info.health_contribution(health_type, &self.token_infos);
-            health = cm!(health + contrib);
-        }
-        for perp_info in self.perp_infos.iter() {
-            let contrib = perp_info.health_contribution(health_type);
-            health = cm!(health + contrib);
-        }
-        Ok(health)
+        };
+        self.health_sum(health_type, sum);
+        health
     }
 
     pub fn adjust_token_balance(&mut self, token_index: TokenIndex, change: I80F48) -> Result<()> {
@@ -580,23 +582,54 @@ impl HealthCache {
             .any(|p| p.quote.is_negative() || p.base != 0);
         spot_borrows || perp_borrows
     }
-}
 
-/// Compute health contribution for a given balance
-/// wart: independent of the balance stored in TokenInfo
-/// balance is in health-reference-token native units
-#[inline(always)]
-fn health_contribution(
-    health_type: HealthType,
-    info: &TokenInfo,
-    balance: I80F48,
-) -> Result<I80F48> {
-    let weight = if balance.is_negative() {
-        info.liab_weight(health_type)
-    } else {
-        info.asset_weight(health_type)
-    };
-    Ok(cm!(balance * weight))
+    fn health_sum(&self, health_type: HealthType, mut action: impl FnMut(I80F48)) {
+        for token_info in self.token_infos.iter() {
+            let contrib = token_info.health_contribution(health_type);
+            action(contrib);
+        }
+        for serum3_info in self.serum3_infos.iter() {
+            let contrib = serum3_info.health_contribution(health_type, &self.token_infos);
+            action(contrib);
+        }
+        for perp_info in self.perp_infos.iter() {
+            let contrib = perp_info.health_contribution(health_type);
+            action(contrib);
+        }
+    }
+
+    /// Sum of only the positive health components (assets) and
+    /// sum of absolute values of all negative health components (liabs, always >= 0)
+    pub fn health_assets_and_liabs(&self, health_type: HealthType) -> (I80F48, I80F48) {
+        let mut assets = I80F48::ZERO;
+        let mut liabs = I80F48::ZERO;
+        let sum = |contrib| {
+            if contrib > 0 {
+                assets = cm!(assets + contrib);
+            } else {
+                liabs = cm!(liabs - contrib);
+            }
+        };
+        self.health_sum(health_type, sum);
+        (assets, liabs)
+    }
+
+    /// The health ratio is
+    /// - 0 if health is 0 - meaning assets = liabs
+    /// - 100 if there's 2x as many assets as liabs
+    /// - 200 if there's 3x as many assets as liabs
+    /// - MAX if liabs = 0
+    ///
+    /// Maybe talking about the collateralization ratio assets/liabs is more intuitive?
+    pub fn health_ratio(&self, health_type: HealthType) -> I80F48 {
+        let (assets, liabs) = self.health_assets_and_liabs(health_type);
+        let hundred = I80F48::from(100);
+        if liabs > 0 {
+            cm!(hundred * (assets - liabs) / liabs)
+        } else {
+            I80F48::MAX
+        }
+    }
 }
 
 /// Generate a HealthCache for an account and its health accounts.
