@@ -769,6 +769,7 @@ impl ClientInstruction for TokenDepositInstruction {
 pub struct TokenRegisterInstruction<'keypair> {
     pub token_index: TokenIndex,
     pub decimals: u8,
+    pub adjustment_factor: f32,
     pub util0: f32,
     pub rate0: f32,
     pub util1: f32,
@@ -805,6 +806,7 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
                 conf_filter: I80F48::from_num::<f32>(0.10),
             },
             interest_rate_params: InterestRateParams {
+                adjustment_factor: self.adjustment_factor,
                 util0: self.util0,
                 rate0: self.rate0,
                 util1: self.util1,
@@ -2545,13 +2547,13 @@ impl ClientInstruction for BenchmarkInstruction {
         vec![]
     }
 }
-pub struct TokenUpdateIndexInstruction {
+pub struct TokenUpdateIndexAndRateInstruction {
     pub mint_info: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for TokenUpdateIndexInstruction {
-    type Accounts = mango_v4::accounts::TokenUpdateIndex;
-    type Instruction = mango_v4::instruction::TokenUpdateIndex;
+impl ClientInstruction for TokenUpdateIndexAndRateInstruction {
+    type Accounts = mango_v4::accounts::TokenUpdateIndexAndRate;
+    type Instruction = mango_v4::instruction::TokenUpdateIndexAndRate;
     async fn to_instruction(
         &self,
         loader: impl ClientAccountLoader + 'async_trait,
@@ -2564,6 +2566,7 @@ impl ClientInstruction for TokenUpdateIndexInstruction {
         let accounts = Self::Accounts {
             mint_info: self.mint_info,
             oracle: mint_info.oracle,
+            instructions: solana_program::sysvar::instructions::id(),
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);

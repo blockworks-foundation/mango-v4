@@ -60,6 +60,7 @@ async function main() {
       0.1,
       0,
       'BTC',
+      0.01,
       0.4,
       0.07,
       0.8,
@@ -100,6 +101,7 @@ async function main() {
       0.1,
       1,
       'USDC',
+      0.01,
       0.4,
       0.07,
       0.8,
@@ -130,6 +132,7 @@ async function main() {
       0.1,
       2, // tokenIndex
       'SOL',
+      0.01,
       0.4,
       0.07,
       0.8,

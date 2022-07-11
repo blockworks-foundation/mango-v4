@@ -3,7 +3,7 @@ export type MangoV4 = {
   "name": "mango_v4",
   "instructions": [
     {
-      "name": "groupCreate",
+      "name": "createGroup",
       "accounts": [
         {
           "name": "group",
@@ -91,7 +91,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "groupClose",
+      "name": "closeGroup",
       "accounts": [
         {
           "name": "group",
@@ -568,7 +568,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "tokenUpdateIndex",
+      "name": "updateIndexAndRate",
       "accounts": [
         {
           "name": "mintInfo",
@@ -584,7 +584,7 @@ export type MangoV4 = {
       "args": []
     },
     {
-      "name": "accountCreate",
+      "name": "createAccount",
       "accounts": [
         {
           "name": "group",
@@ -648,7 +648,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "accountEdit",
+      "name": "editAccount",
       "accounts": [
         {
           "name": "group",
@@ -682,7 +682,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "accountClose",
+      "name": "closeAccount",
       "accounts": [
         {
           "name": "group",
@@ -713,7 +713,7 @@ export type MangoV4 = {
       "args": []
     },
     {
-      "name": "stubOracleCreate",
+      "name": "createStubOracle",
       "accounts": [
         {
           "name": "group",
@@ -776,7 +776,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "stubOracleClose",
+      "name": "closeStubOracle",
       "accounts": [
         {
           "name": "group",
@@ -807,7 +807,7 @@ export type MangoV4 = {
       "args": []
     },
     {
-      "name": "stubOracleSet",
+      "name": "setStubOracle",
       "accounts": [
         {
           "name": "group",
@@ -2560,8 +2560,24 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "lastUpdated",
+            "name": "indexLastUpdated",
             "type": "i64"
+          },
+          {
+            "name": "bankRateLastUpdated",
+            "type": "i64"
+          },
+          {
+            "name": "avgUtilization",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "adjustmentFactor",
+            "type": {
+              "defined": "I80F48"
+            }
           },
           {
             "name": "util0",
@@ -3361,6 +3377,10 @@ export type MangoV4 = {
           },
           {
             "name": "maxRate",
+            "type": "f32"
+          },
+          {
+            "name": "adjustmentFactor",
             "type": "f32"
           }
         ]
@@ -4394,6 +4414,41 @@ export type MangoV4 = {
         },
         {
           "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UpdateRateLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "avgUtilization",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "rate0",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "rate1",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "maxRate",
           "type": "i128",
           "index": false
         }
@@ -4539,7 +4594,7 @@ export const IDL: MangoV4 = {
   "name": "mango_v4",
   "instructions": [
     {
-      "name": "groupCreate",
+      "name": "createGroup",
       "accounts": [
         {
           "name": "group",
@@ -4627,7 +4682,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "groupClose",
+      "name": "closeGroup",
       "accounts": [
         {
           "name": "group",
@@ -5104,7 +5159,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "tokenUpdateIndex",
+      "name": "updateIndexAndRate",
       "accounts": [
         {
           "name": "mintInfo",
@@ -5120,7 +5175,7 @@ export const IDL: MangoV4 = {
       "args": []
     },
     {
-      "name": "accountCreate",
+      "name": "createAccount",
       "accounts": [
         {
           "name": "group",
@@ -5184,7 +5239,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "accountEdit",
+      "name": "editAccount",
       "accounts": [
         {
           "name": "group",
@@ -5218,7 +5273,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "accountClose",
+      "name": "closeAccount",
       "accounts": [
         {
           "name": "group",
@@ -5249,7 +5304,7 @@ export const IDL: MangoV4 = {
       "args": []
     },
     {
-      "name": "stubOracleCreate",
+      "name": "createStubOracle",
       "accounts": [
         {
           "name": "group",
@@ -5312,7 +5367,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "stubOracleClose",
+      "name": "closeStubOracle",
       "accounts": [
         {
           "name": "group",
@@ -5343,7 +5398,7 @@ export const IDL: MangoV4 = {
       "args": []
     },
     {
-      "name": "stubOracleSet",
+      "name": "setStubOracle",
       "accounts": [
         {
           "name": "group",
@@ -7096,8 +7151,24 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "lastUpdated",
+            "name": "indexLastUpdated",
             "type": "i64"
+          },
+          {
+            "name": "bankRateLastUpdated",
+            "type": "i64"
+          },
+          {
+            "name": "avgUtilization",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "adjustmentFactor",
+            "type": {
+              "defined": "I80F48"
+            }
           },
           {
             "name": "util0",
@@ -7897,6 +7968,10 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "maxRate",
+            "type": "f32"
+          },
+          {
+            "name": "adjustmentFactor",
             "type": "f32"
           }
         ]
@@ -8930,6 +9005,41 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UpdateRateLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "avgUtilization",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "rate0",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "rate1",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "maxRate",
           "type": "i128",
           "index": false
         }

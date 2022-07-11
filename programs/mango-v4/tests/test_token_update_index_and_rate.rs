@@ -9,7 +9,7 @@ use program_test::*;
 mod program_test;
 
 #[tokio::test]
-async fn test_update_index() -> Result<(), TransportError> {
+async fn test_token_update_index_and_rate() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
@@ -99,24 +99,30 @@ async fn test_update_index() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    let bank_before_update_index = solana.get_account::<Bank>(tokens[0].bank).await;
+    let bank_before_update_index_and_rate = solana.get_account::<Bank>(tokens[0].bank).await;
 
     solana.advance_clock().await;
 
     send_tx(
         solana,
-        TokenUpdateIndexInstruction {
+        TokenUpdateIndexAndRateInstruction {
             mint_info: tokens[0].mint_info,
         },
     )
     .await
     .unwrap();
 
-    let bank_after_update_index = solana.get_account::<Bank>(tokens[0].bank).await;
-    dbg!(bank_after_update_index);
-    dbg!(bank_after_update_index);
-    assert!(bank_before_update_index.deposit_index < bank_after_update_index.deposit_index);
-    assert!(bank_before_update_index.borrow_index < bank_after_update_index.borrow_index);
+    let bank_after_update_index_and_rate = solana.get_account::<Bank>(tokens[0].bank).await;
+    dbg!(bank_after_update_index_and_rate);
+    dbg!(bank_after_update_index_and_rate);
+    assert!(
+        bank_before_update_index_and_rate.deposit_index
+            < bank_after_update_index_and_rate.deposit_index
+    );
+    assert!(
+        bank_before_update_index_and_rate.borrow_index
+            < bank_after_update_index_and_rate.borrow_index
+    );
 
     Ok(())
 }

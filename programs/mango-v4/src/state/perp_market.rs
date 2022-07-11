@@ -6,10 +6,10 @@ use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
 
 use crate::state::orderbook::order_type::Side;
-use crate::state::{TokenIndex, DAY};
+use crate::state::TokenIndex;
 use crate::util::checked_math as cm;
 
-use super::{Book, OracleConfig};
+use super::{Book, OracleConfig, DAY_I80F48};
 
 pub type PerpMarketIndex = u16;
 
@@ -134,7 +134,7 @@ impl PerpMarket {
         };
 
         let diff_ts = I80F48::from_num(now_ts - self.funding_last_updated as u64);
-        let time_factor = cm!(diff_ts / DAY);
+        let time_factor = cm!(diff_ts / DAY_I80F48);
         let base_lot_size = I80F48::from_num(self.base_lot_size);
         let funding_delta = cm!(index_price * diff_price * base_lot_size * time_factor);
 

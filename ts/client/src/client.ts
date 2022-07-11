@@ -140,6 +140,7 @@ export class MangoClient {
     oracleConfFilter: number,
     tokenIndex: number,
     name: string,
+    adjustmentFactor: number,
     util0: number,
     rate0: number,
     util1: number,
@@ -163,7 +164,7 @@ export class MangoClient {
             val: I80F48.fromNumber(oracleConfFilter).getData(),
           },
         } as any, // future: nested custom types dont typecheck, fix if possible?
-        { util0, rate0, util1, rate1, maxRate },
+        { adjustmentFactor, util0, rate0, util1, rate1, maxRate },
         loanFeeRate,
         loanOriginationFeeRate,
         maintAssetWeight,
@@ -188,6 +189,7 @@ export class MangoClient {
     tokenName: string,
     oracle: PublicKey,
     oracleConfFilter: number,
+    adjustmentFactor: number,
     util0: number,
     rate0: number,
     util1: number,
@@ -213,7 +215,7 @@ export class MangoClient {
             val: I80F48.fromNumber(oracleConfFilter).getData(),
           },
         } as any, // future: nested custom types dont typecheck, fix if possible?
-        { util0, rate0, util1, rate1, maxRate },
+        { adjustmentFactor, util0, rate0, util1, rate1, maxRate },
         loanFeeRate,
         loanOriginationFeeRate,
         maintAssetWeight,

@@ -82,6 +82,7 @@ pub struct InterestRateParams {
     pub util1: f32,
     pub rate1: f32,
     pub max_rate: f32,
+    pub adjustment_factor: f32,
 }
 
 // TODO: should this be "configure_mint", we pass an explicit index, and allow
@@ -128,8 +129,11 @@ pub fn token_register(
         cached_indexed_total_borrows: I80F48::ZERO,
         indexed_deposits: I80F48::ZERO,
         indexed_borrows: I80F48::ZERO,
-        last_updated: Clock::get()?.unix_timestamp,
+        index_last_updated: Clock::get()?.unix_timestamp,
+        bank_rate_last_updated: Clock::get()?.unix_timestamp,
         // TODO: add a require! verifying relation between the parameters
+        avg_utilization: I80F48::ZERO,
+        adjustment_factor: I80F48::from_num(interest_rate_params.adjustment_factor),
         util0: I80F48::from_num(interest_rate_params.util0),
         rate0: I80F48::from_num(interest_rate_params.rate0),
         util1: I80F48::from_num(interest_rate_params.util1),

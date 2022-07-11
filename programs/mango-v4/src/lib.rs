@@ -118,8 +118,8 @@ pub mod mango_v4 {
         instructions::token_deregister(ctx, token_index)
     }
 
-    pub fn token_update_index(ctx: Context<TokenUpdateIndex>) -> Result<()> {
-        instructions::token_update_index(ctx)
+    pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Result<()> {
+        instructions::token_update_index_and_rate(ctx)
     }
 
     pub fn account_create(
@@ -159,10 +159,12 @@ pub mod mango_v4 {
         instructions::stub_oracle_set(ctx, price)
     }
 
+    // NOTE: keep disc synced in token_update_index_and_rate ix
     pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
         instructions::token_deposit(ctx, amount)
     }
 
+    // NOTE: keep disc synced in token_update_index_and_rate ix
     pub fn token_withdraw(
         ctx: Context<TokenWithdraw>,
         amount: u64,
@@ -199,6 +201,7 @@ pub mod mango_v4 {
         instructions::flash_loan3_begin(ctx, loan_amounts)
     }
 
+    // NOTE: keep disc synced in flash_loan3.rs
     pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan3End<'info>>,
     ) -> Result<()> {

@@ -37,7 +37,7 @@ pub use token_deposit::*;
 pub use token_deregister::*;
 pub use token_edit::*;
 pub use token_register::*;
-pub use token_update_index::*;
+pub use token_update_index_and_rate::*;
 pub use token_withdraw::*;
 
 mod account_close;
@@ -79,5 +79,5 @@ mod token_deposit;
 mod token_deregister;
 mod token_edit;
 mod token_register;
-mod token_update_index;
+mod token_update_index_and_rate;
 mod token_withdraw;
