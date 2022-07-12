@@ -24,9 +24,10 @@ pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
     let equity = compute_equity(&account, &account_retriever)?;
 
     emit!(MangoAccountData {
+        health_cache,
         init_health,
         maint_health,
-        equity
+        equity,
     });
 
     Ok(())

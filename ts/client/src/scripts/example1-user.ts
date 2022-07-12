@@ -1,6 +1,7 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
+import { HealthType } from '../accounts/mangoAccount';
 import { OrderType, Side } from '../accounts/perp';
 import {
   Serum3OrderType,
@@ -67,12 +68,22 @@ async function main() {
     const randomKey = new PublicKey(
       '4ZkS7ZZkxfsC3GtvvsHP3DFcUeByU9zzZELS4r8HCELo',
     );
-    await client.editMangoAccount(group, mangoAccount, 'my_changed_name', randomKey);
+    await client.editMangoAccount(
+      group,
+      mangoAccount,
+      'my_changed_name',
+      randomKey,
+    );
     await mangoAccount.reload(client, group);
     console.log(mangoAccount.toString());
 
     console.log(`...resetting mango account name, and re-setting a delegate`);
-    await client.editMangoAccount(group, mangoAccount, 'my_mango_account', PublicKey.default);
+    await client.editMangoAccount(
+      group,
+      mangoAccount,
+      'my_mango_account',
+      PublicKey.default,
+    );
     await mangoAccount.reload(client, group);
     console.log(mangoAccount.toString());
   }
@@ -198,6 +209,14 @@ async function main() {
     console.log(
       '...mangoAccount.getCollateralValue() ' +
         toUiDecimals(mangoAccount.getCollateralValue().toNumber()),
+    );
+    console.log(
+      '...mangoAccount.accountData["healthCache"].health(HealthType.init) ' +
+        toUiDecimals(
+          mangoAccount.accountData['healthCache']
+            .health(HealthType.init)
+            .toNumber(),
+        ),
     );
     console.log(
       '...mangoAccount.getAssetsVal() ' +
