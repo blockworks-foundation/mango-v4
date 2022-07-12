@@ -314,10 +314,7 @@ impl MangoAccountSerum3Orders {
             .values
             .iter()
             .position(|p| p.is_active_for_market(market_index))
-            .ok_or(error_msg!(
-                "serum3 open orders index {} not found",
-                market_index
-            ))?;
+            .ok_or_else(|| error_msg!("serum3 open orders index {} not found", market_index))?;
 
         self.values[index].market_index = Serum3MarketIndex::MAX;
 
