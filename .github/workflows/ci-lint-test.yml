@@ -9,7 +9,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  SOLANA_VERSION: '1.9.14'
+  SOLANA_VERSION: '1.10.29'
   RUST_TOOLCHAIN: 1.60.0
   LOG_PROGRAM: 'm43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD'
 
@@ -65,10 +65,12 @@ jobs:
           echo "Generating keypair..."
           solana-keygen new -o "$HOME/.config/solana/id.json" --no-passphrase --silent
       - name: Build all deps
-        run: cargo build-bpf
+        run: |
+          cargo build-bpf || true
+          cargo +bpf build-bpf
         # Run bpf tests and output to runner and log
       - name: Run tests
-        run: cargo test-bpf 2> >(tee raw-test-bpf.log >&2)
+        run: cargo +bpf test-bpf 2> >(tee raw-test-bpf.log >&2)
       - name: Save raw log
         uses: actions/upload-artifact@v3
         with:
