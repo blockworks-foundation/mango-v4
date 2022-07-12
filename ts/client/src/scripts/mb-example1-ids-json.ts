@@ -1,6 +1,7 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
+import { HealthType } from '../accounts/mangoAccount';
 import { MangoClient } from '../client';
 import { toUiDecimals } from '../utils';
 
@@ -53,6 +54,14 @@ async function main() {
         toUiDecimals(mangoAccount.getEquity().toNumber()),
     );
     console.log(
+      'mangoAccount.getHealth(HealthType.init) ' +
+        toUiDecimals(mangoAccount.getHealth(HealthType.init).toNumber()),
+    );
+    console.log(
+      'mangoAccount.getHealthRatio(HealthType.init) ' +
+        mangoAccount.getHealthRatio(HealthType.init).toNumber(),
+    );
+    console.log(
       'mangoAccount.getCollateralValue() ' +
         toUiDecimals(mangoAccount.getCollateralValue().toNumber()),
     );
@@ -69,6 +78,39 @@ async function main() {
         toUiDecimals(
           (
             await mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL')
+          ).toNumber(),
+        ),
+    );
+    console.log(
+      "mangoAccount.getMaxSourceForTokenSwap(group, 'USDC', 'BTC') " +
+        toUiDecimals(
+          (
+            await mangoAccount.getMaxSourceForTokenSwap(
+              group,
+              'USDC',
+              'BTC',
+              0.94,
+            )
+          ).toNumber(),
+        ),
+    );
+    console.log(
+      'mangoAccount.simHealthWithTokenPositionChanges ' +
+        toUiDecimals(
+          (
+            await mangoAccount.simHealthWithTokenPositionChanges(group, [
+              {
+                tokenName: 'USDC',
+                tokenAmount:
+                  -20_000 *
+                  Math.pow(10, group.banksMap.get('BTC')?.mintDecimals!),
+              },
+              {
+                tokenName: 'BTC',
+                tokenAmount:
+                  1 * Math.pow(10, group.banksMap.get('BTC')?.mintDecimals!),
+              },
+            ])
           ).toNumber(),
         ),
     );

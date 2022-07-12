@@ -126,6 +126,24 @@ export class MangoAccount {
     return ta ? ta.uiBorrows(bank) : 0;
   }
 
+  getHealth(healthType: HealthType): I80F48 {
+    return healthType == HealthType.init
+      ? (this.accountData as MangoAccountData).initHealth
+      : (this.accountData as MangoAccountData).maintHealth;
+  }
+
+  /**
+   * TODO: this is incorrect, getAssetsVal and getLiabsVal are in equity, and not in init health.
+   * Wait for dev to be deployed to mainnet, and then we can adapt this.
+   */
+  getHealthRatio(healthType: HealthType): I80F48 {
+    const assets = this.getAssetsVal();
+    const liabs = this.getLiabsVal();
+    return liabs.gt(ZERO_I80F48)
+      ? assets.div(liabs).sub(ONE_I80F48).mul(I80F48.fromNumber(100))
+      : I80F48.fromNumber(100);
+  }
+
   /**
    * Sum of all the assets i.e. token deposits, borrows, total assets in spot open orders, (perps positions is todo) in terms of quote value.
    */
@@ -142,7 +160,7 @@ export class MangoAccount {
    * The amount of native quote you could withdraw against your existing assets.
    */
   getCollateralValue(): I80F48 {
-    return (this.accountData as MangoAccountData).initHealth;
+    return this.getHealth(HealthType.init);
   }
 
   /**
@@ -173,10 +191,7 @@ export class MangoAccount {
    * The amount of given native token you can borrow, considering all existing assets as collateral except the deposits for this token.
    * The existing native deposits need to be added to get the full amount that could be withdrawn.
    */
-  async getMaxWithdrawWithBorrowForToken(
-    group: Group,
-    tokenName: string,
-  ): Promise<I80F48> {
+  getMaxWithdrawWithBorrowForToken(group: Group, tokenName: string): I80F48 {
     const bank = group.banksMap.get(tokenName);
     const initHealth = (this.accountData as MangoAccountData).initHealth;
     const inUsdcUnits = this.getInNativeUsdcUnits(bank)
@@ -184,6 +199,75 @@ export class MangoAccount {
       .mul(bank.initAssetWeight);
     const newInitHealth = initHealth.sub(inUsdcUnits);
     return newInitHealth.div(bank.price.mul(bank.initLiabWeight));
+  }
+
+  /**
+   * The amount of given source native token you can swap to a target token considering all existing assets as collateral.
+   * note: slippageAndFeesFactor is a normalized number, <1, e.g. a slippage of 5% and some fees which are 1%, then slippageAndFeesFactor = 0.94
+   * the factor is used to compute how much target can be obtained by swapping source
+   */
+  getMaxSourceForTokenSwap(
+    group: Group,
+    sourceTokenName: string,
+    targetTokenName: string,
+    slippageAndFeesFactor: number,
+  ): I80F48 {
+    const initHealth = (this.accountData as MangoAccountData).initHealth;
+
+    const sourceBank = group.banksMap.get(sourceTokenName);
+    const targetBank = group.banksMap.get(targetTokenName);
+
+    // This is a conservative approximation of the easy case, where
+    // mango account has no token positions for source and target tokens, or
+    // borrows for source and deposits for target tokens before the swap.
+    // Tighter estimates can be obtained by adding cases where deposits can exist for source,
+    // and borrows for target. TODO: solve this by searching over a blackbox like health formula.
+    // Lets solve below for s,
+    // h - s * slw + t * taw = 0
+    // where h is init_health, s is source amount in usdc native units, and t is target amount in usdc native units
+    // where t = s * slip ( s < 1), where slip is factor for slippage and fees which is normalised e.g. for 5% slippage, slip = 0.95
+    // h - s * (slw - slip * taw) = 0
+    // s = h / ( slw - slip * taw )
+    return initHealth
+      .div(
+        sourceBank.initLiabWeight.sub(
+          I80F48.fromNumber(slippageAndFeesFactor).mul(
+            targetBank.initAssetWeight,
+          ),
+        ),
+      )
+      .div(sourceBank.price);
+  }
+
+  /**
+   * Simulates new health after applying tokenChanges to the token positions. Useful to simulate health after a potential swap.
+   */
+  simHealthWithTokenPositionChanges(
+    group: Group,
+    tokenChanges: { tokenName: string; tokenAmount: number }[],
+  ): I80F48 {
+    // This is a approximation of the easy case, where
+    // mango account has no token positions for tokens in changes list, or
+    // the change is in direction e.g. deposits for deposits, borrows for borrows, of existing token position.
+    // TODO: recompute entire health using components.
+    const initHealth = (this.accountData as MangoAccountData).initHealth;
+    for (const change of tokenChanges) {
+      const bank = group.banksMap.get(change.tokenName);
+      if (change.tokenAmount >= 0) {
+        initHealth.add(
+          bank.initAssetWeight
+            .mul(I80F48.fromNumber(change.tokenAmount))
+            .mul(bank.price),
+        );
+      } else {
+        initHealth.sub(
+          bank.initLiabWeight
+            .mul(I80F48.fromNumber(change.tokenAmount))
+            .mul(bank.price),
+        );
+      }
+    }
+    return initHealth;
   }
 
   /**
