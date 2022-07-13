@@ -12,7 +12,7 @@ use fixed::types::I80F48;
 use itertools::Itertools;
 use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{
-    Bank, MangoAccount, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market, TokenIndex,
+    Bank, Group, MangoAccount, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market, TokenIndex,
 };
 
 use solana_client::rpc_client::RpcClient;
@@ -34,6 +34,7 @@ pub struct MangoClient {
     pub admin: Keypair,
     pub mango_account_cache: (Pubkey, MangoAccount),
     pub group: Pubkey,
+    pub group_cache: Group,
     // TODO: future: this may not scale if there's thousands of mints, probably some function
     // wrapping getMultipleAccounts is needed (or bettew: we provide this data as a service)
     pub banks_cache: HashMap<String, Vec<(Pubkey, Bank)>>,
@@ -74,6 +75,8 @@ impl MangoClient {
             &program.id(),
         )
         .0;
+
+        let group_data = program.account::<Group>(group)?;
 
         // Mango Account
         let mut mango_account_tuples = program.accounts::<MangoAccount>(vec![
@@ -238,6 +241,7 @@ impl MangoClient {
             payer,
             mango_account_cache,
             group,
+            group_cache: group_data,
             banks_cache,
             banks_cache_by_token_index,
             mint_infos_cache,
@@ -909,6 +913,73 @@ impl MangoClient {
                 data: anchor_lang::InstructionData::data(
                     &mango_v4::instruction::LiqTokenWithToken {
                         asset_token_index,
+                        liab_token_index,
+                        max_liab_transfer,
+                    },
+                ),
+            })
+            .send()
+    }
+
+    pub fn liq_token_bankruptcy(
+        &self,
+        liqee: (&Pubkey, &MangoAccount),
+        liab_token_index: TokenIndex,
+        max_liab_transfer: I80F48,
+    ) -> Result<Signature, anchor_client::ClientError> {
+        let quote_token_index = 0;
+
+        let (_, quote_mint_info, _) = self
+            .mint_infos_cache_by_token_index
+            .get(&quote_token_index)
+            .unwrap();
+        let (liab_mint_info_key, liab_mint_info, _) = self
+            .mint_infos_cache_by_token_index
+            .get(&liab_token_index)
+            .unwrap();
+
+        let bank_remaining_ams = liab_mint_info
+            .banks()
+            .iter()
+            .map(|bank_pubkey| AccountMeta {
+                pubkey: *bank_pubkey,
+                is_signer: false,
+                is_writable: true,
+            })
+            .collect::<Vec<_>>();
+
+        let health_remaining_ams = self
+            .derive_liquidation_health_check_remaining_account_metas(
+                liqee.1,
+                quote_token_index,
+                liab_token_index,
+            )
+            .unwrap();
+
+        self.program()
+            .request()
+            .instruction(Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        &mango_v4::accounts::LiqTokenBankruptcy {
+                            group: self.group(),
+                            liqee: *liqee.0,
+                            liqor: self.mango_account_cache.0,
+                            liqor_owner: self.payer.pubkey(),
+                            liab_mint_info: *liab_mint_info_key,
+                            quote_vault: quote_mint_info.first_vault(),
+                            insurance_vault: self.group_cache.insurance_vault,
+                            token_program: Token::id(),
+                        },
+                        None,
+                    );
+                    ams.extend(bank_remaining_ams);
+                    ams.extend(health_remaining_ams);
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(
+                    &mango_v4::instruction::LiqTokenBankruptcy {
                         liab_token_index,
                         max_liab_transfer,
                     },
