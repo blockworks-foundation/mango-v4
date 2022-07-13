@@ -131,7 +131,7 @@ async function main() {
 
       // flash loan start ix - takes a loan for source token,
       // flash loan end ix - returns increase in all token account's amounts to respective vaults,
-      const healthRemainingAccounts = await client.buildHealthRemainingAccounts(
+      const healthRemainingAccounts = client.buildHealthRemainingAccounts(
         group,
         mangoAccount,
         [sourceBank, targetBank], // we would be taking a sol loan potentially
