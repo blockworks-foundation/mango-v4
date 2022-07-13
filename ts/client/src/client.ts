@@ -454,6 +454,7 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
+      .signers([])
       .simulate();
 
     return MangoAccountData.from(
