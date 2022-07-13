@@ -1,12 +1,12 @@
-use std::{collections::HashMap, str::FromStr};
+use std::collections::HashMap;
 
 use crate::account_shared_data::KeyedAccountSharedData;
 
 use client::MangoClient;
 use mango_v4::accounts_zerocopy::LoadZeroCopy;
 use mango_v4::state::{
-    compute_health, oracle_price, Bank, FixedOrderAccountRetriever, HealthType, MangoAccount,
-    MintInfo, PerpMarketIndex, TokenIndex,
+    new_health_cache, oracle_price, Bank, FixedOrderAccountRetriever, HealthCache, HealthType,
+    MangoAccount, MintInfo, PerpMarketIndex, TokenIndex,
 };
 
 use {
@@ -31,13 +31,12 @@ fn load_mango_account_from_chain<'a, T: anchor_lang::ZeroCopy + anchor_lang::Own
     )
 }
 
-pub fn compute_health_(
+pub fn new_health_cache_(
     chain_data: &ChainData,
     mint_infos: &HashMap<TokenIndex, Pubkey>,
     perp_markets: &HashMap<PerpMarketIndex, Pubkey>,
     account: &MangoAccount,
-    health_type: HealthType,
-) -> anchor_lang::Result<I80F48> {
+) -> anchor_lang::Result<HealthCache> {
     let mut health_accounts = vec![];
     let mut banks = vec![];
     let mut oracles = vec![];
@@ -109,7 +108,7 @@ pub fn compute_health_(
         begin_perp: active_token_len * 2,
         begin_serum3: active_token_len * 2 + active_perp_len,
     };
-    compute_health(account, health_type, &retriever)
+    new_health_cache(account, &retriever)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -120,6 +119,9 @@ pub fn process_accounts<'a>(
     mint_infos: &HashMap<TokenIndex, Pubkey>,
     perp_markets: &HashMap<PerpMarketIndex, Pubkey>,
 ) -> anyhow::Result<()> {
+    // TODO: configurable
+    let min_health_ratio = I80F48::from_num(50.0f64);
+
     for pubkey in accounts {
         let account_result = load_mango_account_from_chain::<MangoAccount>(chain_data, pubkey);
         let account = match account_result {
@@ -131,14 +133,9 @@ pub fn process_accounts<'a>(
         };
 
         // compute maint health for account
-        let maint_health = compute_health_(
-            chain_data,
-            mint_infos,
-            perp_markets,
-            account,
-            HealthType::Maint,
-        )
-        .expect("always ok");
+        let maint_health = new_health_cache_(chain_data, mint_infos, perp_markets, account)
+            .expect("always ok")
+            .health(HealthType::Maint);
 
         // try liquidating
         if maint_health.is_negative() {
@@ -171,28 +168,34 @@ pub fn process_accounts<'a>(
             let (asset_token_index, _asset_bank, _asset_price) = tokens.last().unwrap();
             let (liab_token_index, _liab_bank, _liab_price) = tokens.first().unwrap();
 
+            let max_liab_transfer = {
+                let liqor = load_mango_account_from_chain::<MangoAccount>(
+                    chain_data,
+                    &mango_client.mango_account_cache.0,
+                )?;
+
+                let health_cache = new_health_cache_(chain_data, mint_infos, perp_markets, liqor)
+                    .expect("always ok");
+
+                health_cache.max_swap_source_for_health_ratio(
+                    *liab_token_index,
+                    *asset_token_index,
+                    min_health_ratio,
+                )?
+            };
+
             //
             // TODO: log liqor's assets in UI form
             // TODO: log liquee's liab_needed, need to refactor program code to be able to be accessed from client side
             // TODO: swap inherited liabs to desired asset for liqor
+            // TODO: hook ChainData into MangoClient
+            // TODO: liq_token_with_token() re-gets the liqor account via rpc unnecessarily
             //
             let sig = mango_client.liq_token_with_token(
                 (pubkey, account),
                 *asset_token_index,
                 *liab_token_index,
-                {
-                    // max liab liqor can provide
-                    // let fresh_liqor = load_mango_account_from_chain::<MangoAccount>(
-                    //     chain_data,
-                    //     &mango_client.mango_account_cache.0,
-                    // )?;
-                    // fresh_liqor
-                    //     .tokens
-                    //     .find(*liab_token_index)
-                    //     .unwrap()
-                    //     .native(&_liab_bank)
-                    I80F48::from_str("0.0000001").unwrap()
-                },
+                max_liab_transfer,
             );
             match sig {
                 Ok(sig) => log::info!(
