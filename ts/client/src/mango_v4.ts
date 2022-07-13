@@ -3428,6 +3428,158 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "TokenInfo",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "maintAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maintLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "oraclePrice",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "balance",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "serum3MaxReserved",
+            "type": {
+              "defined": "I80F48"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Serum3Info",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "reserved",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "baseIndex",
+            "type": "u64"
+          },
+          {
+            "name": "quoteIndex",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PerpInfo",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "maintAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maintLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "base",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "quote",
+            "type": {
+              "defined": "I80F48"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "HealthCache",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenInfos",
+            "type": {
+              "vec": {
+                "defined": "TokenInfo"
+              }
+            }
+          },
+          {
+            "name": "serum3Infos",
+            "type": {
+              "vec": {
+                "defined": "Serum3Info"
+              }
+            }
+          },
+          {
+            "name": "perpInfos",
+            "type": {
+              "vec": {
+                "defined": "PerpInfo"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "TokenPosition",
       "type": {
         "kind": "struct",
@@ -4046,6 +4198,13 @@ export type MangoV4 = {
     {
       "name": "MangoAccountData",
       "fields": [
+        {
+          "name": "healthCache",
+          "type": {
+            "defined": "HealthCache"
+          },
+          "index": false
+        },
         {
           "name": "initHealth",
           "type": {
@@ -8049,6 +8208,158 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "TokenInfo",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "maintAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maintLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "oraclePrice",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "balance",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "serum3MaxReserved",
+            "type": {
+              "defined": "I80F48"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Serum3Info",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "reserved",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "baseIndex",
+            "type": "u64"
+          },
+          {
+            "name": "quoteIndex",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PerpInfo",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "maintAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initAssetWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maintLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "initLiabWeight",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "base",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "quote",
+            "type": {
+              "defined": "I80F48"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "HealthCache",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenInfos",
+            "type": {
+              "vec": {
+                "defined": "TokenInfo"
+              }
+            }
+          },
+          {
+            "name": "serum3Infos",
+            "type": {
+              "vec": {
+                "defined": "Serum3Info"
+              }
+            }
+          },
+          {
+            "name": "perpInfos",
+            "type": {
+              "vec": {
+                "defined": "PerpInfo"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "TokenPosition",
       "type": {
         "kind": "struct",
@@ -8667,6 +8978,13 @@ export const IDL: MangoV4 = {
     {
       "name": "MangoAccountData",
       "fields": [
+        {
+          "name": "healthCache",
+          "type": {
+            "defined": "HealthCache"
+          },
+          "index": false
+        },
         {
           "name": "initHealth",
           "type": {

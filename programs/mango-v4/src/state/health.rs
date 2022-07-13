@@ -410,7 +410,8 @@ pub fn compute_health(
     Ok(new_health_cache(account, retriever)?.health(health_type))
 }
 
-struct TokenInfo {
+#[derive(AnchorDeserialize, AnchorSerialize)]
+pub struct TokenInfo {
     token_index: TokenIndex,
     maint_asset_weight: I80F48,
     init_asset_weight: I80F48,
@@ -451,7 +452,8 @@ impl TokenInfo {
     }
 }
 
-struct Serum3Info {
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct Serum3Info {
     reserved: I80F48,
     base_index: usize,
     quote_index: usize,
@@ -496,7 +498,8 @@ impl Serum3Info {
     }
 }
 
-struct PerpInfo {
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct PerpInfo {
     maint_asset_weight: I80F48,
     init_asset_weight: I80F48,
     maint_liab_weight: I80F48,
@@ -535,6 +538,7 @@ impl PerpInfo {
     }
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct HealthCache {
     token_infos: Vec<TokenInfo>,
     serum3_infos: Vec<Serum3Info>,
