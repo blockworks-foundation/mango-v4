@@ -542,7 +542,7 @@ impl PerpInfo {
 pub struct HealthCache {
     token_infos: Vec<TokenInfo>,
     serum3_infos: Vec<Serum3Info>,
-    perp_infos: Vec<PerpInfo>
+    perp_infos: Vec<PerpInfo>,
 }
 
 impl HealthCache {
