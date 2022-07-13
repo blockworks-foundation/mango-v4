@@ -4,6 +4,8 @@ import fs from 'fs';
 import { MangoClient } from '../../client';
 import { MANGO_V4_ID } from '../../constants';
 
+const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
+
 async function main() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
@@ -31,7 +33,7 @@ async function main() {
       JSON.parse(fs.readFileSync(process.env.ADMIN_KEYPAIR!, 'utf-8')),
     ),
   );
-  const group = await user1Client.getGroupForAdmin(admin.publicKey, 0);
+  const group = await user1Client.getGroupForAdmin(admin.publicKey, GROUP_NUM);
   console.log(`Found group ${group.publicKey.toBase58()}`);
 
   const user1MangoAccount = await user1Client.getOrCreateMangoAccount(
