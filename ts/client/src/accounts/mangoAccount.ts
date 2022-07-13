@@ -133,7 +133,7 @@ export class MangoAccount {
   }
 
   /**
-   * TODO: this is incorrect, getAssetsVal and getLiabsVal are in equity, and not in init health.
+   * TODO: this is incorrect, getAssetsVal and getLiabsVal are in equity, and not in given health type.
    * Wait for dev to be deployed to mainnet, and then we can adapt this.
    */
   getHealthRatio(healthType: HealthType): I80F48 {
