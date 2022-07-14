@@ -25,3 +25,7 @@ yarn ts-node ts/client/src/scripts/mb-example1-admin.ts
 yarn ts-node ts/client/src/scripts/mb-example1-ids-json.ts
 yarn ts-node ts/client/src/scripts/mb-example1-ids-json.ts
 ```
+
+TODO:
+consolidate devnet+mainnet-beta scripts into single scripts
+consolidate release scripts
