@@ -92,15 +92,25 @@ export class MangoAccount {
     return ta ? ta.native(bank) : ZERO_I80F48;
   }
 
-  getEquivalentNativeUsdcPosition(bank: Bank): I80F48 {
-    const ta = this.findToken(bank.tokenIndex);
-    return ta
-      ? ta
-          .native(bank)
-          .mul(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
-          .div(I80F48.fromNumber(Math.pow(10, bank.mintDecimals)))
-          .mul(bank.price)
-      : ZERO_I80F48;
+  static getEquivalentNativeUsdcPosition(
+    sourceBank: Bank,
+    nativeTokenPosition: TokenPosition,
+  ): I80F48 {
+    return nativeTokenPosition
+      .native(sourceBank)
+      .mul(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
+      .div(I80F48.fromNumber(Math.pow(10, sourceBank.mintDecimals)))
+      .mul(sourceBank.price);
+  }
+
+  static getEquivalentNativeTokenPosition(
+    targetBank: Bank,
+    nativeUsdcPosition: I80F48,
+  ): I80F48 {
+    return nativeUsdcPosition
+      .div(targetBank.price)
+      .div(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
+      .mul(I80F48.fromNumber(Math.pow(10, targetBank.mintDecimals)));
   }
 
   getNativeDeposits(bank: Bank): I80F48 {
@@ -191,14 +201,21 @@ export class MangoAccount {
 
   /**
    * The amount of given native token you can borrow, considering all existing assets as collateral except the deposits for this token.
-   * The existing native deposits need to be added to get the full amount that could be withdrawn.
+   * Note 1: The existing native deposits need to be added to get the full amount that could be withdrawn.
+   * Note 2: The group might have less native deposits than what this returns.
    */
   getMaxWithdrawWithBorrowForToken(group: Group, tokenName: string): I80F48 {
     const bank = group.banksMap.get(tokenName);
     const initHealth = (this.accountData as MangoAccountData).initHealth;
-    const inUsdcUnits = this.getEquivalentNativeUsdcPosition(bank);
+    const inUsdcUnits = MangoAccount.getEquivalentNativeUsdcPosition(
+      bank,
+      this.findToken(bank.tokenIndex),
+    );
     const newInitHealth = initHealth.sub(inUsdcUnits.mul(bank.initAssetWeight));
-    return newInitHealth.div(bank.price.mul(bank.initLiabWeight));
+    return MangoAccount.getEquivalentNativeTokenPosition(
+      bank,
+      newInitHealth.div(bank.initLiabWeight),
+    );
   }
 
   /**
