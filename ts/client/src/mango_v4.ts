@@ -313,7 +313,7 @@ export type MangoV4 = {
         },
         {
           "name": "mintInfo",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         }
       ],
@@ -5093,7 +5093,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "mintInfo",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         }
       ],
