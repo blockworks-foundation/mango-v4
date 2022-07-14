@@ -52,6 +52,16 @@ async function main() {
   console.log(mangoAccount.toString(group));
 
   if (true) {
+    console.log(`...depositing 10 USDC`);
+    await client.tokenDeposit(group, mangoAccount, 'USDC', 10);
+    await mangoAccount.reload(client, group);
+
+    console.log(`...depositing 1 SOL`);
+    await client.tokenDeposit(group, mangoAccount, 'SOL', 1);
+    await mangoAccount.reload(client, group);
+  }
+
+  if (true) {
     await mangoAccount.reload(client, group);
     console.log(
       'mangoAccount.getEquity() ' +
