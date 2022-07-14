@@ -1,5 +1,6 @@
 import { Jupiter } from '@jup-ag/core';
 import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
+import { simulateTransaction } from '@project-serum/anchor/dist/cjs/utils/rpc';
 import { getFeeRates, getFeeTier } from '@project-serum/serum';
 import { Order } from '@project-serum/serum/lib/market';
 import {
@@ -50,6 +51,7 @@ import {
   toNativeDecimals,
   toU64,
 } from './utils';
+import { simulate } from './utils/anchor';
 
 // TODO: replace ui values with native as input wherever possible
 // TODO: replace token/market names with token or market indices
@@ -440,7 +442,10 @@ export class MangoClient {
     mangoAccount: MangoAccount,
   ): Promise<MangoAccountData> {
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount);
+      this.buildHealthRemainingAccounts(group, mangoAccount);
+
+    // Use our custom simulate fn in utils/anchor.ts so signing the tx is not required
+    this.program.provider.simulate = simulate;
 
     const res = await this.program.methods
       .computeAccountData()
@@ -454,7 +459,6 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-      .signers([])
       .simulate();
 
     return MangoAccountData.from(
@@ -508,7 +512,7 @@ export class MangoClient {
     }
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
+      this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     return await this.program.methods
       .tokenDeposit(toNativeDecimals(amount, bank.mintDecimals))
@@ -551,7 +555,7 @@ export class MangoClient {
     );
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
+      this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     return await this.program.methods
       .tokenWithdraw(toNativeDecimals(amount, bank.mintDecimals), allowBorrow)
@@ -586,7 +590,7 @@ export class MangoClient {
     );
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
+      this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     return await this.program.methods
       .tokenWithdraw(new BN(nativeAmount), allowBorrow)
@@ -774,7 +778,7 @@ export class MangoClient {
       );
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount);
+      this.buildHealthRemainingAccounts(group, mangoAccount);
 
     const limitPrice = serum3MarketExternal.priceNumberToLots(price);
     const maxBaseQuantity = serum3MarketExternal.baseSizeNumberToLots(size);
@@ -1131,7 +1135,7 @@ export class MangoClient {
     const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount);
+      this.buildHealthRemainingAccounts(group, mangoAccount);
 
     let [nativePrice, nativeQuantity] = perpMarket.uiToNativePriceQuantity(
       price,
@@ -1193,7 +1197,7 @@ export class MangoClient {
     if (!inputBank || !outputBank) throw new Error('Invalid token');
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount, [
+      this.buildHealthRemainingAccounts(group, mangoAccount, [
         inputBank,
         outputBank,
       ]);
@@ -1438,7 +1442,7 @@ export class MangoClient {
     if (!inputBank || !outputBank) throw new Error('Invalid token');
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount, [
+      this.buildHealthRemainingAccounts(group, mangoAccount, [
         inputBank,
         outputBank,
       ]);
@@ -1645,7 +1649,7 @@ export class MangoClient {
 
   /// private
 
-  public async buildHealthRemainingAccounts(
+  public buildHealthRemainingAccounts(
     group: Group,
     mangoAccount: MangoAccount,
     banks?: Bank[] /** TODO for serum3PlaceOrder we are just ingoring this atm */,
