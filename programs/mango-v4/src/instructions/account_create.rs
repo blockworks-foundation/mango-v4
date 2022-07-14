@@ -6,7 +6,7 @@ use crate::util::fill32_from_str;
 
 #[derive(Accounts)]
 #[instruction(account_num: u8)]
-pub struct CreateAccount<'info> {
+pub struct AccountCreate<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
@@ -17,7 +17,6 @@ pub struct CreateAccount<'info> {
         space = 8 + std::mem::size_of::<MangoAccount>(),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
-
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -26,7 +25,7 @@ pub struct CreateAccount<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn create_account(ctx: Context<CreateAccount>, account_num: u8, name: String) -> Result<()> {
+pub fn account_create(ctx: Context<AccountCreate>, account_num: u8, name: String) -> Result<()> {
     let mut account = ctx.accounts.account.load_init()?;
 
     account.name = fill32_from_str(name)?;
@@ -38,8 +37,8 @@ pub fn create_account(ctx: Context<CreateAccount>, account_num: u8, name: String
     account.tokens = MangoAccountTokenPositions::default();
     account.serum3 = MangoAccountSerum3Orders::default();
     account.perps = MangoAccountPerpPositions::default();
-    account.being_liquidated = 0;
-    account.is_bankrupt = 0;
+    account.set_being_liquidated(false);
+    account.set_bankrupt(false);
 
     Ok(())
 }

@@ -27,7 +27,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // SETUP: Create a group, account, register a token (mint0)
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -39,7 +39,7 @@ async fn test_basic() -> Result<(), TransportError> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -63,7 +63,8 @@ async fn test_basic() -> Result<(), TransportError> {
                 amount: deposit_amount,
                 account,
                 token_account: payer_mint0_account,
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -80,6 +81,13 @@ async fn test_basic() -> Result<(), TransportError> {
         );
         let bank_data: Bank = solana.get_account(bank).await;
         assert!(bank_data.native_deposits() - I80F48::from_num(deposit_amount) < dust_threshold);
+
+        let account_data: MangoAccount = solana.get_account(account).await;
+        // Assumes oracle price of 1
+        assert_eq!(
+            account_data.net_deposits,
+            (I80F48::from_num(deposit_amount) * QUOTE_NATIVE_TO_UI).to_num::<f32>()
+        );
     }
 
     //
@@ -111,6 +119,7 @@ async fn test_basic() -> Result<(), TransportError> {
                 account,
                 owner,
                 token_account: payer_mint0_account,
+                bank_index: 0,
             },
         )
         .await
@@ -130,6 +139,13 @@ async fn test_basic() -> Result<(), TransportError> {
             bank_data.native_deposits() - I80F48::from_num(start_amount - withdraw_amount)
                 < dust_threshold
         );
+
+        let account_data: MangoAccount = solana.get_account(account).await;
+        // Assumes oracle price of 1
+        assert_eq!(
+            account_data.net_deposits,
+            (I80F48::from_num(start_amount - withdraw_amount) * QUOTE_NATIVE_TO_UI).to_num::<f32>()
+        );
     }
 
     //
@@ -139,12 +155,8 @@ async fn test_basic() -> Result<(), TransportError> {
     // withdraw whatever is remaining, can't close bank vault without this
     send_tx(
         solana,
-        UpdateIndexInstruction {
+        TokenUpdateIndexAndRateInstruction {
             mint_info: tokens[0].mint_info,
-            banks: {
-                let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
-                mint_info.banks.to_vec()
-            },
         },
     )
     .await
@@ -158,6 +170,7 @@ async fn test_basic() -> Result<(), TransportError> {
             account,
             owner,
             token_account: payer_mint0_account,
+            bank_index: 0,
         },
     )
     .await
@@ -166,7 +179,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // close account
     send_tx(
         solana,
-        CloseAccountInstruction {
+        AccountCloseInstruction {
             group,
             account,
             owner,
@@ -204,7 +217,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // close stub oracle
     send_tx(
         solana,
-        CloseStubOracleInstruction {
+        StubOracleCloseInstruction {
             group,
             mint: bank_data.mint,
             admin,
@@ -217,7 +230,7 @@ async fn test_basic() -> Result<(), TransportError> {
     // close group
     send_tx(
         solana,
-        CloseGroupInstruction {
+        GroupCloseInstruction {
             group,
             admin,
             sol_destination: payer.pubkey(),

@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use core::fmt::Display;
 
 // todo: group error blocks by kind
 // todo: add comments which indicate decimal code for an error
@@ -6,16 +7,111 @@ use anchor_lang::prelude::*;
 pub enum MangoError {
     #[msg("")]
     SomeError,
-    #[msg("")]
+    #[msg("checked math error")]
     MathError,
     #[msg("")]
     UnexpectedOracle,
-    #[msg("")]
+    #[msg("oracle type cannot be determined")]
     UnknownOracleType,
     #[msg("")]
     InvalidFlashLoanTargetCpiProgram,
-    #[msg("")]
+    #[msg("health must be positive")]
     HealthMustBePositive,
-    #[msg("The account is bankrupt")]
+    #[msg("the account is bankrupt")]
     IsBankrupt,
+    #[msg("the account is not bankrupt")]
+    IsNotBankrupt,
+    #[msg("no free token position index")]
+    NoFreeTokenPositionIndex,
+    #[msg("no free serum3 open orders index")]
+    NoFreeSerum3OpenOrdersIndex,
+    #[msg("no free perp position index")]
+    NoFreePerpPositionIndex,
+    #[msg("serum3 open orders exist already")]
+    Serum3OpenOrdersExistAlready,
 }
+
+pub trait Contextable {
+    /// Add a context string `c` to a Result or Error
+    ///
+    /// Example: foo().context("calling foo")?;
+    fn context(self, c: impl Display) -> Self;
+
+    /// Like `context()`, but evaluate the context string lazily
+    ///
+    /// Use this if it's expensive to generate, like a format!() call.
+    fn with_context<C, F>(self, c: F) -> Self
+    where
+        C: Display,
+        F: FnOnce() -> C;
+}
+
+impl Contextable for Error {
+    fn context(self, c: impl Display) -> Self {
+        match self {
+            Error::AnchorError(err) => Error::AnchorError(AnchorError {
+                error_msg: if err.error_msg.is_empty() {
+                    format!("{}", c)
+                } else {
+                    format!("{}; {}", err.error_msg, c)
+                },
+                ..err
+            }),
+            // Maybe wrap somehow?
+            Error::ProgramError(err) => Error::ProgramError(err),
+        }
+    }
+    fn with_context<C, F>(self, c: F) -> Self
+    where
+        C: Display,
+        F: FnOnce() -> C,
+    {
+        self.context(c())
+    }
+}
+
+impl<T> Contextable for Result<T> {
+    fn context(self, c: impl Display) -> Self {
+        if let Err(err) = self {
+            Err(err.context(c))
+        } else {
+            self
+        }
+    }
+    fn with_context<C, F>(self, c: F) -> Self
+    where
+        C: Display,
+        F: FnOnce() -> C,
+    {
+        if let Err(err) = self {
+            Err(err.context(c()))
+        } else {
+            self
+        }
+    }
+}
+
+/// Creates an Error with a particular message, using format!() style arguments
+///
+/// Example: error_msg!("index {} not found", index)
+#[macro_export]
+macro_rules! error_msg {
+    ($($arg:tt)*) => {
+        error!(MangoError::SomeError).context(format!($($arg)*))
+    };
+}
+
+/// Like anchor's require!(), but with a customizable message
+///
+/// Example: require!(condition, "the condition on account {} was violated", account_key);
+#[macro_export]
+macro_rules! require_msg {
+    ($invariant:expr, $($arg:tt)*) => {
+        if !($invariant) {
+            Err(error_msg!($($arg)*))?;
+        }
+    };
+}
+
+pub use error_msg;
+pub use require_msg;

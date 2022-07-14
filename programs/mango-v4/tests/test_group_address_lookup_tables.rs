@@ -31,14 +31,14 @@ async fn test_group_address_lookup_tables() -> Result<()> {
     // SETUP: Create a group
     //
 
-    let group = send_tx(solana, CreateGroupInstruction { admin, payer })
+    let group = send_tx(solana, GroupCreateInstruction { admin, payer })
         .await
         .unwrap()
         .group;
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -56,7 +56,7 @@ async fn test_group_address_lookup_tables() -> Result<()> {
     let register_mint = |index: TokenIndex, mint: MintCookie, address_lookup_table: Pubkey| async move {
         let create_stub_oracle_accounts = send_tx(
             solana,
-            CreateStubOracle {
+            StubOracleCreate {
                 mint: mint.pubkey,
                 payer,
             },
@@ -66,7 +66,7 @@ async fn test_group_address_lookup_tables() -> Result<()> {
         let oracle = create_stub_oracle_accounts.oracle;
         send_tx(
             solana,
-            SetStubOracleInstruction {
+            StubOracleSetInstruction {
                 group,
                 admin,
                 mint: mint.pubkey,

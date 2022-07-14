@@ -17,15 +17,17 @@ pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
 
     let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, &group_pk)?;
 
-    let init_health = compute_health(&account, HealthType::Init, &account_retriever)?;
-    let maint_health = compute_health(&account, HealthType::Maint, &account_retriever)?;
+    let health_cache = new_health_cache(&account, &account_retriever)?;
+    let init_health = health_cache.health(HealthType::Init);
+    let maint_health = health_cache.health(HealthType::Maint);
 
     let equity = compute_equity(&account, &account_retriever)?;
 
     emit!(MangoAccountData {
+        health_cache,
         init_health,
         maint_health,
-        equity
+        equity,
     });
 
     Ok(())

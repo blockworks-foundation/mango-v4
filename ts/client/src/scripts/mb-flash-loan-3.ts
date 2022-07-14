@@ -20,6 +20,9 @@ const MANGO_MAINNET_PAYER_KEYPAIR =
   process.env.MANGO_MAINNET_PAYER_KEYPAIR ||
   '/Users/tylershipe/.config/solana/deploy.json';
 
+//
+// example script which shows usage of flash loan 3 ix using a jupiter swap
+//
 // NOTE: we assume that ATA for source and target already exist for wallet
 async function main() {
   const options = AnchorProvider.defaultOptions();

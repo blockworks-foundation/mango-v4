@@ -18,7 +18,7 @@ pub struct Serum3SettleFunds<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = owner,
+        constraint = account.load()?.is_owner_or_delegate(owner.key()),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
@@ -77,7 +77,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     //
     {
         let account = ctx.accounts.account.load()?;
-        require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
+        require!(!account.is_bankrupt(), MangoError::IsBankrupt);
 
         // Validate open_orders
         require!(
@@ -149,17 +149,19 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         let after_quote_vault = ctx.accounts.quote_vault.amount;
 
         // Charge the difference in vault balances to the user's account
-        let base_bank = ctx.accounts.base_bank.load_mut()?;
-        let quote_bank = ctx.accounts.quote_bank.load_mut()?;
+        let mut account = ctx.accounts.account.load_mut()?;
+        let mut base_bank = ctx.accounts.base_bank.load_mut()?;
+        let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
         apply_vault_difference(
-            ctx.accounts.account.load_mut()?,
-            base_bank,
+            &mut account,
+            &mut base_bank,
             after_base_vault,
             before_base_vault,
-            quote_bank,
+            &mut quote_bank,
             after_quote_vault,
             before_quote_vault,
-        )?;
+        )?
+        .deactivate_inactive_token_accounts(&mut account);
     }
 
     Ok(())
@@ -185,7 +187,7 @@ pub fn charge_maybe_fees(
         serum3_account.previous_native_coin_reserved = after_oo.native_coin_reserved();
 
         // loan origination fees
-        let coin_token_account = account.tokens.get_mut(coin_bank.token_index)?;
+        let coin_token_account = account.tokens.get_mut(coin_bank.token_index)?.0;
         let coin_token_native = coin_token_account.native(&coin_bank);
 
         if coin_token_native.is_negative() {
@@ -195,7 +197,7 @@ pub fn charge_maybe_fees(
             // charge the loan origination fee
             coin_bank
                 .borrow_mut()
-                .charge_loan_origination_fee(coin_token_account, actualized_loan)?;
+                .withdraw_loan_origination_fee(coin_token_account, actualized_loan)?;
         }
     }
 
@@ -209,7 +211,7 @@ pub fn charge_maybe_fees(
         serum3_account.previous_native_pc_reserved = after_oo.native_pc_reserved();
 
         // loan origination fees
-        let pc_token_account = account.tokens.get_mut(pc_bank.token_index)?;
+        let pc_token_account = account.tokens.get_mut(pc_bank.token_index)?.0;
         let pc_token_native = pc_token_account.native(&pc_bank);
 
         if pc_token_native.is_negative() {
@@ -219,7 +221,7 @@ pub fn charge_maybe_fees(
             // charge the loan origination fee
             pc_bank
                 .borrow_mut()
-                .charge_loan_origination_fee(pc_token_account, actualized_loan)?;
+                .withdraw_loan_origination_fee(pc_token_account, actualized_loan)?;
         }
     }
 

@@ -1,14 +1,16 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
 
+use crate::error::*;
 use crate::state::*;
 
 #[derive(Accounts)]
-pub struct CloseAccount<'info> {
+pub struct AccountClose<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
         mut,
+        // note: should never be the delegate
         has_one = owner,
         has_one = group,
         close = sol_destination
@@ -23,7 +25,7 @@ pub struct CloseAccount<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
+pub fn account_close(ctx: Context<AccountClose>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
     // don't perform checks if group is just testing
@@ -32,9 +34,9 @@ pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
     }
 
     let account = ctx.accounts.account.load()?;
-    require_eq!(account.being_liquidated, 0);
+    require!(!account.being_liquidated(), MangoError::SomeError);
+    require!(!account.is_bankrupt(), MangoError::SomeError);
     require_eq!(account.delegate, Pubkey::default());
-    require_eq!(account.is_bankrupt, 0);
     for ele in account.tokens.values {
         require_eq!(ele.is_active(), false);
     }

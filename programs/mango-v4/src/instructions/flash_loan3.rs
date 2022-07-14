@@ -1,5 +1,5 @@
 use crate::accounts_zerocopy::*;
-use crate::error::MangoError;
+use crate::error::*;
 use crate::group_seeds;
 use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
 use crate::state::{
@@ -40,10 +40,11 @@ pub struct FlashLoan3Begin<'info> {
 pub struct FlashLoan3End<'info> {
     #[account(
         mut,
-        has_one = owner,
+        constraint = account.load()?.is_owner_or_delegate(owner.key()),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
+
     pub token_program: Program<'info, Token>,
 }
 
@@ -54,11 +55,7 @@ pub fn flash_loan3_begin<'key, 'accounts, 'remaining, 'info>(
     loan_amounts: Vec<u64>,
 ) -> Result<()> {
     let num_loans = loan_amounts.len();
-    require_eq!(
-        ctx.remaining_accounts.len(),
-        3 * num_loans,
-        MangoError::SomeError
-    );
+    require_eq!(ctx.remaining_accounts.len(), 3 * num_loans);
     let banks = &ctx.remaining_accounts[..num_loans];
     let vaults = &ctx.remaining_accounts[num_loans..2 * num_loans];
     let token_accounts = &ctx.remaining_accounts[2 * num_loans..];
@@ -105,10 +102,9 @@ pub fn flash_loan3_begin<'key, 'accounts, 'remaining, 'info>(
 
         // Forbid FlashLoan3Begin to be called from CPI (it does not have to be the first instruction)
         let current_ix = tx_instructions::load_instruction_at_checked(current_index, ixs)?;
-        require_keys_eq!(
-            current_ix.program_id,
-            *ctx.program_id,
-            MangoError::SomeError
+        require_msg!(
+            current_ix.program_id == *ctx.program_id,
+            "FlashLoan3Begin must be a top-level instruction"
         );
 
         // The only other mango instruction that must appear before the end of the tx is
@@ -119,19 +115,22 @@ pub fn flash_loan3_begin<'key, 'accounts, 'remaining, 'info>(
             let ix = match tx_instructions::load_instruction_at_checked(index, ixs) {
                 Ok(ix) => ix,
                 Err(ProgramError::InvalidArgument) => break, // past the last instruction
-                Err(e) => Err(e)?,
+                Err(e) => return Err(e.into()),
             };
 
             // Check that the mango program key is not used
             if ix.program_id == crate::id() {
                 // must be the last mango ix -- this could possibly be relaxed, but right now
                 // we need to guard against multiple FlashLoanEnds
-                require!(!found_end, MangoError::SomeError);
+                require_msg!(
+                    !found_end,
+                    "the transaction must not contain a Mango instruction after FlashLoan3End"
+                );
                 found_end = true;
 
                 // must be the FlashLoan3End instruction
                 require!(
-                    &ix.data[0..8] == &[163, 231, 155, 56, 201, 68, 84, 148],
+                    ix.data[0..8] == [163, 231, 155, 56, 201, 68, 84, 148],
                     MangoError::SomeError
                 );
 
@@ -139,18 +138,21 @@ pub fn flash_loan3_begin<'key, 'accounts, 'remaining, 'info>(
                 let begin_accounts = &ctx.remaining_accounts[num_loans..];
                 let end_accounts = &ix.accounts[ix.accounts.len() - 2 * num_loans..];
                 for (begin_account, end_account) in begin_accounts.iter().zip(end_accounts.iter()) {
-                    require_keys_eq!(*begin_account.key, end_account.pubkey);
+                    require_msg!(*begin_account.key == end_account.pubkey, "the trailing accounts passed to FlashLoan3Begin and End must match, found {} on begin and {} on end", begin_account.key, end_account.pubkey);
                 }
             } else {
                 // ensure no one can cpi into mango either
                 for meta in ix.accounts.iter() {
-                    require_keys_neq!(meta.pubkey, crate::id());
+                    require_msg!(meta.pubkey != crate::id(), "instructions between FlashLoan3Begin and End may not use the Mango program account");
                 }
             }
 
             index += 1;
         }
-        require!(found_end, MangoError::SomeError);
+        require_msg!(
+            found_end,
+            "found no FlashLoan3End instruction in transaction"
+        );
     }
 
     Ok(())
@@ -167,7 +169,7 @@ pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan3End<'info>>,
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_mut()?;
-    require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!account.is_bankrupt(), MangoError::IsBankrupt);
 
     // Find index at which vaults start
     let vaults_index = ctx
@@ -181,7 +183,7 @@ pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
 
             maybe_token_account.unwrap().owner == account.group
         })
-        .ok_or_else(|| error!(MangoError::SomeError))?;
+        .ok_or_else(|| error_msg!("expected at least one vault token account to be passed"))?;
     let vaults_len = (ctx.remaining_accounts.len() - vaults_index) / 2;
     require_eq!(ctx.remaining_accounts.len(), vaults_index + 2 * vaults_len);
 
@@ -252,7 +254,14 @@ pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
     }
 
     // all vaults must have had matching banks
-    require!(vaults_with_banks.iter().all(|&b| b), MangoError::SomeError);
+    for (i, has_bank) in vaults_with_banks.iter().enumerate() {
+        require_msg!(
+            has_bank,
+            "missing bank for vault index {}, address {}",
+            i,
+            vaults[i].key
+        );
+    }
 
     // Check pre-cpi health
     // NOTE: This health check isn't strictly necessary. It will be, later, when

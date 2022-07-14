@@ -1,6 +1,7 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
+import { HealthType } from '../accounts/mangoAccount';
 import { OrderType, Side } from '../accounts/perp';
 import {
   Serum3OrderType,
@@ -17,6 +18,9 @@ import { toUiDecimals } from '../utils';
 // process.env.USER_KEYPAIR - mango account owner keypair path
 // process.env.ADMIN_KEYPAIR - group admin keypair path (useful for automatically finding the group)
 //
+// This script deposits some tokens, places some serum orders, cancels them, places some perp orders
+//
+
 async function main() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
@@ -58,32 +62,57 @@ async function main() {
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString());
 
-  await mangoAccount.reloadAccountData(client, group);
-
   if (true) {
-    // deposit and withdraw
-    console.log(`Depositing...50 USDC`);
-    await client.tokenDeposit(group, mangoAccount, 'USDC', 50);
-    await mangoAccount.reload(client, group);
-
-    console.log(`Depositing...0.0005 BTC`);
-    await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005);
-    await mangoAccount.reload(client, group);
-
-    console.log(`Withdrawing...0.1 ORCA`);
-    await client.tokenWithdraw2(
+    // set delegate, and change name
+    console.log(`...changing mango account name, and setting a delegate`);
+    const randomKey = new PublicKey(
+      '4ZkS7ZZkxfsC3GtvvsHP3DFcUeByU9zzZELS4r8HCELo',
+    );
+    await client.editMangoAccount(
       group,
       mangoAccount,
-      'ORCA',
-      0.1 * Math.pow(10, group.banksMap.get('ORCA').mintDecimals),
-      true,
+      'my_changed_name',
+      randomKey,
     );
     await mangoAccount.reload(client, group);
     console.log(mangoAccount.toString());
 
+    console.log(`...resetting mango account name, and re-setting a delegate`);
+    await client.editMangoAccount(
+      group,
+      mangoAccount,
+      'my_mango_account',
+      PublicKey.default,
+    );
+    await mangoAccount.reload(client, group);
+    console.log(mangoAccount.toString());
+  }
+
+  if (true) {
+    // deposit and withdraw
+    console.log(`...depositing 50 USDC`);
+    await client.tokenDeposit(group, mangoAccount, 'USDC', 50);
+    await mangoAccount.reload(client, group);
+
+    console.log(`...depositing 0.0005 BTC`);
+    await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005);
+    await mangoAccount.reload(client, group);
+
+    // witdrawing fails if no (other) user has deposited ORCA in the group
+    // console.log(`Withdrawing...0.1 ORCA`);
+    // await client.tokenWithdraw2(
+    //   group,
+    //   mangoAccount,
+    //   'ORCA',
+    //   0.1 * Math.pow(10, group.banksMap.get('ORCA').mintDecimals),
+    //   true,
+    // );
+    // await mangoAccount.reload(client, group);
+    // console.log(mangoAccount.toString());
+
     // serum3
     console.log(
-      `Placing serum3 bid which would not be settled since its relatively low then midprice...`,
+      `...placing serum3 bid which would not be settled since its relatively low then midprice`,
     );
     await client.serum3PlaceOrder(
       group,
@@ -100,7 +129,7 @@ async function main() {
     );
     await mangoAccount.reload(client, group);
 
-    console.log(`Placing serum3 bid way above midprice...`);
+    console.log(`...placing serum3 bid way above midprice`);
     await client.serum3PlaceOrder(
       group,
       mangoAccount,
@@ -116,7 +145,7 @@ async function main() {
     );
     await mangoAccount.reload(client, group);
 
-    console.log(`Placing serum3 ask way below midprice...`);
+    console.log(`...placing serum3 ask way below midprice`);
     await client.serum3PlaceOrder(
       group,
       mangoAccount,
@@ -131,7 +160,7 @@ async function main() {
       10,
     );
 
-    console.log(`Current own orders on OB...`);
+    console.log(`...current own orders on OB`);
     let orders = await client.getSerum3Orders(
       group,
 
@@ -139,9 +168,9 @@ async function main() {
     );
     for (const order of orders) {
       console.log(
-        ` - Order orderId ${order.orderId}, ${order.side}, ${order.price}, ${order.size}`,
+        `  - order orderId ${order.orderId}, ${order.side}, ${order.price}, ${order.size}`,
       );
-      console.log(` - Cancelling order with ${order.orderId}`);
+      console.log(`  - cancelling order with ${order.orderId}`);
       await client.serum3CancelOrder(
         group,
         mangoAccount,
@@ -152,7 +181,7 @@ async function main() {
       );
     }
 
-    console.log(`Current own orders on OB...`);
+    console.log(`...current own orders on OB`);
     orders = await client.getSerum3Orders(
       group,
 
@@ -162,7 +191,7 @@ async function main() {
       console.log(order);
     }
 
-    console.log(`Settling funds...`);
+    console.log(`...settling funds`);
     await client.serum3SettleFunds(
       group,
       mangoAccount,
@@ -174,23 +203,31 @@ async function main() {
   if (true) {
     await mangoAccount.reload(client, group);
     console.log(
-      'mangoAccount.getEquity() ' +
+      '...mangoAccount.getEquity() ' +
         toUiDecimals(mangoAccount.getEquity().toNumber()),
     );
     console.log(
-      'mangoAccount.getCollateralValue() ' +
+      '...mangoAccount.getCollateralValue() ' +
         toUiDecimals(mangoAccount.getCollateralValue().toNumber()),
     );
     console.log(
-      'mangoAccount.getAssetsVal() ' +
+      '...mangoAccount.accountData["healthCache"].health(HealthType.init) ' +
+        toUiDecimals(
+          mangoAccount.accountData['healthCache']
+            .health(HealthType.init)
+            .toNumber(),
+        ),
+    );
+    console.log(
+      '...mangoAccount.getAssetsVal() ' +
         toUiDecimals(mangoAccount.getAssetsVal().toNumber()),
     );
     console.log(
-      'mangoAccount.getLiabsVal() ' +
+      '...mangoAccount.getLiabsVal() ' +
         toUiDecimals(mangoAccount.getLiabsVal().toNumber()),
     );
     console.log(
-      "mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL') " +
+      '...mangoAccount.getMaxWithdrawWithBorrowForToken(group, "SOL") ' +
         toUiDecimals(
           (
             await mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL')
@@ -198,7 +235,7 @@ async function main() {
         ),
     );
     console.log(
-      "mangoAccount.getSerum3MarketMarginAvailable(group, 'BTC/USDC') " +
+      "...mangoAccount.getSerum3MarketMarginAvailable(group, 'BTC/USDC') " +
         toUiDecimals(
           mangoAccount
             .getSerum3MarketMarginAvailable(group, 'BTC/USDC')
@@ -206,7 +243,7 @@ async function main() {
         ),
     );
     console.log(
-      "mangoAccount.getPerpMarketMarginAvailable(group, 'BTC-PERP') " +
+      "...mangoAccount.getPerpMarketMarginAvailable(group, 'BTC-PERP') " +
         toUiDecimals(
           mangoAccount
             .getPerpMarketMarginAvailable(group, 'BTC-PERP')
@@ -217,7 +254,7 @@ async function main() {
 
   if (true) {
     // perps
-    console.log(`Placing perp bid...`);
+    console.log(`...placing perp bid`);
     try {
       await client.perpPlaceOrder(
         group,
@@ -236,7 +273,7 @@ async function main() {
       console.log(error);
     }
 
-    console.log(`Placing perp ask...`);
+    console.log(`...placing perp ask`);
     await client.perpPlaceOrder(
       group,
       mangoAccount,
@@ -254,7 +291,7 @@ async function main() {
     while (true) {
       // TODO: quotePositionNative might be buggy on program side, investigate...
       console.log(
-        `Waiting for self trade to consume (note: make sure keeper crank is running)...`,
+        `...waiting for self trade to consume (note: make sure keeper crank is running)`,
       );
       await mangoAccount.reload(client, group);
       console.log(mangoAccount.toString());

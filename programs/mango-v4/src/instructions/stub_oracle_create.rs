@@ -5,7 +5,7 @@ use fixed::types::I80F48;
 use crate::state::*;
 
 #[derive(Accounts)]
-pub struct CreateStubOracle<'info> {
+pub struct StubOracleCreate<'info> {
     #[account(
         has_one = admin,
     )]
@@ -30,7 +30,7 @@ pub struct CreateStubOracle<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn create_stub_oracle(ctx: Context<CreateStubOracle>, price: I80F48) -> Result<()> {
+pub fn stub_oracle_create(ctx: Context<StubOracleCreate>, price: I80F48) -> Result<()> {
     let mut oracle = ctx.accounts.oracle.load_init()?;
     oracle.group = ctx.accounts.group.key();
     oracle.mint = ctx.accounts.token_mint.key();

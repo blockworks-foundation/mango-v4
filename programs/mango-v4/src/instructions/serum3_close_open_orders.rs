@@ -10,7 +10,7 @@ pub struct Serum3CloseOpenOrders<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = owner,
+        constraint = account.load()?.is_owner_or_delegate(owner.key()),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
@@ -41,7 +41,7 @@ pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<(
     //
     let mut account = ctx.accounts.account.load_mut()?;
     let serum_market = ctx.accounts.serum_market.load()?;
-    require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!account.is_bankrupt(), MangoError::IsBankrupt);
     // Validate open_orders
     require!(
         account

@@ -121,18 +121,26 @@ impl MangoAccountTokenPositions {
         }
     }
 
-    pub fn get(&self, token_index: TokenIndex) -> Result<&TokenPosition> {
+    /// Returns
+    /// - the position
+    /// - the raw index into the token positions list (for use with get_raw/deactivate)
+    pub fn get(&self, token_index: TokenIndex) -> Result<(&TokenPosition, usize)> {
         self.values
             .iter()
-            .find(|p| p.is_active_for_token(token_index))
-            .ok_or_else(|| error!(MangoError::SomeError)) // TODO: not found error
+            .enumerate()
+            .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| (p, raw_index)))
+            .ok_or_else(|| error_msg!("position for token index {} not found", token_index))
     }
 
-    pub fn get_mut(&mut self, token_index: TokenIndex) -> Result<&mut TokenPosition> {
+    /// Returns
+    /// - the position
+    /// - the raw index into the token positions list (for use with get_raw/deactivate)
+    pub fn get_mut(&mut self, token_index: TokenIndex) -> Result<(&mut TokenPosition, usize)> {
         self.values
             .iter_mut()
-            .find(|p| p.is_active_for_token(token_index))
-            .ok_or_else(|| error!(MangoError::SomeError)) // TODO: not found error
+            .enumerate()
+            .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| (p, raw_index)))
+            .ok_or_else(|| error_msg!("position for token index {} not found", token_index))
     }
 
     pub fn get_mut_raw(&mut self, raw_token_index: usize) -> &mut TokenPosition {
@@ -178,7 +186,8 @@ impl MangoAccountTokenPositions {
             }
             Ok((v, raw_index, bank_index))
         } else {
-            err!(MangoError::SomeError) // TODO: No free space
+            err!(MangoError::NoFreeTokenPositionIndex)
+                .context(format!("when looking for token index {}", token_index))
         }
     }
 
@@ -287,7 +296,7 @@ impl MangoAccountSerum3Orders {
 
     pub fn create(&mut self, market_index: Serum3MarketIndex) -> Result<&mut Serum3Orders> {
         if self.find(market_index).is_some() {
-            return err!(MangoError::SomeError); // exists already
+            return err!(MangoError::Serum3OpenOrdersExistAlready);
         }
         if let Some(v) = self.values.iter_mut().find(|p| !p.is_active()) {
             *v = Serum3Orders {
@@ -296,7 +305,7 @@ impl MangoAccountSerum3Orders {
             };
             Ok(v)
         } else {
-            err!(MangoError::SomeError) // no space
+            err!(MangoError::NoFreeSerum3OpenOrdersIndex)
         }
     }
 
@@ -305,7 +314,7 @@ impl MangoAccountSerum3Orders {
             .values
             .iter()
             .position(|p| p.is_active_for_market(market_index))
-            .ok_or(MangoError::SomeError)?;
+            .ok_or_else(|| error_msg!("serum3 open orders index {} not found", market_index))?;
 
         self.values[index].market_index = Serum3MarketIndex::MAX;
 
@@ -541,7 +550,7 @@ impl MangoAccountPerpPositions {
         if let Some(i) = pos {
             Ok((&mut self.accounts[i], i))
         } else {
-            err!(MangoError::SomeError) // TODO: No free space
+            err!(MangoError::NoFreePerpPositionIndex)
         }
     }
 
@@ -587,10 +596,7 @@ impl MangoAccountPerpPositions {
     }
 
     pub fn remove_order(&mut self, slot: usize, quantity: i64) -> Result<()> {
-        require!(
-            self.order_market[slot] != FREE_ORDER_SLOT,
-            MangoError::SomeError
-        );
+        require_neq!(self.order_market[slot], FREE_ORDER_SLOT);
         let order_side = self.order_side[slot];
         let perp_market_index = self.order_market[slot];
         let perp_account = self.get_account_mut_or_create(perp_market_index).unwrap().0;
@@ -704,10 +710,13 @@ impl Default for MangoAccountPerpPositions {
 
 #[account(zero_copy)]
 pub struct MangoAccount {
-    pub name: [u8; 32],
-
+    // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
+
+    // ABI: Clients rely on this being at offset 40
     pub owner: Pubkey,
+
+    pub name: [u8; 32],
 
     // Alternative authority/signer of transactions for a mango account
     pub delegate: Pubkey,
@@ -723,16 +732,24 @@ pub struct MangoAccount {
     pub perps: MangoAccountPerpPositions,
 
     /// This account cannot open new positions or borrow until `init_health >= 0`
-    pub being_liquidated: u8,
+    being_liquidated: u8,
 
     /// This account cannot do anything except go through `resolve_bankruptcy`
-    pub is_bankrupt: u8,
+    is_bankrupt: u8,
 
     pub account_num: u8,
     pub bump: u8,
 
     // pub info: [u8; INFO_LEN], // TODO: Info could be in a separate PDA?
     pub reserved: [u8; 4],
+
+    // Cumulative (deposits - withdraws)
+    // using USD prices at the time of the deposit/withdraw
+    // in UI USD units
+    pub net_deposits: f32,
+    // Cumulative settles on perp positions
+    // TODO: unimplemented
+    pub net_settled: f32,
 }
 const_assert_eq!(
     size_of::<MangoAccount>(),
@@ -742,6 +759,7 @@ const_assert_eq!(
         + size_of::<MangoAccountPerpPositions>()
         + 4
         + 4
+        + 2 * 4 // net_deposits and net_settled
 );
 const_assert_eq!(size_of::<MangoAccount>() % 8, 0);
 
@@ -770,6 +788,26 @@ impl MangoAccount {
             .unwrap()
             .trim_matches(char::from(0))
     }
+
+    pub fn is_owner_or_delegate(&self, ix_signer: Pubkey) -> bool {
+        self.owner == ix_signer || self.delegate == ix_signer
+    }
+
+    pub fn is_bankrupt(&self) -> bool {
+        self.is_bankrupt != 0
+    }
+
+    pub fn set_bankrupt(&mut self, b: bool) {
+        self.is_bankrupt = if b { 1 } else { 0 };
+    }
+
+    pub fn being_liquidated(&self) -> bool {
+        self.being_liquidated != 0
+    }
+
+    pub fn set_being_liquidated(&mut self, b: bool) {
+        self.being_liquidated = if b { 1 } else { 0 };
+    }
 }
 
 impl Default for MangoAccount {
@@ -787,6 +825,8 @@ impl Default for MangoAccount {
             account_num: 0,
             bump: 0,
             reserved: Default::default(),
+            net_deposits: 0.0,
+            net_settled: 0.0,
         }
     }
 }

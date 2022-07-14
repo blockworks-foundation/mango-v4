@@ -82,6 +82,7 @@ pub struct InterestRateParams {
     pub util1: f32,
     pub rate1: f32,
     pub max_rate: f32,
+    pub adjustment_factor: f32,
 }
 
 // TODO: should this be "configure_mint", we pass an explicit index, and allow
@@ -106,6 +107,14 @@ pub fn token_register(
 
     require_eq!(bank_num, 0);
 
+    // Require token 0 to be in the insurance token
+    if token_index == QUOTE_TOKEN_INDEX {
+        require_keys_eq!(
+            ctx.accounts.group.load()?.insurance_mint,
+            ctx.accounts.mint.key()
+        );
+    }
+
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
         name: fill16_from_str(name)?,
@@ -120,8 +129,11 @@ pub fn token_register(
         cached_indexed_total_borrows: I80F48::ZERO,
         indexed_deposits: I80F48::ZERO,
         indexed_borrows: I80F48::ZERO,
-        last_updated: Clock::get()?.unix_timestamp,
+        index_last_updated: Clock::get()?.unix_timestamp,
+        bank_rate_last_updated: Clock::get()?.unix_timestamp,
         // TODO: add a require! verifying relation between the parameters
+        avg_utilization: I80F48::ZERO,
+        adjustment_factor: I80F48::from_num(interest_rate_params.adjustment_factor),
         util0: I80F48::from_num(interest_rate_params.util0),
         rate0: I80F48::from_num(interest_rate_params.rate0),
         util1: I80F48::from_num(interest_rate_params.util1),
@@ -162,6 +174,7 @@ pub fn token_register(
         token_index,
         address_lookup_table_bank_index: alt_previous_size as u8,
         address_lookup_table_oracle_index: alt_previous_size as u8 + 1,
+        padding: Default::default(),
         reserved: Default::default(),
     };
 

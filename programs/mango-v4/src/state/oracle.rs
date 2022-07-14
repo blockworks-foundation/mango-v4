@@ -12,8 +12,6 @@ use crate::accounts_zerocopy::*;
 use crate::checked_math as cm;
 use crate::error::MangoError;
 
-pub const QUOTE_DECIMALS: i8 = 6;
-
 const LOOKUP_START: i8 = -12;
 const LOOKUP: [I80F48; 25] = [
     I80F48::from_bits((1 << 48) / 10i128.pow(12u32)),
@@ -44,6 +42,9 @@ const LOOKUP: [I80F48; 25] = [
 ];
 const LOOKUP_FN: fn(i8) -> usize = |decimals: i8| (decimals - LOOKUP_START) as usize;
 
+pub const QUOTE_DECIMALS: i8 = 6;
+pub const QUOTE_NATIVE_TO_UI: I80F48 = LOOKUP[(-QUOTE_DECIMALS - LOOKUP_START) as usize];
+
 pub mod switchboard_v1_devnet_oracle {
     use solana_program::declare_id;
     declare_id!("7azgmy1pFXHikv36q1zZASvFq5vFa39TT9NweVugKKTU");
@@ -71,7 +72,9 @@ pub enum OracleType {
 
 #[account(zero_copy)]
 pub struct StubOracle {
+    // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
+    // ABI: Clients rely on this being at offset 40
     pub mint: Pubkey,
     pub price: I80F48,
     pub last_updated: i64,

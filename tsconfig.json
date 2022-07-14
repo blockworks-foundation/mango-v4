@@ -10,6 +10,11 @@
     "skipLibCheck": true,
     "target": "es2019"
   },
-  "include": ["ts/client/src"],
-  "exclude": ["./ts/**/*.test.js", "node_modules", "**/node_modules"]
+  "include": ["ts/client/src", "ts/client/scripts", "ts/client/scripts"],
+  "exclude": [
+    "./ts/**/*.test.js",
+    "node_modules",
+    "**/node_modules",
+    "./ts/client/src/scripts"
+  ]
 }

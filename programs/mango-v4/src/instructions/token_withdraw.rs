@@ -8,6 +8,7 @@ use fixed::types::I80F48;
 
 use crate::logs::{TokenBalanceLog, WithdrawLog};
 use crate::state::new_fixed_order_account_retriever;
+use crate::util::checked_math as cm;
 
 #[derive(Accounts)]
 pub struct TokenWithdraw<'info> {
@@ -16,6 +17,7 @@ pub struct TokenWithdraw<'info> {
     #[account(
         mut,
         has_one = group,
+        // note: should never be the delegate
         has_one = owner,
     )]
     pub account: AccountLoader<'info, MangoAccount>,
@@ -56,21 +58,21 @@ impl<'info> TokenWithdraw<'info> {
 //       right index for the mint.
 // TODO: https://github.com/blockworks-foundation/mango-v4/commit/15961ec81c7e9324b37d79d0e2a1650ce6bd981d comments
 pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
-    require!(amount > 0, MangoError::SomeError);
+    require_msg!(amount > 0, "withdraw amount must be positive");
 
     let group = ctx.accounts.group.load()?;
     let token_index = ctx.accounts.bank.load()?.token_index;
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;
-    require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!account.is_bankrupt(), MangoError::IsBankrupt);
 
     let (position, raw_token_index, active_token_index) =
         account.tokens.get_mut_or_create(token_index)?;
 
     // The bank will also be passed in remainingAccounts. Use an explicit scope
     // to drop the &mut before we borrow it immutably again later.
-    let position_is_active = {
+    let (position_is_active, amount_i80f48) = {
         let mut bank = ctx.accounts.bank.load_mut()?;
         let native_position = position.native(&bank);
 
@@ -104,7 +106,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             amount,
         )?;
 
-        position_is_active
+        (position_is_active, amount_i80f48)
     };
 
     let indexed_position = position.indexed_position;
@@ -112,6 +114,10 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
     let (bank, oracle_price) =
         retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
+
+    // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
+    account.net_deposits -= cm!(amount_i80f48 * oracle_price * QUOTE_NATIVE_TO_UI).to_num::<f32>();
+
     emit!(TokenBalanceLog {
         mango_account: ctx.accounts.account.key(),
         token_index: token_index,
@@ -124,7 +130,8 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     //
     // Health check
     //
-    let health = compute_health(&account, HealthType::Init, &retriever)?;
+    let health = compute_health(&account, HealthType::Init, &retriever)
+        .context("post-withdraw init health")?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
 

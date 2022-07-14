@@ -74,6 +74,7 @@ pub fn serum3_register_market(
         base_token_index: base_bank.token_index,
         quote_token_index: quote_bank.token_index,
         bump: *ctx.bumps.get("serum_market").ok_or(MangoError::SomeError)?,
+        padding: Default::default(),
         reserved: Default::default(),
     };
 

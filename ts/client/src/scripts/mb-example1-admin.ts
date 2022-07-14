@@ -4,6 +4,10 @@ import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 
+//
+// Script which depoys a new mango group, and registers 3 tokens
+//
+
 const MAINNET_MINTS = new Map([
   ['USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'],
   ['BTC', '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E'],
@@ -37,7 +41,7 @@ async function main() {
   // group
   console.log(`Creating Group...`);
   try {
-    await client.createGroup(0, true);
+    await client.groupCreate(0, true);
   } catch (error) {
     console.log(error);
   }
@@ -56,6 +60,7 @@ async function main() {
       0.1,
       0,
       'BTC',
+      0.01,
       0.4,
       0.07,
       0.8,
@@ -78,7 +83,7 @@ async function main() {
   console.log(`Creating USDC stub oracle...`);
   const usdcMainnetMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
   try {
-    await client.createStubOracle(group, usdcMainnetMint, 1.0);
+    await client.stubOracleCreate(group, usdcMainnetMint, 1.0);
   } catch (error) {
     console.log(error);
   }
@@ -96,6 +101,7 @@ async function main() {
       0.1,
       1,
       'USDC',
+      0.01,
       0.4,
       0.07,
       0.8,
@@ -126,6 +132,7 @@ async function main() {
       0.1,
       2, // tokenIndex
       'SOL',
+      0.01,
       0.4,
       0.07,
       0.8,

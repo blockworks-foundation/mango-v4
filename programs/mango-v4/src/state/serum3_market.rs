@@ -9,19 +9,26 @@ pub type Serum3MarketIndex = u16;
 #[account(zero_copy)]
 #[derive(Debug)]
 pub struct Serum3Market {
-    pub name: [u8; 16],
+    // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
+    // ABI: Clients rely on this being at offset 40
+    pub base_token_index: TokenIndex,
+    // ABI: Clients rely on this being at offset 42
+    pub quote_token_index: TokenIndex,
+    pub padding: [u8; 4],
+    pub name: [u8; 16],
     pub serum_program: Pubkey,
     pub serum_market_external: Pubkey,
 
     pub market_index: Serum3MarketIndex,
-    pub base_token_index: TokenIndex,
-    pub quote_token_index: TokenIndex,
 
     pub bump: u8,
-    pub reserved: [u8; 1],
+    pub reserved: [u8; 5],
 }
-const_assert_eq!(size_of::<Serum3Market>(), 16 + 32 * 3 + 3 * 2 + 1 + 1);
+const_assert_eq!(
+    size_of::<Serum3Market>(),
+    32 + 2 + 2 + 4 + 16 + 2 * 32 + 2 + 1 + 5
+);
 const_assert_eq!(size_of::<Serum3Market>() % 8, 0);
 
 impl Serum3Market {

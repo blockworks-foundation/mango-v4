@@ -6,6 +6,7 @@ use fixed::types::I80F48;
 
 use crate::error::*;
 use crate::state::*;
+use crate::util::checked_math as cm;
 
 use crate::logs::{DepositLog, TokenBalanceLog};
 
@@ -54,20 +55,21 @@ impl<'info> TokenDeposit<'info> {
 //       That would save a lot of computation that needs to go into finding the
 //       right index for the mint.
 pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
-    require!(amount > 0, MangoError::SomeError);
+    require_msg!(amount > 0, "deposit amount must be positive");
 
     let token_index = ctx.accounts.bank.load()?.token_index;
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;
-    require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!account.is_bankrupt(), MangoError::IsBankrupt);
 
     let (position, raw_token_index, active_token_index) =
         account.tokens.get_mut_or_create(token_index)?;
 
+    let amount_i80f48 = I80F48::from(amount);
     let position_is_active = {
         let mut bank = ctx.accounts.bank.load_mut()?;
-        bank.deposit(position, I80F48::from(amount))?
+        bank.deposit(position, amount_i80f48)?
     };
 
     // Transfer the actual tokens
@@ -78,6 +80,10 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
     let (bank, oracle_price) =
         retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
+
+    // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
+    account.net_deposits += cm!(amount_i80f48 * oracle_price * QUOTE_NATIVE_TO_UI).to_num::<f32>();
+
     emit!(TokenBalanceLog {
         mango_account: ctx.accounts.account.key(),
         token_index: token_index,
@@ -92,7 +98,8 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     // TODO: This will be used to disable is_bankrupt or being_liquidated
     //       when health recovers sufficiently
     //
-    let health = compute_health(&account, HealthType::Init, &retriever)?;
+    let health = compute_health(&account, HealthType::Init, &retriever)
+        .context("post-deposit init health")?;
     msg!("health: {}", health);
 
     //

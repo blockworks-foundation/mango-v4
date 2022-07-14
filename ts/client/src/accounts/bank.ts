@@ -141,9 +141,39 @@ export class Bank {
   }
 
   toString(): string {
-    return `Bank ${
-      this.tokenIndex
-    } deposit index - ${this.depositIndex.toNumber()}, borrow index - ${this.borrowIndex.toNumber()}`;
+    return (
+      'Bank ' +
+      '\n token index -' +
+      this.tokenIndex +
+      '\n deposit index -' +
+      this.depositIndex.toNumber() +
+      '\n borrow index -' +
+      this.borrowIndex.toNumber() +
+      '\n cachedIndexedTotalDeposits -' +
+      this.cachedIndexedTotalDeposits.toNumber() +
+      '\n cachedIndexedTotalBorrows -' +
+      this.cachedIndexedTotalBorrows.toNumber() +
+      '\n maxRate -' +
+      this.maxRate.toNumber() +
+      '\n util0 -' +
+      this.util0.toNumber() +
+      '\n rate0 -' +
+      this.rate0.toNumber() +
+      '\n util1 -' +
+      this.util1.toNumber() +
+      '\n rate1 -' +
+      this.rate1.toNumber() +
+      '\n maintAssetWeight -' +
+      this.maintAssetWeight.toNumber() +
+      '\n initAssetWeight -' +
+      this.initAssetWeight.toNumber() +
+      '\n maintLiabWeight -' +
+      this.maintLiabWeight.toNumber() +
+      '\n initLiabWeight -' +
+      this.initLiabWeight.toNumber() +
+      '\n liquidationFee -' +
+      this.liquidationFee.toNumber()
+    );
   }
 
   nativeDeposits(): I80F48 {

@@ -130,9 +130,19 @@ pub struct UpdateFundingLog {
 pub struct UpdateIndexLog {
     pub mango_group: Pubkey,
     pub token_index: u16,
-    pub deposit_index: i128, // I80F48
-    pub borrow_index: i128,  // I80F48
-                             // pub price: i128, // I80F48
+    pub deposit_index: i128,   // I80F48
+    pub borrow_index: i128,    // I80F48
+    pub avg_utilization: i128, // I80F48
+    pub price: i128,           // I80F48
+}
+
+#[event]
+pub struct UpdateRateLog {
+    pub mango_group: Pubkey,
+    pub token_index: u16,
+    pub rate0: i128,    // I80F48
+    pub rate1: i128,    // I80F48
+    pub max_rate: i128, // I80F48
 }
 
 #[event]

@@ -4,6 +4,16 @@ import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 
+//
+// An example for admins based on high level api i.e. the client
+// Depoys a new mango group to devnet, registers 4 tokens, and 1 serum3 spot market
+//
+// process.env.ADMIN_KEYPAIR - group admin keypair path
+// to create a new admin keypair:
+// * solana-keygen new --outfile ~/.config/solana/admin.json
+// * solana airdrop 1  -k ~/.config/solana/admin.json
+//
+
 const DEVNET_SERUM3_MARKETS = new Map([
   ['BTC/USDC', 'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB'],
   ['SOL/USDC', '5xWpt56U1NCuHoAEtpLeUrQcxDkEpNfScjfLFaRzLPgR'],
@@ -20,15 +30,6 @@ const DEVNET_ORACLES = new Map([
   ['ORCA', 'A1WttWF7X3Rg6ZRpB2YQUFHCRh1kiXV8sKKLV3S9neJV'],
 ]);
 
-//
-// An example for admins based on high level api i.e. the client
-// Depoys a new mango group to devnet, registers 2 tokens, and 1 serum3 spot market
-//
-// process.env.ADMIN_KEYPAIR - group admin keypair path
-// to create a new admin keypair:
-// * solana-keygen new --outfile ~/.config/solana/admin.json
-// * solana airdrop 1  -k ~/.config/solana/admin.json
-//
 async function main() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
@@ -52,15 +53,16 @@ async function main() {
 
   // group
   console.log(`Creating Group...`);
+  const insuranceMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
-    await client.createGroup(0, true);
+    await client.groupCreate(0, true, insuranceMint);
   } catch (error) {
     console.log(error);
   }
   const group = await client.getGroupForAdmin(admin.publicKey);
   console.log(`...registered group ${group.publicKey}`);
 
-  // register token 0
+  // register token 1
   console.log(`Registering BTC...`);
   const btcDevnetMint = new PublicKey(DEVNET_MINTS.get('BTC')!);
   const btcDevnetOracle = new PublicKey(DEVNET_ORACLES.get('BTC')!);
@@ -70,8 +72,9 @@ async function main() {
       btcDevnetMint,
       btcDevnetOracle,
       0.1,
-      0,
+      1, // tokenIndex
       'BTC',
+      0.01,
       0.4,
       0.07,
       0.8,
@@ -90,11 +93,11 @@ async function main() {
     console.log(error);
   }
 
-  // stub oracle + register token 1
+  // stub oracle + register token 0
   console.log(`Registering USDC...`);
   const usdcDevnetMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
-    await client.createStubOracle(group, usdcDevnetMint, 1.0);
+    await client.stubOracleCreate(group, usdcDevnetMint, 1.0);
   } catch (error) {
     console.log(error);
   }
@@ -108,8 +111,9 @@ async function main() {
       usdcDevnetMint,
       usdcDevnetOracle.publicKey,
       0.1,
-      1,
+      0, // tokenIndex
       'USDC',
+      0.01,
       0.4,
       0.07,
       0.8,
@@ -138,6 +142,7 @@ async function main() {
       0.1,
       2, // tokenIndex
       'SOL',
+      0.01,
       0.4,
       0.07,
       0.8,
@@ -168,6 +173,7 @@ async function main() {
       0.1,
       3, // tokenIndex
       'ORCA',
+      0.01,
       0.4,
       0.07,
       0.8,
@@ -227,7 +233,7 @@ async function main() {
       0,
       'BTC-PERP',
       0.1,
-      0,
+      1,
       6,
       1,
       10,
@@ -250,9 +256,120 @@ async function main() {
   const perpMarkets = await client.perpGetMarkets(
     group,
     group.banksMap.get('BTC')?.tokenIndex,
-    group.banksMap.get('USDC')?.tokenIndex,
   );
   console.log(`...created perp market ${perpMarkets[0].publicKey}`);
+
+  //
+  // edit
+  //
+
+  console.log(`Editing USDC...`);
+  try {
+    let sig = await client.tokenEdit(
+      group,
+      'USDC',
+      btcDevnetOracle,
+      0.1,
+      0.01,
+      0.3,
+      0.08,
+      0.81,
+      0.91,
+      0.75,
+      0.0007,
+      1.7,
+      0.9,
+      0.7,
+      1.3,
+      1.5,
+      0.04,
+    );
+    console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    await group.reloadAll(client);
+    console.log(group.banksMap.get('USDC').toString());
+  } catch (error) {
+    throw error;
+  }
+  console.log(`Resetting USDC...`);
+  try {
+    let sig = await client.tokenEdit(
+      group,
+      'USDC',
+      usdcDevnetOracle.publicKey,
+      0.1,
+      0.01,
+      0.4,
+      0.07,
+      0.8,
+      0.9,
+      1.5,
+      0.0005,
+      1.5,
+      0.8,
+      0.6,
+      1.2,
+      1.4,
+      0.02,
+    );
+    console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    await group.reloadAll(client);
+    console.log(group.banksMap.get('USDC').toString());
+  } catch (error) {
+    throw error;
+  }
+
+  console.log(`Editing perp market...`);
+  try {
+    let sig = await client.perpEditMarket(
+      group,
+      'BTC-PERP',
+      btcDevnetOracle,
+      0.2,
+      0,
+      6,
+      0.9,
+      0.9,
+      1.035,
+      1.06,
+      0.013,
+      0.0003,
+      0.1,
+      0.07,
+      0.07,
+      1001,
+    );
+    console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    await group.reloadAll(client);
+    console.log(group.perpMarketsMap.get('BTC-PERP').toString());
+  } catch (error) {
+    console.log(error);
+  }
+  console.log(`Resetting perp market...`);
+  try {
+    let sig = await client.perpEditMarket(
+      group,
+      'BTC-PERP',
+      btcDevnetOracle,
+      0.1,
+      1,
+      6,
+      1,
+      0.95,
+      1.025,
+      1.05,
+      0.012,
+      0.0002,
+      0.0,
+      0.05,
+      0.05,
+      100,
+    );
+    console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    await group.reloadAll(client);
+    console.log(group.perpMarketsMap.get('BTC-PERP').toString());
+  } catch (error) {
+    console.log(error);
+  }
 
   process.exit();
 }

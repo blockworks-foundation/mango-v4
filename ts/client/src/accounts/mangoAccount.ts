@@ -5,6 +5,7 @@ import { MangoClient } from '../client';
 import { nativeI80F48ToUi } from '../utils';
 import { Bank, QUOTE_DECIMALS } from './bank';
 import { Group } from './group';
+import { HealthCache, HealthCacheDto } from './healthCache';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from './I80F48';
 export class MangoAccount {
   public tokens: TokenPosition[];
@@ -318,6 +319,7 @@ export class MangoAccount {
     let res = 'MangoAccount';
     res = res + '\n pk: ' + this.publicKey.toString();
     res = res + '\n name: ' + this.name;
+    res = res + '\n delegate: ' + this.delegate;
 
     res =
       this.tokensActive().length > 0
@@ -505,12 +507,14 @@ export class HealthType {
 
 export class MangoAccountData {
   constructor(
+    public healthCache: HealthCache,
     public initHealth: I80F48,
     public maintHealth: I80F48,
     public equity: Equity,
   ) {}
 
   static from(event: {
+    healthCache: HealthCacheDto;
     initHealth: I80F48Dto;
     maintHealth: I80F48Dto;
     equity: {
@@ -521,6 +525,7 @@ export class MangoAccountData {
     tokenAssets: any;
   }) {
     return new MangoAccountData(
+      new HealthCache(event.healthCache),
       I80F48.from(event.initHealth),
       I80F48.from(event.maintHealth),
       Equity.from(event.equity),

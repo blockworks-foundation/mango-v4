@@ -1,6 +1,6 @@
 #![cfg(feature = "test-bpf")]
 
-use mango_v4::state::{Bank, MintInfo};
+use mango_v4::state::*;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, transport::TransportError};
 
@@ -9,7 +9,7 @@ use program_test::*;
 mod program_test;
 
 #[tokio::test]
-async fn test_update_index() -> Result<(), TransportError> {
+async fn test_token_update_index_and_rate() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
@@ -23,7 +23,7 @@ async fn test_update_index() -> Result<(), TransportError> {
     // SETUP: Create a group and an account to fill the vaults
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -34,7 +34,7 @@ async fn test_update_index() -> Result<(), TransportError> {
     // deposit some funds, to the vaults aren't empty
     let deposit_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -51,7 +51,8 @@ async fn test_update_index() -> Result<(), TransportError> {
                 amount: 10000,
                 account: deposit_account,
                 token_account,
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -60,7 +61,7 @@ async fn test_update_index() -> Result<(), TransportError> {
 
     let withdraw_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 1,
             group,
             owner,
@@ -77,7 +78,8 @@ async fn test_update_index() -> Result<(), TransportError> {
             amount: 100000,
             account: withdraw_account,
             token_account: payer_mint_accounts[1],
-            token_authority: payer,
+            token_authority: payer.clone(),
+            bank_index: 0,
         },
     )
     .await
@@ -91,33 +93,36 @@ async fn test_update_index() -> Result<(), TransportError> {
             account: withdraw_account,
             owner,
             token_account: context.users[0].token_accounts[0],
+            bank_index: 0,
         },
     )
     .await
     .unwrap();
 
-    let bank_before_update_index = solana.get_account::<Bank>(tokens[0].bank).await;
+    let bank_before_update_index_and_rate = solana.get_account::<Bank>(tokens[0].bank).await;
 
     solana.advance_clock().await;
 
     send_tx(
         solana,
-        UpdateIndexInstruction {
+        TokenUpdateIndexAndRateInstruction {
             mint_info: tokens[0].mint_info,
-            banks: {
-                let mint_info: MintInfo = solana.get_account(tokens[0].mint_info).await;
-                mint_info.banks.to_vec()
-            },
         },
     )
     .await
     .unwrap();
 
-    let bank_after_update_index = solana.get_account::<Bank>(tokens[0].bank).await;
-    dbg!(bank_after_update_index);
-    dbg!(bank_after_update_index);
-    assert!(bank_before_update_index.deposit_index < bank_after_update_index.deposit_index);
-    assert!(bank_before_update_index.borrow_index < bank_after_update_index.borrow_index);
+    let bank_after_update_index_and_rate = solana.get_account::<Bank>(tokens[0].bank).await;
+    dbg!(bank_after_update_index_and_rate);
+    dbg!(bank_after_update_index_and_rate);
+    assert!(
+        bank_before_update_index_and_rate.deposit_index
+            < bank_after_update_index_and_rate.deposit_index
+    );
+    assert!(
+        bank_before_update_index_and_rate.borrow_index
+            < bank_after_update_index_and_rate.borrow_index
+    );
 
     Ok(())
 }

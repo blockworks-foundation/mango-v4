@@ -78,12 +78,12 @@ impl MangoClient {
         // Mango Account
         let mut mango_account_tuples = program.accounts::<MangoAccount>(vec![
             RpcFilterType::Memcmp(Memcmp {
-                offset: 40,
+                offset: 8,
                 bytes: MemcmpEncodedBytes::Base58(group.to_string()),
                 encoding: None,
             }),
             RpcFilterType::Memcmp(Memcmp {
-                offset: 72,
+                offset: 40,
                 bytes: MemcmpEncodedBytes::Base58(payer.pubkey().to_string()),
                 encoding: None,
             }),
@@ -103,7 +103,7 @@ impl MangoClient {
                 .instruction(Instruction {
                     program_id: mango_v4::id(),
                     accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                        &mango_v4::accounts::CreateAccount {
+                        &mango_v4::accounts::AccountCreate {
                             group,
                             owner: payer.pubkey(),
                             account: {
@@ -124,7 +124,7 @@ impl MangoClient {
                         None,
                     ),
                     data: anchor_lang::InstructionData::data(
-                        &mango_v4::instruction::CreateAccount {
+                        &mango_v4::instruction::AccountCreate {
                             account_num,
                             name: mango_account_name.to_owned(),
                         },
@@ -135,12 +135,12 @@ impl MangoClient {
         }
         let mango_account_tuples = program.accounts::<MangoAccount>(vec![
             RpcFilterType::Memcmp(Memcmp {
-                offset: 40,
+                offset: 8,
                 bytes: MemcmpEncodedBytes::Base58(group.to_string()),
                 encoding: None,
             }),
             RpcFilterType::Memcmp(Memcmp {
-                offset: 72,
+                offset: 40,
                 bytes: MemcmpEncodedBytes::Base58(payer.pubkey().to_string()),
                 encoding: None,
             }),
@@ -155,7 +155,7 @@ impl MangoClient {
         let mut banks_cache = HashMap::new();
         let mut banks_cache_by_token_index = HashMap::new();
         let bank_tuples = program.accounts::<Bank>(vec![RpcFilterType::Memcmp(Memcmp {
-            offset: 24,
+            offset: 8,
             bytes: MemcmpEncodedBytes::Base58(group.to_string()),
             encoding: None,
         })])?;
@@ -197,7 +197,7 @@ impl MangoClient {
         let mut serum3_external_markets_cache = HashMap::new();
         let serum3_market_tuples =
             program.accounts::<Serum3Market>(vec![RpcFilterType::Memcmp(Memcmp {
-                offset: 24,
+                offset: 8,
                 bytes: MemcmpEncodedBytes::Base58(group.to_string()),
                 encoding: None,
             })])?;
@@ -221,7 +221,7 @@ impl MangoClient {
         let mut perp_markets_cache_by_perp_market_index = HashMap::new();
         let perp_market_tuples =
             program.accounts::<PerpMarket>(vec![RpcFilterType::Memcmp(Memcmp {
-                offset: 24,
+                offset: 8,
                 bytes: MemcmpEncodedBytes::Base58(group.to_string()),
                 encoding: None,
             })])?;
@@ -279,12 +279,12 @@ impl MangoClient {
     pub fn get_account(&self) -> Result<(Pubkey, MangoAccount), anchor_client::ClientError> {
         let mango_accounts = self.program().accounts::<MangoAccount>(vec![
             RpcFilterType::Memcmp(Memcmp {
-                offset: 40,
+                offset: 8,
                 bytes: MemcmpEncodedBytes::Base58(self.group().to_string()),
                 encoding: None,
             }),
             RpcFilterType::Memcmp(Memcmp {
-                offset: 72,
+                offset: 40,
                 bytes: MemcmpEncodedBytes::Base58(self.payer().to_string()),
                 encoding: None,
             }),

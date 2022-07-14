@@ -26,7 +26,7 @@ async fn test_serum() -> Result<(), TransportError> {
     // SETUP: Create a group and an account
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -38,7 +38,7 @@ async fn test_serum() -> Result<(), TransportError> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -69,7 +69,8 @@ async fn test_serum() -> Result<(), TransportError> {
                 amount: deposit_amount,
                 account,
                 token_account: payer_mint_accounts[0],
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -81,7 +82,8 @@ async fn test_serum() -> Result<(), TransportError> {
                 amount: deposit_amount,
                 account,
                 token_account: payer_mint_accounts[1],
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await

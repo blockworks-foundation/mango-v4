@@ -14,9 +14,10 @@ pub struct PerpPlaceOrder<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = owner,
+        constraint = account.load()?.is_owner_or_delegate(owner.key()),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
+    pub owner: Signer<'info>,
 
     #[account(
         mut,
@@ -36,8 +37,6 @@ pub struct PerpPlaceOrder<'info> {
 
     /// CHECK: The oracle can be one of several different account types and the pubkey is checked above
     pub oracle: UncheckedAccount<'info>,
-
-    pub owner: Signer<'info>,
 }
 
 // TODO
@@ -80,7 +79,7 @@ pub fn perp_place_order(
     limit: u8,
 ) -> Result<()> {
     let mut mango_account = ctx.accounts.account.load_mut()?;
-    require!(mango_account.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!mango_account.is_bankrupt(), MangoError::IsBankrupt);
     let mango_account_pk = ctx.accounts.account.key();
 
     {

@@ -1,11 +1,12 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::error::*;
 use crate::state::*;
 
 #[derive(Accounts)]
 #[instruction(group_num: u32)]
-pub struct CreateGroup<'info> {
+pub struct GroupCreate<'info> {
     #[account(
         init,
         seeds = [b"Group".as_ref(), admin.key().as_ref(), &group_num.to_le_bytes()],
@@ -17,15 +18,31 @@ pub struct CreateGroup<'info> {
 
     pub admin: Signer<'info>,
 
+    pub insurance_mint: Account<'info, Mint>,
+
+    #[account(
+        init,
+        seeds = [group.key().as_ref(), b"InsuranceVault".as_ref()],
+        bump,
+        token::authority = group,
+        token::mint = insurance_mint,
+        payer = payer
+    )]
+    pub insurance_vault: Account<'info, TokenAccount>,
+
     #[account(mut)]
     pub payer: Signer<'info>,
 
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn create_group(ctx: Context<CreateGroup>, group_num: u32, testing: u8) -> Result<()> {
+pub fn group_create(ctx: Context<GroupCreate>, group_num: u32, testing: u8) -> Result<()> {
     let mut group = ctx.accounts.group.load_init()?;
     group.admin = ctx.accounts.admin.key();
+    group.insurance_vault = ctx.accounts.insurance_vault.key();
+    group.insurance_mint = ctx.accounts.insurance_mint.key();
     group.bump = *ctx.bumps.get("group").ok_or(MangoError::SomeError)?;
     group.group_num = group_num;
     group.testing = testing;

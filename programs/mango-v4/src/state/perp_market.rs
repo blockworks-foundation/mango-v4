@@ -6,18 +6,29 @@ use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
 
 use crate::state::orderbook::order_type::Side;
-use crate::state::{TokenIndex, DAY};
+use crate::state::TokenIndex;
 use crate::util::checked_math as cm;
 
-use super::{Book, OracleConfig};
+use super::{Book, OracleConfig, DAY_I80F48};
 
 pub type PerpMarketIndex = u16;
 
 #[account(zero_copy)]
+#[derive(Debug)]
 pub struct PerpMarket {
-    pub name: [u8; 16],
-
+    // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
+
+    // TODO: Remove!
+    // ABI: Clients rely on this being at offset 40
+    pub base_token_index: TokenIndex,
+
+    /// Lookup indices
+    pub perp_market_index: PerpMarketIndex,
+
+    pub padding: [u8; 4],
+
+    pub name: [u8; 16],
 
     pub oracle: Pubkey,
 
@@ -75,18 +86,12 @@ pub struct PerpMarket {
 
     pub base_token_decimals: u8,
 
-    /// Lookup indices
-    pub perp_market_index: PerpMarketIndex,
-
-    pub base_token_index: TokenIndex,
-
-    /// Cannot be chosen freely, must be the health-reference token, same for all PerpMarkets
-    pub quote_token_index: TokenIndex,
+    pub reserved: [u8; 6],
 }
 
 const_assert_eq!(
     size_of::<PerpMarket>(),
-    16 + 32 * 2 + 16 + 32 * 3 + 8 * 2 + 16 * 11 + 8 * 2 + 8 * 2 + 16 + 8
+    32 + 2 + 2 + 4 + 16 + 32 + 16 + 32 * 3 + 8 * 2 + 16 * 11 + 8 * 2 + 8 * 2 + 16 + 2 + 6
 );
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
 
@@ -129,7 +134,7 @@ impl PerpMarket {
         };
 
         let diff_ts = I80F48::from_num(now_ts - self.funding_last_updated as u64);
-        let time_factor = cm!(diff_ts / DAY);
+        let time_factor = cm!(diff_ts / DAY_I80F48);
         let base_lot_size = I80F48::from_num(self.base_lot_size);
         let funding_delta = cm!(index_price * diff_price * base_lot_size * time_factor);
 

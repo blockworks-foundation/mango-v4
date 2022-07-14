@@ -4,6 +4,10 @@ import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 
+//
+// example script to close accounts - banks, markets, group etc. which require admin to be the signer
+//
+
 export const DEVNET_MINTS = new Map([
   ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'], // use devnet usdc
 ]);
@@ -40,7 +44,7 @@ async function main() {
   const usdcDevnetOracle = (
     await client.getStubOracle(group, usdcDevnetMint)
   )[0];
-  sig = await client.closeStubOracle(group, usdcDevnetOracle.publicKey);
+  sig = await client.stubOracleClose(group, usdcDevnetOracle.publicKey);
   console.log(
     `Closed USDC stub oracle, sig https://explorer.solana.com/tx/${sig}?cluster=devnet`,
   );
@@ -71,7 +75,7 @@ async function main() {
 
   // finally, close the group
 
-  sig = await client.closeGroup(group);
+  sig = await client.groupClose(group);
   console.log(
     `Closed group, sig https://explorer.solana.com/tx/${sig}?cluster=devnet`,
   );

@@ -32,7 +32,7 @@ pub struct FlashLoan<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = owner,
+        constraint = account.load()?.is_owner_or_delegate(owner.key()),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
 
@@ -85,7 +85,7 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
 
     let group = ctx.accounts.group.load()?;
     let mut account = ctx.accounts.account.load_mut()?;
-    require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!account.is_bankrupt(), MangoError::IsBankrupt);
 
     // Go over the banks passed as health accounts and:
     // - Ensure that all banks that are passed in have activated positions.

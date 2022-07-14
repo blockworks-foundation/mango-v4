@@ -1,15 +1,20 @@
 use anchor_lang::prelude::*;
+use anchor_lang::ZeroCopy;
 
 use fixed::types::I80F48;
+use fixed_macro::types::I80F48;
 use serum_dex::state::OpenOrders;
 
+use std::cell::Ref;
 use std::collections::HashMap;
 
 use crate::accounts_zerocopy::*;
-use crate::error::MangoError;
+use crate::error::*;
 use crate::serum3_cpi;
 use crate::state::{oracle_price, Bank, MangoAccount, PerpMarket, PerpMarketIndex, TokenIndex};
 use crate::util::checked_math as cm;
+
+const BANKRUPTCY_DUST_THRESHOLD: I80F48 = I80F48!(0.000001);
 
 /// This trait abstracts how to find accounts needed for the health computation.
 ///
@@ -62,7 +67,7 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
     let expected_ais = cm!(active_token_len * 2 // banks + oracles
         + active_perp_len // PerpMarkets
         + active_serum3_len); // open_orders
-    require_eq!(ais.len(), expected_ais, MangoError::SomeError);
+    require_eq!(ais.len(), expected_ais);
 
     Ok(FixedOrderAccountRetriever {
         ais: ais
@@ -76,10 +81,21 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
 }
 
 impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
-    fn bank(&self, group: &Pubkey, account_index: usize) -> Result<&Bank> {
+    fn bank(&self, group: &Pubkey, account_index: usize, token_index: TokenIndex) -> Result<&Bank> {
         let bank = self.ais[account_index].load::<Bank>()?;
-        require!(&bank.group == group, MangoError::SomeError);
+        require_keys_eq!(bank.group, *group);
+        require_eq!(bank.token_index, token_index);
         Ok(bank)
+    }
+
+    fn oracle_price(&self, account_index: usize, bank: &Bank) -> Result<I80F48> {
+        let oracle = &self.ais[cm!(self.n_banks + account_index)];
+        require_keys_eq!(bank.oracle, *oracle.key());
+        Ok(oracle_price(
+            oracle,
+            bank.oracle_config.conf_filter,
+            bank.mint_decimals,
+        )?)
     }
 }
 
@@ -90,14 +106,27 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
         account_index: usize,
         token_index: TokenIndex,
     ) -> Result<(&Bank, I80F48)> {
-        let bank = self.bank(group, account_index)?;
-        require_eq!(bank.token_index, token_index, MangoError::SomeError);
-        let oracle = &self.ais[cm!(self.n_banks + account_index)];
-        require_keys_eq!(bank.oracle, *oracle.key(), MangoError::SomeError);
-        Ok((
-            bank,
-            oracle_price(oracle, bank.oracle_config.conf_filter, bank.mint_decimals)?,
-        ))
+        let bank = self
+            .bank(group, account_index, token_index)
+            .with_context(|| {
+                format!(
+                    "loading bank with health account index {}, token index {}, passed account {}",
+                    account_index,
+                    token_index,
+                    self.ais[account_index].key(),
+                )
+            })?;
+
+        let oracle_price = self.oracle_price(account_index, bank).with_context(|| {
+            format!(
+                "getting oracle for bank with health account index {} and token index {}, passed account {}",
+                account_index,
+                token_index,
+                self.ais[self.n_banks + account_index].key(),
+            )
+        })?;
+
+        Ok((bank, oracle_price))
     }
 
     fn perp_market(
@@ -107,19 +136,35 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
         perp_market_index: PerpMarketIndex,
     ) -> Result<&PerpMarket> {
         let ai = &self.ais[cm!(self.begin_perp + account_index)];
-        let market = ai.load::<PerpMarket>()?;
-        require!(&market.group == group, MangoError::SomeError);
-        require!(
-            market.perp_market_index == perp_market_index,
-            MangoError::SomeError
-        );
-        Ok(market)
+        (|| {
+            let market = ai.load::<PerpMarket>()?;
+            require_keys_eq!(market.group, *group);
+            require_eq!(market.perp_market_index, perp_market_index);
+            Ok(market)
+        })()
+        .with_context(|| {
+            format!(
+                "loading perp market with health account index {} and perp market index {}, passed account {}",
+                account_index,
+                perp_market_index,
+                ai.key(),
+            )
+        })
     }
 
     fn serum_oo(&self, account_index: usize, key: &Pubkey) -> Result<&OpenOrders> {
         let ai = &self.ais[cm!(self.begin_serum3 + account_index)];
-        require!(key == ai.key(), MangoError::SomeError);
-        serum3_cpi::load_open_orders(ai)
+        (|| {
+            require_keys_eq!(*key, *ai.key());
+            serum3_cpi::load_open_orders(ai)
+        })()
+        .with_context(|| {
+            format!(
+                "loading serum open orders with health account index {}, passed account {}",
+                account_index,
+                ai.key(),
+            )
+        })
     }
 }
 
@@ -136,47 +181,58 @@ pub struct ScanningAccountRetriever<'a, 'info> {
     perp_index_map: HashMap<PerpMarketIndex, usize>,
 }
 
+// Returns None if `ai` doesn't have the owner or discriminator for T
+fn can_load_as<'a, T: ZeroCopy + Owner>(
+    (i, ai): (usize, &'a AccountInfo),
+) -> Option<(usize, Result<Ref<'a, T>>)> {
+    let load_result = ai.load::<T>();
+    match load_result {
+        Err(Error::AnchorError(error))
+            if error.error_code_number == ErrorCode::AccountDiscriminatorMismatch as u32
+                || error.error_code_number == ErrorCode::AccountOwnedByWrongProgram as u32 =>
+        {
+            return None;
+        }
+        _ => {}
+    };
+    Some((i, load_result))
+}
+
 impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
     pub fn new(ais: &'a [AccountInfo<'info>], group: &Pubkey) -> Result<Self> {
+        // find all Bank accounts
         let mut token_index_map = HashMap::with_capacity(ais.len() / 2);
-        for (i, ai) in ais.iter().enumerate() {
-            match ai.load::<Bank>() {
-                Ok(bank) => {
-                    require!(&bank.group == group, MangoError::SomeError);
+        ais.iter()
+            .enumerate()
+            .map_while(can_load_as::<Bank>)
+            .try_for_each(|(i, loaded)| {
+                (|| {
+                    let bank = loaded?;
+                    require_keys_eq!(bank.group, *group);
                     token_index_map.insert(bank.token_index, i);
-                }
-                Err(Error::AnchorError(error))
-                    if error.error_code_number
-                        == ErrorCode::AccountDiscriminatorMismatch as u32
-                        || error.error_code_number
-                            == ErrorCode::AccountOwnedByWrongProgram as u32 =>
-                {
-                    break;
-                }
-                Err(error) => return Err(error),
-            };
-        }
+                    Ok(())
+                })()
+                .with_context(|| format!("scanning banks, health account index {}", i))
+            })?;
 
         // skip all banks and oracles, then find number of PerpMarket accounts
         let skip = token_index_map.len() * 2;
         let mut perp_index_map = HashMap::with_capacity(ais.len() - skip);
-        for (i, ai) in ais[skip..].iter().enumerate() {
-            match ai.load::<PerpMarket>() {
-                Ok(perp_market) => {
-                    require!(&perp_market.group == group, MangoError::SomeError);
+        ais[skip..]
+            .iter()
+            .enumerate()
+            .map_while(can_load_as::<PerpMarket>)
+            .try_for_each(|(i, loaded)| {
+                (|| {
+                    let perp_market = loaded?;
+                    require_keys_eq!(perp_market.group, *group);
                     perp_index_map.insert(perp_market.perp_market_index, cm!(skip + i));
-                }
-                Err(Error::AnchorError(error))
-                    if error.error_code_number
-                        == ErrorCode::AccountDiscriminatorMismatch as u32
-                        || error.error_code_number
-                            == ErrorCode::AccountOwnedByWrongProgram as u32 =>
-                {
-                    break;
-                }
-                Err(error) => return Err(error),
-            };
-        }
+                    Ok(())
+                })()
+                .with_context(|| {
+                    format!("scanning perp markets, health account index {}", i + skip)
+                })
+            })?;
 
         Ok(Self {
             ais: ais
@@ -201,7 +257,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         Ok(*self
             .token_index_map
             .get(&token_index)
-            .ok_or_else(|| error!(MangoError::SomeError))?)
+            .ok_or_else(|| error_msg!("token index {} not found", token_index))?)
     }
 
     #[inline]
@@ -209,14 +265,24 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         Ok(*self
             .perp_index_map
             .get(&perp_market_index)
-            .ok_or_else(|| error!(MangoError::SomeError))?)
+            .ok_or_else(|| error_msg!("perp market index {} not found", perp_market_index))?)
     }
 
     pub fn banks_mut_and_oracles(
         &mut self,
         token_index1: TokenIndex,
         token_index2: TokenIndex,
-    ) -> Result<(&mut Bank, &mut Bank, I80F48, I80F48)> {
+    ) -> Result<(&mut Bank, I80F48, Option<(&mut Bank, I80F48)>)> {
+        let n_banks = self.n_banks();
+        if token_index1 == token_index2 {
+            let index = self.bank_index(token_index1)?;
+            let (bank_part, oracle_part) = self.ais.split_at_mut(index + 1);
+            let bank = bank_part[index].load_mut_fully_unchecked::<Bank>()?;
+            let oracle = &oracle_part[n_banks - 1];
+            require_keys_eq!(bank.oracle, *oracle.key);
+            let price = oracle_price(oracle, bank.oracle_config.conf_filter, bank.mint_decimals)?;
+            return Ok((bank, price, None));
+        }
         let index1 = self.bank_index(token_index1)?;
         let index2 = self.bank_index(token_index2)?;
         let (first, second, swap) = if index1 < index2 {
@@ -224,7 +290,6 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         } else {
             (index2, index1, true)
         };
-        let n_banks = self.n_banks();
 
         // split_at_mut after the first bank and after the second bank
         let (first_bank_part, second_part) = self.ais.split_at_mut(first + 1);
@@ -234,16 +299,16 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         let bank2 = second_bank_part[second - (first + 1)].load_mut_fully_unchecked::<Bank>()?;
         let oracle1 = &oracles_part[cm!(n_banks + first - (second + 1))];
         let oracle2 = &oracles_part[cm!(n_banks + second - (second + 1))];
-        require!(&bank1.oracle == oracle1.key, MangoError::SomeError);
-        require!(&bank2.oracle == oracle2.key, MangoError::SomeError);
+        require_keys_eq!(bank1.oracle, *oracle1.key);
+        require_keys_eq!(bank2.oracle, *oracle2.key);
         let mint_decimals1 = bank1.mint_decimals;
         let mint_decimals2 = bank2.mint_decimals;
         let price1 = oracle_price(oracle1, bank1.oracle_config.conf_filter, mint_decimals1)?;
         let price2 = oracle_price(oracle2, bank2.oracle_config.conf_filter, mint_decimals2)?;
         if swap {
-            Ok((bank2, bank1, price2, price1))
+            Ok((bank2, price2, Some((bank1, price1))))
         } else {
-            Ok((bank1, bank2, price1, price2))
+            Ok((bank1, price1, Some((bank2, price2))))
         }
     }
 
@@ -251,7 +316,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         let index = self.bank_index(token_index)?;
         let bank = self.ais[index].load_fully_unchecked::<Bank>()?;
         let oracle = &self.ais[cm!(self.n_banks() + index)];
-        require!(&bank.oracle == oracle.key, MangoError::SomeError);
+        require_keys_eq!(bank.oracle, *oracle.key);
         Ok((
             bank,
             oracle_price(oracle, bank.oracle_config.conf_filter, bank.mint_decimals)?,
@@ -267,7 +332,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         let oo = self.ais[self.begin_serum3()..]
             .iter()
             .find(|ai| ai.key == key)
-            .ok_or_else(|| error!(MangoError::SomeError))?;
+            .ok_or_else(|| error_msg!("no serum3 open orders for key {}", key))?;
         serum3_cpi::load_open_orders(oo)
     }
 }
@@ -322,7 +387,7 @@ pub fn compute_health_from_fixed_accounts(
     let expected_ais = cm!(active_token_len * 2 // banks + oracles
         + active_perp_len // PerpMarkets
         + active_serum3_len); // open_orders
-    require!(ais.len() == expected_ais, MangoError::SomeError);
+    require_eq!(ais.len(), expected_ais);
 
     let retriever = FixedOrderAccountRetriever {
         ais: ais
@@ -333,7 +398,7 @@ pub fn compute_health_from_fixed_accounts(
         begin_perp: cm!(active_token_len * 2),
         begin_serum3: cm!(active_token_len * 2 + active_perp_len),
     };
-    new_health_cache(account, &retriever)?.health(health_type)
+    Ok(new_health_cache(account, &retriever)?.health(health_type))
 }
 
 /// Compute health with an arbitrary AccountRetriever
@@ -342,10 +407,11 @@ pub fn compute_health(
     health_type: HealthType,
     retriever: &impl AccountRetriever,
 ) -> Result<I80F48> {
-    new_health_cache(account, retriever)?.health(health_type)
+    Ok(new_health_cache(account, retriever)?.health(health_type))
 }
 
-struct TokenInfo {
+#[derive(AnchorDeserialize, AnchorSerialize)]
+pub struct TokenInfo {
     token_index: TokenIndex,
     maint_asset_weight: I80F48,
     init_asset_weight: I80F48,
@@ -374,9 +440,20 @@ impl TokenInfo {
             HealthType::Maint => self.maint_liab_weight,
         }
     }
+
+    #[inline(always)]
+    fn health_contribution(&self, health_type: HealthType) -> I80F48 {
+        let weight = if self.balance.is_negative() {
+            self.liab_weight(health_type)
+        } else {
+            self.asset_weight(health_type)
+        };
+        cm!(self.balance * weight)
+    }
 }
 
-struct Serum3Info {
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct Serum3Info {
     reserved: I80F48,
     base_index: usize,
     quote_index: usize,
@@ -421,7 +498,8 @@ impl Serum3Info {
     }
 }
 
-struct PerpInfo {
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct PerpInfo {
     maint_asset_weight: I80F48,
     init_asset_weight: I80F48,
     maint_liab_weight: I80F48,
@@ -460,6 +538,7 @@ impl PerpInfo {
     }
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct HealthCache {
     token_infos: Vec<TokenInfo>,
     serum3_infos: Vec<Serum3Info>,
@@ -467,21 +546,13 @@ pub struct HealthCache {
 }
 
 impl HealthCache {
-    pub fn health(&self, health_type: HealthType) -> Result<I80F48> {
+    pub fn health(&self, health_type: HealthType) -> I80F48 {
         let mut health = I80F48::ZERO;
-        for token_info in self.token_infos.iter() {
-            let contrib = health_contribution(health_type, token_info, token_info.balance)?;
+        let sum = |contrib| {
             health = cm!(health + contrib);
-        }
-        for serum3_info in self.serum3_infos.iter() {
-            let contrib = serum3_info.health_contribution(health_type, &self.token_infos);
-            health = cm!(health + contrib);
-        }
-        for perp_info in self.perp_infos.iter() {
-            let contrib = perp_info.health_contribution(health_type);
-            health = cm!(health + contrib);
-        }
-        Ok(health)
+        };
+        self.health_sum(health_type, sum);
+        health
     }
 
     pub fn adjust_token_balance(&mut self, token_index: TokenIndex, change: I80F48) -> Result<()> {
@@ -489,27 +560,80 @@ impl HealthCache {
             .token_infos
             .iter_mut()
             .find(|t| t.token_index == token_index)
-            .ok_or_else(|| error!(MangoError::SomeError))?;
+            .ok_or_else(|| error_msg!("token index {} not found", token_index))?;
         entry.balance = cm!(entry.balance + change * entry.oracle_price);
         Ok(())
     }
-}
 
-/// Compute health contribution for a given balance
-/// wart: independent of the balance stored in TokenInfo
-/// balance is in health-reference-token native units
-#[inline(always)]
-fn health_contribution(
-    health_type: HealthType,
-    info: &TokenInfo,
-    balance: I80F48,
-) -> Result<I80F48> {
-    let weight = if balance.is_negative() {
-        info.liab_weight(health_type)
-    } else {
-        info.asset_weight(health_type)
-    };
-    Ok(cm!(balance * weight))
+    pub fn has_liquidatable_assets(&self) -> bool {
+        let spot_liquidatable = self.token_infos.iter().any(|ti| {
+            ti.balance > BANKRUPTCY_DUST_THRESHOLD || ti.serum3_max_reserved.is_positive()
+        });
+        let perp_liquidatable = self
+            .perp_infos
+            .iter()
+            .any(|p| p.base != 0 || p.quote > BANKRUPTCY_DUST_THRESHOLD);
+        spot_liquidatable || perp_liquidatable
+    }
+
+    pub fn has_borrows(&self) -> bool {
+        // AUDIT: Can we really guarantee that liquidation/bankruptcy resolution always leaves
+        //        non-negative balances?
+        let spot_borrows = self.token_infos.iter().any(|ti| ti.balance.is_negative());
+        let perp_borrows = self
+            .perp_infos
+            .iter()
+            .any(|p| p.quote.is_negative() || p.base != 0);
+        spot_borrows || perp_borrows
+    }
+
+    fn health_sum(&self, health_type: HealthType, mut action: impl FnMut(I80F48)) {
+        for token_info in self.token_infos.iter() {
+            let contrib = token_info.health_contribution(health_type);
+            action(contrib);
+        }
+        for serum3_info in self.serum3_infos.iter() {
+            let contrib = serum3_info.health_contribution(health_type, &self.token_infos);
+            action(contrib);
+        }
+        for perp_info in self.perp_infos.iter() {
+            let contrib = perp_info.health_contribution(health_type);
+            action(contrib);
+        }
+    }
+
+    /// Sum of only the positive health components (assets) and
+    /// sum of absolute values of all negative health components (liabs, always >= 0)
+    pub fn health_assets_and_liabs(&self, health_type: HealthType) -> (I80F48, I80F48) {
+        let mut assets = I80F48::ZERO;
+        let mut liabs = I80F48::ZERO;
+        let sum = |contrib| {
+            if contrib > 0 {
+                assets = cm!(assets + contrib);
+            } else {
+                liabs = cm!(liabs - contrib);
+            }
+        };
+        self.health_sum(health_type, sum);
+        (assets, liabs)
+    }
+
+    /// The health ratio is
+    /// - 0 if health is 0 - meaning assets = liabs
+    /// - 100 if there's 2x as many assets as liabs
+    /// - 200 if there's 3x as many assets as liabs
+    /// - MAX if liabs = 0
+    ///
+    /// Maybe talking about the collateralization ratio assets/liabs is more intuitive?
+    pub fn health_ratio(&self, health_type: HealthType) -> I80F48 {
+        let (assets, liabs) = self.health_assets_and_liabs(health_type);
+        let hundred = I80F48::from(100);
+        if liabs > 0 {
+            cm!(hundred * (assets - liabs) / liabs)
+        } else {
+            I80F48::MAX
+        }
+    }
 }
 
 /// Generate a HealthCache for an account and its health accounts.
@@ -523,7 +647,7 @@ pub fn new_health_cache(
         infos
             .iter()
             .position(|ti| ti.token_index == token_index)
-            .ok_or_else(|| error!(MangoError::SomeError))
+            .ok_or_else(|| error_msg!("token index {} not found", token_index))
     }
 
     for (i, position) in account.tokens.iter_active().enumerate() {
@@ -835,7 +959,6 @@ mod tests {
         perp1.data().group = group;
         perp1.data().perp_market_index = 9;
         perp1.data().base_token_index = 4;
-        perp1.data().quote_token_index = 1;
         perp1.data().init_asset_weight = I80F48::from_num(1.0 - 0.2f64);
         perp1.data().init_liab_weight = I80F48::from_num(1.0 + 0.2f64);
         perp1.data().maint_asset_weight = I80F48::from_num(1.0 - 0.1f64);
@@ -914,7 +1037,8 @@ mod tests {
         assert_eq!(retriever.perp_index_map.len(), 1);
 
         {
-            let (b1, b2, o1, o2) = retriever.banks_mut_and_oracles(1, 4).unwrap();
+            let (b1, o1, opt_b2o2) = retriever.banks_mut_and_oracles(1, 4).unwrap();
+            let (b2, o2) = opt_b2o2.unwrap();
             assert_eq!(b1.token_index, 1);
             assert_eq!(o1, I80F48::ONE);
             assert_eq!(b2.token_index, 4);
@@ -922,11 +1046,19 @@ mod tests {
         }
 
         {
-            let (b1, b2, o1, o2) = retriever.banks_mut_and_oracles(4, 1).unwrap();
+            let (b1, o1, opt_b2o2) = retriever.banks_mut_and_oracles(4, 1).unwrap();
+            let (b2, o2) = opt_b2o2.unwrap();
             assert_eq!(b1.token_index, 4);
             assert_eq!(o1, 5 * I80F48::ONE);
             assert_eq!(b2.token_index, 1);
             assert_eq!(o2, I80F48::ONE);
+        }
+
+        {
+            let (b1, o1, opt_b2o2) = retriever.banks_mut_and_oracles(4, 4).unwrap();
+            assert!(opt_b2o2.is_none());
+            assert_eq!(b1.token_index, 4);
+            assert_eq!(o1, 5 * I80F48::ONE);
         }
 
         retriever.banks_mut_and_oracles(4, 2).unwrap_err();
@@ -1001,7 +1133,6 @@ mod tests {
         perp1.data().group = group;
         perp1.data().perp_market_index = 9;
         perp1.data().base_token_index = 4;
-        perp1.data().quote_token_index = 1;
         perp1.data().init_asset_weight = I80F48::from_num(1.0 - 0.2f64);
         perp1.data().init_liab_weight = I80F48::from_num(1.0 + 0.2f64);
         perp1.data().maint_asset_weight = I80F48::from_num(1.0 - 0.1f64);

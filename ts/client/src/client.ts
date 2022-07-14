@@ -1,6 +1,4 @@
-import { Jupiter } from '@jup-ag/core';
 import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
-import { simulateTransaction } from '@project-serum/anchor/dist/cjs/utils/rpc';
 import { getFeeRates, getFeeTier } from '@project-serum/serum';
 import { Order } from '@project-serum/serum/lib/market';
 import {
@@ -67,24 +65,26 @@ export class MangoClient {
 
   // Group
 
-  public async createGroup(
+  public async groupCreate(
     groupNum: number,
     testing: boolean,
+    insuranceMintPk: PublicKey,
   ): Promise<TransactionSignature> {
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
     return await this.program.methods
-      .createGroup(groupNum, testing ? 1 : 0)
+      .groupCreate(groupNum, testing ? 1 : 0)
       .accounts({
         admin: adminPk,
         payer: adminPk,
+        insuranceMint: insuranceMintPk,
       })
       .rpc();
   }
 
-  public async closeGroup(group: Group): Promise<TransactionSignature> {
+  public async groupClose(group: Group): Promise<TransactionSignature> {
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
     return await this.program.methods
-      .closeGroup()
+      .groupClose()
       .accounts({
         group: group.publicKey,
         admin: adminPk,
@@ -120,7 +120,7 @@ export class MangoClient {
       filters.push({
         memcmp: {
           bytes: bs58.encode(bbuf),
-          offset: 44,
+          offset: 40,
         },
       });
     }
@@ -141,6 +141,7 @@ export class MangoClient {
     oracleConfFilter: number,
     tokenIndex: number,
     name: string,
+    adjustmentFactor: number,
     util0: number,
     rate0: number,
     util1: number,
@@ -154,7 +155,6 @@ export class MangoClient {
     initLiabWeight: number,
     liquidationFee: number,
   ): Promise<TransactionSignature> {
-    const bn = I80F48.fromNumber(oracleConfFilter).getData();
     return await this.program.methods
       .tokenRegister(
         tokenIndex,
@@ -165,7 +165,7 @@ export class MangoClient {
             val: I80F48.fromNumber(oracleConfFilter).getData(),
           },
         } as any, // future: nested custom types dont typecheck, fix if possible?
-        { util0, rate0, util1, rate1, maxRate },
+        { adjustmentFactor, util0, rate0, util1, rate1, maxRate },
         loanFeeRate,
         loanOriginationFeeRate,
         maintAssetWeight,
@@ -183,6 +183,61 @@ export class MangoClient {
         rent: SYSVAR_RENT_PUBKEY,
       })
       .rpc();
+  }
+
+  public async tokenEdit(
+    group: Group,
+    tokenName: string,
+    oracle: PublicKey,
+    oracleConfFilter: number,
+    adjustmentFactor: number,
+    util0: number,
+    rate0: number,
+    util1: number,
+    rate1: number,
+    maxRate: number,
+    loanFeeRate: number,
+    loanOriginationFeeRate: number,
+    maintAssetWeight: number,
+    initAssetWeight: number,
+    maintLiabWeight: number,
+    initLiabWeight: number,
+    liquidationFee: number,
+  ): Promise<TransactionSignature> {
+    const bank = group.banksMap.get(tokenName)!;
+    const mintInfo = group.mintInfosMap.get(bank.tokenIndex)!;
+
+    return await this.program.methods
+      .tokenEdit(
+        new BN(0),
+        oracle,
+        {
+          confFilter: {
+            val: I80F48.fromNumber(oracleConfFilter).getData(),
+          },
+        } as any, // future: nested custom types dont typecheck, fix if possible?
+        { adjustmentFactor, util0, rate0, util1, rate1, maxRate },
+        loanFeeRate,
+        loanOriginationFeeRate,
+        maintAssetWeight,
+        initAssetWeight,
+        maintLiabWeight,
+        initLiabWeight,
+        liquidationFee,
+      )
+      .accounts({
+        group: group.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        mintInfo: mintInfo.publicKey,
+      })
+      .remainingAccounts([
+        {
+          pubkey: bank.publicKey,
+          isWritable: true,
+          isSigner: false,
+        } as AccountMeta,
+      ])
+      .rpc({ skipPreflight: true });
   }
 
   public async tokenDeregister(
@@ -236,7 +291,7 @@ export class MangoClient {
         {
           memcmp: {
             bytes: group.publicKey.toBase58(),
-            offset: 24,
+            offset: 8,
           },
         },
       ])
@@ -275,7 +330,7 @@ export class MangoClient {
         {
           memcmp: {
             bytes: bs58.encode(tokenIndexBuf),
-            offset: 200,
+            offset: 40,
           },
         },
       ])
@@ -286,13 +341,13 @@ export class MangoClient {
 
   // Stub Oracle
 
-  public async createStubOracle(
+  public async stubOracleCreate(
     group: Group,
     mintPk: PublicKey,
     price: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .createStubOracle({ val: I80F48.fromNumber(price).getData() })
+      .stubOracleCreate({ val: I80F48.fromNumber(price).getData() })
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -302,12 +357,12 @@ export class MangoClient {
       .rpc();
   }
 
-  public async closeStubOracle(
+  public async stubOracleClose(
     group: Group,
     oracle: PublicKey,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .closeStubOracle()
+      .stubOracleClose()
       .accounts({
         group: group.publicKey,
         oracle: oracle,
@@ -317,13 +372,13 @@ export class MangoClient {
       .rpc();
   }
 
-  public async setStubOracle(
+  public async stubOracleSet(
     group: Group,
     oraclePk: PublicKey,
     price: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .setStubOracle({ val: I80F48.fromNumber(price).getData() })
+      .stubOracleSet({ val: I80F48.fromNumber(price).getData() })
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -382,11 +437,27 @@ export class MangoClient {
     name?: string,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .createAccount(accountNumber, name ?? '')
+      .accountCreate(accountNumber, name ?? '')
       .accounts({
         group: group.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
+  }
+
+  public async editMangoAccount(
+    group: Group,
+    mangoAccount: MangoAccount,
+    name?: string,
+    delegate?: PublicKey,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .accountEdit(name, delegate)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .rpc();
   }
@@ -407,13 +478,13 @@ export class MangoClient {
         {
           memcmp: {
             bytes: group.publicKey.toBase58(),
-            offset: 40,
+            offset: 8,
           },
         },
         {
           memcmp: {
             bytes: ownerPk.toBase58(),
-            offset: 72,
+            offset: 40,
           },
         },
       ])
@@ -427,7 +498,7 @@ export class MangoClient {
     mangoAccount: MangoAccount,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .closeAccount()
+      .accountClose()
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -663,7 +734,7 @@ export class MangoClient {
       {
         memcmp: {
           bytes: group.publicKey.toBase58(),
-          offset: 24,
+          offset: 8,
         },
       },
     ];
@@ -674,7 +745,7 @@ export class MangoClient {
       filters.push({
         memcmp: {
           bytes: bs58.encode(bbuf),
-          offset: 122,
+          offset: 40,
         },
       });
     }
@@ -685,7 +756,7 @@ export class MangoClient {
       filters.push({
         memcmp: {
           bytes: bs58.encode(qbuf),
-          offset: 124,
+          offset: 42,
         },
       });
     }
@@ -991,7 +1062,6 @@ export class MangoClient {
         } as any, // future: nested custom types dont typecheck, fix if possible?
         baseTokenIndex,
         baseTokenDecimals,
-        quoteTokenIndex,
         new BN(quoteLotSize),
         new BN(baseLotSize),
         maintAssetWeight,
@@ -1054,6 +1124,55 @@ export class MangoClient {
       .rpc();
   }
 
+  async perpEditMarket(
+    group: Group,
+    perpMarketName: string,
+    oracle: PublicKey,
+    oracleConfFilter: number,
+    baseTokenIndex: number,
+    baseTokenDecimals: number,
+    maintAssetWeight: number,
+    initAssetWeight: number,
+    maintLiabWeight: number,
+    initLiabWeight: number,
+    liquidationFee: number,
+    makerFee: number,
+    takerFee: number,
+    minFunding: number,
+    maxFunding: number,
+    impactQuantity: number,
+  ): Promise<TransactionSignature> {
+    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+
+    return await this.program.methods
+      .perpEditMarket(
+        oracle,
+        {
+          confFilter: {
+            val: I80F48.fromNumber(oracleConfFilter).getData(),
+          },
+        } as any, // future: nested custom types dont typecheck, fix if possible?
+        baseTokenIndex,
+        baseTokenDecimals,
+        maintAssetWeight,
+        initAssetWeight,
+        maintLiabWeight,
+        initLiabWeight,
+        liquidationFee,
+        makerFee,
+        takerFee,
+        minFunding,
+        maxFunding,
+        new BN(impactQuantity),
+      )
+      .accounts({
+        group: group.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        perpMarket: perpMarket.publicKey,
+      })
+      .rpc();
+  }
+
   async perpCloseMarket(
     group: Group,
     perpMarketName: string,
@@ -1078,7 +1197,6 @@ export class MangoClient {
   public async perpGetMarkets(
     group: Group,
     baseTokenIndex?: number,
-    quoteTokenIndex?: number,
   ): Promise<PerpMarket[]> {
     const bumpfbuf = Buffer.alloc(1);
     bumpfbuf.writeUInt8(255);
@@ -1087,7 +1205,7 @@ export class MangoClient {
       {
         memcmp: {
           bytes: group.publicKey.toBase58(),
-          offset: 24,
+          offset: 8,
         },
       },
     ];
@@ -1098,18 +1216,7 @@ export class MangoClient {
       filters.push({
         memcmp: {
           bytes: bs58.encode(bbuf),
-          offset: 444,
-        },
-      });
-    }
-
-    if (quoteTokenIndex) {
-      const qbuf = Buffer.alloc(2);
-      qbuf.writeUInt16LE(quoteTokenIndex);
-      filters.push({
-        memcmp: {
-          bytes: bs58.encode(qbuf),
-          offset: 446,
+          offset: 40,
         },
       });
     }
@@ -1182,14 +1289,14 @@ export class MangoClient {
     inputToken,
     amountIn,
     outputToken,
-    slippage = 0.5,
+    userDefinedInstructions,
   }: {
     group: Group;
     mangoAccount: MangoAccount;
     inputToken: string;
     amountIn: number;
     outputToken: string;
-    slippage: number;
+    userDefinedInstructions: TransactionInstruction[];
   }): Promise<TransactionSignature> {
     const inputBank = group.banksMap.get(inputToken);
     const outputBank = group.banksMap.get(outputToken);
@@ -1260,8 +1367,7 @@ export class MangoClient {
     }
 
     /*
-     * Transfer input token to users wallet, then swap with the Jupiter route,
-     * and finally transfer output token from users wallet back to the mango vault
+     * Transfer input token to users wallet, then concat the passed in instructions
      */
     const nativeInputAmount = toU64(
       amountIn,
@@ -1281,57 +1387,7 @@ export class MangoClient {
     transferIx.keys[2] = { ...inputBankKey, isWritable: true, isSigner: false };
     instructions.push(transferIx);
 
-    // TODO: move out of client and into ui
-    // Start Jupiter
-
-    const jupiter = await Jupiter.load({
-      connection: this.program.provider.connection,
-      cluster: 'mainnet-beta',
-      user: mangoAccount.owner, // or public key
-      // platformFeeAndAccounts:  NO_PLATFORM_FEE,
-      routeCacheDuration: 10_000, // Will not refetch data on computeRoutes for up to 10 seconds
-    });
-
-    const routes = await jupiter.computeRoutes({
-      inputMint: inputBank.mint, // Mint address of the input token
-      outputMint: outputBank.mint, // Mint address of the output token
-      inputAmount: nativeInputAmount, // raw input amount of tokens
-      slippage, // The slippage in % terms
-      forceFetch: false, // false is the default value => will use cache if not older than routeCacheDuration
-    });
-
-    const routesInfosWithoutRaydium = routes.routesInfos.filter((r) => {
-      if (r.marketInfos.length > 1) {
-        for (const mkt of r.marketInfos) {
-          if (mkt.amm.label === 'Raydium' || mkt.amm.label === 'Serum')
-            return false;
-        }
-      }
-      return true;
-    });
-
-    const selectedRoute = routesInfosWithoutRaydium[0];
-
-    console.log(
-      `route found: ${selectedRoute.marketInfos[0].amm.label}. generating jup transaction`,
-    );
-
-    const { transactions } = await jupiter.exchange({
-      routeInfo: selectedRoute,
-    });
-    console.log('Jupiter Transactions:', transactions);
-    const { setupTransaction, swapTransaction } = transactions;
-
-    for (const ix of swapTransaction.instructions) {
-      if (
-        ix.programId.toBase58() ===
-        'JUP2jxvXaqu7NQY1GmNF4m1vodw12LVXYxbFL2uJvfo'
-      ) {
-        instructions.push(ix);
-      }
-    }
-
-    // End Jupiter
+    instructions.concat(userDefinedInstructions);
 
     const transferIx2 = Token.createTransferInstruction(
       TOKEN_PROGRAM_ID,
@@ -1339,12 +1395,12 @@ export class MangoClient {
       outputBank.vault,
       mangoAccount.owner,
       [],
-      selectedRoute.outAmountWithSlippage,
+      0, // todo: use this for testing, this should be the amount to transfer back
     );
     instructions.push(transferIx2);
 
     /*
-     * Build data objects for margin trade instructions
+     * Create object of amounts that will be withdrawn from bank vaults
      */
     const targetRemainingAccounts = instructions
       .map((ix) => [
@@ -1368,6 +1424,9 @@ export class MangoClient {
       },
     ];
 
+    /*
+     * Build cpi data objects for instructions
+     */
     let cpiDatas = [];
     for (const [index, ix] of instructions.entries()) {
       if (index === 0) {
@@ -1385,27 +1444,11 @@ export class MangoClient {
       }
     }
 
-    console.log(
-      'instructions',
-      instructions.map((i) => ({ ...i, programId: i.programId.toString() })),
-    );
-    console.log('cpiDatas', cpiDatas);
-    console.log(
-      'targetRemainingAccounts',
-      targetRemainingAccounts.map((t) => ({
-        ...t,
-        pubkey: t.pubkey.toString(),
-      })),
-    );
-
-    if (setupTransaction) {
-      await this.program.provider.sendAndConfirm(setupTransaction);
-    } else if (preInstructions.length) {
+    if (preInstructions.length) {
       const tx = new Transaction();
       for (const ix of preInstructions) {
         tx.add(ix);
       }
-      console.log('preInstructions', preInstructions);
 
       await this.program.provider.sendAndConfirm(tx);
     }
@@ -1454,6 +1497,7 @@ export class MangoClient {
           isSigner: false,
         } as AccountMeta),
     );
+    console.log('1');
 
     /*
      * Find or create associated token accounts
@@ -1500,6 +1544,7 @@ export class MangoClient {
         ),
       );
     }
+    console.log('2');
 
     if (preInstructions.length) {
       const tx = new Transaction();
@@ -1510,6 +1555,7 @@ export class MangoClient {
 
       await this.program.provider.sendAndConfirm(tx);
     }
+    console.log('3');
 
     const inputBankAccount = {
       pubkey: inputBank.publicKey,
@@ -1560,6 +1606,9 @@ export class MangoClient {
         },
       ])
       .instruction();
+    console.log('4');
+
+    // userDefinedInstructions.push(flashLoanEndIx);
 
     const flashLoanBeginIx = await this.program.methods
       .flashLoan3Begin([

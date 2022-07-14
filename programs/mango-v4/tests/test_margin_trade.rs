@@ -34,7 +34,7 @@ async fn test_margin_trade1() -> Result<(), BanksClientError> {
     // SETUP: Create a group, account, register a token (mint0)
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -51,7 +51,7 @@ async fn test_margin_trade1() -> Result<(), BanksClientError> {
 
     let provider_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 1,
             group,
             owner,
@@ -68,7 +68,8 @@ async fn test_margin_trade1() -> Result<(), BanksClientError> {
             amount: provided_amount,
             account: provider_account,
             token_account: payer_mint0_account,
-            token_authority: payer,
+            token_authority: payer.clone(),
+            bank_index: 0,
         },
     )
     .await
@@ -79,7 +80,8 @@ async fn test_margin_trade1() -> Result<(), BanksClientError> {
             amount: provided_amount,
             account: provider_account,
             token_account: payer_mint1_account,
-            token_authority: payer,
+            token_authority: payer.clone(),
+            bank_index: 0,
         },
     )
     .await
@@ -91,7 +93,7 @@ async fn test_margin_trade1() -> Result<(), BanksClientError> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -115,7 +117,8 @@ async fn test_margin_trade1() -> Result<(), BanksClientError> {
                 amount: deposit_amount_initial,
                 account,
                 token_account: payer_mint0_account,
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -347,7 +350,7 @@ async fn test_margin_trade2() -> Result<(), BanksClientError> {
     // SETUP: Create a group, account, register a token (mint0)
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -364,7 +367,7 @@ async fn test_margin_trade2() -> Result<(), BanksClientError> {
 
     let provider_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 1,
             group,
             owner,
@@ -381,7 +384,8 @@ async fn test_margin_trade2() -> Result<(), BanksClientError> {
             amount: provided_amount,
             account: provider_account,
             token_account: payer_mint0_account,
-            token_authority: payer,
+            token_authority: payer.clone(),
+            bank_index: 0,
         },
     )
     .await
@@ -392,7 +396,8 @@ async fn test_margin_trade2() -> Result<(), BanksClientError> {
             amount: provided_amount,
             account: provider_account,
             token_account: payer_mint1_account,
-            token_authority: payer,
+            token_authority: payer.clone(),
+            bank_index: 0,
         },
     )
     .await
@@ -404,7 +409,7 @@ async fn test_margin_trade2() -> Result<(), BanksClientError> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -428,7 +433,8 @@ async fn test_margin_trade2() -> Result<(), BanksClientError> {
                 amount: deposit_amount_initial,
                 account,
                 token_account: payer_mint0_account,
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -605,7 +611,7 @@ async fn test_margin_trade3() -> Result<(), BanksClientError> {
     // SETUP: Create a group, account, register a token (mint0)
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -622,7 +628,7 @@ async fn test_margin_trade3() -> Result<(), BanksClientError> {
 
     let provider_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 1,
             group,
             owner,
@@ -639,7 +645,8 @@ async fn test_margin_trade3() -> Result<(), BanksClientError> {
             amount: provided_amount,
             account: provider_account,
             token_account: payer_mint0_account,
-            token_authority: payer,
+            token_authority: payer.clone(),
+            bank_index: 0,
         },
     )
     .await
@@ -650,7 +657,8 @@ async fn test_margin_trade3() -> Result<(), BanksClientError> {
             amount: provided_amount,
             account: provider_account,
             token_account: payer_mint1_account,
-            token_authority: payer,
+            token_authority: payer.clone(),
+            bank_index: 0,
         },
     )
     .await
@@ -662,7 +670,7 @@ async fn test_margin_trade3() -> Result<(), BanksClientError> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -686,7 +694,8 @@ async fn test_margin_trade3() -> Result<(), BanksClientError> {
                 amount: deposit_amount_initial,
                 account,
                 token_account: payer_mint0_account,
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await

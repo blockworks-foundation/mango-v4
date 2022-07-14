@@ -26,7 +26,7 @@ async fn test_position_lifetime() -> Result<()> {
     // SETUP: Create a group and accounts
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -36,7 +36,7 @@ async fn test_position_lifetime() -> Result<()> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -49,7 +49,7 @@ async fn test_position_lifetime() -> Result<()> {
 
     let funding_account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 1,
             group,
             owner,
@@ -72,7 +72,8 @@ async fn test_position_lifetime() -> Result<()> {
                     amount: funding_amount,
                     account: funding_account,
                     token_account: payer_token,
-                    token_authority: payer,
+                    token_authority: payer.clone(),
+                    bank_index: 0,
                 },
             )
             .await
@@ -95,7 +96,8 @@ async fn test_position_lifetime() -> Result<()> {
                     amount: deposit_amount,
                     account,
                     token_account: payer_token,
-                    token_authority: payer,
+                    token_authority: payer.clone(),
+                    bank_index: 0,
                 },
             )
             .await
@@ -112,6 +114,7 @@ async fn test_position_lifetime() -> Result<()> {
                     account,
                     owner,
                     token_account: payer_token,
+                    bank_index: 0,
                 },
             )
             .await
@@ -145,7 +148,8 @@ async fn test_position_lifetime() -> Result<()> {
                 amount: collateral_amount,
                 account,
                 token_account: payer_mint_accounts[0],
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -161,6 +165,7 @@ async fn test_position_lifetime() -> Result<()> {
                 account,
                 owner,
                 token_account: payer_mint_accounts[1],
+                bank_index: 0,
             },
         )
         .await
@@ -179,7 +184,8 @@ async fn test_position_lifetime() -> Result<()> {
                     amount: borrow_amount + 2,
                     account,
                     token_account: payer_mint_accounts[1],
-                    token_authority: payer,
+                    token_authority: payer.clone(),
+                    bank_index: 0,
                 },
             )
             .await
@@ -193,6 +199,7 @@ async fn test_position_lifetime() -> Result<()> {
                     account,
                     owner,
                     token_account: payer_mint_accounts[1],
+                    bank_index: 0,
                 },
             )
             .await
@@ -208,6 +215,7 @@ async fn test_position_lifetime() -> Result<()> {
                 account,
                 owner,
                 token_account: payer_mint_accounts[0],
+                bank_index: 0,
             },
         )
         .await

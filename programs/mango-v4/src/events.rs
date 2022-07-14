@@ -1,11 +1,11 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
-use crate::state::{PerpMarketIndex, TokenIndex};
+use crate::state::{HealthCache, PerpMarketIndex, TokenIndex};
 
 #[event]
-#[derive(Debug)]
 pub struct MangoAccountData {
+    pub health_cache: HealthCache,
     pub init_health: I80F48,
     pub maint_health: I80F48,
     pub equity: Equity,

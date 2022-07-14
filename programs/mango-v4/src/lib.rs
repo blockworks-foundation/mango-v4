@@ -30,12 +30,12 @@ pub mod mango_v4 {
 
     use super::*;
 
-    pub fn create_group(ctx: Context<CreateGroup>, group_num: u32, testing: u8) -> Result<()> {
-        instructions::create_group(ctx, group_num, testing)
+    pub fn group_create(ctx: Context<GroupCreate>, group_num: u32, testing: u8) -> Result<()> {
+        instructions::group_create(ctx, group_num, testing)
     }
 
-    pub fn close_group(ctx: Context<CloseGroup>) -> Result<()> {
-        instructions::close_group(ctx)
+    pub fn group_close(ctx: Context<GroupClose>) -> Result<()> {
+        instructions::group_close(ctx)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -72,6 +72,37 @@ pub mod mango_v4 {
     }
 
     #[allow(clippy::too_many_arguments)]
+    pub fn token_edit(
+        ctx: Context<TokenEdit>,
+        bank_num: u64,
+        oracle_opt: Option<Pubkey>,
+        oracle_config_opt: Option<OracleConfig>,
+        interest_rate_params_opt: Option<InterestRateParams>,
+        loan_fee_rate_opt: Option<f32>,
+        loan_origination_fee_rate_opt: Option<f32>,
+        maint_asset_weight_opt: Option<f32>,
+        init_asset_weight_opt: Option<f32>,
+        maint_liab_weight_opt: Option<f32>,
+        init_liab_weight_opt: Option<f32>,
+        liquidation_fee_opt: Option<f32>,
+    ) -> Result<()> {
+        instructions::token_edit(
+            ctx,
+            bank_num,
+            oracle_opt,
+            oracle_config_opt,
+            interest_rate_params_opt,
+            loan_fee_rate_opt,
+            loan_origination_fee_rate_opt,
+            maint_asset_weight_opt,
+            init_asset_weight_opt,
+            maint_liab_weight_opt,
+            init_liab_weight_opt,
+            liquidation_fee_opt,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn token_add_bank(
         ctx: Context<TokenAddBank>,
         token_index: TokenIndex,
@@ -87,22 +118,28 @@ pub mod mango_v4 {
         instructions::token_deregister(ctx, token_index)
     }
 
-    pub fn update_index(ctx: Context<UpdateIndex>) -> Result<()> {
-        instructions::update_index(ctx)
+    pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Result<()> {
+        instructions::token_update_index_and_rate(ctx)
     }
 
-    pub fn create_account(
-        ctx: Context<CreateAccount>,
+    pub fn account_create(
+        ctx: Context<AccountCreate>,
         account_num: u8,
         name: String,
     ) -> Result<()> {
-        instructions::create_account(ctx, account_num, name)
+        instructions::account_create(ctx, account_num, name)
     }
 
-    // TODO set delegate
+    pub fn account_edit(
+        ctx: Context<AccountEdit>,
+        name_opt: Option<String>,
+        delegate_opt: Option<Pubkey>,
+    ) -> Result<()> {
+        instructions::account_edit(ctx, name_opt, delegate_opt)
+    }
 
-    pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
-        instructions::close_account(ctx)
+    pub fn account_close(ctx: Context<AccountClose>) -> Result<()> {
+        instructions::account_close(ctx)
     }
 
     // todo:
@@ -110,22 +147,24 @@ pub mod mango_v4 {
     // because generic anchor clients won't know how to deal with it
     // and it's tricky to use in typescript generally
     // lets do an interface pass later
-    pub fn create_stub_oracle(ctx: Context<CreateStubOracle>, price: I80F48) -> Result<()> {
-        instructions::create_stub_oracle(ctx, price)
+    pub fn stub_oracle_create(ctx: Context<StubOracleCreate>, price: I80F48) -> Result<()> {
+        instructions::stub_oracle_create(ctx, price)
     }
 
-    pub fn close_stub_oracle(ctx: Context<CloseStubOracle>) -> Result<()> {
-        instructions::close_stub_oracle(ctx)
+    pub fn stub_oracle_close(ctx: Context<StubOracleClose>) -> Result<()> {
+        instructions::stub_oracle_close(ctx)
     }
 
-    pub fn set_stub_oracle(ctx: Context<SetStubOracle>, price: I80F48) -> Result<()> {
-        instructions::set_stub_oracle(ctx, price)
+    pub fn stub_oracle_set(ctx: Context<StubOracleSet>, price: I80F48) -> Result<()> {
+        instructions::stub_oracle_set(ctx, price)
     }
 
+    // NOTE: keep disc synced in token_update_index_and_rate ix
     pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
         instructions::token_deposit(ctx, amount)
     }
 
+    // NOTE: keep disc synced in token_update_index_and_rate ix
     pub fn token_withdraw(
         ctx: Context<TokenWithdraw>,
         amount: u64,
@@ -162,6 +201,7 @@ pub mod mango_v4 {
         instructions::flash_loan3_begin(ctx, loan_amounts)
     }
 
+    // NOTE: keep disc synced in flash_loan3.rs
     pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan3End<'info>>,
     ) -> Result<()> {
@@ -181,6 +221,11 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::serum3_register_market(ctx, market_index, name)
     }
+
+    // note:
+    // pub fn serum3_edit_market - doesn't exist since a mango serum3 market only contains the properties
+    // registered base and quote token pairs, and serum3 external market its pointing to, and none of them
+    // should be edited once set on creation
 
     pub fn serum3_deregister_market(ctx: Context<Serum3DeregisterMarket>) -> Result<()> {
         instructions::serum3_deregister_market(ctx)
@@ -260,6 +305,14 @@ pub mod mango_v4 {
         )
     }
 
+    pub fn liq_token_bankruptcy(
+        ctx: Context<LiqTokenBankruptcy>,
+        liab_token_index: TokenIndex,
+        max_liab_transfer: I80F48,
+    ) -> Result<()> {
+        instructions::liq_token_bankruptcy(ctx, liab_token_index, max_liab_transfer)
+    }
+
     ///
     /// Perps
     ///
@@ -272,7 +325,6 @@ pub mod mango_v4 {
         oracle_config: OracleConfig,
         base_token_index_opt: Option<TokenIndex>,
         base_token_decimals: u8,
-        quote_token_index: TokenIndex,
         quote_lot_size: i64,
         base_lot_size: i64,
         maint_asset_weight: f32,
@@ -293,7 +345,6 @@ pub mod mango_v4 {
             oracle_config,
             base_token_index_opt,
             base_token_decimals,
-            quote_token_index,
             quote_lot_size,
             base_lot_size,
             maint_asset_weight,
@@ -306,6 +357,43 @@ pub mod mango_v4 {
             max_funding,
             min_funding,
             impact_quantity,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn perp_edit_market(
+        ctx: Context<PerpEditMarket>,
+        oracle_opt: Option<Pubkey>,
+        oracle_config_opt: Option<OracleConfig>,
+        base_token_index_opt: Option<TokenIndex>,
+        base_token_decimals_opt: Option<u8>,
+        maint_asset_weight_opt: Option<f32>,
+        init_asset_weight_opt: Option<f32>,
+        maint_liab_weight_opt: Option<f32>,
+        init_liab_weight_opt: Option<f32>,
+        liquidation_fee_opt: Option<f32>,
+        maker_fee_opt: Option<f32>,
+        taker_fee_opt: Option<f32>,
+        min_funding_opt: Option<f32>,
+        max_funding_opt: Option<f32>,
+        impact_quantity_opt: Option<i64>,
+    ) -> Result<()> {
+        instructions::perp_edit_market(
+            ctx,
+            oracle_opt,
+            oracle_config_opt,
+            base_token_index_opt,
+            base_token_decimals_opt,
+            maint_asset_weight_opt,
+            init_asset_weight_opt,
+            maint_liab_weight_opt,
+            init_liab_weight_opt,
+            liquidation_fee_opt,
+            maker_fee_opt,
+            taker_fee_opt,
+            min_funding_opt,
+            max_funding_opt,
+            impact_quantity_opt,
         )
     }
 

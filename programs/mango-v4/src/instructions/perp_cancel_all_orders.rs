@@ -10,9 +10,10 @@ pub struct PerpCancelAllOrders<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = owner,
+        constraint = account.load()?.is_owner_or_delegate(owner.key()),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
+    pub owner: Signer<'info>,
 
     #[account(
         mut,
@@ -25,13 +26,11 @@ pub struct PerpCancelAllOrders<'info> {
     pub asks: AccountLoader<'info, BookSide>,
     #[account(mut)]
     pub bids: AccountLoader<'info, BookSide>,
-
-    pub owner: Signer<'info>,
 }
 
 pub fn perp_cancel_all_orders(ctx: Context<PerpCancelAllOrders>, limit: u8) -> Result<()> {
     let mut mango_account = ctx.accounts.account.load_mut()?;
-    require!(mango_account.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!mango_account.is_bankrupt(), MangoError::IsBankrupt);
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
     let bids = ctx.accounts.bids.load_mut()?;

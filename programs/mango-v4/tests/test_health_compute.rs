@@ -35,7 +35,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -59,7 +59,8 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
                 amount: deposit_amount,
                 account,
                 token_account,
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -88,7 +89,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     // SETUP: Create a group and an account
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -98,7 +99,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -169,7 +170,8 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
                 amount: 10,
                 account,
                 token_account: payer_mint_accounts[0],
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await
@@ -198,7 +200,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     // SETUP: Create a group and an account
     //
 
-    let mango_setup::GroupWithTokens { group, tokens } = mango_setup::GroupWithTokensConfig {
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -208,7 +210,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
 
     let account = send_tx(
         solana,
-        CreateAccountInstruction {
+        AccountCreateInstruction {
             account_num: 0,
             group,
             owner,
@@ -226,7 +228,8 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
             amount: 1000,
             account,
             token_account: payer_mint_accounts[0],
-            token_authority: payer,
+            token_authority: payer.clone(),
+            bank_index: 0,
         },
     )
     .await
@@ -268,7 +271,6 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 perp_market_index: perp_market_index as PerpMarketIndex,
                 base_token_index: quote_token.index,
                 base_token_decimals: quote_token.mint.decimals,
-                quote_token_index: token.index,
                 quote_lot_size: 10,
                 base_lot_size: 100,
                 maint_asset_weight: 0.975,
@@ -323,7 +325,8 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 amount: 10,
                 account,
                 token_account: payer_mint_accounts[0],
-                token_authority: payer,
+                token_authority: payer.clone(),
+                bank_index: 0,
             },
         )
         .await

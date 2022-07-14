@@ -37,11 +37,12 @@ pub struct FlashLoan2End<'info> {
     pub group: AccountLoader<'info, Group>,
     #[account(
         mut,
-        has_one = owner,
         has_one = group,
+        constraint = account.load()?.is_owner_or_delegate(owner.key()),
     )]
     pub account: AccountLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
+
     pub token_program: Program<'info, Token>,
 }
 
@@ -161,7 +162,7 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
     let group_seeds = group_seeds!(group);
 
     let mut account = ctx.accounts.account.load_mut()?;
-    require!(account.is_bankrupt == 0, MangoError::IsBankrupt);
+    require!(!account.is_bankrupt(), MangoError::IsBankrupt);
 
     // Find index at which vaults start
     let vaults_index = ctx
