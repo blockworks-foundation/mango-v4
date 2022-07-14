@@ -31,7 +31,6 @@ pub struct MangoClient {
     pub cluster: Cluster,
     pub commitment: CommitmentConfig,
     pub payer: Keypair,
-    pub admin: Keypair,
     pub mango_account_cache: (Pubkey, MangoAccount),
     pub group: Pubkey,
     pub group_cache: Group,
@@ -53,11 +52,19 @@ pub struct MangoClient {
 // 2/ pubkey, can be both owned, but also delegated accouns
 
 impl MangoClient {
+    pub fn group_for_admin(admin: Pubkey, num: u32) -> Pubkey {
+        Pubkey::find_program_address(
+            &["Group".as_ref(), admin.as_ref(), num.to_le_bytes().as_ref()],
+            &mango_v4::ID,
+        )
+        .0
+    }
+
     pub fn new(
         cluster: Cluster,
         commitment: CommitmentConfig,
         payer: Keypair,
-        admin: Keypair,
+        group: Pubkey,
         mango_account_name: &str,
     ) -> anyhow::Result<Self> {
         let program =
@@ -65,16 +72,6 @@ impl MangoClient {
                 .program(mango_v4::ID);
 
         let rpc = program.rpc();
-
-        let group = Pubkey::find_program_address(
-            &[
-                "Group".as_ref(),
-                admin.pubkey().as_ref(),
-                0u32.to_le_bytes().as_ref(),
-            ],
-            &program.id(),
-        )
-        .0;
 
         let group_data = program.account::<Group>(group)?;
 
@@ -237,7 +234,6 @@ impl MangoClient {
             rpc,
             cluster,
             commitment,
-            admin,
             payer,
             mango_account_cache,
             group,
