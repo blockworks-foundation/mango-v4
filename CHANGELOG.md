@@ -3,6 +3,14 @@
 Update this for each mainnet deployment.
 
 ## not on mainnet
+
+-
+
+## mainnet
+
+Jul 14, 2022 at 09:33:52 Central European Summer Time
+https://explorer.solana.com/tx/vZ5hP1vGp37fgzBfG9nb4nfA5ZdmYgk8meq53YPR4ReFxrcTwBUxTYBQUgnfAnq9u5fH36S3QTfb9mVkBXt5A6C
+
 - Account data was rearranged to put fields that are often used with gPA first
 - The `CreateGroup` instruction now requires an `insurance_mint` account, which is
   used as the mint for the `insurance_vault` token account it creates. Pass the
