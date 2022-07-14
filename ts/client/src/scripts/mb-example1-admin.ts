@@ -157,6 +157,10 @@ async function main() {
     console.log(`${bank.toString()}`);
   }
 
+  console.log(
+    `NOTE: run yarn ts-node ts/client/src/scripts/mb-add-group-to-ids-json.ts to update ids json`,
+  );
+
   process.exit();
 }
 
