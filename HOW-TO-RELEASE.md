@@ -13,4 +13,15 @@ If there are no breaking changes, simply running `release-to-mainnet.sh` should 
 - merge dev to main, and then `release-to-mainnet.sh` to deploy latest code to mainnet
 - setup group and banks, etc. using `ts/client/src/scripts/mb-example1-admin.ts`
 - update ids json `ts/client/src/scripts/mb-example1-ids-json.ts`
-- create mango account and deposit some tokens `ts/client/src/scripts/mb-example1-close-account.ts`
+- create mango account and deposit some tokens `ts/client/src/scripts/mb-example1-ids-json.ts`
+
+tldr;
+
+```
+yarn ts-node ts/client/src/scripts/mb-example1-close-account.ts
+yarn ts-node ts/client/src/scripts/mb-example1-admin-close.ts
+./release-to-mainnet.sh
+yarn ts-node ts/client/src/scripts/mb-example1-admin.ts
+yarn ts-node ts/client/src/scripts/mb-example1-ids-json.ts
+yarn ts-node ts/client/src/scripts/mb-example1-ids-json.ts
+```
