@@ -9,5 +9,4 @@ snapshot_interval_secs = 240
 parallel_rpc_requests = 10
 get_multiple_accounts_count = 100
 payer = "/root/.config/solana/mango-devnet.json"
-admin = "/root/.config/solana/admin.json"
 mango_account_name = "Taker"

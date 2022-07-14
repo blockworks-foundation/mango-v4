@@ -66,7 +66,6 @@ pub struct Config {
     // FUTURE: split mango client and feed config
     // mango client specific
     pub payer: String,
-    pub admin: String,
     pub mango_account_name: String,
 }
 
@@ -89,12 +88,13 @@ async fn main() -> anyhow::Result<()> {
         toml::from_str(&contents).unwrap()
     };
 
+    let mango_group_id = Pubkey::from_str(&config.mango_group_id)?;
+
     //
     // mango client setup
     //
     let mango_client = {
         let payer = keypair::read_keypair_file(&config.payer).unwrap();
-        let admin = keypair::read_keypair_file(&config.admin).unwrap();
 
         let rpc_url = config.rpc_http_url.to_owned();
         let ws_url = rpc_url.replace("https", "wss");
@@ -106,7 +106,7 @@ async fn main() -> anyhow::Result<()> {
             cluster,
             commitment,
             payer,
-            admin,
+            mango_group_id,
             &config.mango_account_name,
         )?)
     };
@@ -123,7 +123,6 @@ async fn main() -> anyhow::Result<()> {
     // FUTURE: decouple feed setup and liquidator business logic
     // feed should send updates to a channel which liquidator can consume
     let mango_program_id = Pubkey::from_str(&config.mango_program_id)?;
-    let mango_group_id = Pubkey::from_str(&config.mango_group_id)?;
 
     solana_logger::setup_with_default("info");
     info!("startup");
