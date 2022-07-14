@@ -210,7 +210,7 @@ export class MangoAccount {
     const inUsdcUnits = MangoAccount.getEquivalentNativeUsdcPosition(
       bank,
       this.findToken(bank.tokenIndex),
-    );
+    ).max(ZERO_I80F48);
     const newInitHealth = initHealth.sub(inUsdcUnits.mul(bank.initAssetWeight));
     return MangoAccount.getEquivalentNativeTokenPosition(
       bank,
