@@ -154,9 +154,7 @@ async function main() {
 
   // log tokens/banks
   for (const bank of await group.banksMap.values()) {
-    console.log(
-      `...registered Bank ${bank.name} ${bank.tokenIndex} ${bank.publicKey}, mint ${bank.mint}, oracle ${bank.oracle}`,
-    );
+    console.log(`${bank.toString()}`);
   }
 
   process.exit();
