@@ -26,6 +26,7 @@ https://explorer.solana.com/tx/vZ5hP1vGp37fgzBfG9nb4nfA5ZdmYgk8meq53YPR4ReFxrcTw
 - New instructions: `AccountEdit`, `TokenEdit`, `PerpEditMarket` for reconfiguring.
 - The `delegate` field on `MangoAccount` is now used and many instructions can be
   called by the account delegate.
+- `TokenUpdateIndexAndRate` now maintains dynamic optimal and max rates for token interest rates.
 
 - Renamed instructions:
   - create/close_group -> group_create/close
