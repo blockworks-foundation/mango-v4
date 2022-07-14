@@ -74,11 +74,11 @@
           "publicKey": "6XDZbWax9imnCEaKokorQtwRY7dGj9HnZNk612ibZu4v"
         },
         {
-          "name": "BTC",
+          "name": "USDC",
           "publicKey": "9pJ3V2WvGWtWomiUsRLHvMguoZ9SUCWwZxfvaqdRDq44"
         },
         {
-          "name": "USDC",
+          "name": "BTC",
           "publicKey": "41gvXTAYM4xckLYqxPXWwjpr6WM3GZEytM9QZSGKqfjX"
         }
       ],
