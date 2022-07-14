@@ -92,13 +92,14 @@ export class MangoAccount {
     return ta ? ta.native(bank) : ZERO_I80F48;
   }
 
-  getInNativeUsdcUnits(bank: Bank): I80F48 {
+  getEquivalentNativeUsdcPosition(bank: Bank): I80F48 {
     const ta = this.findToken(bank.tokenIndex);
     return ta
       ? ta
           .native(bank)
           .mul(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
           .div(I80F48.fromNumber(Math.pow(10, bank.mintDecimals)))
+          .mul(bank.price)
       : ZERO_I80F48;
   }
 
@@ -195,10 +196,8 @@ export class MangoAccount {
   getMaxWithdrawWithBorrowForToken(group: Group, tokenName: string): I80F48 {
     const bank = group.banksMap.get(tokenName);
     const initHealth = (this.accountData as MangoAccountData).initHealth;
-    const inUsdcUnits = this.getInNativeUsdcUnits(bank)
-      .mul(bank.price)
-      .mul(bank.initAssetWeight);
-    const newInitHealth = initHealth.sub(inUsdcUnits);
+    const inUsdcUnits = this.getEquivalentNativeUsdcPosition(bank);
+    const newInitHealth = initHealth.sub(inUsdcUnits.mul(bank.initAssetWeight));
     return newInitHealth.div(bank.price.mul(bank.initLiabWeight));
   }
 
