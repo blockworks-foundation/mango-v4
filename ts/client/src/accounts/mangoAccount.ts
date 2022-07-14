@@ -202,7 +202,7 @@ export class MangoAccount {
   /**
    * The amount of given native token you can borrow, considering all existing assets as collateral except the deposits for this token.
    * Note 1: The existing native deposits need to be added to get the full amount that could be withdrawn.
-   * Note 2: The group might have less native deposits than what this returns.
+   * Note 2: The group might have less native deposits than what this returns. TODO: loan origination fees
    */
   getMaxWithdrawWithBorrowForToken(group: Group, tokenName: string): I80F48 {
     const bank = group.banksMap.get(tokenName);
@@ -221,7 +221,7 @@ export class MangoAccount {
   /**
    * The amount of given source native token you can swap to a target token considering all existing assets as collateral.
    * note: slippageAndFeesFactor is a normalized number, <1, e.g. a slippage of 5% and some fees which are 1%, then slippageAndFeesFactor = 0.94
-   * the factor is used to compute how much target can be obtained by swapping source
+   * the factor is used to compute how much target can be obtained by swapping source TODO: loan origination fees
    */
   getMaxSourceForTokenSwap(
     group: Group,
