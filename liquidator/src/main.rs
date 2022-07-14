@@ -263,7 +263,16 @@ async fn main() -> anyhow::Result<()> {
                 chain_data.update_from_snapshot(message);
                 one_snapshot_done = true;
 
-                // TODO: trigger a full health check
+                // trigger a full health check
+                if let Err(err) = liquidate::process_accounts(
+                        &mango_client,
+                        &chain_data,
+                        mango_accounts.iter(),
+                        &mint_infos,
+                        &perp_markets,
+                ) {
+                    warn!("could not process accounts: {:?}", err);
+                }
             },
         }
     }
