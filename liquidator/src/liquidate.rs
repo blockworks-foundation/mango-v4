@@ -150,18 +150,32 @@ pub fn process_account(
     tokens.sort_by(|a, b| a.2.cmp(&b.2));
 
     let get_max_liab_transfer = |source, target| -> anyhow::Result<I80F48> {
-        let liqor = load_mango_account_from_chain::<MangoAccount>(
+        let mut liqor = load_mango_account_from_chain::<MangoAccount>(
             chain_data,
             &mango_client.mango_account_cache.0,
-        )?;
+        )
+        .context("getting liquidator account")?
+        .clone();
+
+        // Ensure the tokens are activated, so they appear in the health cache and
+        // max_swap_source() will work.
+        liqor.tokens.get_mut_or_create(source)?;
+        liqor.tokens.get_mut_or_create(target)?;
 
         let health_cache =
-            new_health_cache_(chain_data, mint_infos, perp_markets, liqor).expect("always ok");
-
-        let amount =
-            health_cache.max_swap_source_for_health_ratio(source, target, min_health_ratio)?;
+            new_health_cache_(chain_data, mint_infos, perp_markets, &liqor).expect("always ok");
+        let amount = health_cache
+            .max_swap_source_for_health_ratio(source, target, min_health_ratio)
+            .context("getting max_swap_source")?;
         Ok(amount)
     };
+
+    log::trace!(
+        "checking account {} with owner {}: maint health: {}",
+        pubkey,
+        account.owner,
+        maint_health
+    );
 
     // try liquidating
     if account.is_bankrupt() {
@@ -188,7 +202,8 @@ pub fn process_account(
         let (asset_token_index, _asset_bank, _asset_price) = tokens.last().unwrap();
         let (liab_token_index, _liab_bank, _liab_price) = tokens.first().unwrap();
 
-        let max_liab_transfer = get_max_liab_transfer(*liab_token_index, *asset_token_index)?;
+        let max_liab_transfer = get_max_liab_transfer(*liab_token_index, *asset_token_index)
+            .context("getting max_liab_transfer")?;
 
         //
         // TODO: log liqor's assets in UI form
