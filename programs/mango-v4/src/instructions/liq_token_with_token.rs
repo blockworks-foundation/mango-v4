@@ -36,7 +36,8 @@ pub fn liq_token_with_token(
     let group_pk = &ctx.accounts.group.key();
 
     require!(asset_token_index != liab_token_index, MangoError::SomeError);
-    let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)?;
+    let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
+        .context("create account retriever")?;
 
     let mut liqor = ctx.accounts.liqor.load_mut()?;
     require!(!liqor.is_bankrupt(), MangoError::IsBankrupt);
@@ -45,7 +46,8 @@ pub fn liq_token_with_token(
     require!(!liqee.is_bankrupt(), MangoError::IsBankrupt);
 
     // Initial liqee health check
-    let mut liqee_health_cache = new_health_cache(&liqee, &account_retriever)?;
+    let mut liqee_health_cache =
+        new_health_cache(&liqee, &account_retriever).context("create liqee health cache")?;
     let init_health = liqee_health_cache.health(HealthType::Init);
     if liqee.being_liquidated() {
         if init_health > I80F48::ZERO {
@@ -223,7 +225,8 @@ pub fn liq_token_with_token(
     }
 
     // Check liqor's health
-    let liqor_health = compute_health(&liqor, HealthType::Init, &account_retriever)?;
+    let liqor_health = compute_health(&liqor, HealthType::Init, &account_retriever)
+        .context("compute liqor health")?;
     require!(liqor_health >= 0, MangoError::HealthMustBePositive);
 
     Ok(())
