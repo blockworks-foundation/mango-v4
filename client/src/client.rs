@@ -439,11 +439,7 @@ impl MangoClient {
             .collect())
     }
 
-    pub fn token_deposit(
-        &self,
-        token_name: &str,
-        amount: u64,
-    ) -> Result<Signature, anchor_client::ClientError> {
+    pub fn token_deposit(&self, token_name: &str, amount: u64) -> anyhow::Result<Signature> {
         let bank = self.banks_cache.get(token_name).unwrap().get(0).unwrap();
         let mint_info: MintInfo = self.mint_infos_cache.get(&bank.1.mint).unwrap().1;
 
@@ -478,6 +474,7 @@ impl MangoClient {
                 }),
             })
             .send()
+            .map_err(prettify_client_error)
     }
 
     pub fn get_oracle_price(
@@ -501,10 +498,7 @@ impl MangoClient {
     // Serum3
     //
 
-    pub fn serum3_create_open_orders(
-        &self,
-        name: &str,
-    ) -> Result<Signature, anchor_client::ClientError> {
+    pub fn serum3_create_open_orders(&self, name: &str) -> anyhow::Result<Signature> {
         let (account_pubkey, _) = self.mango_account_cache;
 
         let serum3_market = self.serum3_markets_cache.get(name).unwrap();
@@ -544,6 +538,7 @@ impl MangoClient {
                 ),
             })
             .send()
+            .map_err(prettify_client_error)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -557,7 +552,7 @@ impl MangoClient {
         order_type: Serum3OrderType,
         client_order_id: u64,
         limit: u16,
-    ) -> Result<Signature, anchor_client::ClientError> {
+    ) -> anyhow::Result<Signature> {
         let (_, account) = self.get_account()?;
 
         let serum3_market = self.serum3_markets_cache.get(name).unwrap();
@@ -701,9 +696,10 @@ impl MangoClient {
                 ),
             })
             .send()
+            .map_err(prettify_client_error)
     }
 
-    pub fn serum3_settle_funds(&self, name: &str) -> Result<Signature, anchor_client::ClientError> {
+    pub fn serum3_settle_funds(&self, name: &str) -> anyhow::Result<Signature> {
         let (_, account) = self.get_account()?;
 
         let serum3_market = self.serum3_markets_cache.get(name).unwrap();
@@ -763,6 +759,7 @@ impl MangoClient {
                 ),
             })
             .send()
+            .map_err(prettify_client_error)
     }
 
     pub fn serum3_cancel_all_orders(&self, market_name: &str) -> Result<Vec<u128>, anyhow::Error> {
@@ -810,7 +807,7 @@ impl MangoClient {
         market_name: &str,
         side: Serum3Side,
         order_id: u128,
-    ) -> Result<(), anyhow::Error> {
+    ) -> anyhow::Result<()> {
         let (account_pubkey, _account) = self.get_account()?;
 
         let serum3_market = self.serum3_markets_cache.get(market_name).unwrap();
@@ -861,7 +858,8 @@ impl MangoClient {
                     &mango_v4::instruction::Serum3CancelOrder { side, order_id },
                 ),
             })
-            .send()?;
+            .send()
+            .map_err(prettify_client_error)?;
 
         Ok(())
     }
@@ -880,7 +878,7 @@ impl MangoClient {
         asset_token_index: TokenIndex,
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
-    ) -> Result<Signature, anchor_client::ClientError> {
+    ) -> anyhow::Result<Signature> {
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
@@ -915,6 +913,7 @@ impl MangoClient {
                 ),
             })
             .send()
+            .map_err(prettify_client_error)
     }
 
     pub fn liq_token_bankruptcy(
@@ -922,7 +921,7 @@ impl MangoClient {
         liqee: (&Pubkey, &MangoAccount),
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
-    ) -> Result<Signature, anchor_client::ClientError> {
+    ) -> anyhow::Result<Signature> {
         let quote_token_index = 0;
 
         let (_, quote_mint_info, _) = self
@@ -982,9 +981,40 @@ impl MangoClient {
                 ),
             })
             .send()
+            .map_err(prettify_client_error)
     }
 }
 
 fn from_serum_style_pubkey(d: &[u64; 4]) -> Pubkey {
     Pubkey::new(bytemuck::cast_slice(d as &[_]))
+}
+
+/// Do some manual unpacking on some ClientErrors
+///
+/// Unfortunately solana's RpcResponseError will very unhelpfully print [N log messages]
+/// instead of showing the actual log messages. This unpacks the error to provide more useful
+/// output.
+fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
+    use solana_client::client_error::ClientErrorKind;
+    use solana_client::rpc_request::{RpcError, RpcResponseErrorData};
+    match &err {
+        anchor_client::ClientError::SolanaClientError(c) => {
+            match c.kind() {
+                ClientErrorKind::RpcError(RpcError::RpcResponseError { data, .. }) => match data {
+                    RpcResponseErrorData::SendTransactionPreflightFailure(s) => {
+                        if let Some(logs) = s.logs.as_ref() {
+                            return anyhow::anyhow!(
+                                "transaction simulation error. logs:\n{}",
+                                logs.iter().map(|l| format!("    {}", l)).join("\n")
+                            );
+                        }
+                    }
+                    _ => {}
+                },
+                _ => {}
+            };
+        }
+        _ => {}
+    };
+    err.into()
 }
