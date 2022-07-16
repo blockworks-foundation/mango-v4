@@ -43,6 +43,10 @@ pub struct TokenPosition {
 
     pub reserved: [u8; 5],
 }
+
+unsafe impl bytemuck::Pod for TokenPosition {}
+unsafe impl bytemuck::Zeroable for TokenPosition {}
+
 const_assert_eq!(size_of::<TokenPosition>(), 24);
 const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
 

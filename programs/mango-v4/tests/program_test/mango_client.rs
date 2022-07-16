@@ -745,9 +745,21 @@ impl ClientInstruction for TokenDepositInstruction {
         )
         .await;
 
+        let em_test_account = Pubkey::find_program_address(
+            &[
+                account.group.as_ref(),
+                b"EMTestAccount".as_ref(),
+                account.owner.as_ref(),
+                &account.account_num.to_le_bytes(),
+            ],
+            &program_id,
+        )
+        .0;
+
         let accounts = Self::Accounts {
             group: account.group,
             account: self.account,
+            em_test_account,
             bank: mint_info.banks[self.bank_index],
             vault: mint_info.vaults[self.bank_index],
             token_account: self.token_account,
@@ -1305,12 +1317,24 @@ impl<'keypair> ClientInstruction for AccountCreateInstruction<'keypair> {
         )
         .0;
 
+        let em_test_account = Pubkey::find_program_address(
+            &[
+                self.group.as_ref(),
+                b"EMTestAccount".as_ref(),
+                self.owner.pubkey().as_ref(),
+                &self.account_num.to_le_bytes(),
+            ],
+            &program_id,
+        )
+        .0;
+
         let accounts = mango_v4::accounts::AccountCreate {
             group: self.group,
             owner: self.owner.pubkey(),
             account,
             payer: self.payer.pubkey(),
             system_program: System::id(),
+            em_test_account,
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);

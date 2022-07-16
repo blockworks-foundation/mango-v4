@@ -2,19 +2,20 @@
 
 use anchor_lang::error::{Error, ErrorCode};
 use anchor_lang::{
-    Accounts, AccountsClose, AccountsExit, Key, Owner, Result, ToAccountInfo, ToAccountInfos,
-    ToAccountMetas, ZeroCopy,
+    require_eq, require_gt, Accounts, AccountsClose, AccountsExit, Key, Owner, Result,
+    ToAccountInfo, ToAccountInfos, ToAccountMetas, ZeroCopy,
 };
 use arrayref::array_ref;
 use solana_program::account_info::AccountInfo;
 use solana_program::instruction::AccountMeta;
+use solana_program::msg;
 use solana_program::pubkey::Pubkey;
 use std::cell::{Ref, RefMut};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::io::Write;
 use std::marker::PhantomData;
-use std::mem;
+use std::mem::{self, size_of};
 use std::ops::DerefMut;
 
 pub trait Header: Sized {
@@ -54,10 +55,14 @@ struct ExampleDynamicHeader {
     serum3_count: u8,
 }
 
-fn get_helper<T: bytemuck::Pod>(data: &[u8], index: usize) -> &T {
+pub fn get_helper<T: bytemuck::Pod>(data: &[u8], index: usize) -> &T {
     bytemuck::from_bytes(&data[index..index + mem::size_of::<T>()])
 }
-fn get_helper_mut<T: bytemuck::Pod>(data: &mut [u8], index: usize) -> &mut T {
+pub fn get_helper_mut<T: bytemuck::Pod>(data: &mut [u8], index: usize) -> &mut T {
+    msg!("62");
+    msg!("data {}", data.len());
+    msg!("size of T {}", size_of::<T>());
+    msg!("index {}", index);
     bytemuck::from_bytes_mut(&mut data[index..index + mem::size_of::<T>()])
 }
 
@@ -119,6 +124,7 @@ impl<'a> ExampleDynamicAccessorMut<'a> {
 impl Header for ExampleDynamicHeader {
     fn try_new_header(data: &[u8]) -> Result<Self> {
         let header_version = data[0];
+        msg!("header_version {:?}", header_version);
         match header_version {
             0 => Ok(Self {
                 header_size: 2,
@@ -166,8 +172,8 @@ fn testfn() {
 }
 
 pub struct SplitAccount<T, U> {
-    fixed: T,
-    dynamic: U,
+    pub fixed: T,
+    pub dynamic: U,
 }
 
 #[derive(Clone)]
@@ -205,18 +211,24 @@ impl<'info, T: ZeroCopy + Owner, U: Header> MangoAccountLoader<'info, T, U> {
                 .with_pubkeys((*acc_info.owner, T::owner())));
         }
         let data: &[u8] = &acc_info.try_borrow_data()?;
+        msg!("data{:?}", data);
+        msg!("data.len {:?}", data.len());
+        msg!("T::discriminator().len() {:?}", T::discriminator().len());
         if data.len() < T::discriminator().len() {
             return Err(ErrorCode::AccountDiscriminatorNotFound.into());
         }
+        msg!("T::discriminator().len() {:?}", T::discriminator().len());
         // Discriminator must match.
         let disc_bytes = array_ref![data, 0, 8];
         if disc_bytes != &T::discriminator() {
             return Err(ErrorCode::AccountDiscriminatorMismatch.into());
         }
 
+        msg!("223");
         let dynamic_bytes = &data[8 + mem::size_of::<T>()..];
         let header = U::try_new_header(dynamic_bytes)?;
 
+        msg!("227");
         Ok(MangoAccountLoader::new(acc_info.clone(), header))
     }
 
@@ -232,7 +244,10 @@ impl<'info, T: ZeroCopy + Owner, U: Header> MangoAccountLoader<'info, T, U> {
         }
 
         let data: &[u8] = &acc_info.try_borrow_data()?;
+        msg!("data{:?}", data);
+        msg!("data.len {:?}", data.len());
         let dynamic_bytes = &data[8 + mem::size_of::<T>()..];
+        msg!("dynamic_bytes.len {:?}", dynamic_bytes.len());
         let header = U::try_new_header(dynamic_bytes)?;
 
         Ok(MangoAccountLoader::new(acc_info.clone(), header))
@@ -275,19 +290,29 @@ impl<'info, T: ZeroCopy + Owner, U: Header> MangoAccountLoader<'info, T, U> {
         }
 
         let data = self.acc_info.try_borrow_mut_data()?;
+        msg!("data.len {:?}", data.len());
         if data.len() < T::discriminator().len() {
             return Err(ErrorCode::AccountDiscriminatorNotFound.into());
         }
+        msg!("data.len {:?}", data.len());
 
         let disc_bytes = array_ref![data, 0, 8];
+        msg!("{:?}", disc_bytes);
+        msg!("{:?}", &T::discriminator());
+        msg!("size of  T{:?}", size_of::<T>());
         if disc_bytes != &T::discriminator() {
             return Err(ErrorCode::AccountDiscriminatorMismatch.into());
         }
 
         let (fixed, dynamic) = RefMut::map_split(data, |data| {
             let (fixed_slice, dynamic_slice) = data.split_at_mut(8 + mem::size_of::<T>());
+            msg!("fixed_slice.len {:?}", fixed_slice.len());
+            msg!("dynamic_slice.len {:?}", dynamic_slice.len());
+            let (_, fixed_slice) = fixed_slice.split_at_mut(8);
+            msg!("fixed_slice.len {:?}", fixed_slice.len());
             (bytemuck::from_bytes_mut(fixed_slice), dynamic_slice)
         });
+        msg!("311");
         Ok(SplitAccount {
             fixed,
             dynamic: U::new_accessor_mut(&self.header, dynamic),
@@ -318,8 +343,8 @@ impl<'info, T: ZeroCopy + Owner, U: Header> MangoAccountLoader<'info, T, U> {
         }))
     }
 }
-/*
-impl<'info, T: ZeroCopy + Owner> Accounts<'info> for MangoAccountLoader<'info, T> {
+
+impl<'info, T: ZeroCopy + Owner, U: Header> Accounts<'info> for MangoAccountLoader<'info, T, U> {
     #[inline(never)]
     fn try_accounts(
         _program_id: &Pubkey,
@@ -337,7 +362,9 @@ impl<'info, T: ZeroCopy + Owner> Accounts<'info> for MangoAccountLoader<'info, T
     }
 }
 
-impl<'info, T: ZeroCopy + Owner> AccountsExit<'info> for MangoAccountLoader<'info, T> {
+impl<'info, T: ZeroCopy + Owner, U: Header> AccountsExit<'info>
+    for MangoAccountLoader<'info, T, U>
+{
     // The account *cannot* be loaded when this is called.
     fn exit(&self, _program_id: &Pubkey) -> Result<()> {
         let mut data = self.acc_info.try_borrow_mut_data()?;
@@ -357,7 +384,9 @@ impl<'info, T: ZeroCopy + Owner> AccountsExit<'info> for MangoAccountLoader<'inf
 /// Details: Using `close` with `AccountLoader<'info, T>` is not safe because
 /// it requires the `mut` constraint but for that type the constraint
 /// overwrites the "closed account" discriminator at the end of the instruction.
-impl<'info, T: ZeroCopy + Owner> AccountsClose<'info> for MangoAccountLoader<'info, T> {
+impl<'info, T: ZeroCopy + Owner, U: Header> AccountsClose<'info>
+    for MangoAccountLoader<'info, T, U>
+{
     fn close(&self, sol_destination: AccountInfo<'info>) -> Result<()> {
         // TODO
         //crate::common::close(self.to_account_info(), sol_destination)
@@ -365,7 +394,7 @@ impl<'info, T: ZeroCopy + Owner> AccountsClose<'info> for MangoAccountLoader<'in
     }
 }
 
-impl<'info, T: ZeroCopy + Owner> ToAccountMetas for MangoAccountLoader<'info, T> {
+impl<'info, T: ZeroCopy + Owner, U: Header> ToAccountMetas for MangoAccountLoader<'info, T, U> {
     fn to_account_metas(&self, is_signer: Option<bool>) -> Vec<AccountMeta> {
         let is_signer = is_signer.unwrap_or(self.acc_info.is_signer);
         let meta = match self.acc_info.is_writable {
@@ -376,21 +405,24 @@ impl<'info, T: ZeroCopy + Owner> ToAccountMetas for MangoAccountLoader<'info, T>
     }
 }
 
-impl<'info, T: ZeroCopy + Owner> AsRef<AccountInfo<'info>> for MangoAccountLoader<'info, T> {
+impl<'info, T: ZeroCopy + Owner, U: Header> AsRef<AccountInfo<'info>>
+    for MangoAccountLoader<'info, T, U>
+{
     fn as_ref(&self) -> &AccountInfo<'info> {
         &self.acc_info
     }
 }
 
-impl<'info, T: ZeroCopy + Owner> ToAccountInfos<'info> for MangoAccountLoader<'info, T> {
+impl<'info, T: ZeroCopy + Owner, U: Header> ToAccountInfos<'info>
+    for MangoAccountLoader<'info, T, U>
+{
     fn to_account_infos(&self) -> Vec<AccountInfo<'info>> {
         vec![self.acc_info.clone()]
     }
 }
 
-impl<'info, T: ZeroCopy + Owner> Key for MangoAccountLoader<'info, T> {
+impl<'info, T: ZeroCopy + Owner, U: Header> Key for MangoAccountLoader<'info, T, U> {
     fn key(&self) -> Pubkey {
         *self.acc_info.key
     }
 }
-*/

@@ -1,5 +1,6 @@
 pub use bank::*;
 pub use equity::*;
+pub use expandable_mango_account::*;
 pub use group::*;
 pub use health::*;
 pub use mango_account::*;
@@ -11,6 +12,7 @@ pub use serum3_market::*;
 
 mod bank;
 mod equity;
+mod expandable_mango_account;
 mod group;
 mod health;
 mod mango_account;
