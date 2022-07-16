@@ -1,6 +1,7 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 
-use anchor_client::{Client, Cluster, Program};
+use anchor_client::{Client, ClientError, Cluster, Program};
 
 use anchor_lang::__private::bytemuck;
 use anchor_lang::prelude::System;
@@ -20,6 +21,7 @@ use solana_client::rpc_client::RpcClient;
 use crate::util::MyClone;
 use anyhow::Context;
 use solana_client::rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType};
+use solana_sdk::account::Account;
 use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::sysvar;
@@ -30,10 +32,13 @@ pub struct MangoClient {
     pub rpc: RpcClient,
     pub cluster: Cluster,
     pub commitment: CommitmentConfig,
+    pub account_fetcher: Box<dyn AccountFetcher>,
     pub payer: Keypair,
-    pub mango_account_cache: (Pubkey, MangoAccount),
-    pub group: Pubkey,
+    pub mango_account_address: Pubkey,
+    pub mango_account_cache: RefCell<MangoAccount>,
+    pub group_address: Pubkey,
     pub group_cache: Group,
+
     // TODO: future: this may not scale if there's thousands of mints, probably some function
     // wrapping getMultipleAccounts is needed (or bettew: we provide this data as a service)
     pub banks_cache: HashMap<String, Vec<(Pubkey, Bank)>>,
@@ -71,9 +76,15 @@ impl MangoClient {
             Client::new_with_options(cluster.clone(), std::rc::Rc::new(payer.clone()), commitment)
                 .program(mango_v4::ID);
 
+        // TODO: allow startup with a different fetcher
+        let program2 =
+            Client::new_with_options(cluster.clone(), std::rc::Rc::new(payer.clone()), commitment)
+                .program(mango_v4::ID);
+        let rpc_account_fetcher = Box::new(RpcAccountFetcher { program: program2 });
+
         let rpc = program.rpc();
 
-        let group_data = program.account::<Group>(group)?;
+        let group_data = account_fetcher_fetch_anchor_account(&*rpc_account_fetcher, group)?;
 
         // Mango Account
         let mut mango_account_tuples = program.accounts::<MangoAccount>(vec![
@@ -154,11 +165,7 @@ impl MangoClient {
         // banks cache
         let mut banks_cache = HashMap::new();
         let mut banks_cache_by_token_index = HashMap::new();
-        let bank_tuples = program.accounts::<Bank>(vec![RpcFilterType::Memcmp(Memcmp {
-            offset: 8,
-            bytes: MemcmpEncodedBytes::Base58(group.to_string()),
-            encoding: None,
-        })])?;
+        let bank_tuples = rpc_account_fetcher.fetch_banks(group)?;
         for (k, v) in bank_tuples {
             banks_cache
                 .entry(v.name().to_owned())
@@ -180,11 +187,9 @@ impl MangoClient {
                 encoding: None,
             })])?;
         for (k, v) in mint_info_tuples {
-            let data = program
-                .rpc()
-                .get_account_with_commitment(&v.mint, commitment)?
-                .value
-                .unwrap()
+            let data = rpc_account_fetcher
+                .fetch_raw_account(v.mint)
+                .context("fetch mint")?
                 .data;
             let mint = Mint::try_deserialize(&mut &data[..])?;
 
@@ -204,11 +209,9 @@ impl MangoClient {
         for (k, v) in serum3_market_tuples {
             serum3_markets_cache.insert(v.name().to_owned(), (k, v));
 
-            let market_external_bytes = program
-                .rpc()
-                .get_account_with_commitment(&v.serum_market_external, commitment)?
-                .value
-                .unwrap()
+            let market_external_bytes = rpc_account_fetcher
+                .fetch_raw_account(v.serum_market_external)
+                .context("fetch serum market external")?
                 .data;
             serum3_external_markets_cache.insert(
                 v.name().to_owned(),
@@ -232,11 +235,13 @@ impl MangoClient {
 
         Ok(Self {
             rpc,
-            cluster,
+            cluster: cluster.clone(),
             commitment,
+            account_fetcher: rpc_account_fetcher,
             payer,
-            mango_account_cache,
-            group,
+            mango_account_address: mango_account_cache.0,
+            mango_account_cache: RefCell::new(mango_account_cache.1),
+            group_address: group,
             group_cache: group_data,
             banks_cache,
             banks_cache_by_token_index,
@@ -273,23 +278,25 @@ impl MangoClient {
     }
 
     pub fn group(&self) -> Pubkey {
-        self.group
+        self.group_address
     }
 
-    pub fn get_account(&self) -> Result<(Pubkey, MangoAccount), anchor_client::ClientError> {
-        let mango_accounts = self.program().accounts::<MangoAccount>(vec![
-            RpcFilterType::Memcmp(Memcmp {
-                offset: 8,
-                bytes: MemcmpEncodedBytes::Base58(self.group().to_string()),
-                encoding: None,
-            }),
-            RpcFilterType::Memcmp(Memcmp {
-                offset: 40,
-                bytes: MemcmpEncodedBytes::Base58(self.payer().to_string()),
-                encoding: None,
-            }),
-        ])?;
-        Ok(mango_accounts[0])
+    pub fn mango_account_cached(&self) -> MangoAccount {
+        self.mango_account_cache.borrow().clone()
+    }
+
+    pub fn refresh_mango_account(&self) -> Result<(), anchor_client::ClientError> {
+        let mango_account: MangoAccount = account_fetcher_fetch_anchor_account(
+            &*self.account_fetcher,
+            self.mango_account_address,
+        )?;
+        *self.mango_account_cache.borrow_mut() = mango_account.clone();
+        Ok(())
+    }
+
+    pub fn mango_account_fresh(&self) -> Result<MangoAccount, anchor_client::ClientError> {
+        self.refresh_mango_account()?;
+        Ok(self.mango_account_cached())
     }
 
     pub fn derive_health_check_remaining_account_metas(
@@ -300,8 +307,8 @@ impl MangoClient {
         // figure out all the banks/oracles that need to be passed for the health check
         let mut banks = vec![];
         let mut oracles = vec![];
-        let account = self.get_account()?;
-        for position in account.1.tokens.iter_active() {
+        let account = self.mango_account_cached();
+        for position in account.tokens.iter_active() {
             let mint_info = self
                 .mint_infos_cache_by_token_index
                 .get(&position.token_index)
@@ -323,7 +330,6 @@ impl MangoClient {
                 // If there is not yet an active position for the token, we need to pass
                 // the bank/oracle for health check anyway.
                 let new_position = account
-                    .1
                     .tokens
                     .values
                     .iter()
@@ -334,8 +340,8 @@ impl MangoClient {
             }
         }
 
-        let serum_oos = account.1.serum3.iter_active().map(|&s| s.open_orders);
-        let perp_markets = account.1.perps.iter_active_accounts().map(|&pa| {
+        let serum_oos = account.serum3.iter_active().map(|&s| s.open_orders);
+        let perp_markets = account.perps.iter_active_accounts().map(|&pa| {
             self.perp_markets_cache_by_perp_market_index
                 .get(&pa.market_index)
                 .unwrap()
@@ -376,12 +382,12 @@ impl MangoClient {
         // figure out all the banks/oracles that need to be passed for the health check
         let mut banks = vec![];
         let mut oracles = vec![];
-        let account = self.get_account()?;
+        let account = self.mango_account_cached();
 
         let token_indexes = liqee
             .tokens
             .iter_active()
-            .chain(account.1.tokens.iter_active())
+            .chain(account.tokens.iter_active())
             .map(|ta| ta.token_index)
             .unique();
 
@@ -407,12 +413,12 @@ impl MangoClient {
         let serum_oos = liqee
             .serum3
             .iter_active()
-            .chain(account.1.serum3.iter_active())
+            .chain(account.serum3.iter_active())
             .map(|&s| s.open_orders);
         let perp_markets = liqee
             .perps
             .iter_active_accounts()
-            .chain(account.1.perps.iter_active_accounts())
+            .chain(account.perps.iter_active_accounts())
             .map(|&pa| {
                 self.perp_markets_cache_by_perp_market_index
                     .get(&pa.market_index)
@@ -454,7 +460,7 @@ impl MangoClient {
                     let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
                         &mango_v4::accounts::TokenDeposit {
                             group: self.group(),
-                            account: self.mango_account_cache.0,
+                            account: self.mango_account_address,
                             bank: bank.0,
                             vault: bank.1.vault,
                             token_account: get_associated_token_address(
@@ -482,16 +488,8 @@ impl MangoClient {
         token_name: &str,
     ) -> Result<pyth_sdk_solana::Price, anyhow::Error> {
         let bank = self.banks_cache.get(token_name).unwrap().get(0).unwrap().1;
-
-        let data = self
-            .program()
-            .rpc()
-            .get_account_with_commitment(&bank.oracle, self.commitment)?
-            .value
-            .unwrap()
-            .data;
-
-        Ok(pyth_sdk_solana::load_price(&data).unwrap())
+        let oracle_account = self.account_fetcher.fetch_raw_account(bank.oracle)?;
+        Ok(pyth_sdk_solana::load_price(&oracle_account.data).unwrap())
     }
 
     //
@@ -499,7 +497,7 @@ impl MangoClient {
     //
 
     pub fn serum3_create_open_orders(&self, name: &str) -> anyhow::Result<Signature> {
-        let (account_pubkey, _) = self.mango_account_cache;
+        let account_pubkey = self.mango_account_address;
 
         let serum3_market = self.serum3_markets_cache.get(name).unwrap();
 
@@ -553,7 +551,7 @@ impl MangoClient {
         client_order_id: u64,
         limit: u16,
     ) -> anyhow::Result<Signature> {
-        let (_, account) = self.get_account()?;
+        let account = self.mango_account_cached();
 
         let serum3_market = self.serum3_markets_cache.get(name).unwrap();
         let open_orders = account
@@ -658,7 +656,7 @@ impl MangoClient {
                     let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
                         &mango_v4::accounts::Serum3PlaceOrder {
                             group: self.group(),
-                            account: self.mango_account_cache.0,
+                            account: self.mango_account_address,
                             open_orders,
                             quote_bank: quote_info.first_bank(),
                             quote_vault: quote_info.first_vault(),
@@ -700,7 +698,7 @@ impl MangoClient {
     }
 
     pub fn serum3_settle_funds(&self, name: &str) -> anyhow::Result<Signature> {
-        let (_, account) = self.get_account()?;
+        let account = self.mango_account_cached();
 
         let serum3_market = self.serum3_markets_cache.get(name).unwrap();
         let open_orders = account
@@ -737,7 +735,7 @@ impl MangoClient {
                 accounts: anchor_lang::ToAccountMetas::to_account_metas(
                     &mango_v4::accounts::Serum3SettleFunds {
                         group: self.group(),
-                        account: self.mango_account_cache.0,
+                        account: self.mango_account_address,
                         open_orders,
                         quote_bank: quote_info.first_bank(),
                         quote_vault: quote_info.first_vault(),
@@ -767,7 +765,7 @@ impl MangoClient {
 
         let open_orders = Pubkey::find_program_address(
             &[
-                self.mango_account_cache.0.as_ref(),
+                self.mango_account_address.as_ref(),
                 b"Serum3OO".as_ref(),
                 serum3_market.0.as_ref(),
             ],
@@ -775,13 +773,7 @@ impl MangoClient {
         )
         .0;
 
-        let open_orders_bytes = self
-            .program()
-            .rpc()
-            .get_account_with_commitment(&open_orders, self.commitment)?
-            .value
-            .unwrap()
-            .data;
+        let open_orders_bytes = self.account_fetcher.fetch_raw_account(open_orders)?.data;
         let open_orders_data: &serum_dex::state::OpenOrders = bytemuck::from_bytes(
             &open_orders_bytes[5..5 + std::mem::size_of::<serum_dex::state::OpenOrders>()],
         );
@@ -808,7 +800,7 @@ impl MangoClient {
         side: Serum3Side,
         order_id: u128,
     ) -> anyhow::Result<()> {
-        let (account_pubkey, _account) = self.get_account()?;
+        let account_pubkey = self.mango_account_address;
 
         let serum3_market = self.serum3_markets_cache.get(market_name).unwrap();
 
@@ -896,7 +888,7 @@ impl MangoClient {
                         &mango_v4::accounts::LiqTokenWithToken {
                             group: self.group(),
                             liqee: *liqee.0,
-                            liqor: self.mango_account_cache.0,
+                            liqor: self.mango_account_address,
                             liqor_owner: self.payer.pubkey(),
                         },
                         None,
@@ -960,7 +952,7 @@ impl MangoClient {
                         &mango_v4::accounts::LiqTokenBankruptcy {
                             group: self.group(),
                             liqee: *liqee.0,
-                            liqor: self.mango_account_cache.0,
+                            liqor: self.mango_account_address,
                             liqor_owner: self.payer.pubkey(),
                             liab_mint_info: *liab_mint_info_key,
                             quote_vault: quote_mint_info.first_vault(),
@@ -982,6 +974,50 @@ impl MangoClient {
             })
             .send()
             .map_err(prettify_client_error)
+    }
+}
+
+pub trait RawAccountFetcher {
+    fn fetch_raw_account(&self, address: Pubkey) -> Result<Account, ClientError>;
+}
+
+pub trait MangoAccountFetcher {
+    fn fetch_banks(&self, group: Pubkey) -> Result<Vec<(Pubkey, Bank)>, ClientError>;
+}
+
+pub trait AccountFetcher: RawAccountFetcher + MangoAccountFetcher {}
+impl<T: RawAccountFetcher + MangoAccountFetcher> AccountFetcher for T {}
+
+fn account_fetcher_fetch_anchor_account<T: AccountDeserialize>(
+    fetcher: &dyn AccountFetcher,
+    address: Pubkey,
+) -> Result<T, ClientError> {
+    let account = fetcher.fetch_raw_account(address)?;
+    let mut data: &[u8] = &account.data;
+    Ok(T::try_deserialize(&mut data)?)
+}
+
+pub struct RpcAccountFetcher {
+    program: Program,
+}
+
+impl RawAccountFetcher for RpcAccountFetcher {
+    fn fetch_raw_account(&self, address: Pubkey) -> Result<Account, ClientError> {
+        let rpc = self.program.rpc();
+        rpc.get_account_with_commitment(&address, rpc.commitment())?
+            .value
+            .ok_or(ClientError::AccountNotFound)
+    }
+}
+
+impl MangoAccountFetcher for RpcAccountFetcher {
+    fn fetch_banks(&self, group: Pubkey) -> Result<Vec<(Pubkey, Bank)>, ClientError> {
+        self.program
+            .accounts::<Bank>(vec![RpcFilterType::Memcmp(Memcmp {
+                offset: 8,
+                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
+                encoding: None,
+            })])
     }
 }
 
