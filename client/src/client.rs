@@ -87,18 +87,8 @@ impl MangoClient {
         let group_data = account_fetcher_fetch_anchor_account(&*rpc_account_fetcher, group)?;
 
         // Mango Account
-        let mut mango_account_tuples = program.accounts::<MangoAccount>(vec![
-            RpcFilterType::Memcmp(Memcmp {
-                offset: 8,
-                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
-                encoding: None,
-            }),
-            RpcFilterType::Memcmp(Memcmp {
-                offset: 40,
-                bytes: MemcmpEncodedBytes::Base58(payer.pubkey().to_string()),
-                encoding: None,
-            }),
-        ])?;
+        let mut mango_account_tuples =
+            rpc_account_fetcher.fetch_mango_accounts(group, payer.pubkey())?;
         let mango_account_opt = mango_account_tuples
             .iter()
             .find(|tuple| tuple.1.name() == mango_account_name);
@@ -144,18 +134,8 @@ impl MangoClient {
                 .send()
                 .context("Failed to create account...")?;
         }
-        let mango_account_tuples = program.accounts::<MangoAccount>(vec![
-            RpcFilterType::Memcmp(Memcmp {
-                offset: 8,
-                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
-                encoding: None,
-            }),
-            RpcFilterType::Memcmp(Memcmp {
-                offset: 40,
-                bytes: MemcmpEncodedBytes::Base58(payer.pubkey().to_string()),
-                encoding: None,
-            }),
-        ])?;
+        let mango_account_tuples =
+            rpc_account_fetcher.fetch_mango_accounts(group, payer.pubkey())?;
         let index = mango_account_tuples
             .iter()
             .position(|tuple| tuple.1.name() == mango_account_name)
@@ -180,12 +160,7 @@ impl MangoClient {
         // mintinfo cache
         let mut mint_infos_cache = HashMap::new();
         let mut mint_infos_cache_by_token_index = HashMap::new();
-        let mint_info_tuples =
-            program.accounts::<MintInfo>(vec![RpcFilterType::Memcmp(Memcmp {
-                offset: 8,
-                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
-                encoding: None,
-            })])?;
+        let mint_info_tuples = rpc_account_fetcher.fetch_mint_infos(group)?;
         for (k, v) in mint_info_tuples {
             let data = rpc_account_fetcher
                 .fetch_raw_account(v.mint)
@@ -200,12 +175,7 @@ impl MangoClient {
         // serum3 markets cache
         let mut serum3_markets_cache = HashMap::new();
         let mut serum3_external_markets_cache = HashMap::new();
-        let serum3_market_tuples =
-            program.accounts::<Serum3Market>(vec![RpcFilterType::Memcmp(Memcmp {
-                offset: 8,
-                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
-                encoding: None,
-            })])?;
+        let serum3_market_tuples = rpc_account_fetcher.fetch_serum3_markets(group)?;
         for (k, v) in serum3_market_tuples {
             serum3_markets_cache.insert(v.name().to_owned(), (k, v));
 
@@ -222,12 +192,7 @@ impl MangoClient {
         // perp markets cache
         let mut perp_markets_cache = HashMap::new();
         let mut perp_markets_cache_by_perp_market_index = HashMap::new();
-        let perp_market_tuples =
-            program.accounts::<PerpMarket>(vec![RpcFilterType::Memcmp(Memcmp {
-                offset: 8,
-                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
-                encoding: None,
-            })])?;
+        let perp_market_tuples = rpc_account_fetcher.fetch_perp_markets(group)?;
         for (k, v) in perp_market_tuples {
             perp_markets_cache.insert(v.name().to_owned(), (k, v));
             perp_markets_cache_by_perp_market_index.insert(v.perp_market_index, (k, v));
@@ -982,12 +947,24 @@ pub trait RawAccountFetcher {
 }
 
 pub trait MangoAccountFetcher {
+    fn fetch_mango_accounts(
+        &self,
+        group: Pubkey,
+        owner: Pubkey,
+    ) -> Result<Vec<(Pubkey, MangoAccount)>, ClientError>;
     fn fetch_banks(&self, group: Pubkey) -> Result<Vec<(Pubkey, Bank)>, ClientError>;
+    fn fetch_mint_infos(&self, group: Pubkey) -> Result<Vec<(Pubkey, MintInfo)>, ClientError>;
+    fn fetch_serum3_markets(
+        &self,
+        group: Pubkey,
+    ) -> Result<Vec<(Pubkey, Serum3Market)>, ClientError>;
+    fn fetch_perp_markets(&self, group: Pubkey) -> Result<Vec<(Pubkey, PerpMarket)>, ClientError>;
 }
 
 pub trait AccountFetcher: RawAccountFetcher + MangoAccountFetcher {}
 impl<T: RawAccountFetcher + MangoAccountFetcher> AccountFetcher for T {}
 
+// Can't be in the trait, since then it would no longer be object-safe...
 fn account_fetcher_fetch_anchor_account<T: AccountDeserialize>(
     fetcher: &dyn AccountFetcher,
     address: Pubkey,
@@ -1011,9 +988,58 @@ impl RawAccountFetcher for RpcAccountFetcher {
 }
 
 impl MangoAccountFetcher for RpcAccountFetcher {
+    fn fetch_mango_accounts(
+        &self,
+        group: Pubkey,
+        owner: Pubkey,
+    ) -> Result<Vec<(Pubkey, MangoAccount)>, ClientError> {
+        self.program.accounts::<MangoAccount>(vec![
+            RpcFilterType::Memcmp(Memcmp {
+                offset: 8,
+                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
+                encoding: None,
+            }),
+            RpcFilterType::Memcmp(Memcmp {
+                offset: 40,
+                bytes: MemcmpEncodedBytes::Base58(owner.to_string()),
+                encoding: None,
+            }),
+        ])
+    }
+
     fn fetch_banks(&self, group: Pubkey) -> Result<Vec<(Pubkey, Bank)>, ClientError> {
         self.program
             .accounts::<Bank>(vec![RpcFilterType::Memcmp(Memcmp {
+                offset: 8,
+                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
+                encoding: None,
+            })])
+    }
+
+    fn fetch_mint_infos(&self, group: Pubkey) -> Result<Vec<(Pubkey, MintInfo)>, ClientError> {
+        self.program
+            .accounts::<MintInfo>(vec![RpcFilterType::Memcmp(Memcmp {
+                offset: 8,
+                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
+                encoding: None,
+            })])
+    }
+
+    fn fetch_serum3_markets(
+        &self,
+        group: Pubkey,
+    ) -> Result<Vec<(Pubkey, Serum3Market)>, ClientError> {
+        self.program
+            .accounts::<Serum3Market>(vec![RpcFilterType::Memcmp(Memcmp {
+                offset: 8,
+                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
+                encoding: None,
+            })])
+    }
+
+    fn fetch_perp_markets(&self, group: Pubkey) -> Result<Vec<(Pubkey, PerpMarket)>, ClientError> {
+        self.program
+            .accounts::<PerpMarket>(vec![RpcFilterType::Memcmp(Memcmp {
                 offset: 8,
                 bytes: MemcmpEncodedBytes::Base58(group.to_string()),
                 encoding: None,
