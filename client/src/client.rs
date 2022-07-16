@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 use anchor_client::{Client, ClientError, Cluster, Program};
 
@@ -13,7 +14,8 @@ use fixed::types::I80F48;
 use itertools::Itertools;
 use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{
-    Bank, Group, MangoAccount, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market, TokenIndex,
+    Bank, Group, MangoAccount, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market,
+    Serum3MarketIndex, TokenIndex,
 };
 
 use solana_client::rpc_client::RpcClient;
@@ -34,21 +36,11 @@ pub struct MangoClient {
     pub commitment: CommitmentConfig,
     pub account_fetcher: Box<dyn AccountFetcher>,
     pub payer: Keypair,
+
     pub mango_account_address: Pubkey,
     pub mango_account_cache: RefCell<MangoAccount>,
-    pub group_address: Pubkey,
-    pub group_cache: Group,
 
-    // TODO: future: this may not scale if there's thousands of mints, probably some function
-    // wrapping getMultipleAccounts is needed (or bettew: we provide this data as a service)
-    pub banks_cache: HashMap<String, Vec<(Pubkey, Bank)>>,
-    pub banks_cache_by_token_index: HashMap<TokenIndex, Vec<(Pubkey, Bank)>>,
-    pub mint_infos_cache: HashMap<Pubkey, (Pubkey, MintInfo, Mint)>,
-    pub mint_infos_cache_by_token_index: HashMap<TokenIndex, (Pubkey, MintInfo, Mint)>,
-    pub serum3_markets_cache: HashMap<String, (Pubkey, Serum3Market)>,
-    pub serum3_external_markets_cache: HashMap<String, (Pubkey, Vec<u8>)>,
-    pub perp_markets_cache: HashMap<String, (Pubkey, PerpMarket)>,
-    pub perp_markets_cache_by_perp_market_index: HashMap<PerpMarketIndex, (Pubkey, PerpMarket)>,
+    pub context: MangoGroupContext,
 }
 
 // TODO: add retry framework for sending tx and rpc calls
@@ -80,15 +72,16 @@ impl MangoClient {
         let program2 =
             Client::new_with_options(cluster.clone(), std::rc::Rc::new(payer.clone()), commitment)
                 .program(mango_v4::ID);
-        let rpc_account_fetcher = Box::new(RpcAccountFetcher { program: program2 });
+        let fetcher = Box::new(CachedAccountFetcher::new(RpcAccountFetcher {
+            program: program2,
+        }));
+
+        let context = MangoGroupContext::new(group, &*fetcher)?;
 
         let rpc = program.rpc();
 
-        let group_data = account_fetcher_fetch_anchor_account(&*rpc_account_fetcher, group)?;
-
         // Mango Account
-        let mut mango_account_tuples =
-            rpc_account_fetcher.fetch_mango_accounts(group, payer.pubkey())?;
+        let mut mango_account_tuples = fetcher.fetch_mango_accounts(group, payer.pubkey())?;
         let mango_account_opt = mango_account_tuples
             .iter()
             .find(|tuple| tuple.1.name() == mango_account_name);
@@ -134,96 +127,23 @@ impl MangoClient {
                 .send()
                 .context("Failed to create account...")?;
         }
-        let mango_account_tuples =
-            rpc_account_fetcher.fetch_mango_accounts(group, payer.pubkey())?;
+        let mango_account_tuples = fetcher.fetch_mango_accounts(group, payer.pubkey())?;
         let index = mango_account_tuples
             .iter()
             .position(|tuple| tuple.1.name() == mango_account_name)
             .unwrap();
         let mango_account_cache = mango_account_tuples[index];
 
-        // banks cache
-        let mut banks_cache = HashMap::new();
-        let mut banks_cache_by_token_index = HashMap::new();
-        let bank_tuples = rpc_account_fetcher.fetch_banks(group)?;
-        for (k, v) in bank_tuples {
-            banks_cache
-                .entry(v.name().to_owned())
-                .or_insert_with(|| Vec::new())
-                .push((k, v));
-            banks_cache_by_token_index
-                .entry(v.token_index)
-                .or_insert_with(|| Vec::new())
-                .push((k, v));
-        }
-
-        // mintinfo cache
-        let mut mint_infos_cache = HashMap::new();
-        let mut mint_infos_cache_by_token_index = HashMap::new();
-        let mint_info_tuples = rpc_account_fetcher.fetch_mint_infos(group)?;
-        for (k, v) in mint_info_tuples {
-            let data = rpc_account_fetcher
-                .fetch_raw_account(v.mint)
-                .context("fetch mint")?
-                .data;
-            let mint = Mint::try_deserialize(&mut &data[..])?;
-
-            mint_infos_cache.insert(v.mint, (k, v, mint.clone()));
-            mint_infos_cache_by_token_index.insert(v.token_index, (k, v, mint));
-        }
-
-        // serum3 markets cache
-        let mut serum3_markets_cache = HashMap::new();
-        let mut serum3_external_markets_cache = HashMap::new();
-        let serum3_market_tuples = rpc_account_fetcher.fetch_serum3_markets(group)?;
-        for (k, v) in serum3_market_tuples {
-            serum3_markets_cache.insert(v.name().to_owned(), (k, v));
-
-            let market_external_bytes = rpc_account_fetcher
-                .fetch_raw_account(v.serum_market_external)
-                .context("fetch serum market external")?
-                .data;
-            serum3_external_markets_cache.insert(
-                v.name().to_owned(),
-                (v.serum_market_external, market_external_bytes),
-            );
-        }
-
-        // perp markets cache
-        let mut perp_markets_cache = HashMap::new();
-        let mut perp_markets_cache_by_perp_market_index = HashMap::new();
-        let perp_market_tuples = rpc_account_fetcher.fetch_perp_markets(group)?;
-        for (k, v) in perp_market_tuples {
-            perp_markets_cache.insert(v.name().to_owned(), (k, v));
-            perp_markets_cache_by_perp_market_index.insert(v.perp_market_index, (k, v));
-        }
-
         Ok(Self {
             rpc,
             cluster: cluster.clone(),
             commitment,
-            account_fetcher: rpc_account_fetcher,
+            account_fetcher: fetcher,
             payer,
             mango_account_address: mango_account_cache.0,
             mango_account_cache: RefCell::new(mango_account_cache.1),
-            group_address: group,
-            group_cache: group_data,
-            banks_cache,
-            banks_cache_by_token_index,
-            mint_infos_cache,
-            mint_infos_cache_by_token_index,
-            serum3_markets_cache,
-            serum3_external_markets_cache,
-            perp_markets_cache,
-            perp_markets_cache_by_perp_market_index,
+            context,
         })
-    }
-
-    pub fn get_mint_info(&self, token_index: &TokenIndex) -> Pubkey {
-        self.mint_infos_cache_by_token_index
-            .get(token_index)
-            .unwrap()
-            .0
     }
 
     pub fn client(&self) -> Client {
@@ -243,7 +163,7 @@ impl MangoClient {
     }
 
     pub fn group(&self) -> Pubkey {
-        self.group_address
+        self.context.group
     }
 
     pub fn mango_account_cached(&self) -> MangoAccount {
@@ -266,7 +186,7 @@ impl MangoClient {
 
     pub fn derive_health_check_remaining_account_metas(
         &self,
-        affected_bank: Option<(Pubkey, Bank)>,
+        affected_token: Option<TokenIndex>,
         writable_banks: bool,
     ) -> Result<Vec<AccountMeta>, anchor_client::ClientError> {
         // figure out all the banks/oracles that need to be passed for the health check
@@ -274,11 +194,7 @@ impl MangoClient {
         let mut oracles = vec![];
         let account = self.mango_account_cached();
         for position in account.tokens.iter_active() {
-            let mint_info = self
-                .mint_infos_cache_by_token_index
-                .get(&position.token_index)
-                .unwrap()
-                .1;
+            let mint_info = self.context.mint_info(position.token_index);
             // TODO: ALTs are unavailable
             // let lookup_table = account_loader
             //     .load_bytes(&mint_info.address_lookup_table)
@@ -290,8 +206,13 @@ impl MangoClient {
             banks.push(mint_info.first_bank());
             oracles.push(mint_info.oracle);
         }
-        if let Some(affected_bank) = affected_bank {
-            if !banks.iter().any(|&v| v == affected_bank.0) {
+        if let Some(affected_token_index) = affected_token {
+            if account
+                .tokens
+                .iter_active()
+                .find(|p| p.token_index == affected_token_index)
+                .is_none()
+            {
                 // If there is not yet an active position for the token, we need to pass
                 // the bank/oracle for health check anyway.
                 let new_position = account
@@ -300,18 +221,17 @@ impl MangoClient {
                     .iter()
                     .position(|p| !p.is_active())
                     .unwrap();
-                banks.insert(new_position, affected_bank.0);
-                oracles.insert(new_position, affected_bank.1.oracle);
+                let mint_info = self.context.mint_info(affected_token_index);
+                banks.insert(new_position, mint_info.first_bank());
+                oracles.insert(new_position, mint_info.oracle);
             }
         }
 
         let serum_oos = account.serum3.iter_active().map(|&s| s.open_orders);
-        let perp_markets = account.perps.iter_active_accounts().map(|&pa| {
-            self.perp_markets_cache_by_perp_market_index
-                .get(&pa.market_index)
-                .unwrap()
-                .0
-        });
+        let perp_markets = account
+            .perps
+            .iter_active_accounts()
+            .map(|&pa| self.context.perp_market_address(pa.market_index));
 
         Ok(banks
             .iter()
@@ -357,11 +277,7 @@ impl MangoClient {
             .unique();
 
         for token_index in token_indexes {
-            let mint_info = self
-                .mint_infos_cache_by_token_index
-                .get(&token_index)
-                .unwrap()
-                .1;
+            let mint_info = self.context.mint_info(token_index);
             let writable_bank = token_index == asset_token_index || token_index == liab_token_index;
             // TODO: ALTs are unavailable
             // let lookup_table = account_loader
@@ -384,12 +300,7 @@ impl MangoClient {
             .perps
             .iter_active_accounts()
             .chain(account.perps.iter_active_accounts())
-            .map(|&pa| {
-                self.perp_markets_cache_by_perp_market_index
-                    .get(&pa.market_index)
-                    .unwrap()
-                    .0
-            });
+            .map(|&pa| self.context.perp_market_address(pa.market_index));
 
         let to_account_meta = |pubkey| AccountMeta {
             pubkey,
@@ -411,11 +322,11 @@ impl MangoClient {
     }
 
     pub fn token_deposit(&self, token_name: &str, amount: u64) -> anyhow::Result<Signature> {
-        let bank = self.banks_cache.get(token_name).unwrap().get(0).unwrap();
-        let mint_info: MintInfo = self.mint_infos_cache.get(&bank.1.mint).unwrap().1;
+        let token_index = *self.context.token_indexes_by_name.get(token_name).unwrap();
+        let mint_info = self.context.mint_info(token_index);
 
         let health_check_metas =
-            self.derive_health_check_remaining_account_metas(Some(*bank), false)?;
+            self.derive_health_check_remaining_account_metas(Some(token_index), false)?;
 
         self.program()
             .request()
@@ -426,8 +337,8 @@ impl MangoClient {
                         &mango_v4::accounts::TokenDeposit {
                             group: self.group(),
                             account: self.mango_account_address,
-                            bank: bank.0,
-                            vault: bank.1.vault,
+                            bank: mint_info.first_bank(),
+                            vault: mint_info.first_vault(),
                             token_account: get_associated_token_address(
                                 &self.payer(),
                                 &mint_info.mint,
@@ -452,8 +363,9 @@ impl MangoClient {
         &self,
         token_name: &str,
     ) -> Result<pyth_sdk_solana::Price, anyhow::Error> {
-        let bank = self.banks_cache.get(token_name).unwrap().get(0).unwrap().1;
-        let oracle_account = self.account_fetcher.fetch_raw_account(bank.oracle)?;
+        let token_index = *self.context.token_indexes_by_name.get(token_name).unwrap();
+        let mint_info = self.context.mint_info(token_index);
+        let oracle_account = self.account_fetcher.fetch_raw_account(mint_info.oracle)?;
         Ok(pyth_sdk_solana::load_price(&oracle_account.data).unwrap())
     }
 
@@ -464,13 +376,18 @@ impl MangoClient {
     pub fn serum3_create_open_orders(&self, name: &str) -> anyhow::Result<Signature> {
         let account_pubkey = self.mango_account_address;
 
-        let serum3_market = self.serum3_markets_cache.get(name).unwrap();
+        let market_index = *self
+            .context
+            .serum3_market_indexes_by_name
+            .get(name)
+            .unwrap();
+        let serum3_info = self.context.serum3_markets.get(&market_index).unwrap();
 
         let open_orders = Pubkey::find_program_address(
             &[
                 account_pubkey.as_ref(),
                 b"Serum3OO".as_ref(),
-                serum3_market.0.as_ref(),
+                serum3_info.address.as_ref(),
             ],
             &self.program().id(),
         )
@@ -485,9 +402,9 @@ impl MangoClient {
                         group: self.group(),
                         account: account_pubkey,
 
-                        serum_market: serum3_market.0,
-                        serum_program: serum3_market.1.serum_program,
-                        serum_market_external: serum3_market.1.serum_market_external,
+                        serum_market: serum3_info.address,
+                        serum_program: serum3_info.market.serum_program,
+                        serum_market_external: serum3_info.market.serum_market_external,
                         open_orders,
                         owner: self.payer(),
                         payer: self.payer(),
@@ -504,6 +421,53 @@ impl MangoClient {
             .map_err(prettify_client_error)
     }
 
+    fn serum3_data<'a>(&'a self, name: &str) -> Result<Serum3Data<'a>, ClientError> {
+        let market_index = *self
+            .context
+            .serum3_market_indexes_by_name
+            .get(name)
+            .unwrap();
+        let serum3_info = self.context.serum3_markets.get(&market_index).unwrap();
+
+        let quote_info = self.context.token(serum3_info.market.quote_token_index);
+        let base_info = self.context.token(serum3_info.market.base_token_index);
+
+        let market_external_account = self
+            .account_fetcher
+            .fetch_raw_account(serum3_info.market.serum_market_external)?;
+        let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
+            &market_external_account.data
+                [5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
+        );
+        let bids = from_serum_style_pubkey(market_external.bids);
+        let asks = from_serum_style_pubkey(market_external.asks);
+        let event_q = from_serum_style_pubkey(market_external.event_q);
+        let req_q = from_serum_style_pubkey(market_external.req_q);
+        let coin_vault = from_serum_style_pubkey(market_external.coin_vault);
+        let pc_vault = from_serum_style_pubkey(market_external.pc_vault);
+        let vault_signer = serum_dex::state::gen_vault_signer_key(
+            market_external.vault_signer_nonce,
+            &serum3_info.market.serum_market_external,
+            &serum3_info.market.serum_program,
+        )
+        .unwrap();
+
+        Ok(Serum3Data {
+            market_index,
+            market: serum3_info,
+            quote: quote_info,
+            base: base_info,
+            market_external: market_external.clone(),
+            bids,
+            asks,
+            event_q,
+            req_q,
+            coin_vault,
+            pc_vault,
+            vault_signer,
+        })
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn serum3_place_order(
         &self,
@@ -516,53 +480,24 @@ impl MangoClient {
         client_order_id: u64,
         limit: u16,
     ) -> anyhow::Result<Signature> {
+        let s3 = self.serum3_data(name)?;
+
         let account = self.mango_account_cached();
-
-        let serum3_market = self.serum3_markets_cache.get(name).unwrap();
-        let open_orders = account
-            .serum3
-            .find(serum3_market.1.market_index)
-            .unwrap()
-            .open_orders;
-        let (_, quote_info, quote_mint) = self
-            .mint_infos_cache_by_token_index
-            .get(&serum3_market.1.quote_token_index)
-            .unwrap();
-        let (_, base_info, base_mint) = self
-            .mint_infos_cache_by_token_index
-            .get(&serum3_market.1.base_token_index)
-            .unwrap();
-
-        let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
-            &(self.serum3_external_markets_cache.get(name).unwrap().1)
-                [5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
-        );
-        let bids = market_external.bids;
-        let asks = market_external.asks;
-        let event_q = market_external.event_q;
-        let req_q = market_external.req_q;
-        let coin_vault = market_external.coin_vault;
-        let pc_vault = market_external.pc_vault;
-        let vault_signer = serum_dex::state::gen_vault_signer_key(
-            market_external.vault_signer_nonce,
-            &serum3_market.1.serum_market_external,
-            &serum3_market.1.serum_program,
-        )
-        .unwrap();
+        let open_orders = account.serum3.find(s3.market_index).unwrap().open_orders;
 
         let health_check_metas = self.derive_health_check_remaining_account_metas(None, false)?;
 
         // https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1306
         let limit_price = {
             (price
-                * ((10u64.pow(quote_mint.decimals as u32) * market_external.coin_lot_size) as f64))
+                * ((10u64.pow(s3.quote.decimals as u32) * s3.market_external.coin_lot_size) as f64))
                 as u64
-                / (10u64.pow(base_mint.decimals as u32) * market_external.pc_lot_size)
+                / (10u64.pow(s3.base.decimals as u32) * s3.market_external.pc_lot_size)
         };
         // https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1333
         let max_base_qty = {
-            (size * 10u64.pow(base_mint.decimals as u32) as f64) as u64
-                / market_external.coin_lot_size
+            (size * 10u64.pow(s3.base.decimals as u32) as f64) as u64
+                / s3.market_external.coin_lot_size
         };
         let max_native_quote_qty_including_fees = {
             fn get_fee_tier(msrm_balance: u64, srm_balance: u64) -> u64 {
@@ -609,7 +544,7 @@ impl MangoClient {
 
             let fee_tier = get_fee_tier(0, 0);
             let rates = get_fee_rates(fee_tier);
-            (market_external.pc_lot_size as f64 * (1f64 + rates.0)) as u64
+            (s3.market_external.pc_lot_size as f64 * (1f64 + rates.0)) as u64
                 * (limit_price * max_base_qty)
         };
 
@@ -623,20 +558,20 @@ impl MangoClient {
                             group: self.group(),
                             account: self.mango_account_address,
                             open_orders,
-                            quote_bank: quote_info.first_bank(),
-                            quote_vault: quote_info.first_vault(),
-                            base_bank: base_info.first_bank(),
-                            base_vault: base_info.first_vault(),
-                            serum_market: serum3_market.0,
-                            serum_program: serum3_market.1.serum_program,
-                            serum_market_external: serum3_market.1.serum_market_external,
-                            market_bids: from_serum_style_pubkey(&bids),
-                            market_asks: from_serum_style_pubkey(&asks),
-                            market_event_queue: from_serum_style_pubkey(&event_q),
-                            market_request_queue: from_serum_style_pubkey(&req_q),
-                            market_base_vault: from_serum_style_pubkey(&coin_vault),
-                            market_quote_vault: from_serum_style_pubkey(&pc_vault),
-                            market_vault_signer: vault_signer,
+                            quote_bank: s3.quote.mint_info.first_bank(),
+                            quote_vault: s3.quote.mint_info.first_vault(),
+                            base_bank: s3.base.mint_info.first_bank(),
+                            base_vault: s3.base.mint_info.first_vault(),
+                            serum_market: s3.market.address,
+                            serum_program: s3.market.market.serum_program,
+                            serum_market_external: s3.market.market.serum_market_external,
+                            market_bids: s3.bids,
+                            market_asks: s3.asks,
+                            market_event_queue: s3.event_q,
+                            market_request_queue: s3.req_q,
+                            market_base_vault: s3.coin_vault,
+                            market_quote_vault: s3.pc_vault,
+                            market_vault_signer: s3.vault_signer,
                             owner: self.payer(),
                             token_program: Token::id(),
                         },
@@ -663,35 +598,10 @@ impl MangoClient {
     }
 
     pub fn serum3_settle_funds(&self, name: &str) -> anyhow::Result<Signature> {
+        let s3 = self.serum3_data(name)?;
+
         let account = self.mango_account_cached();
-
-        let serum3_market = self.serum3_markets_cache.get(name).unwrap();
-        let open_orders = account
-            .serum3
-            .find(serum3_market.1.market_index)
-            .unwrap()
-            .open_orders;
-        let (_, quote_info, _) = self
-            .mint_infos_cache_by_token_index
-            .get(&serum3_market.1.quote_token_index)
-            .unwrap();
-        let (_, base_info, _) = self
-            .mint_infos_cache_by_token_index
-            .get(&serum3_market.1.base_token_index)
-            .unwrap();
-
-        let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
-            &(self.serum3_external_markets_cache.get(name).unwrap().1)
-                [5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
-        );
-        let coin_vault = market_external.coin_vault;
-        let pc_vault = market_external.pc_vault;
-        let vault_signer = serum_dex::state::gen_vault_signer_key(
-            market_external.vault_signer_nonce,
-            &serum3_market.1.serum_market_external,
-            &serum3_market.1.serum_program,
-        )
-        .unwrap();
+        let open_orders = account.serum3.find(s3.market_index).unwrap().open_orders;
 
         self.program()
             .request()
@@ -702,16 +612,16 @@ impl MangoClient {
                         group: self.group(),
                         account: self.mango_account_address,
                         open_orders,
-                        quote_bank: quote_info.first_bank(),
-                        quote_vault: quote_info.first_vault(),
-                        base_bank: base_info.first_bank(),
-                        base_vault: base_info.first_vault(),
-                        serum_market: serum3_market.0,
-                        serum_program: serum3_market.1.serum_program,
-                        serum_market_external: serum3_market.1.serum_market_external,
-                        market_base_vault: from_serum_style_pubkey(&coin_vault),
-                        market_quote_vault: from_serum_style_pubkey(&pc_vault),
-                        market_vault_signer: vault_signer,
+                        quote_bank: s3.quote.mint_info.first_bank(),
+                        quote_vault: s3.quote.mint_info.first_vault(),
+                        base_bank: s3.base.mint_info.first_bank(),
+                        base_vault: s3.base.mint_info.first_vault(),
+                        serum_market: s3.market.address,
+                        serum_program: s3.market.market.serum_program,
+                        serum_market_external: s3.market.market.serum_market_external,
+                        market_base_vault: s3.coin_vault,
+                        market_quote_vault: s3.pc_vault,
+                        market_vault_signer: s3.vault_signer,
                         owner: self.payer(),
                         token_program: Token::id(),
                     },
@@ -726,17 +636,13 @@ impl MangoClient {
     }
 
     pub fn serum3_cancel_all_orders(&self, market_name: &str) -> Result<Vec<u128>, anyhow::Error> {
-        let serum3_market = self.serum3_markets_cache.get(market_name).unwrap();
-
-        let open_orders = Pubkey::find_program_address(
-            &[
-                self.mango_account_address.as_ref(),
-                b"Serum3OO".as_ref(),
-                serum3_market.0.as_ref(),
-            ],
-            &self.program().id(),
-        )
-        .0;
+        let market_index = *self
+            .context
+            .serum3_market_indexes_by_name
+            .get(market_name)
+            .unwrap();
+        let account = self.mango_account_cached();
+        let open_orders = account.serum3.find(market_index).unwrap().open_orders;
 
         let open_orders_bytes = self.account_fetcher.fetch_raw_account(open_orders)?.data;
         let open_orders_data: &serum_dex::state::OpenOrders = bytemuck::from_bytes(
@@ -765,30 +671,10 @@ impl MangoClient {
         side: Serum3Side,
         order_id: u128,
     ) -> anyhow::Result<()> {
-        let account_pubkey = self.mango_account_address;
+        let s3 = self.serum3_data(market_name)?;
 
-        let serum3_market = self.serum3_markets_cache.get(market_name).unwrap();
-
-        let open_orders = Pubkey::find_program_address(
-            &[
-                account_pubkey.as_ref(),
-                b"Serum3OO".as_ref(),
-                serum3_market.0.as_ref(),
-            ],
-            &self.program().id(),
-        )
-        .0;
-
-        let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
-            &(self
-                .serum3_external_markets_cache
-                .get(market_name)
-                .unwrap()
-                .1)[5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
-        );
-        let bids = market_external.bids;
-        let asks = market_external.asks;
-        let event_q = market_external.event_q;
+        let account = self.mango_account_cached();
+        let open_orders = account.serum3.find(s3.market_index).unwrap().open_orders;
 
         self.program()
             .request()
@@ -798,14 +684,14 @@ impl MangoClient {
                     anchor_lang::ToAccountMetas::to_account_metas(
                         &mango_v4::accounts::Serum3CancelOrder {
                             group: self.group(),
-                            account: account_pubkey,
-                            serum_market: serum3_market.0,
-                            serum_program: serum3_market.1.serum_program,
-                            serum_market_external: serum3_market.1.serum_market_external,
+                            account: self.mango_account_address,
+                            serum_market: s3.market.address,
+                            serum_program: s3.market.market.serum_program,
+                            serum_market_external: s3.market.market.serum_market_external,
                             open_orders,
-                            market_bids: from_serum_style_pubkey(&bids),
-                            market_asks: from_serum_style_pubkey(&asks),
-                            market_event_queue: from_serum_style_pubkey(&event_q),
+                            market_bids: s3.bids,
+                            market_asks: s3.asks,
+                            market_event_queue: s3.event_q,
                             owner: self.payer(),
                         },
                         None,
@@ -881,16 +767,11 @@ impl MangoClient {
     ) -> anyhow::Result<Signature> {
         let quote_token_index = 0;
 
-        let (_, quote_mint_info, _) = self
-            .mint_infos_cache_by_token_index
-            .get(&quote_token_index)
-            .unwrap();
-        let (liab_mint_info_key, liab_mint_info, _) = self
-            .mint_infos_cache_by_token_index
-            .get(&liab_token_index)
-            .unwrap();
+        let quote_info = self.context.token(quote_token_index);
+        let liab_info = self.context.token(liab_token_index);
 
-        let bank_remaining_ams = liab_mint_info
+        let bank_remaining_ams = liab_info
+            .mint_info
             .banks()
             .iter()
             .map(|bank_pubkey| AccountMeta {
@@ -908,6 +789,11 @@ impl MangoClient {
             )
             .unwrap();
 
+        let group = account_fetcher_fetch_anchor_account::<Group>(
+            &*self.account_fetcher,
+            self.context.group,
+        )?;
+
         self.program()
             .request()
             .instruction(Instruction {
@@ -919,9 +805,9 @@ impl MangoClient {
                             liqee: *liqee.0,
                             liqor: self.mango_account_address,
                             liqor_owner: self.payer.pubkey(),
-                            liab_mint_info: *liab_mint_info_key,
-                            quote_vault: quote_mint_info.first_vault(),
-                            insurance_vault: self.group_cache.insurance_vault,
+                            liab_mint_info: liab_info.mint_info_address,
+                            quote_vault: quote_info.mint_info.first_vault(),
+                            insurance_vault: group.insurance_vault,
                             token_program: Token::id(),
                         },
                         None,
@@ -1047,8 +933,215 @@ impl MangoAccountFetcher for RpcAccountFetcher {
     }
 }
 
-fn from_serum_style_pubkey(d: &[u64; 4]) -> Pubkey {
-    Pubkey::new(bytemuck::cast_slice(d as &[_]))
+pub struct CachedAccountFetcher<T: RawAccountFetcher> {
+    fetcher: T,
+    cache: Mutex<HashMap<Pubkey, Account>>,
+}
+
+impl<T: RawAccountFetcher> CachedAccountFetcher<T> {
+    fn new(fetcher: T) -> Self {
+        Self {
+            fetcher,
+            cache: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn clear_cache(&self) {
+        let mut cache = self.cache.lock().unwrap();
+        cache.clear();
+    }
+}
+
+impl<T: RawAccountFetcher> RawAccountFetcher for CachedAccountFetcher<T> {
+    fn fetch_raw_account(&self, address: Pubkey) -> Result<Account, ClientError> {
+        let mut cache = self.cache.lock().unwrap();
+        if let Some(account) = cache.get(&address) {
+            return Ok(account.clone());
+        }
+        let account = self.fetcher.fetch_raw_account(address)?;
+        cache.insert(address, account.clone());
+        Ok(account)
+    }
+}
+
+impl<T: RawAccountFetcher + MangoAccountFetcher> MangoAccountFetcher for CachedAccountFetcher<T> {
+    fn fetch_mango_accounts(
+        &self,
+        group: Pubkey,
+        owner: Pubkey,
+    ) -> Result<Vec<(Pubkey, MangoAccount)>, ClientError> {
+        self.fetcher.fetch_mango_accounts(group, owner)
+    }
+
+    fn fetch_banks(&self, group: Pubkey) -> Result<Vec<(Pubkey, Bank)>, ClientError> {
+        self.fetcher.fetch_banks(group)
+    }
+
+    fn fetch_mint_infos(&self, group: Pubkey) -> Result<Vec<(Pubkey, MintInfo)>, ClientError> {
+        self.fetcher.fetch_mint_infos(group)
+    }
+
+    fn fetch_serum3_markets(
+        &self,
+        group: Pubkey,
+    ) -> Result<Vec<(Pubkey, Serum3Market)>, ClientError> {
+        self.fetcher.fetch_serum3_markets(group)
+    }
+
+    fn fetch_perp_markets(&self, group: Pubkey) -> Result<Vec<(Pubkey, PerpMarket)>, ClientError> {
+        self.fetcher.fetch_perp_markets(group)
+    }
+}
+
+pub struct TokenContext {
+    pub name: String,
+    pub mint_info: MintInfo,
+    pub mint_info_address: Pubkey,
+    pub decimals: u8,
+}
+
+pub struct Serum3MarketContext {
+    pub address: Pubkey,
+    pub market: Serum3Market,
+}
+
+pub struct PerpMarketContext {
+    pub address: Pubkey,
+    pub market: PerpMarket,
+}
+
+pub struct MangoGroupContext {
+    pub group: Pubkey,
+
+    pub tokens: HashMap<TokenIndex, TokenContext>,
+    pub token_indexes_by_name: HashMap<String, TokenIndex>,
+
+    pub serum3_markets: HashMap<Serum3MarketIndex, Serum3MarketContext>,
+    pub serum3_market_indexes_by_name: HashMap<String, Serum3MarketIndex>,
+
+    pub perp_markets: HashMap<PerpMarketIndex, PerpMarketContext>,
+    pub perp_market_indexes_by_name: HashMap<String, PerpMarketIndex>,
+}
+
+impl MangoGroupContext {
+    fn new(group: Pubkey, fetcher: &dyn AccountFetcher) -> Result<Self, ClientError> {
+        // tokens
+        let mint_info_tuples = fetcher.fetch_mint_infos(group)?;
+        let mut tokens = mint_info_tuples
+            .iter()
+            .map(|(pk, mi)| {
+                (
+                    mi.token_index,
+                    TokenContext {
+                        name: String::new(),
+                        mint_info: *mi,
+                        mint_info_address: *pk,
+                        decimals: u8::MAX,
+                    },
+                )
+            })
+            .collect::<HashMap<_, _>>();
+
+        // reading the banks is only needed for the token names and decimals
+        // FUTURE: either store the names on MintInfo as well, or maybe don't store them at all
+        //         because they are in metaplex?
+        let bank_tuples = fetcher.fetch_banks(group)?;
+        for (_, bank) in bank_tuples {
+            let token = tokens.get_mut(&bank.token_index).unwrap();
+            token.name = bank.name().into();
+            token.decimals = bank.mint_decimals;
+        }
+        assert!(tokens.values().all(|t| t.decimals != u8::MAX));
+
+        // serum3 markets
+        let serum3_market_tuples = fetcher.fetch_serum3_markets(group)?;
+        let serum3_markets = serum3_market_tuples
+            .iter()
+            .map(|(pk, s)| {
+                (
+                    s.market_index,
+                    Serum3MarketContext {
+                        address: *pk,
+                        market: *s,
+                    },
+                )
+            })
+            .collect::<HashMap<_, _>>();
+
+        // perp markets
+        let perp_market_tuples = fetcher.fetch_perp_markets(group)?;
+        let perp_markets = perp_market_tuples
+            .iter()
+            .map(|(pk, pm)| {
+                (
+                    pm.perp_market_index,
+                    PerpMarketContext {
+                        address: *pk,
+                        market: *pm,
+                    },
+                )
+            })
+            .collect::<HashMap<_, _>>();
+
+        // Name lookup tables
+        let token_indexes_by_name = tokens
+            .iter()
+            .map(|(i, t)| (t.name.clone(), *i))
+            .collect::<HashMap<_, _>>();
+        let serum3_market_indexes_by_name = serum3_markets
+            .iter()
+            .map(|(i, s)| (s.market.name().to_string(), *i))
+            .collect::<HashMap<_, _>>();
+        let perp_market_indexes_by_name = perp_markets
+            .iter()
+            .map(|(i, p)| (p.market.name().to_string(), *i))
+            .collect::<HashMap<_, _>>();
+
+        Ok(Self {
+            group,
+            tokens,
+            token_indexes_by_name,
+            serum3_markets,
+            serum3_market_indexes_by_name,
+            perp_markets,
+            perp_market_indexes_by_name,
+        })
+    }
+
+    pub fn mint_info_address(&self, token_index: TokenIndex) -> Pubkey {
+        self.token(token_index).mint_info_address
+    }
+
+    pub fn mint_info(&self, token_index: TokenIndex) -> MintInfo {
+        self.token(token_index).mint_info
+    }
+
+    pub fn token(&self, token_index: TokenIndex) -> &TokenContext {
+        self.tokens.get(&token_index).unwrap()
+    }
+
+    pub fn perp_market_address(&self, perp_market_index: PerpMarketIndex) -> Pubkey {
+        self.perp_markets.get(&perp_market_index).unwrap().address
+    }
+}
+
+struct Serum3Data<'a> {
+    market_index: Serum3MarketIndex,
+    market: &'a Serum3MarketContext,
+    quote: &'a TokenContext,
+    base: &'a TokenContext,
+    market_external: serum_dex::state::MarketState,
+    bids: Pubkey,
+    asks: Pubkey,
+    event_q: Pubkey,
+    req_q: Pubkey,
+    coin_vault: Pubkey,
+    pc_vault: Pubkey,
+    vault_signer: Pubkey,
+}
+
+fn from_serum_style_pubkey(d: [u64; 4]) -> Pubkey {
+    Pubkey::new(bytemuck::cast_slice(&d as &[_]))
 }
 
 /// Do some manual unpacking on some ClientErrors
@@ -1080,3 +1173,8 @@ fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
     };
     err.into()
 }
+
+// TODO:
+// - get serum3 data once
+// - remove MangoAccountFetcher trait, just build the context once, keep individual functions
+// - pass in context and fetcher to MangoClient::new()
