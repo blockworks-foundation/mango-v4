@@ -1,17 +1,16 @@
 use std::collections::HashMap;
-use std::sync::Arc;
-
-use crate::chain_data::*;
-use crate::util::{is_mango_account, is_mango_bank, is_mint_info, is_perp_market};
+use std::sync::{Arc, RwLock};
+use std::time::Duration;
 
 use anchor_client::Cluster;
-use client::MangoClient;
+use client::{MangoClient, MangoGroupContext};
 use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 
 use once_cell::sync::OnceCell;
 use serde_derive::Deserialize;
 
+use solana_client::rpc_client::RpcClient;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signer::keypair;
@@ -22,11 +21,16 @@ use std::str::FromStr;
 
 pub mod account_shared_data;
 pub mod chain_data;
+pub mod chain_data_fetcher;
 pub mod liquidate;
 pub mod metrics;
 pub mod snapshot_source;
 pub mod util;
 pub mod websocket_source;
+
+use crate::chain_data::*;
+use crate::chain_data_fetcher::*;
+use crate::util::{is_mango_account, is_mango_bank, is_mint_info, is_perp_market};
 
 // jemalloc seems to be better at keeping the memory footprint reasonable over
 // longer periods of time
@@ -90,31 +94,19 @@ async fn main() -> anyhow::Result<()> {
 
     let mango_group_id = Pubkey::from_str(&config.mango_group_id)?;
 
-    //
-    // mango client setup
-    //
-    let mango_client = {
-        let payer = keypair::read_keypair_file(&config.payer).unwrap();
+    let rpc_url = config.rpc_http_url.to_owned();
+    let ws_url = rpc_url.replace("https", "wss");
+    let rpc_timeout = Duration::from_secs(1);
+    let cluster = Cluster::Custom(rpc_url, ws_url);
+    let commitment = CommitmentConfig::processed();
+    let group_context =
+        MangoGroupContext::new_from_rpc(mango_group_id, cluster.clone(), commitment)?;
 
-        let rpc_url = config.rpc_http_url.to_owned();
-        let ws_url = rpc_url.replace("https", "wss");
-
-        let cluster = Cluster::Custom(rpc_url, ws_url);
-        let commitment = CommitmentConfig::confirmed();
-
-        Arc::new(MangoClient::new(
-            cluster,
-            commitment,
-            payer,
-            mango_group_id,
-            &config.mango_account_name,
-        )?)
-    };
-
-    let mango_pyth_oracles = mango_client
-        .mint_infos_cache
+    // TODO: this is all oracles, not just pyth!
+    let mango_pyth_oracles = group_context
+        .tokens
         .values()
-        .map(|value| value.1.oracle)
+        .map(|value| value.mint_info.oracle)
         .collect::<Vec<Pubkey>>();
 
     //
@@ -142,7 +134,16 @@ async fn main() -> anyhow::Result<()> {
     snapshot_source::start(config.clone(), mango_pyth_oracles, snapshot_sender);
 
     // The representation of current on-chain account data
-    let mut chain_data = ChainData::new(&metrics);
+    let chain_data = Arc::new(RwLock::new(ChainData::new(&metrics)));
+    // Reading accounts from chain_data
+    let account_fetcher = Arc::new(ChainDataAccountFetcher {
+        chain_data: chain_data.clone(),
+        rpc: RpcClient::new_with_timeout_and_commitment(
+            cluster.url().to_string(),
+            rpc_timeout,
+            commitment,
+        ),
+    });
 
     // Addresses of the MangoAccounts belonging to the mango program.
     // Needed to check health of them all when the cache updates.
@@ -167,6 +168,22 @@ async fn main() -> anyhow::Result<()> {
     let mut metric_snapshot_queue_len = metrics.register_u64("snapshot_queue_length".into());
     let mut metric_mango_accounts = metrics.register_u64("mango_accouns".into());
 
+    //
+    // mango client setup
+    //
+    let mango_client = {
+        let payer = keypair::read_keypair_file(&config.payer).unwrap();
+
+        Arc::new(MangoClient::new_detail(
+            cluster,
+            commitment,
+            payer,
+            &config.mango_account_name,
+            group_context,
+            account_fetcher.clone(),
+        )?)
+    };
+
     info!("main loop");
     loop {
         tokio::select! {
@@ -177,7 +194,7 @@ async fn main() -> anyhow::Result<()> {
 
                 // build a model of slots and accounts in `chain_data`
                 // this code should be generic so it can be reused in future projects
-                chain_data.update_from_websocket(message.clone());
+                chain_data.write().unwrap().update_from_websocket(message.clone());
 
                 // specific program logic using the mirrored data
                 if let websocket_source::Message::Account(account_write) = message {
@@ -197,10 +214,8 @@ async fn main() -> anyhow::Result<()> {
 
                         if let Err(err) = liquidate::process_accounts(
                                 &mango_client,
-                                &chain_data,
+                                &account_fetcher,
                                 std::iter::once(&account_write.pubkey),
-                                &mint_infos,
-                                &perp_markets,
 
                         ) {
                             warn!("could not process account {}: {:?}", account_write.pubkey, err);
@@ -230,10 +245,8 @@ async fn main() -> anyhow::Result<()> {
                         // so optimizing much seems unnecessary.
                         if let Err(err) = liquidate::process_accounts(
                                 &mango_client,
-                                &chain_data,
+                                &account_fetcher,
                                 mango_accounts.iter(),
-                                &mint_infos,
-                                &perp_markets,
                         ) {
                             warn!("could not process accounts: {:?}", err);
                         }
@@ -260,16 +273,14 @@ async fn main() -> anyhow::Result<()> {
                 }
                 metric_mango_accounts.set(mango_accounts.len() as u64);
 
-                chain_data.update_from_snapshot(message);
+                chain_data.write().unwrap().update_from_snapshot(message);
                 one_snapshot_done = true;
 
                 // trigger a full health check
                 if let Err(err) = liquidate::process_accounts(
                         &mango_client,
-                        &chain_data,
+                        &account_fetcher,
                         mango_accounts.iter(),
-                        &mint_infos,
-                        &perp_markets,
                 ) {
                     warn!("could not process accounts: {:?}", err);
                 }
