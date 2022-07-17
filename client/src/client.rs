@@ -57,28 +57,48 @@ impl MangoClient {
         .0
     }
 
+    /// Conveniently creates a RPC based client
     pub fn new(
         cluster: Cluster,
         commitment: CommitmentConfig,
-        payer: Keypair,
         group: Pubkey,
+        payer: Keypair,
         mango_account_name: &str,
     ) -> anyhow::Result<Self> {
         let program =
             Client::new_with_options(cluster.clone(), std::rc::Rc::new(payer.clone()), commitment)
                 .program(mango_v4::ID);
 
-        // TODO: allow startup with a different fetcher
-        let program2 =
+        let group_context = MangoGroupContext::new_from_rpc(&program, group)?;
+
+        let account_fetcher = Box::new(CachedAccountFetcher::new(RpcAccountFetcher { program }));
+
+        Self::new_detail(
+            cluster,
+            commitment,
+            payer,
+            mango_account_name,
+            group_context,
+            account_fetcher,
+        )
+    }
+
+    /// Allows control of AccountFetcher and externally created MangoGroupContext
+    pub fn new_detail(
+        cluster: Cluster,
+        commitment: CommitmentConfig,
+        payer: Keypair,
+        mango_account_name: &str,
+        // future: maybe pass Arc<MangoGroupContext>, so it can be extenally updated?
+        group_context: MangoGroupContext,
+        account_fetcher: Box<dyn AccountFetcher>,
+    ) -> anyhow::Result<Self> {
+        let program =
             Client::new_with_options(cluster.clone(), std::rc::Rc::new(payer.clone()), commitment)
                 .program(mango_v4::ID);
-        let fetcher = Box::new(CachedAccountFetcher::new(RpcAccountFetcher {
-            program: program2,
-        }));
-
-        let context = MangoGroupContext::new_from_rpc(&program, group)?;
 
         let rpc = program.rpc();
+        let group = group_context.group;
 
         // Mango Account
         let mut mango_account_tuples = fetch_mango_accounts(&program, group, payer.pubkey())?;
@@ -138,11 +158,11 @@ impl MangoClient {
             rpc,
             cluster: cluster.clone(),
             commitment,
-            account_fetcher: fetcher,
+            account_fetcher,
             payer,
             mango_account_address: mango_account_cache.0,
             mango_account_cache: RefCell::new(mango_account_cache.1),
-            context,
+            context: group_context,
         })
     }
 
@@ -1119,6 +1139,3 @@ fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
     };
     err.into()
 }
-
-// TODO:
-// - pass in context and fetcher to MangoClient::new()
