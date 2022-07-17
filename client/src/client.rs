@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use anchor_client::{Client, ClientError, Cluster, Program};
 
@@ -33,9 +33,12 @@ pub struct MangoClient {
     pub rpc: RpcClient,
     pub cluster: Cluster,
     pub commitment: CommitmentConfig,
-    pub account_fetcher: Box<dyn AccountFetcher>,
-    pub payer: Keypair,
 
+    // todo: possibly this object should have cache-functions, so there can be one getMultipleAccounts
+    // call to refresh banks etc -- if it's backed by websockets, these could just do nothing
+    pub account_fetcher: Arc<dyn AccountFetcher>,
+
+    pub payer: Keypair,
     pub mango_account_address: Pubkey,
 
     pub context: MangoGroupContext,
@@ -69,7 +72,7 @@ impl MangoClient {
 
         let group_context = MangoGroupContext::new_from_rpc(&program, group)?;
 
-        let account_fetcher = Box::new(CachedAccountFetcher::new(RpcAccountFetcher {
+        let account_fetcher = Arc::new(CachedAccountFetcher::new(RpcAccountFetcher {
             rpc: program.rpc(),
         }));
 
@@ -91,7 +94,7 @@ impl MangoClient {
         mango_account_name: &str,
         // future: maybe pass Arc<MangoGroupContext>, so it can be extenally updated?
         group_context: MangoGroupContext,
-        account_fetcher: Box<dyn AccountFetcher>,
+        account_fetcher: Arc<dyn AccountFetcher>,
     ) -> anyhow::Result<Self> {
         let program =
             Client::new_with_options(cluster.clone(), std::rc::Rc::new(payer.clone()), commitment)
