@@ -1,14 +1,15 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use crate::chain_data::*;
 use crate::util::{is_mango_account, is_mango_bank, is_mint_info, is_perp_market};
 
 use anchor_client::Cluster;
-use client::MangoClient;
+use client::{AccountFetcher, MangoClient, MangoGroupContext};
 use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 
+use anyhow::Context;
 use once_cell::sync::OnceCell;
 use serde_derive::Deserialize;
 
@@ -90,30 +91,15 @@ async fn main() -> anyhow::Result<()> {
 
     let mango_group_id = Pubkey::from_str(&config.mango_group_id)?;
 
-    //
-    // mango client setup
-    //
-    let mango_client = {
-        let payer = keypair::read_keypair_file(&config.payer).unwrap();
-
-        let rpc_url = config.rpc_http_url.to_owned();
-        let ws_url = rpc_url.replace("https", "wss");
-
-        let cluster = Cluster::Custom(rpc_url, ws_url);
-        let commitment = CommitmentConfig::confirmed();
-
-        Arc::new(MangoClient::new(
-            cluster,
-            commitment,
-            mango_group_id,
-            payer,
-            &config.mango_account_name,
-        )?)
-    };
+    let rpc_url = config.rpc_http_url.to_owned();
+    let ws_url = rpc_url.replace("https", "wss");
+    let cluster = Cluster::Custom(rpc_url, ws_url);
+    let commitment = CommitmentConfig::confirmed();
+    let group_context =
+        MangoGroupContext::new_from_rpc(mango_group_id, cluster.clone(), commitment)?;
 
     // TODO: this is all oracles, not just pyth!
-    let mango_pyth_oracles = mango_client
-        .context
+    let mango_pyth_oracles = group_context
         .tokens
         .values()
         .map(|value| value.mint_info.oracle)
@@ -144,7 +130,7 @@ async fn main() -> anyhow::Result<()> {
     snapshot_source::start(config.clone(), mango_pyth_oracles, snapshot_sender);
 
     // The representation of current on-chain account data
-    let mut chain_data = ChainData::new(&metrics);
+    let chain_data = Arc::new(RwLock::new(ChainData::new(&metrics)));
 
     // Addresses of the MangoAccounts belonging to the mango program.
     // Needed to check health of them all when the cache updates.
@@ -169,6 +155,26 @@ async fn main() -> anyhow::Result<()> {
     let mut metric_snapshot_queue_len = metrics.register_u64("snapshot_queue_length".into());
     let mut metric_mango_accounts = metrics.register_u64("mango_accouns".into());
 
+    //
+    // mango client setup
+    //
+    let mango_client = {
+        let payer = keypair::read_keypair_file(&config.payer).unwrap();
+
+        let account_fetcher = Arc::new(ChainDataAccountFetcher {
+            chain_data: chain_data.clone(),
+        });
+
+        Arc::new(MangoClient::new_detail(
+            cluster,
+            commitment,
+            payer,
+            &config.mango_account_name,
+            group_context,
+            account_fetcher,
+        )?)
+    };
+
     info!("main loop");
     loop {
         tokio::select! {
@@ -179,7 +185,7 @@ async fn main() -> anyhow::Result<()> {
 
                 // build a model of slots and accounts in `chain_data`
                 // this code should be generic so it can be reused in future projects
-                chain_data.update_from_websocket(message.clone());
+                chain_data.write().unwrap().update_from_websocket(message.clone());
 
                 // specific program logic using the mirrored data
                 if let websocket_source::Message::Account(account_write) = message {
@@ -199,7 +205,7 @@ async fn main() -> anyhow::Result<()> {
 
                         if let Err(err) = liquidate::process_accounts(
                                 &mango_client,
-                                &chain_data,
+                                &chain_data.read().unwrap(),
                                 std::iter::once(&account_write.pubkey),
                                 &mint_infos,
                                 &perp_markets,
@@ -232,7 +238,7 @@ async fn main() -> anyhow::Result<()> {
                         // so optimizing much seems unnecessary.
                         if let Err(err) = liquidate::process_accounts(
                                 &mango_client,
-                                &chain_data,
+                                &chain_data.read().unwrap(),
                                 mango_accounts.iter(),
                                 &mint_infos,
                                 &perp_markets,
@@ -262,13 +268,13 @@ async fn main() -> anyhow::Result<()> {
                 }
                 metric_mango_accounts.set(mango_accounts.len() as u64);
 
-                chain_data.update_from_snapshot(message);
+                chain_data.write().unwrap().update_from_snapshot(message);
                 one_snapshot_done = true;
 
                 // trigger a full health check
                 if let Err(err) = liquidate::process_accounts(
                         &mango_client,
-                        &chain_data,
+                        &chain_data.read().unwrap(),
                         mango_accounts.iter(),
                         &mint_infos,
                         &perp_markets,
@@ -277,5 +283,19 @@ async fn main() -> anyhow::Result<()> {
                 }
             },
         }
+    }
+}
+
+struct ChainDataAccountFetcher {
+    chain_data: Arc<RwLock<ChainData>>,
+}
+
+impl AccountFetcher for ChainDataAccountFetcher {
+    fn fetch_raw_account(&self, address: Pubkey) -> anyhow::Result<solana_sdk::account::Account> {
+        let chain_data = self.chain_data.read().unwrap();
+        chain_data
+            .account(&address)
+            .with_context(|| format!("fetch account {}", address))
+            .map(|a| a.clone().into())
     }
 }

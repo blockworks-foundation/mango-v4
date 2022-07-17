@@ -66,15 +66,10 @@ impl MangoClient {
         payer: Keypair,
         mango_account_name: &str,
     ) -> anyhow::Result<Self> {
-        let program =
-            Client::new_with_options(cluster.clone(), std::rc::Rc::new(payer.clone()), commitment)
-                .program(mango_v4::ID);
+        let group_context = MangoGroupContext::new_from_rpc(group, cluster.clone(), commitment)?;
 
-        let group_context = MangoGroupContext::new_from_rpc(&program, group)?;
-
-        let account_fetcher = Arc::new(CachedAccountFetcher::new(RpcAccountFetcher {
-            rpc: program.rpc(),
-        }));
+        let rpc = RpcClient::new_with_commitment(cluster.url().to_string(), commitment);
+        let account_fetcher = Arc::new(CachedAccountFetcher::new(RpcAccountFetcher { rpc }));
 
         Self::new_detail(
             cluster,
@@ -188,11 +183,11 @@ impl MangoClient {
         self.context.group
     }
 
-    pub fn mango_account(&self) -> Result<MangoAccount, ClientError> {
+    pub fn mango_account(&self) -> anyhow::Result<MangoAccount> {
         account_fetcher_fetch_anchor_account(&*self.account_fetcher, self.mango_account_address)
     }
 
-    pub fn first_bank(&self, token_index: TokenIndex) -> Result<Bank, ClientError> {
+    pub fn first_bank(&self, token_index: TokenIndex) -> anyhow::Result<Bank> {
         let bank_address = self.context.mint_info(token_index).first_bank();
         account_fetcher_fetch_anchor_account(&*self.account_fetcher, bank_address)
     }
@@ -201,7 +196,7 @@ impl MangoClient {
         &self,
         affected_token: Option<TokenIndex>,
         writable_banks: bool,
-    ) -> Result<Vec<AccountMeta>, anchor_client::ClientError> {
+    ) -> anyhow::Result<Vec<AccountMeta>> {
         // figure out all the banks/oracles that need to be passed for the health check
         let mut banks = vec![];
         let mut oracles = vec![];
@@ -276,7 +271,7 @@ impl MangoClient {
         liqee: &MangoAccount,
         asset_token_index: TokenIndex,
         liab_token_index: TokenIndex,
-    ) -> Result<Vec<AccountMeta>, anchor_client::ClientError> {
+    ) -> anyhow::Result<Vec<AccountMeta>> {
         // figure out all the banks/oracles that need to be passed for the health check
         let mut banks = vec![];
         let mut oracles = vec![];
@@ -810,17 +805,17 @@ impl MangoClient {
 }
 
 pub trait AccountFetcher: Sync + Send {
-    fn fetch_raw_account(&self, address: Pubkey) -> Result<Account, ClientError>;
+    fn fetch_raw_account(&self, address: Pubkey) -> anyhow::Result<Account>;
 }
 
 // Can't be in the trait, since then it would no longer be object-safe...
 fn account_fetcher_fetch_anchor_account<T: AccountDeserialize>(
     fetcher: &dyn AccountFetcher,
     address: Pubkey,
-) -> Result<T, ClientError> {
+) -> anyhow::Result<T> {
     let account = fetcher.fetch_raw_account(address)?;
     let mut data: &[u8] = &account.data;
-    Ok(T::try_deserialize(&mut data)?)
+    T::try_deserialize(&mut data).with_context(|| format!("deserializing account {}", address))
 }
 
 fn fetch_mango_accounts(
@@ -895,11 +890,12 @@ pub struct RpcAccountFetcher {
 }
 
 impl AccountFetcher for RpcAccountFetcher {
-    fn fetch_raw_account(&self, address: Pubkey) -> Result<Account, ClientError> {
+    fn fetch_raw_account(&self, address: Pubkey) -> anyhow::Result<Account> {
         self.rpc
             .get_account_with_commitment(&address, self.rpc.commitment())?
             .value
             .ok_or(ClientError::AccountNotFound)
+            .with_context(|| format!("fetch account {}", address))
     }
 }
 
@@ -923,7 +919,7 @@ impl<T: AccountFetcher> CachedAccountFetcher<T> {
 }
 
 impl<T: AccountFetcher> AccountFetcher for CachedAccountFetcher<T> {
-    fn fetch_raw_account(&self, address: Pubkey) -> Result<Account, ClientError> {
+    fn fetch_raw_account(&self, address: Pubkey) -> anyhow::Result<Account> {
         let mut cache = self.cache.lock().unwrap();
         if let Some(account) = cache.get(&address) {
             return Ok(account.clone());
@@ -990,7 +986,15 @@ impl MangoGroupContext {
         self.perp_markets.get(&perp_market_index).unwrap().address
     }
 
-    pub fn new_from_rpc(program: &Program, group: Pubkey) -> Result<Self, ClientError> {
+    pub fn new_from_rpc(
+        group: Pubkey,
+        cluster: Cluster,
+        commitment: CommitmentConfig,
+    ) -> Result<Self, ClientError> {
+        let program =
+            Client::new_with_options(cluster, std::rc::Rc::new(Keypair::new()), commitment)
+                .program(mango_v4::ID);
+
         // tokens
         let mint_info_tuples = fetch_mint_infos(&program, group)?;
         let mut tokens = mint_info_tuples
@@ -1011,7 +1015,7 @@ impl MangoGroupContext {
         // reading the banks is only needed for the token names and decimals
         // FUTURE: either store the names on MintInfo as well, or maybe don't store them at all
         //         because they are in metaplex?
-        let bank_tuples = fetch_banks(program, group)?;
+        let bank_tuples = fetch_banks(&program, group)?;
         for (_, bank) in bank_tuples {
             let token = tokens.get_mut(&bank.token_index).unwrap();
             token.name = bank.name().into();
@@ -1020,11 +1024,11 @@ impl MangoGroupContext {
         assert!(tokens.values().all(|t| t.decimals != u8::MAX));
 
         // serum3 markets
-        let serum3_market_tuples = fetch_serum3_markets(program, group)?;
+        let serum3_market_tuples = fetch_serum3_markets(&program, group)?;
         let serum3_markets = serum3_market_tuples
             .iter()
             .map(|(pk, s)| {
-                let market_external_account = fetch_raw_account(program, s.serum_market_external)?;
+                let market_external_account = fetch_raw_account(&program, s.serum_market_external)?;
                 let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
                     &market_external_account.data
                         [5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
@@ -1055,7 +1059,7 @@ impl MangoGroupContext {
             .collect::<Result<HashMap<_, _>, ClientError>>()?;
 
         // perp markets
-        let perp_market_tuples = fetch_perp_markets(program, group)?;
+        let perp_market_tuples = fetch_perp_markets(&program, group)?;
         let perp_markets = perp_market_tuples
             .iter()
             .map(|(pk, pm)| {
