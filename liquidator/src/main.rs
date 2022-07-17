@@ -105,16 +105,18 @@ async fn main() -> anyhow::Result<()> {
         Arc::new(MangoClient::new(
             cluster,
             commitment,
-            payer,
             mango_group_id,
+            payer,
             &config.mango_account_name,
         )?)
     };
 
+    // TODO: this is all oracles, not just pyth!
     let mango_pyth_oracles = mango_client
-        .mint_infos_cache
+        .context
+        .tokens
         .values()
-        .map(|value| value.1.oracle)
+        .map(|value| value.mint_info.oracle)
         .collect::<Vec<Pubkey>>();
 
     //

@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -8,7 +7,7 @@ use anchor_lang::__private::bytemuck;
 use anchor_lang::prelude::System;
 use anchor_lang::{AccountDeserialize, Id};
 use anchor_spl::associated_token::get_associated_token_address;
-use anchor_spl::token::{Mint, Token};
+use anchor_spl::token::Token;
 
 use fixed::types::I80F48;
 use itertools::Itertools;
@@ -188,6 +187,11 @@ impl MangoClient {
 
     pub fn mango_account(&self) -> Result<MangoAccount, ClientError> {
         account_fetcher_fetch_anchor_account(&*self.account_fetcher, self.mango_account_address)
+    }
+
+    pub fn first_bank(&self, token_index: TokenIndex) -> Result<Bank, ClientError> {
+        let bank_address = self.context.mint_info(token_index).first_bank();
+        account_fetcher_fetch_anchor_account(&*self.account_fetcher, bank_address)
     }
 
     pub fn derive_health_check_remaining_account_metas(

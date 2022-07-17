@@ -152,7 +152,7 @@ pub fn process_account(
     let get_max_liab_transfer = |source, target| -> anyhow::Result<I80F48> {
         let mut liqor = load_mango_account_from_chain::<MangoAccount>(
             chain_data,
-            &mango_client.mango_account_cache.0,
+            &mango_client.mango_account_address,
         )
         .context("getting liquidator account")?
         .clone();
