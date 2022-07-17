@@ -76,12 +76,12 @@ impl MangoClient {
             program: program2,
         }));
 
-        let context = MangoGroupContext::new(group, &*fetcher)?;
+        let context = MangoGroupContext::new_from_rpc(&program, group)?;
 
         let rpc = program.rpc();
 
         // Mango Account
-        let mut mango_account_tuples = fetcher.fetch_mango_accounts(group, payer.pubkey())?;
+        let mut mango_account_tuples = fetch_mango_accounts(&program, group, payer.pubkey())?;
         let mango_account_opt = mango_account_tuples
             .iter()
             .find(|tuple| tuple.1.name() == mango_account_name);
@@ -127,7 +127,7 @@ impl MangoClient {
                 .send()
                 .context("Failed to create account...")?;
         }
-        let mango_account_tuples = fetcher.fetch_mango_accounts(group, payer.pubkey())?;
+        let mango_account_tuples = fetch_mango_accounts(&program, group, payer.pubkey())?;
         let index = mango_account_tuples
             .iter()
             .position(|tuple| tuple.1.name() == mango_account_name)
@@ -796,27 +796,9 @@ impl MangoClient {
     }
 }
 
-pub trait RawAccountFetcher {
+pub trait AccountFetcher {
     fn fetch_raw_account(&self, address: Pubkey) -> Result<Account, ClientError>;
 }
-
-pub trait MangoAccountFetcher {
-    fn fetch_mango_accounts(
-        &self,
-        group: Pubkey,
-        owner: Pubkey,
-    ) -> Result<Vec<(Pubkey, MangoAccount)>, ClientError>;
-    fn fetch_banks(&self, group: Pubkey) -> Result<Vec<(Pubkey, Bank)>, ClientError>;
-    fn fetch_mint_infos(&self, group: Pubkey) -> Result<Vec<(Pubkey, MintInfo)>, ClientError>;
-    fn fetch_serum3_markets(
-        &self,
-        group: Pubkey,
-    ) -> Result<Vec<(Pubkey, Serum3Market)>, ClientError>;
-    fn fetch_perp_markets(&self, group: Pubkey) -> Result<Vec<(Pubkey, PerpMarket)>, ClientError>;
-}
-
-pub trait AccountFetcher: RawAccountFetcher + MangoAccountFetcher {}
-impl<T: RawAccountFetcher + MangoAccountFetcher> AccountFetcher for T {}
 
 // Can't be in the trait, since then it would no longer be object-safe...
 fn account_fetcher_fetch_anchor_account<T: AccountDeserialize>(
@@ -828,85 +810,89 @@ fn account_fetcher_fetch_anchor_account<T: AccountDeserialize>(
     Ok(T::try_deserialize(&mut data)?)
 }
 
+fn fetch_mango_accounts(
+    program: &Program,
+    group: Pubkey,
+    owner: Pubkey,
+) -> Result<Vec<(Pubkey, MangoAccount)>, ClientError> {
+    program.accounts::<MangoAccount>(vec![
+        RpcFilterType::Memcmp(Memcmp {
+            offset: 8,
+            bytes: MemcmpEncodedBytes::Base58(group.to_string()),
+            encoding: None,
+        }),
+        RpcFilterType::Memcmp(Memcmp {
+            offset: 40,
+            bytes: MemcmpEncodedBytes::Base58(owner.to_string()),
+            encoding: None,
+        }),
+    ])
+}
+
+fn fetch_raw_account(program: &Program, address: Pubkey) -> Result<Account, ClientError> {
+    let rpc = program.rpc();
+    rpc.get_account_with_commitment(&address, rpc.commitment())?
+        .value
+        .ok_or(ClientError::AccountNotFound)
+}
+
+fn fetch_banks(program: &Program, group: Pubkey) -> Result<Vec<(Pubkey, Bank)>, ClientError> {
+    program.accounts::<Bank>(vec![RpcFilterType::Memcmp(Memcmp {
+        offset: 8,
+        bytes: MemcmpEncodedBytes::Base58(group.to_string()),
+        encoding: None,
+    })])
+}
+
+fn fetch_mint_infos(
+    program: &Program,
+    group: Pubkey,
+) -> Result<Vec<(Pubkey, MintInfo)>, ClientError> {
+    program.accounts::<MintInfo>(vec![RpcFilterType::Memcmp(Memcmp {
+        offset: 8,
+        bytes: MemcmpEncodedBytes::Base58(group.to_string()),
+        encoding: None,
+    })])
+}
+
+fn fetch_serum3_markets(
+    program: &Program,
+    group: Pubkey,
+) -> Result<Vec<(Pubkey, Serum3Market)>, ClientError> {
+    program.accounts::<Serum3Market>(vec![RpcFilterType::Memcmp(Memcmp {
+        offset: 8,
+        bytes: MemcmpEncodedBytes::Base58(group.to_string()),
+        encoding: None,
+    })])
+}
+
+fn fetch_perp_markets(
+    program: &Program,
+    group: Pubkey,
+) -> Result<Vec<(Pubkey, PerpMarket)>, ClientError> {
+    program.accounts::<PerpMarket>(vec![RpcFilterType::Memcmp(Memcmp {
+        offset: 8,
+        bytes: MemcmpEncodedBytes::Base58(group.to_string()),
+        encoding: None,
+    })])
+}
+
 pub struct RpcAccountFetcher {
     program: Program,
 }
 
-impl RawAccountFetcher for RpcAccountFetcher {
+impl AccountFetcher for RpcAccountFetcher {
     fn fetch_raw_account(&self, address: Pubkey) -> Result<Account, ClientError> {
-        let rpc = self.program.rpc();
-        rpc.get_account_with_commitment(&address, rpc.commitment())?
-            .value
-            .ok_or(ClientError::AccountNotFound)
+        fetch_raw_account(&self.program, address)
     }
 }
 
-impl MangoAccountFetcher for RpcAccountFetcher {
-    fn fetch_mango_accounts(
-        &self,
-        group: Pubkey,
-        owner: Pubkey,
-    ) -> Result<Vec<(Pubkey, MangoAccount)>, ClientError> {
-        self.program.accounts::<MangoAccount>(vec![
-            RpcFilterType::Memcmp(Memcmp {
-                offset: 8,
-                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
-                encoding: None,
-            }),
-            RpcFilterType::Memcmp(Memcmp {
-                offset: 40,
-                bytes: MemcmpEncodedBytes::Base58(owner.to_string()),
-                encoding: None,
-            }),
-        ])
-    }
-
-    fn fetch_banks(&self, group: Pubkey) -> Result<Vec<(Pubkey, Bank)>, ClientError> {
-        self.program
-            .accounts::<Bank>(vec![RpcFilterType::Memcmp(Memcmp {
-                offset: 8,
-                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
-                encoding: None,
-            })])
-    }
-
-    fn fetch_mint_infos(&self, group: Pubkey) -> Result<Vec<(Pubkey, MintInfo)>, ClientError> {
-        self.program
-            .accounts::<MintInfo>(vec![RpcFilterType::Memcmp(Memcmp {
-                offset: 8,
-                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
-                encoding: None,
-            })])
-    }
-
-    fn fetch_serum3_markets(
-        &self,
-        group: Pubkey,
-    ) -> Result<Vec<(Pubkey, Serum3Market)>, ClientError> {
-        self.program
-            .accounts::<Serum3Market>(vec![RpcFilterType::Memcmp(Memcmp {
-                offset: 8,
-                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
-                encoding: None,
-            })])
-    }
-
-    fn fetch_perp_markets(&self, group: Pubkey) -> Result<Vec<(Pubkey, PerpMarket)>, ClientError> {
-        self.program
-            .accounts::<PerpMarket>(vec![RpcFilterType::Memcmp(Memcmp {
-                offset: 8,
-                bytes: MemcmpEncodedBytes::Base58(group.to_string()),
-                encoding: None,
-            })])
-    }
-}
-
-pub struct CachedAccountFetcher<T: RawAccountFetcher> {
+pub struct CachedAccountFetcher<T: AccountFetcher> {
     fetcher: T,
     cache: Mutex<HashMap<Pubkey, Account>>,
 }
 
-impl<T: RawAccountFetcher> CachedAccountFetcher<T> {
+impl<T: AccountFetcher> CachedAccountFetcher<T> {
     fn new(fetcher: T) -> Self {
         Self {
             fetcher,
@@ -920,7 +906,7 @@ impl<T: RawAccountFetcher> CachedAccountFetcher<T> {
     }
 }
 
-impl<T: RawAccountFetcher> RawAccountFetcher for CachedAccountFetcher<T> {
+impl<T: AccountFetcher> AccountFetcher for CachedAccountFetcher<T> {
     fn fetch_raw_account(&self, address: Pubkey) -> Result<Account, ClientError> {
         let mut cache = self.cache.lock().unwrap();
         if let Some(account) = cache.get(&address) {
@@ -929,35 +915,6 @@ impl<T: RawAccountFetcher> RawAccountFetcher for CachedAccountFetcher<T> {
         let account = self.fetcher.fetch_raw_account(address)?;
         cache.insert(address, account.clone());
         Ok(account)
-    }
-}
-
-impl<T: RawAccountFetcher + MangoAccountFetcher> MangoAccountFetcher for CachedAccountFetcher<T> {
-    fn fetch_mango_accounts(
-        &self,
-        group: Pubkey,
-        owner: Pubkey,
-    ) -> Result<Vec<(Pubkey, MangoAccount)>, ClientError> {
-        self.fetcher.fetch_mango_accounts(group, owner)
-    }
-
-    fn fetch_banks(&self, group: Pubkey) -> Result<Vec<(Pubkey, Bank)>, ClientError> {
-        self.fetcher.fetch_banks(group)
-    }
-
-    fn fetch_mint_infos(&self, group: Pubkey) -> Result<Vec<(Pubkey, MintInfo)>, ClientError> {
-        self.fetcher.fetch_mint_infos(group)
-    }
-
-    fn fetch_serum3_markets(
-        &self,
-        group: Pubkey,
-    ) -> Result<Vec<(Pubkey, Serum3Market)>, ClientError> {
-        self.fetcher.fetch_serum3_markets(group)
-    }
-
-    fn fetch_perp_markets(&self, group: Pubkey) -> Result<Vec<(Pubkey, PerpMarket)>, ClientError> {
-        self.fetcher.fetch_perp_markets(group)
     }
 }
 
@@ -1001,9 +958,25 @@ pub struct MangoGroupContext {
 }
 
 impl MangoGroupContext {
-    fn new(group: Pubkey, fetcher: &dyn AccountFetcher) -> Result<Self, ClientError> {
+    pub fn mint_info_address(&self, token_index: TokenIndex) -> Pubkey {
+        self.token(token_index).mint_info_address
+    }
+
+    pub fn mint_info(&self, token_index: TokenIndex) -> MintInfo {
+        self.token(token_index).mint_info
+    }
+
+    pub fn token(&self, token_index: TokenIndex) -> &TokenContext {
+        self.tokens.get(&token_index).unwrap()
+    }
+
+    pub fn perp_market_address(&self, perp_market_index: PerpMarketIndex) -> Pubkey {
+        self.perp_markets.get(&perp_market_index).unwrap().address
+    }
+
+    pub fn new_from_rpc(program: &Program, group: Pubkey) -> Result<Self, ClientError> {
         // tokens
-        let mint_info_tuples = fetcher.fetch_mint_infos(group)?;
+        let mint_info_tuples = fetch_mint_infos(&program, group)?;
         let mut tokens = mint_info_tuples
             .iter()
             .map(|(pk, mi)| {
@@ -1022,7 +995,7 @@ impl MangoGroupContext {
         // reading the banks is only needed for the token names and decimals
         // FUTURE: either store the names on MintInfo as well, or maybe don't store them at all
         //         because they are in metaplex?
-        let bank_tuples = fetcher.fetch_banks(group)?;
+        let bank_tuples = fetch_banks(program, group)?;
         for (_, bank) in bank_tuples {
             let token = tokens.get_mut(&bank.token_index).unwrap();
             token.name = bank.name().into();
@@ -1031,11 +1004,11 @@ impl MangoGroupContext {
         assert!(tokens.values().all(|t| t.decimals != u8::MAX));
 
         // serum3 markets
-        let serum3_market_tuples = fetcher.fetch_serum3_markets(group)?;
+        let serum3_market_tuples = fetch_serum3_markets(program, group)?;
         let serum3_markets = serum3_market_tuples
             .iter()
             .map(|(pk, s)| {
-                let market_external_account = fetcher.fetch_raw_account(s.serum_market_external)?;
+                let market_external_account = fetch_raw_account(program, s.serum_market_external)?;
                 let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
                     &market_external_account.data
                         [5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
@@ -1066,7 +1039,7 @@ impl MangoGroupContext {
             .collect::<Result<HashMap<_, _>, ClientError>>()?;
 
         // perp markets
-        let perp_market_tuples = fetcher.fetch_perp_markets(group)?;
+        let perp_market_tuples = fetch_perp_markets(program, group)?;
         let perp_markets = perp_market_tuples
             .iter()
             .map(|(pk, pm)| {
@@ -1094,7 +1067,7 @@ impl MangoGroupContext {
             .map(|(i, p)| (p.market.name().to_string(), *i))
             .collect::<HashMap<_, _>>();
 
-        Ok(Self {
+        Ok(MangoGroupContext {
             group,
             tokens,
             token_indexes_by_name,
@@ -1103,22 +1076,6 @@ impl MangoGroupContext {
             perp_markets,
             perp_market_indexes_by_name,
         })
-    }
-
-    pub fn mint_info_address(&self, token_index: TokenIndex) -> Pubkey {
-        self.token(token_index).mint_info_address
-    }
-
-    pub fn mint_info(&self, token_index: TokenIndex) -> MintInfo {
-        self.token(token_index).mint_info
-    }
-
-    pub fn token(&self, token_index: TokenIndex) -> &TokenContext {
-        self.tokens.get(&token_index).unwrap()
-    }
-
-    pub fn perp_market_address(&self, perp_market_index: PerpMarketIndex) -> Pubkey {
-        self.perp_markets.get(&perp_market_index).unwrap().address
     }
 }
 
@@ -1164,5 +1121,4 @@ fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
 }
 
 // TODO:
-// - remove MangoAccountFetcher trait, just build the context once, keep individual functions
 // - pass in context and fetcher to MangoClient::new()
