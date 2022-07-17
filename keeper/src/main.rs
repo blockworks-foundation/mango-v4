@@ -101,8 +101,8 @@ fn main() -> Result<(), anyhow::Error> {
     let mango_client = Arc::new(MangoClient::new(
         cluster,
         commitment,
-        payer,
         group,
+        payer,
         &cli.mango_account_name,
     )?);
 
