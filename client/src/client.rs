@@ -432,39 +432,11 @@ impl MangoClient {
         let quote_info = self.context.token(serum3_info.market.quote_token_index);
         let base_info = self.context.token(serum3_info.market.base_token_index);
 
-        let market_external_account = self
-            .account_fetcher
-            .fetch_raw_account(serum3_info.market.serum_market_external)?;
-        let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
-            &market_external_account.data
-                [5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
-        );
-        let bids = from_serum_style_pubkey(market_external.bids);
-        let asks = from_serum_style_pubkey(market_external.asks);
-        let event_q = from_serum_style_pubkey(market_external.event_q);
-        let req_q = from_serum_style_pubkey(market_external.req_q);
-        let coin_vault = from_serum_style_pubkey(market_external.coin_vault);
-        let pc_vault = from_serum_style_pubkey(market_external.pc_vault);
-        let vault_signer = serum_dex::state::gen_vault_signer_key(
-            market_external.vault_signer_nonce,
-            &serum3_info.market.serum_market_external,
-            &serum3_info.market.serum_program,
-        )
-        .unwrap();
-
         Ok(Serum3Data {
             market_index,
             market: serum3_info,
             quote: quote_info,
             base: base_info,
-            market_external: market_external.clone(),
-            bids,
-            asks,
-            event_q,
-            req_q,
-            coin_vault,
-            pc_vault,
-            vault_signer,
         })
     }
 
@@ -489,16 +461,13 @@ impl MangoClient {
 
         // https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1306
         let limit_price = {
-            (price
-                * ((10u64.pow(s3.quote.decimals as u32) * s3.market_external.coin_lot_size) as f64))
+            (price * ((10u64.pow(s3.quote.decimals as u32) * s3.market.coin_lot_size) as f64))
                 as u64
-                / (10u64.pow(s3.base.decimals as u32) * s3.market_external.pc_lot_size)
+                / (10u64.pow(s3.base.decimals as u32) * s3.market.pc_lot_size)
         };
         // https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1333
-        let max_base_qty = {
-            (size * 10u64.pow(s3.base.decimals as u32) as f64) as u64
-                / s3.market_external.coin_lot_size
-        };
+        let max_base_qty =
+            { (size * 10u64.pow(s3.base.decimals as u32) as f64) as u64 / s3.market.coin_lot_size };
         let max_native_quote_qty_including_fees = {
             fn get_fee_tier(msrm_balance: u64, srm_balance: u64) -> u64 {
                 if msrm_balance >= 1 {
@@ -544,8 +513,7 @@ impl MangoClient {
 
             let fee_tier = get_fee_tier(0, 0);
             let rates = get_fee_rates(fee_tier);
-            (s3.market_external.pc_lot_size as f64 * (1f64 + rates.0)) as u64
-                * (limit_price * max_base_qty)
+            (s3.market.pc_lot_size as f64 * (1f64 + rates.0)) as u64 * (limit_price * max_base_qty)
         };
 
         self.program()
@@ -565,13 +533,13 @@ impl MangoClient {
                             serum_market: s3.market.address,
                             serum_program: s3.market.market.serum_program,
                             serum_market_external: s3.market.market.serum_market_external,
-                            market_bids: s3.bids,
-                            market_asks: s3.asks,
-                            market_event_queue: s3.event_q,
-                            market_request_queue: s3.req_q,
-                            market_base_vault: s3.coin_vault,
-                            market_quote_vault: s3.pc_vault,
-                            market_vault_signer: s3.vault_signer,
+                            market_bids: s3.market.bids,
+                            market_asks: s3.market.asks,
+                            market_event_queue: s3.market.event_q,
+                            market_request_queue: s3.market.req_q,
+                            market_base_vault: s3.market.coin_vault,
+                            market_quote_vault: s3.market.pc_vault,
+                            market_vault_signer: s3.market.vault_signer,
                             owner: self.payer(),
                             token_program: Token::id(),
                         },
@@ -619,9 +587,9 @@ impl MangoClient {
                         serum_market: s3.market.address,
                         serum_program: s3.market.market.serum_program,
                         serum_market_external: s3.market.market.serum_market_external,
-                        market_base_vault: s3.coin_vault,
-                        market_quote_vault: s3.pc_vault,
-                        market_vault_signer: s3.vault_signer,
+                        market_base_vault: s3.market.coin_vault,
+                        market_quote_vault: s3.market.pc_vault,
+                        market_vault_signer: s3.market.vault_signer,
                         owner: self.payer(),
                         token_program: Token::id(),
                     },
@@ -689,9 +657,9 @@ impl MangoClient {
                             serum_program: s3.market.market.serum_program,
                             serum_market_external: s3.market.market.serum_market_external,
                             open_orders,
-                            market_bids: s3.bids,
-                            market_asks: s3.asks,
-                            market_event_queue: s3.event_q,
+                            market_bids: s3.market.bids,
+                            market_asks: s3.market.asks,
+                            market_event_queue: s3.market.event_q,
                             owner: self.payer(),
                         },
                         None,
@@ -1003,6 +971,15 @@ pub struct TokenContext {
 pub struct Serum3MarketContext {
     pub address: Pubkey,
     pub market: Serum3Market,
+    pub bids: Pubkey,
+    pub asks: Pubkey,
+    pub event_q: Pubkey,
+    pub req_q: Pubkey,
+    pub coin_vault: Pubkey,
+    pub pc_vault: Pubkey,
+    pub vault_signer: Pubkey,
+    pub coin_lot_size: u64,
+    pub pc_lot_size: u64,
 }
 
 pub struct PerpMarketContext {
@@ -1058,15 +1035,35 @@ impl MangoGroupContext {
         let serum3_markets = serum3_market_tuples
             .iter()
             .map(|(pk, s)| {
-                (
+                let market_external_account = fetcher.fetch_raw_account(s.serum_market_external)?;
+                let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
+                    &market_external_account.data
+                        [5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
+                );
+                let vault_signer = serum_dex::state::gen_vault_signer_key(
+                    market_external.vault_signer_nonce,
+                    &s.serum_market_external,
+                    &s.serum_program,
+                )
+                .unwrap();
+                Ok((
                     s.market_index,
                     Serum3MarketContext {
                         address: *pk,
                         market: *s,
+                        bids: from_serum_style_pubkey(market_external.bids),
+                        asks: from_serum_style_pubkey(market_external.asks),
+                        event_q: from_serum_style_pubkey(market_external.event_q),
+                        req_q: from_serum_style_pubkey(market_external.req_q),
+                        coin_vault: from_serum_style_pubkey(market_external.coin_vault),
+                        pc_vault: from_serum_style_pubkey(market_external.pc_vault),
+                        vault_signer,
+                        coin_lot_size: market_external.coin_lot_size,
+                        pc_lot_size: market_external.pc_lot_size,
                     },
-                )
+                ))
             })
-            .collect::<HashMap<_, _>>();
+            .collect::<Result<HashMap<_, _>, ClientError>>()?;
 
         // perp markets
         let perp_market_tuples = fetcher.fetch_perp_markets(group)?;
@@ -1130,14 +1127,6 @@ struct Serum3Data<'a> {
     market: &'a Serum3MarketContext,
     quote: &'a TokenContext,
     base: &'a TokenContext,
-    market_external: serum_dex::state::MarketState,
-    bids: Pubkey,
-    asks: Pubkey,
-    event_q: Pubkey,
-    req_q: Pubkey,
-    coin_vault: Pubkey,
-    pc_vault: Pubkey,
-    vault_signer: Pubkey,
 }
 
 fn from_serum_style_pubkey(d: [u64; 4]) -> Pubkey {
@@ -1175,6 +1164,5 @@ fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
 }
 
 // TODO:
-// - get serum3 data once
 // - remove MangoAccountFetcher trait, just build the context once, keep individual functions
 // - pass in context and fetcher to MangoClient::new()
