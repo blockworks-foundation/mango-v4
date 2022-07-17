@@ -197,73 +197,12 @@ impl MangoClient {
         affected_token: Option<TokenIndex>,
         writable_banks: bool,
     ) -> anyhow::Result<Vec<AccountMeta>> {
-        // figure out all the banks/oracles that need to be passed for the health check
-        let mut banks = vec![];
-        let mut oracles = vec![];
         let account = self.mango_account()?;
-        for position in account.tokens.iter_active() {
-            let mint_info = self.context.mint_info(position.token_index);
-            // TODO: ALTs are unavailable
-            // let lookup_table = account_loader
-            //     .load_bytes(&mint_info.address_lookup_table)
-            //     .await
-            //     .unwrap();
-            // let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
-            // banks.push(addresses[mint_info.address_lookup_table_bank_index as usize]);
-            // oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
-            banks.push(mint_info.first_bank());
-            oracles.push(mint_info.oracle);
-        }
-        if let Some(affected_token_index) = affected_token {
-            if account
-                .tokens
-                .iter_active()
-                .find(|p| p.token_index == affected_token_index)
-                .is_none()
-            {
-                // If there is not yet an active position for the token, we need to pass
-                // the bank/oracle for health check anyway.
-                let new_position = account
-                    .tokens
-                    .values
-                    .iter()
-                    .position(|p| !p.is_active())
-                    .unwrap();
-                let mint_info = self.context.mint_info(affected_token_index);
-                banks.insert(new_position, mint_info.first_bank());
-                oracles.insert(new_position, mint_info.oracle);
-            }
-        }
-
-        let serum_oos = account.serum3.iter_active().map(|&s| s.open_orders);
-        let perp_markets = account
-            .perps
-            .iter_active_accounts()
-            .map(|&pa| self.context.perp_market_address(pa.market_index));
-
-        Ok(banks
-            .iter()
-            .map(|&pubkey| AccountMeta {
-                pubkey,
-                is_writable: writable_banks,
-                is_signer: false,
-            })
-            .chain(oracles.iter().map(|&pubkey| AccountMeta {
-                pubkey,
-                is_writable: false,
-                is_signer: false,
-            }))
-            .chain(serum_oos.map(|pubkey| AccountMeta {
-                pubkey,
-                is_writable: false,
-                is_signer: false,
-            }))
-            .chain(perp_markets.map(|pubkey| AccountMeta {
-                pubkey,
-                is_writable: false,
-                is_signer: false,
-            }))
-            .collect())
+        self.context.derive_health_check_remaining_account_metas(
+            &account,
+            affected_token,
+            writable_banks,
+        )
     }
 
     pub fn derive_liquidation_health_check_remaining_account_metas(
@@ -287,14 +226,6 @@ impl MangoClient {
         for token_index in token_indexes {
             let mint_info = self.context.mint_info(token_index);
             let writable_bank = token_index == asset_token_index || token_index == liab_token_index;
-            // TODO: ALTs are unavailable
-            // let lookup_table = account_loader
-            //     .load_bytes(&mint_info.address_lookup_table)
-            //     .await
-            //     .unwrap();
-            // let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
-            // banks.push(addresses[mint_info.address_lookup_table_bank_index as usize]);
-            // oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
             banks.push((mint_info.first_bank(), writable_bank));
             oracles.push(mint_info.oracle);
         }
@@ -324,8 +255,8 @@ impl MangoClient {
                 is_signer: false,
             })
             .chain(oracles.into_iter().map(to_account_meta))
-            .chain(serum_oos.map(to_account_meta))
             .chain(perp_markets.map(to_account_meta))
+            .chain(serum_oos.map(to_account_meta))
             .collect())
     }
 
@@ -809,7 +740,7 @@ pub trait AccountFetcher: Sync + Send {
 }
 
 // Can't be in the trait, since then it would no longer be object-safe...
-fn account_fetcher_fetch_anchor_account<T: AccountDeserialize>(
+pub fn account_fetcher_fetch_anchor_account<T: AccountDeserialize>(
     fetcher: &dyn AccountFetcher,
     address: Pubkey,
 ) -> anyhow::Result<T> {
@@ -892,7 +823,8 @@ pub struct RpcAccountFetcher {
 impl AccountFetcher for RpcAccountFetcher {
     fn fetch_raw_account(&self, address: Pubkey) -> anyhow::Result<Account> {
         self.rpc
-            .get_account_with_commitment(&address, self.rpc.commitment())?
+            .get_account_with_commitment(&address, self.rpc.commitment())
+            .with_context(|| format!("fetch account {}", address))?
             .value
             .ok_or(ClientError::AccountNotFound)
             .with_context(|| format!("fetch account {}", address))
@@ -1096,6 +1028,72 @@ impl MangoGroupContext {
             perp_markets,
             perp_market_indexes_by_name,
         })
+    }
+
+    pub fn derive_health_check_remaining_account_metas(
+        &self,
+        account: &MangoAccount,
+        affected_token: Option<TokenIndex>,
+        writable_banks: bool,
+    ) -> anyhow::Result<Vec<AccountMeta>> {
+        // figure out all the banks/oracles that need to be passed for the health check
+        let mut banks = vec![];
+        let mut oracles = vec![];
+        for position in account.tokens.iter_active() {
+            let mint_info = self.mint_info(position.token_index);
+            banks.push(mint_info.first_bank());
+            oracles.push(mint_info.oracle);
+        }
+        if let Some(affected_token_index) = affected_token {
+            if account
+                .tokens
+                .iter_active()
+                .find(|p| p.token_index == affected_token_index)
+                .is_none()
+            {
+                // If there is not yet an active position for the token, we need to pass
+                // the bank/oracle for health check anyway.
+                let new_position = account
+                    .tokens
+                    .values
+                    .iter()
+                    .position(|p| !p.is_active())
+                    .unwrap();
+                let mint_info = self.mint_info(affected_token_index);
+                banks.insert(new_position, mint_info.first_bank());
+                oracles.insert(new_position, mint_info.oracle);
+            }
+        }
+
+        let serum_oos = account.serum3.iter_active().map(|&s| s.open_orders);
+        let perp_markets = account
+            .perps
+            .iter_active_accounts()
+            .map(|&pa| self.perp_market_address(pa.market_index));
+
+        Ok(banks
+            .iter()
+            .map(|&pubkey| AccountMeta {
+                pubkey,
+                is_writable: writable_banks,
+                is_signer: false,
+            })
+            .chain(oracles.iter().map(|&pubkey| AccountMeta {
+                pubkey,
+                is_writable: false,
+                is_signer: false,
+            }))
+            .chain(perp_markets.map(|pubkey| AccountMeta {
+                pubkey,
+                is_writable: false,
+                is_signer: false,
+            }))
+            .chain(serum_oos.map(|pubkey| AccountMeta {
+                pubkey,
+                is_writable: false,
+                is_signer: false,
+            }))
+            .collect())
     }
 }
 

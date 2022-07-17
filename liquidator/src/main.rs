@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 
 use crate::chain_data::*;
 use crate::util::{is_mango_account, is_mango_bank, is_mint_info, is_perp_market};
@@ -7,12 +8,16 @@ use crate::util::{is_mango_account, is_mango_bank, is_mint_info, is_perp_market}
 use anchor_client::Cluster;
 use client::{AccountFetcher, MangoClient, MangoGroupContext};
 use log::*;
+use mango_v4::accounts_zerocopy::LoadZeroCopy;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 
 use anyhow::Context;
 use once_cell::sync::OnceCell;
 use serde_derive::Deserialize;
 
+use solana_client::rpc_client::RpcClient;
+use solana_sdk::account::AccountSharedData;
+use solana_sdk::client::SyncClient;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signer::keypair;
@@ -93,8 +98,9 @@ async fn main() -> anyhow::Result<()> {
 
     let rpc_url = config.rpc_http_url.to_owned();
     let ws_url = rpc_url.replace("https", "wss");
+    let rpc_timeout = Duration::from_secs(1);
     let cluster = Cluster::Custom(rpc_url, ws_url);
-    let commitment = CommitmentConfig::confirmed();
+    let commitment = CommitmentConfig::processed();
     let group_context =
         MangoGroupContext::new_from_rpc(mango_group_id, cluster.clone(), commitment)?;
 
@@ -131,6 +137,15 @@ async fn main() -> anyhow::Result<()> {
 
     // The representation of current on-chain account data
     let chain_data = Arc::new(RwLock::new(ChainData::new(&metrics)));
+    // Reading accounts from chain_data
+    let account_fetcher = Arc::new(ChainDataAccountFetcher {
+        chain_data: chain_data.clone(),
+        rpc: RpcClient::new_with_timeout_and_commitment(
+            cluster.url().to_string(),
+            rpc_timeout,
+            commitment,
+        ),
+    });
 
     // Addresses of the MangoAccounts belonging to the mango program.
     // Needed to check health of them all when the cache updates.
@@ -161,17 +176,13 @@ async fn main() -> anyhow::Result<()> {
     let mango_client = {
         let payer = keypair::read_keypair_file(&config.payer).unwrap();
 
-        let account_fetcher = Arc::new(ChainDataAccountFetcher {
-            chain_data: chain_data.clone(),
-        });
-
         Arc::new(MangoClient::new_detail(
             cluster,
             commitment,
             payer,
             &config.mango_account_name,
             group_context,
-            account_fetcher,
+            account_fetcher.clone(),
         )?)
     };
 
@@ -205,10 +216,8 @@ async fn main() -> anyhow::Result<()> {
 
                         if let Err(err) = liquidate::process_accounts(
                                 &mango_client,
-                                &chain_data.read().unwrap(),
+                                &account_fetcher,
                                 std::iter::once(&account_write.pubkey),
-                                &mint_infos,
-                                &perp_markets,
 
                         ) {
                             warn!("could not process account {}: {:?}", account_write.pubkey, err);
@@ -238,10 +247,8 @@ async fn main() -> anyhow::Result<()> {
                         // so optimizing much seems unnecessary.
                         if let Err(err) = liquidate::process_accounts(
                                 &mango_client,
-                                &chain_data.read().unwrap(),
+                                &account_fetcher,
                                 mango_accounts.iter(),
-                                &mint_infos,
-                                &perp_markets,
                         ) {
                             warn!("could not process accounts: {:?}", err);
                         }
@@ -274,10 +281,8 @@ async fn main() -> anyhow::Result<()> {
                 // trigger a full health check
                 if let Err(err) = liquidate::process_accounts(
                         &mango_client,
-                        &chain_data.read().unwrap(),
+                        &account_fetcher,
                         mango_accounts.iter(),
-                        &mint_infos,
-                        &perp_markets,
                 ) {
                     warn!("could not process accounts: {:?}", err);
                 }
@@ -286,16 +291,71 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-struct ChainDataAccountFetcher {
+pub struct ChainDataAccountFetcher {
     chain_data: Arc<RwLock<ChainData>>,
+    rpc: RpcClient,
+}
+
+impl ChainDataAccountFetcher {
+    // loads from ChainData
+    pub fn fetch<T: anchor_lang::ZeroCopy + anchor_lang::Owner>(
+        &self,
+        address: &Pubkey,
+    ) -> anyhow::Result<T> {
+        Ok(self
+            .fetch_raw(address)?
+            .load::<T>()
+            .with_context(|| format!("loading account {}", address))?
+            .clone())
+    }
+
+    // fetches via RPC, stores in ChainData, returns new version
+    pub fn fetch_fresh<T: anchor_lang::ZeroCopy + anchor_lang::Owner>(
+        &self,
+        address: &Pubkey,
+    ) -> anyhow::Result<T> {
+        self.refresh_account_via_rpc(address)?;
+        self.fetch(address)
+    }
+
+    pub fn fetch_raw(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
+        let chain_data = self.chain_data.read().unwrap();
+        Ok(chain_data
+            .account(address)
+            .with_context(|| format!("fetch account {} via chain_data", address))?
+            .clone())
+    }
+
+    pub fn refresh_account_via_rpc(&self, address: &Pubkey) -> anyhow::Result<()> {
+        let response = self
+            .rpc
+            .get_account_with_commitment(&address, self.rpc.commitment())
+            .with_context(|| format!("refresh account {} via rpc", address))?;
+        let account = response
+            .value
+            .ok_or(anchor_client::ClientError::AccountNotFound)
+            .with_context(|| format!("refresh account {} via rpc", address))?;
+
+        let mut chain_data = self.chain_data.write().unwrap();
+        chain_data.update_from_rpc(
+            address,
+            AccountData {
+                slot: response.context.slot,
+                account: account.into(),
+            },
+        );
+        log::trace!(
+            "refreshed data of account {} via rpc, got context slot {}",
+            address,
+            response.context.slot
+        );
+
+        Ok(())
+    }
 }
 
 impl AccountFetcher for ChainDataAccountFetcher {
     fn fetch_raw_account(&self, address: Pubkey) -> anyhow::Result<solana_sdk::account::Account> {
-        let chain_data = self.chain_data.read().unwrap();
-        chain_data
-            .account(&address)
-            .with_context(|| format!("fetch account {}", address))
-            .map(|a| a.clone().into())
+        self.fetch_raw(&address).map(|a| a.clone().into())
     }
 }
