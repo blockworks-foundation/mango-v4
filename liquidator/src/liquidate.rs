@@ -65,6 +65,8 @@ pub fn process_account(
     );
 
     // Fetch a fresh account and re-compute
+    // This is -- unfortunately -- needed because the websocket streams seem to not
+    // be great at providing timely updates to the account data.
     let account = account_fetcher.fetch_fresh::<MangoAccount>(pubkey)?;
     let maint_health = new_health_cache_(&mango_client.context, account_fetcher, &account)
         .expect("always ok")
