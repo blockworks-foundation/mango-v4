@@ -205,9 +205,13 @@ pub fn liq_token_bankruptcy(
     }
 
     // If the account has no more borrows then it's no longer bankrupt
+    // and should (always?) no longer be liquidated.
     let account_retriever = ScanningAccountRetriever::new(health_ais, group_pk)?;
     let liqee_health_cache = new_health_cache(&liqee, &account_retriever)?;
     liqee.set_bankrupt(liqee_health_cache.has_borrows());
+    if !liqee.is_bankrupt() && liqee_health_cache.health(HealthType::Init) >= 0 {
+        liqee.set_being_liquidated(false);
+    }
 
     if !liqee_liab_active {
         liqee.tokens.deactivate(liqee_raw_token_index);
