@@ -53,6 +53,16 @@ impl<T, E: std::fmt::Debug> AnyhowWrap for Result<T, E> {
     }
 }
 
+#[derive(Parser, Debug)]
+#[clap()]
+struct CliDotenv {
+    // When --dotenv <file> is passed, read the specified dotenv file before parsing args
+    #[clap(long)]
+    dotenv: std::path::PathBuf,
+
+    remaining_args: Vec<std::ffi::OsString>,
+}
+
 #[derive(Parser)]
 #[clap()]
 struct Cli {
@@ -106,8 +116,14 @@ pub fn encode_address(addr: &Pubkey) -> String {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    dotenv::dotenv().ok();
-    let cli = Cli::parse();
+    let args = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
+        dotenv::from_path(cli_dotenv.dotenv)?;
+        cli_dotenv.remaining_args
+    } else {
+        dotenv::dotenv().ok();
+        std::env::args_os().collect()
+    };
+    let cli = Cli::parse_from(args);
 
     let liqor_owner = keypair_from_path(&cli.liqor_owner);
 

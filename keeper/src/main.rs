@@ -23,6 +23,16 @@ use tokio::time;
 // - I'm really annoyed about Keypair not being clonable. Seems everyone works around that manually. Should make a PR to solana to newtype it and provide that function.
 // keypair_from_arg_or_env could be a function
 
+#[derive(Parser, Debug)]
+#[clap()]
+struct CliDotenv {
+    // When --dotenv <file> is passed, read the specified dotenv file before parsing args
+    #[clap(long)]
+    dotenv: std::path::PathBuf,
+
+    remaining_args: Vec<std::ffi::OsString>,
+}
+
 #[derive(Parser)]
 #[clap()]
 struct Cli {
@@ -64,9 +74,14 @@ fn main() -> Result<(), anyhow::Error> {
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
     );
 
-    dotenv::dotenv().ok();
-
-    let cli = Cli::parse();
+    let args = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
+        dotenv::from_path(cli_dotenv.dotenv)?;
+        cli_dotenv.remaining_args
+    } else {
+        dotenv::dotenv().ok();
+        std::env::args_os().collect()
+    };
+    let cli = Cli::parse_from(args);
 
     let payer = keypair_from_path(&cli.payer);
 
