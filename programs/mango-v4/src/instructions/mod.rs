@@ -1,6 +1,7 @@
 pub use account_close::*;
 pub use account_create::*;
 pub use account_edit::*;
+pub use account_expand::*;
 pub use benchmark::*;
 pub use compute_account_data::*;
 pub use flash_loan::*;
@@ -43,6 +44,7 @@ pub use token_withdraw::*;
 mod account_close;
 mod account_create;
 mod account_edit;
+mod account_expand;
 mod benchmark;
 mod compute_account_data;
 mod flash_loan;

@@ -5,7 +5,7 @@
       "name": "devnet.microwavedcola",
       "publicKey": "8SPemjpDsXAqJNCL5vF2qk1XsocPVDTdY7sWVeU7t4NV",
       "serum3ProgramId": "DESVgJVGajEgKGXhb6XmqDHGz3VjdgP7rEVESBgxmroY",
-      "mangoProgramId": "m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD",
+      "mangoProgramId": "5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM",
       "banks": [
         {
           "name": "BTC",
@@ -67,7 +67,7 @@
       "name": "mainnet-beta.microwavedcola",
       "publicKey": "A9XhGqUUjV992cD36qWDY8wDiZnGuCaUWtSE3NGXjDCb",
       "serum3ProgramId": "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin",
-      "mangoProgramId": "m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD",
+      "mangoProgramId": "5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM",
       "banks": [
         {
           "name": "SOL",

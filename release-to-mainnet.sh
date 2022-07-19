@@ -3,7 +3,7 @@
 set -e pipefail
 
 WALLET_WITH_FUNDS=~/.config/solana/mango-mainnet.json
-PROGRAM_ID=m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD
+PROGRAM_ID=5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM
 
 # TODO fix need for --skip-lint
 # build program, 

@@ -1,8 +1,8 @@
 [programs.localnet]
-mango_v4 = "m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD"
+mango_v4 = "5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM"
 
 [programs.devnet]
-mango_v4 = "m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD"
+mango_v4 = "5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM"
 
 [features]
 seeds = true

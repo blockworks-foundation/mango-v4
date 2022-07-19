@@ -39,6 +39,8 @@ pub struct TokenWithdraw<'info> {
     pub token_account: Box<Account<'info, TokenAccount>>,
 
     pub token_program: Program<'info, Token>,
+
+    pub account2: UncheckedAccount<'info>,
 }
 
 impl<'info> TokenWithdraw<'info> {
@@ -151,6 +153,25 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         quantity: amount,
         price: oracle_price.to_bits(),
     });
+
+    // verify account expansion
+    // size - 2 should have set indices, and last 2 in all positions should be unset
+    let mal: MangoAccountLoader<MangoAccount2Fixed, MangoAccount2DynamicHeader, MangoAccount2> =
+        MangoAccountLoader::new(ctx.accounts.account2.to_account_info());
+    let meta = mal.load()?;
+    // test
+    for i in 0..meta.dynamic.header.token_count {
+        let pos = meta.dynamic.token_get_raw(i);
+        msg!("pos {:?} token index {:?}", i, pos.token_index);
+    }
+    for i in 0..meta.dynamic.header.serum3_count {
+        let pos = meta.dynamic.serum3_get_raw(i);
+        msg!("pos {:?} serum market index {:?}", i, pos.market_index);
+    }
+    for i in 0..meta.dynamic.header.perp_count {
+        let pos = meta.dynamic.perp_get_raw(i);
+        msg!("pos {:?} perp market index {:?}", i, pos.market_index);
+    }
 
     Ok(())
 }

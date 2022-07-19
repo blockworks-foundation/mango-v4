@@ -493,6 +493,17 @@ export class MangoClient {
     });
   }
 
+  public async getCFTestccountForOwner(ownerPk: PublicKey): Promise<any> {
+    return await this.program.account.MangoAccount2.all([
+      {
+        memcmp: {
+          bytes: ownerPk.toBase58(),
+          offset: 8,
+        },
+      },
+    ]);
+  }
+
   public async closeMangoAccount(
     group: Group,
     mangoAccount: MangoAccount,

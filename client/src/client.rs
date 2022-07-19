@@ -118,6 +118,18 @@ impl MangoClient {
                                 )
                                 .0
                             },
+                            account2: {
+                                Pubkey::find_program_address(
+                                    &[
+                                        group.as_ref(),
+                                        b"MangoAccount2".as_ref(),
+                                        payer.pubkey().as_ref(),
+                                        &account_num.to_le_bytes(),
+                                    ],
+                                    &mango_v4::id(),
+                                )
+                                .0
+                            },
                             payer: payer.pubkey(),
                             system_program: System::id(),
                         },
@@ -459,6 +471,18 @@ impl MangoClient {
                         &mango_v4::accounts::TokenDeposit {
                             group: self.group(),
                             account: self.mango_account_cache.0,
+                            account2: {
+                                Pubkey::find_program_address(
+                                    &[
+                                        self.group().as_ref(),
+                                        b"MangoAccount2".as_ref(),
+                                        self.payer().as_ref(),
+                                        &self.mango_account_cache.1.account_num.to_le_bytes(),
+                                    ],
+                                    &mango_v4::id(),
+                                )
+                                .0
+                            },
                             bank: bank.0,
                             vault: bank.1.vault,
                             token_account: get_associated_token_address(

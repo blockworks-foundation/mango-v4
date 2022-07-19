@@ -50,6 +50,19 @@ async fn test_basic() -> Result<(), TransportError> {
     .unwrap()
     .account;
 
+    let account = send_tx(
+        solana,
+        AccountExpandInstruction {
+            account_num: 0,
+            group,
+            owner,
+            payer,
+        },
+    )
+    .await
+    .unwrap()
+    .account;
+
     //
     // TEST: Deposit funds
     //

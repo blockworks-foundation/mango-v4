@@ -5,7 +5,6 @@ use anchor_spl::token::TokenAccount;
 use fixed::types::I80F48;
 
 use crate::error::*;
-use crate::mango_account_loader::MangoAccountLoader;
 use crate::state::*;
 use crate::util::checked_math as cm;
 
@@ -40,7 +39,7 @@ pub struct TokenDeposit<'info> {
     pub token_program: Program<'info, Token>,
 
     #[account(mut)]
-    pub em_test_account: UncheckedAccount<'info>,
+    pub account2: UncheckedAccount<'info>,
 }
 
 impl<'info> TokenDeposit<'info> {
@@ -124,12 +123,14 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
         price: oracle_price.to_bits(),
     });
 
-    let mal: MangoAccountLoader<EMTestAccount, EMTestAccountHeader> =
-        MangoAccountLoader::try_from(&ctx.accounts.em_test_account.to_account_info())?;
-    msg!("129");
-    let mut dynamic = mal.load_mut()?.dynamic;
-    let pos = dynamic.token_get_raw_mut(0);
-    pos.indexed_position = I80F48::ZERO;
+    //
+    // mango account 2 i.e. mango account with expandable positions
+    //
+    let mal: MangoAccountLoader<MangoAccount2Fixed, MangoAccount2DynamicHeader, MangoAccount2> =
+        MangoAccountLoader::new(ctx.accounts.account2.to_account_info());
+    let mut meta = mal.load_mut()?;
+    let mut token_position = meta.dynamic.token_get_raw_mut(0);
+    token_position.in_use_count = 1;
 
     Ok(())
 }

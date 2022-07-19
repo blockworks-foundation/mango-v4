@@ -7,7 +7,7 @@ export const SERUM3_PROGRAM_ID = {
 };
 
 export const MANGO_V4_ID = {
-  testnet: new PublicKey('m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD'),
-  devnet: new PublicKey('m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD'),
-  'mainnet-beta': new PublicKey('m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD'),
+  testnet: new PublicKey('5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM'),
+  devnet: new PublicKey('5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM'),
+  'mainnet-beta': new PublicKey('5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM'),
 };

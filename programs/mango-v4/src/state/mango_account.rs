@@ -25,7 +25,7 @@ pub const MAX_PERP_OPEN_ORDERS: usize = 8;
 pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 
 #[zero_copy]
-#[derive(Debug)]
+#[derive(AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct TokenPosition {
     // TODO: Why did we have deposits and borrows as two different values
     //       if only one of them was allowed to be != 0 at a time?
@@ -212,7 +212,7 @@ impl MangoAccountTokenPositions {
 }
 
 #[zero_copy]
-#[derive(Debug)]
+#[derive(AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct Serum3Orders {
     pub open_orders: Pubkey,
 
@@ -233,8 +233,11 @@ pub struct Serum3Orders {
 
     pub reserved: [u8; 2],
 }
-const_assert_eq!(size_of::<Serum3Orders>(), 32 + 8 * 2 + 2 * 3 + 2);
+const_assert_eq!(size_of::<Serum3Orders>(), 32 + 8 * 2 + 2 * 3 + 2); // 56
 const_assert_eq!(size_of::<Serum3Orders>() % 8, 0);
+
+unsafe impl bytemuck::Pod for Serum3Orders {}
+unsafe impl bytemuck::Zeroable for Serum3Orders {}
 
 impl Serum3Orders {
     pub fn is_active(&self) -> bool {
@@ -343,6 +346,7 @@ impl MangoAccountSerum3Orders {
 }
 
 #[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct PerpPositions {
     pub market_index: PerpMarketIndex,
     pub reserved: [u8; 6],
@@ -383,8 +387,11 @@ impl std::fmt::Debug for PerpPositions {
             .finish()
     }
 }
-const_assert_eq!(size_of::<PerpPositions>(), 8 + 8 * 5 + 3 * 16);
+const_assert_eq!(size_of::<PerpPositions>(), 8 + 8 * 5 + 3 * 16); // 96
 const_assert_eq!(size_of::<PerpPositions>() % 8, 0);
+
+unsafe impl bytemuck::Pod for PerpPositions {}
+unsafe impl bytemuck::Zeroable for PerpPositions {}
 
 impl Default for PerpPositions {
     fn default() -> Self {
