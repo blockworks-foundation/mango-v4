@@ -3,20 +3,21 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use anchor_client::Cluster;
+use clap::Parser;
 use client::{MangoClient, MangoGroupContext};
 use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 
 use once_cell::sync::OnceCell;
-use serde_derive::Deserialize;
 
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
-use solana_sdk::signer::keypair;
+use solana_sdk::signer::{
+    keypair::{self, Keypair},
+    Signer,
+};
 use std::collections::HashSet;
-use std::fs::File;
-use std::io::Read;
 use std::str::FromStr;
 
 pub mod account_shared_data;
@@ -52,25 +53,51 @@ impl<T, E: std::fmt::Debug> AnyhowWrap for Result<T, E> {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct Config {
-    pub rpc_ws_url: String,
-    pub rpc_http_url: String,
-    pub mango_program_id: String,
-    pub pyth_program_id: String,
-    pub mango_group_id: String,
-    pub mango_signer_id: String,
-    pub serum_program_id: String,
-    pub snapshot_interval_secs: u64,
-    // how many getMultipleAccounts requests to send in parallel
-    pub parallel_rpc_requests: usize,
-    // typically 100 is the max number for getMultipleAccounts
-    pub get_multiple_accounts_count: usize,
+#[derive(Parser)]
+#[clap()]
+struct Cli {
+    #[clap(short, long, env)]
+    rpc_url: String,
 
-    // FUTURE: split mango client and feed config
-    // mango client specific
-    pub payer: String,
-    pub mango_account_name: String,
+    #[clap(long, env)]
+    group: Option<Pubkey>,
+
+    // These exist only as a shorthand to make testing easier. Normal users would provide the group.
+    #[clap(long, env)]
+    group_from_admin_keypair: Option<std::path::PathBuf>,
+    #[clap(long, env, default_value = "0")]
+    group_from_admin_num: u32,
+
+    // TODO: maybe store this in the group, so it's easy to start without providing it?
+    #[clap(long, env)]
+    pyth_program: Pubkey,
+
+    // TODO: different serum markets could use different serum programs, should come from registered markets
+    #[clap(long, env)]
+    serum_program: Pubkey,
+
+    #[clap(long, env)]
+    liqor_owner: std::path::PathBuf,
+
+    #[clap(long, env)]
+    liqor_mango_account_name: String,
+
+    #[clap(long, env, default_value = "300")]
+    snapshot_interval_secs: u64,
+
+    // how many getMultipleAccounts requests to send in parallel
+    #[clap(long, env, default_value = "10")]
+    parallel_rpc_requests: usize,
+
+    // typically 100 is the max number for getMultipleAccounts
+    #[clap(long, env, default_value = "100")]
+    get_multiple_accounts_count: usize,
+}
+
+fn keypair_from_path(p: &std::path::PathBuf) -> Keypair {
+    let path = std::path::PathBuf::from_str(&*shellexpand::tilde(p.to_str().unwrap())).unwrap();
+    keypair::read_keypair_file(path)
+        .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy()))
 }
 
 pub fn encode_address(addr: &Pubkey) -> String {
@@ -79,28 +106,27 @@ pub fn encode_address(addr: &Pubkey) -> String {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() < 2 {
-        println!("requires a config file argument");
-        return Ok(());
-    }
+    dotenv::dotenv().ok();
+    let cli = Cli::parse();
 
-    let config: Config = {
-        let mut file = File::open(&args[1])?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-        toml::from_str(&contents).unwrap()
+    let liqor_owner = keypair_from_path(&cli.liqor_owner);
+
+    let mango_group = if let Some(group) = cli.group {
+        group
+    } else if let Some(p) = cli.group_from_admin_keypair {
+        let admin = keypair_from_path(&p);
+        MangoClient::group_for_admin(admin.pubkey(), cli.group_from_admin_num)
+    } else {
+        panic!("Must provide either group or group_from_admin_keypair");
     };
 
-    let mango_group_id = Pubkey::from_str(&config.mango_group_id)?;
-
-    let rpc_url = config.rpc_http_url.to_owned();
+    let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss");
+
     let rpc_timeout = Duration::from_secs(1);
-    let cluster = Cluster::Custom(rpc_url, ws_url);
+    let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
     let commitment = CommitmentConfig::processed();
-    let group_context =
-        MangoGroupContext::new_from_rpc(mango_group_id, cluster.clone(), commitment)?;
+    let group_context = MangoGroupContext::new_from_rpc(mango_group, cluster.clone(), commitment)?;
 
     // TODO: this is all oracles, not just pyth!
     let mango_pyth_oracles = group_context
@@ -114,7 +140,8 @@ async fn main() -> anyhow::Result<()> {
     //
     // FUTURE: decouple feed setup and liquidator business logic
     // feed should send updates to a channel which liquidator can consume
-    let mango_program_id = Pubkey::from_str(&config.mango_program_id)?;
+
+    let mango_program = mango_v4::ID;
 
     solana_logger::setup_with_default("info");
     info!("startup");
@@ -125,13 +152,33 @@ async fn main() -> anyhow::Result<()> {
     // FUTURE: websocket feed should take which accounts to listen to as an input
     let (websocket_sender, websocket_receiver) =
         async_channel::unbounded::<websocket_source::Message>();
-    websocket_source::start(config.clone(), mango_pyth_oracles.clone(), websocket_sender);
+    websocket_source::start(
+        websocket_source::Config {
+            rpc_ws_url: ws_url.clone(),
+            mango_program,
+            serum_program: cli.serum_program,
+            open_orders_authority: mango_group,
+        },
+        mango_pyth_oracles.clone(),
+        websocket_sender,
+    );
 
     // Getting solana account snapshots via jsonrpc
     let (snapshot_sender, snapshot_receiver) =
         async_channel::unbounded::<snapshot_source::AccountSnapshot>();
     // FUTURE: of what to fetch a snapshot - should probably take as an input
-    snapshot_source::start(config.clone(), mango_pyth_oracles, snapshot_sender);
+    snapshot_source::start(
+        snapshot_source::Config {
+            rpc_http_url: rpc_url.clone(),
+            mango_program,
+            mango_group,
+            get_multiple_accounts_count: cli.get_multiple_accounts_count,
+            parallel_rpc_requests: cli.parallel_rpc_requests,
+            snapshot_interval: std::time::Duration::from_secs(cli.snapshot_interval_secs),
+        },
+        mango_pyth_oracles,
+        snapshot_sender,
+    );
 
     // The representation of current on-chain account data
     let chain_data = Arc::new(RwLock::new(ChainData::new(&metrics)));
@@ -172,13 +219,11 @@ async fn main() -> anyhow::Result<()> {
     // mango client setup
     //
     let mango_client = {
-        let payer = keypair::read_keypair_file(&config.payer).unwrap();
-
         Arc::new(MangoClient::new_detail(
             cluster,
             commitment,
-            payer,
-            &config.mango_account_name,
+            liqor_owner,
+            &cli.liqor_mango_account_name,
             group_context,
             account_fetcher.clone(),
         )?)
@@ -199,7 +244,7 @@ async fn main() -> anyhow::Result<()> {
                 // specific program logic using the mirrored data
                 if let websocket_source::Message::Account(account_write) = message {
 
-                    if is_mango_account(&account_write.account, &mango_program_id, &mango_group_id).is_some() {
+                    if is_mango_account(&account_write.account, &mango_program, &mango_group).is_some() {
 
                         // e.g. to render debug logs RUST_LOG="liquidator=debug"
                         log::debug!("change to mango account {}...", &account_write.pubkey.to_string()[0..3]);
@@ -222,12 +267,12 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
 
-                    if is_mango_bank(&account_write.account, &mango_program_id, &mango_group_id).is_some() || oracles.contains(&account_write.pubkey) {
+                    if is_mango_bank(&account_write.account, &mango_program, &mango_group).is_some() || oracles.contains(&account_write.pubkey) {
                         if !one_snapshot_done {
                             continue;
                         }
 
-                        if is_mango_bank(&account_write.account, &mango_program_id, &mango_group_id).is_some() {
+                        if is_mango_bank(&account_write.account, &mango_program, &mango_group).is_some() {
                             log::debug!("change to bank {}", &account_write.pubkey);
                         }
 
@@ -260,14 +305,14 @@ async fn main() -> anyhow::Result<()> {
 
                 // Track all mango account pubkeys
                 for update in message.accounts.iter() {
-                    if is_mango_account(&update.account, &mango_program_id, &mango_group_id).is_some() {
+                    if is_mango_account(&update.account, &mango_program, &mango_group).is_some() {
                         mango_accounts.insert(update.pubkey);
                     }
-                    if let Some(mint_info) = is_mint_info(&update.account, &mango_program_id, &mango_group_id) {
+                    if let Some(mint_info) = is_mint_info(&update.account, &mango_program, &mango_group) {
                         mint_infos.insert(mint_info.token_index, update.pubkey);
                         oracles.insert(mint_info.oracle);
                     }
-                    if let Some(perp_market) = is_perp_market(&update.account, &mango_program_id, &mango_group_id) {
+                    if let Some(perp_market) = is_perp_market(&update.account, &mango_program, &mango_group) {
                         perp_markets.insert(perp_market.perp_market_index, update.pubkey);
                     }
                 }

@@ -76,6 +76,6 @@ impl ChainDataAccountFetcher {
 
 impl AccountFetcher for ChainDataAccountFetcher {
     fn fetch_raw_account(&self, address: Pubkey) -> anyhow::Result<solana_sdk::account::Account> {
-        self.fetch_raw(&address).map(|a| a.clone().into())
+        self.fetch_raw(&address).map(|a| a.into())
     }
 }
