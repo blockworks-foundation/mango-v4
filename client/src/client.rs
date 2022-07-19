@@ -152,7 +152,7 @@ impl MangoClient {
 
         Ok(Self {
             rpc,
-            cluster: cluster.clone(),
+            cluster,
             commitment,
             account_fetcher,
             payer,

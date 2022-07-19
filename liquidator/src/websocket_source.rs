@@ -14,7 +14,7 @@ use log::*;
 use std::{str::FromStr, sync::Arc, time::Duration};
 use tokio_stream::StreamMap;
 
-use crate::{AnyhowWrap, Config};
+use crate::AnyhowWrap;
 
 #[derive(Clone)]
 pub struct AccountUpdate {
@@ -45,15 +45,18 @@ pub enum Message {
     Slot(Arc<solana_client::rpc_response::SlotUpdate>),
 }
 
+pub struct Config {
+    pub rpc_ws_url: String,
+    pub mango_program: Pubkey,
+    pub serum_program: Pubkey,
+    pub open_orders_authority: Pubkey,
+}
+
 async fn feed_data(
     config: &Config,
     mango_pyth_oracles: Vec<Pubkey>,
     sender: async_channel::Sender<Message>,
 ) -> anyhow::Result<()> {
-    let mango_program_id = Pubkey::from_str(&config.mango_program_id)?;
-    let serum_program_id = Pubkey::from_str(&config.serum_program_id)?;
-    let mango_signer_id = Pubkey::from_str(&config.mango_signer_id)?;
-
     let connect = ws::try_connect::<RpcSolPubSubClient>(&config.rpc_ws_url).map_err_anyhow()?;
     let client = connect.await.map_err_anyhow()?;
 
@@ -68,7 +71,7 @@ async fn feed_data(
         account_config: account_info_config.clone(),
     };
     let open_orders_accounts_config = RpcProgramAccountsConfig {
-        // filter for only OpenOrders with mango_signer as owner
+        // filter for only OpenOrders with v4 authority
         filters: Some(vec![
             RpcFilterType::DataSize(3228), // open orders size
             RpcFilterType::Memcmp(Memcmp {
@@ -79,7 +82,7 @@ async fn feed_data(
             }),
             RpcFilterType::Memcmp(Memcmp {
                 offset: 45, // owner is the 4th field, after "serum" (header), account_flags: u64 and market: Pubkey
-                bytes: MemcmpEncodedBytes::Bytes(mango_signer_id.to_bytes().into()),
+                bytes: MemcmpEncodedBytes::Bytes(config.open_orders_authority.to_bytes().into()),
                 encoding: None,
             }),
         ]),
@@ -88,7 +91,7 @@ async fn feed_data(
     };
     let mut mango_sub = client
         .program_subscribe(
-            mango_program_id.to_string(),
+            config.mango_program.to_string(),
             Some(all_accounts_config.clone()),
         )
         .map_err_anyhow()?;
@@ -111,7 +114,7 @@ async fn feed_data(
     }
     let mut open_orders_sub = client
         .program_subscribe(
-            serum_program_id.to_string(),
+            config.serum_program.to_string(),
             Some(open_orders_accounts_config.clone()),
         )
         .map_err_anyhow()?;

@@ -1,7 +1,6 @@
 mod crank;
 mod taker;
 
-use std::env;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -27,22 +26,22 @@ use tokio::time;
 #[derive(Parser)]
 #[clap()]
 struct Cli {
-    #[clap(short, long, env = "RPC_URL")]
-    rpc_url: Option<String>,
+    #[clap(short, long, env)]
+    rpc_url: String,
 
     #[clap(short, long, env = "PAYER_KEYPAIR")]
-    payer: Option<std::path::PathBuf>,
+    payer: std::path::PathBuf,
 
-    #[clap(short, long, env = "GROUP")]
+    #[clap(short, long, env)]
     group: Option<Pubkey>,
 
     // These exist only as a shorthand to make testing easier. Normal users would provide the group.
-    #[clap(long, env = "GROUP_FROM_ADMIN_KEYPAIR")]
+    #[clap(long, env)]
     group_from_admin_keypair: Option<std::path::PathBuf>,
-    #[clap(long, env = "GROUP_FROM_ADMIN_NUM", default_value = "0")]
+    #[clap(long, env, default_value = "0")]
     group_from_admin_num: u32,
 
-    #[clap(short, long, env = "MANGO_ACCOUNT_NAME")]
+    #[clap(short, long, env)]
     mango_account_name: String,
 
     #[clap(subcommand)]
@@ -69,18 +68,9 @@ fn main() -> Result<(), anyhow::Error> {
 
     let cli = Cli::parse();
 
-    let payer = match cli.payer {
-        Some(p) => keypair_from_path(&p),
-        None => panic!("Payer keypair not provided..."),
-    };
+    let payer = keypair_from_path(&cli.payer);
 
-    let rpc_url = match cli.rpc_url {
-        Some(rpc_url) => rpc_url,
-        None => match env::var("RPC_URL").ok() {
-            Some(rpc_url) => rpc_url,
-            None => panic!("Rpc URL not provided..."),
-        },
-    };
+    let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss");
 
     let cluster = Cluster::Custom(rpc_url, ws_url);

@@ -2659,7 +2659,9 @@ dependencies = [
  "bytemuck",
  "bytes 1.1.0",
  "checked_math",
+ "clap 3.1.18",
  "client",
+ "dotenv",
  "fixed",
  "futures 0.3.21",
  "futures-core",
@@ -2676,6 +2678,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serum_dex",
+ "shellexpand",
  "solana-account-decoder",
  "solana-client",
  "solana-logger",
@@ -2684,7 +2687,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tungstenite",
- "toml",
 ]
 
 [[package]]
