@@ -453,7 +453,7 @@ impl TokenInfo {
 }
 
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
-struct Serum3Info {
+pub struct Serum3Info {
     reserved: I80F48,
     base_index: usize,
     quote_index: usize,
@@ -499,7 +499,7 @@ impl Serum3Info {
 }
 
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
-struct PerpInfo {
+pub struct PerpInfo {
     maint_asset_weight: I80F48,
     init_asset_weight: I80F48,
     maint_liab_weight: I80F48,
