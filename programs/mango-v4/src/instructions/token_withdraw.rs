@@ -99,6 +99,16 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         // Update the bank and position
         let position_is_active = bank.withdraw_with_fee(position, amount_i80f48)?;
 
+        // Provide a readable error message in case the vault doesn't have enough tokens
+        if ctx.accounts.vault.amount < amount {
+            return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {
+                format!(
+                    "bank vault does not have enough tokens, need {} but have {}",
+                    amount, ctx.accounts.vault.amount
+                )
+            });
+        }
+
         // Transfer the actual tokens
         let group_seeds = group_seeds!(group);
         token::transfer(

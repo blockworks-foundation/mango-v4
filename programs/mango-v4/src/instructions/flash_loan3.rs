@@ -82,6 +82,16 @@ pub fn flash_loan3_begin<'key, 'accounts, 'remaining, 'info>(
 
         // Transfer the loaned funds
         if *amount > 0 {
+            // Provide a readable error message in case the vault doesn't have enough tokens
+            if token_account.amount < *amount {
+                return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {
+                    format!(
+                        "bank vault {} does not have enough tokens, need {} but have {}",
+                        vault_ai.key, amount, token_account.amount
+                    )
+                });
+            }
+
             let transfer_ctx = CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
                 token::Transfer {
