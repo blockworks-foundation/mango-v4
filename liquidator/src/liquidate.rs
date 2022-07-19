@@ -1,7 +1,7 @@
 use crate::account_shared_data::KeyedAccountSharedData;
 use crate::ChainDataAccountFetcher;
 
-use client::{AccountFetcher, MangoClient, MangoGroupContext};
+use client::{AccountFetcher, MangoClient, MangoClientError, MangoGroupContext};
 use mango_v4::state::{
     new_health_cache, oracle_price, Bank, FixedOrderAccountRetriever, HealthCache, HealthType,
     MangoAccount, TokenIndex,
@@ -172,7 +172,22 @@ pub fn process_accounts<'a>(
 ) -> anyhow::Result<()> {
     for pubkey in accounts {
         match process_account(mango_client, account_fetcher, pubkey) {
-            Err(err) => log::error!("error liquidating account {}: {:?}", pubkey, err),
+            Err(err) => {
+                // Not all errors need to be raised to the user's attention.
+                let mut log_level = log::Level::Error;
+
+                // Simulation errors due to liqee precondition failures on the liquidation instructions
+                // will commonly happen if our liquidator is late or if there are chain forks.
+                match err.downcast_ref::<MangoClientError>() {
+                    Some(MangoClientError::SendTransactionPreflightFailure { logs }) => {
+                        if logs.contains("HealthMustBeNegative") || logs.contains("IsNotBankrupt") {
+                            log_level = log::Level::Trace;
+                        }
+                    }
+                    _ => {}
+                };
+                log::log!(log_level, "liquidating account {}: {:?}", pubkey, err);
+            }
             _ => {}
         };
     }

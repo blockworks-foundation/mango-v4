@@ -918,6 +918,7 @@ dependencies = [
  "serum_dex",
  "solana-client",
  "solana-sdk",
+ "thiserror",
 ]
 
 [[package]]

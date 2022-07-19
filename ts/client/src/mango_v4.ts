@@ -4747,33 +4747,43 @@ export type MangoV4 = {
     },
     {
       "code": 6006,
+      "name": "HealthMustBeNegative",
+      "msg": "health must be negative"
+    },
+    {
+      "code": 6007,
       "name": "IsBankrupt",
       "msg": "the account is bankrupt"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "IsNotBankrupt",
       "msg": "the account is not bankrupt"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "NoFreeTokenPositionIndex",
       "msg": "no free token position index"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "NoFreeSerum3OpenOrdersIndex",
       "msg": "no free serum3 open orders index"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "NoFreePerpPositionIndex",
       "msg": "no free perp position index"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "Serum3OpenOrdersExistAlready",
       "msg": "serum3 open orders exist already"
+    },
+    {
+      "code": 6013,
+      "name": "InsufficentBankVaultFunds",
+      "msg": "bank vault has insufficent funds"
     }
   ]
 };
@@ -9527,33 +9537,43 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6006,
+      "name": "HealthMustBeNegative",
+      "msg": "health must be negative"
+    },
+    {
+      "code": 6007,
       "name": "IsBankrupt",
       "msg": "the account is bankrupt"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "IsNotBankrupt",
       "msg": "the account is not bankrupt"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "NoFreeTokenPositionIndex",
       "msg": "no free token position index"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "NoFreeSerum3OpenOrdersIndex",
       "msg": "no free serum3 open orders index"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "NoFreePerpPositionIndex",
       "msg": "no free perp position index"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "Serum3OpenOrdersExistAlready",
       "msg": "serum3 open orders exist already"
+    },
+    {
+      "code": 6013,
+      "name": "InsufficentBankVaultFunds",
+      "msg": "bank vault has insufficent funds"
     }
   ]
 };
