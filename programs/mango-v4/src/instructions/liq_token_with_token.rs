@@ -49,6 +49,7 @@ pub fn liq_token_with_token(
     let mut liqee_health_cache =
         new_health_cache(&liqee, &account_retriever).context("create liqee health cache")?;
     let init_health = liqee_health_cache.health(HealthType::Init);
+    msg!("init health: {}", init_health);
     if liqee.being_liquidated() {
         if init_health > I80F48::ZERO {
             liqee.set_being_liquidated(false);
@@ -57,7 +58,11 @@ pub fn liq_token_with_token(
         }
     } else {
         let maint_health = liqee_health_cache.health(HealthType::Maint);
-        require!(maint_health < I80F48::ZERO, MangoError::SomeError);
+        msg!("maint health: {}", maint_health);
+        require!(
+            maint_health < I80F48::ZERO,
+            MangoError::HealthMustBeNegative
+        );
         liqee.set_being_liquidated(true);
     }
 

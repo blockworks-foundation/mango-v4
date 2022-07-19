@@ -740,6 +740,12 @@ struct Serum3Data<'a> {
     base: &'a TokenContext,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum MangoClientError {
+    #[error("Transaction simulation error. Logs: {logs}")]
+    SendTransactionPreflightFailure { logs: String },
+}
+
 /// Do some manual unpacking on some ClientErrors
 ///
 /// Unfortunately solana's RpcResponseError will very unhelpfully print [N log messages]
@@ -754,10 +760,10 @@ fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
                 ClientErrorKind::RpcError(RpcError::RpcResponseError { data, .. }) => match data {
                     RpcResponseErrorData::SendTransactionPreflightFailure(s) => {
                         if let Some(logs) = s.logs.as_ref() {
-                            return anyhow::anyhow!(
-                                "transaction simulation error. logs:\n{}",
-                                logs.iter().map(|l| format!("    {}", l)).join("\n")
-                            );
+                            return MangoClientError::SendTransactionPreflightFailure {
+                                logs: logs.iter().join("; "),
+                            }
+                            .into();
                         }
                     }
                     _ => {}
