@@ -50,6 +50,17 @@ unsafe impl bytemuck::Zeroable for TokenPosition {}
 const_assert_eq!(size_of::<TokenPosition>(), 24);
 const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
 
+impl Default for TokenPosition {
+    fn default() -> Self {
+        TokenPosition {
+            indexed_position: I80F48::ZERO,
+            token_index: TokenIndex::MAX,
+            in_use_count: 0,
+            reserved: Default::default(),
+        }
+    }
+}
+
 impl TokenPosition {
     pub fn is_active(&self) -> bool {
         self.token_index != TokenIndex::MAX
@@ -116,12 +127,7 @@ impl Default for MangoAccountTokenPositions {
 impl MangoAccountTokenPositions {
     pub fn new() -> Self {
         Self {
-            values: [TokenPosition {
-                indexed_position: I80F48::ZERO,
-                token_index: TokenIndex::MAX,
-                in_use_count: 0,
-                reserved: Default::default(),
-            }; MAX_TOKEN_POSITIONS],
+            values: [TokenPosition::default(); MAX_TOKEN_POSITIONS],
         }
     }
 

@@ -265,7 +265,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
                 *self.perp_raw(i)
             } else {
                 // new unset positions
-                PerpPositions::zeroed()
+                PerpPositions::default()
             };
             let dest_bytes: &mut [u8] =
                 &mut self.data[dest_offset..dest_offset + size_of::<PerpPositions>()];
@@ -278,7 +278,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
             let source_copy = if i < self.header.serum3_count() {
                 *self.serum3_raw(i)
             } else {
-                Serum3Orders::zeroed()
+                Serum3Orders::default()
             };
             // msg!(
             //     "pos {:?} serum market index {:?}",
@@ -296,7 +296,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
             let source_copy = if i < self.header.token_count() {
                 *self.token_raw(i)
             } else {
-                TokenPosition::zeroed()
+                TokenPosition::default()
             };
             let dest_bytes: &mut [u8] =
                 &mut self.data[dest_offset..dest_offset + size_of::<TokenPosition>()];
