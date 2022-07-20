@@ -72,8 +72,8 @@ pub trait Header: Sized {
     // build header by scanning and parsing dynamic portion of the account
     fn try_new_header(data: &[u8]) -> Result<Self>;
 
-    // build header from desired dynamic portion size
-    fn new_header(token_count: usize, serum3_count: usize, perp_count: usize) -> Self;
+    // initialize a header on a new account, if necessary
+    fn initialize(data: &mut [u8]) -> Result<()>;
 }
 pub trait GetAccessor<'a> {
     type Accessor;
@@ -218,7 +218,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
 
     // writes length of tokens vec at appropriate offset so that borsh can infer the vector length
     // length used is that present in the header
-    pub fn write_tokens_length(&mut self) {
+    fn write_token_length(&mut self) {
         let tokens_offset = self.header.token_offset(0);
         // msg!(
         //     "writing tokens length at {}",
@@ -229,7 +229,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         dst.copy_from_slice(&(self.header.token_count as u32).to_le_bytes());
     }
 
-    pub fn write_serum3_length(&mut self) {
+    fn write_serum3_length(&mut self) {
         let serum3_offset = self.header.serum3_offset(0);
         // msg!(
         //     "writing serum3 length at {}",
@@ -240,7 +240,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         dst.copy_from_slice(&(self.header.serum3_count as u32).to_le_bytes());
     }
 
-    pub fn write_perp_length(&mut self) {
+    fn write_perp_length(&mut self) {
         let perp_offset = self.header.perp_offset(0);
         // msg!(
         //     "writing perp length at {}",
@@ -321,7 +321,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         self.header.perp_count = new_perp_count;
 
         // write new lengths (uses header)
-        self.write_tokens_length();
+        self.write_token_length();
         self.write_serum3_length();
         self.write_perp_length();
 
@@ -383,12 +383,8 @@ impl Header for MangoAccount2DynamicHeader {
         })
     }
 
-    fn new_header(token_count: usize, serum3_count: usize, perp_count: usize) -> Self {
-        Self {
-            token_count,
-            serum3_count,
-            perp_count,
-        }
+    fn initialize(_data: &mut [u8]) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -500,13 +496,14 @@ impl<'info, FixedPart: bytemuck::Pod, HeaderPart: Header, ClientAccount: Owner +
     /// Should only be called once, when the account is being initialized.
     pub fn load_init<'a>(
         &'a self,
-        token_count: usize,
-        serum3_count: usize,
-        perp_count: usize,
     ) -> Result<SplitAccount<RefMut<FixedPart>, HeaderPart::AccessorMut>>
     where
         HeaderPart: GetAccessorMut<'a>,
     {
+        if !self.acc_info.is_writable {
+            return Err(ErrorCode::AccountNotMutable.into());
+        }
+
         let mut data = self.acc_info.try_borrow_mut_data()?;
         let mut disc_bytes = [0u8; 8];
         disc_bytes.copy_from_slice(&data[..8]);
@@ -518,7 +515,7 @@ impl<'info, FixedPart: bytemuck::Pod, HeaderPart: Header, ClientAccount: Owner +
         let disc_bytes: &mut [u8] = &mut data[0..8];
         disc_bytes.copy_from_slice(bytemuck::bytes_of(&(ClientAccount::discriminator())));
 
-        let (fixed, dynamic) = RefMut::map_split(data, |data| {
+        let (fixed, mut dynamic) = RefMut::map_split(data, |data| {
             let (fixed_slice, dynamic_slice) = data.split_at_mut(8 + size_of::<FixedPart>());
             let (_disc, fixed_slice) = fixed_slice.split_at_mut(8);
             (
@@ -527,12 +524,11 @@ impl<'info, FixedPart: bytemuck::Pod, HeaderPart: Header, ClientAccount: Owner +
             )
         });
 
+        HeaderPart::initialize(&mut dynamic)?;
+
         Ok(SplitAccount {
             fixed,
-            dynamic: HeaderPart::new_accessor_mut(
-                HeaderPart::new_header(token_count, serum3_count, perp_count),
-                dynamic,
-            ),
+            dynamic: HeaderPart::new_accessor_mut(HeaderPart::try_new_header(&dynamic)?, dynamic),
         })
     }
 }
