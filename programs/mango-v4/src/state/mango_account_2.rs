@@ -2,6 +2,7 @@ use std::cell::Ref;
 use std::cell::RefMut;
 use std::marker::PhantomData;
 use std::mem::size_of;
+use std::ops::{Deref, DerefMut};
 
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
@@ -179,12 +180,12 @@ impl MangoAccount2DynamicHeader {
     }
 }
 
-pub struct MangoAccount2DynamicAccessor<'a> {
+pub struct MangoAccount2DynamicAccessor<T: Deref<Target = [u8]>> {
     pub header: MangoAccount2DynamicHeader,
-    data: Ref<'a, [u8]>,
+    data: T,
 }
 
-impl<'a> MangoAccount2DynamicAccessor<'a> {
+impl<T: Deref<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
     pub fn token_get_raw(&self, raw_index: usize) -> &TokenPosition {
         self.header.token_get_raw(&self.data, raw_index)
     }
@@ -202,22 +203,9 @@ impl<'a> MangoAccount2DynamicAccessor<'a> {
     }
 }
 
-pub struct MangoAccount2DynamicAccessorMut<'a> {
-    pub header: MangoAccount2DynamicHeader,
-    data: RefMut<'a, [u8]>,
-}
-
-impl<'a> MangoAccount2DynamicAccessorMut<'a> {
-    pub fn token_get_raw(&self, raw_index: usize) -> &TokenPosition {
-        self.header.token_get_raw(&self.data, raw_index)
-    }
-
+impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
     pub fn token_get_raw_mut(&mut self, raw_index: usize) -> &mut TokenPosition {
         self.header.token_get_raw_mut(&mut self.data, raw_index)
-    }
-
-    pub fn token_iter(&self) -> impl Iterator<Item = &TokenPosition> + '_ {
-        self.header.token_iter(&self.data)
     }
 
     pub fn serum3_get_raw_mut(&mut self, raw_index: usize) -> &mut Serum3Orders {
@@ -405,14 +393,14 @@ impl Header for MangoAccount2DynamicHeader {
 }
 
 impl<'a> GetAccessor<'a> for MangoAccount2DynamicHeader {
-    type Accessor = MangoAccount2DynamicAccessor<'a>;
+    type Accessor = MangoAccount2DynamicAccessor<Ref<'a, [u8]>>;
     fn new_accessor(header: Self, data: Ref<'a, [u8]>) -> Self::Accessor {
         MangoAccount2DynamicAccessor { header, data }
     }
 }
 
 impl<'a> GetAccessorMut<'a> for MangoAccount2DynamicHeader {
-    type AccessorMut = MangoAccount2DynamicAccessorMut<'a>;
+    type AccessorMut = MangoAccount2DynamicAccessor<RefMut<'a, [u8]>>;
     fn new_accessor_mut(header: Self, data: RefMut<'a, [u8]>) -> Self::AccessorMut {
         Self::AccessorMut { header, data }
     }
