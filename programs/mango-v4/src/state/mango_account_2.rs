@@ -376,13 +376,17 @@ impl<'info, FixedPart: bytemuck::Pod, HeaderPart: Header, ClientAccount: Owner +
 {
     pub fn new(
         acc_info: AccountInfo<'info>,
-    ) -> MangoAccountLoader<'info, FixedPart, HeaderPart, ClientAccount> {
-        Self {
+    ) -> Result<MangoAccountLoader<'info, FixedPart, HeaderPart, ClientAccount>> {
+        if acc_info.owner != &ClientAccount::owner() {
+            return Err(Error::from(ErrorCode::AccountOwnedByWrongProgram)
+                .with_pubkeys((*acc_info.owner, ClientAccount::owner())));
+        }
+        Ok(Self {
             acc_info,
             phantom1: PhantomData,
             phantom2: PhantomData,
             phantom3: PhantomData,
-        }
+        })
     }
 
     /// Returns a Ref to the account data structure for reading.

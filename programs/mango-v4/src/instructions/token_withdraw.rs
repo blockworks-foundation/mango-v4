@@ -157,7 +157,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     // verify account expansion
     // size - 2 should have set indices, and last 2 in all positions should be unset
     let mal: MangoAccountLoader<MangoAccount2Fixed, MangoAccount2DynamicHeader, MangoAccount2> =
-        MangoAccountLoader::new(ctx.accounts.account2.to_account_info());
+        MangoAccountLoader::new(ctx.accounts.account2.to_account_info())?;
     let meta = mal.load()?;
     // test
     for i in 0..meta.dynamic.header.token_count {

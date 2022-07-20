@@ -93,7 +93,7 @@ pub fn account_create(ctx: Context<AccountCreate>, account_num: u8, name: String
     }
     // init disc, dynamic fields lengths
     let mal: MangoAccountLoader<MangoAccount2Fixed, MangoAccount2DynamicHeader, MangoAccount2> =
-        MangoAccountLoader::new(ctx.accounts.account2.to_account_info());
+        MangoAccountLoader::new(ctx.accounts.account2.to_account_info())?;
     let mut meta = mal.load_init()?;
     // init fixed fields
     // later we would expand, and verify if the existing ones are set and new expanded ones are unset
