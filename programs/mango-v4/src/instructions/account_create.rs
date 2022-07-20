@@ -102,15 +102,15 @@ pub fn account_create(ctx: Context<AccountCreate>, account_num: u8, name: String
         .expand_dynamic_content(token_count, serum3_count, perp_count)?;
     // test
     for i in 0..3 {
-        let pos = meta.dynamic.token_get_raw_mut(i);
+        let pos = meta.dynamic.token_raw_mut(i);
         pos.token_index = i as TokenIndex + 1;
     }
     for i in 0..4 {
-        let pos = meta.dynamic.serum3_get_raw_mut(i);
+        let pos = meta.dynamic.serum3_raw_mut(i);
         pos.market_index = i as Serum3MarketIndex + 1;
     }
     for i in 0..2 {
-        let pos = meta.dynamic.perp_get_raw_mut(i);
+        let pos = meta.dynamic.perp_raw_mut(i);
         pos.market_index = i as PerpMarketIndex + 1;
     }
 

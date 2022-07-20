@@ -136,39 +136,39 @@ pub struct MangoAccount2DynamicAccessor<T: Deref<Target = [u8]>> {
 
 impl<T: Deref<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
     // get TokenPosition at raw_index
-    pub fn token_get_raw(&self, raw_index: usize) -> &TokenPosition {
+    pub fn token_raw(&self, raw_index: usize) -> &TokenPosition {
         get_helper(&self.data, self.header.token_offset(raw_index))
     }
 
     // get iter over all TokenPositions (including inactive)
-    pub fn token_iter(&self) -> impl Iterator<Item = &TokenPosition> + '_ {
-        (0..self.header.token_count as usize).map(|i| self.token_get_raw(i))
+    pub fn token_iter_raw(&self) -> impl Iterator<Item = &TokenPosition> + '_ {
+        (0..self.header.token_count as usize).map(|i| self.token_raw(i))
     }
 
     // get Serum3Orders at raw_index
-    pub fn serum3_get_raw(&self, raw_index: usize) -> &Serum3Orders {
+    pub fn serum3_raw(&self, raw_index: usize) -> &Serum3Orders {
         get_helper(&self.data, self.header.serum3_offset(raw_index))
     }
 
     // get PerpPosition at raw_index
-    pub fn perp_get_raw(&self, raw_index: usize) -> &PerpPositions {
+    pub fn perp_raw(&self, raw_index: usize) -> &PerpPositions {
         get_helper(&self.data, self.header.perp_offset(raw_index))
     }
 }
 
 impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
     // get mut TokenPosition at raw_index
-    pub fn token_get_raw_mut(&mut self, raw_index: usize) -> &mut TokenPosition {
+    pub fn token_raw_mut(&mut self, raw_index: usize) -> &mut TokenPosition {
         get_helper_mut(&mut self.data, self.header.token_offset(raw_index))
     }
 
     // get mut Serum3Orders at raw_index
-    pub fn serum3_get_raw_mut(&mut self, raw_index: usize) -> &mut Serum3Orders {
+    pub fn serum3_raw_mut(&mut self, raw_index: usize) -> &mut Serum3Orders {
         get_helper_mut(&mut self.data, self.header.serum3_offset(raw_index))
     }
 
     // get mut PerpPosition at raw_index
-    pub fn perp_get_raw_mut(&mut self, raw_index: usize) -> &mut PerpPositions {
+    pub fn perp_raw_mut(&mut self, raw_index: usize) -> &mut PerpPositions {
         get_helper_mut(&mut self.data, self.header.perp_offset(raw_index))
     }
 
@@ -230,7 +230,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
             let dest_offset = new_header.perp_offset(i);
             let source_copy = if i < self.header.perp_count {
                 // create a clone since we are modifying self.data mutably later
-                *self.perp_get_raw(i)
+                *self.perp_raw(i)
             } else {
                 // new unset positions
                 PerpPositions::zeroed()
@@ -244,7 +244,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         for i in (0..new_header.serum3_count).rev() {
             let dest_offset = new_header.serum3_offset(i);
             let source_copy = if i < self.header.serum3_count {
-                *self.serum3_get_raw(i)
+                *self.serum3_raw(i)
             } else {
                 Serum3Orders::zeroed()
             };
@@ -262,7 +262,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         for i in (0..new_header.token_count).rev() {
             let dest_offset = new_header.token_offset(i);
             let source_copy = if i < self.header.token_count {
-                *self.token_get_raw(i)
+                *self.token_raw(i)
             } else {
                 TokenPosition::zeroed()
             };

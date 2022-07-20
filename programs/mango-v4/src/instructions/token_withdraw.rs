@@ -161,15 +161,15 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     let meta = mal.load()?;
     // test
     for i in 0..meta.dynamic.header.token_count {
-        let pos = meta.dynamic.token_get_raw(i);
+        let pos = meta.dynamic.token_raw(i);
         msg!("pos {:?} token index {:?}", i, pos.token_index);
     }
     for i in 0..meta.dynamic.header.serum3_count {
-        let pos = meta.dynamic.serum3_get_raw(i);
+        let pos = meta.dynamic.serum3_raw(i);
         msg!("pos {:?} serum market index {:?}", i, pos.market_index);
     }
     for i in 0..meta.dynamic.header.perp_count {
-        let pos = meta.dynamic.perp_get_raw(i);
+        let pos = meta.dynamic.perp_raw(i);
         msg!("pos {:?} perp market index {:?}", i, pos.market_index);
     }
 
