@@ -26,20 +26,20 @@ pub struct MangoAccount2 {
 
     // dynamic
     // note: padding is required for TokenPosition, etc. to be aligned
-    pub padding1: [u8; 8 - size_of::<BorshVecLength>()],
+    pub padding1: u32,
     pub tokens: Vec<TokenPosition>,
-    pub padding2: [u8; 8 - size_of::<BorshVecLength>()],
+    pub padding2: u32,
     pub serum3: Vec<Serum3Orders>,
-    pub padding3: [u8; 8 - size_of::<BorshVecLength>()],
+    pub padding3: u32,
     pub perps: Vec<PerpPositions>,
     // placeholders for future features, adding them here for backwards compatibility
-    pub padding4: [u8; 8 - size_of::<BorshVecLength>()],
+    pub padding4: u32,
     pub feature4: Vec<u8>,
-    pub padding5: [u8; 8 - size_of::<BorshVecLength>()],
+    pub padding5: u32,
     pub feature5: Vec<u8>,
-    pub padding6: [u8; 8 - size_of::<BorshVecLength>()],
+    pub padding6: u32,
     pub feature6: Vec<u8>,
-    pub padding7: [u8; 8 - size_of::<BorshVecLength>()],
+    pub padding7: u32,
     pub feature7: Vec<u8>,
 }
 
