@@ -64,6 +64,7 @@ async fn feed_data(
         encoding: Some(UiAccountEncoding::Base64),
         commitment: Some(CommitmentConfig::processed()),
         data_slice: None,
+        min_context_slot: None,
     };
     let all_accounts_config = RpcProgramAccountsConfig {
         filters: None,
@@ -107,6 +108,7 @@ async fn feed_data(
                         encoding: Some(UiAccountEncoding::Base64),
                         commitment: Some(CommitmentConfig::processed()),
                         data_slice: None,
+                        min_context_slot: None,
                     }),
                 )
                 .map_err_anyhow()?,
@@ -134,7 +136,7 @@ async fn feed_data(
             message = mango_pyth_oracles_sub_map.next() => {
                 if let Some(data) = message {
                     let response = data.1.map_err_anyhow()?;
-                    let response = solana_client::rpc_response::Response{ context: RpcResponseContext{ slot: response.context.slot }, value: RpcKeyedAccount{ pubkey: data.0.to_string(), account:  response.value} } ;
+                    let response = solana_client::rpc_response::Response{ context: RpcResponseContext{ slot: response.context.slot, api_version: None }, value: RpcKeyedAccount{ pubkey: data.0.to_string(), account:  response.value} } ;
                     sender.send(Message::Account(AccountUpdate::from_rpc(response)?)).await.expect("sending must succeed");
                 } else {
                     warn!("pyth stream closed");
