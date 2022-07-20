@@ -407,57 +407,69 @@ impl<'a> GetAccessorMut<'a> for MangoAccount2DynamicHeader {
 }
 
 #[derive(Clone)]
-pub struct MangoAccountLoader<'info, T: bytemuck::Pod, U: Header, V: Owner + Discriminator> {
+pub struct MangoAccountLoader<
+    'info,
+    FixedPart: bytemuck::Pod,
+    HeaderPart: Header,
+    ClientAccount: Owner + Discriminator,
+> {
     acc_info: AccountInfo<'info>,
-    phantom_t: PhantomData<&'info T>,
-    phantom_u: PhantomData<&'info U>,
-    phantom_v: PhantomData<&'info V>,
+    phantom1: PhantomData<&'info FixedPart>,
+    phantom2: PhantomData<&'info HeaderPart>,
+    phantom3: PhantomData<&'info ClientAccount>,
 }
 
-impl<'info, T: bytemuck::Pod, U: Header, V: Owner + Discriminator>
-    MangoAccountLoader<'info, T, U, V>
+impl<'info, FixedPart: bytemuck::Pod, HeaderPart: Header, ClientAccount: Owner + Discriminator>
+    MangoAccountLoader<'info, FixedPart, HeaderPart, ClientAccount>
 {
-    pub fn new(acc_info: AccountInfo<'info>) -> MangoAccountLoader<'info, T, U, V> {
+    pub fn new(
+        acc_info: AccountInfo<'info>,
+    ) -> MangoAccountLoader<'info, FixedPart, HeaderPart, ClientAccount> {
         Self {
             acc_info,
-            phantom_t: PhantomData,
-            phantom_u: PhantomData,
-            phantom_v: PhantomData,
+            phantom1: PhantomData,
+            phantom2: PhantomData,
+            phantom3: PhantomData,
         }
     }
 
     /// Returns a Ref to the account data structure for reading.
-    pub fn load<'a>(&'a self) -> Result<SplitAccount<Ref<T>, U::Accessor>>
+    pub fn load<'a>(&'a self) -> Result<SplitAccount<Ref<FixedPart>, HeaderPart::Accessor>>
     where
-        U: GetAccessor<'a>,
+        HeaderPart: GetAccessor<'a>,
     {
         let data = self.acc_info.try_borrow_data()?;
-        if data.len() < V::discriminator().len() {
+        if data.len() < ClientAccount::discriminator().len() {
             return Err(ErrorCode::AccountDiscriminatorNotFound.into());
         }
         let disc_bytes = array_ref![data, 0, 8];
-        if disc_bytes != &V::discriminator() {
+        if disc_bytes != &ClientAccount::discriminator() {
             return Err(ErrorCode::AccountDiscriminatorMismatch.into());
         }
         drop(data);
 
         let data = self.acc_info.try_borrow_data()?;
         let (fixed, dynamic) = Ref::map_split(data, |data| {
-            let (fixed_slice, dynamic_slice) = data.split_at(8 + size_of::<T>());
+            let (fixed_slice, dynamic_slice) = data.split_at(8 + size_of::<FixedPart>());
             let (_disc, fixed_slice) = fixed_slice.split_at(8);
-            (bytemuck::from_bytes::<T>(fixed_slice), dynamic_slice)
+            (
+                bytemuck::from_bytes::<FixedPart>(fixed_slice),
+                dynamic_slice,
+            )
         });
 
         Ok(SplitAccount {
             fixed,
-            dynamic: U::new_accessor(U::try_new_header(&dynamic)?, dynamic),
+            dynamic: HeaderPart::new_accessor(HeaderPart::try_new_header(&dynamic)?, dynamic),
         })
     }
 
     /// Returns a `RefMut` to the account data structure for reading or writing.
-    pub fn load_mut<'a>(&'a self) -> Result<SplitAccount<RefMut<T>, U::AccessorMut>>
+    pub fn load_mut<'a>(
+        &'a self,
+    ) -> Result<SplitAccount<RefMut<FixedPart>, HeaderPart::AccessorMut>>
     where
-        U: GetAccessorMut<'a>,
+        HeaderPart: GetAccessorMut<'a>,
     {
         if !self.acc_info.is_writable {
             return Err(ErrorCode::AccountNotMutable.into());
@@ -465,19 +477,22 @@ impl<'info, T: bytemuck::Pod, U: Header, V: Owner + Discriminator>
 
         let data = self.acc_info.try_borrow_mut_data()?;
         let disc_bytes = array_ref![data, 0, 8];
-        if disc_bytes != &V::discriminator() {
+        if disc_bytes != &ClientAccount::discriminator() {
             return Err(ErrorCode::AccountDiscriminatorMismatch.into());
         }
 
         let (fixed, dynamic) = RefMut::map_split(data, |data| {
-            let (fixed_slice, dynamic_slice) = data.split_at_mut(8 + size_of::<T>());
+            let (fixed_slice, dynamic_slice) = data.split_at_mut(8 + size_of::<FixedPart>());
             let (_disc, fixed_slice) = fixed_slice.split_at_mut(8);
-            (bytemuck::from_bytes_mut::<T>(fixed_slice), dynamic_slice)
+            (
+                bytemuck::from_bytes_mut::<FixedPart>(fixed_slice),
+                dynamic_slice,
+            )
         });
 
         Ok(SplitAccount {
             fixed,
-            dynamic: U::new_accessor_mut(U::try_new_header(&dynamic)?, dynamic),
+            dynamic: HeaderPart::new_accessor_mut(HeaderPart::try_new_header(&dynamic)?, dynamic),
         })
     }
 
@@ -488,9 +503,9 @@ impl<'info, T: bytemuck::Pod, U: Header, V: Owner + Discriminator>
         token_count: usize,
         serum3_count: usize,
         perp_count: usize,
-    ) -> Result<SplitAccount<RefMut<T>, U::AccessorMut>>
+    ) -> Result<SplitAccount<RefMut<FixedPart>, HeaderPart::AccessorMut>>
     where
-        U: GetAccessorMut<'a>,
+        HeaderPart: GetAccessorMut<'a>,
     {
         let mut data = self.acc_info.try_borrow_mut_data()?;
         let mut disc_bytes = [0u8; 8];
@@ -501,18 +516,21 @@ impl<'info, T: bytemuck::Pod, U: Header, V: Owner + Discriminator>
         }
 
         let disc_bytes: &mut [u8] = &mut data[0..8];
-        disc_bytes.copy_from_slice(bytemuck::bytes_of(&(V::discriminator())));
+        disc_bytes.copy_from_slice(bytemuck::bytes_of(&(ClientAccount::discriminator())));
 
         let (fixed, dynamic) = RefMut::map_split(data, |data| {
-            let (fixed_slice, dynamic_slice) = data.split_at_mut(8 + size_of::<T>());
+            let (fixed_slice, dynamic_slice) = data.split_at_mut(8 + size_of::<FixedPart>());
             let (_disc, fixed_slice) = fixed_slice.split_at_mut(8);
-            (bytemuck::from_bytes_mut::<T>(fixed_slice), dynamic_slice)
+            (
+                bytemuck::from_bytes_mut::<FixedPart>(fixed_slice),
+                dynamic_slice,
+            )
         });
 
         Ok(SplitAccount {
             fixed,
-            dynamic: U::new_accessor_mut(
-                U::new_header(token_count, serum3_count, perp_count),
+            dynamic: HeaderPart::new_accessor_mut(
+                HeaderPart::new_header(token_count, serum3_count, perp_count),
                 dynamic,
             ),
         })
