@@ -6,7 +6,6 @@ use std::ops::{Deref, DerefMut};
 
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
-use anchor_lang::ZeroCopy;
 use arrayref::array_ref;
 use bytemuck::Zeroable;
 
@@ -61,7 +60,8 @@ impl MangoAccount2 {
 }
 
 // Mango Account fixed part for easy zero copy deserialization
-#[account(zero_copy)]
+#[derive(Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
+#[repr(C)]
 pub struct MangoAccount2Fixed {
     pub owner: Pubkey,
 }
@@ -407,14 +407,14 @@ impl<'a> GetAccessorMut<'a> for MangoAccount2DynamicHeader {
 }
 
 #[derive(Clone)]
-pub struct MangoAccountLoader<'info, T: ZeroCopy + Owner, U: Header, V: Owner + Discriminator> {
+pub struct MangoAccountLoader<'info, T: bytemuck::Pod, U: Header, V: Owner + Discriminator> {
     acc_info: AccountInfo<'info>,
     phantom_t: PhantomData<&'info T>,
     phantom_u: PhantomData<&'info U>,
     phantom_v: PhantomData<&'info V>,
 }
 
-impl<'info, T: ZeroCopy + Owner, U: Header, V: Owner + Discriminator>
+impl<'info, T: bytemuck::Pod, U: Header, V: Owner + Discriminator>
     MangoAccountLoader<'info, T, U, V>
 {
     pub fn new(acc_info: AccountInfo<'info>) -> MangoAccountLoader<'info, T, U, V> {
