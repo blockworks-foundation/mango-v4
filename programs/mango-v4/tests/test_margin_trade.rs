@@ -15,6 +15,7 @@ mod program_test;
 #[tokio::test]
 async fn test_margin_trade1() -> Result<(), BanksClientError> {
     let mut builder = TestContextBuilder::new();
+    builder.test().set_compute_max_units(170000);
     let margin_trade = builder.add_margin_trade_program();
     let context = builder.start_default().await;
     let solana = &context.solana.clone();
