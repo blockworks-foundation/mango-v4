@@ -30,6 +30,8 @@ const DEVNET_ORACLES = new Map([
   ['ORCA', 'A1WttWF7X3Rg6ZRpB2YQUFHCRh1kiXV8sKKLV3S9neJV'],
 ]);
 
+const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
+
 async function main() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
@@ -55,11 +57,11 @@ async function main() {
   console.log(`Creating Group...`);
   const insuranceMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
-    await client.groupCreate(0, true, insuranceMint);
+    await client.groupCreate(GROUP_NUM, true, insuranceMint);
   } catch (error) {
     console.log(error);
   }
-  const group = await client.getGroupForAdmin(admin.publicKey);
+  const group = await client.getGroupForAdmin(admin.publicKey, GROUP_NUM);
   console.log(`...registered group ${group.publicKey}`);
 
   // register token 1
@@ -81,7 +83,7 @@ async function main() {
       0.9,
       0.88,
       0.0005,
-      1.5,
+      0.0005,
       0.8,
       0.6,
       1.2,
@@ -120,7 +122,7 @@ async function main() {
       0.9,
       1.5,
       0.0005,
-      1.5,
+      0.0005,
       0.8,
       0.6,
       1.2,
@@ -149,7 +151,7 @@ async function main() {
       0.9,
       0.63,
       0.0005,
-      1.5,
+      0.0005,
       0.8,
       0.6,
       1.2,
@@ -180,7 +182,7 @@ async function main() {
       0.9,
       0.63,
       0.0005,
-      1.5,
+      0.0005,
       0.8,
       0.6,
       1.2,
@@ -304,11 +306,11 @@ async function main() {
       0.9,
       1.5,
       0.0005,
-      1.5,
-      0.8,
-      0.6,
-      1.2,
-      1.4,
+      0.0005,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
       0.02,
     );
     console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);

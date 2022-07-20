@@ -1,14 +1,19 @@
 mod crank;
 mod taker;
 
-use std::env;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use anchor_client::Cluster;
 
 use clap::{Parser, Subcommand};
 use client::MangoClient;
-use solana_sdk::{commitment_config::CommitmentConfig, signer::keypair};
+use solana_sdk::pubkey::Pubkey;
+use solana_sdk::{
+    commitment_config::CommitmentConfig,
+    signature::Signer,
+    signer::{keypair, keypair::Keypair},
+};
 use tokio::time;
 
 // TODO
@@ -18,23 +23,45 @@ use tokio::time;
 // - I'm really annoyed about Keypair not being clonable. Seems everyone works around that manually. Should make a PR to solana to newtype it and provide that function.
 // keypair_from_arg_or_env could be a function
 
+#[derive(Parser, Debug)]
+#[clap()]
+struct CliDotenv {
+    // When --dotenv <file> is passed, read the specified dotenv file before parsing args
+    #[clap(long)]
+    dotenv: std::path::PathBuf,
+
+    remaining_args: Vec<std::ffi::OsString>,
+}
+
 #[derive(Parser)]
 #[clap()]
 struct Cli {
-    #[clap(short, long, env = "RPC_URL")]
-    rpc_url: Option<String>,
+    #[clap(short, long, env)]
+    rpc_url: String,
 
     #[clap(short, long, env = "PAYER_KEYPAIR")]
-    payer: Option<std::path::PathBuf>,
+    payer: std::path::PathBuf,
 
-    #[clap(short, long, env = "ADMIN_KEYPAIR")]
-    admin: Option<std::path::PathBuf>,
+    #[clap(short, long, env)]
+    group: Option<Pubkey>,
 
-    #[clap(short, long, env = "MANGO_ACCOUNT_NAME")]
+    // These exist only as a shorthand to make testing easier. Normal users would provide the group.
+    #[clap(long, env)]
+    group_from_admin_keypair: Option<std::path::PathBuf>,
+    #[clap(long, env, default_value = "0")]
+    group_from_admin_num: u32,
+
+    #[clap(short, long, env)]
     mango_account_name: String,
 
     #[clap(subcommand)]
     command: Command,
+}
+
+fn keypair_from_path(p: &std::path::PathBuf) -> Keypair {
+    let path = std::path::PathBuf::from_str(&*shellexpand::tilde(p.to_str().unwrap())).unwrap();
+    keypair::read_keypair_file(path)
+        .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy()))
 }
 
 #[derive(Subcommand)]
@@ -47,49 +74,41 @@ fn main() -> Result<(), anyhow::Error> {
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
     );
 
-    dotenv::dotenv().ok();
-
-    let Cli {
-        rpc_url,
-        payer,
-        admin,
-        command,
-        mango_account_name,
-    } = Cli::parse();
-
-    let payer = match payer {
-        Some(p) => keypair::read_keypair_file(&p)
-            .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy())),
-        None => panic!("Payer keypair not provided..."),
+    let args = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
+        dotenv::from_path(cli_dotenv.dotenv)?;
+        cli_dotenv.remaining_args
+    } else {
+        dotenv::dotenv().ok();
+        std::env::args_os().collect()
     };
+    let cli = Cli::parse_from(args);
 
-    let admin = match admin {
-        Some(p) => keypair::read_keypair_file(&p)
-            .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy())),
-        None => panic!("Admin keypair not provided..."),
-    };
+    let payer = keypair_from_path(&cli.payer);
 
-    let rpc_url = match rpc_url {
-        Some(rpc_url) => rpc_url,
-        None => match env::var("RPC_URL").ok() {
-            Some(rpc_url) => rpc_url,
-            None => panic!("Rpc URL not provided..."),
-        },
-    };
+    let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss");
 
     let cluster = Cluster::Custom(rpc_url, ws_url);
-    let commitment = match command {
+    let commitment = match cli.command {
         Command::Crank { .. } => CommitmentConfig::confirmed(),
         Command::Taker { .. } => CommitmentConfig::confirmed(),
+    };
+
+    let group = if let Some(group) = cli.group {
+        group
+    } else if let Some(p) = cli.group_from_admin_keypair {
+        let admin = keypair_from_path(&p);
+        MangoClient::group_for_admin(admin.pubkey(), cli.group_from_admin_num)
+    } else {
+        panic!("Must provide either group or group_from_admin_keypair");
     };
 
     let mango_client = Arc::new(MangoClient::new(
         cluster,
         commitment,
+        group,
         payer,
-        admin,
-        &mango_account_name,
+        &cli.mango_account_name,
     )?);
 
     let rt = tokio::runtime::Builder::new_multi_thread()
@@ -111,7 +130,7 @@ fn main() -> Result<(), anyhow::Error> {
         }
     };
 
-    match command {
+    match cli.command {
         Command::Crank { .. } => {
             let client = mango_client.clone();
             rt.block_on(crank::runner(client, debugging_handle))

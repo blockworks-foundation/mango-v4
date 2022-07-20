@@ -37,19 +37,18 @@ async function main() {
   );
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
+  // fetch group
+  const group = await client.getGroupForAdmin(admin.publicKey);
+  console.log(`Found group ${group.publicKey.toBase58()}`);
+
+  // account
+  const mangoAccount = (
+    await client.getMangoAccountForOwner(group, user.publicKey)
+  )[0];
+  console.log(`...found mangoAccount ${mangoAccount.publicKey}`);
+  console.log(mangoAccount.toString(group));
+
   try {
-    // fetch group
-    const group = await client.getGroupForAdmin(admin.publicKey);
-    console.log(`Found group ${group.publicKey.toBase58()}`);
-
-    // account
-    console.log(`Creating mangoaccount...`);
-    const mangoAccount = (
-      await client.getMangoAccountForOwner(group, user.publicKey)
-    )[0];
-    console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
-    console.log(mangoAccount.toString(group));
-
     // cancel serum3 accounts, closing might require cancelling orders and settling
     for (const serum3Account of mangoAccount.serum3Active()) {
       let orders = await client.getSerum3Orders(
@@ -104,16 +103,16 @@ async function main() {
         false,
       );
     }
-
-    await mangoAccount.reload(client, group);
-    console.log(`...mangoAccount ${mangoAccount.publicKey}`);
-    console.log(mangoAccount.toString());
-
-    console.log(`Close mango account...`);
-    const res = await client.closeMangoAccount(group, mangoAccount);
   } catch (error) {
     console.log(error);
   }
+
+  await mangoAccount.reload(client, group);
+  console.log(`...mangoAccount ${mangoAccount.publicKey}`);
+  console.log(mangoAccount.toString());
+
+  console.log(`Close mango account...`);
+  const res = await client.closeMangoAccount(group, mangoAccount);
 
   process.exit();
 }

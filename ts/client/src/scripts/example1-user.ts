@@ -1,6 +1,7 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
+import { HealthType } from '../accounts/mangoAccount';
 import { OrderType, Side } from '../accounts/perp';
 import {
   Serum3OrderType,
@@ -19,6 +20,8 @@ import { toUiDecimals } from '../utils';
 //
 // This script deposits some tokens, places some serum orders, cancels them, places some perp orders
 //
+
+const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
@@ -47,7 +50,7 @@ async function main() {
       JSON.parse(fs.readFileSync(process.env.ADMIN_KEYPAIR!, 'utf-8')),
     ),
   );
-  const group = await client.getGroupForAdmin(admin.publicKey, 0);
+  const group = await client.getGroupForAdmin(admin.publicKey, GROUP_NUM);
   console.log(group.toString());
 
   // create + fetch account
@@ -67,12 +70,22 @@ async function main() {
     const randomKey = new PublicKey(
       '4ZkS7ZZkxfsC3GtvvsHP3DFcUeByU9zzZELS4r8HCELo',
     );
-    await client.editMangoAccount(group, mangoAccount, 'my_changed_name', randomKey);
+    await client.editMangoAccount(
+      group,
+      mangoAccount,
+      'my_changed_name',
+      randomKey,
+    );
     await mangoAccount.reload(client, group);
     console.log(mangoAccount.toString());
 
     console.log(`...resetting mango account name, and re-setting a delegate`);
-    await client.editMangoAccount(group, mangoAccount, 'my_mango_account', PublicKey.default);
+    await client.editMangoAccount(
+      group,
+      mangoAccount,
+      'my_mango_account',
+      PublicKey.default,
+    );
     await mangoAccount.reload(client, group);
     console.log(mangoAccount.toString());
   }
@@ -198,6 +211,14 @@ async function main() {
     console.log(
       '...mangoAccount.getCollateralValue() ' +
         toUiDecimals(mangoAccount.getCollateralValue().toNumber()),
+    );
+    console.log(
+      '...mangoAccount.accountData["healthCache"].health(HealthType.init) ' +
+        toUiDecimals(
+          mangoAccount.accountData['healthCache']
+            .health(HealthType.init)
+            .toNumber(),
+        ),
     );
     console.log(
       '...mangoAccount.getAssetsVal() ' +

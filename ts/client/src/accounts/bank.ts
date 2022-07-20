@@ -143,35 +143,37 @@ export class Bank {
   toString(): string {
     return (
       'Bank ' +
-      '\n token index -' +
+      '\n token index - ' +
       this.tokenIndex +
-      '\n deposit index -' +
+      '\n token name - ' +
+      this.name +
+      '\n deposit index - ' +
       this.depositIndex.toNumber() +
-      '\n borrow index -' +
+      '\n borrow index - ' +
       this.borrowIndex.toNumber() +
-      '\n cachedIndexedTotalDeposits -' +
+      '\n cachedIndexedTotalDeposits - ' +
       this.cachedIndexedTotalDeposits.toNumber() +
-      '\n cachedIndexedTotalBorrows -' +
+      '\n cachedIndexedTotalBorrows - ' +
       this.cachedIndexedTotalBorrows.toNumber() +
-      '\n maxRate -' +
+      '\n maxRate - ' +
       this.maxRate.toNumber() +
-      '\n util0 -' +
+      '\n util0 - ' +
       this.util0.toNumber() +
-      '\n rate0 -' +
+      '\n rate0 - ' +
       this.rate0.toNumber() +
-      '\n util1 -' +
+      '\n util1 - ' +
       this.util1.toNumber() +
-      '\n rate1 -' +
+      '\n rate1 - ' +
       this.rate1.toNumber() +
-      '\n maintAssetWeight -' +
+      '\n maintAssetWeight - ' +
       this.maintAssetWeight.toNumber() +
-      '\n initAssetWeight -' +
+      '\n initAssetWeight - ' +
       this.initAssetWeight.toNumber() +
-      '\n maintLiabWeight -' +
+      '\n maintLiabWeight - ' +
       this.maintLiabWeight.toNumber() +
-      '\n initLiabWeight -' +
+      '\n initLiabWeight - ' +
       this.initLiabWeight.toNumber() +
-      '\n liquidationFee -' +
+      '\n liquidationFee - ' +
       this.liquidationFee.toNumber()
     );
   }

@@ -244,6 +244,22 @@ impl ChainData {
         }
     }
 
+    pub fn update_from_rpc(&mut self, pubkey: &Pubkey, account: AccountData) {
+        // Add a stub slot if the rpc has information about the future.
+        // If it's in the past, either the slot already exists (and maybe we have
+        // the data already), or it was a skipped slot and adding it now makes no difference.
+        if account.slot > self.newest_processed_slot {
+            self.update_slot(SlotData {
+                slot: account.slot,
+                parent: Some(self.newest_processed_slot),
+                status: SlotStatus::Processed,
+                chain: 0,
+            });
+        }
+
+        self.update_account(*pubkey, account)
+    }
+
     fn is_account_write_live(&self, write: &AccountData) -> bool {
         self.slots
             .get(&write.slot)

@@ -49,6 +49,7 @@ import {
   toNativeDecimals,
   toU64,
 } from './utils';
+import { simulate } from './utils/anchor';
 
 // TODO: replace ui values with native as input wherever possible
 // TODO: replace token/market names with token or market indices
@@ -58,7 +59,10 @@ export class MangoClient {
     public programId: PublicKey,
     public cluster: Cluster,
     public groupName?: string,
-  ) {}
+  ) {
+    // TODO: evil side effect, but limited backtraces are a nightmare
+    Error.stackTraceLimit = 1000;
+  }
 
   /// public
 
@@ -512,7 +516,10 @@ export class MangoClient {
     mangoAccount: MangoAccount,
   ): Promise<MangoAccountData> {
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount);
+      this.buildHealthRemainingAccounts(group, mangoAccount);
+
+    // Use our custom simulate fn in utils/anchor.ts so signing the tx is not required
+    this.program.provider.simulate = simulate;
 
     const res = await this.program.methods
       .computeAccountData()
@@ -579,7 +586,7 @@ export class MangoClient {
     }
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
+      this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     return await this.program.methods
       .tokenDeposit(toNativeDecimals(amount, bank.mintDecimals))
@@ -622,7 +629,7 @@ export class MangoClient {
     );
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
+      this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     return await this.program.methods
       .tokenWithdraw(toNativeDecimals(amount, bank.mintDecimals), allowBorrow)
@@ -657,7 +664,7 @@ export class MangoClient {
     );
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
+      this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     return await this.program.methods
       .tokenWithdraw(new BN(nativeAmount), allowBorrow)
@@ -845,7 +852,7 @@ export class MangoClient {
       );
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount);
+      this.buildHealthRemainingAccounts(group, mangoAccount);
 
     const limitPrice = serum3MarketExternal.priceNumberToLots(price);
     const maxBaseQuantity = serum3MarketExternal.baseSizeNumberToLots(size);
@@ -1238,7 +1245,7 @@ export class MangoClient {
     const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount);
+      this.buildHealthRemainingAccounts(group, mangoAccount);
 
     let [nativePrice, nativeQuantity] = perpMarket.uiToNativePriceQuantity(
       price,
@@ -1300,7 +1307,7 @@ export class MangoClient {
     if (!inputBank || !outputBank) throw new Error('Invalid token');
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount, [
+      this.buildHealthRemainingAccounts(group, mangoAccount, [
         inputBank,
         outputBank,
       ]);
@@ -1481,7 +1488,7 @@ export class MangoClient {
     if (!inputBank || !outputBank) throw new Error('Invalid token');
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, mangoAccount, [
+      this.buildHealthRemainingAccounts(group, mangoAccount, [
         inputBank,
         outputBank,
       ]);
@@ -1553,32 +1560,32 @@ export class MangoClient {
     }
     console.log('3');
 
-    const sourceBankAccounts = {
+    const inputBankAccount = {
       pubkey: inputBank.publicKey,
       isWritable: true,
       isSigner: false,
     };
-    const targetBankAccount = {
+    const outputBankAccount = {
       pubkey: outputBank.publicKey,
       isWritable: true,
       isSigner: false,
     };
-    const sourceBankVault = {
+    const inputBankVault = {
       pubkey: inputBank.vault,
       isWritable: true,
       isSigner: false,
     };
-    const targetBankVault = {
+    const outputBankVault = {
       pubkey: outputBank.vault,
       isWritable: true,
       isSigner: false,
     };
-    const sourceATA = {
+    const inputATA = {
       pubkey: inputTokenAccountPk,
       isWritable: true,
       isSigner: false,
     };
-    const targetATA = {
+    const outputATA = {
       pubkey: outputTokenAccountPk,
       isWritable: false,
       isSigner: false,
@@ -1592,9 +1599,9 @@ export class MangoClient {
       })
       .remainingAccounts([
         ...parsedHealthAccounts,
-        sourceBankVault,
-        targetBankVault,
-        sourceATA,
+        inputBankVault,
+        outputBankVault,
+        inputATA,
         {
           isWritable: true,
           pubkey: outputTokenAccountPk,
@@ -1606,7 +1613,7 @@ export class MangoClient {
 
     // userDefinedInstructions.push(flashLoanEndIx);
 
-    return await this.program.methods
+    const flashLoanBeginIx = await this.program.methods
       .flashLoan3Begin([
         toNativeDecimals(amountIn, inputBank.mintDecimals),
         new BN(
@@ -1618,17 +1625,23 @@ export class MangoClient {
         instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       })
       .remainingAccounts([
-        sourceBankAccounts,
-        targetBankAccount,
-        sourceBankVault,
-        targetBankVault,
-        sourceATA,
-        targetATA,
+        inputBankAccount,
+        outputBankAccount,
+        inputBankVault,
+        outputBankVault,
+        inputATA,
+        outputATA,
       ])
-      .postInstructions([flashLoanEndIx])
-      .rpc();
-  }
+      .instruction();
 
+    const tx = new Transaction();
+    tx.add(flashLoanBeginIx);
+    for (const i of userDefinedInstructions) {
+      tx.add(i);
+    }
+    tx.add(flashLoanEndIx);
+    return this.program.provider.sendAndConfirm(tx);
+  }
   /// liquidations
 
   // TODO
@@ -1688,7 +1701,7 @@ export class MangoClient {
 
   /// private
 
-  public async buildHealthRemainingAccounts(
+  public buildHealthRemainingAccounts(
     group: Group,
     mangoAccount: MangoAccount,
     banks?: Bank[] /** TODO for serum3PlaceOrder we are just ingoring this atm */,

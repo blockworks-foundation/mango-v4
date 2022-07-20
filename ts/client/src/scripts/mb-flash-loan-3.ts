@@ -23,7 +23,6 @@ const MANGO_MAINNET_PAYER_KEYPAIR =
 //
 // example script which shows usage of flash loan 3 ix using a jupiter swap
 //
-
 // NOTE: we assume that ATA for source and target already exist for wallet
 async function main() {
   const options = AnchorProvider.defaultOptions();
@@ -135,7 +134,7 @@ async function main() {
 
       // flash loan start ix - takes a loan for source token,
       // flash loan end ix - returns increase in all token account's amounts to respective vaults,
-      const healthRemainingAccounts = await client.buildHealthRemainingAccounts(
+      const healthRemainingAccounts = client.buildHealthRemainingAccounts(
         group,
         mangoAccount,
         [sourceBank, targetBank], // we would be taking a sol loan potentially

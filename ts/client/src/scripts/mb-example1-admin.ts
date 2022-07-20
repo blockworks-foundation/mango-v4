@@ -41,14 +41,15 @@ async function main() {
   // group
   console.log(`Creating Group...`);
   try {
-    await client.groupCreate(0, true);
+    const insuranceMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
+    await client.groupCreate(0, true, insuranceMint);
   } catch (error) {
     console.log(error);
   }
   const group = await client.getGroupForAdmin(admin.publicKey);
   console.log(`...registered group ${group.publicKey}`);
 
-  // register token 0
+  // register token 1
   console.log(`Registering BTC...`);
   const btcMainnetMint = new PublicKey(MAINNET_MINTS.get('BTC')!);
   const btcMainnetOracle = new PublicKey(MAINNET_ORACLES.get('BTC')!);
@@ -58,28 +59,28 @@ async function main() {
       btcMainnetMint,
       btcMainnetOracle,
       0.1,
-      0,
+      1,
       'BTC',
       0.01,
       0.4,
       0.07,
-      0.8,
-      0.9,
+      0.7,
       0.88,
+      1.5,
       0.0005,
       1.5,
+      0.9,
       0.8,
-      0.6,
+      1.1,
       1.2,
-      1.4,
-      0.02,
+      0.05,
     );
     await group.reloadAll(client);
   } catch (error) {
     console.log(error);
   }
 
-  // stub oracle + register token 1
+  // stub oracle + register token 0
   console.log(`Creating USDC stub oracle...`);
   const usdcMainnetMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
   try {
@@ -99,7 +100,7 @@ async function main() {
       usdcMainnetMint,
       usdcMainnetOracle.publicKey,
       0.1,
-      1,
+      0,
       'USDC',
       0.01,
       0.4,
@@ -109,11 +110,11 @@ async function main() {
       1.5,
       0.0005,
       1.5,
-      0.8,
-      0.6,
-      1.2,
-      1.4,
-      0.02,
+      1,
+      1,
+      1,
+      1,
+      0,
     );
     await group.reloadAll(client);
   } catch (error) {
@@ -137,14 +138,14 @@ async function main() {
       0.07,
       0.8,
       0.9,
-      0.63,
+      1.5,
       0.0005,
       1.5,
+      0.9,
       0.8,
-      0.6,
+      1.1,
       1.2,
-      1.4,
-      0.02,
+      0.05,
     );
     await group.reloadAll(client);
   } catch (error) {
@@ -153,10 +154,12 @@ async function main() {
 
   // log tokens/banks
   for (const bank of await group.banksMap.values()) {
-    console.log(
-      `...registered Bank ${bank.name} ${bank.tokenIndex} ${bank.publicKey}, mint ${bank.mint}, oracle ${bank.oracle}`,
-    );
+    console.log(`${bank.toString()}`);
   }
+
+  console.log(
+    `NOTE: run yarn ts-node ts/client/src/scripts/mb-add-group-to-ids-json.ts to update ids json`,
+  );
 
   process.exit();
 }
