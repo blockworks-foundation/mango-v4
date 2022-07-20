@@ -44,14 +44,14 @@ pub struct MangoAccount2 {
 }
 
 impl MangoAccount2 {
-    pub fn space(token_count: usize, serum3_count: usize, perp_count: usize) -> usize {
+    pub fn space(token_count: u8, serum3_count: u8, perp_count: u8) -> usize {
         8 + size_of::<MangoAccount2Fixed>() // owner
             + 8 // padding + length of vec
-            + size_of::<TokenPosition>() * token_count
+            + size_of::<TokenPosition>() * usize::from(token_count)
             + 8
-            + size_of::<Serum3Orders>() * serum3_count
+            + size_of::<Serum3Orders>() * usize::from(serum3_count)
             + 8
-            + size_of::<PerpPositions>() * perp_count
+            + size_of::<PerpPositions>() * usize::from(perp_count)
             + 8 // feature 4
             + 8 // feature 5
             + 8 // feature 6
@@ -91,9 +91,9 @@ pub struct SplitAccount<T, U> {
 }
 
 pub struct MangoAccount2DynamicHeader {
-    pub token_count: usize,
-    pub serum3_count: usize,
-    pub perp_count: usize,
+    pub token_count: u8,
+    pub serum3_count: u8,
+    pub perp_count: u8,
 }
 
 fn get_helper<T: bytemuck::Pod>(data: &[u8], index: usize) -> &T {
@@ -112,7 +112,7 @@ impl MangoAccount2DynamicHeader {
 
     // offset into dynamic data where 1st Serum3Orders would be found
     fn serum3_offset(&self, raw_index: usize) -> usize {
-        self.token_offset(self.token_count) + 8 + raw_index * size_of::<Serum3Orders>()
+        self.token_offset(self.token_count()) + 8 + raw_index * size_of::<Serum3Orders>()
     }
 
     // offset into dynamic data where 1st PerpPositions would be found
@@ -125,7 +125,17 @@ impl MangoAccount2DynamicHeader {
         //     "perp_offset size_of::<Serum3Orders>() * self.serum3_count {}",
         //     size_of::<Serum3Orders>() * self.serum3_count
         // );
-        self.serum3_offset(self.serum3_count) + 8 + raw_index * size_of::<PerpPositions>()
+        self.serum3_offset(self.serum3_count()) + 8 + raw_index * size_of::<PerpPositions>()
+    }
+
+    pub fn token_count(&self) -> usize {
+        self.token_count.into()
+    }
+    pub fn serum3_count(&self) -> usize {
+        self.serum3_count.into()
+    }
+    pub fn perp_count(&self) -> usize {
+        self.perp_count.into()
     }
 }
 
@@ -142,7 +152,7 @@ impl<T: Deref<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
 
     // get iter over all TokenPositions (including inactive)
     pub fn token_iter_raw(&self) -> impl Iterator<Item = &TokenPosition> + '_ {
-        (0..self.header.token_count as usize).map(|i| self.token_raw(i))
+        (0..self.header.token_count()).map(|i| self.token_raw(i))
     }
 
     // get Serum3Orders at raw_index
@@ -182,7 +192,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         // );
         let dst: &mut [u8] =
             &mut self.data[tokens_offset - size_of::<BorshVecLength>()..tokens_offset];
-        dst.copy_from_slice(&(self.header.token_count as u32).to_le_bytes());
+        dst.copy_from_slice(&BorshVecLength::from(self.header.token_count).to_le_bytes());
     }
 
     fn write_serum3_length(&mut self) {
@@ -193,7 +203,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         // );
         let dst: &mut [u8] =
             &mut self.data[serum3_offset - size_of::<BorshVecLength>()..serum3_offset];
-        dst.copy_from_slice(&(self.header.serum3_count as u32).to_le_bytes());
+        dst.copy_from_slice(&BorshVecLength::from(self.header.serum3_count).to_le_bytes());
     }
 
     fn write_perp_length(&mut self) {
@@ -203,14 +213,14 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         //     perp_offset - size_of::<BorshVecLength>()
         // );
         let dst: &mut [u8] = &mut self.data[perp_offset - size_of::<BorshVecLength>()..perp_offset];
-        dst.copy_from_slice(&(self.header.perp_count as u32).to_le_bytes());
+        dst.copy_from_slice(&BorshVecLength::from(self.header.perp_count).to_le_bytes());
     }
 
     pub fn expand_dynamic_content(
         &mut self,
-        new_token_count: usize,
-        new_serum3_count: usize,
-        new_perp_count: usize,
+        new_token_count: u8,
+        new_serum3_count: u8,
+        new_perp_count: u8,
     ) -> Result<()> {
         require_gt!(new_token_count, self.header.token_count);
         require_gt!(new_serum3_count, self.header.serum3_count);
@@ -226,9 +236,9 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         // slide dynamic components further later, starting at the one closest to the end i.e. perp positions
 
         // move perp positions
-        for i in (0..new_header.perp_count).rev() {
+        for i in (0..new_header.perp_count()).rev() {
             let dest_offset = new_header.perp_offset(i);
-            let source_copy = if i < self.header.perp_count {
+            let source_copy = if i < self.header.perp_count() {
                 // create a clone since we are modifying self.data mutably later
                 *self.perp_raw(i)
             } else {
@@ -241,9 +251,9 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         }
 
         // move serum3 orders
-        for i in (0..new_header.serum3_count).rev() {
+        for i in (0..new_header.serum3_count()).rev() {
             let dest_offset = new_header.serum3_offset(i);
-            let source_copy = if i < self.header.serum3_count {
+            let source_copy = if i < self.header.serum3_count() {
                 *self.serum3_raw(i)
             } else {
                 Serum3Orders::zeroed()
@@ -259,9 +269,9 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         }
 
         // move token positions
-        for i in (0..new_header.token_count).rev() {
+        for i in (0..new_header.token_count()).rev() {
             let dest_offset = new_header.token_offset(i);
-            let source_copy = if i < self.header.token_count {
+            let source_copy = if i < self.header.token_count() {
                 *self.token_raw(i)
             } else {
                 TokenPosition::zeroed()
@@ -287,7 +297,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
 
 impl Header for MangoAccount2DynamicHeader {
     fn try_new_header(data: &[u8]) -> Result<Self> {
-        let token_count = u32::from_le_bytes(*array_ref![
+        let token_count = BorshVecLength::from_le_bytes(*array_ref![
             data,
             8 - size_of::<BorshVecLength>(),
             size_of::<BorshVecLength>()
@@ -297,7 +307,7 @@ impl Header for MangoAccount2DynamicHeader {
         //     8 - size_of::<BorshVecLength>()
         // );
 
-        let serum3_count = u32::from_le_bytes(*array_ref![
+        let serum3_count = BorshVecLength::from_le_bytes(*array_ref![
             data,
             8 + size_of::<TokenPosition>() * token_count + 8 - size_of::<BorshVecLength>(),
             size_of::<BorshVecLength>()
@@ -307,7 +317,7 @@ impl Header for MangoAccount2DynamicHeader {
         //     8 + size_of::<TokenPosition>() * token_count + 8 - size_of::<BorshVecLength>()
         // );
 
-        let perp_count = u32::from_le_bytes(*array_ref![
+        let perp_count = BorshVecLength::from_le_bytes(*array_ref![
             data,
             8 + size_of::<TokenPosition>() * token_count
                 + 8
@@ -333,9 +343,9 @@ impl Header for MangoAccount2DynamicHeader {
         // );
 
         Ok(Self {
-            token_count,
-            serum3_count,
-            perp_count,
+            token_count: u8::try_from(token_count).unwrap(),
+            serum3_count: u8::try_from(serum3_count).unwrap(),
+            perp_count: u8::try_from(perp_count).unwrap(),
         })
     }
 

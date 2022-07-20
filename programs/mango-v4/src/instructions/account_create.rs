@@ -64,9 +64,9 @@ pub fn account_create(ctx: Context<AccountCreate>, account_num: u8, name: String
     // later we would expand, and verify if the existing ones are set and new expanded ones are unset
     meta.fixed.owner = ctx.accounts.owner.key();
     // init dynamic fields
-    let token_count: usize = 3;
-    let serum3_count: usize = 4;
-    let perp_count: usize = 2;
+    let token_count: u8 = 3;
+    let serum3_count: u8 = 4;
+    let perp_count: u8 = 2;
     meta.dynamic
         .expand_dynamic_content(token_count, serum3_count, perp_count)?;
     // test
