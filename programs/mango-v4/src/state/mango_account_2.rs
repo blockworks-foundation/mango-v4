@@ -8,6 +8,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 use arrayref::array_ref;
 use bytemuck::Zeroable;
+use solana_program::program_memory::sol_memmove;
 
 use super::{PerpPositions, Serum3Orders, TokenPosition};
 
@@ -255,52 +256,45 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
             perp_count: new_perp_count,
         };
 
-        // slide dynamic components further later, starting at the one closest to the end i.e. perp positions
+        // expand dynamic components by first moving existing positions, and then setting new ones to defaults
 
-        // move perp positions
-        for i in (0..new_header.perp_count()).rev() {
-            let dest_offset = new_header.perp_offset(i);
-            let source_copy = if i < self.header.perp_count() {
-                // create a clone since we are modifying self.data mutably later
-                *self.perp_raw(i)
-            } else {
-                // new unset positions
-                PerpPositions::default()
-            };
-            let dest_bytes: &mut [u8] =
-                &mut self.data[dest_offset..dest_offset + size_of::<PerpPositions>()];
-            dest_bytes.copy_from_slice(bytemuck::bytes_of(&source_copy));
+        // perp positions
+        unsafe {
+            sol_memmove(
+                &mut self.data[new_header.perp_offset(0)],
+                &mut self.data[self.header.perp_offset(0)],
+                size_of::<PerpPositions>() * self.header.perp_count(),
+            );
+        }
+        for i in self.header.perp_count..new_perp_count {
+            *get_helper_mut(&mut self.data, new_header.perp_offset(i.into())) =
+                PerpPositions::default();
         }
 
-        // move serum3 orders
-        for i in (0..new_header.serum3_count()).rev() {
-            let dest_offset = new_header.serum3_offset(i);
-            let source_copy = if i < self.header.serum3_count() {
-                *self.serum3_raw(i)
-            } else {
-                Serum3Orders::default()
-            };
-            // msg!(
-            //     "pos {:?} serum market index {:?}",
-            //     i,
-            //     source_copy.market_index
-            // );
-            let dest_bytes: &mut [u8] =
-                &mut self.data[dest_offset..dest_offset + size_of::<Serum3Orders>()];
-            dest_bytes.copy_from_slice(bytemuck::bytes_of(&source_copy));
+        // serum3 positions
+        unsafe {
+            sol_memmove(
+                &mut self.data[new_header.serum3_offset(0)],
+                &mut self.data[self.header.serum3_offset(0)],
+                size_of::<Serum3Orders>() * self.header.serum3_count(),
+            );
+        }
+        for i in self.header.serum3_count..new_serum3_count {
+            *get_helper_mut(&mut self.data, new_header.serum3_offset(i.into())) =
+                Serum3Orders::default();
         }
 
-        // move token positions
-        for i in (0..new_header.token_count()).rev() {
-            let dest_offset = new_header.token_offset(i);
-            let source_copy = if i < self.header.token_count() {
-                *self.token_raw(i)
-            } else {
-                TokenPosition::default()
-            };
-            let dest_bytes: &mut [u8] =
-                &mut self.data[dest_offset..dest_offset + size_of::<TokenPosition>()];
-            dest_bytes.copy_from_slice(bytemuck::bytes_of(&source_copy));
+        // token positions
+        unsafe {
+            sol_memmove(
+                &mut self.data[new_header.token_offset(0)],
+                &mut self.data[self.header.token_offset(0)],
+                size_of::<TokenPosition>() * self.header.token_count(),
+            );
+        }
+        for i in self.header.token_count..new_token_count {
+            *get_helper_mut(&mut self.data, new_header.token_offset(i.into())) =
+                TokenPosition::default();
         }
 
         // update header
