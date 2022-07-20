@@ -112,10 +112,7 @@ impl MangoAccount2DynamicHeader {
 
     // offset into dynamic data where 1st Serum3Orders would be found
     fn serum3_offset(&self, raw_index: usize) -> usize {
-        self.token_offset(0)
-            + size_of::<TokenPosition>() * self.token_count
-            + 8
-            + raw_index * size_of::<Serum3Orders>()
+        self.token_offset(self.token_count) + 8 + raw_index * size_of::<Serum3Orders>()
     }
 
     // offset into dynamic data where 1st PerpPositions would be found
@@ -128,55 +125,7 @@ impl MangoAccount2DynamicHeader {
         //     "perp_offset size_of::<Serum3Orders>() * self.serum3_count {}",
         //     size_of::<Serum3Orders>() * self.serum3_count
         // );
-        self.serum3_offset(0)
-            + size_of::<Serum3Orders>() * self.serum3_count
-            + 8
-            + raw_index * size_of::<PerpPositions>()
-    }
-
-    // get TokenPosition at raw_index
-    fn token_get_raw<'a>(&self, data: &'a [u8], raw_index: usize) -> &'a TokenPosition {
-        get_helper(data, self.token_offset(raw_index))
-    }
-
-    // get mut TokenPosition at raw_index
-    fn token_get_raw_mut<'a>(&self, data: &'a mut [u8], raw_index: usize) -> &'a mut TokenPosition {
-        get_helper_mut(data, self.token_offset(raw_index))
-    }
-
-    // get iter over all TokenPositions
-    fn token_iter<'a>(&'a self, data: &'a [u8]) -> impl Iterator<Item = &'a TokenPosition> + '_ {
-        (0..self.token_count as usize).map(|i| self.token_get_raw(data, i))
-    }
-
-    // get Serum3Orders at raw_index
-    fn serum3_get_raw<'a>(&self, data: &'a [u8], raw_index: usize) -> &'a Serum3Orders {
-        get_helper(data, self.serum3_offset(raw_index))
-    }
-
-    // get mut Serum3Orders at raw_index
-    fn serum3_get_raw_mut<'a>(&self, data: &'a mut [u8], raw_index: usize) -> &'a mut Serum3Orders {
-        get_helper_mut(data, self.serum3_offset(raw_index))
-    }
-
-    // get iter Serum3Orders all TokenPositions
-    fn serum3_iter<'a>(&'a self, data: &'a [u8]) -> impl Iterator<Item = &'a Serum3Orders> + '_ {
-        (0..self.serum3_count as usize).map(|i| self.serum3_get_raw(data, i))
-    }
-
-    // get PerpPosition at raw_index
-    fn perp_get_raw<'a>(&self, data: &'a [u8], raw_index: usize) -> &'a PerpPositions {
-        get_helper(data, self.perp_offset(raw_index))
-    }
-
-    // get mut PerpPosition at raw_index
-    fn perp_get_raw_mut<'a>(&self, data: &'a mut [u8], raw_index: usize) -> &'a mut PerpPositions {
-        get_helper_mut(data, self.perp_offset(raw_index))
-    }
-
-    // get iter PerpPosition all PerpPositions
-    fn perp_iter<'a>(&'a self, data: &'a [u8]) -> impl Iterator<Item = &'a PerpPositions> + '_ {
-        (0..self.perp_count as usize).map(|i| self.perp_get_raw(data, i))
+        self.serum3_offset(self.serum3_count) + 8 + raw_index * size_of::<PerpPositions>()
     }
 }
 
@@ -186,34 +135,41 @@ pub struct MangoAccount2DynamicAccessor<T: Deref<Target = [u8]>> {
 }
 
 impl<T: Deref<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
+    // get TokenPosition at raw_index
     pub fn token_get_raw(&self, raw_index: usize) -> &TokenPosition {
-        self.header.token_get_raw(&self.data, raw_index)
+        get_helper(&self.data, self.header.token_offset(raw_index))
     }
 
+    // get iter over all TokenPositions (including inactive)
     pub fn token_iter(&self) -> impl Iterator<Item = &TokenPosition> + '_ {
-        self.header.token_iter(&self.data)
+        (0..self.header.token_count as usize).map(|i| self.token_get_raw(i))
     }
 
+    // get Serum3Orders at raw_index
     pub fn serum3_get_raw(&self, raw_index: usize) -> &Serum3Orders {
-        self.header.serum3_get_raw(&self.data, raw_index)
+        get_helper(&self.data, self.header.serum3_offset(raw_index))
     }
 
+    // get PerpPosition at raw_index
     pub fn perp_get_raw(&self, raw_index: usize) -> &PerpPositions {
-        self.header.perp_get_raw(&self.data, raw_index)
+        get_helper(&self.data, self.header.perp_offset(raw_index))
     }
 }
 
 impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
+    // get mut TokenPosition at raw_index
     pub fn token_get_raw_mut(&mut self, raw_index: usize) -> &mut TokenPosition {
-        self.header.token_get_raw_mut(&mut self.data, raw_index)
+        get_helper_mut(&mut self.data, self.header.token_offset(raw_index))
     }
 
+    // get mut Serum3Orders at raw_index
     pub fn serum3_get_raw_mut(&mut self, raw_index: usize) -> &mut Serum3Orders {
-        self.header.serum3_get_raw_mut(&mut self.data, raw_index)
+        get_helper_mut(&mut self.data, self.header.serum3_offset(raw_index))
     }
 
+    // get mut PerpPosition at raw_index
     pub fn perp_get_raw_mut(&mut self, raw_index: usize) -> &mut PerpPositions {
-        self.header.perp_get_raw_mut(&mut self.data, raw_index)
+        get_helper_mut(&mut self.data, self.header.perp_offset(raw_index))
     }
 
     // writes length of tokens vec at appropriate offset so that borsh can infer the vector length
@@ -274,7 +230,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
             let dest_offset = new_header.perp_offset(i);
             let source_copy = if i < self.header.perp_count {
                 // create a clone since we are modifying self.data mutably later
-                *self.header.perp_get_raw(&self.data, i)
+                *self.perp_get_raw(i)
             } else {
                 // new unset positions
                 PerpPositions::zeroed()
@@ -288,7 +244,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         for i in (0..new_header.serum3_count).rev() {
             let dest_offset = new_header.serum3_offset(i);
             let source_copy = if i < self.header.serum3_count {
-                *self.header.serum3_get_raw(&self.data, i)
+                *self.serum3_get_raw(i)
             } else {
                 Serum3Orders::zeroed()
             };
@@ -306,7 +262,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         for i in (0..new_header.token_count).rev() {
             let dest_offset = new_header.token_offset(i);
             let source_copy = if i < self.header.token_count {
-                *self.header.token_get_raw(&self.data, i)
+                *self.token_get_raw(i)
             } else {
                 TokenPosition::zeroed()
             };
