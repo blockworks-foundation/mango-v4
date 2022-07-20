@@ -12,12 +12,15 @@ use bytemuck::Zeroable;
 use super::{PerpPositions, Serum3Orders, TokenPosition};
 
 type BorshVecLength = u32;
+const BORSH_VEC_PADDING_BYTES: usize = 4;
+const BORSH_VEC_SIZE_BYTES: usize = 4;
 
 // Mango Account
 // This struct definition is only for clients e.g. typescript, so that they can easily use out of the box
 // deserialization and not have to do custom deserialization
 // On chain, we would prefer zero-copying to optimize for compute
 #[account]
+#[derive(Default)]
 pub struct MangoAccount2 {
     // fixed
     // note: keep MangoAccount2Fixed in sync with changes here
@@ -32,31 +35,46 @@ pub struct MangoAccount2 {
     pub serum3: Vec<Serum3Orders>,
     pub padding3: u32,
     pub perps: Vec<PerpPositions>,
-    // placeholders for future features, adding them here for backwards compatibility
-    pub padding4: u32,
-    pub feature4: Vec<u8>,
-    pub padding5: u32,
-    pub feature5: Vec<u8>,
-    pub padding6: u32,
-    pub feature6: Vec<u8>,
-    pub padding7: u32,
-    pub feature7: Vec<u8>,
 }
 
 impl MangoAccount2 {
     pub fn space(token_count: u8, serum3_count: u8, perp_count: u8) -> usize {
-        8 + size_of::<MangoAccount2Fixed>() // owner
-            + 8 // padding + length of vec
-            + size_of::<TokenPosition>() * usize::from(token_count)
-            + 8
-            + size_of::<Serum3Orders>() * usize::from(serum3_count)
-            + 8
-            + size_of::<PerpPositions>() * usize::from(perp_count)
-            + 8 // feature 4
-            + 8 // feature 5
-            + 8 // feature 6
-            + 8 // feature 7
+        8 + size_of::<MangoAccount2Fixed>()
+            + Self::dynamic_size(token_count, serum3_count, perp_count)
     }
+
+    pub fn dynamic_token_vec_offset() -> usize {
+        BORSH_VEC_PADDING_BYTES
+    }
+
+    pub fn dynamic_serum3_vec_offset(token_count: u8) -> usize {
+        Self::dynamic_token_vec_offset()
+            + (BORSH_VEC_SIZE_BYTES + size_of::<TokenPosition>() * usize::from(token_count))
+            + BORSH_VEC_PADDING_BYTES
+    }
+
+    pub fn dynamic_perp_vec_offset(token_count: u8, serum3_count: u8) -> usize {
+        Self::dynamic_serum3_vec_offset(token_count)
+            + (BORSH_VEC_SIZE_BYTES + size_of::<Serum3Orders>() * usize::from(serum3_count))
+            + BORSH_VEC_PADDING_BYTES
+    }
+
+    pub fn dynamic_size(token_count: u8, serum3_count: u8, perp_count: u8) -> usize {
+        Self::dynamic_perp_vec_offset(token_count, serum3_count)
+            + (BORSH_VEC_SIZE_BYTES + size_of::<PerpPositions>() * usize::from(perp_count))
+    }
+}
+
+#[test]
+fn test_dynamic_offsets() {
+    let mut account = MangoAccount2::default();
+    account.tokens.resize(3, TokenPosition::zeroed());
+    account.serum3.resize(5, Serum3Orders::default());
+    account.perps.resize(7, PerpPositions::default());
+    assert_eq!(
+        8 + AnchorSerialize::try_to_vec(&account).unwrap().len(),
+        MangoAccount2::space(3, 5, 7)
+    );
 }
 
 // Mango Account fixed part for easy zero copy deserialization
@@ -107,12 +125,16 @@ fn get_helper_mut<T: bytemuck::Pod>(data: &mut [u8], index: usize) -> &mut T {
 impl MangoAccount2DynamicHeader {
     // offset into dynamic data where 1st TokenPosition would be found
     fn token_offset(&self, raw_index: usize) -> usize {
-        8 + raw_index * size_of::<TokenPosition>()
+        MangoAccount2::dynamic_token_vec_offset()
+            + BORSH_VEC_SIZE_BYTES
+            + raw_index * size_of::<TokenPosition>()
     }
 
     // offset into dynamic data where 1st Serum3Orders would be found
     fn serum3_offset(&self, raw_index: usize) -> usize {
-        self.token_offset(self.token_count()) + 8 + raw_index * size_of::<Serum3Orders>()
+        MangoAccount2::dynamic_serum3_vec_offset(self.token_count)
+            + BORSH_VEC_SIZE_BYTES
+            + raw_index * size_of::<Serum3Orders>()
     }
 
     // offset into dynamic data where 1st PerpPositions would be found
@@ -125,7 +147,9 @@ impl MangoAccount2DynamicHeader {
         //     "perp_offset size_of::<Serum3Orders>() * self.serum3_count {}",
         //     size_of::<Serum3Orders>() * self.serum3_count
         // );
-        self.serum3_offset(self.serum3_count()) + 8 + raw_index * size_of::<PerpPositions>()
+        MangoAccount2::dynamic_perp_vec_offset(self.token_count, self.serum3_count)
+            + BORSH_VEC_SIZE_BYTES
+            + raw_index * size_of::<PerpPositions>()
     }
 
     pub fn token_count(&self) -> usize {
@@ -190,8 +214,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         //     "writing tokens length at {}",
         //     tokens_offset - size_of::<BorshVecLength>()
         // );
-        let dst: &mut [u8] =
-            &mut self.data[tokens_offset - size_of::<BorshVecLength>()..tokens_offset];
+        let dst: &mut [u8] = &mut self.data[tokens_offset - BORSH_VEC_SIZE_BYTES..tokens_offset];
         dst.copy_from_slice(&BorshVecLength::from(self.header.token_count).to_le_bytes());
     }
 
@@ -201,8 +224,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         //     "writing serum3 length at {}",
         //     serum3_offset - size_of::<BorshVecLength>()
         // );
-        let dst: &mut [u8] =
-            &mut self.data[serum3_offset - size_of::<BorshVecLength>()..serum3_offset];
+        let dst: &mut [u8] = &mut self.data[serum3_offset - BORSH_VEC_SIZE_BYTES..serum3_offset];
         dst.copy_from_slice(&BorshVecLength::from(self.header.serum3_count).to_le_bytes());
     }
 
@@ -212,7 +234,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         //     "writing perp length at {}",
         //     perp_offset - size_of::<BorshVecLength>()
         // );
-        let dst: &mut [u8] = &mut self.data[perp_offset - size_of::<BorshVecLength>()..perp_offset];
+        let dst: &mut [u8] = &mut self.data[perp_offset - BORSH_VEC_SIZE_BYTES..perp_offset];
         dst.copy_from_slice(&BorshVecLength::from(self.header.perp_count).to_le_bytes());
     }
 
@@ -297,35 +319,34 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
 
 impl Header for MangoAccount2DynamicHeader {
     fn try_new_header(data: &[u8]) -> Result<Self> {
-        let token_count = BorshVecLength::from_le_bytes(*array_ref![
+        let token_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
             data,
-            8 - size_of::<BorshVecLength>(),
-            size_of::<BorshVecLength>()
-        ]) as usize;
+            MangoAccount2::dynamic_token_vec_offset(),
+            BORSH_VEC_SIZE_BYTES
+        ]))
+        .unwrap();
         // msg!(
         //     "reading tokens length at {}",
         //     8 - size_of::<BorshVecLength>()
         // );
 
-        let serum3_count = BorshVecLength::from_le_bytes(*array_ref![
+        let serum3_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
             data,
-            8 + size_of::<TokenPosition>() * token_count + 8 - size_of::<BorshVecLength>(),
-            size_of::<BorshVecLength>()
-        ]) as usize;
+            MangoAccount2::dynamic_serum3_vec_offset(token_count),
+            BORSH_VEC_SIZE_BYTES
+        ]))
+        .unwrap();
         // msg!(
         //     "reading serum3 length at {}",
         //     8 + size_of::<TokenPosition>() * token_count + 8 - size_of::<BorshVecLength>()
         // );
 
-        let perp_count = BorshVecLength::from_le_bytes(*array_ref![
+        let perp_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
             data,
-            8 + size_of::<TokenPosition>() * token_count
-                + 8
-                + size_of::<Serum3Orders>() * serum3_count
-                + 8
-                - size_of::<BorshVecLength>(),
-            size_of::<BorshVecLength>()
-        ]) as usize;
+            MangoAccount2::dynamic_perp_vec_offset(token_count, serum3_count),
+            BORSH_VEC_SIZE_BYTES
+        ]))
+        .unwrap();
         // msg!(
         //     "reading perp length at {}",
         //     8 + size_of::<TokenPosition>() * token_count
@@ -343,9 +364,9 @@ impl Header for MangoAccount2DynamicHeader {
         // );
 
         Ok(Self {
-            token_count: u8::try_from(token_count).unwrap(),
-            serum3_count: u8::try_from(serum3_count).unwrap(),
-            perp_count: u8::try_from(perp_count).unwrap(),
+            token_count,
+            serum3_count,
+            perp_count,
         })
     }
 
