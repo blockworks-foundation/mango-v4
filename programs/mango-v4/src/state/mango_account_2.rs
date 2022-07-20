@@ -94,21 +94,22 @@ pub trait Header: Sized {
     // initialize a header on a new account, if necessary
     fn initialize(data: &mut [u8]) -> Result<()>;
 }
-pub trait GetAccessor<'a> {
+pub trait GetAccessor<'a, FixedPart> {
     type Accessor;
-    fn new_accessor(header: Self, data: Ref<'a, [u8]>) -> Self::Accessor;
+    fn new_accessor(fixed: Ref<'a, FixedPart>, header: Self, data: Ref<'a, [u8]>)
+        -> Self::Accessor;
 }
 
-pub trait GetAccessorMut<'a> {
+pub trait GetAccessorMut<'a, FixedPart> {
     type AccessorMut;
-    fn new_accessor_mut(header: Self, data: RefMut<'a, [u8]>) -> Self::AccessorMut;
+    fn new_accessor_mut(
+        fixed: RefMut<'a, FixedPart>,
+        header: Self,
+        dynamic: RefMut<'a, [u8]>,
+    ) -> Self::AccessorMut;
 }
 
-pub struct SplitAccount<T, U> {
-    pub fixed: T,
-    pub dynamic: U,
-}
-
+#[derive(Clone)]
 pub struct MangoAccount2DynamicHeader {
     pub token_count: u8,
     pub serum3_count: u8,
@@ -164,15 +165,21 @@ impl MangoAccount2DynamicHeader {
     }
 }
 
-pub struct MangoAccount2DynamicAccessor<T: Deref<Target = [u8]>> {
+pub struct MangoAccount2Accessor<
+    Fixed: Deref<Target = MangoAccount2Fixed>,
+    Dynamic: Deref<Target = [u8]>,
+> {
     pub header: MangoAccount2DynamicHeader,
-    data: T,
+    pub fixed: Fixed,
+    pub dynamic: Dynamic,
 }
 
-impl<T: Deref<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
+impl<Fixed: Deref<Target = MangoAccount2Fixed>, Dynamic: Deref<Target = [u8]>>
+    MangoAccount2Accessor<Fixed, Dynamic>
+{
     // get TokenPosition at raw_index
     pub fn token_raw(&self, raw_index: usize) -> &TokenPosition {
-        get_helper(&self.data, self.header.token_offset(raw_index))
+        get_helper(&self.dynamic, self.header.token_offset(raw_index))
     }
 
     // get iter over all TokenPositions (including inactive)
@@ -182,29 +189,39 @@ impl<T: Deref<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
 
     // get Serum3Orders at raw_index
     pub fn serum3_raw(&self, raw_index: usize) -> &Serum3Orders {
-        get_helper(&self.data, self.header.serum3_offset(raw_index))
+        get_helper(&self.dynamic, self.header.serum3_offset(raw_index))
     }
 
     // get PerpPosition at raw_index
     pub fn perp_raw(&self, raw_index: usize) -> &PerpPositions {
-        get_helper(&self.data, self.header.perp_offset(raw_index))
+        get_helper(&self.dynamic, self.header.perp_offset(raw_index))
+    }
+
+    pub fn borrow<'a>(&'a self) -> MangoAccount2Accessor<&'a MangoAccount2Fixed, &'a [u8]> {
+        MangoAccount2Accessor {
+            fixed: &self.fixed,
+            header: self.header.clone(),
+            dynamic: &self.dynamic,
+        }
     }
 }
 
-impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
+impl<Fixed: DerefMut<Target = MangoAccount2Fixed>, Dynamic: DerefMut<Target = [u8]>>
+    MangoAccount2Accessor<Fixed, Dynamic>
+{
     // get mut TokenPosition at raw_index
     pub fn token_raw_mut(&mut self, raw_index: usize) -> &mut TokenPosition {
-        get_helper_mut(&mut self.data, self.header.token_offset(raw_index))
+        get_helper_mut(&mut self.dynamic, self.header.token_offset(raw_index))
     }
 
     // get mut Serum3Orders at raw_index
     pub fn serum3_raw_mut(&mut self, raw_index: usize) -> &mut Serum3Orders {
-        get_helper_mut(&mut self.data, self.header.serum3_offset(raw_index))
+        get_helper_mut(&mut self.dynamic, self.header.serum3_offset(raw_index))
     }
 
     // get mut PerpPosition at raw_index
     pub fn perp_raw_mut(&mut self, raw_index: usize) -> &mut PerpPositions {
-        get_helper_mut(&mut self.data, self.header.perp_offset(raw_index))
+        get_helper_mut(&mut self.dynamic, self.header.perp_offset(raw_index))
     }
 
     // writes length of tokens vec at appropriate offset so that borsh can infer the vector length
@@ -215,7 +232,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         //     "writing tokens length at {}",
         //     tokens_offset - size_of::<BorshVecLength>()
         // );
-        let dst: &mut [u8] = &mut self.data[tokens_offset - BORSH_VEC_SIZE_BYTES..tokens_offset];
+        let dst: &mut [u8] = &mut self.dynamic[tokens_offset - BORSH_VEC_SIZE_BYTES..tokens_offset];
         dst.copy_from_slice(&BorshVecLength::from(self.header.token_count).to_le_bytes());
     }
 
@@ -225,7 +242,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         //     "writing serum3 length at {}",
         //     serum3_offset - size_of::<BorshVecLength>()
         // );
-        let dst: &mut [u8] = &mut self.data[serum3_offset - BORSH_VEC_SIZE_BYTES..serum3_offset];
+        let dst: &mut [u8] = &mut self.dynamic[serum3_offset - BORSH_VEC_SIZE_BYTES..serum3_offset];
         dst.copy_from_slice(&BorshVecLength::from(self.header.serum3_count).to_le_bytes());
     }
 
@@ -235,7 +252,7 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         //     "writing perp length at {}",
         //     perp_offset - size_of::<BorshVecLength>()
         // );
-        let dst: &mut [u8] = &mut self.data[perp_offset - BORSH_VEC_SIZE_BYTES..perp_offset];
+        let dst: &mut [u8] = &mut self.dynamic[perp_offset - BORSH_VEC_SIZE_BYTES..perp_offset];
         dst.copy_from_slice(&BorshVecLength::from(self.header.perp_count).to_le_bytes());
     }
 
@@ -261,39 +278,39 @@ impl<T: DerefMut<Target = [u8]>> MangoAccount2DynamicAccessor<T> {
         // perp positions
         unsafe {
             sol_memmove(
-                &mut self.data[new_header.perp_offset(0)],
-                &mut self.data[self.header.perp_offset(0)],
+                &mut self.dynamic[new_header.perp_offset(0)],
+                &mut self.dynamic[self.header.perp_offset(0)],
                 size_of::<PerpPositions>() * self.header.perp_count(),
             );
         }
         for i in self.header.perp_count..new_perp_count {
-            *get_helper_mut(&mut self.data, new_header.perp_offset(i.into())) =
+            *get_helper_mut(&mut self.dynamic, new_header.perp_offset(i.into())) =
                 PerpPositions::default();
         }
 
         // serum3 positions
         unsafe {
             sol_memmove(
-                &mut self.data[new_header.serum3_offset(0)],
-                &mut self.data[self.header.serum3_offset(0)],
+                &mut self.dynamic[new_header.serum3_offset(0)],
+                &mut self.dynamic[self.header.serum3_offset(0)],
                 size_of::<Serum3Orders>() * self.header.serum3_count(),
             );
         }
         for i in self.header.serum3_count..new_serum3_count {
-            *get_helper_mut(&mut self.data, new_header.serum3_offset(i.into())) =
+            *get_helper_mut(&mut self.dynamic, new_header.serum3_offset(i.into())) =
                 Serum3Orders::default();
         }
 
         // token positions
         unsafe {
             sol_memmove(
-                &mut self.data[new_header.token_offset(0)],
-                &mut self.data[self.header.token_offset(0)],
+                &mut self.dynamic[new_header.token_offset(0)],
+                &mut self.dynamic[self.header.token_offset(0)],
                 size_of::<TokenPosition>() * self.header.token_count(),
             );
         }
         for i in self.header.token_count..new_token_count {
-            *get_helper_mut(&mut self.data, new_header.token_offset(i.into())) =
+            *get_helper_mut(&mut self.dynamic, new_header.token_offset(i.into())) =
                 TokenPosition::default();
         }
 
@@ -369,17 +386,33 @@ impl Header for MangoAccount2DynamicHeader {
     }
 }
 
-impl<'a> GetAccessor<'a> for MangoAccount2DynamicHeader {
-    type Accessor = MangoAccount2DynamicAccessor<Ref<'a, [u8]>>;
-    fn new_accessor(header: Self, data: Ref<'a, [u8]>) -> Self::Accessor {
-        MangoAccount2DynamicAccessor { header, data }
+impl<'a> GetAccessor<'a, MangoAccount2Fixed> for MangoAccount2DynamicHeader {
+    type Accessor = MangoAccount2Accessor<Ref<'a, MangoAccount2Fixed>, Ref<'a, [u8]>>;
+    fn new_accessor(
+        fixed: Ref<'a, MangoAccount2Fixed>,
+        header: Self,
+        dynamic: Ref<'a, [u8]>,
+    ) -> Self::Accessor {
+        Self::Accessor {
+            fixed,
+            header,
+            dynamic,
+        }
     }
 }
 
-impl<'a> GetAccessorMut<'a> for MangoAccount2DynamicHeader {
-    type AccessorMut = MangoAccount2DynamicAccessor<RefMut<'a, [u8]>>;
-    fn new_accessor_mut(header: Self, data: RefMut<'a, [u8]>) -> Self::AccessorMut {
-        Self::AccessorMut { header, data }
+impl<'a> GetAccessorMut<'a, MangoAccount2Fixed> for MangoAccount2DynamicHeader {
+    type AccessorMut = MangoAccount2Accessor<RefMut<'a, MangoAccount2Fixed>, RefMut<'a, [u8]>>;
+    fn new_accessor_mut(
+        fixed: RefMut<'a, MangoAccount2Fixed>,
+        header: Self,
+        dynamic: RefMut<'a, [u8]>,
+    ) -> Self::AccessorMut {
+        Self::AccessorMut {
+            fixed,
+            header,
+            dynamic,
+        }
     }
 }
 
@@ -415,9 +448,9 @@ impl<'info, FixedPart: bytemuck::Pod, HeaderPart: Header, ClientAccount: Owner +
     }
 
     /// Returns a Ref to the account data structure for reading.
-    pub fn load<'a>(&'a self) -> Result<SplitAccount<Ref<FixedPart>, HeaderPart::Accessor>>
+    pub fn load<'a>(&'a self) -> Result<HeaderPart::Accessor>
     where
-        HeaderPart: GetAccessor<'a>,
+        HeaderPart: GetAccessor<'a, FixedPart>,
     {
         let data = self.acc_info.try_borrow_data()?;
         if data.len() < ClientAccount::discriminator().len() {
@@ -439,18 +472,17 @@ impl<'info, FixedPart: bytemuck::Pod, HeaderPart: Header, ClientAccount: Owner +
             )
         });
 
-        Ok(SplitAccount {
+        Ok(HeaderPart::new_accessor(
             fixed,
-            dynamic: HeaderPart::new_accessor(HeaderPart::try_new_header(&dynamic)?, dynamic),
-        })
+            HeaderPart::try_new_header(&dynamic)?,
+            dynamic,
+        ))
     }
 
     /// Returns a `RefMut` to the account data structure for reading or writing.
-    pub fn load_mut<'a>(
-        &'a self,
-    ) -> Result<SplitAccount<RefMut<FixedPart>, HeaderPart::AccessorMut>>
+    pub fn load_mut<'a>(&'a self) -> Result<HeaderPart::AccessorMut>
     where
-        HeaderPart: GetAccessorMut<'a>,
+        HeaderPart: GetAccessorMut<'a, FixedPart>,
     {
         if !self.acc_info.is_writable {
             return Err(ErrorCode::AccountNotMutable.into());
@@ -471,19 +503,18 @@ impl<'info, FixedPart: bytemuck::Pod, HeaderPart: Header, ClientAccount: Owner +
             )
         });
 
-        Ok(SplitAccount {
+        Ok(HeaderPart::new_accessor_mut(
             fixed,
-            dynamic: HeaderPart::new_accessor_mut(HeaderPart::try_new_header(&dynamic)?, dynamic),
-        })
+            HeaderPart::try_new_header(&dynamic)?,
+            dynamic,
+        ))
     }
 
     /// Returns a `RefMut` to the account data structure for reading or writing.
     /// Should only be called once, when the account is being initialized.
-    pub fn load_init<'a>(
-        &'a self,
-    ) -> Result<SplitAccount<RefMut<FixedPart>, HeaderPart::AccessorMut>>
+    pub fn load_init<'a>(&'a self) -> Result<HeaderPart::AccessorMut>
     where
-        HeaderPart: GetAccessorMut<'a>,
+        HeaderPart: GetAccessorMut<'a, FixedPart>,
     {
         if !self.acc_info.is_writable {
             return Err(ErrorCode::AccountNotMutable.into());
@@ -511,9 +542,10 @@ impl<'info, FixedPart: bytemuck::Pod, HeaderPart: Header, ClientAccount: Owner +
 
         HeaderPart::initialize(&mut dynamic)?;
 
-        Ok(SplitAccount {
+        Ok(HeaderPart::new_accessor_mut(
             fixed,
-            dynamic: HeaderPart::new_accessor_mut(HeaderPart::try_new_header(&dynamic)?, dynamic),
-        })
+            HeaderPart::try_new_header(&dynamic)?,
+            dynamic,
+        ))
     }
 }

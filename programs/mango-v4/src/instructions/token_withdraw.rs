@@ -160,16 +160,16 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         MangoAccountLoader::new(ctx.accounts.account2.to_account_info())?;
     let meta = mal.load()?;
     // test
-    for i in 0..meta.dynamic.header.token_count() {
-        let pos = meta.dynamic.token_raw(i);
+    for i in 0..meta.header.token_count() {
+        let pos = meta.token_raw(i);
         msg!("pos {:?} token index {:?}", i, pos.token_index);
     }
-    for i in 0..meta.dynamic.header.serum3_count() {
-        let pos = meta.dynamic.serum3_raw(i);
+    for i in 0..meta.header.serum3_count() {
+        let pos = meta.serum3_raw(i);
         msg!("pos {:?} serum market index {:?}", i, pos.market_index);
     }
-    for i in 0..meta.dynamic.header.perp_count() {
-        let pos = meta.dynamic.perp_raw(i);
+    for i in 0..meta.header.perp_count() {
+        let pos = meta.perp_raw(i);
         msg!("pos {:?} perp market index {:?}", i, pos.market_index);
     }
 

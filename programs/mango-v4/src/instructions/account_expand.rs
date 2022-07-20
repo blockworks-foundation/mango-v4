@@ -59,8 +59,7 @@ pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
     let mal: MangoAccountLoader<MangoAccount2Fixed, MangoAccount2DynamicHeader, MangoAccount2> =
         MangoAccountLoader::new(ctx.accounts.account2.to_account_info())?;
     let mut meta = mal.load_mut()?;
-    meta.dynamic
-        .expand_dynamic_content(token_count, serum3_count, perp_count)?;
+    meta.expand_dynamic_content(token_count, serum3_count, perp_count)?;
 
     Ok(())
 }
