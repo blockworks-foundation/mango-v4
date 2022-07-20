@@ -446,6 +446,23 @@ export class MangoClient {
       .rpc();
   }
 
+  public async expandMangoAccount(
+    group: Group,
+    account: MangoAccount,
+    account2: PublicKey,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .accountExpand()
+      .accounts({
+        group: group.publicKey,
+        account: account.publicKey,
+        account2,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
+  }
+
   public async editMangoAccount(
     group: Group,
     mangoAccount: MangoAccount,
@@ -494,7 +511,7 @@ export class MangoClient {
   }
 
   public async getCFTestccountForOwner(ownerPk: PublicKey): Promise<any> {
-    return await this.program.account.MangoAccount2.all([
+    return await this.program.account.mangoAccount2.all([
       {
         memcmp: {
           bytes: ownerPk.toBase58(),
