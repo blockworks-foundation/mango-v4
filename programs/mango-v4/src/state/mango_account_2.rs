@@ -309,49 +309,45 @@ impl<Header: DerefMut<Target = MangoAccount2DynamicHeader>, Data: DerefMut<Targe
             serum3_count: new_serum3_count,
             perp_count: new_perp_count,
         };
+        let old_header = self.header.clone();
+        let dynamic = self.dynamic_mut();
 
         // expand dynamic components by first moving existing positions, and then setting new ones to defaults
 
         // perp positions
-        let old_offset = self.header.perp_offset(0);
         unsafe {
             sol_memmove(
-                &mut self.dynamic_mut()[new_header.perp_offset(0)],
-                &mut self.dynamic_mut()[old_offset],
-                size_of::<PerpPositions>() * self.header.perp_count(),
+                &mut dynamic[new_header.perp_offset(0)],
+                &mut dynamic[old_header.perp_offset(0)],
+                size_of::<PerpPositions>() * old_header.perp_count(),
             );
         }
-        for i in self.header.perp_count..new_perp_count {
-            *get_helper_mut(self.dynamic_mut(), new_header.perp_offset(i.into())) =
-                PerpPositions::default();
+        for i in old_header.perp_count..new_perp_count {
+            *get_helper_mut(dynamic, new_header.perp_offset(i.into())) = PerpPositions::default();
         }
 
         // serum3 positions
-        let old_offset = self.header.serum3_offset(0);
         unsafe {
             sol_memmove(
-                &mut self.dynamic_mut()[new_header.serum3_offset(0)],
-                &mut self.dynamic_mut()[old_offset],
-                size_of::<Serum3Orders>() * self.header.serum3_count(),
+                &mut dynamic[new_header.serum3_offset(0)],
+                &mut dynamic[old_header.serum3_offset(0)],
+                size_of::<Serum3Orders>() * old_header.serum3_count(),
             );
         }
-        for i in self.header.serum3_count..new_serum3_count {
-            *get_helper_mut(self.dynamic_mut(), new_header.serum3_offset(i.into())) =
-                Serum3Orders::default();
+        for i in old_header.serum3_count..new_serum3_count {
+            *get_helper_mut(dynamic, new_header.serum3_offset(i.into())) = Serum3Orders::default();
         }
 
         // token positions
-        let old_offset = self.header.token_offset(0);
         unsafe {
             sol_memmove(
-                &mut self.dynamic_mut()[new_header.token_offset(0)],
-                &mut self.dynamic_mut()[old_offset],
-                size_of::<TokenPosition>() * self.header.token_count(),
+                &mut dynamic[new_header.token_offset(0)],
+                &mut dynamic[old_header.token_offset(0)],
+                size_of::<TokenPosition>() * old_header.token_count(),
             );
         }
-        for i in self.header.token_count..new_token_count {
-            *get_helper_mut(self.dynamic_mut(), new_header.token_offset(i.into())) =
-                TokenPosition::default();
+        for i in old_header.token_count..new_token_count {
+            *get_helper_mut(dynamic, new_header.token_offset(i.into())) = TokenPosition::default();
         }
 
         // update header
