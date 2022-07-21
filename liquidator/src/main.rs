@@ -4,11 +4,9 @@ use std::time::Duration;
 
 use anchor_client::Cluster;
 use clap::Parser;
-use client::{keypair_from_cli, MangoClient, MangoGroupContext};
+use client::{chain_data, keypair_from_cli, MangoClient, MangoGroupContext};
 use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
-
-use once_cell::sync::OnceCell;
 
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::commitment_config::CommitmentConfig;
@@ -17,25 +15,18 @@ use solana_sdk::signer::Signer;
 use std::collections::HashSet;
 
 pub mod account_shared_data;
-pub mod chain_data;
-pub mod chain_data_fetcher;
 pub mod liquidate;
 pub mod metrics;
 pub mod snapshot_source;
 pub mod util;
 pub mod websocket_source;
 
-use crate::chain_data::*;
-use crate::chain_data_fetcher::*;
 use crate::util::{is_mango_account, is_mango_bank, is_mint_info, is_perp_market};
 
 // jemalloc seems to be better at keeping the memory footprint reasonable over
 // longer periods of time
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
-
-// first slot received from websocket feed
-static FIRST_WEBSOCKET_SLOT: OnceCell<u64> = OnceCell::new();
 
 trait AnyhowWrap {
     type Value;
@@ -170,6 +161,12 @@ async fn main() -> anyhow::Result<()> {
         websocket_sender,
     );
 
+    let first_websocket_slot = websocket_source::get_next_create_bank_slot(
+        websocket_receiver.clone(),
+        Duration::from_secs(10),
+    )
+    .await?;
+
     // Getting solana account snapshots via jsonrpc
     let (snapshot_sender, snapshot_receiver) =
         async_channel::unbounded::<snapshot_source::AccountSnapshot>();
@@ -182,15 +179,16 @@ async fn main() -> anyhow::Result<()> {
             get_multiple_accounts_count: cli.get_multiple_accounts_count,
             parallel_rpc_requests: cli.parallel_rpc_requests,
             snapshot_interval: std::time::Duration::from_secs(cli.snapshot_interval_secs),
+            min_slot: first_websocket_slot + 10,
         },
         mango_pyth_oracles,
         snapshot_sender,
     );
 
     // The representation of current on-chain account data
-    let chain_data = Arc::new(RwLock::new(ChainData::new(&metrics)));
+    let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
     // Reading accounts from chain_data
-    let account_fetcher = Arc::new(ChainDataAccountFetcher {
+    let account_fetcher = Arc::new(chain_data::AccountFetcher {
         chain_data: chain_data.clone(),
         rpc: RpcClient::new_with_timeout_and_commitment(
             cluster.url().to_string(),
@@ -198,6 +196,8 @@ async fn main() -> anyhow::Result<()> {
             commitment,
         ),
     });
+
+    start_chain_data_metrics(chain_data.clone(), &metrics);
 
     // Addresses of the MangoAccounts belonging to the mango program.
     // Needed to check health of them all when the cache updates.
@@ -245,8 +245,7 @@ async fn main() -> anyhow::Result<()> {
                 let message = message.expect("channel not closed");
 
                 // build a model of slots and accounts in `chain_data`
-                // this code should be generic so it can be reused in future projects
-                chain_data.write().unwrap().update_from_websocket(message.clone());
+                websocket_source::update_chain_data(&mut chain_data.write().unwrap(), message.clone());
 
                 // specific program logic using the mirrored data
                 if let websocket_source::Message::Account(account_write) = message {
@@ -325,7 +324,7 @@ async fn main() -> anyhow::Result<()> {
                 }
                 metric_mango_accounts.set(mango_accounts.len() as u64);
 
-                chain_data.write().unwrap().update_from_snapshot(message);
+                snapshot_source::update_chain_data(&mut chain_data.write().unwrap(), message);
                 one_snapshot_done = true;
 
                 // trigger a full health check
@@ -339,4 +338,23 @@ async fn main() -> anyhow::Result<()> {
             },
         }
     }
+}
+
+fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: &metrics::Metrics) {
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+
+    let mut metric_slots_count = metrics.register_u64("chain_data_slots_count".into());
+    let mut metric_accounts_count = metrics.register_u64("chain_data_accounts_count".into());
+    let mut metric_account_write_count =
+        metrics.register_u64("chain_data_account_write_count".into());
+
+    tokio::spawn(async move {
+        loop {
+            interval.tick().await;
+            let chain_lock = chain.read().unwrap();
+            metric_slots_count.set(chain_lock.slots_count() as u64);
+            metric_accounts_count.set(chain_lock.accounts_count() as u64);
+            metric_account_write_count.set(chain_lock.account_writes_count() as u64);
+        }
+    });
 }

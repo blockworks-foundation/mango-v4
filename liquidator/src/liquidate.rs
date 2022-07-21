@@ -1,7 +1,6 @@
 use crate::account_shared_data::KeyedAccountSharedData;
-use crate::ChainDataAccountFetcher;
 
-use client::{AccountFetcher, MangoClient, MangoClientError, MangoGroupContext};
+use client::{chain_data, AccountFetcher, MangoClient, MangoClientError, MangoGroupContext};
 use mango_v4::state::{
     new_health_cache, oracle_price, Bank, FixedOrderAccountRetriever, HealthCache, HealthType,
     MangoAccountValue, TokenIndex,
@@ -11,7 +10,7 @@ use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 pub fn new_health_cache_(
     context: &MangoGroupContext,
-    account_fetcher: &ChainDataAccountFetcher,
+    account_fetcher: &chain_data::AccountFetcher,
     account: &MangoAccountValue,
 ) -> anyhow::Result<HealthCache> {
     let active_token_len = account.token_iter_active().count();
@@ -40,7 +39,7 @@ pub fn new_health_cache_(
 #[allow(clippy::too_many_arguments)]
 pub fn process_account(
     mango_client: &MangoClient,
-    account_fetcher: &ChainDataAccountFetcher,
+    account_fetcher: &chain_data::AccountFetcher,
     pubkey: &Pubkey,
 ) -> anyhow::Result<()> {
     // TODO: configurable
@@ -165,7 +164,7 @@ pub fn process_account(
 #[allow(clippy::too_many_arguments)]
 pub fn process_accounts<'a>(
     mango_client: &MangoClient,
-    account_fetcher: &ChainDataAccountFetcher,
+    account_fetcher: &chain_data::AccountFetcher,
     accounts: impl Iterator<Item = &'a Pubkey>,
 ) -> anyhow::Result<()> {
     for pubkey in accounts {

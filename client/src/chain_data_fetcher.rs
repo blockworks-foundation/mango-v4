@@ -2,7 +2,6 @@ use std::sync::{Arc, RwLock};
 
 use crate::chain_data::*;
 
-use client::AccountFetcher;
 use mango_v4::accounts_zerocopy::LoadZeroCopy;
 use mango_v4::state::MangoAccountValue;
 
@@ -12,12 +11,12 @@ use solana_client::rpc_client::RpcClient;
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
 use solana_sdk::pubkey::Pubkey;
 
-pub struct ChainDataAccountFetcher {
+pub struct AccountFetcher {
     pub chain_data: Arc<RwLock<ChainData>>,
     pub rpc: RpcClient,
 }
 
-impl ChainDataAccountFetcher {
+impl AccountFetcher {
     // loads from ChainData
     pub fn fetch<T: anchor_lang::ZeroCopy + anchor_lang::Owner>(
         &self,
@@ -71,22 +70,17 @@ impl ChainDataAccountFetcher {
         let mut chain_data = self.chain_data.write().unwrap();
         chain_data.update_from_rpc(
             address,
-            AccountData {
+            AccountAndSlot {
                 slot: response.context.slot,
                 account: account.into(),
             },
-        );
-        log::trace!(
-            "refreshed data of account {} via rpc, got context slot {}",
-            address,
-            response.context.slot
         );
 
         Ok(())
     }
 }
 
-impl AccountFetcher for ChainDataAccountFetcher {
+impl crate::AccountFetcher for AccountFetcher {
     fn fetch_raw_account(&self, address: Pubkey) -> anyhow::Result<solana_sdk::account::Account> {
         self.fetch_raw(&address).map(|a| a.into())
     }
