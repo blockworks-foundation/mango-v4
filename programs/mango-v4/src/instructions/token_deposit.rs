@@ -89,7 +89,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
 
     emit!(TokenBalanceLog {
         mango_account: ctx.accounts.account.key(),
-        token_index: token_index,
+        token_index,
         indexed_position: indexed_position.to_bits(),
         deposit_index: bank.deposit_index.to_bits(),
         borrow_index: bank.borrow_index.to_bits(),
