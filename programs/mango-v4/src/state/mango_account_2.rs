@@ -95,7 +95,7 @@ pub trait Header: Sized {
     fn initialize(data: &mut [u8]) -> Result<()>;
 }
 
-trait DynamicAccount {
+pub trait DynamicAccount: Owner + Discriminator {
     type Header: Header;
     type Fixed: bytemuck::Pod;
 }
@@ -161,30 +161,29 @@ impl MangoAccount2DynamicHeader {
     }
 }
 
-// Future: The accessor struct itself could be generic
-pub struct MangoAccount2Accessor<
-    Header: Deref<Target = MangoAccount2DynamicHeader>,
-    Fixed: Deref<Target = MangoAccount2Fixed>,
-    Dynamic: Deref<Target = [u8]>,
-> {
+pub struct DynamicAccessor<Header, Fixed, Dynamic> {
     pub header: Header,
     pub fixed: Fixed,
     pub dynamic: Dynamic,
 }
 
-pub type MangoAccountAcc<'a> =
-    MangoAccount2Accessor<&'a MangoAccount2DynamicHeader, &'a MangoAccount2Fixed, &'a [u8]>;
-pub type MangoAccountAccMut<'a> = MangoAccount2Accessor<
-    &'a mut MangoAccount2DynamicHeader,
-    &'a mut MangoAccount2Fixed,
+type DynamicAccessorRef<'a, D> =
+    DynamicAccessor<&'a <D as DynamicAccount>::Header, &'a <D as DynamicAccount>::Fixed, &'a [u8]>;
+type DynamicAccessorRefMut<'a, D> = DynamicAccessor<
+    &'a mut <D as DynamicAccount>::Header,
+    &'a mut <D as DynamicAccount>::Fixed,
     &'a mut [u8],
 >;
 
+pub type MangoAccountAcc<'a> = DynamicAccessorRef<'a, MangoAccount2>;
+pub type MangoAccountAccMut<'a> = DynamicAccessorRefMut<'a, MangoAccount2>;
+
+// This generic impl covers MangoAccountAcc and MangoAccountAccMut
 impl<
         Header: Deref<Target = MangoAccount2DynamicHeader>,
         Fixed: Deref<Target = MangoAccount2Fixed>,
         Dynamic: Deref<Target = [u8]>,
-    > MangoAccount2Accessor<Header, Fixed, Dynamic>
+    > DynamicAccessor<Header, Fixed, Dynamic>
 {
     // get TokenPosition at raw_index
     pub fn token_raw(&self, raw_index: usize) -> &TokenPosition {
@@ -206,11 +205,8 @@ impl<
         get_helper(&self.dynamic, self.header.perp_offset(raw_index))
     }
 
-    pub fn borrow<'b>(
-        &'b self,
-    ) -> MangoAccount2Accessor<&'b MangoAccount2DynamicHeader, &'b MangoAccount2Fixed, &'b [u8]>
-    {
-        MangoAccount2Accessor {
+    pub fn borrow<'b>(&'b self) -> DynamicAccessorRef<'b, MangoAccount2> {
+        DynamicAccessor {
             header: &self.header,
             fixed: &self.fixed,
             dynamic: &self.dynamic,
@@ -218,35 +214,19 @@ impl<
     }
 }
 
-pub struct TokensMutAccessor<
-    'a,
-    Header: DerefMut<Target = MangoAccount2DynamicHeader>,
-    Fixed: DerefMut<Target = MangoAccount2Fixed>,
-    Dynamic: DerefMut<Target = [u8]>,
-> {
-    acc: &'a mut MangoAccount2Accessor<Header, Fixed, Dynamic>,
+pub struct TokensMutAccessor<'a, 'b> {
+    acc: &'b mut MangoAccountAccMut<'a>,
 }
 
-impl<
-        'a,
-        Header: DerefMut<Target = MangoAccount2DynamicHeader>,
-        Fixed: DerefMut<Target = MangoAccount2Fixed>,
-        Dynamic: DerefMut<Target = [u8]>,
-    > TokensMutAccessor<'a, Header, Fixed, Dynamic>
-{
+impl<'a, 'b> TokensMutAccessor<'a, 'b> {
     pub fn get_raw(&mut self, raw_index: usize) -> &mut TokenPosition {
         let offset = self.acc.header.token_offset(raw_index);
         get_helper_mut(&mut self.acc.dynamic, offset)
     }
 }
 
-impl<
-        Header: DerefMut<Target = MangoAccount2DynamicHeader>,
-        Fixed: DerefMut<Target = MangoAccount2Fixed>,
-        Dynamic: DerefMut<Target = [u8]>,
-    > MangoAccount2Accessor<Header, Fixed, Dynamic>
-{
-    pub fn tokens_mut<'a>(&'a mut self) -> TokensMutAccessor<'a, Header, Fixed, Dynamic> {
+impl<'a> MangoAccountAccMut<'a> {
+    pub fn tokens_mut<'b>(&'b mut self) -> TokensMutAccessor<'a, 'b> {
         TokensMutAccessor { acc: self }
     }
 
@@ -443,8 +423,7 @@ pub trait GetAccessorMut<'a> {
 }
 
 impl<'a> GetAccessor<'a> for MangoAccount2DynamicHeader {
-    type Accessor =
-        MangoAccount2Accessor<&'a MangoAccount2DynamicHeader, &'a MangoAccount2Fixed, &'a [u8]>;
+    type Accessor = MangoAccountAcc<'a>;
     fn new_accessor(&'a self, data: &'a [u8]) -> Self::Accessor {
         let (start_slice, dynamic) = data.split_at(8 + size_of::<MangoAccount2Fixed>());
         let (_disc, fixed) = start_slice.split_at(8);
@@ -457,11 +436,7 @@ impl<'a> GetAccessor<'a> for MangoAccount2DynamicHeader {
 }
 
 impl<'a> GetAccessorMut<'a> for MangoAccount2DynamicHeader {
-    type AccessorMut = MangoAccount2Accessor<
-        &'a mut MangoAccount2DynamicHeader,
-        &'a mut MangoAccount2Fixed,
-        &'a mut [u8],
-    >;
+    type AccessorMut = MangoAccountAccMut<'a>;
     fn new_accessor_mut(&'a mut self, data: &'a mut [u8]) -> Self::AccessorMut {
         let (start_slice, dynamic) = data.split_at_mut(8 + size_of::<MangoAccount2Fixed>());
         let (_disc, fixed) = start_slice.split_at_mut(8);
@@ -473,49 +448,34 @@ impl<'a> GetAccessorMut<'a> for MangoAccount2DynamicHeader {
     }
 }
 
-pub struct MangoAccountLoader<
-    'info,
-    'acc,
-    FixedPart: bytemuck::Pod,
-    HeaderPart: Header,
-    ClientAccount: Owner + Discriminator,
-> {
+pub struct MangoAccountLoader<'info, 'acc, D: DynamicAccount> {
     data: RefMut<'acc, &'info mut [u8]>,
-    header: HeaderPart,
-    phantom1: PhantomData<&'info FixedPart>,
-    phantom2: PhantomData<&'info ClientAccount>,
+    header: D::Header,
+    phantom1: PhantomData<&'info D>,
 }
 
-impl<
-        'info,
-        'acc,
-        FixedPart: bytemuck::Pod,
-        HeaderPart: Header,
-        ClientAccount: Owner + Discriminator,
-    > MangoAccountLoader<'info, 'acc, FixedPart, HeaderPart, ClientAccount>
-{
+impl<'info, 'acc, D: DynamicAccount> MangoAccountLoader<'info, 'acc, D> {
     pub fn new(acc_info: &'acc AccountInfo<'info>) -> Result<Self> {
-        if acc_info.owner != &ClientAccount::owner() {
+        if acc_info.owner != &D::owner() {
             return Err(Error::from(ErrorCode::AccountOwnedByWrongProgram)
-                .with_pubkeys((*acc_info.owner, ClientAccount::owner())));
+                .with_pubkeys((*acc_info.owner, D::owner())));
         }
 
         let data = acc_info.try_borrow_mut_data()?;
-        if data.len() < ClientAccount::discriminator().len() {
+        if data.len() < D::discriminator().len() {
             return Err(ErrorCode::AccountDiscriminatorNotFound.into());
         }
         let disc_bytes = array_ref![data, 0, 8];
-        if disc_bytes != &ClientAccount::discriminator() {
+        if disc_bytes != &D::discriminator() {
             return Err(ErrorCode::AccountDiscriminatorMismatch.into());
         }
 
-        let header = HeaderPart::try_new_header(&data[8 + size_of::<FixedPart>()..])?;
+        let header = D::Header::try_new_header(&data[8 + size_of::<D::Fixed>()..])?;
 
         Ok(Self {
             data,
             header,
             phantom1: PhantomData,
-            phantom2: PhantomData,
         })
     }
 
@@ -533,24 +493,24 @@ impl<
         }
 
         let disc_bytes: &mut [u8] = &mut data[0..8];
-        disc_bytes.copy_from_slice(bytemuck::bytes_of(&(ClientAccount::discriminator())));
+        disc_bytes.copy_from_slice(bytemuck::bytes_of(&(D::discriminator())));
         drop(data);
 
         Self::new(acc_info)
     }
 
     /// Returns a Ref to the account data structure for reading.
-    pub fn load<'a>(&'a self) -> Result<HeaderPart::Accessor>
+    pub fn load<'a>(&'a self) -> Result<<D::Header as GetAccessor<'a>>::Accessor>
     where
-        HeaderPart: GetAccessor<'a>,
+        D::Header: GetAccessor<'a>,
     {
         Ok(self.header.new_accessor(&self.data))
     }
 
     /// Returns a `RefMut` to the account data structure for reading or writing.
-    pub fn load_mut<'a>(&'a mut self) -> Result<HeaderPart::AccessorMut>
+    pub fn load_mut<'a>(&'a mut self) -> Result<<D::Header as GetAccessorMut<'a>>::AccessorMut>
     where
-        HeaderPart: GetAccessorMut<'a>,
+        D::Header: GetAccessorMut<'a>,
     {
         // TODO: hmm, early writability checks would be good!
         // if !self.acc_info.is_writable {

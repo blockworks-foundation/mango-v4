@@ -126,7 +126,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     //
     // mango account 2 i.e. mango account with expandable positions
     //
-    let mut mal: MangoAccountLoader<MangoAccount2Fixed, MangoAccount2DynamicHeader, MangoAccount2> =
+    let mut mal: MangoAccountLoader<MangoAccount2> =
         MangoAccountLoader::new(&ctx.accounts.account2)?;
     let mut meta = mal.load_mut()?;
     let mut token_position = meta.token_raw_mut(0);

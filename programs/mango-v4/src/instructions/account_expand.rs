@@ -56,7 +56,7 @@ pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
     ctx.accounts.account2.realloc(new_space, true)?;
 
     // expand dynamic content, e.g. to grow token positions, we need to slide serum3orders further later, and so on....
-    let mut mal: MangoAccountLoader<MangoAccount2Fixed, MangoAccount2DynamicHeader, MangoAccount2> =
+    let mut mal: MangoAccountLoader<MangoAccount2> =
         MangoAccountLoader::new(&ctx.accounts.account2)?;
     let mut meta = mal.load_mut()?;
     meta.expand_dynamic_content(token_count, serum3_count, perp_count)?;

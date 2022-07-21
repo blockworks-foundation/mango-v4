@@ -57,7 +57,7 @@ pub fn account_create(ctx: Context<AccountCreate>, account_num: u8, name: String
     // mango account 2 i.e. mango account with expandable positions
     //
     // init disc
-    let mut mal: MangoAccountLoader<MangoAccount2Fixed, MangoAccount2DynamicHeader, MangoAccount2> =
+    let mut mal: MangoAccountLoader<MangoAccount2> =
         MangoAccountLoader::new_init(&ctx.accounts.account2)?;
     let mut meta: MangoAccountAccMut = mal.load_mut()?;
     // init fixed fields
