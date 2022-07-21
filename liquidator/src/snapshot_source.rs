@@ -18,7 +18,9 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::time;
 
-use crate::{util::is_mango_account, AnyhowWrap, FIRST_WEBSOCKET_SLOT};
+use client::chain_data;
+
+use crate::{util::is_mango_account, AnyhowWrap};
 
 #[derive(Clone)]
 pub struct AccountUpdate {
@@ -79,6 +81,7 @@ pub struct Config {
     pub get_multiple_accounts_count: usize,
     pub parallel_rpc_requests: usize,
     pub snapshot_interval: Duration,
+    pub min_slot: u64,
 }
 
 async fn feed_snapshots(
@@ -94,7 +97,7 @@ async fn feed_snapshots(
         encoding: Some(UiAccountEncoding::Base64),
         commitment: Some(CommitmentConfig::finalized()),
         data_slice: None,
-        min_context_slot: None,
+        min_context_slot: Some(config.min_slot),
     };
     let all_accounts_config = RpcProgramAccountsConfig {
         filters: None,
@@ -215,6 +218,7 @@ pub fn start(
             .await
             .expect("always Ok");
 
+        // Wait for slot to exceed min_slot
         loop {
             poll_wait_first_snapshot.tick().await;
 
@@ -227,14 +231,9 @@ pub fn start(
                 .expect("always Ok");
             log::debug!("latest slot for snapshot {}", epoch_info.absolute_slot);
 
-            match FIRST_WEBSOCKET_SLOT.get() {
-                Some(first_websocket_slot) => {
-                    if first_websocket_slot < &epoch_info.absolute_slot {
-                        log::debug!("continuing to fetch snapshot now, first websocket feed slot {} is older than latest snapshot slot {}",first_websocket_slot,  epoch_info.absolute_slot);
-                        break;
-                    }
-                }
-                None => {}
+            if epoch_info.absolute_slot > config.min_slot {
+                log::debug!("continuing to fetch snapshot now, min_slot {} is older than latest epoch slot {}", config.min_slot, epoch_info.absolute_slot);
+                break;
             }
         }
 
@@ -247,4 +246,16 @@ pub fn start(
             };
         }
     });
+}
+
+pub fn update_chain_data(chain: &mut chain_data::ChainData, snapshot: AccountSnapshot) {
+    for account_update in snapshot.accounts {
+        chain.update_account(
+            account_update.pubkey,
+            chain_data::AccountAndSlot {
+                account: account_update.account,
+                slot: account_update.slot,
+            },
+        );
+    }
 }
