@@ -14,9 +14,17 @@ use crate::error::Contextable;
 use crate::error::MangoError;
 use crate::error_msg;
 
+use super::FillEvent;
+use super::LeafNode;
+use super::PerpMarket;
+use super::PerpMarketIndex;
+use super::PerpOpenOrders;
 use super::Serum3MarketIndex;
+use super::Side;
 use super::TokenIndex;
+use super::FREE_ORDER_SLOT;
 use super::{PerpPositions, Serum3Orders, TokenPosition};
+use checked_math as cm;
 
 type BorshVecLength = u32;
 const BORSH_VEC_PADDING_BYTES: usize = 4;
@@ -74,12 +82,14 @@ pub struct MangoAccount2 {
     pub serum3: Vec<Serum3Orders>,
     pub padding3: u32,
     pub perps: Vec<PerpPositions>,
+    pub padding4: u32,
+    pub perp_open_orders: Vec<PerpOpenOrders>,
 }
 
 impl MangoAccount2 {
-    pub fn space(token_count: u8, serum3_count: u8, perp_count: u8) -> usize {
+    pub fn space(token_count: u8, serum3_count: u8, perp_count: u8, perp_oo_count: u8) -> usize {
         8 + size_of::<MangoAccount2Fixed>()
-            + Self::dynamic_size(token_count, serum3_count, perp_count)
+            + Self::dynamic_size(token_count, serum3_count, perp_count, perp_oo_count)
     }
 
     pub fn dynamic_token_vec_offset() -> usize {
@@ -98,9 +108,20 @@ impl MangoAccount2 {
             + BORSH_VEC_PADDING_BYTES
     }
 
-    pub fn dynamic_size(token_count: u8, serum3_count: u8, perp_count: u8) -> usize {
+    pub fn dynamic_perp_oo_vec_offset(token_count: u8, serum3_count: u8, perp_count: u8) -> usize {
         Self::dynamic_perp_vec_offset(token_count, serum3_count)
             + (BORSH_VEC_SIZE_BYTES + size_of::<PerpPositions>() * usize::from(perp_count))
+            + BORSH_VEC_PADDING_BYTES
+    }
+
+    pub fn dynamic_size(
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
+    ) -> usize {
+        Self::dynamic_perp_oo_vec_offset(token_count, serum3_count, perp_count)
+            + (BORSH_VEC_SIZE_BYTES + size_of::<PerpOpenOrders>() * usize::from(perp_oo_count))
     }
 }
 
@@ -112,7 +133,7 @@ fn test_dynamic_offsets() {
     account.perps.resize(7, PerpPositions::default());
     assert_eq!(
         8 + AnchorSerialize::try_to_vec(&account).unwrap().len(),
-        MangoAccount2::space(3, 5, 7)
+        MangoAccount2::space(3, 5, 7, 4)
     );
 }
 
@@ -186,6 +207,7 @@ pub struct MangoAccount2DynamicHeader {
     pub token_count: u8,
     pub serum3_count: u8,
     pub perp_count: u8,
+    pub perp_oo_count: u8,
 }
 
 fn get_helper<T: bytemuck::Pod>(data: &[u8], index: usize) -> &T {
@@ -213,17 +235,18 @@ impl MangoAccount2DynamicHeader {
 
     // offset into dynamic data where 1st PerpPositions would be found
     fn perp_offset(&self, raw_index: usize) -> usize {
-        // msg!(
-        //     "perp_offset self.serum3_offset(0) {}",
-        //     self.serum3_offset(0)
-        // );
-        // msg!(
-        //     "perp_offset size_of::<Serum3Orders>() * self.serum3_count {}",
-        //     size_of::<Serum3Orders>() * self.serum3_count
-        // );
         MangoAccount2::dynamic_perp_vec_offset(self.token_count, self.serum3_count)
             + BORSH_VEC_SIZE_BYTES
             + raw_index * size_of::<PerpPositions>()
+    }
+
+    fn perp_oo_offset(&self, raw_index: usize) -> usize {
+        MangoAccount2::dynamic_perp_oo_vec_offset(
+            self.token_count,
+            self.serum3_count,
+            self.perp_count,
+        ) + BORSH_VEC_SIZE_BYTES
+            + raw_index * size_of::<PerpOpenOrders>()
     }
 
     pub fn token_count(&self) -> usize {
@@ -234,6 +257,9 @@ impl MangoAccount2DynamicHeader {
     }
     pub fn perp_count(&self) -> usize {
         self.perp_count.into()
+    }
+    pub fn perp_oo_count(&self) -> usize {
+        self.perp_oo_count.into()
     }
 }
 
@@ -316,6 +342,62 @@ impl<
     // get PerpPosition at raw_index
     pub fn perp_get_raw(&self, raw_index: usize) -> &PerpPositions {
         get_helper(&self.dynamic, self.header.perp_offset(raw_index))
+    }
+
+    pub fn perp_iter(&self) -> impl Iterator<Item = &PerpPositions> {
+        (0..self.header.perp_count()).map(|i| self.perp_get_raw(i))
+    }
+
+    pub fn perp_iter_active_accounts(&self) -> impl Iterator<Item = &PerpPositions> {
+        (0..self.header.perp_count())
+            .map(|i| self.perp_get_raw(i))
+            .filter(|p| p.is_active())
+    }
+
+    pub fn perp_find_account(&self, market_index: PerpMarketIndex) -> Option<&PerpPositions> {
+        self.perp_iter_active_accounts()
+            .find(|p| p.is_active_for_market(market_index))
+    }
+
+    pub fn perp_oo_get_raw(&self, raw_index: usize) -> &PerpOpenOrders {
+        get_helper(&self.dynamic, self.header.perp_oo_offset(raw_index))
+    }
+
+    pub fn perp_oo_iter(&self) -> impl Iterator<Item = &PerpOpenOrders> {
+        (0..self.header.perp_oo_count()).map(|i| self.perp_oo_get_raw(i))
+    }
+
+    pub fn perp_next_order_slot(&self) -> Option<usize> {
+        self.perp_oo_iter()
+            .position(|&oo| oo.order_market == FREE_ORDER_SLOT)
+    }
+
+    pub fn perp_find_order_with_client_order_id(
+        &self,
+        market_index: PerpMarketIndex,
+        client_order_id: u64,
+    ) -> Option<(i128, Side)> {
+        for i in 0..self.header.perp_oo_count() {
+            let oo = self.perp_oo_get_raw(i);
+            if oo.order_market == market_index && oo.client_order_id == client_order_id {
+                return Some((oo.order_id, oo.order_side));
+            }
+        }
+        None
+    }
+
+    pub fn perp_find_order_side(
+        &self,
+        market_index: PerpMarketIndex,
+        order_id: i128,
+    ) -> Option<Side> {
+        for i in 0..self.header.perp_oo_count() {
+            let oo = self.perp_oo_get_raw(i);
+            if oo.order_market == market_index && oo.order_id == order_id {
+                return Some(oo.order_side);
+            }
+        }
+        None
     }
 
     pub fn borrow<'b>(&'b self) -> DynamicAccessorRef<'b, MangoAccount2> {
@@ -437,6 +519,162 @@ impl<'a> MangoAccountAccMut<'a> {
         get_helper_mut(&mut self.dynamic, offset)
     }
 
+    pub fn perp_oo_get_mut_raw(&mut self, raw_index: usize) -> &mut PerpOpenOrders {
+        let offset = self.header.perp_oo_offset(raw_index);
+        get_helper_mut(&mut self.dynamic, offset)
+    }
+
+    pub fn perp_get_account_mut_or_create(
+        &mut self,
+        perp_market_index: PerpMarketIndex,
+    ) -> Result<(&mut PerpPositions, usize)> {
+        let mut raw_index_opt = self
+            .perp_iter_active_accounts()
+            .position(|p| p.is_active_for_market(perp_market_index));
+        if raw_index_opt.is_none() {
+            raw_index_opt = self.perp_iter().position(|p| !p.is_active());
+            if let Some(raw_index) = raw_index_opt {
+                *(self.perp_get_mut_raw(raw_index)) = PerpPositions {
+                    market_index: perp_market_index,
+                    ..Default::default()
+                };
+            }
+        }
+        if let Some(raw_index) = raw_index_opt {
+            Ok((self.perp_get_mut_raw(raw_index), raw_index))
+        } else {
+            err!(MangoError::NoFreePerpPositionIndex)
+        }
+    }
+
+    pub fn perp_deactivate_account(&mut self, raw_index: usize) {
+        self.perp_get_mut_raw(raw_index).market_index = PerpMarketIndex::MAX;
+    }
+
+    pub fn perp_add_order(
+        &mut self,
+        perp_market_index: PerpMarketIndex,
+        side: Side,
+        order: &LeafNode,
+    ) -> Result<()> {
+        let mut perp_account = self
+            .perp_get_account_mut_or_create(perp_market_index)
+            .unwrap()
+            .0;
+        match side {
+            Side::Bid => {
+                perp_account.bids_base_lots = cm!(perp_account.bids_base_lots + order.quantity);
+            }
+            Side::Ask => {
+                perp_account.asks_base_lots = cm!(perp_account.asks_base_lots + order.quantity);
+            }
+        };
+        let slot = order.owner_slot as usize;
+
+        let mut oo = self.perp_oo_get_mut_raw(slot);
+        oo.order_market = perp_market_index;
+        oo.order_side = side;
+        oo.order_id = order.key;
+        oo.client_order_id = order.client_order_id;
+        Ok(())
+    }
+
+    pub fn perp_remove_order(&mut self, slot: usize, quantity: i64) -> Result<()> {
+        {
+            let mut oo = self.perp_oo_get_mut_raw(slot);
+            require_neq!(oo.order_market, FREE_ORDER_SLOT);
+            let order_side = oo.order_side;
+            let perp_market_index = oo.order_market;
+            let perp_account = self
+                .perp_get_account_mut_or_create(perp_market_index)
+                .unwrap()
+                .0;
+
+            // accounting
+            match order_side {
+                Side::Bid => {
+                    perp_account.bids_base_lots = cm!(perp_account.bids_base_lots - quantity);
+                }
+                Side::Ask => {
+                    perp_account.asks_base_lots = cm!(perp_account.asks_base_lots - quantity);
+                }
+            }
+        }
+
+        // release space
+        let oo = self.perp_oo_get_mut_raw(slot);
+        oo.order_market = FREE_ORDER_SLOT;
+        oo.order_side = Side::Bid;
+        oo.order_id = 0i128;
+        oo.client_order_id = 0u64;
+        Ok(())
+    }
+
+    pub fn perp_execute_maker(
+        &mut self,
+        perp_market_index: PerpMarketIndex,
+        perp_market: &mut PerpMarket,
+        fill: &FillEvent,
+    ) -> Result<()> {
+        let pa = self
+            .perp_get_account_mut_or_create(perp_market_index)
+            .unwrap()
+            .0;
+        pa.settle_funding(perp_market);
+
+        let side = fill.taker_side.invert_side();
+        let (base_change, quote_change) = fill.base_quote_change(side);
+        pa.change_base_position(perp_market, base_change);
+        let quote = I80F48::from_num(
+            perp_market
+                .quote_lot_size
+                .checked_mul(quote_change)
+                .unwrap(),
+        );
+        let fees = quote.abs() * fill.maker_fee;
+        if !fill.market_fees_applied {
+            perp_market.fees_accrued += fees;
+        }
+        pa.quote_position_native = pa.quote_position_native.checked_add(quote - fees).unwrap();
+
+        if fill.maker_out {
+            self.perp_remove_order(fill.maker_slot as usize, base_change.abs())
+        } else {
+            match side {
+                Side::Bid => {
+                    pa.bids_base_lots = cm!(pa.bids_base_lots - base_change.abs());
+                }
+                Side::Ask => {
+                    pa.asks_base_lots = cm!(pa.asks_base_lots - base_change.abs());
+                }
+            }
+            Ok(())
+        }
+    }
+
+    pub fn perp_execute_taker(
+        &mut self,
+        perp_market_index: PerpMarketIndex,
+        perp_market: &mut PerpMarket,
+        fill: &FillEvent,
+    ) -> Result<()> {
+        let pa = self
+            .perp_get_account_mut_or_create(perp_market_index)
+            .unwrap()
+            .0;
+        pa.settle_funding(perp_market);
+
+        let (base_change, quote_change) = fill.base_quote_change(fill.taker_side);
+        pa.remove_taker_trade(base_change, quote_change);
+        pa.change_base_position(perp_market, base_change);
+        let quote = I80F48::from_num(perp_market.quote_lot_size * quote_change);
+
+        // fees are assessed at time of trade; no need to assess fees here
+
+        pa.quote_position_native += quote;
+        Ok(())
+    }
+
     // writes length of tokens vec at appropriate offset so that borsh can infer the vector length
     // length used is that present in the header
     fn write_token_length(&mut self) {
@@ -477,21 +715,37 @@ impl<'a> MangoAccountAccMut<'a> {
         new_token_count: u8,
         new_serum3_count: u8,
         new_perp_count: u8,
+        new_perp_oo_count: u8,
     ) -> Result<()> {
         require_gt!(new_token_count, self.header.token_count);
         require_gt!(new_serum3_count, self.header.serum3_count);
         require_gt!(new_perp_count, self.header.perp_count);
+        require_gt!(new_perp_oo_count, self.header.perp_oo_count);
 
         // create a temp copy to compute new starting offsets
         let new_header = MangoAccount2DynamicHeader {
             token_count: new_token_count,
             serum3_count: new_serum3_count,
             perp_count: new_perp_count,
+            perp_oo_count: new_perp_oo_count,
         };
         let old_header = self.header.clone();
         let dynamic = &mut self.dynamic;
 
         // expand dynamic components by first moving existing positions, and then setting new ones to defaults
+
+        // perp oo
+        unsafe {
+            sol_memmove(
+                &mut dynamic[new_header.perp_oo_offset(0)],
+                &mut dynamic[old_header.perp_oo_offset(0)],
+                size_of::<PerpPositions>() * old_header.perp_oo_count(),
+            );
+        }
+        for i in old_header.perp_oo_count..new_perp_oo_count {
+            *get_helper_mut(dynamic, new_header.perp_oo_offset(i.into())) =
+                PerpOpenOrders::default();
+        }
 
         // perp positions
         unsafe {
@@ -551,10 +805,6 @@ impl Header for MangoAccount2DynamicHeader {
             BORSH_VEC_SIZE_BYTES
         ]))
         .unwrap();
-        // msg!(
-        //     "reading tokens length at {}",
-        //     8 - size_of::<BorshVecLength>()
-        // );
 
         let serum3_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
             data,
@@ -562,10 +812,6 @@ impl Header for MangoAccount2DynamicHeader {
             BORSH_VEC_SIZE_BYTES
         ]))
         .unwrap();
-        // msg!(
-        //     "reading serum3 length at {}",
-        //     8 + size_of::<TokenPosition>() * token_count + 8 - size_of::<BorshVecLength>()
-        // );
 
         let perp_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
             data,
@@ -573,26 +819,19 @@ impl Header for MangoAccount2DynamicHeader {
             BORSH_VEC_SIZE_BYTES
         ]))
         .unwrap();
-        // msg!(
-        //     "reading perp length at {}",
-        //     8 + size_of::<TokenPosition>() * token_count
-        //         + 8
-        //         + size_of::<Serum3Orders>() * serum3_count
-        //         + 8
-        //         - size_of::<BorshVecLength>()
-        // );
 
-        // msg!(
-        //     "scanned & parsed {:?} {:?} {:?}",
-        //     token_count,
-        //     serum3_count,
-        //     perp_count
-        // );
+        let perp_oo_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
+            data,
+            MangoAccount2::dynamic_perp_oo_vec_offset(token_count, serum3_count, perp_count),
+            BORSH_VEC_SIZE_BYTES
+        ]))
+        .unwrap();
 
         Ok(Self {
             token_count,
             serum3_count,
             perp_count,
+            perp_oo_count,
         })
     }
 

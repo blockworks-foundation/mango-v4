@@ -29,8 +29,9 @@ pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
     let token_count = 5;
     let serum3_count = 6;
     let perp_count = 4;
+    let perp_oo_count = 4;
 
-    let new_space = MangoAccount2::space(token_count, serum3_count, perp_count);
+    let new_space = MangoAccount2::space(token_count, serum3_count, perp_count, perp_oo_count);
     let new_rent_minimum = Rent::get()?.minimum_balance(new_space);
 
     let old_space = ctx.accounts.account2.data_len();
@@ -58,7 +59,7 @@ pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
     let mut mal: MangoAccountLoader<MangoAccount2> =
         MangoAccountLoader::new(&ctx.accounts.account2)?;
     let mut meta = mal.load_mut()?;
-    meta.expand_dynamic_content(token_count, serum3_count, perp_count)?;
+    meta.expand_dynamic_content(token_count, serum3_count, perp_count, perp_oo_count)?;
 
     Ok(())
 }

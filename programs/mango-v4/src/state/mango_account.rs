@@ -472,6 +472,36 @@ impl PerpPositions {
 }
 
 #[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct PerpOpenOrders {
+    pub order_side: Side, // TODO: storing enums isn't POD
+    pub reserved1: [u8; 1],
+    pub order_market: PerpMarketIndex,
+    pub reserved2: [u8; 4],
+    pub client_order_id: u64,
+    pub order_id: i128,
+}
+
+impl Default for PerpOpenOrders {
+    fn default() -> Self {
+        Self {
+            order_side: Side::Bid,
+            reserved1: Default::default(),
+            order_market: FREE_ORDER_SLOT,
+            reserved2: Default::default(),
+            client_order_id: 0,
+            order_id: 0,
+        }
+    }
+}
+
+unsafe impl bytemuck::Pod for PerpOpenOrders {}
+unsafe impl bytemuck::Zeroable for PerpOpenOrders {}
+
+const_assert_eq!(size_of::<PerpOpenOrders>(), 1 + 1 + 2 + 4 + 8 + 16);
+const_assert_eq!(size_of::<PerpOpenOrders>() % 8, 0);
+
+#[zero_copy]
 pub struct MangoAccountPerpPositions {
     pub accounts: [PerpPositions; MAX_PERP_ACCOUNTS],
 
