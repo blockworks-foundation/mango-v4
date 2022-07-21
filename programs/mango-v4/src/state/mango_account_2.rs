@@ -225,9 +225,39 @@ impl<'a, 'b> TokensMutAccessor<'a, 'b> {
     }
 }
 
+pub struct Serum3MutAccessor<'a, 'b> {
+    acc: &'b mut MangoAccountAccMut<'a>,
+}
+
+impl<'a, 'b> Serum3MutAccessor<'a, 'b> {
+    pub fn get_raw(&mut self, raw_index: usize) -> &mut Serum3Orders {
+        let offset = self.acc.header.serum3_offset(raw_index);
+        get_helper_mut(&mut self.acc.dynamic, offset)
+    }
+}
+
+pub struct PerpsMutAccessor<'a, 'b> {
+    acc: &'b mut MangoAccountAccMut<'a>,
+}
+
+impl<'a, 'b> PerpsMutAccessor<'a, 'b> {
+    pub fn get_raw(&mut self, raw_index: usize) -> &mut PerpPositions {
+        let offset = self.acc.header.perp_offset(raw_index);
+        get_helper_mut(&mut self.acc.dynamic, offset)
+    }
+}
+
 impl<'a> MangoAccountAccMut<'a> {
     pub fn tokens_mut<'b>(&'b mut self) -> TokensMutAccessor<'a, 'b> {
         TokensMutAccessor { acc: self }
+    }
+
+    pub fn serum3_mut<'b>(&'b mut self) -> Serum3MutAccessor<'a, 'b> {
+        Serum3MutAccessor { acc: self }
+    }
+
+    pub fn perps_mut<'b>(&'b mut self) -> PerpsMutAccessor<'a, 'b> {
+        PerpsMutAccessor { acc: self }
     }
 
     // get mut TokenPosition at raw_index
