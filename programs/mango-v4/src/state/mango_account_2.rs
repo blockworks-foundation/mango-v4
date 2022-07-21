@@ -174,6 +174,13 @@ pub struct MangoAccount2Accessor<
     pub dynamic: Dynamic,
 }
 
+type MangoAccountAcc<'a> = MangoAccount2Accessor<&'a MangoAccount2Fixed, &'a [u8]>;
+type MangoAccountAccMut<'a> = MangoAccount2Accessor<&'a mut MangoAccount2Fixed, &'a mut [u8]>;
+
+pub fn test_fun(a: MangoAccountAcc) -> u16 {
+    a.token_raw(1).token_index
+}
+
 impl<Fixed: Deref<Target = MangoAccount2Fixed>, Dynamic: Deref<Target = [u8]>>
     MangoAccount2Accessor<Fixed, Dynamic>
 {
