@@ -2955,6 +2955,7 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serum_dex",
+ "solana-address-lookup-table-program",
  "solana-logger",
  "solana-program",
  "solana-program-test",

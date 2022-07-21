@@ -5,7 +5,6 @@ use anchor_lang::AccountDeserialize;
 use anchor_spl::token::TokenAccount;
 use solana_program::{program_pack::Pack, rent::*, system_instruction};
 use solana_program_test::*;
-use solana_sdk::transport::TransportError;
 use solana_sdk::{
     account::ReadableAccount,
     instruction::Instruction,
@@ -169,11 +168,12 @@ impl SolanaCookie {
         authority: &Keypair,
         payer: &Keypair,
     ) -> Pubkey {
-        let (instruction, alt_address) = mango_v4::address_lookup_table::create_lookup_table(
-            authority.pubkey(),
-            payer.pubkey(),
-            self.get_newest_slot_from_history().await,
-        );
+        let (instruction, alt_address) =
+            solana_address_lookup_table_program::instruction::create_lookup_table(
+                authority.pubkey(),
+                payer.pubkey(),
+                self.get_newest_slot_from_history().await,
+            );
         self.process_transaction(&[instruction], Some(&[authority, payer]))
             .await
             .unwrap();

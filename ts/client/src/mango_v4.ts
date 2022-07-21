@@ -3930,49 +3930,6 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "ProgramInstruction",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "CreateLookupTable",
-            "fields": [
-              {
-                "name": "recent_slot",
-                "type": {
-                  "defined": "Slot"
-                }
-              },
-              {
-                "name": "bump_seed",
-                "type": "u8"
-              }
-            ]
-          },
-          {
-            "name": "FreezeLookupTable"
-          },
-          {
-            "name": "ExtendLookupTable",
-            "fields": [
-              {
-                "name": "new_addresses",
-                "type": {
-                  "vec": "publicKey"
-                }
-              }
-            ]
-          },
-          {
-            "name": "DeactivateLookupTable"
-          },
-          {
-            "name": "CloseLookupTable"
-          }
-        ]
-      }
-    },
-    {
       "name": "Serum3SelfTradeBehavior",
       "type": {
         "kind": "enum",
@@ -8715,49 +8672,6 @@ export const IDL: MangoV4 = {
           {
             "name": "val",
             "type": "i128"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ProgramInstruction",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "CreateLookupTable",
-            "fields": [
-              {
-                "name": "recent_slot",
-                "type": {
-                  "defined": "Slot"
-                }
-              },
-              {
-                "name": "bump_seed",
-                "type": "u8"
-              }
-            ]
-          },
-          {
-            "name": "FreezeLookupTable"
-          },
-          {
-            "name": "ExtendLookupTable",
-            "fields": [
-              {
-                "name": "new_addresses",
-                "type": {
-                  "vec": "publicKey"
-                }
-              }
-            ]
-          },
-          {
-            "name": "DeactivateLookupTable"
-          },
-          {
-            "name": "CloseLookupTable"
           }
         ]
       }
