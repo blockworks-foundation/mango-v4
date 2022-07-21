@@ -57,12 +57,12 @@ pub fn account_create(ctx: Context<AccountCreate>, account_num: u8, name: String
     // mango account 2 i.e. mango account with expandable positions
     //
     // init disc
-    let mal: MangoAccountLoader<MangoAccount2Fixed, MangoAccount2DynamicHeader, MangoAccount2> =
-        MangoAccountLoader::new(ctx.accounts.account2.to_account_info())?;
-    let mut meta = mal.load_init()?;
+    let mut mal: MangoAccountLoader<MangoAccount2Fixed, MangoAccount2DynamicHeader, MangoAccount2> =
+        MangoAccountLoader::new_init(&ctx.accounts.account2)?;
+    let mut meta = mal.load_mut()?;
     // init fixed fields
     // later we would expand, and verify if the existing ones are set and new expanded ones are unset
-    meta.fixed.owner = ctx.accounts.owner.key();
+    meta.fixed_mut().owner = ctx.accounts.owner.key();
     // init dynamic fields
     let token_count: u8 = 3;
     let serum3_count: u8 = 4;
