@@ -3,7 +3,6 @@ use anchor_lang::prelude::*;
 use crate::error::*;
 use crate::state::*;
 use crate::util::fill32_from_str;
-use fixed_macro::types::I80F48;
 
 #[derive(Accounts)]
 #[instruction(account_num: u8)]

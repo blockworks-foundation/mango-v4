@@ -1,13 +1,12 @@
-use std::cell::Ref;
 use std::cell::RefMut;
 use std::marker::PhantomData;
 use std::mem::size_of;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 use arrayref::array_ref;
-use bytemuck::Zeroable;
+
 use solana_program::program_memory::sol_memmove;
 
 use super::{PerpPositions, Serum3Orders, TokenPosition};
@@ -69,7 +68,7 @@ impl MangoAccount2 {
 #[test]
 fn test_dynamic_offsets() {
     let mut account = MangoAccount2::default();
-    account.tokens.resize(3, TokenPosition::zeroed());
+    account.tokens.resize(3, TokenPosition::default());
     account.serum3.resize(5, Serum3Orders::default());
     account.perps.resize(7, PerpPositions::default());
     assert_eq!(
