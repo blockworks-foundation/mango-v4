@@ -95,6 +95,16 @@ pub trait Header: Sized {
     fn initialize(data: &mut [u8]) -> Result<()>;
 }
 
+trait DynamicAccount {
+    type Header: Header;
+    type Fixed: bytemuck::Pod;
+}
+
+impl DynamicAccount for MangoAccount2 {
+    type Header = MangoAccount2DynamicHeader;
+    type Fixed = MangoAccount2Fixed;
+}
+
 #[derive(Clone)]
 pub struct MangoAccount2DynamicHeader {
     pub token_count: u8,
@@ -151,24 +161,34 @@ impl MangoAccount2DynamicHeader {
     }
 }
 
+// Future: The accessor struct itself could be generic
 pub struct MangoAccount2Accessor<
     Header: Deref<Target = MangoAccount2DynamicHeader>,
-    Data: Deref<Target = [u8]>,
+    Fixed: Deref<Target = MangoAccount2Fixed>,
+    Dynamic: Deref<Target = [u8]>,
 > {
     pub header: Header,
-    pub data: Data,
+    pub fixed: Fixed,
+    pub dynamic: Dynamic,
 }
 
-pub type MangoAccountAcc<'a> = MangoAccount2Accessor<&'a MangoAccount2DynamicHeader, &'a [u8]>;
-pub type MangoAccountAccMut<'a> =
-    MangoAccount2Accessor<&'a mut MangoAccount2DynamicHeader, &'a mut [u8]>;
+pub type MangoAccountAcc<'a> =
+    MangoAccount2Accessor<&'a MangoAccount2DynamicHeader, &'a MangoAccount2Fixed, &'a [u8]>;
+pub type MangoAccountAccMut<'a> = MangoAccount2Accessor<
+    &'a mut MangoAccount2DynamicHeader,
+    &'a mut MangoAccount2Fixed,
+    &'a mut [u8],
+>;
 
-impl<Header: Deref<Target = MangoAccount2DynamicHeader>, Data: Deref<Target = [u8]>>
-    MangoAccount2Accessor<Header, Data>
+impl<
+        Header: Deref<Target = MangoAccount2DynamicHeader>,
+        Fixed: Deref<Target = MangoAccount2Fixed>,
+        Dynamic: Deref<Target = [u8]>,
+    > MangoAccount2Accessor<Header, Fixed, Dynamic>
 {
     // get TokenPosition at raw_index
     pub fn token_raw(&self, raw_index: usize) -> &TokenPosition {
-        get_helper(self.dynamic(), self.header.token_offset(raw_index))
+        get_helper(&self.dynamic, self.header.token_offset(raw_index))
     }
 
     // get iter over all TokenPositions (including inactive)
@@ -178,98 +198,74 @@ impl<Header: Deref<Target = MangoAccount2DynamicHeader>, Data: Deref<Target = [u
 
     // get Serum3Orders at raw_index
     pub fn serum3_raw(&self, raw_index: usize) -> &Serum3Orders {
-        get_helper(self.dynamic(), self.header.serum3_offset(raw_index))
+        get_helper(&self.dynamic, self.header.serum3_offset(raw_index))
     }
 
     // get PerpPosition at raw_index
     pub fn perp_raw(&self, raw_index: usize) -> &PerpPositions {
-        get_helper(self.dynamic(), self.header.perp_offset(raw_index))
+        get_helper(&self.dynamic, self.header.perp_offset(raw_index))
     }
 
-    pub fn borrow<'b>(&'b self) -> MangoAccount2Accessor<&'b MangoAccount2DynamicHeader, &'b [u8]> {
+    pub fn borrow<'b>(
+        &'b self,
+    ) -> MangoAccount2Accessor<&'b MangoAccount2DynamicHeader, &'b MangoAccount2Fixed, &'b [u8]>
+    {
         MangoAccount2Accessor {
             header: &self.header,
-            data: &self.data,
+            fixed: &self.fixed,
+            dynamic: &self.dynamic,
         }
-    }
-
-    fn split(&self) -> (&MangoAccount2Fixed, &[u8]) {
-        let data = &self.data;
-        let (start_slice, dynamic_slice) = data.split_at(8 + size_of::<MangoAccount2Fixed>());
-        let (_disc, fixed_slice) = start_slice.split_at(8);
-        (
-            bytemuck::from_bytes::<MangoAccount2Fixed>(fixed_slice),
-            dynamic_slice,
-        )
-    }
-
-    pub fn fixed(&self) -> &MangoAccount2Fixed {
-        self.split().0
-    }
-
-    fn dynamic(&self) -> &[u8] {
-        self.split().1
     }
 }
 
 pub struct TokensMutAccessor<
     'a,
     Header: DerefMut<Target = MangoAccount2DynamicHeader>,
-    Data: DerefMut<Target = [u8]>,
+    Fixed: DerefMut<Target = MangoAccount2Fixed>,
+    Dynamic: DerefMut<Target = [u8]>,
 > {
-    acc: &'a mut MangoAccount2Accessor<Header, Data>,
+    acc: &'a mut MangoAccount2Accessor<Header, Fixed, Dynamic>,
 }
 
-impl<'a, Header: DerefMut<Target = MangoAccount2DynamicHeader>, Data: DerefMut<Target = [u8]>>
-    TokensMutAccessor<'a, Header, Data>
+impl<
+        'a,
+        Header: DerefMut<Target = MangoAccount2DynamicHeader>,
+        Fixed: DerefMut<Target = MangoAccount2Fixed>,
+        Dynamic: DerefMut<Target = [u8]>,
+    > TokensMutAccessor<'a, Header, Fixed, Dynamic>
 {
     pub fn get_raw(&mut self, raw_index: usize) -> &mut TokenPosition {
         let offset = self.acc.header.token_offset(raw_index);
-        get_helper_mut(self.acc.dynamic_mut(), offset)
+        get_helper_mut(&mut self.acc.dynamic, offset)
     }
 }
 
-impl<Header: DerefMut<Target = MangoAccount2DynamicHeader>, Data: DerefMut<Target = [u8]>>
-    MangoAccount2Accessor<Header, Data>
+impl<
+        Header: DerefMut<Target = MangoAccount2DynamicHeader>,
+        Fixed: DerefMut<Target = MangoAccount2Fixed>,
+        Dynamic: DerefMut<Target = [u8]>,
+    > MangoAccount2Accessor<Header, Fixed, Dynamic>
 {
-    pub fn tokens_mut<'a>(&'a mut self) -> TokensMutAccessor<'a, Header, Data> {
+    pub fn tokens_mut<'a>(&'a mut self) -> TokensMutAccessor<'a, Header, Fixed, Dynamic> {
         TokensMutAccessor { acc: self }
-    }
-
-    fn split_mut(&mut self) -> (&mut MangoAccount2Fixed, &mut [u8]) {
-        let data = &mut self.data;
-        let (start_slice, dynamic_slice) = data.split_at_mut(8 + size_of::<MangoAccount2Fixed>());
-        let (_disc, fixed_slice) = start_slice.split_at_mut(8);
-        (
-            bytemuck::from_bytes_mut::<MangoAccount2Fixed>(fixed_slice),
-            dynamic_slice,
-        )
-    }
-
-    pub fn fixed_mut(&mut self) -> &mut MangoAccount2Fixed {
-        self.split_mut().0
-    }
-
-    fn dynamic_mut(&mut self) -> &mut [u8] {
-        self.split_mut().1
     }
 
     // get mut TokenPosition at raw_index
     pub fn token_raw_mut(&mut self, raw_index: usize) -> &mut TokenPosition {
         let offset = self.header.token_offset(raw_index);
-        get_helper_mut(self.dynamic_mut(), offset)
+        get_helper_mut(&mut self.dynamic, offset)
     }
 
     // get mut Serum3Orders at raw_index
     pub fn serum3_raw_mut(&mut self, raw_index: usize) -> &mut Serum3Orders {
         let offset = self.header.serum3_offset(raw_index);
-        get_helper_mut(self.dynamic_mut(), offset)
+        get_helper_mut(&mut self.dynamic, offset)
     }
 
     // get mut PerpPosition at raw_index
     pub fn perp_raw_mut(&mut self, raw_index: usize) -> &mut PerpPositions {
         let offset = self.header.perp_offset(raw_index);
-        get_helper_mut(self.dynamic_mut(), offset)
+        get_helper_mut(&mut self.dynamic, offset)
     }
 
     // writes length of tokens vec at appropriate offset so that borsh can infer the vector length
@@ -281,8 +277,7 @@ impl<Header: DerefMut<Target = MangoAccount2DynamicHeader>, Data: DerefMut<Targe
         //     tokens_offset - size_of::<BorshVecLength>()
         // );
         let count = self.header.token_count;
-        let dst: &mut [u8] =
-            &mut self.dynamic_mut()[tokens_offset - BORSH_VEC_SIZE_BYTES..tokens_offset];
+        let dst: &mut [u8] = &mut self.dynamic[tokens_offset - BORSH_VEC_SIZE_BYTES..tokens_offset];
         dst.copy_from_slice(&BorshVecLength::from(count).to_le_bytes());
     }
 
@@ -293,8 +288,7 @@ impl<Header: DerefMut<Target = MangoAccount2DynamicHeader>, Data: DerefMut<Targe
         //     serum3_offset - size_of::<BorshVecLength>()
         // );
         let count = self.header.serum3_count;
-        let dst: &mut [u8] =
-            &mut self.dynamic_mut()[serum3_offset - BORSH_VEC_SIZE_BYTES..serum3_offset];
+        let dst: &mut [u8] = &mut self.dynamic[serum3_offset - BORSH_VEC_SIZE_BYTES..serum3_offset];
         dst.copy_from_slice(&BorshVecLength::from(count).to_le_bytes());
     }
 
@@ -305,8 +299,7 @@ impl<Header: DerefMut<Target = MangoAccount2DynamicHeader>, Data: DerefMut<Targe
         //     perp_offset - size_of::<BorshVecLength>()
         // );
         let count = self.header.perp_count;
-        let dst: &mut [u8] =
-            &mut self.dynamic_mut()[perp_offset - BORSH_VEC_SIZE_BYTES..perp_offset];
+        let dst: &mut [u8] = &mut self.dynamic[perp_offset - BORSH_VEC_SIZE_BYTES..perp_offset];
         dst.copy_from_slice(&BorshVecLength::from(count).to_le_bytes());
     }
 
@@ -327,7 +320,7 @@ impl<Header: DerefMut<Target = MangoAccount2DynamicHeader>, Data: DerefMut<Targe
             perp_count: new_perp_count,
         };
         let old_header = self.header.clone();
-        let dynamic = self.dynamic_mut();
+        let dynamic = &mut self.dynamic;
 
         // expand dynamic components by first moving existing positions, and then setting new ones to defaults
 
@@ -450,16 +443,33 @@ pub trait GetAccessorMut<'a> {
 }
 
 impl<'a> GetAccessor<'a> for MangoAccount2DynamicHeader {
-    type Accessor = MangoAccount2Accessor<&'a MangoAccount2DynamicHeader, &'a [u8]>;
+    type Accessor =
+        MangoAccount2Accessor<&'a MangoAccount2DynamicHeader, &'a MangoAccount2Fixed, &'a [u8]>;
     fn new_accessor(&'a self, data: &'a [u8]) -> Self::Accessor {
-        Self::Accessor { header: self, data }
+        let (start_slice, dynamic) = data.split_at(8 + size_of::<MangoAccount2Fixed>());
+        let (_disc, fixed) = start_slice.split_at(8);
+        Self::Accessor {
+            header: self,
+            fixed: bytemuck::from_bytes::<MangoAccount2Fixed>(fixed),
+            dynamic,
+        }
     }
 }
 
 impl<'a> GetAccessorMut<'a> for MangoAccount2DynamicHeader {
-    type AccessorMut = MangoAccount2Accessor<&'a mut MangoAccount2DynamicHeader, &'a mut [u8]>;
+    type AccessorMut = MangoAccount2Accessor<
+        &'a mut MangoAccount2DynamicHeader,
+        &'a mut MangoAccount2Fixed,
+        &'a mut [u8],
+    >;
     fn new_accessor_mut(&'a mut self, data: &'a mut [u8]) -> Self::AccessorMut {
-        Self::AccessorMut { header: self, data }
+        let (start_slice, dynamic) = data.split_at_mut(8 + size_of::<MangoAccount2Fixed>());
+        let (_disc, fixed) = start_slice.split_at_mut(8);
+        Self::AccessorMut {
+            header: self,
+            fixed: bytemuck::from_bytes_mut::<MangoAccount2Fixed>(fixed),
+            dynamic,
+        }
     }
 }
 

@@ -62,7 +62,7 @@ pub fn account_create(ctx: Context<AccountCreate>, account_num: u8, name: String
     let mut meta: MangoAccountAccMut = mal.load_mut()?;
     // init fixed fields
     // later we would expand, and verify if the existing ones are set and new expanded ones are unset
-    meta.fixed_mut().owner = ctx.accounts.owner.key();
+    meta.fixed.owner = ctx.accounts.owner.key();
     // init dynamic fields
     let token_count: u8 = 3;
     let serum3_count: u8 = 4;
@@ -86,7 +86,6 @@ pub fn account_create(ctx: Context<AccountCreate>, account_num: u8, name: String
 
     let meta_borrowed = meta.borrow();
     msg!("{}", meta_borrowed.token_raw(1).token_index);
-    test_fun(meta_borrowed);
 
     Ok(())
 }
