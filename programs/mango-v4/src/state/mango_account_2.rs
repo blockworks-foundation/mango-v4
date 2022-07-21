@@ -7,8 +7,14 @@ use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 use arrayref::array_ref;
 
+use fixed::types::I80F48;
 use solana_program::program_memory::sol_memmove;
 
+use crate::error::Contextable;
+use crate::error::MangoError;
+use crate::error_msg;
+
+use super::TokenIndex;
 use super::{PerpPositions, Serum3Orders, TokenPosition};
 
 type BorshVecLength = u32;
@@ -24,14 +30,46 @@ const BORSH_VEC_SIZE_BYTES: usize = 4;
 pub struct MangoAccount2 {
     // fixed
     // note: keep MangoAccount2Fixed in sync with changes here
+    // ABI: Clients rely on this being at offset 8
+    pub group: Pubkey,
+
+    // ABI: Clients rely on this being at offset 40
     pub owner: Pubkey,
-    // TODO: port remaining fixed fields from MangoAccount
+
+    pub name: [u8; 32],
+
+    // Alternative authority/signer of transactions for a mango account
+    pub delegate: Pubkey,
+
+    /// This account cannot open new positions or borrow until `init_health >= 0`
+    being_liquidated: u8,
+
+    /// This account cannot do anything except go through `resolve_bankruptcy`
+    is_bankrupt: u8,
+
+    pub account_num: u8,
+    pub bump: u8,
+
+    // pub info: [u8; INFO_LEN], // TODO: Info could be in a separate PDA?
+    pub reserved: [u8; 4],
+
+    // Cumulative (deposits - withdraws)
+    // using USD prices at the time of the deposit/withdraw
+    // in UI USD units
+    pub net_deposits: f32,
+    // Cumulative settles on perp positions
+    // TODO: unimplemented
+    pub net_settled: f32,
 
     // dynamic
     // note: padding is required for TokenPosition, etc. to be aligned
     pub padding1: u32,
+    // Maps token_index -> deposit/borrow account for each token
+    // that is active on this MangoAccount.
     pub tokens: Vec<TokenPosition>,
     pub padding2: u32,
+    // Maps serum_market_index -> open orders for each serum market
+    // that is active on this MangoAccount.
     pub serum3: Vec<Serum3Orders>,
     pub padding3: u32,
     pub perps: Vec<PerpPositions>,
@@ -81,7 +119,45 @@ fn test_dynamic_offsets() {
 #[derive(Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
 #[repr(C)]
 pub struct MangoAccount2Fixed {
+    pub group: Pubkey,
     pub owner: Pubkey,
+    pub name: [u8; 32],
+    pub delegate: Pubkey,
+    being_liquidated: u8,
+    is_bankrupt: u8,
+    pub account_num: u8,
+    pub bump: u8,
+    pub reserved: [u8; 4],
+    pub net_deposits: f32,
+    pub net_settled: f32,
+}
+
+impl MangoAccount2Fixed {
+    pub fn name(&self) -> &str {
+        std::str::from_utf8(&self.name)
+            .unwrap()
+            .trim_matches(char::from(0))
+    }
+
+    pub fn is_owner_or_delegate(&self, ix_signer: Pubkey) -> bool {
+        self.owner == ix_signer || self.delegate == ix_signer
+    }
+
+    pub fn is_bankrupt(&self) -> bool {
+        self.is_bankrupt != 0
+    }
+
+    pub fn set_bankrupt(&mut self, b: bool) {
+        self.is_bankrupt = if b { 1 } else { 0 };
+    }
+
+    pub fn being_liquidated(&self) -> bool {
+        self.being_liquidated != 0
+    }
+
+    pub fn set_being_liquidated(&mut self, b: bool) {
+        self.being_liquidated = if b { 1 } else { 0 };
+    }
 }
 
 // Header is created by scanning and parsing dynamic portion of the account
@@ -184,14 +260,36 @@ impl<
         Dynamic: Deref<Target = [u8]>,
     > DynamicAccessor<Header, Fixed, Dynamic>
 {
+    /// Returns
+    /// - the position
+    /// - the raw index into the token positions list (for use with get_raw/deactivate)
+    pub fn token_get(&self, token_index: TokenIndex) -> Result<(&TokenPosition, usize)> {
+        self.token_iter_active()
+            .enumerate()
+            .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| (p, raw_index)))
+            .ok_or_else(|| error_msg!("position for token index {} not found", token_index))
+    }
+
     // get TokenPosition at raw_index
-    pub fn token_raw(&self, raw_index: usize) -> &TokenPosition {
+    pub fn token_get_raw(&self, raw_index: usize) -> &TokenPosition {
         get_helper(&self.dynamic, self.header.token_offset(raw_index))
     }
 
     // get iter over all TokenPositions (including inactive)
-    pub fn token_iter_raw(&self) -> impl Iterator<Item = &TokenPosition> + '_ {
-        (0..self.header.token_count()).map(|i| self.token_raw(i))
+    pub fn token_iter(&self) -> impl Iterator<Item = &TokenPosition> + '_ {
+        (0..self.header.token_count()).map(|i| self.token_get_raw(i))
+    }
+
+    // get iter over all active TokenPositions
+    pub fn token_iter_active(&self) -> impl Iterator<Item = &TokenPosition> + '_ {
+        (0..self.header.token_count())
+            .map(|i| self.token_get_raw(i))
+            .filter(|token| token.is_active())
+    }
+
+    pub fn token_find(&self, token_index: TokenIndex) -> Option<&TokenPosition> {
+        self.token_iter_active()
+            .find(|p| p.is_active_for_token(token_index))
     }
 
     // get Serum3Orders at raw_index
@@ -213,66 +311,76 @@ impl<
     }
 }
 
-pub struct TokensMutAccessor<'a, 'b> {
-    acc: &'b mut MangoAccountAccMut<'a>,
-}
-
-impl<'a, 'b> TokensMutAccessor<'a, 'b> {
-    pub fn get_raw(&mut self, raw_index: usize) -> &mut TokenPosition {
-        let offset = self.acc.header.token_offset(raw_index);
-        get_helper_mut(&mut self.acc.dynamic, offset)
-    }
-}
-
-pub struct Serum3MutAccessor<'a, 'b> {
-    acc: &'b mut MangoAccountAccMut<'a>,
-}
-
-impl<'a, 'b> Serum3MutAccessor<'a, 'b> {
-    pub fn get_raw(&mut self, raw_index: usize) -> &mut Serum3Orders {
-        let offset = self.acc.header.serum3_offset(raw_index);
-        get_helper_mut(&mut self.acc.dynamic, offset)
-    }
-}
-
-pub struct PerpsMutAccessor<'a, 'b> {
-    acc: &'b mut MangoAccountAccMut<'a>,
-}
-
-impl<'a, 'b> PerpsMutAccessor<'a, 'b> {
-    pub fn get_raw(&mut self, raw_index: usize) -> &mut PerpPositions {
-        let offset = self.acc.header.perp_offset(raw_index);
-        get_helper_mut(&mut self.acc.dynamic, offset)
-    }
-}
-
 impl<'a> MangoAccountAccMut<'a> {
-    pub fn tokens_mut<'b>(&'b mut self) -> TokensMutAccessor<'a, 'b> {
-        TokensMutAccessor { acc: self }
-    }
-
-    pub fn serum3_mut<'b>(&'b mut self) -> Serum3MutAccessor<'a, 'b> {
-        Serum3MutAccessor { acc: self }
-    }
-
-    pub fn perps_mut<'b>(&'b mut self) -> PerpsMutAccessor<'a, 'b> {
-        PerpsMutAccessor { acc: self }
+    /// Returns
+    /// - the position
+    /// - the raw index into the token positions list (for use with get_raw/deactivate)
+    pub fn token_get_mut(
+        &mut self,
+        token_index: TokenIndex,
+    ) -> Result<(&mut TokenPosition, usize)> {
+        let raw_index = self
+            .token_iter_active()
+            .enumerate()
+            .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| raw_index))
+            .ok_or_else(|| error_msg!("position for token index {} not found", token_index))?;
+        Ok((self.token_get_mut_raw(raw_index), raw_index))
     }
 
     // get mut TokenPosition at raw_index
-    pub fn token_raw_mut(&mut self, raw_index: usize) -> &mut TokenPosition {
+    pub fn token_get_mut_raw(&mut self, raw_index: usize) -> &mut TokenPosition {
         let offset = self.header.token_offset(raw_index);
         get_helper_mut(&mut self.dynamic, offset)
     }
 
+    /// Creates or retrieves a TokenPosition for the token_index.
+    /// Returns:
+    /// - the position
+    /// - the raw index into the token positions list (for use with get_raw)
+    /// - the active index, for use with FixedOrderAccountRetriever
+    pub fn token_get_mut_or_create(
+        &mut self,
+        token_index: TokenIndex,
+    ) -> Result<(&mut TokenPosition, usize, usize)> {
+        let mut active_index = 0;
+        let mut match_or_free = None;
+        for (raw_index, position) in self.token_iter().enumerate() {
+            if position.is_active_for_token(token_index) {
+                // Can't return early because of lifetimes
+                match_or_free = Some((raw_index, active_index));
+                break;
+            }
+            if position.is_active() {
+                active_index += 1;
+            } else if match_or_free.is_none() {
+                match_or_free = Some((raw_index, active_index));
+            }
+        }
+        if let Some((raw_index, bank_index)) = match_or_free {
+            let v = self.token_get_mut_raw(raw_index);
+            if !v.is_active_for_token(token_index) {
+                *v = TokenPosition {
+                    indexed_position: I80F48::ZERO,
+                    token_index,
+                    in_use_count: 0,
+                    reserved: Default::default(),
+                };
+            }
+            Ok((v, raw_index, bank_index))
+        } else {
+            err!(MangoError::NoFreeTokenPositionIndex)
+                .context(format!("when looking for token index {}", token_index))
+        }
+    }
+
     // get mut Serum3Orders at raw_index
-    pub fn serum3_raw_mut(&mut self, raw_index: usize) -> &mut Serum3Orders {
+    pub fn serum3_get_mut_raw(&mut self, raw_index: usize) -> &mut Serum3Orders {
         let offset = self.header.serum3_offset(raw_index);
         get_helper_mut(&mut self.dynamic, offset)
     }
 
     // get mut PerpPosition at raw_index
-    pub fn perp_raw_mut(&mut self, raw_index: usize) -> &mut PerpPositions {
+    pub fn perp_get_mut_raw(&mut self, raw_index: usize) -> &mut PerpPositions {
         let offset = self.header.perp_offset(raw_index);
         get_helper_mut(&mut self.dynamic, offset)
     }

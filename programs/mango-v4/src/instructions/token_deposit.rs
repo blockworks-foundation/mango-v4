@@ -129,7 +129,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     let mut mal: MangoAccountLoader<MangoAccount2> =
         MangoAccountLoader::new(&ctx.accounts.account2)?;
     let mut meta = mal.load_mut()?;
-    let mut token_position = meta.token_raw_mut(0);
+    let mut token_position = meta.token_get_mut_raw(0);
     token_position.in_use_count = 1;
 
     Ok(())

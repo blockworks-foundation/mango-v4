@@ -160,7 +160,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     let meta = mal.load()?;
     // test
     for i in 0..meta.header.token_count() {
-        let pos = meta.token_raw(i);
+        let pos = meta.token_get_raw(i);
         msg!("pos {:?} token index {:?}", i, pos.token_index);
     }
     for i in 0..meta.header.serum3_count() {
