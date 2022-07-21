@@ -495,7 +495,7 @@ impl<'info, 'acc, D: DynamicAccount> MangoAccountLoader<'info, 'acc, D> {
         let disc_bytes: &mut [u8] = &mut data[0..8];
         disc_bytes.copy_from_slice(bytemuck::bytes_of(&(D::discriminator())));
 
-        D::Header::initialize(&mut data)?;
+        D::Header::initialize(&mut data[8 + size_of::<D::Fixed>()..])?;
 
         drop(data);
 
