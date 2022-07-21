@@ -14,6 +14,7 @@ use crate::error::Contextable;
 use crate::error::MangoError;
 use crate::error_msg;
 
+use super::Serum3MarketIndex;
 use super::TokenIndex;
 use super::{PerpPositions, Serum3Orders, TokenPosition};
 
@@ -293,12 +294,27 @@ impl<
     }
 
     // get Serum3Orders at raw_index
-    pub fn serum3_raw(&self, raw_index: usize) -> &Serum3Orders {
+    pub fn serum3_get_raw(&self, raw_index: usize) -> &Serum3Orders {
         get_helper(&self.dynamic, self.header.serum3_offset(raw_index))
     }
 
+    pub fn serum3_iter(&self) -> impl Iterator<Item = &Serum3Orders> + '_ {
+        (0..self.header.serum3_count()).map(|i| self.serum3_get_raw(i))
+    }
+
+    pub fn serum3_iter_active(&self) -> impl Iterator<Item = &Serum3Orders> + '_ {
+        (0..self.header.serum3_count())
+            .map(|i| self.serum3_get_raw(i))
+            .filter(|serum3_order| serum3_order.is_active())
+    }
+
+    pub fn serum3_find(&self, market_index: Serum3MarketIndex) -> Option<&Serum3Orders> {
+        self.serum3_iter_active()
+            .find(|p| p.is_active_for_market(market_index))
+    }
+
     // get PerpPosition at raw_index
-    pub fn perp_raw(&self, raw_index: usize) -> &PerpPositions {
+    pub fn perp_get_raw(&self, raw_index: usize) -> &PerpPositions {
         get_helper(&self.dynamic, self.header.perp_offset(raw_index))
     }
 
@@ -377,6 +393,42 @@ impl<'a> MangoAccountAccMut<'a> {
     pub fn serum3_get_mut_raw(&mut self, raw_index: usize) -> &mut Serum3Orders {
         let offset = self.header.serum3_offset(raw_index);
         get_helper_mut(&mut self.dynamic, offset)
+    }
+
+    pub fn serum3_create(&mut self, market_index: Serum3MarketIndex) -> Result<&mut Serum3Orders> {
+        if self.serum3_find(market_index).is_some() {
+            return err!(MangoError::Serum3OpenOrdersExistAlready);
+        }
+
+        let raw_index_opt = self.serum3_iter().position(|p| !p.is_active());
+        if let Some(raw_index) = raw_index_opt {
+            *(self.serum3_get_mut_raw(raw_index)) = Serum3Orders {
+                market_index: market_index as Serum3MarketIndex,
+                ..Serum3Orders::default()
+            };
+            return Ok(self.serum3_get_mut_raw(raw_index));
+        } else {
+            return err!(MangoError::NoFreeSerum3OpenOrdersIndex);
+        }
+    }
+
+    pub fn serum3_deactivate(&mut self, market_index: Serum3MarketIndex) -> Result<()> {
+        let raw_index = self
+            .serum3_iter()
+            .position(|p| p.is_active_for_market(market_index))
+            .ok_or_else(|| error_msg!("serum3 open orders index {} not found", market_index))?;
+        self.serum3_get_mut_raw(raw_index).market_index = Serum3MarketIndex::MAX;
+        Ok(())
+    }
+
+    pub fn serum3_find_mut(
+        &mut self,
+        market_index: Serum3MarketIndex,
+    ) -> Option<&mut Serum3Orders> {
+        let raw_index_opt = self
+            .serum3_iter_active()
+            .position(|p| p.is_active_for_market(market_index));
+        raw_index_opt.map(|raw_index| self.serum3_get_mut_raw(raw_index))
     }
 
     // get mut PerpPosition at raw_index
