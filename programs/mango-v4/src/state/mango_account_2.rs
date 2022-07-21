@@ -163,10 +163,6 @@ pub type MangoAccountAcc<'a> = MangoAccount2Accessor<&'a MangoAccount2DynamicHea
 pub type MangoAccountAccMut<'a> =
     MangoAccount2Accessor<&'a mut MangoAccount2DynamicHeader, &'a mut [u8]>;
 
-pub fn test_fun(a: MangoAccountAcc) -> u16 {
-    a.token_raw(1).token_index
-}
-
 impl<Header: Deref<Target = MangoAccount2DynamicHeader>, Data: Deref<Target = [u8]>>
     MangoAccount2Accessor<Header, Data>
 {
@@ -216,9 +212,30 @@ impl<Header: Deref<Target = MangoAccount2DynamicHeader>, Data: Deref<Target = [u
     }
 }
 
+pub struct TokensMutAccessor<
+    'a,
+    Header: DerefMut<Target = MangoAccount2DynamicHeader>,
+    Data: DerefMut<Target = [u8]>,
+> {
+    acc: &'a mut MangoAccount2Accessor<Header, Data>,
+}
+
+impl<'a, Header: DerefMut<Target = MangoAccount2DynamicHeader>, Data: DerefMut<Target = [u8]>>
+    TokensMutAccessor<'a, Header, Data>
+{
+    pub fn get_raw(&mut self, raw_index: usize) -> &mut TokenPosition {
+        let offset = self.acc.header.token_offset(raw_index);
+        get_helper_mut(self.acc.dynamic_mut(), offset)
+    }
+}
+
 impl<Header: DerefMut<Target = MangoAccount2DynamicHeader>, Data: DerefMut<Target = [u8]>>
     MangoAccount2Accessor<Header, Data>
 {
+    pub fn tokens_mut<'a>(&'a mut self) -> TokensMutAccessor<'a, Header, Data> {
+        TokensMutAccessor { acc: self }
+    }
+
     fn split_mut(&mut self) -> (&mut MangoAccount2Fixed, &mut [u8]) {
         let data = &mut self.data;
         let (start_slice, dynamic_slice) = data.split_at_mut(8 + size_of::<MangoAccount2Fixed>());
