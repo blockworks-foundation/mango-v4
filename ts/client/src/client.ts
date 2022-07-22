@@ -449,14 +449,12 @@ export class MangoClient {
   public async expandMangoAccount(
     group: Group,
     account: MangoAccount,
-    account2: PublicKey,
   ): Promise<TransactionSignature> {
     return await this.program.methods
       .accountExpand()
       .accounts({
         group: group.publicKey,
         account: account.publicKey,
-        account2,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })

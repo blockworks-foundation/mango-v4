@@ -143,12 +143,12 @@ pub fn liq_token_bankruptcy(
 
             // credit the liqor
             let (liqor_quote, liqor_quote_raw_token_index, _) =
-                liqor.tokens_get_mut_or_create(QUOTE_TOKEN_INDEX)?;
+                liqor.token_get_mut_or_create(QUOTE_TOKEN_INDEX)?;
             let liqor_quote_active = quote_bank.deposit(liqor_quote, insurance_transfer_i80f48)?;
 
             // transfer liab from liqee to liqor
             let (liqor_liab, liqor_liab_raw_token_index, _) =
-                liqor.tokens_get_mut_or_create(liab_token_index)?;
+                liqor.token_get_mut_or_create(liab_token_index)?;
             let liqor_liab_active = liab_bank.withdraw_with_fee(liqor_liab, liab_transfer)?;
 
             // Check liqor's health

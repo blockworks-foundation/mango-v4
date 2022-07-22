@@ -945,14 +945,14 @@ mod tests {
         bank1
             .data()
             .deposit(
-                account.tokens_get_mut_or_create(1).unwrap().0,
+                account.token_get_mut_or_create(1).unwrap().0,
                 I80F48::from(100),
             )
             .unwrap();
         bank2
             .data()
             .withdraw_without_fee(
-                account.tokens_get_mut_or_create(4).unwrap().0,
+                account.token_get_mut_or_create(4).unwrap().0,
                 I80F48::from(10),
             )
             .unwrap();
@@ -1113,21 +1113,21 @@ mod tests {
         bank1
             .data()
             .change_without_fee(
-                account.tokens_get_mut_or_create(1).unwrap().0,
+                account.token_get_mut_or_create(1).unwrap().0,
                 I80F48::from(testcase.token1),
             )
             .unwrap();
         bank2
             .data()
             .change_without_fee(
-                account.tokens_get_mut_or_create(4).unwrap().0,
+                account.token_get_mut_or_create(4).unwrap().0,
                 I80F48::from(testcase.token2),
             )
             .unwrap();
         bank3
             .data()
             .change_without_fee(
-                account.tokens_get_mut_or_create(5).unwrap().0,
+                account.token_get_mut_or_create(5).unwrap().0,
                 I80F48::from(testcase.token3),
             )
             .unwrap();
