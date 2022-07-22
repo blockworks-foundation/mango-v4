@@ -18,13 +18,15 @@ pub struct AccountExpand<'info> {
 }
 
 pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
-    // expand to these lengths
-    let token_count = 18;
-    let serum3_count = 10;
-    let perp_count = 10;
-    let perp_oo_count = 10;
+    let account_size = {
+        let mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
+        let account = mal.load()?;
+        account.size()
+    };
 
-    let new_space = MangoAccount::space(token_count, serum3_count, perp_count, perp_oo_count);
+    require_eq!(account_size, AccountSize::Small);
+
+    let new_space = MangoAccount::space(AccountSize::Large.try_into().unwrap());
     let new_rent_minimum = Rent::get()?.minimum_balance(new_space);
 
     let old_space = ctx.accounts.account.data_len();
@@ -53,7 +55,7 @@ pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
     let mut account = mal.load_mut()?;
     require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
     require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());
-    account.expand_dynamic_content(token_count, serum3_count, perp_count, perp_oo_count)?;
+    account.expand_dynamic_content(AccountSize::Large.try_into().unwrap())?;
 
     Ok(())
 }

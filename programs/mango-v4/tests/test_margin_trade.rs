@@ -53,6 +53,7 @@ async fn test_margin_trade1() -> Result<(), BanksClientError> {
         solana,
         AccountCreateInstruction {
             account_num: 1,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -95,6 +96,7 @@ async fn test_margin_trade1() -> Result<(), BanksClientError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -369,6 +371,7 @@ async fn test_margin_trade2() -> Result<(), BanksClientError> {
         solana,
         AccountCreateInstruction {
             account_num: 1,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -411,6 +414,7 @@ async fn test_margin_trade2() -> Result<(), BanksClientError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -630,6 +634,7 @@ async fn test_margin_trade3() -> Result<(), BanksClientError> {
         solana,
         AccountCreateInstruction {
             account_num: 1,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -672,6 +677,7 @@ async fn test_margin_trade3() -> Result<(), BanksClientError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,

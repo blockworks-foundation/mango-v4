@@ -1,4 +1,6 @@
 use std::cell::RefMut;
+use std::fmt;
+
 use std::marker::PhantomData;
 use std::mem::size_of;
 use std::ops::Deref;
@@ -8,6 +10,8 @@ use anchor_lang::Discriminator;
 use arrayref::array_ref;
 
 use fixed::types::I80F48;
+use num_enum::IntoPrimitive;
+use num_enum::TryFromPrimitive;
 use solana_program::program_memory::sol_memmove;
 
 use crate::error::Contextable;
@@ -29,6 +33,42 @@ use checked_math as cm;
 type BorshVecLength = u32;
 const BORSH_VEC_PADDING_BYTES: usize = 4;
 const BORSH_VEC_SIZE_BYTES: usize = 4;
+
+#[derive(
+    Debug,
+    Eq,
+    PartialEq,
+    Clone,
+    Copy,
+    TryFromPrimitive,
+    IntoPrimitive,
+    AnchorSerialize,
+    AnchorDeserialize,
+)]
+#[repr(u8)]
+
+pub enum AccountSize {
+    Small = 0,
+    Large = 1,
+}
+
+impl fmt::Display for AccountSize {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            AccountSize::Small => write!(f, "Small"),
+            AccountSize::Large => write!(f, "Large"),
+        }
+    }
+}
+
+impl AccountSize {
+    pub fn space(&self) -> (u8, u8, u8, u8) {
+        match self {
+            AccountSize::Small => (8, 2, 2, 2),
+            AccountSize::Large => (16, 8, 8, 8),
+        }
+    }
+}
 
 // Mango Account
 // This struct definition is only for clients e.g. typescript, so that they can easily use out of the box
@@ -112,7 +152,9 @@ impl Default for MangoAccount {
 }
 
 impl MangoAccount {
-    pub fn space(token_count: u8, serum3_count: u8, perp_count: u8, perp_oo_count: u8) -> usize {
+    pub fn space(account_size: AccountSize) -> usize {
+        let (token_count, serum3_count, perp_count, perp_oo_count) = account_size.space();
+
         8 + size_of::<MangoAccountFixed>()
             + Self::dynamic_size(token_count, serum3_count, perp_count, perp_oo_count)
     }
@@ -250,15 +292,15 @@ impl MangoAccount {
 #[test]
 fn test_dynamic_offsets() {
     let mut account = MangoAccount::default();
-    account.tokens.resize(3, TokenPosition::default());
-    account.serum3.resize(5, Serum3Orders::default());
-    account.perps.resize(7, PerpPositions::default());
+    account.tokens.resize(16, TokenPosition::default());
+    account.serum3.resize(8, Serum3Orders::default());
+    account.perps.resize(8, PerpPositions::default());
     account
         .perp_open_orders
-        .resize(4, PerpOpenOrders::default());
+        .resize(8, PerpOpenOrders::default());
     assert_eq!(
         8 + AnchorSerialize::try_to_vec(&account).unwrap().len(),
-        MangoAccount::space(3, 5, 7, 4)
+        MangoAccount::space(AccountSize::Large.try_into().unwrap())
     );
 }
 
@@ -533,6 +575,13 @@ impl<
             fixed: &self.fixed,
             dynamic: &self.dynamic,
         }
+    }
+
+    pub fn size(&self) -> AccountSize {
+        if self.header.perp_count() > 4 {
+            return AccountSize::Large;
+        }
+        AccountSize::Small
     }
 }
 
@@ -854,13 +903,10 @@ impl<'a> MangoAccountAccMut<'a> {
         dst.copy_from_slice(&BorshVecLength::from(count).to_le_bytes());
     }
 
-    pub fn expand_dynamic_content(
-        &mut self,
-        new_token_count: u8,
-        new_serum3_count: u8,
-        new_perp_count: u8,
-        new_perp_oo_count: u8,
-    ) -> Result<()> {
+    pub fn expand_dynamic_content(&mut self, account_size: AccountSize) -> Result<()> {
+        let (new_token_count, new_serum3_count, new_perp_count, new_perp_oo_count) =
+            account_size.space();
+
         require_gt!(new_token_count, self.header.token_count);
         require_gt!(new_serum3_count, self.header.serum3_count);
         require_gt!(new_perp_count, self.header.perp_count);

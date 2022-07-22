@@ -19,14 +19,16 @@ pub mod serum3_cpi;
 pub mod state;
 pub mod types;
 
-use state::{OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex};
+use state::{
+    AccountSize, OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex,
+};
 
 declare_id!("5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM");
 
 #[program]
 pub mod mango_v4 {
 
-    use crate::state::OracleConfig;
+    use crate::state::{AccountSize, OracleConfig};
 
     use super::*;
 
@@ -125,9 +127,10 @@ pub mod mango_v4 {
     pub fn account_create(
         ctx: Context<AccountCreate>,
         account_num: u8,
+        account_size: AccountSize,
         name: String,
     ) -> Result<()> {
-        instructions::account_create(ctx, account_num, name)
+        instructions::account_create(ctx, account_num, account_size, name)
     }
 
     pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {

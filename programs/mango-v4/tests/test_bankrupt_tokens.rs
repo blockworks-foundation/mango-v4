@@ -44,6 +44,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 2,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -89,6 +90,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -351,6 +353,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 2,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -396,6 +399,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,

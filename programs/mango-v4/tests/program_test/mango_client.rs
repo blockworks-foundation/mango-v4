@@ -1271,7 +1271,7 @@ impl<'keypair> ClientInstruction for GroupCloseInstruction<'keypair> {
 
 pub struct AccountCreateInstruction<'keypair> {
     pub account_num: u8,
-
+    pub account_size: AccountSize,
     pub group: Pubkey,
     pub owner: &'keypair Keypair,
     pub payer: &'keypair Keypair,
@@ -1287,6 +1287,7 @@ impl<'keypair> ClientInstruction for AccountCreateInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = mango_v4::instruction::AccountCreate {
             account_num: self.account_num,
+            account_size: self.account_size,
             name: "my_mango_account".to_string(),
         };
 

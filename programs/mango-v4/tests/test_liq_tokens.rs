@@ -42,6 +42,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 2,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -97,6 +98,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -251,6 +253,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 2,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -281,6 +284,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,

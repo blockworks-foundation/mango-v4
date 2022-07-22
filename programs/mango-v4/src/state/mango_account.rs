@@ -6,7 +6,6 @@ use static_assertions::const_assert_eq;
 use std::cmp::Ordering;
 use std::mem::size_of;
 
-use crate::error::*;
 use crate::state::*;
 
 // todo: these are arbitrary
@@ -300,7 +299,7 @@ macro_rules! account_seeds {
     ( $account:expr ) => {
         &[
             $account.group.as_ref(),
-            b"account".as_ref(),
+            b"MangoAccount".as_ref(),
             $account.owner.as_ref(),
             &$account.account_num.to_le_bytes(),
             &[$account.bump],

@@ -586,3 +586,8 @@ export class EquityDto {
   tokens: { tokenIndex: number; value: I80F48Dto }[];
   perps: { perpMarketIndex: number; value: I80F48Dto }[];
 }
+
+export class AccountSize {
+  static small = { small: {} };
+  static large = { large: {} };
+}

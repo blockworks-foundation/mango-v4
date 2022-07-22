@@ -811,7 +811,7 @@ mod tests {
     use crate::state::oracle::StubOracle;
     use crate::state::{
         GetAccessorMut, Header, MangoAccount, MangoAccountAccMut, MangoAccountDynamicHeader,
-        MangoAccountFixed, TokenPosition,
+        MangoAccountFixed,
     };
     use std::cell::RefCell;
     use std::convert::identity;
