@@ -1,12 +1,12 @@
 use std::cell::RefMut;
 
 use crate::accounts_zerocopy::*;
+use crate::state::MangoAccountAccMut;
 use crate::{
     error::MangoError,
     state::{
         orderbook::{bookside::BookSide, nodes::LeafNode},
-        EventQueue, MangoAccount, MangoAccountPerpPositions, PerpMarket, FREE_ORDER_SLOT,
-        MAX_PERP_OPEN_ORDERS,
+        EventQueue, PerpMarket, FREE_ORDER_SLOT,
     },
 };
 use anchor_lang::prelude::*;
@@ -159,7 +159,7 @@ impl<'a> Book<'a> {
         perp_market: &mut PerpMarket,
         event_queue: &mut EventQueue,
         oracle_price: I80F48,
-        mango_account_perps: &mut MangoAccountPerpPositions,
+        mango_account: &mut MangoAccountAccMut,
         mango_account_pk: &Pubkey,
         price_lots: i64,
         max_base_lots: i64,
@@ -264,8 +264,8 @@ impl<'a> Book<'a> {
 
             // Record the taker trade in the account already, even though it will only be
             // realized when the fill event gets executed
-            let perp_account = mango_account_perps
-                .get_account_mut_or_create(market.perp_market_index)?
+            let perp_account = mango_account
+                .perp_get_account_mut_or_create(market.perp_market_index)?
                 .0;
             perp_account.add_taker_trade(side, match_base_lots, match_quote_lots);
 
@@ -346,8 +346,8 @@ impl<'a> Book<'a> {
                 event_queue.push_back(cast(event)).unwrap();
             }
 
-            let owner_slot = mango_account_perps
-                .next_order_slot()
+            let owner_slot = mango_account
+                .perp_next_order_slot()
                 .ok_or_else(|| error!(MangoError::SomeError))?;
             let new_order = LeafNode::new(
                 owner_slot as u8,
@@ -373,13 +373,13 @@ impl<'a> Book<'a> {
                 price_lots
             );
 
-            mango_account_perps.add_order(market.perp_market_index, side, &new_order)?;
+            mango_account.perp_add_order(market.perp_market_index, side, &new_order)?;
         }
 
         // if there were matched taker quote apply ref fees
         // we know ref_fee_rate is not None if total_quote_taken > 0
         if total_quote_lots_taken > 0 {
-            apply_fees(market, mango_account_perps, total_quote_lots_taken)?;
+            apply_fees(market, mango_account, total_quote_lots_taken)?;
         }
 
         Ok(())
@@ -387,20 +387,21 @@ impl<'a> Book<'a> {
 
     pub fn cancel_all_order(
         &mut self,
-        mango_account: &mut MangoAccount,
+        mango_account: &mut MangoAccountAccMut,
         perp_market: &mut PerpMarket,
         mut limit: u8,
         side_to_cancel_option: Option<Side>,
     ) -> Result<()> {
-        for i in 0..MAX_PERP_OPEN_ORDERS {
-            if mango_account.perps.order_market[i] == FREE_ORDER_SLOT
-                || mango_account.perps.order_market[i] != perp_market.perp_market_index
+        for i in 0..mango_account.header.perp_oo_count() {
+            let oo = mango_account.perp_oo_get_raw(i);
+            if oo.order_market == FREE_ORDER_SLOT
+                || oo.order_market != perp_market.perp_market_index
             {
                 continue;
             }
 
-            let order_id = mango_account.perps.order_id[i];
-            let order_side = mango_account.perps.order_side[i];
+            let order_id = oo.order_id;
+            let order_side = oo.order_side;
 
             if let Some(side_to_cancel) = side_to_cancel_option {
                 if side_to_cancel != order_side {
@@ -410,8 +411,7 @@ impl<'a> Book<'a> {
 
             if let Ok(leaf_node) = self.cancel_order(order_id, order_side) {
                 mango_account
-                    .perps
-                    .remove_order(leaf_node.owner_slot as usize, leaf_node.quantity)?
+                    .perp_remove_order(leaf_node.owner_slot as usize, leaf_node.quantity)?
             };
 
             limit -= 1;
@@ -441,7 +441,7 @@ impl<'a> Book<'a> {
 /// both the maker and taker fees.
 fn apply_fees(
     market: &mut PerpMarket,
-    mango_account_perps: &mut MangoAccountPerpPositions,
+    mango_account: &mut MangoAccountAccMut,
     total_quote_taken: i64,
 ) -> Result<()> {
     let taker_quote_native = I80F48::from_num(
@@ -458,8 +458,8 @@ fn apply_fees(
     let maker_fees = taker_quote_native * market.maker_fee;
 
     let taker_fees = taker_quote_native * market.taker_fee;
-    let perp_account = mango_account_perps
-        .get_account_mut_or_create(market.perp_market_index)?
+    let perp_account = mango_account
+        .perp_get_account_mut_or_create(market.perp_market_index)?
         .0;
     perp_account.quote_position_native -= taker_fees;
     market.fees_accrued += taker_fees + maker_fees;

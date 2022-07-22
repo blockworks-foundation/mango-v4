@@ -5,15 +5,15 @@ use anchor_lang::prelude::*;
 pub struct ComputeAccountData<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        has_one = group,
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    pub account: UncheckedAccount<'info>,
 }
 
 pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
     let group_pk = ctx.accounts.group.key();
-    let account = ctx.accounts.account.load()?;
+
+    let mal: MangoAccountLoader<MangoAccount2> =
+        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+    let account: MangoAccountAcc = mal.load()?;
 
     let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, &group_pk)?;
 

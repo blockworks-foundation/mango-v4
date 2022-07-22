@@ -6,16 +6,16 @@ use fixed::types::I80F48;
 
 use crate::events::{Equity, TokenEquity};
 
-use super::{MangoAccount, ScanningAccountRetriever};
+use super::{MangoAccountAcc, ScanningAccountRetriever};
 
 pub fn compute_equity(
-    account: &MangoAccount,
+    account: &MangoAccountAcc,
     retriever: &ScanningAccountRetriever,
 ) -> Result<Equity> {
     let mut token_equity_map = HashMap::new();
 
     // token contributions
-    for (_i, position) in account.tokens.iter_active().enumerate() {
+    for (_i, position) in account.token_iter_active().enumerate() {
         let (bank, oracle_price) = retriever.scanned_bank_and_oracle(position.token_index)?;
         // converts the token value to the basis token value for health computations
         // TODO: health basis token == USDC?
@@ -24,7 +24,7 @@ pub fn compute_equity(
     }
 
     // token contributions from Serum3
-    for (_i, serum_account) in account.serum3.iter_active().enumerate() {
+    for (_i, serum_account) in account.serum3_iter_active().enumerate() {
         let oo = retriever.scanned_serum_oo(&serum_account.open_orders)?;
 
         // note base token value

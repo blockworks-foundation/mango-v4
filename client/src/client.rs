@@ -122,7 +122,7 @@ impl MangoClient {
                                 Pubkey::find_program_address(
                                     &[
                                         group.as_ref(),
-                                        b"MangoAccount2".as_ref(),
+                                        b"MangoAccount".as_ref(),
                                         payer.pubkey().as_ref(),
                                         &account_num.to_le_bytes(),
                                     ],
@@ -475,7 +475,7 @@ impl MangoClient {
                                 Pubkey::find_program_address(
                                     &[
                                         self.group().as_ref(),
-                                        b"MangoAccount2".as_ref(),
+                                        b"MangoAccount".as_ref(),
                                         self.payer().as_ref(),
                                         &self.mango_account_cache.1.account_num.to_le_bytes(),
                                     ],

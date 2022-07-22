@@ -9,11 +9,8 @@ use crate::state::*;
 pub struct Serum3LiqForceCancelOrders<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        has_one = group,
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut)]
+    pub account: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: Validated inline by checking against the pubkey stored in the account
@@ -72,15 +69,18 @@ pub fn serum3_liq_force_cancel_orders(
     // Validation
     //
     {
-        let account = ctx.accounts.account.load()?;
-        require!(!account.is_bankrupt(), MangoError::IsBankrupt);
+        let mal: MangoAccountLoader<MangoAccount2> =
+            MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        let account: MangoAccountAcc = mal.load()?;
+        require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+
+        require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
         let serum_market = ctx.accounts.serum_market.load()?;
 
         // Validate open_orders
         require!(
             account
-                .serum3
-                .find(serum_market.market_index)
+                .serum3_find(serum_market.market_index)
                 .ok_or_else(|| error!(MangoError::SomeError))?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
@@ -110,9 +110,12 @@ pub fn serum3_liq_force_cancel_orders(
 
     // TODO: do the correct health / being_liquidated check
     {
-        let account = ctx.accounts.account.load()?;
+        let mal: MangoAccountLoader<MangoAccount2> =
+            MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        let account: MangoAccountAcc = mal.load()?;
 
-        let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
+        let retriever =
+            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
         let health = compute_health(&account, HealthType::Maint, &retriever)?;
         msg!("health: {}", health);
         require!(health < 0, MangoError::SomeError);
@@ -139,7 +142,9 @@ pub fn serum3_liq_force_cancel_orders(
     let after_quote_vault = ctx.accounts.quote_vault.amount;
 
     // Charge the difference in vault balances to the user's account
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut mal: MangoAccountLoader<MangoAccount2> =
+        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+    let mut account: MangoAccountAccMut = mal.load_mut()?;
     let mut base_bank = ctx.accounts.base_bank.load_mut()?;
     let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
     apply_vault_difference(

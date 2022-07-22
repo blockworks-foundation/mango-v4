@@ -7,12 +7,7 @@ use crate::state::*;
 pub struct Serum3CancelAllOrders<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        has_one = group,
-        constraint = account.load()?.is_owner_or_delegate(owner.key()),
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    pub account: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -49,16 +44,23 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
     // Validation
     //
     {
-        let account = ctx.accounts.account.load()?;
-        require!(!account.is_bankrupt(), MangoError::IsBankrupt);
+        let mal: MangoAccountLoader<MangoAccount2> =
+            MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        let account: MangoAccountAcc = mal.load()?;
+        require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+        require!(
+            account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
+            MangoError::SomeError
+        );
+
+        require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
         let serum_market = ctx.accounts.serum_market.load()?;
 
         // Validate open_orders
         require!(
             account
-                .serum3
-                .find(serum_market.market_index)
+                .serum3_find(serum_market.market_index)
                 .ok_or_else(|| error!(MangoError::SomeError))?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
@@ -70,6 +72,8 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
     // Cancel
     //
     cpi_cancel_all_orders(ctx.accounts, limit)?;
+
+    // TODO: do we need deactivation here?
 
     Ok(())
 }

@@ -680,21 +680,9 @@ impl<'keypair> ClientInstruction for TokenWithdrawInstruction<'keypair> {
         )
         .await;
 
-        let account2 = Pubkey::find_program_address(
-            &[
-                account.group.as_ref(),
-                b"MangoAccount2".as_ref(),
-                account.owner.as_ref(),
-                &account.account_num.to_le_bytes(),
-            ],
-            &program_id,
-        )
-        .0;
-
         let accounts = Self::Accounts {
             group: account.group,
             account: self.account,
-            account2,
             owner: self.owner.pubkey(),
             bank: mint_info.banks[self.bank_index],
             vault: mint_info.vaults[self.bank_index],
@@ -757,17 +745,6 @@ impl ClientInstruction for TokenDepositInstruction {
         )
         .await;
 
-        let account2 = Pubkey::find_program_address(
-            &[
-                account.group.as_ref(),
-                b"MangoAccount2".as_ref(),
-                account.owner.as_ref(),
-                &account.account_num.to_le_bytes(),
-            ],
-            &program_id,
-        )
-        .0;
-
         let accounts = Self::Accounts {
             group: account.group,
             account: self.account,
@@ -776,7 +753,6 @@ impl ClientInstruction for TokenDepositInstruction {
             token_account: self.token_account,
             token_authority: self.token_authority.pubkey(),
             token_program: Token::id(),
-            account2,
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
@@ -1329,24 +1305,12 @@ impl<'keypair> ClientInstruction for AccountCreateInstruction<'keypair> {
         )
         .0;
 
-        let account2 = Pubkey::find_program_address(
-            &[
-                self.group.as_ref(),
-                b"MangoAccount2".as_ref(),
-                self.owner.pubkey().as_ref(),
-                &self.account_num.to_le_bytes(),
-            ],
-            &program_id,
-        )
-        .0;
-
         let accounts = mango_v4::accounts::AccountCreate {
             group: self.group,
             owner: self.owner.pubkey(),
             account,
             payer: self.payer.pubkey(),
             system_program: System::id(),
-            account2,
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);
@@ -1386,24 +1350,12 @@ impl<'keypair> ClientInstruction for AccountExpandInstruction<'keypair> {
         )
         .0;
 
-        let account2 = Pubkey::find_program_address(
-            &[
-                self.group.as_ref(),
-                b"MangoAccount2".as_ref(),
-                self.owner.pubkey().as_ref(),
-                &self.account_num.to_le_bytes(),
-            ],
-            &program_id,
-        )
-        .0;
-
         let accounts = mango_v4::accounts::AccountExpand {
             group: self.group,
             account,
             owner: self.owner.pubkey(),
             payer: self.payer.pubkey(),
             system_program: System::id(),
-            account2,
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);

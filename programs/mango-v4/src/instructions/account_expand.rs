@@ -6,11 +6,8 @@ use crate::state::*;
 pub struct AccountExpand<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        has_one = group,
-        has_one = owner
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut)]
+    pub account: UncheckedAccount<'info>,
 
     pub owner: Signer<'info>,
 
@@ -18,12 +15,8 @@ pub struct AccountExpand<'info> {
     pub payer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
-
-    #[account(mut)]
-    pub account2: UncheckedAccount<'info>,
 }
 
-// https://github.com/coral-xyz/anchor/blob/master/lang/syn/src/codegen/accounts/constraints.rs#L328
 pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
     // expand to these lengths
     let token_count = 5;
@@ -34,7 +27,7 @@ pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
     let new_space = MangoAccount2::space(token_count, serum3_count, perp_count, perp_oo_count);
     let new_rent_minimum = Rent::get()?.minimum_balance(new_space);
 
-    let old_space = ctx.accounts.account2.data_len();
+    let old_space = ctx.accounts.account.data_len();
 
     require_gt!(new_space, old_space);
 
@@ -44,22 +37,24 @@ pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
             ctx.accounts.system_program.to_account_info(),
             anchor_lang::system_program::Transfer {
                 from: ctx.accounts.payer.to_account_info(),
-                to: ctx.accounts.account2.to_account_info(),
+                to: ctx.accounts.account.to_account_info(),
             },
         ),
         new_rent_minimum
-            .checked_sub(ctx.accounts.account2.lamports())
+            .checked_sub(ctx.accounts.account.lamports())
             .unwrap(),
     )?;
 
     // realloc
-    ctx.accounts.account2.realloc(new_space, true)?;
+    ctx.accounts.account.realloc(new_space, true)?;
 
     // expand dynamic content, e.g. to grow token positions, we need to slide serum3orders further later, and so on....
     let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new(&ctx.accounts.account2)?;
-    let mut meta = mal.load_mut()?;
-    meta.expand_dynamic_content(token_count, serum3_count, perp_count, perp_oo_count)?;
+        MangoAccountLoader::new(&ctx.accounts.account)?;
+    let mut account = mal.load_mut()?;
+    require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+    require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());
+    account.expand_dynamic_content(token_count, serum3_count, perp_count, perp_oo_count)?;
 
     Ok(())
 }

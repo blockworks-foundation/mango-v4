@@ -15,12 +15,8 @@ use super::{apply_vault_difference, OpenOrdersReserved, OpenOrdersSlim};
 pub struct Serum3SettleFunds<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        has_one = group,
-        constraint = account.load()?.is_owner_or_delegate(owner.key()),
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut)]
+    pub account: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -76,14 +72,21 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     // Validation
     //
     {
-        let account = ctx.accounts.account.load()?;
-        require!(!account.is_bankrupt(), MangoError::IsBankrupt);
+        let mal: MangoAccountLoader<MangoAccount2> =
+            MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        let account: MangoAccountAcc = mal.load()?;
+        require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+        require!(
+            account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
+            MangoError::SomeError
+        );
+
+        require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
         // Validate open_orders
         require!(
             account
-                .serum3
-                .find(serum_market.market_index)
+                .serum3_find(serum_market.market_index)
                 .ok_or_else(|| error!(MangoError::SomeError))?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
@@ -126,15 +129,16 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         cpi_settle_funds(ctx.accounts)?;
 
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
-        let account = &mut ctx.accounts.account.load_mut()?;
-
+        let mut mal: MangoAccountLoader<MangoAccount2> =
+            MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        let mut account: MangoAccountAccMut = mal.load_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
         charge_maybe_fees(
             serum_market.market_index,
             &mut base_bank,
             &mut quote_bank,
-            account,
+            &mut account,
             &after_oo,
         )?;
     }
@@ -149,7 +153,9 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         let after_quote_vault = ctx.accounts.quote_vault.amount;
 
         // Charge the difference in vault balances to the user's account
-        let mut account = ctx.accounts.account.load_mut()?;
+        let mut mal: MangoAccountLoader<MangoAccount2> =
+            MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        let mut account: MangoAccountAccMut = mal.load_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
         apply_vault_difference(
@@ -172,10 +178,10 @@ pub fn charge_maybe_fees(
     market_index: Serum3MarketIndex,
     coin_bank: &mut Bank,
     pc_bank: &mut Bank,
-    account: &mut MangoAccount,
+    account: &mut MangoAccountAccMut,
     after_oo: &OpenOrdersSlim,
 ) -> Result<()> {
-    let serum3_account = account.serum3.find_mut(market_index).unwrap();
+    let serum3_account = account.serum3_find_mut(market_index).unwrap();
 
     let maybe_actualized_coin_loan = I80F48::from_num::<u64>(
         serum3_account
@@ -185,9 +191,10 @@ pub fn charge_maybe_fees(
 
     if maybe_actualized_coin_loan > 0 {
         serum3_account.previous_native_coin_reserved = after_oo.native_coin_reserved();
+        drop(serum3_account);
 
         // loan origination fees
-        let coin_token_account = account.tokens.get_mut(coin_bank.token_index)?.0;
+        let coin_token_account = account.token_get_mut(coin_bank.token_index)?.0;
         let coin_token_native = coin_token_account.native(&coin_bank);
 
         if coin_token_native.is_negative() {
@@ -201,6 +208,7 @@ pub fn charge_maybe_fees(
         }
     }
 
+    let serum3_account = account.serum3_find_mut(market_index).unwrap();
     let maybe_actualized_pc_loan = I80F48::from_num::<u64>(
         serum3_account
             .previous_native_pc_reserved
@@ -211,7 +219,7 @@ pub fn charge_maybe_fees(
         serum3_account.previous_native_pc_reserved = after_oo.native_pc_reserved();
 
         // loan origination fees
-        let pc_token_account = account.tokens.get_mut(pc_bank.token_index)?.0;
+        let pc_token_account = account.token_get_mut(pc_bank.token_index)?.0;
         let pc_token_native = pc_token_account.native(&pc_bank);
 
         if pc_token_native.is_negative() {

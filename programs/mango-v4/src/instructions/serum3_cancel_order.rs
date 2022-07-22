@@ -14,12 +14,8 @@ use checked_math as cm;
 pub struct Serum3CancelOrder<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        has_one = group,
-        constraint = account.load()?.is_owner_or_delegate(owner.key()),
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut)]
+    pub account: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -62,14 +58,21 @@ pub fn serum3_cancel_order(
     // Validation
     //
     {
-        let account = ctx.accounts.account.load()?;
-        require!(!account.is_bankrupt(), MangoError::IsBankrupt);
+        let mal: MangoAccountLoader<MangoAccount2> =
+            MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        let account: MangoAccountAcc = mal.load()?;
+        require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+        require!(
+            account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
+            MangoError::SomeError
+        );
+
+        require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
         // Validate open_orders
         require!(
             account
-                .serum3
-                .find(serum_market.market_index)
+                .serum3_find(serum_market.market_index)
                 .ok_or_else(|| error!(MangoError::SomeError))?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
@@ -93,7 +96,9 @@ pub fn serum3_cancel_order(
     {
         let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
-        let mut account = ctx.accounts.account.load_mut()?;
+        let mut mal: MangoAccountLoader<MangoAccount2> =
+            MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        let mut account: MangoAccountAccMut = mal.load_mut()?;
         decrease_maybe_loan(
             serum_market.market_index,
             &mut account,
@@ -109,11 +114,11 @@ pub fn serum3_cancel_order(
 // the cached
 pub fn decrease_maybe_loan(
     market_index: Serum3MarketIndex,
-    account: &mut MangoAccount,
+    account: &mut MangoAccountAccMut,
     before_oo: &OpenOrdersSlim,
     after_oo: &OpenOrdersSlim,
 ) {
-    let serum3_account = account.serum3.find_mut(market_index).unwrap();
+    let serum3_account = account.serum3_find_mut(market_index).unwrap();
 
     if after_oo.native_coin_free > before_oo.native_coin_free {
         let native_coin_free_increase = after_oo.native_coin_free - before_oo.native_coin_free;

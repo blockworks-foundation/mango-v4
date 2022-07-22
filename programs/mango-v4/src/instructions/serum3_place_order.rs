@@ -83,12 +83,8 @@ pub enum Serum3Side {
 pub struct Serum3PlaceOrder<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        has_one = group,
-        constraint = account.load()?.is_owner_or_delegate(owner.key()),
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut)]
+    pub account: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -167,14 +163,20 @@ pub fn serum3_place_order(
     // Validation
     //
     {
-        let account = ctx.accounts.account.load()?;
-        require!(!account.is_bankrupt(), MangoError::IsBankrupt);
+        let mal: MangoAccountLoader<MangoAccount2> =
+            MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        let account: MangoAccountAcc = mal.load()?;
+        require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+        require!(
+            account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
+            MangoError::SomeError
+        );
+        require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
         // Validate open_orders
         require!(
             account
-                .serum3
-                .find(serum_market.market_index)
+                .serum3_find(serum_market.market_index)
                 .ok_or_else(|| error!(MangoError::SomeError))?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
@@ -240,7 +242,9 @@ pub fn serum3_place_order(
         let oo_ai = &ctx.accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
-        let mut account = ctx.accounts.account.load_mut()?;
+        let mut mal: MangoAccountLoader<MangoAccount2> =
+            MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        let mut account: MangoAccountAccMut = mal.load_mut()?;
         inc_maybe_loan(
             serum_market.market_index,
             &mut account,
@@ -260,7 +264,9 @@ pub fn serum3_place_order(
     let after_quote_vault = ctx.accounts.quote_vault.amount;
 
     // Charge the difference in vault balances to the user's account
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut mal: MangoAccountLoader<MangoAccount2> =
+        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+    let mut account: MangoAccountAccMut = mal.load_mut()?;
     let vault_difference_result = {
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
@@ -278,8 +284,8 @@ pub fn serum3_place_order(
     //
     // Health check
     //
-    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
-    let health = compute_health(&account, HealthType::Init, &retriever)?;
+    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
+    let health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
 
@@ -291,11 +297,11 @@ pub fn serum3_place_order(
 // if reserved has increased, then increase cached value by the increase in reserved
 pub fn inc_maybe_loan(
     market_index: Serum3MarketIndex,
-    account: &mut MangoAccount,
+    account: &mut MangoAccountAccMut,
     before_oo: &OpenOrdersSlim,
     after_oo: &OpenOrdersSlim,
 ) {
-    let serum3_account = account.serum3.find_mut(market_index).unwrap();
+    let serum3_account = account.serum3_find_mut(market_index).unwrap();
 
     if after_oo.native_coin_reserved() > before_oo.native_coin_reserved() {
         let native_coin_reserved_increase =
@@ -319,18 +325,18 @@ pub struct VaultDifferenceResult {
 }
 
 impl VaultDifferenceResult {
-    pub fn deactivate_inactive_token_accounts(&self, account: &mut MangoAccount) {
+    pub fn deactivate_inactive_token_accounts(&self, account: &mut MangoAccountAccMut) {
         if !self.base_active {
-            account.tokens.deactivate(self.base_raw_index);
+            account.token_deactivate(self.base_raw_index);
         }
         if !self.quote_active {
-            account.tokens.deactivate(self.quote_raw_index);
+            account.token_deactivate(self.quote_raw_index);
         }
     }
 }
 
 pub fn apply_vault_difference(
-    account: &mut MangoAccount,
+    account: &mut MangoAccountAccMut,
     base_bank: &mut Bank,
     after_base_vault: u64,
     before_base_vault: u64,
@@ -342,11 +348,11 @@ pub fn apply_vault_difference(
     // charged if an order executes and the loan materializes? Otherwise MMs that place
     // an order without having the funds will be charged for each place_order!
 
-    let (base_position, base_raw_index) = account.tokens.get_mut(base_bank.token_index)?;
+    let (base_position, base_raw_index) = account.token_get_mut(base_bank.token_index)?;
     let base_change = I80F48::from(after_base_vault) - I80F48::from(before_base_vault);
     let base_active = base_bank.change_with_fee(base_position, base_change)?;
 
-    let (quote_position, quote_raw_index) = account.tokens.get_mut(quote_bank.token_index)?;
+    let (quote_position, quote_raw_index) = account.token_get_mut(quote_bank.token_index)?;
     let quote_change = I80F48::from(after_quote_vault) - I80F48::from(before_quote_vault);
     let quote_active = quote_bank.change_with_fee(quote_position, quote_change)?;
 

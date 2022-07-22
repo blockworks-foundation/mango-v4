@@ -8,14 +8,8 @@ use crate::state::*;
 pub struct AccountClose<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        // note: should never be the delegate
-        has_one = owner,
-        has_one = group,
-        close = sol_destination
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut)]
+    pub account: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -28,23 +22,28 @@ pub struct AccountClose<'info> {
 pub fn account_close(ctx: Context<AccountClose>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
-    // don't perform checks if group is just testing
-    if group.testing == 1 {
-        return Ok(());
-    }
+    let mut mal: MangoAccountLoader<MangoAccount2> =
+        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+    let account: MangoAccountAccMut = mal.load_mut()?;
+    require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+    require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());
 
-    let account = ctx.accounts.account.load()?;
-    require!(!account.being_liquidated(), MangoError::SomeError);
-    require!(!account.is_bankrupt(), MangoError::SomeError);
-    require_eq!(account.delegate, Pubkey::default());
-    for ele in account.tokens.values {
-        require_eq!(ele.is_active(), false);
-    }
-    for ele in account.serum3.values {
-        require_eq!(ele.is_active(), false);
-    }
-    for ele in account.perps.accounts {
-        require_eq!(ele.is_active(), false);
+    // TODO: close account manually
+
+    // don't perform checks if group is just testing
+    if group.testing == 0 {
+        require!(!account.fixed.being_liquidated(), MangoError::SomeError);
+        require!(!account.fixed.is_bankrupt(), MangoError::SomeError);
+        require_eq!(account.fixed.delegate, Pubkey::default());
+        for ele in account.token_iter() {
+            require_eq!(ele.is_active(), false);
+        }
+        for ele in account.serum3_iter() {
+            require_eq!(ele.is_active(), false);
+        }
+        for ele in account.perp_iter() {
+            require_eq!(ele.is_active(), false);
+        }
     }
 
     Ok(())

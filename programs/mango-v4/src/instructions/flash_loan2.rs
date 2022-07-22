@@ -4,7 +4,8 @@ use crate::group_seeds;
 use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
 use crate::state::{
     compute_health, compute_health_from_fixed_accounts, new_fixed_order_account_retriever,
-    AccountRetriever, Bank, Group, HealthType, MangoAccount, TokenIndex,
+    AccountRetriever, Bank, Group, HealthType, MangoAccount2, MangoAccountAccMut,
+    MangoAccountLoader, TokenIndex,
 };
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
@@ -35,12 +36,8 @@ pub struct FlashLoan2Begin<'info> {
 #[derive(Accounts)]
 pub struct FlashLoan2End<'info> {
     pub group: AccountLoader<'info, Group>,
-    #[account(
-        mut,
-        has_one = group,
-        constraint = account.load()?.is_owner_or_delegate(owner.key()),
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut)]
+    pub account: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
@@ -161,9 +158,13 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
     let group = ctx.accounts.group.load()?;
     let group_seeds = group_seeds!(group);
 
-    let mut account = ctx.accounts.account.load_mut()?;
-    require!(!account.is_bankrupt(), MangoError::IsBankrupt);
+    let mut mal: MangoAccountLoader<MangoAccount2> =
+        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+    let mut account: MangoAccountAccMut = mal.load_mut()?;
+    require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+    require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());
 
+    require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
     // Find index at which vaults start
     let vaults_index = ctx
         .remaining_accounts
@@ -174,7 +175,7 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
                 return false;
             }
 
-            maybe_token_account.unwrap().owner == account.group
+            maybe_token_account.unwrap().owner == account.fixed.group
         })
         .ok_or_else(|| error!(MangoError::SomeError))?;
 
@@ -213,7 +214,7 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
         require_neq!(bank.flash_loan_vault_initial, u64::MAX);
 
         // Create the token position now, so we can compute the pre-health with fixed order health accounts
-        let (_, raw_token_index, _) = account.tokens.get_mut_or_create(bank.token_index)?;
+        let (_, raw_token_index, _) = account.token_get_mut_or_create(bank.token_index)?;
 
         // Revoke delegation
         let ix = token::spl_token::instruction::revoke(
@@ -246,8 +247,8 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
     // Check pre-cpi health
     // NOTE: This health check isn't strictly necessary. It will be, later, when
     // we want to have reduce_only or be able to move an account out of bankruptcy.
-    let retriever = new_fixed_order_account_retriever(health_ais, &account)?;
-    let pre_cpi_health = compute_health(&account, HealthType::Init, &retriever)?;
+    let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
+    let pre_cpi_health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
     require!(pre_cpi_health >= 0, MangoError::HealthMustBePositive);
     msg!("pre_cpi_health {:?}", pre_cpi_health);
 
@@ -255,7 +256,7 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
     let mut prices = vec![];
     for change in &changes {
         let (_, oracle_price) = retriever.bank_and_oracle(
-            &account.group,
+            &account.fixed.group,
             change.bank_index,
             change.raw_token_index as TokenIndex,
         )?;
@@ -270,7 +271,7 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
     let mut token_loan_details = Vec::with_capacity(changes.len());
     for (change, price) in changes.iter().zip(prices.iter()) {
         let mut bank = health_ais[change.bank_index].load_mut::<Bank>()?;
-        let position = account.tokens.get_mut_raw(change.raw_token_index);
+        let position = account.token_get_mut_raw(change.raw_token_index);
         let native = position.native(&bank);
         let approved_amount = I80F48::from(bank.flash_loan_approved_amount);
 
@@ -314,18 +315,18 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
 
     emit!(FlashLoanLog {
         mango_account: ctx.accounts.account.key(),
-        token_loan_details: token_loan_details
+        token_loan_details
     });
 
     // Check post-cpi health
     let post_cpi_health =
-        compute_health_from_fixed_accounts(&account, HealthType::Init, health_ais)?;
+        compute_health_from_fixed_accounts(&account.borrow(), HealthType::Init, health_ais)?;
     require!(post_cpi_health >= 0, MangoError::HealthMustBePositive);
     msg!("post_cpi_health {:?}", post_cpi_health);
 
     // Deactivate inactive token accounts after health check
     for raw_token_index in deactivated_token_positions {
-        account.tokens.deactivate(raw_token_index);
+        account.token_deactivate(raw_token_index);
     }
 
     Ok(())

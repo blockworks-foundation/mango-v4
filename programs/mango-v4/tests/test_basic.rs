@@ -50,7 +50,7 @@ async fn test_basic() -> Result<(), TransportError> {
     .unwrap()
     .account;
 
-    let account = send_tx(
+    send_tx(
         solana,
         AccountExpandInstruction {
             account_num: 0,

@@ -14,13 +14,8 @@ use crate::util::checked_math as cm;
 pub struct TokenWithdraw<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        has_one = group,
-        // note: should never be the delegate
-        has_one = owner,
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut)]
+    pub account: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
 
     #[account(
@@ -39,8 +34,6 @@ pub struct TokenWithdraw<'info> {
     pub token_account: Box<Account<'info, TokenAccount>>,
 
     pub token_program: Program<'info, Token>,
-
-    pub account2: UncheckedAccount<'info>,
 }
 
 impl<'info> TokenWithdraw<'info> {
@@ -66,11 +59,15 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     let token_index = ctx.accounts.bank.load()?.token_index;
 
     // Get the account's position for that token index
-    let mut account = ctx.accounts.account.load_mut()?;
-    require!(!account.is_bankrupt(), MangoError::IsBankrupt);
+    let mut mal: MangoAccountLoader<MangoAccount2> =
+        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+    let mut account: MangoAccountAccMut = mal.load_mut()?;
+    require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+    require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());
 
+    require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
     let (position, raw_token_index, active_token_index) =
-        account.tokens.get_mut_or_create(token_index)?;
+        account.token_get_mut_or_create(token_index)?;
 
     // The bank will also be passed in remainingAccounts. Use an explicit scope
     // to drop the &mut before we borrow it immutably again later.
@@ -113,16 +110,17 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     let indexed_position = position.indexed_position;
 
-    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
+    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
     let (bank, oracle_price) =
         retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
 
     // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
-    account.net_deposits -= cm!(amount_i80f48 * oracle_price * QUOTE_NATIVE_TO_UI).to_num::<f32>();
+    account.fixed.net_deposits -=
+        cm!(amount_i80f48 * oracle_price * QUOTE_NATIVE_TO_UI).to_num::<f32>();
 
     emit!(TokenBalanceLog {
         mango_account: ctx.accounts.account.key(),
-        token_index: token_index,
+        token_index,
         indexed_position: indexed_position.to_bits(),
         deposit_index: bank.deposit_index.to_bits(),
         borrow_index: bank.borrow_index.to_bits(),
@@ -132,7 +130,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     //
     // Health check
     //
-    let health = compute_health(&account, HealthType::Init, &retriever)
+    let health = compute_health(&account.borrow(), HealthType::Init, &retriever)
         .context("post-withdraw init health")?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
@@ -143,34 +141,16 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     // deactivated.
     //
     if !position_is_active {
-        account.tokens.deactivate(raw_token_index);
+        account.token_deactivate(raw_token_index);
     }
 
     emit!(WithdrawLog {
         mango_account: ctx.accounts.account.key(),
         signer: ctx.accounts.owner.key(),
-        token_index: token_index,
+        token_index,
         quantity: amount,
         price: oracle_price.to_bits(),
     });
-
-    // verify account expansion
-    // size - 2 should have set indices, and last 2 in all positions should be unset
-    let mal: MangoAccountLoader<MangoAccount2> = MangoAccountLoader::new(&ctx.accounts.account2)?;
-    let meta = mal.load()?;
-    // test
-    for i in 0..meta.header.token_count() {
-        let pos = meta.token_get_raw(i);
-        msg!("pos {:?} token index {:?}", i, pos.token_index);
-    }
-    for i in 0..meta.header.serum3_count() {
-        let pos = meta.serum3_get_raw(i);
-        msg!("pos {:?} serum market index {:?}", i, pos.market_index);
-    }
-    for i in 0..meta.header.perp_count() {
-        let pos = meta.perp_get_raw(i);
-        msg!("pos {:?} perp market index {:?}", i, pos.market_index);
-    }
 
     Ok(())
 }

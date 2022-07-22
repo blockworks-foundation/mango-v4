@@ -7,12 +7,8 @@ use crate::state::*;
 pub struct Serum3CreateOpenOrders<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        has_one = group,
-        constraint = account.load()?.is_owner_or_delegate(owner.key()),
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut)]
+    pub account: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
 
     #[account(
@@ -50,9 +46,19 @@ pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result
     cpi_init_open_orders(ctx.accounts)?;
 
     let serum_market = ctx.accounts.serum_market.load()?;
-    let mut account = ctx.accounts.account.load_mut()?;
-    require!(!account.is_bankrupt(), MangoError::IsBankrupt);
-    let serum_account = account.serum3.create(serum_market.market_index)?;
+
+    let mut mal: MangoAccountLoader<MangoAccount2> =
+        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+    let mut account: MangoAccountAccMut = mal.load_mut()?;
+    require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+    require!(
+        account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
+        MangoError::SomeError
+    );
+
+    require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
+
+    let serum_account = account.serum3_create(serum_market.market_index)?;
     serum_account.open_orders = ctx.accounts.open_orders.key();
     serum_account.base_token_index = serum_market.base_token_index;
     serum_account.quote_token_index = serum_market.quote_token_index;
@@ -60,13 +66,9 @@ pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result
     // Make it so that the token_account_map for the base and quote currency
     // stay permanently blocked. Otherwise users may end up in situations where
     // they can't settle a market because they don't have free token_account_map!
-    let (quote_position, _, _) = account
-        .tokens
-        .get_mut_or_create(serum_market.quote_token_index)?;
+    let (quote_position, _, _) = account.token_get_mut_or_create(serum_market.quote_token_index)?;
     quote_position.in_use_count += 1;
-    let (base_position, _, _) = account
-        .tokens
-        .get_mut_or_create(serum_market.base_token_index)?;
+    let (base_position, _, _) = account.token_get_mut_or_create(serum_market.base_token_index)?;
     base_position.in_use_count += 1;
 
     Ok(())

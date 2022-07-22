@@ -7,12 +7,8 @@ use crate::state::*;
 pub struct Serum3CloseOpenOrders<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        has_one = group,
-        constraint = account.load()?.is_owner_or_delegate(owner.key()),
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut)]
+    pub account: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
 
     #[account(
@@ -39,14 +35,23 @@ pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<(
     //
     // Validation
     //
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut mal: MangoAccountLoader<MangoAccount2> =
+        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+    let mut account: MangoAccountAccMut = mal.load_mut()?;
+    require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+    require!(
+        account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
+        MangoError::SomeError
+    );
+
+    require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
+
     let serum_market = ctx.accounts.serum_market.load()?;
-    require!(!account.is_bankrupt(), MangoError::IsBankrupt);
+
     // Validate open_orders
     require!(
         account
-            .serum3
-            .find(serum_market.market_index)
+            .serum3_find(serum_market.market_index)
             .ok_or_else(|| error!(MangoError::SomeError))?
             .open_orders
             == ctx.accounts.open_orders.key(),
@@ -59,7 +64,7 @@ pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<(
     cpi_close_open_orders(ctx.accounts)?;
 
     // TODO: decrement in_use_count on the base token and quote token
-    account.serum3.deactivate(serum_market.market_index)?;
+    account.serum3_deactivate(serum_market.market_index)?;
 
     Ok(())
 }

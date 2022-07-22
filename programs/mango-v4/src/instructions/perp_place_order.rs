@@ -2,21 +2,20 @@ use anchor_lang::prelude::*;
 
 use crate::accounts_zerocopy::*;
 use crate::error::*;
+use crate::state::MangoAccount2;
+use crate::state::MangoAccountAccMut;
+use crate::state::MangoAccountLoader;
 use crate::state::{
     compute_health, new_fixed_order_account_retriever, oracle_price, Book, BookSide, EventQueue,
-    Group, HealthType, MangoAccount, OrderType, PerpMarket, Side,
+    Group, HealthType, OrderType, PerpMarket, Side,
 };
 
 #[derive(Accounts)]
 pub struct PerpPlaceOrder<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        has_one = group,
-        constraint = account.load()?.is_owner_or_delegate(owner.key()),
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut)]
+    pub account: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
 
     #[account(
@@ -78,9 +77,17 @@ pub fn perp_place_order(
     // When the limit is reached, processing stops and the instruction succeeds.
     limit: u8,
 ) -> Result<()> {
-    let mut mango_account = ctx.accounts.account.load_mut()?;
-    require!(!mango_account.is_bankrupt(), MangoError::IsBankrupt);
-    let mango_account_pk = ctx.accounts.account.key();
+    let mut mal: MangoAccountLoader<MangoAccount2> =
+        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+    let mut account: MangoAccountAccMut = mal.load_mut()?;
+    require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+    require!(
+        account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
+        MangoError::SomeError
+    );
+
+    require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
+    let account_pk = ctx.accounts.account.key();
 
     {
         let mut perp_market = ctx.accounts.perp_market.load_mut()?;
@@ -118,8 +125,8 @@ pub fn perp_place_order(
             &mut perp_market,
             &mut event_queue,
             oracle_price,
-            &mut mango_account.perps,
-            &mango_account_pk,
+            &mut account,
+            &account_pk,
             price_lots,
             max_base_lots,
             max_quote_lots,
@@ -131,8 +138,8 @@ pub fn perp_place_order(
         )?;
     }
 
-    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &mango_account)?;
-    let health = compute_health(&mango_account, HealthType::Init, &retriever)?;
+    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
+    let health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
 

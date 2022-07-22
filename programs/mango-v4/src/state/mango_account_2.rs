@@ -35,7 +35,6 @@ const BORSH_VEC_SIZE_BYTES: usize = 4;
 // deserialization and not have to do custom deserialization
 // On chain, we would prefer zero-copying to optimize for compute
 #[account]
-#[derive(Default)]
 pub struct MangoAccount2 {
     // fixed
     // note: keep MangoAccount2Fixed in sync with changes here
@@ -84,6 +83,32 @@ pub struct MangoAccount2 {
     pub perps: Vec<PerpPositions>,
     pub padding4: u32,
     pub perp_open_orders: Vec<PerpOpenOrders>,
+}
+
+impl Default for MangoAccount2 {
+    fn default() -> Self {
+        Self {
+            name: Default::default(),
+            group: Pubkey::default(),
+            owner: Pubkey::default(),
+            delegate: Pubkey::default(),
+            being_liquidated: 0,
+            is_bankrupt: 0,
+            account_num: 0,
+            bump: 0,
+            reserved: Default::default(),
+            net_deposits: 0.0,
+            net_settled: 0.0,
+            padding1: Default::default(),
+            tokens: vec![TokenPosition::default(); 3],
+            padding2: Default::default(),
+            serum3: vec![Serum3Orders::default(); 4],
+            padding3: Default::default(),
+            perps: vec![PerpPositions::default(); 2],
+            padding4: Default::default(),
+            perp_open_orders: vec![PerpOpenOrders::default(); 2],
+        }
+    }
 }
 
 impl MangoAccount2 {
@@ -471,6 +496,11 @@ impl<'a> MangoAccountAccMut<'a> {
         }
     }
 
+    pub fn token_deactivate(&mut self, raw_index: usize) {
+        assert!(self.token_get_mut_raw(raw_index).in_use_count == 0);
+        self.token_get_mut_raw(raw_index).token_index = TokenIndex::MAX;
+    }
+
     // get mut Serum3Orders at raw_index
     pub fn serum3_get_mut_raw(&mut self, raw_index: usize) -> &mut Serum3Orders {
         let offset = self.header.serum3_offset(raw_index);
@@ -581,7 +611,7 @@ impl<'a> MangoAccountAccMut<'a> {
 
     pub fn perp_remove_order(&mut self, slot: usize, quantity: i64) -> Result<()> {
         {
-            let mut oo = self.perp_oo_get_mut_raw(slot);
+            let oo = self.perp_oo_get_mut_raw(slot);
             require_neq!(oo.order_market, FREE_ORDER_SLOT);
             let order_side = oo.order_side;
             let perp_market_index = oo.order_market;
