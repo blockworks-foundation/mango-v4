@@ -14,7 +14,7 @@ pub struct AccountCreate<'info> {
         seeds = [group.key().as_ref(), b"MangoAccount".as_ref(), owner.key().as_ref(), &account_num.to_le_bytes()],
         bump,
         payer = payer,
-        space = MangoAccount2::space(16, 8, 8, 8),
+        space = MangoAccount::space(16, 8, 8, 8),
     )]
     // borsh smashes the stack, and zero copy doesnt work out of the box
     // deserialize manually

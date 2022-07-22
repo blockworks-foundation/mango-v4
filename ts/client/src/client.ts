@@ -474,7 +474,7 @@ export class MangoClient {
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
-      .rpc();
+      .rpc({ skipPreflight: true });
   }
 
   public async getMangoAccount(mangoAccount: MangoAccount) {
@@ -506,17 +506,6 @@ export class MangoClient {
     ).map((pa) => {
       return MangoAccount.from(pa.publicKey, pa.account);
     });
-  }
-
-  public async getCFTestccountForOwner(ownerPk: PublicKey): Promise<any> {
-    return await this.program.account.mangoAccount2.all([
-      {
-        memcmp: {
-          bytes: ownerPk.toBase58(),
-          offset: 8,
-        },
-      },
-    ]);
   }
 
   public async closeMangoAccount(

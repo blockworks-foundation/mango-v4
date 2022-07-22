@@ -90,13 +90,18 @@ async function main() {
 
   if (true) {
     // deposit and withdraw
-    console.log(`...depositing 50 USDC`);
-    await client.tokenDeposit(group, mangoAccount, 'USDC', 50);
-    await mangoAccount.reload(client, group);
 
-    console.log(`...depositing 0.0005 BTC`);
-    await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005);
-    await mangoAccount.reload(client, group);
+    try {
+      console.log(`...depositing 50 USDC`);
+      await client.tokenDeposit(group, mangoAccount, 'USDC', 50);
+      await mangoAccount.reload(client, group);
+
+      console.log(`...depositing 0.0005 BTC`);
+      await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005);
+      await mangoAccount.reload(client, group);
+    } catch (error) {
+      console.log(error);
+    }
 
     // witdrawing fails if no (other) user has deposited ORCA in the group
     // console.log(`Withdrawing...0.1 ORCA`);

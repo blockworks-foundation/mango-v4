@@ -2795,7 +2795,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "mangoAccount2",
+      "name": "mangoAccount",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2900,86 +2900,6 @@ export type MangoV4 = {
                 "defined": "PerpOpenOrders"
               }
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "mangoAccount",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "group",
-            "type": "publicKey"
-          },
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "name",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "delegate",
-            "type": "publicKey"
-          },
-          {
-            "name": "tokens",
-            "type": {
-              "defined": "MangoAccountTokenPositions"
-            }
-          },
-          {
-            "name": "serum3",
-            "type": {
-              "defined": "MangoAccountSerum3Orders"
-            }
-          },
-          {
-            "name": "perps",
-            "type": {
-              "defined": "MangoAccountPerpPositions"
-            }
-          },
-          {
-            "name": "beingLiquidated",
-            "type": "u8"
-          },
-          {
-            "name": "isBankrupt",
-            "type": "u8"
-          },
-          {
-            "name": "accountNum",
-            "type": "u8"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          },
-          {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                4
-              ]
-            }
-          },
-          {
-            "name": "netDeposits",
-            "type": "f32"
-          },
-          {
-            "name": "netSettled",
-            "type": "f32"
           }
         ]
       }
@@ -3752,25 +3672,6 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "MangoAccountTokenPositions",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "values",
-            "type": {
-              "array": [
-                {
-                  "defined": "TokenPosition"
-                },
-                16
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
       "name": "Serum3Orders",
       "type": {
         "kind": "struct",
@@ -3805,25 +3706,6 @@ export type MangoV4 = {
               "array": [
                 "u8",
                 2
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "MangoAccountSerum3Orders",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "values",
-            "type": {
-              "array": [
-                {
-                  "defined": "Serum3Orders"
-                },
-                8
               ]
             }
           }
@@ -3929,63 +3811,6 @@ export type MangoV4 = {
           {
             "name": "orderId",
             "type": "i128"
-          }
-        ]
-      }
-    },
-    {
-      "name": "MangoAccountPerpPositions",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "accounts",
-            "type": {
-              "array": [
-                {
-                  "defined": "PerpPositions"
-                },
-                8
-              ]
-            }
-          },
-          {
-            "name": "orderMarket",
-            "type": {
-              "array": [
-                "u16",
-                8
-              ]
-            }
-          },
-          {
-            "name": "orderSide",
-            "type": {
-              "array": [
-                {
-                  "defined": "Side"
-                },
-                8
-              ]
-            }
-          },
-          {
-            "name": "orderId",
-            "type": {
-              "array": [
-                "i128",
-                8
-              ]
-            }
-          },
-          {
-            "name": "clientOrderId",
-            "type": {
-              "array": [
-                "u64",
-                8
-              ]
-            }
           }
         ]
       }
@@ -7760,7 +7585,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "mangoAccount2",
+      "name": "mangoAccount",
       "type": {
         "kind": "struct",
         "fields": [
@@ -7865,86 +7690,6 @@ export const IDL: MangoV4 = {
                 "defined": "PerpOpenOrders"
               }
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "mangoAccount",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "group",
-            "type": "publicKey"
-          },
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "name",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "delegate",
-            "type": "publicKey"
-          },
-          {
-            "name": "tokens",
-            "type": {
-              "defined": "MangoAccountTokenPositions"
-            }
-          },
-          {
-            "name": "serum3",
-            "type": {
-              "defined": "MangoAccountSerum3Orders"
-            }
-          },
-          {
-            "name": "perps",
-            "type": {
-              "defined": "MangoAccountPerpPositions"
-            }
-          },
-          {
-            "name": "beingLiquidated",
-            "type": "u8"
-          },
-          {
-            "name": "isBankrupt",
-            "type": "u8"
-          },
-          {
-            "name": "accountNum",
-            "type": "u8"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          },
-          {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                4
-              ]
-            }
-          },
-          {
-            "name": "netDeposits",
-            "type": "f32"
-          },
-          {
-            "name": "netSettled",
-            "type": "f32"
           }
         ]
       }
@@ -8717,25 +8462,6 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "MangoAccountTokenPositions",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "values",
-            "type": {
-              "array": [
-                {
-                  "defined": "TokenPosition"
-                },
-                16
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
       "name": "Serum3Orders",
       "type": {
         "kind": "struct",
@@ -8770,25 +8496,6 @@ export const IDL: MangoV4 = {
               "array": [
                 "u8",
                 2
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "MangoAccountSerum3Orders",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "values",
-            "type": {
-              "array": [
-                {
-                  "defined": "Serum3Orders"
-                },
-                8
               ]
             }
           }
@@ -8894,63 +8601,6 @@ export const IDL: MangoV4 = {
           {
             "name": "orderId",
             "type": "i128"
-          }
-        ]
-      }
-    },
-    {
-      "name": "MangoAccountPerpPositions",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "accounts",
-            "type": {
-              "array": [
-                {
-                  "defined": "PerpPositions"
-                },
-                8
-              ]
-            }
-          },
-          {
-            "name": "orderMarket",
-            "type": {
-              "array": [
-                "u16",
-                8
-              ]
-            }
-          },
-          {
-            "name": "orderSide",
-            "type": {
-              "array": [
-                {
-                  "defined": "Side"
-                },
-                8
-              ]
-            }
-          },
-          {
-            "name": "orderId",
-            "type": {
-              "array": [
-                "i128",
-                8
-              ]
-            }
-          },
-          {
-            "name": "clientOrderId",
-            "type": {
-              "array": [
-                "u64",
-                8
-              ]
-            }
           }
         ]
       }
