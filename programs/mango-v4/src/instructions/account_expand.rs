@@ -24,7 +24,7 @@ pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
     let perp_count = 10;
     let perp_oo_count = 10;
 
-    let new_space = MangoAccount2::space(token_count, serum3_count, perp_count, perp_oo_count);
+    let new_space = MangoAccount::space(token_count, serum3_count, perp_count, perp_oo_count);
     let new_rent_minimum = Rent::get()?.minimum_balance(new_space);
 
     let old_space = ctx.accounts.account.data_len();
@@ -49,8 +49,7 @@ pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
     ctx.accounts.account.realloc(new_space, true)?;
 
     // expand dynamic content, e.g. to grow token positions, we need to slide serum3orders further later, and so on....
-    let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new(&ctx.accounts.account)?;
+    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
     let mut account = mal.load_mut()?;
     require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
     require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());

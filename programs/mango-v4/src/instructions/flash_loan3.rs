@@ -2,7 +2,7 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::group_seeds;
 use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
-use crate::state::MangoAccount2;
+use crate::state::MangoAccount;
 use crate::state::MangoAccountAccMut;
 use crate::state::MangoAccountLoader;
 use crate::state::{
@@ -168,8 +168,7 @@ struct TokenVaultChange {
 pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan3End<'info>>,
 ) -> Result<()> {
-    let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new(&ctx.accounts.account)?;
+    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
     let mut account: MangoAccountAccMut = mal.load_mut()?;
     require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());
 

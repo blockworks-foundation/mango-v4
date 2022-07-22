@@ -29,7 +29,7 @@ pub struct AccountCreate<'info> {
 }
 
 pub fn account_create(ctx: Context<AccountCreate>, account_num: u8, name: String) -> Result<()> {
-    let mut mal: MangoAccountLoader<MangoAccount2> =
+    let mut mal: MangoAccountLoader<MangoAccount> =
         MangoAccountLoader::new_init(&ctx.accounts.account)?;
     let mut account: MangoAccountAccMut = mal.load_mut()?;
 

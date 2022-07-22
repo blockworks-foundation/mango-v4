@@ -810,8 +810,8 @@ mod tests {
     use super::*;
     use crate::state::oracle::StubOracle;
     use crate::state::{
-        GetAccessorMut, Header, MangoAccount2, MangoAccount2DynamicHeader, MangoAccount2Fixed,
-        MangoAccountAccMut, TokenPosition,
+        GetAccessorMut, Header, MangoAccount, MangoAccountAccMut, MangoAccountDynamicHeader,
+        MangoAccountFixed, TokenPosition,
     };
     use std::cell::RefCell;
     use std::convert::identity;
@@ -932,9 +932,9 @@ mod tests {
     #[test]
     fn test_health0() {
         let mut buffer: Vec<u8> = Vec::new();
-        MangoAccount2::default().serialize(&mut buffer).unwrap();
+        MangoAccount::default().serialize(&mut buffer).unwrap();
         let mut header =
-            MangoAccount2DynamicHeader::try_new_header(&buffer[size_of::<MangoAccount2Fixed>()..])
+            MangoAccountDynamicHeader::try_new_header(&buffer[size_of::<MangoAccountFixed>()..])
                 .unwrap();
         let mut account: MangoAccountAccMut = header.new_accessor_mut(&mut buffer[..]);
 
@@ -1099,9 +1099,9 @@ mod tests {
     }
     fn test_health1_runner(testcase: &TestHealth1Case) {
         let mut buffer: Vec<u8> = Vec::new();
-        MangoAccount2::default().serialize(&mut buffer).unwrap();
+        MangoAccount::default().serialize(&mut buffer).unwrap();
         let mut header =
-            MangoAccount2DynamicHeader::try_new_header(&buffer[size_of::<MangoAccount2Fixed>()..])
+            MangoAccountDynamicHeader::try_new_header(&buffer[size_of::<MangoAccountFixed>()..])
                 .unwrap();
         let mut account: MangoAccountAccMut = header.new_accessor_mut(&mut buffer[..]);
 

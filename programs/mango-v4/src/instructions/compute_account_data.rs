@@ -11,7 +11,7 @@ pub struct ComputeAccountData<'info> {
 pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
     let group_pk = ctx.accounts.group.key();
 
-    let mal: MangoAccountLoader<MangoAccount2> = MangoAccountLoader::new(&ctx.accounts.account)?;
+    let mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
     let account: MangoAccountAcc = mal.load()?;
 
     let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, &group_pk)?;

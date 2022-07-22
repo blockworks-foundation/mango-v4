@@ -47,8 +47,7 @@ pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result
 
     let serum_market = ctx.accounts.serum_market.load()?;
 
-    let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new(&ctx.accounts.account)?;
+    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
     let mut account: MangoAccountAccMut = mal.load_mut()?;
     require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
     require!(

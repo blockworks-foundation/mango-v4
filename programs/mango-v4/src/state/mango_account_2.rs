@@ -35,9 +35,9 @@ const BORSH_VEC_SIZE_BYTES: usize = 4;
 // deserialization and not have to do custom deserialization
 // On chain, we would prefer zero-copying to optimize for compute
 #[account]
-pub struct MangoAccount2 {
+pub struct MangoAccount {
     // fixed
-    // note: keep MangoAccount2Fixed in sync with changes here
+    // note: keep MangoAccountFixed in sync with changes here
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
 
@@ -85,7 +85,7 @@ pub struct MangoAccount2 {
     pub perp_open_orders: Vec<PerpOpenOrders>,
 }
 
-impl Default for MangoAccount2 {
+impl Default for MangoAccount {
     fn default() -> Self {
         Self {
             name: Default::default(),
@@ -111,9 +111,9 @@ impl Default for MangoAccount2 {
     }
 }
 
-impl MangoAccount2 {
+impl MangoAccount {
     pub fn space(token_count: u8, serum3_count: u8, perp_count: u8, perp_oo_count: u8) -> usize {
-        8 + size_of::<MangoAccount2Fixed>()
+        8 + size_of::<MangoAccountFixed>()
             + Self::dynamic_size(token_count, serum3_count, perp_count, perp_oo_count)
     }
 
@@ -249,7 +249,7 @@ impl MangoAccount2 {
 
 #[test]
 fn test_dynamic_offsets() {
-    let mut account = MangoAccount2::default();
+    let mut account = MangoAccount::default();
     account.tokens.resize(3, TokenPosition::default());
     account.serum3.resize(5, Serum3Orders::default());
     account.perps.resize(7, PerpPositions::default());
@@ -258,14 +258,14 @@ fn test_dynamic_offsets() {
         .resize(4, PerpOpenOrders::default());
     assert_eq!(
         8 + AnchorSerialize::try_to_vec(&account).unwrap().len(),
-        MangoAccount2::space(3, 5, 7, 4)
+        MangoAccount::space(3, 5, 7, 4)
     );
 }
 
 // Mango Account fixed part for easy zero copy deserialization
 #[derive(Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
 #[repr(C)]
-pub struct MangoAccount2Fixed {
+pub struct MangoAccountFixed {
     pub group: Pubkey,
     pub owner: Pubkey,
     pub name: [u8; 32],
@@ -279,7 +279,7 @@ pub struct MangoAccount2Fixed {
     pub net_settled: f32,
 }
 
-impl MangoAccount2Fixed {
+impl MangoAccountFixed {
     pub fn name(&self) -> &str {
         std::str::from_utf8(&self.name)
             .unwrap()
@@ -322,13 +322,13 @@ pub trait DynamicAccount: Owner + Discriminator {
     type Fixed: bytemuck::Pod;
 }
 
-impl DynamicAccount for MangoAccount2 {
-    type Header = MangoAccount2DynamicHeader;
-    type Fixed = MangoAccount2Fixed;
+impl DynamicAccount for MangoAccount {
+    type Header = MangoAccountDynamicHeader;
+    type Fixed = MangoAccountFixed;
 }
 
 #[derive(Clone)]
-pub struct MangoAccount2DynamicHeader {
+pub struct MangoAccountDynamicHeader {
     pub token_count: u8,
     pub serum3_count: u8,
     pub perp_count: u8,
@@ -343,11 +343,11 @@ fn get_helper_mut<T: bytemuck::Pod>(data: &mut [u8], index: usize) -> &mut T {
     bytemuck::from_bytes_mut(&mut data[index..index + size_of::<T>()])
 }
 
-impl MangoAccount2DynamicHeader {
+impl MangoAccountDynamicHeader {
     // offset into dynamic data where 1st TokenPosition would be found
     // todo make fn private
     pub fn token_offset(&self, raw_index: usize) -> usize {
-        MangoAccount2::dynamic_token_vec_offset()
+        MangoAccount::dynamic_token_vec_offset()
             + BORSH_VEC_SIZE_BYTES
             + raw_index * size_of::<TokenPosition>()
     }
@@ -355,20 +355,20 @@ impl MangoAccount2DynamicHeader {
     // offset into dynamic data where 1st Serum3Orders would be found
     // todo make fn private
     pub fn serum3_offset(&self, raw_index: usize) -> usize {
-        MangoAccount2::dynamic_serum3_vec_offset(self.token_count)
+        MangoAccount::dynamic_serum3_vec_offset(self.token_count)
             + BORSH_VEC_SIZE_BYTES
             + raw_index * size_of::<Serum3Orders>()
     }
 
     // offset into dynamic data where 1st PerpPositions would be found
     fn perp_offset(&self, raw_index: usize) -> usize {
-        MangoAccount2::dynamic_perp_vec_offset(self.token_count, self.serum3_count)
+        MangoAccount::dynamic_perp_vec_offset(self.token_count, self.serum3_count)
             + BORSH_VEC_SIZE_BYTES
             + raw_index * size_of::<PerpPositions>()
     }
 
     fn perp_oo_offset(&self, raw_index: usize) -> usize {
-        MangoAccount2::dynamic_perp_oo_vec_offset(
+        MangoAccount::dynamic_perp_oo_vec_offset(
             self.token_count,
             self.serum3_count,
             self.perp_count,
@@ -404,13 +404,13 @@ type DynamicAccessorRefMut<'a, D> = DynamicAccessor<
     &'a mut [u8],
 >;
 
-pub type MangoAccountAcc<'a> = DynamicAccessorRef<'a, MangoAccount2>;
-pub type MangoAccountAccMut<'a> = DynamicAccessorRefMut<'a, MangoAccount2>;
+pub type MangoAccountAcc<'a> = DynamicAccessorRef<'a, MangoAccount>;
+pub type MangoAccountAccMut<'a> = DynamicAccessorRefMut<'a, MangoAccount>;
 
 // This generic impl covers MangoAccountAcc and MangoAccountAccMut
 impl<
-        Header: Deref<Target = MangoAccount2DynamicHeader>,
-        Fixed: Deref<Target = MangoAccount2Fixed>,
+        Header: Deref<Target = MangoAccountDynamicHeader>,
+        Fixed: Deref<Target = MangoAccountFixed>,
         Dynamic: Deref<Target = [u8]>,
     > DynamicAccessor<Header, Fixed, Dynamic>
 {
@@ -527,7 +527,7 @@ impl<
         None
     }
 
-    pub fn borrow<'b>(&'b self) -> DynamicAccessorRef<'b, MangoAccount2> {
+    pub fn borrow<'b>(&'b self) -> DynamicAccessorRef<'b, MangoAccount> {
         DynamicAccessor {
             header: &self.header,
             fixed: &self.fixed,
@@ -867,7 +867,7 @@ impl<'a> MangoAccountAccMut<'a> {
         require_gt!(new_perp_oo_count, self.header.perp_oo_count);
 
         // create a temp copy to compute new starting offsets
-        let new_header = MangoAccount2DynamicHeader {
+        let new_header = MangoAccountDynamicHeader {
             token_count: new_token_count,
             serum3_count: new_serum3_count,
             perp_count: new_perp_count,
@@ -943,32 +943,32 @@ impl<'a> MangoAccountAccMut<'a> {
     }
 }
 
-impl Header for MangoAccount2DynamicHeader {
+impl Header for MangoAccountDynamicHeader {
     fn try_new_header(data: &[u8]) -> Result<Self> {
         let token_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
             data,
-            MangoAccount2::dynamic_token_vec_offset(),
+            MangoAccount::dynamic_token_vec_offset(),
             BORSH_VEC_SIZE_BYTES
         ]))
         .unwrap();
 
         let serum3_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
             data,
-            MangoAccount2::dynamic_serum3_vec_offset(token_count),
+            MangoAccount::dynamic_serum3_vec_offset(token_count),
             BORSH_VEC_SIZE_BYTES
         ]))
         .unwrap();
 
         let perp_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
             data,
-            MangoAccount2::dynamic_perp_vec_offset(token_count, serum3_count),
+            MangoAccount::dynamic_perp_vec_offset(token_count, serum3_count),
             BORSH_VEC_SIZE_BYTES
         ]))
         .unwrap();
 
         let perp_oo_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
             data,
-            MangoAccount2::dynamic_perp_oo_vec_offset(token_count, serum3_count, perp_count),
+            MangoAccount::dynamic_perp_oo_vec_offset(token_count, serum3_count, perp_count),
             BORSH_VEC_SIZE_BYTES
         ]))
         .unwrap();
@@ -1004,25 +1004,25 @@ pub trait GetAccessorMut<'a> {
     fn new_accessor_mut(&'a mut self, data: &'a mut [u8]) -> Self::AccessorMut;
 }
 
-impl<'a> GetAccessor<'a> for MangoAccount2DynamicHeader {
+impl<'a> GetAccessor<'a> for MangoAccountDynamicHeader {
     type Accessor = MangoAccountAcc<'a>;
     fn new_accessor(&'a self, data: &'a [u8]) -> Self::Accessor {
-        let (fixed, dynamic) = data.split_at(size_of::<MangoAccount2Fixed>());
+        let (fixed, dynamic) = data.split_at(size_of::<MangoAccountFixed>());
         Self::Accessor {
             header: self,
-            fixed: bytemuck::from_bytes::<MangoAccount2Fixed>(fixed),
+            fixed: bytemuck::from_bytes::<MangoAccountFixed>(fixed),
             dynamic,
         }
     }
 }
 
-impl<'a> GetAccessorMut<'a> for MangoAccount2DynamicHeader {
+impl<'a> GetAccessorMut<'a> for MangoAccountDynamicHeader {
     type AccessorMut = MangoAccountAccMut<'a>;
     fn new_accessor_mut(&'a mut self, data: &'a mut [u8]) -> Self::AccessorMut {
-        let (fixed, dynamic) = data.split_at_mut(size_of::<MangoAccount2Fixed>());
+        let (fixed, dynamic) = data.split_at_mut(size_of::<MangoAccountFixed>());
         Self::AccessorMut {
             header: self,
-            fixed: bytemuck::from_bytes_mut::<MangoAccount2Fixed>(fixed),
+            fixed: bytemuck::from_bytes_mut::<MangoAccountFixed>(fixed),
             dynamic,
         }
     }

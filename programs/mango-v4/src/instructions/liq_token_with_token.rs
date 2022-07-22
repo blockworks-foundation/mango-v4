@@ -31,7 +31,7 @@ pub fn liq_token_with_token(
     require!(asset_token_index != liab_token_index, MangoError::SomeError);
     let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)?;
 
-    let mut mal: MangoAccountLoader<MangoAccount2> = MangoAccountLoader::new(&ctx.accounts.liqor)?;
+    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.liqor)?;
     let mut liqor: MangoAccountAccMut = mal.load_mut()?;
     require_keys_eq!(liqor.fixed.group, ctx.accounts.group.key());
     require!(
@@ -42,7 +42,7 @@ pub fn liq_token_with_token(
     );
     require!(!liqor.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
-    let mut mal: MangoAccountLoader<MangoAccount2> = MangoAccountLoader::new(&ctx.accounts.liqee)?;
+    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.liqee)?;
     let mut liqee: MangoAccountAccMut = mal.load_mut()?;
     require_keys_eq!(liqee.fixed.group, ctx.accounts.group.key());
     require!(!liqee.fixed.is_bankrupt(), MangoError::IsBankrupt);

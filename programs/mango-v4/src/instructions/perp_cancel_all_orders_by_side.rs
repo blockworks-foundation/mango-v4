@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::error::MangoError;
 use crate::state::{
-    Book, BookSide, Group, MangoAccount2, MangoAccountAccMut, MangoAccountLoader, PerpMarket, Side,
+    Book, BookSide, Group, MangoAccount, MangoAccountAccMut, MangoAccountLoader, PerpMarket, Side,
 };
 
 #[derive(Accounts)]
@@ -31,8 +31,7 @@ pub fn perp_cancel_all_orders_by_side(
     side_option: Option<Side>,
     limit: u8,
 ) -> Result<()> {
-    let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new(&ctx.accounts.account)?;
+    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
     let mut account: MangoAccountAccMut = mal.load_mut()?;
     require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
     require!(

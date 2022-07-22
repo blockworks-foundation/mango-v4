@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::accounts_zerocopy::*;
 use crate::error::*;
-use crate::state::MangoAccount2;
+use crate::state::MangoAccount;
 use crate::state::MangoAccountAccMut;
 use crate::state::MangoAccountLoader;
 use crate::state::{
@@ -77,8 +77,7 @@ pub fn perp_place_order(
     // When the limit is reached, processing stops and the instruction succeeds.
     limit: u8,
 ) -> Result<()> {
-    let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new(&ctx.accounts.account)?;
+    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
     let mut account: MangoAccountAccMut = mal.load_mut()?;
     require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
     require!(

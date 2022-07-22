@@ -4,7 +4,7 @@ use crate::group_seeds;
 use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
 use crate::state::{
     compute_health, compute_health_from_fixed_accounts, new_fixed_order_account_retriever,
-    AccountRetriever, Bank, Group, HealthType, MangoAccount2, MangoAccountAccMut,
+    AccountRetriever, Bank, Group, HealthType, MangoAccount, MangoAccountAccMut,
     MangoAccountLoader, TokenIndex,
 };
 use crate::util::checked_math as cm;
@@ -158,8 +158,7 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
     let group = ctx.accounts.group.load()?;
     let group_seeds = group_seeds!(group);
 
-    let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new(&ctx.accounts.account)?;
+    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
     let mut account: MangoAccountAccMut = mal.load_mut()?;
     require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
     require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());

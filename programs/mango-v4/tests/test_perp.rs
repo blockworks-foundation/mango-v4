@@ -198,7 +198,7 @@ async fn test_perp() -> Result<(), TransportError> {
     .unwrap();
 
     let order_id_to_cancel = solana
-        .get_account::<MangoAccount2>(account_0)
+        .get_account::<MangoAccount>(account_0)
         .await
         .perp_open_orders[0]
         .order_id;
@@ -397,11 +397,11 @@ async fn test_perp() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    let mango_account_0 = solana.get_account::<MangoAccount2>(account_0).await;
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(mango_account_0.perps[0].base_position_lots, 1);
     assert!(mango_account_0.perps[0].quote_position_native < -100.019);
 
-    let mango_account_1 = solana.get_account::<MangoAccount2>(account_1).await;
+    let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(mango_account_1.perps[0].base_position_lots, -1);
     assert_eq!(mango_account_1.perps[0].quote_position_native, 100);
 
@@ -424,7 +424,7 @@ async fn test_perp() -> Result<(), TransportError> {
 }
 
 async fn assert_no_perp_orders(solana: &SolanaCookie, account_0: Pubkey) {
-    let mango_account_0 = solana.get_account::<MangoAccount2>(account_0).await;
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
 
     for oo in mango_account_0.perp_open_orders.iter() {
         assert!(oo.order_id == 0);

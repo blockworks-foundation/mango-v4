@@ -16,8 +16,8 @@ pub mod queue;
 mod tests {
     use super::*;
     use crate::state::{
-        GetAccessorMut, Header, MangoAccount2, MangoAccount2DynamicHeader, MangoAccount2Fixed,
-        MangoAccountAccMut, PerpMarket, FREE_ORDER_SLOT,
+        GetAccessorMut, Header, MangoAccount, MangoAccountAccMut, MangoAccountDynamicHeader,
+        MangoAccountFixed, PerpMarket, FREE_ORDER_SLOT,
     };
     use anchor_lang::prelude::*;
     use bytemuck::Zeroable;
@@ -104,9 +104,9 @@ mod tests {
         let mut new_order =
             |book: &mut Book, event_queue: &mut EventQueue, side, price, now_ts| -> i128 {
                 let mut buffer: Vec<u8> = Vec::new();
-                MangoAccount2::default().serialize(&mut buffer).unwrap();
-                let mut header = MangoAccount2DynamicHeader::try_new_header(
-                    &buffer[size_of::<MangoAccount2Fixed>()..],
+                MangoAccount::default().serialize(&mut buffer).unwrap();
+                let mut header = MangoAccountDynamicHeader::try_new_header(
+                    &buffer[size_of::<MangoAccountFixed>()..],
                 )
                 .unwrap();
                 let mut account: MangoAccountAccMut = header.new_accessor_mut(&mut buffer[..]);
@@ -204,16 +204,16 @@ mod tests {
         market.taker_fee = I80F48::from_num(0.01f64);
 
         let mut buffer: Vec<u8> = Vec::new();
-        MangoAccount2::default().serialize(&mut buffer).unwrap();
+        MangoAccount::default().serialize(&mut buffer).unwrap();
         let mut header =
-            MangoAccount2DynamicHeader::try_new_header(&buffer[size_of::<MangoAccount2Fixed>()..])
+            MangoAccountDynamicHeader::try_new_header(&buffer[size_of::<MangoAccountFixed>()..])
                 .unwrap();
         let mut maker: MangoAccountAccMut = header.new_accessor_mut(&mut buffer[..]);
 
         let mut buffer: Vec<u8> = Vec::new();
-        MangoAccount2::default().serialize(&mut buffer).unwrap();
+        MangoAccount::default().serialize(&mut buffer).unwrap();
         let mut header =
-            MangoAccount2DynamicHeader::try_new_header(&buffer[size_of::<MangoAccount2Fixed>()..])
+            MangoAccountDynamicHeader::try_new_header(&buffer[size_of::<MangoAccountFixed>()..])
                 .unwrap();
         let mut taker: MangoAccountAccMut = header.new_accessor_mut(&mut buffer[..]);
 

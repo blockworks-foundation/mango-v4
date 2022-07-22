@@ -3,7 +3,7 @@ use crate::error::MangoError;
 use crate::logs::{MarginTradeLog, TokenBalanceLog};
 use crate::state::{
     compute_health, new_fixed_order_account_retriever, AccountRetriever, Bank, Group, HealthType,
-    MangoAccount2, MangoAccountAccMut, MangoAccountLoader,
+    MangoAccount, MangoAccountAccMut, MangoAccountLoader,
 };
 use crate::{group_seeds, Mango};
 use anchor_lang::prelude::*;
@@ -79,8 +79,7 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
     let num_health_accounts = cpi_datas.get(0).unwrap().account_start as usize;
 
     let group = ctx.accounts.group.load()?;
-    let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new(&ctx.accounts.account)?;
+    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
     let mut account: MangoAccountAccMut = mal.load_mut()?;
     require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
     require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());
@@ -322,8 +321,7 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
     }
 
     // Track vault changes and apply them to the user's token positions
-    let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new(&ctx.accounts.account)?;
+    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
     let mut account: MangoAccountAccMut = mal.load_mut()?;
     let inactive_tokens =
         adjust_for_post_cpi_vault_amounts(health_ais, all_cpi_ais, &used_vaults, &mut account)?;

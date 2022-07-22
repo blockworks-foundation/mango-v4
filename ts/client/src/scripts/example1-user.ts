@@ -62,22 +62,6 @@ async function main() {
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString());
 
-  let MangoAccount2 = await client.getCFTestccountForOwner(mangoAccount.owner);
-  console.log(MangoAccount2[0].publicKey.toBase58());
-  console.log(MangoAccount2[0].account.tokens);
-  console.log(MangoAccount2[0].account.serum3);
-  console.log(MangoAccount2[0].account.perps);
-  await client.expandMangoAccount(
-    group,
-    mangoAccount,
-    MangoAccount2[0].publicKey,
-  );
-  MangoAccount2 = await client.getCFTestccountForOwner(mangoAccount.owner);
-  console.log(MangoAccount2[0].publicKey.toBase58());
-  console.log(MangoAccount2[0].account.tokens);
-  console.log(MangoAccount2[0].account.serum3);
-  console.log(MangoAccount2[0].account.perps);
-
   if (true) {
     // set delegate, and change name
     console.log(`...changing mango account name, and setting a delegate`);
