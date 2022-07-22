@@ -101,7 +101,7 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
         match ai.load::<Bank>() {
             Ok(bank) => {
                 require!(bank.group == account.fixed.group, MangoError::SomeError);
-                let (_, raw_token_index, _) = account.token_get_mut_or_create(bank.token_index)?;
+                let (_, raw_token_index, _) = account.tokens_get_mut_or_create(bank.token_index)?;
                 allowed_vaults.insert(bank.vault, (i, raw_token_index));
                 allowed_banks.insert(ai.key, bank);
             }
@@ -303,7 +303,6 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
     let group = ctx.accounts.group.load()?;
     let group_seeds = group_seeds!(group);
     for (_, vault_info) in used_vaults.iter() {
-        msg!("304");
         if vault_info.withdraw_amount > 0 {
             let ix = token::spl_token::instruction::revoke(
                 &token::spl_token::ID,

@@ -73,8 +73,6 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
     //
     cpi_cancel_all_orders(ctx.accounts, limit)?;
 
-    // TODO: do we need deactivation here?
-
     Ok(())
 }
 

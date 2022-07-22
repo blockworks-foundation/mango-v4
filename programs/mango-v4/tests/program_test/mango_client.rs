@@ -171,7 +171,7 @@ async fn derive_health_check_remaining_account_metas(
     if let Some(affected_bank) = affected_bank {
         let bank: Bank = account_loader.load(&affected_bank).await.unwrap();
         adjusted_account
-            .token_get_mut_or_create(bank.token_index)
+            .tokens_get_mut_or_create(bank.token_index)
             .unwrap();
     }
     if let Some(affected_perp_market_index) = affected_perp_market_index {

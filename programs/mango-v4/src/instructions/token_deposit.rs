@@ -64,7 +64,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
     let (position, raw_token_index, active_token_index) =
-        account.token_get_mut_or_create(token_index)?;
+        account.tokens_get_mut_or_create(token_index)?;
 
     let amount_i80f48 = I80F48::from(amount);
     let position_is_active = {

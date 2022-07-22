@@ -67,7 +67,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
     let (position, raw_token_index, active_token_index) =
-        account.token_get_mut_or_create(token_index)?;
+        account.tokens_get_mut_or_create(token_index)?;
 
     // The bank will also be passed in remainingAccounts. Use an explicit scope
     // to drop the &mut before we borrow it immutably again later.

@@ -214,7 +214,7 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
         require_neq!(bank.flash_loan_vault_initial, u64::MAX);
 
         // Create the token position now, so we can compute the pre-health with fixed order health accounts
-        let (_, raw_token_index, _) = account.token_get_mut_or_create(bank.token_index)?;
+        let (_, raw_token_index, _) = account.tokens_get_mut_or_create(bank.token_index)?;
 
         // Revoke delegation
         let ix = token::spl_token::instruction::revoke(

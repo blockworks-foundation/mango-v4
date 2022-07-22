@@ -66,9 +66,10 @@ pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result
     // Make it so that the token_account_map for the base and quote currency
     // stay permanently blocked. Otherwise users may end up in situations where
     // they can't settle a market because they don't have free token_account_map!
-    let (quote_position, _, _) = account.token_get_mut_or_create(serum_market.quote_token_index)?;
+    let (quote_position, _, _) =
+        account.tokens_get_mut_or_create(serum_market.quote_token_index)?;
     quote_position.in_use_count += 1;
-    let (base_position, _, _) = account.token_get_mut_or_create(serum_market.base_token_index)?;
+    let (base_position, _, _) = account.tokens_get_mut_or_create(serum_market.base_token_index)?;
     base_position.in_use_count += 1;
 
     Ok(())

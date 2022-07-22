@@ -92,7 +92,6 @@ pub fn liq_token_bankruptcy(
     let liab_deposit_index = liab_bank.deposit_index;
     let (liqee_liab, liqee_raw_token_index) = liqee.token_get_mut(liab_token_index)?;
     let mut remaining_liab_loss = -liqee_liab.native(&liab_bank);
-    msg!("liab_bank.token_index {}", liab_bank.token_index);
     require_gt!(remaining_liab_loss, I80F48::ZERO);
     drop(liab_bank);
 
@@ -144,12 +143,12 @@ pub fn liq_token_bankruptcy(
 
             // credit the liqor
             let (liqor_quote, liqor_quote_raw_token_index, _) =
-                liqor.token_get_mut_or_create(QUOTE_TOKEN_INDEX)?;
+                liqor.tokens_get_mut_or_create(QUOTE_TOKEN_INDEX)?;
             let liqor_quote_active = quote_bank.deposit(liqor_quote, insurance_transfer_i80f48)?;
 
             // transfer liab from liqee to liqor
             let (liqor_liab, liqor_liab_raw_token_index, _) =
-                liqor.token_get_mut_or_create(liab_token_index)?;
+                liqor.tokens_get_mut_or_create(liab_token_index)?;
             let liqor_liab_active = liab_bank.withdraw_with_fee(liqor_liab, liab_transfer)?;
 
             // Check liqor's health

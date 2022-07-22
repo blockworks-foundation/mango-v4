@@ -125,12 +125,12 @@ pub fn liq_token_with_token(
         let liqee_liab_position_indexed = liqee_liab_position.indexed_position;
 
         let (liqor_liab_position, liqor_liab_raw_index, _) =
-            liqor.token_get_mut_or_create(liab_token_index)?;
+            liqor.tokens_get_mut_or_create(liab_token_index)?;
         let liqor_liab_active = liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer)?;
         let liqor_liab_position_indexed = liqor_liab_position.indexed_position;
 
         let (liqor_asset_position, liqor_asset_raw_index, _) =
-            liqor.token_get_mut_or_create(asset_token_index)?;
+            liqor.tokens_get_mut_or_create(asset_token_index)?;
         let liqor_asset_active = asset_bank.deposit(liqor_asset_position, asset_transfer)?;
         let liqor_asset_position_indexed = liqor_asset_position.indexed_position;
 
