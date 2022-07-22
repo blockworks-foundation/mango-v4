@@ -45,7 +45,7 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
     //
     {
         let mal: MangoAccountLoader<MangoAccount2> =
-            MangoAccountLoader::new_init(&ctx.accounts.account)?;
+            MangoAccountLoader::new(&ctx.accounts.account)?;
         let account: MangoAccountAcc = mal.load()?;
         require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
         require!(

@@ -58,7 +58,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
 
     // Get the account's position for that token index
     let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        MangoAccountLoader::new(&ctx.accounts.account)?;
     let mut account: MangoAccountAccMut = mal.load_mut()?;
     require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
     require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);

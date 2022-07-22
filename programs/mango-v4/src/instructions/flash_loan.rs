@@ -80,7 +80,7 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
 
     let group = ctx.accounts.group.load()?;
     let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        MangoAccountLoader::new(&ctx.accounts.account)?;
     let mut account: MangoAccountAccMut = mal.load_mut()?;
     require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
     require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());
@@ -258,6 +258,7 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
     drop(allowed_banks);
     drop(group);
     drop(account);
+    drop(mal);
 
     // prepare signer seeds and invoke cpi
     let group_key = ctx.accounts.group.key();
@@ -302,6 +303,7 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
     let group = ctx.accounts.group.load()?;
     let group_seeds = group_seeds!(group);
     for (_, vault_info) in used_vaults.iter() {
+        msg!("304");
         if vault_info.withdraw_amount > 0 {
             let ix = token::spl_token::instruction::revoke(
                 &token::spl_token::ID,
@@ -322,7 +324,7 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
 
     // Track vault changes and apply them to the user's token positions
     let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        MangoAccountLoader::new(&ctx.accounts.account)?;
     let mut account: MangoAccountAccMut = mal.load_mut()?;
     let inactive_tokens =
         adjust_for_post_cpi_vault_amounts(health_ais, all_cpi_ais, &used_vaults, &mut account)?;

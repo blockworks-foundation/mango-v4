@@ -122,8 +122,8 @@ async fn test_position_lifetime() -> Result<()> {
         }
 
         // Check that positions are fully deactivated
-        let account: MangoAccount = solana.get_account(account).await;
-        assert_eq!(account.tokens.iter_active().count(), 0);
+        let account: MangoAccount2 = solana.get_account(account).await;
+        assert_eq!(account.token_iter_active().count(), 0);
 
         // No user tokens got lost
         for &payer_token in payer_mint_accounts {
@@ -222,8 +222,8 @@ async fn test_position_lifetime() -> Result<()> {
         .unwrap();
 
         // Check that positions are fully deactivated
-        let account: MangoAccount = solana.get_account(account).await;
-        assert_eq!(account.tokens.iter_active().count(), 0);
+        let account: MangoAccount2 = solana.get_account(account).await;
+        assert_eq!(account.token_iter_active().count(), 0);
 
         // No user tokens got lost
         // TODO: -1 is a workaround for rounding down in withdraw

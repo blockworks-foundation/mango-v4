@@ -19,10 +19,10 @@ pub struct AccountExpand<'info> {
 
 pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
     // expand to these lengths
-    let token_count = 5;
-    let serum3_count = 6;
-    let perp_count = 4;
-    let perp_oo_count = 4;
+    let token_count = 18;
+    let serum3_count = 10;
+    let perp_count = 10;
+    let perp_oo_count = 10;
 
     let new_space = MangoAccount2::space(token_count, serum3_count, perp_count, perp_oo_count);
     let new_rent_minimum = Rent::get()?.minimum_balance(new_space);

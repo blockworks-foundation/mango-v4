@@ -169,7 +169,7 @@ pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan3End<'info>>,
 ) -> Result<()> {
     let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        MangoAccountLoader::new(&ctx.accounts.account)?;
     let mut account: MangoAccountAccMut = mal.load_mut()?;
     require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());
 

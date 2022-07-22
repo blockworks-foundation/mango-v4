@@ -25,11 +25,8 @@ pub struct LiqTokenBankruptcy<'info> {
     pub liqor: UncheckedAccount<'info>,
     pub liqor_owner: Signer<'info>,
 
-    #[account(
-        mut,
-        has_one = group,
-    )]
-    pub liqee: AccountLoader<'info, MangoAccount>,
+    #[account(mut)]
+    pub liqee: UncheckedAccount<'info>,
 
     #[account(
         has_one = group,
@@ -75,8 +72,7 @@ pub fn liq_token_bankruptcy(
         MangoError::SomeError
     );
 
-    let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new_init(&ctx.accounts.liqor)?;
+    let mut mal: MangoAccountLoader<MangoAccount2> = MangoAccountLoader::new(&ctx.accounts.liqor)?;
     let mut liqor: MangoAccountAccMut = mal.load_mut()?;
     require_keys_eq!(liqor.fixed.group, ctx.accounts.group.key());
     require!(
@@ -87,16 +83,16 @@ pub fn liq_token_bankruptcy(
     );
     require!(!liqor.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
-    let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new_init(&ctx.accounts.liqor)?;
+    let mut mal: MangoAccountLoader<MangoAccount2> = MangoAccountLoader::new(&ctx.accounts.liqee)?;
     let mut liqee: MangoAccountAccMut = mal.load_mut()?;
     require_keys_eq!(liqee.fixed.group, ctx.accounts.group.key());
-    require!(!liqee.fixed.is_bankrupt(), MangoError::IsBankrupt);
+    require!(liqee.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
     let liab_bank = bank_ais[0].load::<Bank>()?;
     let liab_deposit_index = liab_bank.deposit_index;
     let (liqee_liab, liqee_raw_token_index) = liqee.token_get_mut(liab_token_index)?;
     let mut remaining_liab_loss = -liqee_liab.native(&liab_bank);
+    msg!("liab_bank.token_index {}", liab_bank.token_index);
     require_gt!(remaining_liab_loss, I80F48::ZERO);
     drop(liab_bank);
 

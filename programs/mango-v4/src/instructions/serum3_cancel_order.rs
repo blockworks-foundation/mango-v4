@@ -59,7 +59,7 @@ pub fn serum3_cancel_order(
     //
     {
         let mal: MangoAccountLoader<MangoAccount2> =
-            MangoAccountLoader::new_init(&ctx.accounts.account)?;
+            MangoAccountLoader::new(&ctx.accounts.account)?;
         let account: MangoAccountAcc = mal.load()?;
         require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
         require!(
@@ -97,7 +97,7 @@ pub fn serum3_cancel_order(
         let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
         let mut mal: MangoAccountLoader<MangoAccount2> =
-            MangoAccountLoader::new_init(&ctx.accounts.account)?;
+            MangoAccountLoader::new(&ctx.accounts.account)?;
         let mut account: MangoAccountAccMut = mal.load_mut()?;
         decrease_maybe_loan(
             serum_market.market_index,

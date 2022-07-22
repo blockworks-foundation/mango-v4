@@ -210,7 +210,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
         account_position(solana, account, borrow_token1.bank).await,
         (-350.0f64 + (1000.0 / 20.0 / 1.04)).round() as i64
     );
-    let liqee: MangoAccount = solana.get_account(account).await;
+    let liqee: MangoAccount2 = solana.get_account(account).await;
     assert!(liqee.being_liquidated());
     assert!(!liqee.is_bankrupt());
 
@@ -230,13 +230,13 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    assert!(account_position_closed(solana, account, collateral_token2.bank).await,);
+    assert!(account_position_closed(solana, account, collateral_token2.bank).await);
     let borrow1_after_liq = -350.0f64 + (1000.0 / 20.0 / 1.04) + (20.0 / 20.0 / 1.04);
     assert_eq!(
         account_position(solana, account, borrow_token1.bank).await,
         borrow1_after_liq.round() as i64
     );
-    let liqee: MangoAccount = solana.get_account(account).await;
+    let liqee: MangoAccount2 = solana.get_account(account).await;
     assert!(liqee.being_liquidated());
     assert!(liqee.is_bankrupt());
 
@@ -262,7 +262,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
         account_position(solana, vault_account, borrow_token1.bank).await,
         vault_before + (borrow1_after_liq.round() as i64)
     );
-    let liqee: MangoAccount = solana.get_account(account).await;
+    let liqee: MangoAccount2 = solana.get_account(account).await;
     assert!(liqee.being_liquidated());
     assert!(liqee.is_bankrupt());
     assert!(account_position_closed(solana, account, borrow_token1.bank).await);
@@ -289,7 +289,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
         account_position(solana, vault_account, borrow_token2.bank).await,
         (vault_amount - borrow2_amount) as i64
     );
-    let liqee: MangoAccount = solana.get_account(account).await;
+    let liqee: MangoAccount2 = solana.get_account(account).await;
     assert!(liqee.being_liquidated()); // TODO: no longer being liquidated?
     assert!(!liqee.is_bankrupt());
     assert!(account_position_closed(solana, account, borrow_token2.bank).await);
@@ -513,7 +513,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     .await
     .unwrap();
     assert!(account_position_closed(solana, account, collateral_token1.bank).await);
-    let liqee: MangoAccount = solana.get_account(account).await;
+    let liqee: MangoAccount2 = solana.get_account(account).await;
     assert!(liqee.being_liquidated());
     assert!(!liqee.is_bankrupt());
 
@@ -534,7 +534,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     .await
     .unwrap();
     assert!(account_position_closed(solana, account, collateral_token2.bank).await,);
-    let liqee: MangoAccount = solana.get_account(account).await;
+    let liqee: MangoAccount2 = solana.get_account(account).await;
     assert!(liqee.being_liquidated());
     assert!(liqee.is_bankrupt());
 
@@ -559,7 +559,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    let liqee: MangoAccount = solana.get_account(account).await;
+    let liqee: MangoAccount2 = solana.get_account(account).await;
     assert!(liqee.being_liquidated());
     assert!(liqee.is_bankrupt());
     assert!(account_position_closed(solana, account, borrow_token1.bank).await);
@@ -592,7 +592,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    let liqee: MangoAccount = solana.get_account(account).await;
+    let liqee: MangoAccount2 = solana.get_account(account).await;
     assert!(liqee.being_liquidated());
     assert!(liqee.is_bankrupt());
     assert!(account_position_closed(solana, account, borrow_token1.bank).await);
@@ -627,7 +627,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    let liqee: MangoAccount = solana.get_account(account).await;
+    let liqee: MangoAccount2 = solana.get_account(account).await;
     assert!(liqee.being_liquidated());
     assert!(!liqee.is_bankrupt());
     assert!(account_position_closed(solana, account, borrow_token1.bank).await);

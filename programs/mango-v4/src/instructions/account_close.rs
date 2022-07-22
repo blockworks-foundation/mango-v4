@@ -23,7 +23,7 @@ pub fn account_close(ctx: Context<AccountClose>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
     let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        MangoAccountLoader::new(&ctx.accounts.account)?;
     let account: MangoAccountAccMut = mal.load_mut()?;
     require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
     require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());

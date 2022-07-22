@@ -25,7 +25,7 @@ pub fn account_edit(
     );
 
     let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        MangoAccountLoader::new(&ctx.accounts.account)?;
     let mut account: MangoAccountAccMut = mal.load_mut()?;
     require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
     require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());

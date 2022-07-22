@@ -164,7 +164,7 @@ pub fn serum3_place_order(
     //
     {
         let mal: MangoAccountLoader<MangoAccount2> =
-            MangoAccountLoader::new_init(&ctx.accounts.account)?;
+            MangoAccountLoader::new(&ctx.accounts.account)?;
         let account: MangoAccountAcc = mal.load()?;
         require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
         require!(
@@ -243,7 +243,7 @@ pub fn serum3_place_order(
         let open_orders = load_open_orders_ref(oo_ai)?;
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
         let mut mal: MangoAccountLoader<MangoAccount2> =
-            MangoAccountLoader::new_init(&ctx.accounts.account)?;
+            MangoAccountLoader::new(&ctx.accounts.account)?;
         let mut account: MangoAccountAccMut = mal.load_mut()?;
         inc_maybe_loan(
             serum_market.market_index,
@@ -265,7 +265,7 @@ pub fn serum3_place_order(
 
     // Charge the difference in vault balances to the user's account
     let mut mal: MangoAccountLoader<MangoAccount2> =
-        MangoAccountLoader::new_init(&ctx.accounts.account)?;
+        MangoAccountLoader::new(&ctx.accounts.account)?;
     let mut account: MangoAccountAccMut = mal.load_mut()?;
     let vault_difference_result = {
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;

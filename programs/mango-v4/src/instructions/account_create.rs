@@ -14,7 +14,7 @@ pub struct AccountCreate<'info> {
         seeds = [group.key().as_ref(), b"MangoAccount".as_ref(), owner.key().as_ref(), &account_num.to_le_bytes()],
         bump,
         payer = payer,
-        space = MangoAccount2::space(3, 4, 2, 2),
+        space = MangoAccount2::space(16, 8, 8, 8),
     )]
     // borsh smashes the stack, and zero copy doesnt work out of the box
     // deserialize manually
@@ -42,10 +42,10 @@ pub fn account_create(ctx: Context<AccountCreate>, account_num: u8, name: String
     account.fixed.set_being_liquidated(false);
     account.fixed.set_bankrupt(false);
 
-    let token_count: u8 = 3;
-    let serum3_count: u8 = 4;
-    let perp_count: u8 = 2;
-    let perp_oo_count: u8 = 2;
+    let token_count: u8 = 16;
+    let serum3_count: u8 = 8;
+    let perp_count: u8 = 8;
+    let perp_oo_count: u8 = 8;
     account.expand_dynamic_content(token_count, serum3_count, perp_count, perp_oo_count)?;
 
     Ok(())

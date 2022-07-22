@@ -810,7 +810,8 @@ mod tests {
     use super::*;
     use crate::state::oracle::StubOracle;
     use crate::state::{
-        GetAccessorMut, Header, MangoAccount2, MangoAccount2DynamicHeader, MangoAccountAccMut,
+        GetAccessorMut, Header, MangoAccount2, MangoAccount2DynamicHeader, MangoAccount2Fixed,
+        MangoAccountAccMut, TokenPosition,
     };
     use std::cell::RefCell;
     use std::convert::identity;
@@ -929,13 +930,14 @@ mod tests {
 
     // Run a health test that includes all the side values (like referrer_rebates_accrued)
     #[test]
-    fn test_health0() -> Result<()> {
+    fn test_health0() {
         let mut buffer: Vec<u8> = Vec::new();
         MangoAccount2::default().serialize(&mut buffer).unwrap();
-        let mut header = MangoAccount2DynamicHeader::try_new_header(&mut buffer[..])?;
+        let mut header =
+            MangoAccount2DynamicHeader::try_new_header(&buffer[size_of::<MangoAccount2Fixed>()..])
+                .unwrap();
         let mut account: MangoAccountAccMut = header.new_accessor_mut(&mut buffer[..]);
 
-        // let mut account =;
         let group = Pubkey::new_unique();
 
         let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
@@ -1015,8 +1017,6 @@ mod tests {
             compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
             health1 + health2 + health3
         ));
-
-        Ok(())
     }
 
     #[test]
@@ -1100,8 +1100,11 @@ mod tests {
     fn test_health1_runner(testcase: &TestHealth1Case) {
         let mut buffer: Vec<u8> = Vec::new();
         MangoAccount2::default().serialize(&mut buffer).unwrap();
-        let mut header = MangoAccount2DynamicHeader::try_new_header(&mut buffer[..]).unwrap();
+        let mut header =
+            MangoAccount2DynamicHeader::try_new_header(&buffer[size_of::<MangoAccount2Fixed>()..])
+                .unwrap();
         let mut account: MangoAccountAccMut = header.new_accessor_mut(&mut buffer[..]);
+
         let group = Pubkey::new_unique();
 
         let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);

@@ -472,7 +472,7 @@ impl PerpPositions {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct PerpOpenOrders {
     pub order_side: Side, // TODO: storing enums isn't POD
     pub reserved1: [u8; 1],
