@@ -354,9 +354,12 @@ type DynamicAccessorRefMut<'a, D> = DynamicAccessor<
 
 pub type MangoAccountValue = DynamicAccessorValue<MangoAccount>;
 pub type MangoAccountAcc<'a> = DynamicAccessorRef<'a, MangoAccount>;
+pub type MangoAccountAccWithHeader<'a> =
+    DynamicAccessor<MangoAccountDynamicHeader, &'a MangoAccountFixed, &'a [u8]>;
 pub type MangoAccountAccMut<'a> = DynamicAccessorRefMut<'a, MangoAccount>;
 
 impl MangoAccountValue {
+    // bytes without discriminator
     pub fn try_new(bytes: &[u8]) -> Result<Self> {
         let fixed_size = size_of::<MangoAccountFixed>();
         let fixed: MangoAccountFixed = *bytemuck::from_bytes(&bytes[0..fixed_size]);
@@ -365,6 +368,20 @@ impl MangoAccountValue {
             fixed,
             header,
             dynamic: bytes[fixed_size..].to_vec(),
+        })
+    }
+}
+
+impl<'a> MangoAccountAccWithHeader<'a> {
+    // bytes without discriminator
+    pub fn try_new(bytes: &'a [u8]) -> Result<Self> {
+        let fixed_size = size_of::<MangoAccountFixed>();
+        let fixed: &'a MangoAccountFixed = bytemuck::from_bytes(&bytes[0..fixed_size]);
+        let header = MangoAccountDynamicHeader::try_new_header(&bytes[fixed_size..])?;
+        Ok(MangoAccountAccWithHeader {
+            header,
+            fixed,
+            dynamic: &bytes[fixed_size..],
         })
     }
 }

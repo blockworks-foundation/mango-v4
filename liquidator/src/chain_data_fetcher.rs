@@ -4,11 +4,12 @@ use crate::chain_data::*;
 
 use client::AccountFetcher;
 use mango_v4::accounts_zerocopy::LoadZeroCopy;
+use mango_v4::state::MangoAccountValue;
 
 use anyhow::Context;
 
 use solana_client::rpc_client::RpcClient;
-use solana_sdk::account::AccountSharedData;
+use solana_sdk::account::{AccountSharedData, ReadableAccount};
 use solana_sdk::pubkey::Pubkey;
 
 pub struct ChainDataAccountFetcher {
@@ -29,6 +30,12 @@ impl ChainDataAccountFetcher {
             .clone())
     }
 
+    pub fn fetch_mango_account(&self, address: &Pubkey) -> anyhow::Result<MangoAccountValue> {
+        let acc = self.fetch_raw(address)?;
+        Ok(MangoAccountValue::try_new(acc.data())
+            .with_context(|| format!("loading mango account {}", address))?)
+    }
+
     // fetches via RPC, stores in ChainData, returns new version
     pub fn fetch_fresh<T: anchor_lang::ZeroCopy + anchor_lang::Owner>(
         &self,
@@ -36,6 +43,11 @@ impl ChainDataAccountFetcher {
     ) -> anyhow::Result<T> {
         self.refresh_account_via_rpc(address)?;
         self.fetch(address)
+    }
+
+    pub fn fetch_fresh_mango_account(&self, address: &Pubkey) -> anyhow::Result<MangoAccountValue> {
+        self.refresh_account_via_rpc(address)?;
+        self.fetch_mango_account(address)
     }
 
     pub fn fetch_raw(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {

@@ -1,15 +1,16 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use anchor_client::ClientError;
+use anyhow::Context;
 
+use anchor_client::ClientError;
 use anchor_lang::AccountDeserialize;
 
 use solana_client::rpc_client::RpcClient;
-
-use anyhow::Context;
 use solana_sdk::account::Account;
 use solana_sdk::pubkey::Pubkey;
+
+use mango_v4::state::MangoAccountValue;
 
 pub trait AccountFetcher: Sync + Send {
     fn fetch_raw_account(&self, address: Pubkey) -> anyhow::Result<Account>;
@@ -22,7 +23,19 @@ pub fn account_fetcher_fetch_anchor_account<T: AccountDeserialize>(
 ) -> anyhow::Result<T> {
     let account = fetcher.fetch_raw_account(address)?;
     let mut data: &[u8] = &account.data;
-    T::try_deserialize(&mut data).with_context(|| format!("deserializing account {}", address))
+    T::try_deserialize(&mut data)
+        .with_context(|| format!("deserializing anchor account {}", address))
+}
+
+// Can't be in the trait, since then it would no longer be object-safe...
+pub fn account_fetcher_fetch_mango_account(
+    fetcher: &dyn AccountFetcher,
+    address: Pubkey,
+) -> anyhow::Result<MangoAccountValue> {
+    let account = fetcher.fetch_raw_account(address)?;
+    let data: &[u8] = &account.data;
+    MangoAccountValue::try_new(&data[8..])
+        .with_context(|| format!("deserializing mango account {}", address))
 }
 
 pub struct RpcAccountFetcher {
