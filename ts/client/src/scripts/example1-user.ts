@@ -21,6 +21,8 @@ import { toUiDecimals } from '../utils';
 // This script deposits some tokens, places some serum orders, cancels them, places some perp orders
 //
 
+const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
+
 async function main() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
@@ -48,7 +50,7 @@ async function main() {
       JSON.parse(fs.readFileSync(process.env.ADMIN_KEYPAIR!, 'utf-8')),
     ),
   );
-  const group = await client.getGroupForAdmin(admin.publicKey, 0);
+  const group = await client.getGroupForAdmin(admin.publicKey, GROUP_NUM);
   console.log(group.toString());
 
   // create + fetch account

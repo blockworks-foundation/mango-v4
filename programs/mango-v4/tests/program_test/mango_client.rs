@@ -11,6 +11,7 @@ use mango_v4::instructions::{
 };
 use mango_v4::state::{MangoAccount, MangoAccountValue};
 use solana_program::instruction::Instruction;
+use solana_program_test::BanksClientError;
 use solana_sdk::instruction;
 use solana_sdk::signature::{Keypair, Signer};
 use solana_sdk::transport::TransportError;
@@ -89,7 +90,7 @@ impl<'a> ClientTransaction {
         self.signers.push(clone_keypair(keypair));
     }
 
-    pub async fn send(&self) -> std::result::Result<(), TransportError> {
+    pub async fn send(&self) -> std::result::Result<(), BanksClientError> {
         let signer_refs = self.signers.iter().map(|k| k).collect::<Vec<&Keypair>>();
         self.solana
             .process_transaction(&self.instructions, Some(&signer_refs[..]))

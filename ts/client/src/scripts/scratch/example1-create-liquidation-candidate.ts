@@ -4,6 +4,8 @@ import fs from 'fs';
 import { MangoClient } from '../../client';
 import { MANGO_V4_ID } from '../../constants';
 
+const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
+
 async function main() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
@@ -31,7 +33,7 @@ async function main() {
       JSON.parse(fs.readFileSync(process.env.ADMIN_KEYPAIR!, 'utf-8')),
     ),
   );
-  const group = await user1Client.getGroupForAdmin(admin.publicKey, 0);
+  const group = await user1Client.getGroupForAdmin(admin.publicKey, GROUP_NUM);
   console.log(`Found group ${group.publicKey.toBase58()}`);
 
   const user1MangoAccount = await user1Client.getOrCreateMangoAccount(
@@ -76,33 +78,9 @@ async function main() {
   );
   console.log(`...mangoAccount2 ${user2MangoAccount.publicKey}`);
 
-  /// user2 deposits some collateral and borrows BTC
-  console.log(`Depositing...${300} 'USDC'`);
-  await user2Client.tokenDeposit(group, user2MangoAccount, 'USDC', 300);
-  await user2MangoAccount.reload(user2Client, group);
-  console.log(`${user2MangoAccount.toString(group)}`);
-  amount = amount / 10;
-  while (true) {
-    try {
-      console.log(`Withdrawing...${amount} 'BTC'`);
-      await user2Client.tokenWithdraw(
-        group,
-        user2MangoAccount,
-        token,
-        amount,
-        true,
-      );
-    } catch (error) {
-      console.log(error);
-      break;
-    }
-  }
-  await user2MangoAccount.reload(user2Client, group);
-  console.log(`${user2MangoAccount.toString(group)}`);
-
-  /// Reduce usdc price
+  /// Increase usdc price temporarily to allow lots of borrows
   console.log(
-    `Setting USDC price to 0.9, to reduce health contribution of USDC collateral for user`,
+    `Setting USDC price to 1.5, to allow the user to borrow lots of btc`,
   );
   const adminWallet = new Wallet(admin);
   console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
@@ -112,7 +90,33 @@ async function main() {
     'devnet',
     MANGO_V4_ID['devnet'],
   );
-  await client.stubOracleSet(group, group.banksMap.get('USDC')?.oracle!, 0.5);
+  await client.stubOracleSet(group, group.banksMap.get('USDC')?.oracle!, 1.5);
+
+  /// user2 deposits some collateral and borrows BTC
+  amount = 1;
+  console.log(`Depositing...${amount} 'USDC'`);
+  await user2Client.tokenDeposit(group, user2MangoAccount, 'USDC', amount);
+  await user2MangoAccount.reload(user2Client, group);
+  console.log(`${user2MangoAccount.toString(group)}`);
+
+  const maxNative = await (await user2MangoAccount.getMaxWithdrawWithBorrowForToken(group, token)).toNumber();
+  amount = 0.9 * maxNative;
+  console.log(`Withdrawing...${amount} native BTC'`);
+  await user2Client.tokenWithdraw2(
+    group,
+    user2MangoAccount,
+    token,
+    amount,
+    true,
+  );
+  await user2MangoAccount.reload(user2Client, group);
+  console.log(`${user2MangoAccount.toString(group)}`);
+
+  /// Reduce usdc price to normal again
+  console.log(
+    `Setting USDC price back to 1.0, decreasing the user's collateral size`,
+  );
+  await client.stubOracleSet(group, group.banksMap.get('USDC')?.oracle!, 1.0);
 
   process.exit();
 }

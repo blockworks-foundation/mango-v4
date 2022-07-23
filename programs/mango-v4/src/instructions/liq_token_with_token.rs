@@ -29,7 +29,8 @@ pub fn liq_token_with_token(
     let group_pk = &ctx.accounts.group.key();
 
     require!(asset_token_index != liab_token_index, MangoError::SomeError);
-    let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)?;
+    let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
+        .context("create account retriever")?;
 
     let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.liqor)?;
     let mut liqor: MangoAccountAccMut = mal.load_mut()?;
@@ -48,9 +49,10 @@ pub fn liq_token_with_token(
     require!(!liqee.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
     // Initial liqee health check
-    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)?;
+    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
+        .context("create liqee health cache")?;
     let init_health = liqee_health_cache.health(HealthType::Init);
-    if liqee.fixed.being_liquidated() {
+    if liqee.being_liquidated() {
         if init_health > I80F48::ZERO {
             liqee.fixed.set_being_liquidated(false);
             msg!("Liqee init_health above zero");
@@ -58,7 +60,10 @@ pub fn liq_token_with_token(
         }
     } else {
         let maint_health = liqee_health_cache.health(HealthType::Maint);
-        require!(maint_health < I80F48::ZERO, MangoError::SomeError);
+        require!(
+            maint_health < I80F48::ZERO,
+            MangoError::HealthMustBeNegative
+        );
         liqee.fixed.set_being_liquidated(true);
     }
 
@@ -228,7 +233,8 @@ pub fn liq_token_with_token(
     }
 
     // Check liqor's health
-    let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)?;
+    let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
+        .context("compute liqor health")?;
     require!(liqor_health >= 0, MangoError::HealthMustBePositive);
 
     Ok(())

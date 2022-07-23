@@ -63,7 +63,10 @@ export class MangoClient {
     public programId: PublicKey,
     public cluster: Cluster,
     public groupName?: string,
-  ) {}
+  ) {
+    // TODO: evil side effect, but limited backtraces are a nightmare
+    Error.stackTraceLimit = 1000;
+  }
 
   /// public
 

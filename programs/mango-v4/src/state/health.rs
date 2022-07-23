@@ -412,7 +412,7 @@ pub fn compute_health(
     Ok(new_health_cache(account, retriever)?.health(health_type))
 }
 
-#[derive(AnchorDeserialize, AnchorSerialize)]
+#[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct TokenInfo {
     token_index: TokenIndex,
     maint_asset_weight: I80F48,
@@ -454,7 +454,7 @@ impl TokenInfo {
     }
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct Serum3Info {
     reserved: I80F48,
     base_index: usize,
@@ -500,7 +500,7 @@ impl Serum3Info {
     }
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct PerpInfo {
     maint_asset_weight: I80F48,
     init_asset_weight: I80F48,
@@ -540,7 +540,7 @@ impl PerpInfo {
     }
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct HealthCache {
     token_infos: Vec<TokenInfo>,
     serum3_infos: Vec<Serum3Info>,
@@ -636,6 +636,153 @@ impl HealthCache {
             I80F48::MAX
         }
     }
+
+    /// How much source native tokens may be swapped for target tokens while staying
+    /// above the min_ratio health ratio.
+    ///
+    /// TODO: Add slippage/fees.
+    pub fn max_swap_source_for_health_ratio(
+        &self,
+        source: TokenIndex,
+        target: TokenIndex,
+        min_ratio: I80F48,
+    ) -> Result<I80F48> {
+        // The health_ratio is a nonlinear based on swap amount.
+        // For large swap amounts the slope is guaranteed to be negative, but small amounts
+        // can have positive slope (e.g. using source deposits to pay back target borrows).
+        //
+        // That means:
+        // - even if the initial ratio is < min_ratio it can be useful to swap to *increase* health
+        // - be careful about finding the min_ratio point: the function isn't convex
+
+        let initial_ratio = self.health_ratio(HealthType::Init);
+        if initial_ratio < 0 {
+            return Ok(I80F48::ZERO);
+        }
+
+        let source_index = find_token_info_index(&self.token_infos, source)?;
+        let target_index = find_token_info_index(&self.token_infos, target)?;
+        let source = &self.token_infos[source_index];
+        let target = &self.token_infos[target_index];
+
+        // There are two key slope changes: Assume source.balance > 0 and target.balance < 0. Then
+        // initially health ratio goes up. When one of balances flips sign, the health ratio slope
+        // may be positive or negative for a bit, until both balances have flipped and the slope is
+        // negative.
+        // The maximum will be at one of these points (ignoring serum3 effects).
+        let cache_after_swap = |amount| {
+            let mut adjusted_cache = self.clone();
+            adjusted_cache.token_infos[source_index].balance -= amount;
+            adjusted_cache.token_infos[target_index].balance += amount;
+            adjusted_cache
+        };
+        let health_ratio_after_swap =
+            |amount| cache_after_swap(amount).health_ratio(HealthType::Init);
+
+        let point0_amount = source.balance.min(-target.balance).max(I80F48::ZERO);
+        let point1_amount = source.balance.max(-target.balance).max(I80F48::ZERO);
+        let point0_ratio = health_ratio_after_swap(point0_amount);
+        let (point1_ratio, point1_health) = {
+            let cache = cache_after_swap(point1_amount);
+            (
+                cache.health_ratio(HealthType::Init),
+                cache.health(HealthType::Init),
+            )
+        };
+
+        let binary_approximation_search =
+            |mut left,
+             left_ratio: I80F48,
+             mut right,
+             mut right_ratio: I80F48,
+             target_ratio: I80F48| {
+                let max_iterations = 20;
+                let target_error = I80F48::ONE;
+                require_msg!(
+                    (left_ratio - target_ratio).signum() * (right_ratio - target_ratio).signum()
+                        != I80F48::ONE,
+                    "internal error: left {} and right {} don't contain the target value {}",
+                    left_ratio,
+                    right_ratio,
+                    target_ratio
+                );
+                for _ in 0..max_iterations {
+                    let new = I80F48::from_num(0.5) * (left + right);
+                    let new_ratio = health_ratio_after_swap(new);
+                    let error = new_ratio - target_ratio;
+                    if error > 0 && error < target_error {
+                        return Ok(new);
+                    }
+
+                    if (new_ratio > target_ratio) ^ (right_ratio > target_ratio) {
+                        left = new;
+                    } else {
+                        right = new;
+                        right_ratio = new_ratio;
+                    }
+                }
+                Err(error_msg!("binary search iterations exhausted"))
+            };
+
+        let amount =
+            if initial_ratio <= min_ratio && point0_ratio < min_ratio && point1_ratio < min_ratio {
+                // If we have to stay below the target ratio, pick the highest one
+                if point0_ratio > initial_ratio {
+                    if point1_ratio > point0_ratio {
+                        point1_amount
+                    } else {
+                        point0_amount
+                    }
+                } else if point1_ratio > initial_ratio {
+                    point1_amount
+                } else {
+                    I80F48::ZERO
+                }
+            } else if point1_ratio >= min_ratio {
+                // If point1_ratio is still bigger than min_ratio, the target amount must be >point1_amount
+                // search to the right of point1_amount: but how far?
+                // At point1, source.balance < 0 and target.balance > 0, so use a simple estimation for
+                // zero health: health - source_liab_weight * a + target_asset_weight * a = 0.
+                if point1_health <= 0 {
+                    return Ok(I80F48::ZERO);
+                }
+                let zero_health_amount = point1_amount
+                    + point1_health / (source.init_liab_weight - target.init_asset_weight);
+                let zero_health_ratio = health_ratio_after_swap(zero_health_amount);
+                binary_approximation_search(
+                    point1_amount,
+                    point1_ratio,
+                    zero_health_amount,
+                    zero_health_ratio,
+                    min_ratio,
+                )?
+            } else if point0_ratio >= min_ratio {
+                // Must be between point0_amount and point1_amount.
+                binary_approximation_search(
+                    point0_amount,
+                    point0_ratio,
+                    point1_amount,
+                    point1_ratio,
+                    min_ratio,
+                )?
+            } else {
+                // can't happen because slope between 0 and point0_amount is positive!
+                return Err(error_msg!(
+                    "internal error: assert that init ratio {} <= point0 ratio {}",
+                    initial_ratio,
+                    point0_ratio
+                ));
+            };
+
+        Ok(amount / source.oracle_price)
+    }
+}
+
+fn find_token_info_index(infos: &[TokenInfo], token_index: TokenIndex) -> Result<usize> {
+    infos
+        .iter()
+        .position(|ti| ti.token_index == token_index)
+        .ok_or_else(|| error_msg!("token index {} not found", token_index))
 }
 
 /// Generate a HealthCache for an account and its health accounts.
@@ -645,12 +792,6 @@ pub fn new_health_cache(
 ) -> Result<HealthCache> {
     // token contribution from token accounts
     let mut token_infos = vec![];
-    fn find_token_info_index(infos: &[TokenInfo], token_index: TokenIndex) -> Result<usize> {
-        infos
-            .iter()
-            .position(|ti| ti.token_index == token_index)
-            .ok_or_else(|| error_msg!("token index {} not found", token_index))
-    }
 
     for (i, position) in account.token_iter_active().enumerate() {
         let (bank, oracle_price) =
@@ -1303,6 +1444,147 @@ mod tests {
         for (i, testcase) in testcases.iter().enumerate() {
             println!("checking testcase {}", i);
             test_health1_runner(&testcase);
+        }
+    }
+
+    #[test]
+    fn test_max_swap() {
+        let default_token_info = |x| TokenInfo {
+            token_index: 0,
+            maint_asset_weight: I80F48::from_num(1.0 - x),
+            init_asset_weight: I80F48::from_num(1.0 - x),
+            maint_liab_weight: I80F48::from_num(1.0 + x),
+            init_liab_weight: I80F48::from_num(1.0 + x),
+            oracle_price: I80F48::from_num(2.0),
+            balance: I80F48::ZERO,
+            serum3_max_reserved: I80F48::ZERO,
+        };
+
+        let health_cache = HealthCache {
+            token_infos: vec![
+                TokenInfo {
+                    token_index: 0,
+                    oracle_price: I80F48::from_num(2.0),
+                    balance: I80F48::ZERO,
+                    ..default_token_info(0.1)
+                },
+                TokenInfo {
+                    token_index: 1,
+                    oracle_price: I80F48::from_num(3.0),
+                    balance: I80F48::ZERO,
+                    ..default_token_info(0.2)
+                },
+                TokenInfo {
+                    token_index: 2,
+                    oracle_price: I80F48::from_num(4.0),
+                    balance: I80F48::ZERO,
+                    ..default_token_info(0.3)
+                },
+            ],
+            serum3_infos: vec![],
+            perp_infos: vec![],
+        };
+
+        assert_eq!(health_cache.health(HealthType::Init), I80F48::ZERO);
+        assert_eq!(health_cache.health_ratio(HealthType::Init), I80F48::MAX);
+        assert_eq!(
+            health_cache
+                .max_swap_source_for_health_ratio(0, 1, I80F48::from_num(50.0))
+                .unwrap(),
+            I80F48::ZERO
+        );
+
+        let adjust_by_usdc = |c: &mut HealthCache, ti: TokenIndex, usdc: f64| {
+            let ti = &mut c.token_infos[ti as usize];
+            ti.balance += I80F48::from_num(usdc);
+        };
+        let find_max_swap_actual =
+            |c: &HealthCache, source: TokenIndex, target: TokenIndex, ratio: f64| {
+                let source_amount = c
+                    .max_swap_source_for_health_ratio(source, target, I80F48::from_num(ratio))
+                    .unwrap();
+                let mut c = c.clone();
+                let source_price = c.token_infos[source as usize].oracle_price;
+                let target_price = c.token_infos[target as usize].oracle_price;
+                c.adjust_token_balance(source, -source_amount).unwrap();
+                c.adjust_token_balance(target, source_amount * source_price / target_price)
+                    .unwrap();
+                (
+                    source_amount.to_num::<f64>(),
+                    c.health_ratio(HealthType::Init).to_num::<f64>(),
+                )
+            };
+        let check_max_swap_result =
+            |c: &HealthCache, source: TokenIndex, target: TokenIndex, ratio: f64| {
+                let (source_amount, actual_ratio) = find_max_swap_actual(c, source, target, ratio);
+                println!(
+                    "checking {} to {} for target ratio {}: actual ratio: {}, amount: {}",
+                    source, target, ratio, actual_ratio, source_amount
+                );
+                assert!((ratio - actual_ratio).abs() < 1.0);
+            };
+
+        {
+            println!("test 0");
+            let mut health_cache = health_cache.clone();
+            adjust_by_usdc(&mut health_cache, 1, 100.0);
+            check_max_swap_result(&health_cache, 0, 1, 50.0);
+            check_max_swap_result(&health_cache, 1, 0, 50.0);
+            check_max_swap_result(&health_cache, 0, 2, 50.0);
+        }
+
+        {
+            println!("test 1");
+            let mut health_cache = health_cache.clone();
+            adjust_by_usdc(&mut health_cache, 0, -20.0);
+            adjust_by_usdc(&mut health_cache, 1, 100.0);
+            check_max_swap_result(&health_cache, 0, 1, 50.0);
+            check_max_swap_result(&health_cache, 1, 0, 50.0);
+            check_max_swap_result(&health_cache, 0, 2, 50.0);
+            check_max_swap_result(&health_cache, 2, 0, 50.0);
+        }
+
+        {
+            println!("test 2");
+            let mut health_cache = health_cache.clone();
+            adjust_by_usdc(&mut health_cache, 0, -50.0);
+            adjust_by_usdc(&mut health_cache, 1, 100.0);
+            // possible even though the init ratio is <100
+            check_max_swap_result(&health_cache, 1, 0, 100.0);
+        }
+
+        {
+            println!("test 3");
+            let mut health_cache = health_cache.clone();
+            adjust_by_usdc(&mut health_cache, 0, -30.0);
+            adjust_by_usdc(&mut health_cache, 1, 100.0);
+            adjust_by_usdc(&mut health_cache, 2, -30.0);
+
+            // swapping with a high ratio advises paying back all liabs
+            // and then swapping even more because increasing assets in 0 has better asset weight
+            let init_ratio = health_cache.health_ratio(HealthType::Init);
+            let (amount, actual_ratio) = find_max_swap_actual(&health_cache, 1, 0, 100.0);
+            println!(
+                "init {}, after {}, amount {}",
+                init_ratio, actual_ratio, amount
+            );
+            assert!(actual_ratio / 2.0 > init_ratio);
+            assert!((amount - 100.0 / 3.0).abs() < 1.0);
+        }
+
+        {
+            println!("test 4");
+            let mut health_cache = health_cache.clone();
+            adjust_by_usdc(&mut health_cache, 0, 100.0);
+            adjust_by_usdc(&mut health_cache, 1, -2.0);
+            adjust_by_usdc(&mut health_cache, 2, -65.0);
+
+            let init_ratio = health_cache.health_ratio(HealthType::Init);
+            assert!(init_ratio > 3 && init_ratio < 4);
+
+            check_max_swap_result(&health_cache, 0, 1, 1.0);
+            check_max_swap_result(&health_cache, 0, 1, 3.0);
+            check_max_swap_result(&health_cache, 0, 1, 4.0);
         }
     }
 }

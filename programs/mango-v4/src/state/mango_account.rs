@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
 use checked_math as cm;
 use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
@@ -77,13 +76,13 @@ impl TokenPosition {
         }
     }
 
-    pub fn ui(&self, bank: &Bank, mint: &Mint) -> I80F48 {
+    pub fn ui(&self, bank: &Bank) -> I80F48 {
         if self.indexed_position.is_positive() {
             (self.indexed_position * bank.deposit_index)
-                / I80F48::from_num(10u64.pow(mint.decimals as u32))
+                / I80F48::from_num(10u64.pow(bank.mint_decimals as u32))
         } else {
             (self.indexed_position * bank.borrow_index)
-                / I80F48::from_num(10u64.pow(mint.decimals as u32))
+                / I80F48::from_num(10u64.pow(bank.mint_decimals as u32))
         }
     }
 

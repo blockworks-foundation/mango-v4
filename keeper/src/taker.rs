@@ -6,10 +6,7 @@ use std::{
 
 use fixed::types::I80F48;
 use futures::Future;
-use mango_v4::{
-    instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side},
-    state::Bank,
-};
+use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 
 use tokio::time;
 
@@ -24,7 +21,7 @@ pub async fn runner(
     ensure_oo(&mango_client)?;
 
     let mut price_arcs = HashMap::new();
-    for market_name in mango_client.serum3_markets_cache.keys() {
+    for market_name in mango_client.context.serum3_market_indexes_by_name.keys() {
         let price = mango_client
             .get_oracle_price(
                 market_name
@@ -43,7 +40,8 @@ pub async fn runner(
     }
 
     let handles1 = mango_client
-        .serum3_markets_cache
+        .context
+        .serum3_market_indexes_by_name
         .keys()
         .map(|market_name| {
             loop_blocking_price_update(
@@ -55,7 +53,8 @@ pub async fn runner(
         .collect::<Vec<_>>();
 
     let handles2 = mango_client
-        .serum3_markets_cache
+        .context
+        .serum3_market_indexes_by_name
         .keys()
         .map(|market_name| {
             loop_blocking_orders(
@@ -75,11 +74,11 @@ pub async fn runner(
 }
 
 fn ensure_oo(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> {
-    let account = mango_client.get_account()?.1;
+    let account = mango_client.mango_account()?;
 
-    for (_, serum3_market) in mango_client.serum3_markets_cache.values() {
-        if account.serum3.find(serum3_market.market_index).is_none() {
-            mango_client.serum3_create_open_orders(serum3_market.name())?;
+    for (market_index, serum3_market) in mango_client.context.serum3_markets.iter() {
+        if account.serum3.find(*market_index).is_none() {
+            mango_client.serum3_create_open_orders(serum3_market.market.name())?;
         }
     }
 
@@ -87,25 +86,18 @@ fn ensure_oo(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> {
 }
 
 fn ensure_deposit(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> {
-    let mango_account = mango_client.get_account()?.1;
+    let mango_account = mango_client.mango_account()?;
 
-    let banks: Vec<Bank> = mango_client
-        .banks_cache
-        .values()
-        .map(|vec| vec.get(0).unwrap().1)
-        .collect::<Vec<Bank>>();
+    for &token_index in mango_client.context.tokens.keys() {
+        let bank = mango_client.first_bank(token_index)?;
+        let desired_balance = I80F48::from_num(10_000 * 10u64.pow(bank.mint_decimals as u32));
 
-    for bank in banks {
-        let mint = &mango_client.mint_infos_cache.get(&bank.mint).unwrap().2;
-        let desired_balance = I80F48::from_num(10_000 * 10u64.pow(mint.decimals as u32));
-
-        let token_account_opt = mango_account.tokens.find(bank.token_index);
+        let token_account_opt = mango_account.tokens.find(token_index);
 
         let deposit_native = match token_account_opt {
             Some(token_account) => {
                 let native = token_account.native(&bank);
-
-                let ui = token_account.ui(&bank, mint);
+                let ui = token_account.ui(&bank);
                 log::info!("Current balance {} {}", ui, bank.name());
 
                 if native < I80F48::ZERO {

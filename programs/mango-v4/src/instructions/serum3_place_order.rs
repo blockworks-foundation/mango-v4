@@ -1,4 +1,4 @@
-use crate::error::MangoError;
+use crate::error::*;
 
 use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
@@ -209,6 +209,20 @@ pub fn serum3_place_order(
 
     let before_base_vault = ctx.accounts.base_vault.amount;
     let before_quote_vault = ctx.accounts.quote_vault.amount;
+
+    // Provide a readable error message in case the vault doesn't have enough tokens
+    let (vault_amount, needed_amount) = match side {
+        Serum3Side::Ask => (before_base_vault, max_base_qty),
+        Serum3Side::Bid => (before_quote_vault, max_native_quote_qty_including_fees),
+    };
+    if vault_amount < needed_amount {
+        return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {
+            format!(
+                "bank vault does not have enough tokens, need {} but have {}",
+                needed_amount, vault_amount
+            )
+        });
+    }
 
     // TODO: pre-health check
 

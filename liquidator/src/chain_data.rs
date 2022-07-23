@@ -44,6 +44,7 @@ pub struct ChainData {
     accounts: HashMap<Pubkey, Vec<AccountData>>,
     newest_rooted_slot: u64,
     newest_processed_slot: u64,
+    best_chain_slot: u64,
 
     // storing global metrics here is not good style
     metric_slots_count: metrics::MetricU64,
@@ -58,6 +59,7 @@ impl ChainData {
             accounts: HashMap::new(),
             newest_rooted_slot: 0,
             newest_processed_slot: 0,
+            best_chain_slot: 0,
             metric_slots_count: metrics.register_u64("chain_data_slots_count".into()),
             metric_accounts_count: metrics.register_u64("chain_data_accounts_count".into()),
             metric_account_write_count: metrics
@@ -77,6 +79,13 @@ impl ChainData {
             self.newest_rooted_slot = new_slot.slot;
         }
 
+        // Use the highest slot that has a known parent as best chain
+        // (sometimes slots OptimisticallyConfirm before we even know the parent!)
+        let new_best_chain = new_slot.parent.is_some() && new_slot.slot > self.best_chain_slot;
+        if new_best_chain {
+            self.best_chain_slot = new_slot.slot;
+        }
+
         let mut parent_update = false;
 
         use std::collections::hash_map::Entry;
@@ -88,16 +97,18 @@ impl ChainData {
                 let v = o.into_mut();
                 parent_update = v.parent != new_slot.parent && new_slot.parent.is_some();
                 v.parent = v.parent.or(new_slot.parent);
-                v.status = new_slot.status;
+                if v.status == SlotStatus::Processed || new_slot.status == SlotStatus::Rooted {
+                    v.status = new_slot.status;
+                }
             }
         };
 
-        if new_processed_head || parent_update {
+        if new_best_chain || parent_update {
             // update the "chain" field down to the first rooted slot
-            let mut slot = self.newest_processed_slot;
+            let mut slot = self.best_chain_slot;
             loop {
                 if let Some(data) = self.slots.get_mut(&slot) {
-                    data.chain = self.newest_processed_slot;
+                    data.chain = self.best_chain_slot;
                     if data.status == SlotStatus::Rooted {
                         break;
                     }
@@ -127,7 +138,7 @@ impl ChainData {
                                     // getting rooted, hence assume non-uncle slots < newest_rooted_slot
                                     // are rooted too
                                     s.status == SlotStatus::Rooted
-                                        || s.chain == self.newest_processed_slot
+                                        || s.chain == self.best_chain_slot
                                 })
                                 // preserved account writes for deleted slots <= newest_rooted_slot
                                 // are expected to be rooted
@@ -244,11 +255,31 @@ impl ChainData {
         }
     }
 
+    pub fn update_from_rpc(&mut self, pubkey: &Pubkey, account: AccountData) {
+        // Add a stub slot if the rpc has information about the future.
+        // If it's in the past, either the slot already exists (and maybe we have
+        // the data already), or it was a skipped slot and adding it now makes no difference.
+        if account.slot > self.best_chain_slot {
+            self.update_slot(SlotData {
+                slot: account.slot,
+                parent: Some(self.best_chain_slot),
+                status: SlotStatus::Processed,
+                chain: 0,
+            });
+        }
+
+        self.update_account(*pubkey, account)
+    }
+
     fn is_account_write_live(&self, write: &AccountData) -> bool {
         self.slots
             .get(&write.slot)
-            // either the slot is rooted or in the current chain
-            .map(|s| s.status == SlotStatus::Rooted || s.chain == self.newest_processed_slot)
+            // either the slot is rooted, in the current chain or newer than the chain head
+            .map(|s| {
+                s.status == SlotStatus::Rooted
+                    || s.chain == self.best_chain_slot
+                    || write.slot > self.best_chain_slot
+            })
             // if the slot can't be found but preceeds newest rooted, use it too (old rooted slots are removed)
             .unwrap_or(write.slot <= self.newest_rooted_slot)
     }
@@ -269,6 +300,11 @@ impl ChainData {
 
     /// Ref to the most recent live write of the pubkey
     pub fn account<'a>(&'a self, pubkey: &Pubkey) -> anyhow::Result<&'a AccountSharedData> {
+        self.account_and_slot(pubkey).map(|w| &w.account)
+    }
+
+    /// Ref to the most recent live write of the pubkey, along with the slot that it was for
+    pub fn account_and_slot<'a>(&'a self, pubkey: &Pubkey) -> anyhow::Result<&'a AccountData> {
         self.accounts
             .get(pubkey)
             .ok_or_else(|| anyhow::anyhow!("account {} not found", pubkey))?
@@ -276,6 +312,5 @@ impl ChainData {
             .rev()
             .find(|w| self.is_account_write_live(w))
             .ok_or_else(|| anyhow::anyhow!("account {} has no live data", pubkey))
-            .map(|w| &w.account)
     }
 }

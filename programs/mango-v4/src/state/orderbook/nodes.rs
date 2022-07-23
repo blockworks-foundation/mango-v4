@@ -173,12 +173,12 @@ const_assert_eq!(size_of::<AnyNode>(), size_of::<InnerNode>());
 const_assert_eq!(size_of::<AnyNode>(), size_of::<LeafNode>());
 const_assert_eq!(size_of::<AnyNode>(), size_of::<FreeNode>());
 
-pub enum NodeRef<'a> {
+pub(crate) enum NodeRef<'a> {
     Inner(&'a InnerNode),
     Leaf(&'a LeafNode),
 }
 
-pub enum NodeRefMut<'a> {
+pub(crate) enum NodeRefMut<'a> {
     Inner(&'a mut InnerNode),
     Leaf(&'a mut LeafNode),
 }

@@ -99,11 +99,12 @@ export class MangoAccount {
     sourceBank: Bank,
     nativeTokenPosition: TokenPosition,
   ): I80F48 {
-    return nativeTokenPosition
-      .native(sourceBank)
+    return nativeTokenPosition ?
+      nativeTokenPosition.native(sourceBank)
       .mul(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
       .div(I80F48.fromNumber(Math.pow(10, sourceBank.mintDecimals)))
-      .mul(sourceBank.price);
+      .mul(sourceBank.price)
+      : ZERO_I80F48;
   }
 
   static getEquivalentNativeTokenPosition(
@@ -213,7 +214,7 @@ export class MangoAccount {
     const inUsdcUnits = MangoAccount.getEquivalentNativeUsdcPosition(
       bank,
       this.findToken(bank.tokenIndex),
-    );
+    ).max(ZERO_I80F48);
     const newInitHealth = initHealth.sub(inUsdcUnits.mul(bank.initAssetWeight));
     return MangoAccount.getEquivalentNativeTokenPosition(
       bank,
