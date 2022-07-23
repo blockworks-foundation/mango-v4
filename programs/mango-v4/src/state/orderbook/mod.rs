@@ -15,15 +15,12 @@ pub mod queue;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::{
-        GetAccessorMut, Header, MangoAccount, MangoAccountAccMut, MangoAccountDynamicHeader,
-        MangoAccountFixed, PerpMarket, FREE_ORDER_SLOT,
-    };
+    use crate::state::{MangoAccount, MangoAccountValue, PerpMarket, FREE_ORDER_SLOT};
     use anchor_lang::prelude::*;
     use bytemuck::Zeroable;
     use fixed::types::I80F48;
     use solana_program::pubkey::Pubkey;
-    use std::{cell::RefCell, mem::size_of};
+    use std::cell::RefCell;
 
     fn new_bookside(book_side_type: BookSideType) -> BookSide {
         BookSide {
@@ -103,13 +100,8 @@ mod tests {
 
         let mut new_order =
             |book: &mut Book, event_queue: &mut EventQueue, side, price, now_ts| -> i128 {
-                let mut buffer: Vec<u8> = Vec::new();
-                MangoAccount::default().serialize(&mut buffer).unwrap();
-                let mut header = MangoAccountDynamicHeader::try_new_header(
-                    &buffer[size_of::<MangoAccountFixed>()..],
-                )
-                .unwrap();
-                let mut account: MangoAccountAccMut = header.new_accessor_mut(&mut buffer[..]);
+                let buffer = MangoAccount::default().try_to_vec().unwrap();
+                let mut account = MangoAccountValue::try_new(&buffer).unwrap();
 
                 let quantity = 1;
                 let tif = 100;
@@ -119,7 +111,7 @@ mod tests {
                     &mut perp_market,
                     event_queue,
                     oracle_price,
-                    &mut account,
+                    &mut account.borrow_mut(),
                     &Pubkey::default(),
                     price,
                     quantity,
@@ -203,19 +195,9 @@ mod tests {
         market.maker_fee = I80F48::from_num(-0.001f64);
         market.taker_fee = I80F48::from_num(0.01f64);
 
-        let mut buffer: Vec<u8> = Vec::new();
-        MangoAccount::default().serialize(&mut buffer).unwrap();
-        let mut header =
-            MangoAccountDynamicHeader::try_new_header(&buffer[size_of::<MangoAccountFixed>()..])
-                .unwrap();
-        let mut maker: MangoAccountAccMut = header.new_accessor_mut(&mut buffer[..]);
-
-        let mut buffer: Vec<u8> = Vec::new();
-        MangoAccount::default().serialize(&mut buffer).unwrap();
-        let mut header =
-            MangoAccountDynamicHeader::try_new_header(&buffer[size_of::<MangoAccountFixed>()..])
-                .unwrap();
-        let mut taker: MangoAccountAccMut = header.new_accessor_mut(&mut buffer[..]);
+        let buffer = MangoAccount::default().try_to_vec().unwrap();
+        let mut maker = MangoAccountValue::try_new(&buffer).unwrap();
+        let mut taker = MangoAccountValue::try_new(&buffer).unwrap();
 
         let maker_pk = Pubkey::new_unique();
         let taker_pk = Pubkey::new_unique();
@@ -229,7 +211,7 @@ mod tests {
             &mut market,
             &mut event_queue,
             oracle_price,
-            &mut maker,
+            &mut maker.borrow_mut(),
             &maker_pk,
             price,
             bid_quantity,
@@ -272,7 +254,7 @@ mod tests {
             &mut market,
             &mut event_queue,
             oracle_price,
-            &mut taker,
+            &mut taker.borrow_mut(),
             &taker_pk,
             price,
             match_quantity,

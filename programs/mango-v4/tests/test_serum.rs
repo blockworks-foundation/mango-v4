@@ -127,7 +127,7 @@ async fn test_serum() -> Result<(), TransportError> {
     .unwrap()
     .open_orders;
 
-    let account_data: MangoAccount = solana.get_account(account).await;
+    let account_data = get_mango_account(solana, account).await;
     assert_eq!(
         account_data
             .serum3_iter_active()

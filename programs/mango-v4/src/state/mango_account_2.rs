@@ -1,9 +1,9 @@
 use std::cell::RefMut;
 use std::fmt;
 
+use std::borrow::{Borrow, BorrowMut};
 use std::marker::PhantomData;
 use std::mem::size_of;
-use std::ops::Deref;
 
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
@@ -190,103 +190,6 @@ impl MangoAccount {
         Self::dynamic_perp_oo_vec_offset(token_count, serum3_count, perp_count)
             + (BORSH_VEC_SIZE_BYTES + size_of::<PerpOpenOrders>() * usize::from(perp_oo_count))
     }
-
-    pub fn token_iter_active(&self) -> impl Iterator<Item = &TokenPosition> {
-        self.tokens.iter().filter(|token| token.is_active())
-    }
-
-    pub fn token_find(&self, token_index: TokenIndex) -> Option<&TokenPosition> {
-        self.tokens
-            .iter()
-            .find(|token| token.token_index == token_index)
-    }
-
-    pub fn token_get_mut_or_create(
-        &mut self,
-        token_index: TokenIndex,
-    ) -> Result<(&mut TokenPosition, usize, usize)> {
-        let mut active_index = 0;
-        let mut match_or_free = None;
-        for (raw_index, position) in self.tokens.iter().enumerate() {
-            if position.is_active_for_token(token_index) {
-                // Can't return early because of lifetimes
-                match_or_free = Some((raw_index, active_index));
-                break;
-            }
-            if position.is_active() {
-                active_index += 1;
-            } else if match_or_free.is_none() {
-                match_or_free = Some((raw_index, active_index));
-            }
-        }
-        if let Some((raw_index, bank_index)) = match_or_free {
-            let v = &mut self.tokens[raw_index];
-            if !v.is_active_for_token(token_index) {
-                *v = TokenPosition {
-                    indexed_position: I80F48::ZERO,
-                    token_index,
-                    in_use_count: 0,
-                    reserved: Default::default(),
-                };
-            }
-            Ok((v, raw_index, bank_index))
-        } else {
-            err!(MangoError::NoFreeTokenPositionIndex)
-                .context(format!("when looking for token index {}", token_index))
-        }
-    }
-
-    pub fn serum3_iter_active(&self) -> impl Iterator<Item = &Serum3Orders> {
-        self.serum3.iter().filter(|serum3| serum3.is_active())
-    }
-
-    pub fn serum3_find(&self, market_index: Serum3MarketIndex) -> Option<&Serum3Orders> {
-        self.serum3
-            .iter()
-            .find(|serum3_orders| serum3_orders.market_index == market_index)
-    }
-
-    pub fn perp_iter_active_accounts(&self) -> impl Iterator<Item = &PerpPositions> {
-        self.perps.iter().filter(|perp| perp.is_active())
-    }
-
-    pub fn perp_find(&self, market_index: PerpMarketIndex) -> Option<&PerpPositions> {
-        self.perps
-            .iter()
-            .find(|perp| perp.market_index == market_index)
-    }
-
-    pub fn perp_get_account_mut_or_create(
-        &mut self,
-        perp_market_index: PerpMarketIndex,
-    ) -> Result<(&mut PerpPositions, usize)> {
-        let mut pos = self
-            .perps
-            .iter()
-            .position(|p| p.is_active_for_market(perp_market_index));
-        if pos.is_none() {
-            pos = self.perps.iter().position(|p| !p.is_active());
-            if let Some(i) = pos {
-                self.perps[i] = PerpPositions {
-                    market_index: perp_market_index,
-                    ..Default::default()
-                };
-            }
-        }
-        if let Some(i) = pos {
-            Ok((&mut self.perps[i], i))
-        } else {
-            err!(MangoError::NoFreePerpPositionIndex)
-        }
-    }
-
-    pub fn is_bankrupt(&self) -> bool {
-        self.is_bankrupt != 0
-    }
-
-    pub fn being_liquidated(&self) -> bool {
-        self.being_liquidated != 0
-    }
 }
 
 #[test]
@@ -432,12 +335,15 @@ impl MangoAccountDynamicHeader {
     }
 }
 
+#[derive(Clone)]
 pub struct DynamicAccessor<Header, Fixed, Dynamic> {
     pub header: Header,
     pub fixed: Fixed,
     pub dynamic: Dynamic,
 }
 
+type DynamicAccessorValue<D> =
+    DynamicAccessor<<D as DynamicAccount>::Header, <D as DynamicAccount>::Fixed, Vec<u8>>;
 type DynamicAccessorRef<'a, D> =
     DynamicAccessor<&'a <D as DynamicAccount>::Header, &'a <D as DynamicAccount>::Fixed, &'a [u8]>;
 type DynamicAccessorRefMut<'a, D> = DynamicAccessor<
@@ -446,16 +352,40 @@ type DynamicAccessorRefMut<'a, D> = DynamicAccessor<
     &'a mut [u8],
 >;
 
+pub type MangoAccountValue = DynamicAccessorValue<MangoAccount>;
 pub type MangoAccountAcc<'a> = DynamicAccessorRef<'a, MangoAccount>;
 pub type MangoAccountAccMut<'a> = DynamicAccessorRefMut<'a, MangoAccount>;
 
+impl MangoAccountValue {
+    pub fn try_new(bytes: &[u8]) -> Result<Self> {
+        let fixed_size = size_of::<MangoAccountFixed>();
+        let fixed: MangoAccountFixed = *bytemuck::from_bytes(&bytes[0..fixed_size]);
+        let header = MangoAccountDynamicHeader::try_new_header(&bytes[fixed_size..])?;
+        Ok(Self {
+            fixed,
+            header,
+            dynamic: bytes[fixed_size..].to_vec(),
+        })
+    }
+}
+
 // This generic impl covers MangoAccountAcc and MangoAccountAccMut
 impl<
-        Header: Deref<Target = MangoAccountDynamicHeader>,
-        Fixed: Deref<Target = MangoAccountFixed>,
-        Dynamic: Deref<Target = [u8]>,
+        Header: Borrow<MangoAccountDynamicHeader>,
+        Fixed: Borrow<MangoAccountFixed>,
+        Dynamic: Borrow<[u8]>,
     > DynamicAccessor<Header, Fixed, Dynamic>
 {
+    fn header(&self) -> &MangoAccountDynamicHeader {
+        self.header.borrow()
+    }
+    fn fixed(&self) -> &MangoAccountFixed {
+        self.fixed.borrow()
+    }
+    fn dynamic(&self) -> &[u8] {
+        self.dynamic.borrow()
+    }
+
     /// Returns
     /// - the position
     /// - the raw index into the token positions list (for use with get_raw/deactivate)
@@ -468,17 +398,17 @@ impl<
 
     // get TokenPosition at raw_index
     pub fn token_get_raw(&self, raw_index: usize) -> &TokenPosition {
-        get_helper(&self.dynamic, self.header.token_offset(raw_index))
+        get_helper(self.dynamic(), self.header().token_offset(raw_index))
     }
 
     // get iter over all TokenPositions (including inactive)
     pub fn token_iter(&self) -> impl Iterator<Item = &TokenPosition> + '_ {
-        (0..self.header.token_count()).map(|i| self.token_get_raw(i))
+        (0..self.header().token_count()).map(|i| self.token_get_raw(i))
     }
 
     // get iter over all active TokenPositions
     pub fn token_iter_active(&self) -> impl Iterator<Item = &TokenPosition> + '_ {
-        (0..self.header.token_count())
+        (0..self.header().token_count())
             .map(|i| self.token_get_raw(i))
             .filter(|token| token.is_active())
     }
@@ -490,15 +420,15 @@ impl<
 
     // get Serum3Orders at raw_index
     pub fn serum3_get_raw(&self, raw_index: usize) -> &Serum3Orders {
-        get_helper(&self.dynamic, self.header.serum3_offset(raw_index))
+        get_helper(self.dynamic(), self.header().serum3_offset(raw_index))
     }
 
     pub fn serum3_iter(&self) -> impl Iterator<Item = &Serum3Orders> + '_ {
-        (0..self.header.serum3_count()).map(|i| self.serum3_get_raw(i))
+        (0..self.header().serum3_count()).map(|i| self.serum3_get_raw(i))
     }
 
     pub fn serum3_iter_active(&self) -> impl Iterator<Item = &Serum3Orders> + '_ {
-        (0..self.header.serum3_count())
+        (0..self.header().serum3_count())
             .map(|i| self.serum3_get_raw(i))
             .filter(|serum3_order| serum3_order.is_active())
     }
@@ -510,15 +440,15 @@ impl<
 
     // get PerpPosition at raw_index
     pub fn perp_get_raw(&self, raw_index: usize) -> &PerpPositions {
-        get_helper(&self.dynamic, self.header.perp_offset(raw_index))
+        get_helper(self.dynamic(), self.header().perp_offset(raw_index))
     }
 
     pub fn perp_iter(&self) -> impl Iterator<Item = &PerpPositions> {
-        (0..self.header.perp_count()).map(|i| self.perp_get_raw(i))
+        (0..self.header().perp_count()).map(|i| self.perp_get_raw(i))
     }
 
     pub fn perp_iter_active_accounts(&self) -> impl Iterator<Item = &PerpPositions> {
-        (0..self.header.perp_count())
+        (0..self.header().perp_count())
             .map(|i| self.perp_get_raw(i))
             .filter(|p| p.is_active())
     }
@@ -529,11 +459,11 @@ impl<
     }
 
     pub fn perp_oo_get_raw(&self, raw_index: usize) -> &PerpOpenOrders {
-        get_helper(&self.dynamic, self.header.perp_oo_offset(raw_index))
+        get_helper(self.dynamic(), self.header().perp_oo_offset(raw_index))
     }
 
     pub fn perp_oo_iter(&self) -> impl Iterator<Item = &PerpOpenOrders> {
-        (0..self.header.perp_oo_count()).map(|i| self.perp_oo_get_raw(i))
+        (0..self.header().perp_oo_count()).map(|i| self.perp_oo_get_raw(i))
     }
 
     pub fn perp_next_order_slot(&self) -> Option<usize> {
@@ -546,7 +476,7 @@ impl<
         market_index: PerpMarketIndex,
         client_order_id: u64,
     ) -> Option<(i128, Side)> {
-        for i in 0..self.header.perp_oo_count() {
+        for i in 0..self.header().perp_oo_count() {
             let oo = self.perp_oo_get_raw(i);
             if oo.order_market == market_index && oo.client_order_id == client_order_id {
                 return Some((oo.order_id, oo.order_side));
@@ -560,7 +490,7 @@ impl<
         market_index: PerpMarketIndex,
         order_id: i128,
     ) -> Option<Side> {
-        for i in 0..self.header.perp_oo_count() {
+        for i in 0..self.header().perp_oo_count() {
             let oo = self.perp_oo_get_raw(i);
             if oo.order_market == market_index && oo.order_id == order_id {
                 return Some(oo.order_side);
@@ -569,23 +499,51 @@ impl<
         None
     }
 
+    pub fn being_liquidated(&self) -> bool {
+        self.fixed().being_liquidated()
+    }
+
+    pub fn is_bankrupt(&self) -> bool {
+        self.fixed().is_bankrupt()
+    }
+
     pub fn borrow<'b>(&'b self) -> DynamicAccessorRef<'b, MangoAccount> {
         DynamicAccessor {
-            header: &self.header,
-            fixed: &self.fixed,
-            dynamic: &self.dynamic,
+            header: self.header(),
+            fixed: self.fixed(),
+            dynamic: self.dynamic(),
         }
     }
 
     pub fn size(&self) -> AccountSize {
-        if self.header.perp_count() > 4 {
+        if self.header().perp_count() > 4 {
             return AccountSize::Large;
         }
         AccountSize::Small
     }
 }
 
-impl<'a> MangoAccountAccMut<'a> {
+impl<
+        Header: BorrowMut<MangoAccountDynamicHeader>,
+        Fixed: BorrowMut<MangoAccountFixed>,
+        Dynamic: BorrowMut<[u8]>,
+    > DynamicAccessor<Header, Fixed, Dynamic>
+{
+    fn header_mut(&mut self) -> &mut MangoAccountDynamicHeader {
+        self.header.borrow_mut()
+    }
+    fn dynamic_mut(&mut self) -> &mut [u8] {
+        self.dynamic.borrow_mut()
+    }
+
+    pub fn borrow_mut<'b>(&'b mut self) -> DynamicAccessorRefMut<'b, MangoAccount> {
+        DynamicAccessor {
+            header: self.header.borrow_mut(),
+            fixed: self.fixed.borrow_mut(),
+            dynamic: self.dynamic.borrow_mut(),
+        }
+    }
+
     /// Returns
     /// - the position
     /// - the raw index into the token positions list (for use with get_raw/deactivate)
@@ -603,8 +561,8 @@ impl<'a> MangoAccountAccMut<'a> {
 
     // get mut TokenPosition at raw_index
     pub fn token_get_mut_raw(&mut self, raw_index: usize) -> &mut TokenPosition {
-        let offset = self.header.token_offset(raw_index);
-        get_helper_mut(&mut self.dynamic, offset)
+        let offset = self.header().token_offset(raw_index);
+        get_helper_mut(self.dynamic_mut(), offset)
     }
 
     /// Creates or retrieves a TokenPosition for the token_index.
@@ -654,8 +612,8 @@ impl<'a> MangoAccountAccMut<'a> {
 
     // get mut Serum3Orders at raw_index
     pub fn serum3_get_mut_raw(&mut self, raw_index: usize) -> &mut Serum3Orders {
-        let offset = self.header.serum3_offset(raw_index);
-        get_helper_mut(&mut self.dynamic, offset)
+        let offset = self.header().serum3_offset(raw_index);
+        get_helper_mut(self.dynamic_mut(), offset)
     }
 
     pub fn serum3_create(&mut self, market_index: Serum3MarketIndex) -> Result<&mut Serum3Orders> {
@@ -696,13 +654,13 @@ impl<'a> MangoAccountAccMut<'a> {
 
     // get mut PerpPosition at raw_index
     pub fn perp_get_mut_raw(&mut self, raw_index: usize) -> &mut PerpPositions {
-        let offset = self.header.perp_offset(raw_index);
-        get_helper_mut(&mut self.dynamic, offset)
+        let offset = self.header().perp_offset(raw_index);
+        get_helper_mut(self.dynamic_mut(), offset)
     }
 
     pub fn perp_oo_get_mut_raw(&mut self, raw_index: usize) -> &mut PerpOpenOrders {
-        let offset = self.header.perp_oo_offset(raw_index);
-        get_helper_mut(&mut self.dynamic, offset)
+        let offset = self.header().perp_oo_offset(raw_index);
+        get_helper_mut(self.dynamic_mut(), offset)
     }
 
     pub fn perp_get_account_mut_or_create(
@@ -859,47 +817,50 @@ impl<'a> MangoAccountAccMut<'a> {
     // writes length of tokens vec at appropriate offset so that borsh can infer the vector length
     // length used is that present in the header
     fn write_token_length(&mut self) {
-        let tokens_offset = self.header.token_offset(0);
+        let tokens_offset = self.header().token_offset(0);
         // msg!(
         //     "writing tokens length at {}",
         //     tokens_offset - size_of::<BorshVecLength>()
         // );
-        let count = self.header.token_count;
-        let dst: &mut [u8] = &mut self.dynamic[tokens_offset - BORSH_VEC_SIZE_BYTES..tokens_offset];
+        let count = self.header().token_count;
+        let dst: &mut [u8] =
+            &mut self.dynamic_mut()[tokens_offset - BORSH_VEC_SIZE_BYTES..tokens_offset];
         dst.copy_from_slice(&BorshVecLength::from(count).to_le_bytes());
     }
 
     fn write_serum3_length(&mut self) {
-        let serum3_offset = self.header.serum3_offset(0);
+        let serum3_offset = self.header().serum3_offset(0);
         // msg!(
         //     "writing serum3 length at {}",
         //     serum3_offset - size_of::<BorshVecLength>()
         // );
-        let count = self.header.serum3_count;
-        let dst: &mut [u8] = &mut self.dynamic[serum3_offset - BORSH_VEC_SIZE_BYTES..serum3_offset];
+        let count = self.header().serum3_count;
+        let dst: &mut [u8] =
+            &mut self.dynamic_mut()[serum3_offset - BORSH_VEC_SIZE_BYTES..serum3_offset];
         dst.copy_from_slice(&BorshVecLength::from(count).to_le_bytes());
     }
 
     fn write_perp_length(&mut self) {
-        let perp_offset = self.header.perp_offset(0);
+        let perp_offset = self.header().perp_offset(0);
         // msg!(
         //     "writing perp length at {}",
         //     perp_offset - size_of::<BorshVecLength>()
         // );
-        let count = self.header.perp_count;
-        let dst: &mut [u8] = &mut self.dynamic[perp_offset - BORSH_VEC_SIZE_BYTES..perp_offset];
+        let count = self.header().perp_count;
+        let dst: &mut [u8] =
+            &mut self.dynamic_mut()[perp_offset - BORSH_VEC_SIZE_BYTES..perp_offset];
         dst.copy_from_slice(&BorshVecLength::from(count).to_le_bytes());
     }
 
     fn write_perp_oo_length(&mut self) {
-        let perp_oo_offset = self.header.perp_oo_offset(0);
+        let perp_oo_offset = self.header().perp_oo_offset(0);
         // msg!(
         //     "writing perp length at {}",
         //     perp_offset - size_of::<BorshVecLength>()
         // );
-        let count = self.header.perp_oo_count;
+        let count = self.header().perp_oo_count;
         let dst: &mut [u8] =
-            &mut self.dynamic[perp_oo_offset - BORSH_VEC_SIZE_BYTES..perp_oo_offset];
+            &mut self.dynamic_mut()[perp_oo_offset - BORSH_VEC_SIZE_BYTES..perp_oo_offset];
         dst.copy_from_slice(&BorshVecLength::from(count).to_le_bytes());
     }
 
@@ -907,10 +868,10 @@ impl<'a> MangoAccountAccMut<'a> {
         let (new_token_count, new_serum3_count, new_perp_count, new_perp_oo_count) =
             account_size.space();
 
-        require_gt!(new_token_count, self.header.token_count);
-        require_gt!(new_serum3_count, self.header.serum3_count);
-        require_gt!(new_perp_count, self.header.perp_count);
-        require_gt!(new_perp_oo_count, self.header.perp_oo_count);
+        require_gt!(new_token_count, self.header().token_count);
+        require_gt!(new_serum3_count, self.header().serum3_count);
+        require_gt!(new_perp_count, self.header().perp_count);
+        require_gt!(new_perp_oo_count, self.header().perp_oo_count);
 
         // create a temp copy to compute new starting offsets
         let new_header = MangoAccountDynamicHeader {
@@ -919,8 +880,8 @@ impl<'a> MangoAccountAccMut<'a> {
             perp_count: new_perp_count,
             perp_oo_count: new_perp_oo_count,
         };
-        let old_header = self.header.clone();
-        let dynamic = &mut self.dynamic;
+        let old_header = self.header().clone();
+        let dynamic = self.dynamic_mut();
 
         // expand dynamic components by first moving existing positions, and then setting new ones to defaults
 
@@ -974,10 +935,11 @@ impl<'a> MangoAccountAccMut<'a> {
         }
 
         // update header
-        self.header.token_count = new_token_count;
-        self.header.serum3_count = new_serum3_count;
-        self.header.perp_count = new_perp_count;
-        self.header.perp_oo_count = new_perp_oo_count;
+        let header_mut = self.header_mut();
+        header_mut.token_count = new_token_count;
+        header_mut.serum3_count = new_serum3_count;
+        header_mut.perp_count = new_perp_count;
+        header_mut.perp_oo_count = new_perp_oo_count;
 
         // write new lengths (uses header)
         self.write_token_length();
@@ -1018,14 +980,6 @@ impl Header for MangoAccountDynamicHeader {
             BORSH_VEC_SIZE_BYTES
         ]))
         .unwrap();
-
-        msg!(
-            "token_count {:?}, serum_count {:?}, perp_count {:?}, perp_oo_count {:?}",
-            token_count,
-            serum3_count,
-            perp_count,
-            perp_oo_count
-        );
 
         Ok(Self {
             token_count,

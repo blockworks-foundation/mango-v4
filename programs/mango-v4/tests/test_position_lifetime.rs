@@ -124,7 +124,7 @@ async fn test_position_lifetime() -> Result<()> {
         }
 
         // Check that positions are fully deactivated
-        let account: MangoAccount = solana.get_account(account).await;
+        let account = get_mango_account(solana, account).await;
         assert_eq!(account.token_iter_active().count(), 0);
 
         // No user tokens got lost
@@ -224,7 +224,7 @@ async fn test_position_lifetime() -> Result<()> {
         .unwrap();
 
         // Check that positions are fully deactivated
-        let account: MangoAccount = solana.get_account(account).await;
+        let account = get_mango_account(solana, account).await;
         assert_eq!(account.token_iter_active().count(), 0);
 
         // No user tokens got lost

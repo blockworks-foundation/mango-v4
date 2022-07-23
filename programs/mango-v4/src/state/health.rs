@@ -809,10 +809,7 @@ pub fn new_health_cache(
 mod tests {
     use super::*;
     use crate::state::oracle::StubOracle;
-    use crate::state::{
-        GetAccessorMut, Header, MangoAccount, MangoAccountAccMut, MangoAccountDynamicHeader,
-        MangoAccountFixed,
-    };
+    use crate::state::{MangoAccount, MangoAccountValue};
     use std::cell::RefCell;
     use std::convert::identity;
     use std::mem::size_of;
@@ -931,12 +928,8 @@ mod tests {
     // Run a health test that includes all the side values (like referrer_rebates_accrued)
     #[test]
     fn test_health0() {
-        let mut buffer: Vec<u8> = Vec::new();
-        MangoAccount::default().serialize(&mut buffer).unwrap();
-        let mut header =
-            MangoAccountDynamicHeader::try_new_header(&buffer[size_of::<MangoAccountFixed>()..])
-                .unwrap();
-        let mut account: MangoAccountAccMut = header.new_accessor_mut(&mut buffer[..]);
+        let buffer = MangoAccount::default().try_to_vec().unwrap();
+        let mut account = MangoAccountValue::try_new(&buffer).unwrap();
 
         let group = Pubkey::new_unique();
 
@@ -1098,12 +1091,8 @@ mod tests {
         expected_health: f64,
     }
     fn test_health1_runner(testcase: &TestHealth1Case) {
-        let mut buffer: Vec<u8> = Vec::new();
-        MangoAccount::default().serialize(&mut buffer).unwrap();
-        let mut header =
-            MangoAccountDynamicHeader::try_new_header(&buffer[size_of::<MangoAccountFixed>()..])
-                .unwrap();
-        let mut account: MangoAccountAccMut = header.new_accessor_mut(&mut buffer[..]);
+        let buffer = MangoAccount::default().try_to_vec().unwrap();
+        let mut account = MangoAccountValue::try_new(&buffer).unwrap();
 
         let group = Pubkey::new_unique();
 
