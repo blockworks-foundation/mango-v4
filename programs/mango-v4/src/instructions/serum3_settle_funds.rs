@@ -15,8 +15,8 @@ use super::{apply_vault_difference, OpenOrdersReserved, OpenOrdersSlim};
 pub struct Serum3SettleFunds<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut)]
-    pub account: UncheckedAccount<'info>,
+    #[account(mut, has_one = group)]
+    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -72,9 +72,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     // Validation
     //
     {
-        let mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-        let account: MangoAccountAcc = mal.load()?;
-        require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+        let account = ctx.accounts.account.load()?;
         require!(
             account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
             MangoError::SomeError
@@ -128,16 +126,14 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         cpi_settle_funds(ctx.accounts)?;
 
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
-        let mut mal: MangoAccountLoader<MangoAccount> =
-            MangoAccountLoader::new(&ctx.accounts.account)?;
-        let mut account: MangoAccountAccMut = mal.load_mut()?;
+        let mut account = ctx.accounts.account.load_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
         charge_maybe_fees(
             serum_market.market_index,
             &mut base_bank,
             &mut quote_bank,
-            &mut account,
+            &mut account.borrow_mut(),
             &after_oo,
         )?;
     }
@@ -152,13 +148,11 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         let after_quote_vault = ctx.accounts.quote_vault.amount;
 
         // Charge the difference in vault balances to the user's account
-        let mut mal: MangoAccountLoader<MangoAccount> =
-            MangoAccountLoader::new(&ctx.accounts.account)?;
-        let mut account: MangoAccountAccMut = mal.load_mut()?;
+        let mut account = ctx.accounts.account.load_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
         apply_vault_difference(
-            &mut account,
+            &mut account.borrow_mut(),
             &mut base_bank,
             after_base_vault,
             before_base_vault,
@@ -166,7 +160,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
             after_quote_vault,
             before_quote_vault,
         )?
-        .deactivate_inactive_token_accounts(&mut account);
+        .deactivate_inactive_token_accounts(&mut account.borrow_mut());
     }
 
     Ok(())

@@ -7,9 +7,9 @@ edition = "2021"
 doctest = false
 
 [dependencies]
-anchor-client = "0.25.0"
-anchor-lang = "0.25.0"
-anchor-spl = "0.25.0"
+anchor-client = { git = "https://github.com/blockworks-foundation/anchor.git", branch = "v0.25.0-mangov4", version = "0.25.0", features = [] }
+anchor-lang = { git = "https://github.com/blockworks-foundation/anchor.git", branch = "v0.25.0-mangov4", version = "0.25.0", features = [] }
+anchor-spl = { git = "https://github.com/blockworks-foundation/anchor.git", branch = "v0.25.0-mangov4", version = "0.25.0", features = [] }
 anyhow = "1.0"
 fixed = { version = "=1.11.0", features = ["serde", "borsh"] }
 fixed-macro = "^1.1.1"

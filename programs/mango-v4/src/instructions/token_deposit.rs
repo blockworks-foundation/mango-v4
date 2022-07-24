@@ -14,8 +14,8 @@ use crate::logs::{DepositLog, TokenBalanceLog};
 pub struct TokenDeposit<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut)]
-    pub account: UncheckedAccount<'info>,
+    #[account(mut, has_one = group)]
+    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
 
     #[account(
         mut,
@@ -57,9 +57,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     let token_index = ctx.accounts.bank.load()?.token_index;
 
     // Get the account's position for that token index
-    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-    let mut account: MangoAccountAccMut = mal.load_mut()?;
-    require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+    let mut account = ctx.accounts.account.load_mut()?;
     require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
     let (position, raw_token_index, active_token_index) =

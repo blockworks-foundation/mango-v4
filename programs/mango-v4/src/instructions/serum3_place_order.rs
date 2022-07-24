@@ -83,8 +83,8 @@ pub enum Serum3Side {
 pub struct Serum3PlaceOrder<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut)]
-    pub account: UncheckedAccount<'info>,
+    #[account(mut, has_one = group)]
+    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -163,9 +163,7 @@ pub fn serum3_place_order(
     // Validation
     //
     {
-        let mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-        let account: MangoAccountAcc = mal.load()?;
-        require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+        let account = ctx.accounts.account.load()?;
         require!(
             account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
             MangoError::SomeError
@@ -255,12 +253,10 @@ pub fn serum3_place_order(
         let oo_ai = &ctx.accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
-        let mut mal: MangoAccountLoader<MangoAccount> =
-            MangoAccountLoader::new(&ctx.accounts.account)?;
-        let mut account: MangoAccountAccMut = mal.load_mut()?;
+        let mut account = ctx.accounts.account.load_mut()?;
         inc_maybe_loan(
             serum_market.market_index,
-            &mut account,
+            &mut account.borrow_mut(),
             &before_oo,
             &after_oo,
         );
@@ -277,13 +273,12 @@ pub fn serum3_place_order(
     let after_quote_vault = ctx.accounts.quote_vault.amount;
 
     // Charge the difference in vault balances to the user's account
-    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-    let mut account: MangoAccountAccMut = mal.load_mut()?;
+    let mut account = ctx.accounts.account.load_mut()?;
     let vault_difference_result = {
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
         apply_vault_difference(
-            &mut account,
+            &mut account.borrow_mut(),
             &mut base_bank,
             after_base_vault,
             before_base_vault,
@@ -301,7 +296,7 @@ pub fn serum3_place_order(
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
 
-    vault_difference_result.deactivate_inactive_token_accounts(&mut account);
+    vault_difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
 
     Ok(())
 }

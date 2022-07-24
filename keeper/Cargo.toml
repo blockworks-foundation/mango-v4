@@ -6,9 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anchor-client = "0.25.0"
-anchor-lang = "0.25.0"
-anchor-spl = "0.25.0"
+anchor-client = { git = "https://github.com/blockworks-foundation/anchor.git", branch = "v0.25.0-mangov4", version = "0.25.0", features = [] }
+anchor-lang = { git = "https://github.com/blockworks-foundation/anchor.git", branch = "v0.25.0-mangov4", version = "0.25.0", features = [] }
+anchor-spl = { git = "https://github.com/blockworks-foundation/anchor.git", branch = "v0.25.0-mangov4", version = "0.25.0", features = [] }
 anyhow = "1.0"
 clap = { version = "3.1.8", features = ["derive", "env"] }
 client = { path = "../client" }

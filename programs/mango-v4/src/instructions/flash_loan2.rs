@@ -4,8 +4,7 @@ use crate::group_seeds;
 use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
 use crate::state::{
     compute_health, compute_health_from_fixed_accounts, new_fixed_order_account_retriever,
-    AccountRetriever, Bank, Group, HealthType, MangoAccount, MangoAccountAccMut,
-    MangoAccountLoader, TokenIndex,
+    AccountRetriever, Bank, Group, HealthType, MangoAccount, MangoAccountAnchorLoader, TokenIndex,
 };
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
@@ -36,8 +35,8 @@ pub struct FlashLoan2Begin<'info> {
 #[derive(Accounts)]
 pub struct FlashLoan2End<'info> {
     pub group: AccountLoader<'info, Group>,
-    #[account(mut)]
-    pub account: UncheckedAccount<'info>,
+    #[account(mut, has_one = group, has_one = owner)]
+    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
@@ -158,10 +157,7 @@ pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
     let group = ctx.accounts.group.load()?;
     let group_seeds = group_seeds!(group);
 
-    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-    let mut account: MangoAccountAccMut = mal.load_mut()?;
-    require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
-    require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());
+    let mut account = ctx.accounts.account.load_mut()?;
 
     require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
     // Find index at which vaults start

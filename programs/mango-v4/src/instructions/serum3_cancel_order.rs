@@ -14,8 +14,8 @@ use checked_math as cm;
 pub struct Serum3CancelOrder<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut)]
-    pub account: UncheckedAccount<'info>,
+    #[account(mut, has_one = group)]
+    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -58,9 +58,7 @@ pub fn serum3_cancel_order(
     // Validation
     //
     {
-        let mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-        let account: MangoAccountAcc = mal.load()?;
-        require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+        let account = ctx.accounts.account.load()?;
         require!(
             account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
             MangoError::SomeError
@@ -95,12 +93,10 @@ pub fn serum3_cancel_order(
     {
         let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
-        let mut mal: MangoAccountLoader<MangoAccount> =
-            MangoAccountLoader::new(&ctx.accounts.account)?;
-        let mut account: MangoAccountAccMut = mal.load_mut()?;
+        let mut account = ctx.accounts.account.load_mut()?;
         decrease_maybe_loan(
             serum_market.market_index,
-            &mut account,
+            &mut account.borrow_mut(),
             &before_oo,
             &after_oo,
         );

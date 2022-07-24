@@ -9,8 +9,8 @@ use crate::state::*;
 pub struct Serum3LiqForceCancelOrders<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut)]
-    pub account: UncheckedAccount<'info>,
+    #[account(mut, has_one = group)]
+    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
 
     #[account(mut)]
     /// CHECK: Validated inline by checking against the pubkey stored in the account
@@ -69,10 +69,7 @@ pub fn serum3_liq_force_cancel_orders(
     // Validation
     //
     {
-        let mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-        let account: MangoAccountAcc = mal.load()?;
-        require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
-
+        let account = ctx.accounts.account.load()?;
         require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
         let serum_market = ctx.accounts.serum_market.load()?;
 
@@ -109,12 +106,11 @@ pub fn serum3_liq_force_cancel_orders(
 
     // TODO: do the correct health / being_liquidated check
     {
-        let mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-        let account: MangoAccountAcc = mal.load()?;
+        let account = ctx.accounts.account.load()?;
 
         let retriever =
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-        let health = compute_health(&account, HealthType::Maint, &retriever)?;
+        let health = compute_health(&account.borrow(), HealthType::Maint, &retriever)?;
         msg!("health: {}", health);
         require!(health < 0, MangoError::SomeError);
     }
@@ -140,12 +136,11 @@ pub fn serum3_liq_force_cancel_orders(
     let after_quote_vault = ctx.accounts.quote_vault.amount;
 
     // Charge the difference in vault balances to the user's account
-    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-    let mut account: MangoAccountAccMut = mal.load_mut()?;
+    let mut account = ctx.accounts.account.load_mut()?;
     let mut base_bank = ctx.accounts.base_bank.load_mut()?;
     let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
     apply_vault_difference(
-        &mut account,
+        &mut account.borrow_mut(),
         &mut base_bank,
         after_base_vault,
         before_base_vault,
@@ -153,7 +148,7 @@ pub fn serum3_liq_force_cancel_orders(
         after_quote_vault,
         before_quote_vault,
     )?
-    .deactivate_inactive_token_accounts(&mut account);
+    .deactivate_inactive_token_accounts(&mut account.borrow_mut());
 
     Ok(())
 }

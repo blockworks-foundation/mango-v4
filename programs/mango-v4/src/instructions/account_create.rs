@@ -18,7 +18,7 @@ pub struct AccountCreate<'info> {
     )]
     // borsh smashes the stack, and zero copy doesnt work out of the box
     // deserialize manually
-    pub account: UncheckedAccount<'info>,
+    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
 
     pub owner: Signer<'info>,
 
@@ -34,9 +34,7 @@ pub fn account_create(
     account_size: AccountSize,
     name: String,
 ) -> Result<()> {
-    let mut mal: MangoAccountLoader<MangoAccount> =
-        MangoAccountLoader::new_init(&ctx.accounts.account)?;
-    let mut account: MangoAccountAccMut = mal.load_mut()?;
+    let mut account = ctx.accounts.account.load_init()?;
 
     account.fixed.name = fill32_from_str(name)?;
     account.fixed.group = ctx.accounts.group.key();

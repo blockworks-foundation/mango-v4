@@ -3,7 +3,7 @@ use crate::error::MangoError;
 use crate::logs::{MarginTradeLog, TokenBalanceLog};
 use crate::state::{
     compute_health, new_fixed_order_account_retriever, AccountRetriever, Bank, Group, HealthType,
-    MangoAccount, MangoAccountAccMut, MangoAccountLoader,
+    MangoAccount, MangoAccountAccMut, MangoAccountAnchorLoader,
 };
 use crate::{group_seeds, Mango};
 use anchor_lang::prelude::*;
@@ -29,8 +29,8 @@ use std::collections::HashMap;
 pub struct FlashLoan<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut)]
-    pub account: UncheckedAccount<'info>,
+    #[account(mut, has_one = group, has_one = owner)]
+    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
     pub token_program: Program<'info, Token>,
 }
@@ -79,10 +79,7 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
     let num_health_accounts = cpi_datas.get(0).unwrap().account_start as usize;
 
     let group = ctx.accounts.group.load()?;
-    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-    let mut account: MangoAccountAccMut = mal.load_mut()?;
-    require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
-    require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());
+    let mut account = ctx.accounts.account.load_mut()?;
     require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
     // Go over the banks passed as health accounts and:
@@ -257,7 +254,6 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
     drop(allowed_banks);
     drop(group);
     drop(account);
-    drop(mal);
 
     // prepare signer seeds and invoke cpi
     let group_key = ctx.accounts.group.key();
@@ -321,10 +317,13 @@ pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
     }
 
     // Track vault changes and apply them to the user's token positions
-    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-    let mut account: MangoAccountAccMut = mal.load_mut()?;
-    let inactive_tokens =
-        adjust_for_post_cpi_vault_amounts(health_ais, all_cpi_ais, &used_vaults, &mut account)?;
+    let mut account = ctx.accounts.account.load_mut()?;
+    let inactive_tokens = adjust_for_post_cpi_vault_amounts(
+        health_ais,
+        all_cpi_ais,
+        &used_vaults,
+        &mut account.borrow_mut(),
+    )?;
 
     // Check post-cpi health
     let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;

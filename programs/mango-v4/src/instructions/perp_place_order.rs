@@ -3,19 +3,17 @@ use anchor_lang::prelude::*;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::state::MangoAccount;
-use crate::state::MangoAccountAccMut;
-use crate::state::MangoAccountLoader;
 use crate::state::{
     compute_health, new_fixed_order_account_retriever, oracle_price, Book, BookSide, EventQueue,
-    Group, HealthType, OrderType, PerpMarket, Side,
+    Group, HealthType, MangoAccountAnchorLoader, OrderType, PerpMarket, Side,
 };
 
 #[derive(Accounts)]
 pub struct PerpPlaceOrder<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut)]
-    pub account: UncheckedAccount<'info>,
+    #[account(mut, has_one = group)]
+    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     #[account(
@@ -77,9 +75,7 @@ pub fn perp_place_order(
     // When the limit is reached, processing stops and the instruction succeeds.
     limit: u8,
 ) -> Result<()> {
-    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-    let mut account: MangoAccountAccMut = mal.load_mut()?;
-    require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+    let mut account = ctx.accounts.account.load_mut()?;
     require!(
         account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
         MangoError::SomeError
@@ -124,7 +120,7 @@ pub fn perp_place_order(
             &mut perp_market,
             &mut event_queue,
             oracle_price,
-            &mut account,
+            &mut account.borrow_mut(),
             &account_pk,
             price_lots,
             max_base_lots,

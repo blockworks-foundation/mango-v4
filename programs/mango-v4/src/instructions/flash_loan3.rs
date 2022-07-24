@@ -3,11 +3,9 @@ use crate::error::*;
 use crate::group_seeds;
 use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
 use crate::state::MangoAccount;
-use crate::state::MangoAccountAccMut;
-use crate::state::MangoAccountLoader;
 use crate::state::{
     compute_health, compute_health_from_fixed_accounts, new_fixed_order_account_retriever,
-    AccountRetriever, Bank, Group, HealthType, TokenIndex,
+    AccountRetriever, Bank, Group, HealthType, MangoAccountAnchorLoader, TokenIndex,
 };
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
@@ -41,8 +39,8 @@ pub struct FlashLoan3Begin<'info> {
 ///    the `owner` must have authority to transfer tokens out of them
 #[derive(Accounts)]
 pub struct FlashLoan3End<'info> {
-    #[account(mut)]
-    pub account: UncheckedAccount<'info>,
+    #[account(mut, has_one = owner)]
+    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
@@ -178,9 +176,7 @@ struct TokenVaultChange {
 pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan3End<'info>>,
 ) -> Result<()> {
-    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-    let mut account: MangoAccountAccMut = mal.load_mut()?;
-    require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());
+    let mut account = ctx.accounts.account.load_mut()?;
 
     require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
 

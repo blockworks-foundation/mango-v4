@@ -8,8 +8,8 @@ use crate::util::fill32_from_str;
 pub struct AccountEdit<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut)]
-    pub account: UncheckedAccount<'info>,
+    #[account(mut, has_one = group, has_one = owner)]
+    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
 }
 
@@ -24,10 +24,8 @@ pub fn account_edit(
         MangoError::SomeError
     );
 
-    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-    let mut account: MangoAccountAccMut = mal.load_mut()?;
-    require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
-    require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());
+    //let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
+    let mut account = ctx.accounts.account.load_mut()?;
 
     // note: unchanged fields are inline, and match exact definition in create_account
     // please maintain, and don't remove, makes it easy to reason about which support modification by owner

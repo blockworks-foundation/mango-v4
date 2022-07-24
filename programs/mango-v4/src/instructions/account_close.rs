@@ -8,8 +8,8 @@ use crate::state::*;
 pub struct AccountClose<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut)]
-    pub account: UncheckedAccount<'info>,
+    #[account(mut, has_one = group, has_one = owner, close = sol_destination)]
+    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -23,11 +23,7 @@ pub fn account_close(ctx: Context<AccountClose>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
     {
-        let mut mal: MangoAccountLoader<MangoAccount> =
-            MangoAccountLoader::new(&ctx.accounts.account)?;
-        let account: MangoAccountAccMut = mal.load_mut()?;
-        require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
-        require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());
+        let account = ctx.accounts.account.load_mut()?;
 
         // don't perform checks if group is just testing
         if group.testing == 0 {
@@ -45,26 +41,6 @@ pub fn account_close(ctx: Context<AccountClose>) -> Result<()> {
             }
         }
     }
-
-    close(
-        ctx.accounts.account.to_account_info(),
-        ctx.accounts.sol_destination.to_account_info(),
-    )?;
-
-    Ok(())
-}
-
-// https://github.com/coral-xyz/anchor/blob/master/lang/src/common.rs#L8
-pub fn close<'info>(info: AccountInfo<'info>, sol_destination: AccountInfo<'info>) -> Result<()> {
-    // Transfer tokens from the account to the sol_destination.
-    let dest_starting_lamports = sol_destination.lamports();
-    **sol_destination.lamports.borrow_mut() =
-        dest_starting_lamports.checked_add(info.lamports()).unwrap();
-    **info.lamports.borrow_mut() = 0;
-    // Mark the account discriminator as closed.
-    let mut data = info.try_borrow_mut_data()?;
-    let dst: &mut [u8] = &mut data;
-    dst[0..8].copy_from_slice(&[255, 255, 255, 255, 255, 255, 255, 255]);
 
     Ok(())
 }

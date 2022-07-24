@@ -6,8 +6,8 @@ use crate::state::*;
 pub struct AccountExpand<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut)]
-    pub account: UncheckedAccount<'info>,
+    #[account(mut, has_one = group, has_one = owner)]
+    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
 
     pub owner: Signer<'info>,
 
@@ -19,8 +19,7 @@ pub struct AccountExpand<'info> {
 
 pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
     let account_size = {
-        let mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-        let account = mal.load()?;
+        let account = ctx.accounts.account.load()?;
         account.size()
     };
 
@@ -29,7 +28,8 @@ pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
     let new_space = MangoAccount::space(AccountSize::Large.try_into().unwrap());
     let new_rent_minimum = Rent::get()?.minimum_balance(new_space);
 
-    let old_space = ctx.accounts.account.data_len();
+    let realloc_account = ctx.accounts.account.as_ref();
+    let old_space = realloc_account.data_len();
 
     require_gt!(new_space, old_space);
 
@@ -39,22 +39,19 @@ pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
             ctx.accounts.system_program.to_account_info(),
             anchor_lang::system_program::Transfer {
                 from: ctx.accounts.payer.to_account_info(),
-                to: ctx.accounts.account.to_account_info(),
+                to: realloc_account.clone(),
             },
         ),
         new_rent_minimum
-            .checked_sub(ctx.accounts.account.lamports())
+            .checked_sub(realloc_account.lamports())
             .unwrap(),
     )?;
 
     // realloc
-    ctx.accounts.account.realloc(new_space, true)?;
+    realloc_account.realloc(new_space, true)?;
 
     // expand dynamic content, e.g. to grow token positions, we need to slide serum3orders further later, and so on....
-    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-    let mut account = mal.load_mut()?;
-    require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
-    require_keys_eq!(account.fixed.owner, ctx.accounts.owner.key());
+    let mut account = ctx.accounts.account.load_mut()?;
     account.expand_dynamic_content(AccountSize::Large.try_into().unwrap())?;
 
     Ok(())

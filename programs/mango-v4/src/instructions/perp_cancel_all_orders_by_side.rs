@@ -2,15 +2,15 @@ use anchor_lang::prelude::*;
 
 use crate::error::MangoError;
 use crate::state::{
-    Book, BookSide, Group, MangoAccount, MangoAccountAccMut, MangoAccountLoader, PerpMarket, Side,
+    Book, BookSide, Group, MangoAccount, MangoAccountAnchorLoader, PerpMarket, Side,
 };
 
 #[derive(Accounts)]
 pub struct PerpCancelAllOrdersBySide<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut)]
-    pub account: UncheckedAccount<'info>,
+    #[account(mut, has_one = group)]
+    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     #[account(
@@ -31,8 +31,7 @@ pub fn perp_cancel_all_orders_by_side(
     side_option: Option<Side>,
     limit: u8,
 ) -> Result<()> {
-    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-    let mut account: MangoAccountAccMut = mal.load_mut()?;
+    let mut account = ctx.accounts.account.load_mut()?;
     require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
     require!(
         account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
@@ -46,7 +45,12 @@ pub fn perp_cancel_all_orders_by_side(
     let asks = ctx.accounts.asks.load_mut()?;
     let mut book = Book::new(bids, asks);
 
-    book.cancel_all_order(&mut account, &mut perp_market, limit, side_option)?;
+    book.cancel_all_order(
+        &mut account.borrow_mut(),
+        &mut perp_market,
+        limit,
+        side_option,
+    )?;
 
     Ok(())
 }

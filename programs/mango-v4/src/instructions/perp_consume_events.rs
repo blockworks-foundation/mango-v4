@@ -1,9 +1,8 @@
 use anchor_lang::prelude::*;
 use bytemuck::cast_ref;
 
-use crate::accounts_zerocopy::*;
 use crate::error::MangoError;
-use crate::state::{EventQueue, MangoAccount, MangoAccountLoader};
+use crate::state::{EventQueue, MangoAccount, MangoAccountAnchorLoader};
 use crate::state::{EventType, FillEvent, Group, OutEvent, PerpMarket};
 
 use crate::logs::{emit_perp_balances, FillLog};
@@ -48,8 +47,8 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         }
 
                         Some(ai) => {
-                            let mut mal: MangoAccountLoader<MangoAccount> =
-                                MangoAccountLoader::new(&ai)?;
+                            let mal: MangoAccountAnchorLoader<MangoAccount> =
+                                MangoAccountAnchorLoader::try_from(&ai)?;
                             let mut ma = mal.load_mut()?;
                             ma.perp_execute_maker(
                                 perp_market.perp_market_index,
@@ -77,8 +76,8 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                             return Ok(());
                         }
                         Some(ai) => {
-                            let mut mal: MangoAccountLoader<MangoAccount> =
-                                MangoAccountLoader::new(&ai)?;
+                            let mal: MangoAccountAnchorLoader<MangoAccount> =
+                                MangoAccountAnchorLoader::try_from(&ai)?;
                             let mut maker = mal.load_mut()?;
 
                             match mango_account_ais.iter().find(|ai| ai.key == &fill.taker) {
@@ -87,8 +86,8 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                     return Ok(());
                                 }
                                 Some(ai) => {
-                                    let mut mal: MangoAccountLoader<MangoAccount> =
-                                        MangoAccountLoader::new(&ai)?;
+                                    let mal: MangoAccountAnchorLoader<MangoAccount> =
+                                        MangoAccountAnchorLoader::try_from(&ai)?;
                                     let mut taker = mal.load_mut()?;
 
                                     maker.perp_execute_maker(
@@ -155,8 +154,8 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         return Ok(());
                     }
                     Some(ai) => {
-                        let mut mal: MangoAccountLoader<MangoAccount> =
-                            MangoAccountLoader::new(&ai)?;
+                        let mal: MangoAccountAnchorLoader<MangoAccount> =
+                            MangoAccountAnchorLoader::try_from(&ai)?;
                         let mut ma = mal.load_mut()?;
 
                         ma.perp_remove_order(out.owner_slot as usize, out.quantity)?;

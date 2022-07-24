@@ -7,7 +7,8 @@ use crate::state::*;
 pub struct Serum3CancelAllOrders<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    pub account: UncheckedAccount<'info>,
+    #[account(has_one = group)]
+    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -44,9 +45,7 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
     // Validation
     //
     {
-        let mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
-        let account: MangoAccountAcc = mal.load()?;
-        require_keys_eq!(account.fixed.group, ctx.accounts.group.key());
+        let account = ctx.accounts.account.load()?;
         require!(
             account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
             MangoError::SomeError

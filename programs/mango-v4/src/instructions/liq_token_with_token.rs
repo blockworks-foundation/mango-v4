@@ -12,12 +12,12 @@ use crate::util::checked_math as cm;
 pub struct LiqTokenWithToken<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut)]
-    pub liqor: UncheckedAccount<'info>,
+    #[account(mut, has_one = group)]
+    pub liqor: MangoAccountAnchorLoader<'info, MangoAccount>,
     pub liqor_owner: Signer<'info>,
 
-    #[account(mut)]
-    pub liqee: UncheckedAccount<'info>,
+    #[account(mut, has_one = group)]
+    pub liqee: MangoAccountAnchorLoader<'info, MangoAccount>,
 }
 
 pub fn liq_token_with_token(
@@ -32,9 +32,7 @@ pub fn liq_token_with_token(
     let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
         .context("create account retriever")?;
 
-    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.liqor)?;
-    let mut liqor: MangoAccountAccMut = mal.load_mut()?;
-    require_keys_eq!(liqor.fixed.group, ctx.accounts.group.key());
+    let mut liqor = ctx.accounts.liqor.load_mut()?;
     require!(
         liqor
             .fixed
@@ -43,9 +41,7 @@ pub fn liq_token_with_token(
     );
     require!(!liqor.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
-    let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.liqee)?;
-    let mut liqee: MangoAccountAccMut = mal.load_mut()?;
-    require_keys_eq!(liqee.fixed.group, ctx.accounts.group.key());
+    let mut liqee = ctx.accounts.liqee.load_mut()?;
     require!(!liqee.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
     // Initial liqee health check
