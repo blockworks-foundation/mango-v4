@@ -2,8 +2,15 @@
 
 set -e pipefail
 
+ANCHOR_BRANCH=v0.25.0-mangov4
+ANCHOR_FORK=$(cd ../anchor && git rev-parse --abbrev-ref HEAD)
+if [ "$ANCHOR_FORK" != "$ANCHOR_BRANCH" ]; then
+  echo "Check out anchor fork at git@github.com:blockworks-foundation/anchor.git, and switch to branch $ANCHOR_BRANCH!"
+  exit 1;
+fi
+
 WALLET_WITH_FUNDS=~/.config/solana/mango-mainnet.json
-PROGRAM_ID=5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM
+PROGRAM_ID=m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD
 
 # TODO fix need for --skip-lint
 # build program, 

@@ -23,7 +23,7 @@ use state::{
     AccountSize, OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex,
 };
 
-declare_id!("5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM");
+declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
 
 #[program]
 pub mod mango_v4 {
