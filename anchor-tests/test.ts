@@ -4,8 +4,8 @@ import { MangoV4 } from '../target/types/mango_v4';
 import * as spl from '@solana/spl-token';
 import NodeWallet from '@project-serum/anchor/dist/cjs/nodewallet';
 import * as assert from 'assert';
-import { PublicKey } from '@solana/web3.js';
-import { Group, MangoClient, StubOracle } from '../ts/client/src/index';
+import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { Group, MangoAccount, MangoClient, StubOracle } from '../ts/client/src/index';
 
 import { ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
@@ -42,50 +42,30 @@ async function createMints(
   return mintsMap;
 }
 
-// async function createUsers(
-//   mintsMap: Partial<Record<keyof typeof MINTS, spl.Token>>,
-//   payer: anchor.web3.Keypair,
-// ) {
-//   let users: { key: anchor.web3.Keypair; tokenAccounts: spl.AccountInfo[] }[] =
-//     [];
-//   for (let i = 0; i < NUM_USERS; i++) {
-//     let user = anchor.web3.Keypair.generate();
-
-//     let tokenAccounts: spl.AccountInfo[] = [];
-//     for (let mintKey in mintsMap) {
-//       let mint: spl.Token = mintsMap[mintKey];
-//       let tokenAccount = await mint.getOrCreateAssociatedAccountInfo(
-//         user.publicKey,
-//       );
-//       await mint.mintTo(tokenAccount.address, payer, [], 1_000_000_000_000_000);
-//       tokenAccounts.push(tokenAccount);
-//     }
-//     console.log('created user ' + i);
-//     users.push({ key: user, tokenAccounts: tokenAccounts });
-//   }
-
-//   return users;
-// }
-
 async function createUsers(
   mintsMap: Partial<Record<keyof typeof MINTS, spl.Token>>,
   payer: anchor.web3.Keypair,
+  provider: anchor.Provider
 ) {
-  let users: { key: any; tokenAccounts: spl.AccountInfo[] }[] =
+  let users: { keypair: anchor.web3.Keypair; tokenAccounts: spl.AccountInfo[] }[] =
     [];
-  let user = anchor.AnchorProvider.env().wallet;
+  for (let i = 0; i < NUM_USERS; i++) {
+    let user = anchor.web3.Keypair.generate();
 
-  let tokenAccounts: spl.AccountInfo[] = [];
-  for (let mintKey in mintsMap) {
-    let mint: spl.Token = mintsMap[mintKey];
-    let tokenAccount = await mint.getOrCreateAssociatedAccountInfo(
-      user.publicKey,
-    );
-    await mint.mintTo(tokenAccount.address, payer, [], 1_000_000_000_000_000);
-    tokenAccounts.push(tokenAccount);
+    await provider.connection.requestAirdrop(user.publicKey, LAMPORTS_PER_SOL * 1000);
+
+    let tokenAccounts: spl.AccountInfo[] = [];
+    for (let mintKey in mintsMap) {
+      let mint: spl.Token = mintsMap[mintKey];
+      let tokenAccount = await mint.getOrCreateAssociatedAccountInfo(
+        user.publicKey,
+      );
+      await mint.mintTo(tokenAccount.address, payer, [], 1_000_000_000_000_000);
+      tokenAccounts.push(tokenAccount);
+    }
+    console.log('created user ' + i);
+    users.push({ keypair: user, tokenAccounts: tokenAccounts });
   }
-  console.log('created user ');
-  users.push({ key: user, tokenAccounts: tokenAccounts });
 
   return users;
 }
@@ -99,7 +79,7 @@ describe('mango-v4', () => {
   let providerPayer = (providerWallet as NodeWallet).payer;
 
   const program = anchor.workspace.MangoV4 as Program<MangoV4>;
-  let users: { key: anchor.web3.Keypair; tokenAccounts: spl.AccountInfo[] }[] =
+  let users: { keypair: anchor.web3.Keypair; tokenAccounts: spl.AccountInfo[] }[] =
     [];
 
   let mintsMap: Partial<Record<keyof typeof MINTS, spl.Token>>;
@@ -107,12 +87,13 @@ describe('mango-v4', () => {
   let group: Group;
   let client: MangoClient;
   let usdcOracle: StubOracle;
+  let btcOracle: StubOracle;
 
-  it('Initialize', async () => {
+  it('Initialize group and users', async () => {
     console.log(`provider ${providerWallet.publicKey.toString()}`);
 
     mintsMap = await createMints(program, providerPayer, providerWallet);
-    users = await createUsers(mintsMap, providerPayer);
+    users = await createUsers(mintsMap, providerPayer, provider);
 
     let groupNum = 0;
     let testing = 0;
@@ -159,34 +140,34 @@ describe('mango-v4', () => {
     );
     await group.reloadAll(client);
 
-    await client.stubOracleCreate(group, mintsMap['BTC']!.publicKey, 1000.0);
-    const btcOracle = (
+    await client.stubOracleCreate(group, mintsMap['BTC']!.publicKey, 100.0);
+    btcOracle = (
       await client.getStubOracle(group, mintsMap['BTC']!.publicKey)
     )[0];
 
-    // await client.tokenRegister(
-    //   group,
-    //   mintsMap['BTC']!.publicKey,
-    //   btcOracle.publicKey,
-    //   0.1,
-    //   1, // tokenIndex
-    //   'BTC',
-    //   0.01,
-    //   0.4,
-    //   0.07,
-    //   0.8,
-    //   0.9,
-    //   0.88,
-    //   0.0005,
-    //   1.5,
-    //   0.8,
-    //   0.6,
-    //   1.2,
-    //   1.4,
-    //   0.02,
-    // );
-    // // TODO: client can't handle non-python oracles
-    // await group.reloadAll(client);
+    await client.tokenRegister(
+      group,
+      mintsMap['BTC']!.publicKey,
+      btcOracle.publicKey,
+      0.1,
+      1, // tokenIndex
+      'BTC',
+      0.01,
+      0.4,
+      0.07,
+      0.8,
+      0.9,
+      0.88,
+      0.0005,
+      1.5,
+      0.8,
+      0.6,
+      1.2,
+      1.4,
+      0.02,
+    );
+    // TODO: client can't handle non-python oracles
+    await group.reloadAll(client);
 
     await client.perpCreateMarket(
       group,
@@ -212,30 +193,70 @@ describe('mango-v4', () => {
     );
     await group.reloadAll(client);
   });
+  
 
   it('Basic', async () => {
     const mangoAccount = await client.getOrCreateMangoAccount(
       group,
-      users[0].key.publicKey,
+      users[0].keypair.publicKey,
+      users[0].keypair,
       0,
       'my_mango_account',
     );
     await mangoAccount.reload(client, group);
-
-    await client.tokenDeposit(group, mangoAccount, 'USDC', 50);
+    
+    await client.tokenDeposit(group, mangoAccount, 'USDC', 100.5, users[0].keypair);
+    await mangoAccount.reload(client, group);
+    
+    await client.tokenDeposit(group, mangoAccount, 'BTC', 50.5, users[0].keypair);
     await mangoAccount.reload(client, group);
 
-    await client.tokenWithdraw2(group, mangoAccount, 'USDC', 50, false);
+    await client.tokenWithdraw2(group, mangoAccount, 'USDC', 100, false, users[0].keypair);
     await mangoAccount.reload(client, group);
-
-    // const bank = group.banksMap.get('USDC');
-    // await program.methods.tokenUpdateIndexAndRate().accounts({
-    //   mintInfo: group.mintInfosMap.get(bank!.tokenIndex)!.publicKey,
-    //   oracle: usdcOracle.publicKey
-    // }).rpc()
-
-    // await client.closeMangoAccount(group, mangoAccount);
+    
+    await client.tokenWithdraw2(group, mangoAccount, 'BTC', 50, false, users[0].keypair);
+    await mangoAccount.reload(client, group);
   });
 
+  // it('liquidate token and token', async () => {
 
+  //   const mangoAccountA = await client.getOrCreateMangoAccount(
+  //     group,
+  //     users[0].keypair.publicKey,
+  //     users[0].keypair,
+  //     0,
+  //     'my_mango_account',
+  //   );
+  //   await mangoAccountA.reload(client, group);
+
+  //   const mangoAccountB = await client.getOrCreateMangoAccount(
+  //     group,
+  //     users[1].keypair.publicKey,
+  //     users[1].keypair,
+  //     0,
+  //     'my_mango_account',
+  //   );
+  //   await mangoAccountB.reload(client, group);
+
+  //   await client.stubOracleSet(group, btcOracle.publicKey, 100);
+
+  //   // Initialize liquidator
+  //   await client.tokenDeposit(group, mangoAccountA, 'USDC', 1000, users[0].keypair);
+  //   await client.tokenDeposit(group, mangoAccountA, 'BTC', 100, users[0].keypair);
+
+  //   // Deposit collateral
+  //   await client.tokenDeposit(group, mangoAccountB, 'BTC', 100, users[1].keypair);
+  //   await mangoAccountB.reload(client, group);
+  //   // // Borrow
+  //   await client.tokenWithdraw2(group, mangoAccountB, 'USDC', 200, true, users[1].keypair);
+  //   // // Set price so health is below maintanence
+  //   await client.stubOracleSet(group, btcOracle.publicKey, 1);
+
+  //   await mangoAccountB.reload(client, group);
+  //   console.log(mangoAccountB);
+  //   console.log(mangoAccountB.tokens[0].indexedPosition.toNumber());
+  //   console.log(mangoAccountB.tokens[1].indexedPosition.toNumber());
+
+    // await client.liqTokenWithToken(group, mangoAccountA, mangoAccountB, users[0].keypair, 'BTC', 'USDC', 1000);
+  // });
 });

@@ -8,6 +8,7 @@ import { Bank, MintInfo } from './bank';
 import { I80F48, ONE_I80F48 } from './I80F48';
 import { PerpMarket } from './perp';
 import { Serum3Market } from './serum3';
+import { BorshAccountsCoder } from '@project-serum/anchor';
 
 export class Group {
   static from(
@@ -174,13 +175,22 @@ export class Group {
     const prices =
       await client.program.provider.connection.getMultipleAccountsInfo(oracles);
 
+    const coder = new BorshAccountsCoder(client.program.idl);
     for (const [index, price] of prices.entries()) {
       if (banks[index].name === 'USDC') {
         banks[index].price = ONE_I80F48;
       } else {
-        banks[index].price = I80F48.fromNumber(
-          parsePriceData(price.data).previousPrice,
-        );
+        // Try and deserialize to stubOracle - if it fails then assume oracle type is pyth
+        // TODO: Implement switchboard oracle type
+        try {
+          let stubOracle = coder.decode('stubOracle', price.data);
+          banks[index].price = new I80F48(stubOracle.price.val);
+        } catch (e: any)  {
+          console.log(e);
+          banks[index].price = I80F48.fromNumber(
+            parsePriceData(price.data).previousPrice,
+          );
+        }
       }
     }
   }
