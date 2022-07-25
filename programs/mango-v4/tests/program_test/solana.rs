@@ -3,7 +3,6 @@ use std::sync::{Arc, RwLock};
 
 use anchor_lang::AccountDeserialize;
 use anchor_spl::token::TokenAccount;
-use mango_v4::state::MangoAccountValue;
 use solana_program::{program_pack::Pack, rent::*, system_instruction};
 use solana_program_test::*;
 use solana_sdk::{

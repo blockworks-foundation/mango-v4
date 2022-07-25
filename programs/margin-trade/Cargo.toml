@@ -18,6 +18,6 @@ default = []
 test-bpf = []
 
 [dependencies]
-anchor-lang = { version = "0.25.0", features = [] }
-anchor-spl = "0.25.0"
+anchor-lang = { git = "https://github.com/blockworks-foundation/anchor.git", rev = "1153380487706e4d8f486071cf2f519468438eab" }
+anchor-spl = { git = "https://github.com/blockworks-foundation/anchor.git", rev = "1153380487706e4d8f486071cf2f519468438eab" }
 solana-program = "1.10.29"

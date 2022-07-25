@@ -3133,8 +3133,8 @@ dependencies = [
 name = "margin-trade"
 version = "0.1.0"
 dependencies = [
- "anchor-lang 0.25.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "anchor-spl 0.25.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-spl 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
  "solana-program",
 ]
 
