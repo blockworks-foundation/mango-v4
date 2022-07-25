@@ -16,8 +16,6 @@ pub struct AccountCreate<'info> {
         payer = payer,
         space = MangoAccount::space(account_size),
     )]
-    // borsh smashes the stack, and zero copy doesnt work out of the box
-    // deserialize manually
     pub account: AccountLoaderDynamic<'info, MangoAccount>,
 
     pub owner: Signer<'info>,
