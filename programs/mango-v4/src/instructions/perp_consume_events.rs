@@ -1,10 +1,9 @@
 use anchor_lang::prelude::*;
 use bytemuck::cast_ref;
 
-use crate::accounts_zerocopy::*;
 use crate::error::MangoError;
-use crate::state::EventQueue;
-use crate::state::{EventType, FillEvent, Group, MangoAccount, OutEvent, PerpMarket};
+use crate::state::{AccountLoaderDynamic, EventQueue, MangoAccount};
+use crate::state::{EventType, FillEvent, Group, OutEvent, PerpMarket};
 
 use crate::logs::{emit_perp_balances, FillLog};
 
@@ -41,73 +40,88 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
 
                 // handle self trade separately because of rust borrow checker
                 if fill.maker == fill.taker {
-                    let mut ma = match mango_account_ais.iter().find(|ai| ai.key == &fill.maker) {
+                    match mango_account_ais.iter().find(|ai| ai.key == &fill.maker) {
                         None => {
                             msg!("Unable to find account {}", fill.maker.to_string());
                             return Ok(());
                         }
-                        Some(account_info) => account_info.load_mut::<MangoAccount>()?,
-                    };
 
-                    ma.perps.execute_maker(
-                        perp_market.perp_market_index,
-                        &mut perp_market,
-                        fill,
-                    )?;
-                    ma.perps.execute_taker(
-                        perp_market.perp_market_index,
-                        &mut perp_market,
-                        fill,
-                    )?;
-                    emit_perp_balances(
-                        fill.maker,
-                        perp_market.perp_market_index as u64,
-                        fill.price,
-                        &ma.perps.accounts[perp_market.perp_market_index as usize],
-                        &perp_market,
-                    );
+                        Some(ai) => {
+                            let mal: AccountLoaderDynamic<MangoAccount> =
+                                AccountLoaderDynamic::try_from(&ai)?;
+                            let mut ma = mal.load_mut()?;
+                            ma.perp_execute_maker(
+                                perp_market.perp_market_index,
+                                &mut perp_market,
+                                fill,
+                            )?;
+                            ma.perp_execute_taker(
+                                perp_market.perp_market_index,
+                                &mut perp_market,
+                                fill,
+                            )?;
+                            emit_perp_balances(
+                                fill.maker,
+                                perp_market.perp_market_index as u64,
+                                fill.price,
+                                &ma.perp_find_account(perp_market.perp_market_index).unwrap(),
+                                &perp_market,
+                            );
+                        }
+                    };
                 } else {
-                    let mut maker = match mango_account_ais.iter().find(|ai| ai.key == &fill.maker)
-                    {
+                    match mango_account_ais.iter().find(|ai| ai.key == &fill.maker) {
                         None => {
                             msg!("Unable to find maker account {}", fill.maker.to_string());
                             return Ok(());
                         }
-                        Some(account_info) => account_info.load_mut::<MangoAccount>()?,
-                    };
-                    let mut taker = match mango_account_ais.iter().find(|ai| ai.key == &fill.taker)
-                    {
-                        None => {
-                            msg!("Unable to find taker account {}", fill.taker.to_string());
-                            return Ok(());
-                        }
-                        Some(account_info) => account_info.load_mut::<MangoAccount>()?,
-                    };
+                        Some(ai) => {
+                            let mal: AccountLoaderDynamic<MangoAccount> =
+                                AccountLoaderDynamic::try_from(&ai)?;
+                            let mut maker = mal.load_mut()?;
 
-                    maker.perps.execute_maker(
-                        perp_market.perp_market_index,
-                        &mut perp_market,
-                        fill,
-                    )?;
-                    taker.perps.execute_taker(
-                        perp_market.perp_market_index,
-                        &mut perp_market,
-                        fill,
-                    )?;
-                    emit_perp_balances(
-                        fill.maker,
-                        perp_market.perp_market_index as u64,
-                        fill.price,
-                        &maker.perps.accounts[perp_market.perp_market_index as usize],
-                        &perp_market,
-                    );
-                    emit_perp_balances(
-                        fill.taker,
-                        perp_market.perp_market_index as u64,
-                        fill.price,
-                        &taker.perps.accounts[perp_market.perp_market_index as usize],
-                        &perp_market,
-                    );
+                            match mango_account_ais.iter().find(|ai| ai.key == &fill.taker) {
+                                None => {
+                                    msg!("Unable to find taker account {}", fill.taker.to_string());
+                                    return Ok(());
+                                }
+                                Some(ai) => {
+                                    let mal: AccountLoaderDynamic<MangoAccount> =
+                                        AccountLoaderDynamic::try_from(&ai)?;
+                                    let mut taker = mal.load_mut()?;
+
+                                    maker.perp_execute_maker(
+                                        perp_market.perp_market_index,
+                                        &mut perp_market,
+                                        fill,
+                                    )?;
+                                    taker.perp_execute_taker(
+                                        perp_market.perp_market_index,
+                                        &mut perp_market,
+                                        fill,
+                                    )?;
+                                    emit_perp_balances(
+                                        fill.maker,
+                                        perp_market.perp_market_index as u64,
+                                        fill.price,
+                                        &maker
+                                            .perp_find_account(perp_market.perp_market_index)
+                                            .unwrap(),
+                                        &perp_market,
+                                    );
+                                    emit_perp_balances(
+                                        fill.taker,
+                                        perp_market.perp_market_index as u64,
+                                        fill.price,
+                                        &taker
+                                            .perp_find_account(perp_market.perp_market_index)
+                                            .unwrap(),
+                                        &perp_market,
+                                    );
+                                }
+                            };
+                        }
+                    };
                 }
                 emit!(FillLog {
                     mango_group: ctx.accounts.group.key(),
@@ -134,16 +148,19 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
             EventType::Out => {
                 let out: &OutEvent = cast_ref(event);
 
-                let mut ma = match mango_account_ais.iter().find(|ai| ai.key == &out.owner) {
+                match mango_account_ais.iter().find(|ai| ai.key == &out.owner) {
                     None => {
                         msg!("Unable to find account {}", out.owner.to_string());
                         return Ok(());
                     }
-                    Some(account_info) => account_info.load_mut::<MangoAccount>()?,
-                };
+                    Some(ai) => {
+                        let mal: AccountLoaderDynamic<MangoAccount> =
+                            AccountLoaderDynamic::try_from(&ai)?;
+                        let mut ma = mal.load_mut()?;
 
-                ma.perps
-                    .remove_order(out.owner_slot as usize, out.quantity)?;
+                        ma.perp_remove_order(out.owner_slot as usize, out.quantity)?;
+                    }
+                };
             }
             EventType::Liquidate => {
                 // This is purely for record keeping. Can be removed if program logs are superior

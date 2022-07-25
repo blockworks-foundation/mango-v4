@@ -11,7 +11,7 @@ use anchor_spl::token::Token;
 use fixed::types::I80F48;
 use itertools::Itertools;
 use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
-use mango_v4::state::{Bank, Group, MangoAccount, Serum3MarketIndex, TokenIndex};
+use mango_v4::state::{AccountSize, Bank, Group, MangoAccountValue, Serum3MarketIndex, TokenIndex};
 
 use solana_client::rpc_client::RpcClient;
 
@@ -100,12 +100,16 @@ impl MangoClient {
         let mut mango_account_tuples = fetch_mango_accounts(&program, group, payer.pubkey())?;
         let mango_account_opt = mango_account_tuples
             .iter()
-            .find(|tuple| tuple.1.name() == mango_account_name);
+            .find(|(_, account)| account.fixed.name() == mango_account_name);
         if mango_account_opt.is_none() {
-            mango_account_tuples
-                .sort_by(|a, b| a.1.account_num.partial_cmp(&b.1.account_num).unwrap());
+            mango_account_tuples.sort_by(|a, b| {
+                a.1.fixed
+                    .account_num
+                    .partial_cmp(&b.1.fixed.account_num)
+                    .unwrap()
+            });
             let account_num = match mango_account_tuples.last() {
-                Some(tuple) => tuple.1.account_num + 1,
+                Some(tuple) => tuple.1.fixed.account_num + 1,
                 None => 0u8,
             };
             program
@@ -137,6 +141,7 @@ impl MangoClient {
                         &mango_v4::instruction::AccountCreate {
                             account_num,
                             name: mango_account_name.to_owned(),
+                            account_size: AccountSize::Small,
                         },
                     ),
                 })
@@ -146,9 +151,9 @@ impl MangoClient {
         let mango_account_tuples = fetch_mango_accounts(&program, group, payer.pubkey())?;
         let index = mango_account_tuples
             .iter()
-            .position(|tuple| tuple.1.name() == mango_account_name)
+            .position(|tuple| tuple.1.fixed.name() == mango_account_name)
             .unwrap();
-        let mango_account_cache = mango_account_tuples[index];
+        let mango_account_cache = &mango_account_tuples[index];
 
         Ok(Self {
             rpc,
@@ -181,8 +186,8 @@ impl MangoClient {
         self.context.group
     }
 
-    pub fn mango_account(&self) -> anyhow::Result<MangoAccount> {
-        account_fetcher_fetch_anchor_account(&*self.account_fetcher, self.mango_account_address)
+    pub fn mango_account(&self) -> anyhow::Result<MangoAccountValue> {
+        account_fetcher_fetch_mango_account(&*self.account_fetcher, self.mango_account_address)
     }
 
     pub fn first_bank(&self, token_index: TokenIndex) -> anyhow::Result<Bank> {
@@ -205,7 +210,7 @@ impl MangoClient {
 
     pub fn derive_liquidation_health_check_remaining_account_metas(
         &self,
-        liqee: &MangoAccount,
+        liqee: &MangoAccountValue,
         asset_token_index: TokenIndex,
         liab_token_index: TokenIndex,
     ) -> anyhow::Result<Vec<AccountMeta>> {
@@ -215,9 +220,8 @@ impl MangoClient {
         let account = self.mango_account()?;
 
         let token_indexes = liqee
-            .tokens
-            .iter_active()
-            .chain(account.tokens.iter_active())
+            .token_iter_active()
+            .chain(account.token_iter_active())
             .map(|ta| ta.token_index)
             .unique();
 
@@ -229,14 +233,12 @@ impl MangoClient {
         }
 
         let serum_oos = liqee
-            .serum3
-            .iter_active()
-            .chain(account.serum3.iter_active())
+            .serum3_iter_active()
+            .chain(account.serum3_iter_active())
             .map(|&s| s.open_orders);
         let perp_markets = liqee
-            .perps
-            .iter_active_accounts()
-            .chain(account.perps.iter_active_accounts())
+            .perp_iter_active_accounts()
+            .chain(account.perp_iter_active_accounts())
             .map(|&pa| self.context.perp_market_address(pa.market_index));
 
         let to_account_meta = |pubkey| AccountMeta {
@@ -392,7 +394,7 @@ impl MangoClient {
         let s3 = self.serum3_data(name)?;
 
         let account = self.mango_account()?;
-        let open_orders = account.serum3.find(s3.market_index).unwrap().open_orders;
+        let open_orders = account.serum3_find(s3.market_index).unwrap().open_orders;
 
         let health_check_metas = self.derive_health_check_remaining_account_metas(None, false)?;
 
@@ -506,7 +508,7 @@ impl MangoClient {
         let s3 = self.serum3_data(name)?;
 
         let account = self.mango_account()?;
-        let open_orders = account.serum3.find(s3.market_index).unwrap().open_orders;
+        let open_orders = account.serum3_find(s3.market_index).unwrap().open_orders;
 
         self.program()
             .request()
@@ -547,7 +549,7 @@ impl MangoClient {
             .get(market_name)
             .unwrap();
         let account = self.mango_account()?;
-        let open_orders = account.serum3.find(market_index).unwrap().open_orders;
+        let open_orders = account.serum3_find(market_index).unwrap().open_orders;
 
         let open_orders_bytes = self.account_fetcher.fetch_raw_account(open_orders)?.data;
         let open_orders_data: &serum_dex::state::OpenOrders = bytemuck::from_bytes(
@@ -579,7 +581,7 @@ impl MangoClient {
         let s3 = self.serum3_data(market_name)?;
 
         let account = self.mango_account()?;
-        let open_orders = account.serum3.find(s3.market_index).unwrap().open_orders;
+        let open_orders = account.serum3_find(s3.market_index).unwrap().open_orders;
 
         self.program()
             .request()
@@ -622,7 +624,7 @@ impl MangoClient {
 
     pub fn liq_token_with_token(
         &self,
-        liqee: (&Pubkey, &MangoAccount),
+        liqee: (&Pubkey, &MangoAccountValue),
         asset_token_index: TokenIndex,
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
@@ -666,7 +668,7 @@ impl MangoClient {
 
     pub fn liq_token_bankruptcy(
         &self,
-        liqee: (&Pubkey, &MangoAccount),
+        liqee: (&Pubkey, &MangoAccountValue),
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -> anyhow::Result<Signature> {
@@ -740,6 +742,12 @@ struct Serum3Data<'a> {
     base: &'a TokenContext,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum MangoClientError {
+    #[error("Transaction simulation error. Logs: {logs}")]
+    SendTransactionPreflightFailure { logs: String },
+}
+
 /// Do some manual unpacking on some ClientErrors
 ///
 /// Unfortunately solana's RpcResponseError will very unhelpfully print [N log messages]
@@ -754,10 +762,10 @@ fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
                 ClientErrorKind::RpcError(RpcError::RpcResponseError { data, .. }) => match data {
                     RpcResponseErrorData::SendTransactionPreflightFailure(s) => {
                         if let Some(logs) = s.logs.as_ref() {
-                            return anyhow::anyhow!(
-                                "transaction simulation error. logs:\n{}",
-                                logs.iter().map(|l| format!("    {}", l)).join("\n")
-                            );
+                            return MangoClientError::SendTransactionPreflightFailure {
+                                logs: logs.iter().join("; "),
+                            }
+                            .into();
                         }
                     }
                     _ => {}

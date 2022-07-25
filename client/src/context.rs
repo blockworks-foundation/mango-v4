@@ -5,7 +5,7 @@ use anchor_client::{Client, ClientError, Cluster, Program};
 use anchor_lang::__private::bytemuck;
 
 use mango_v4::state::{
-    MangoAccount, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market, Serum3MarketIndex,
+    MangoAccountValue, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market, Serum3MarketIndex,
     TokenIndex,
 };
 
@@ -186,43 +186,36 @@ impl MangoGroupContext {
 
     pub fn derive_health_check_remaining_account_metas(
         &self,
-        account: &MangoAccount,
+        account: &MangoAccountValue,
         affected_token: Option<TokenIndex>,
         writable_banks: bool,
     ) -> anyhow::Result<Vec<AccountMeta>> {
         // figure out all the banks/oracles that need to be passed for the health check
         let mut banks = vec![];
         let mut oracles = vec![];
-        for position in account.tokens.iter_active() {
+        for position in account.token_iter_active() {
             let mint_info = self.mint_info(position.token_index);
             banks.push(mint_info.first_bank());
             oracles.push(mint_info.oracle);
         }
         if let Some(affected_token_index) = affected_token {
             if account
-                .tokens
-                .iter_active()
+                .token_iter_active()
                 .find(|p| p.token_index == affected_token_index)
                 .is_none()
             {
                 // If there is not yet an active position for the token, we need to pass
                 // the bank/oracle for health check anyway.
-                let new_position = account
-                    .tokens
-                    .values
-                    .iter()
-                    .position(|p| !p.is_active())
-                    .unwrap();
+                let new_position = account.token_iter().position(|p| !p.is_active()).unwrap();
                 let mint_info = self.mint_info(affected_token_index);
                 banks.insert(new_position, mint_info.first_bank());
                 oracles.insert(new_position, mint_info.oracle);
             }
         }
 
-        let serum_oos = account.serum3.iter_active().map(|&s| s.open_orders);
+        let serum_oos = account.serum3_iter_active().map(|&s| s.open_orders);
         let perp_markets = account
-            .perps
-            .iter_active_accounts()
+            .perp_iter_active_accounts()
             .map(|&pa| self.perp_market_address(pa.market_index));
 
         Ok(banks

@@ -41,6 +41,20 @@ async fn test_basic() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Small,
+            group,
+            owner,
+            payer,
+        },
+    )
+    .await
+    .unwrap()
+    .account;
+
+    send_tx(
+        solana,
+        AccountExpandInstruction {
+            account_num: 0,
             group,
             owner,
             payer,

@@ -14,11 +14,8 @@ use crate::logs::{DepositLog, TokenBalanceLog};
 pub struct TokenDeposit<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        has_one = group,
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut, has_one = group)]
+    pub account: AccountLoaderDynamic<'info, MangoAccount>,
 
     #[account(
         mut,
@@ -61,10 +58,10 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;
-    require!(!account.is_bankrupt(), MangoError::IsBankrupt);
+    require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
     let (position, raw_token_index, active_token_index) =
-        account.tokens.get_mut_or_create(token_index)?;
+        account.token_get_mut_or_create(token_index)?;
 
     let amount_i80f48 = I80F48::from(amount);
     let position_is_active = {
@@ -77,16 +74,17 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
 
     let indexed_position = position.indexed_position;
 
-    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
+    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
     let (bank, oracle_price) =
         retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
 
     // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
-    account.net_deposits += cm!(amount_i80f48 * oracle_price * QUOTE_NATIVE_TO_UI).to_num::<f32>();
+    account.fixed.net_deposits +=
+        cm!(amount_i80f48 * oracle_price * QUOTE_NATIVE_TO_UI).to_num::<f32>();
 
     emit!(TokenBalanceLog {
         mango_account: ctx.accounts.account.key(),
-        token_index: token_index,
+        token_index,
         indexed_position: indexed_position.to_bits(),
         deposit_index: bank.deposit_index.to_bits(),
         borrow_index: bank.borrow_index.to_bits(),
@@ -98,7 +96,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     // TODO: This will be used to disable is_bankrupt or being_liquidated
     //       when health recovers sufficiently
     //
-    let health = compute_health(&account, HealthType::Init, &retriever)
+    let health = compute_health(&account.borrow(), HealthType::Init, &retriever)
         .context("post-deposit init health")?;
     msg!("health: {}", health);
 
@@ -109,7 +107,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     // Deposits can deactivate a position if they cancel out a previous borrow.
     //
     if !position_is_active {
-        account.tokens.deactivate(raw_token_index);
+        account.token_deactivate(raw_token_index);
     }
 
     emit!(DepositLog {

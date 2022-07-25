@@ -46,6 +46,7 @@ async function main() {
     group,
     user.publicKey,
     0,
+    AccountSize.small,
     'my_mango_account',
   );
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);

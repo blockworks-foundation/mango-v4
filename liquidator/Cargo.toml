@@ -4,8 +4,8 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
-anchor-client = "0.24.2"
-anchor-lang = "0.24.2"
+anchor-lang = { git = "https://github.com/blockworks-foundation/anchor.git", rev = "1153380487706e4d8f486071cf2f519468438eab" }
+anchor-client = { git = "https://github.com/blockworks-foundation/anchor.git", rev = "1153380487706e4d8f486071cf2f519468438eab" }
 anyhow = "1.0"
 arrayref = "0.3.6"
 async-channel = "1.6"
@@ -35,11 +35,11 @@ serde_derive = "1.0.130"
 serde_json = "1.0.68"
 serum_dex = { version = "0.4.0", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false, features = ["no-entrypoint", "program"] }
 shellexpand = "2.1.0"
-solana-account-decoder = "~1.9.13"
-solana-client = "~1.9.13"
-solana-logger = "~1.9.13"
-solana-rpc = "~1.9.24"
-solana-sdk = "~1.9.13"
+solana-account-decoder = "~1.10.29"
+solana-client = "~1.10.29"
+solana-logger = "~1.10.29"
+solana-rpc = "~1.10.29"
+solana-sdk = "~1.10.29"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1.9"}
 tokio-tungstenite = "0.16.1"

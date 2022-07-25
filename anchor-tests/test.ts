@@ -5,7 +5,7 @@ import * as spl from '@solana/spl-token';
 import NodeWallet from '@project-serum/anchor/dist/cjs/nodewallet';
 import * as assert from 'assert';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { Group, MangoAccount, MangoClient, StubOracle } from '../ts/client/src/index';
+import { Group, MangoAccount, MangoClient, StubOracle, AccountSize } from '../ts/client/src/index';
 
 import { ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
@@ -201,6 +201,7 @@ describe('mango-v4', () => {
       users[0].keypair.publicKey,
       users[0].keypair,
       0,
+      AccountSize.small,
       'my_mango_account',
     );
     await mangoAccount.reload(client, group);

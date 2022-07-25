@@ -109,7 +109,6 @@ impl TestContextBuilder {
         }));
 
         // intentionally set to as tight as possible, to catch potential problems early
-        // TODO make configurable
         test.set_compute_max_units(86000);
 
         Self {

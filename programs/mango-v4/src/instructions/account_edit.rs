@@ -8,13 +8,8 @@ use crate::util::fill32_from_str;
 pub struct AccountEdit<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        // Note: should never be the delegate
-        has_one = owner,
-        has_one = group,
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut, has_one = group, has_one = owner)]
+    pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
 }
 
@@ -31,13 +26,11 @@ pub fn account_edit(
 
     let mut account = ctx.accounts.account.load_mut()?;
 
-    // msg!("old account {:#?}", account);
-
     // note: unchanged fields are inline, and match exact definition in create_account
     // please maintain, and don't remove, makes it easy to reason about which support modification by owner
 
     if let Some(name) = name_opt {
-        account.name = fill32_from_str(name)?;
+        account.fixed.name = fill32_from_str(name)?;
     }
 
     // unchanged -
@@ -46,7 +39,7 @@ pub fn account_edit(
     // bump
 
     if let Some(delegate) = delegate_opt {
-        account.delegate = delegate;
+        account.fixed.delegate = delegate;
     }
 
     // unchanged -
@@ -55,8 +48,6 @@ pub fn account_edit(
     // perps
     // being_liquidated
     // is_bankrupt
-
-    // msg!("new account {:#?}", account);
 
     Ok(())
 }

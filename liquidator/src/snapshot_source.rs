@@ -2,7 +2,7 @@ use jsonrpc_core_client::transports::http;
 
 use solana_account_decoder::{UiAccount, UiAccountEncoding};
 use solana_client::{
-    rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
+    rpc_config::{RpcAccountInfoConfig, RpcContextConfig, RpcProgramAccountsConfig},
     rpc_response::{Response, RpcKeyedAccount},
 };
 use solana_rpc::{
@@ -94,6 +94,7 @@ async fn feed_snapshots(
         encoding: Some(UiAccountEncoding::Base64),
         commitment: Some(CommitmentConfig::finalized()),
         data_slice: None,
+        min_context_slot: None,
     };
     let all_accounts_config = RpcProgramAccountsConfig {
         filters: None,
@@ -160,9 +161,9 @@ async fn feed_snapshots(
         })
         .flat_map(|mango_account| {
             mango_account
-                .serum3
-                .iter_active()
+                .serum3_iter_active()
                 .map(|serum3account| serum3account.open_orders)
+                .collect::<Vec<_>>()
         })
         .collect::<Vec<Pubkey>>();
 
@@ -218,7 +219,10 @@ pub fn start(
             poll_wait_first_snapshot.tick().await;
 
             let epoch_info = rpc_client
-                .get_epoch_info(Some(CommitmentConfig::finalized()))
+                .get_epoch_info(Some(RpcContextConfig {
+                    commitment: Some(CommitmentConfig::finalized()),
+                    min_context_slot: None,
+                }))
                 .await
                 .expect("always Ok");
             log::debug!("latest slot for snapshot {}", epoch_info.absolute_slot);

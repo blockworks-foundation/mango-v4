@@ -1,7 +1,7 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
-import { HealthType } from '../accounts/mangoAccount';
+import { AccountSize, HealthType } from '../accounts/mangoAccount';
 import { OrderType, Side } from '../accounts/perp';
 import {
   Serum3OrderType,
@@ -60,6 +60,7 @@ async function main() {
     user.publicKey,
     user,
     0,
+    AccountSize.small,
     'my_mango_account',
   );
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
@@ -93,13 +94,18 @@ async function main() {
 
   if (true) {
     // deposit and withdraw
-    console.log(`...depositing 50 USDC`);
-    await client.tokenDeposit(group, mangoAccount, 'USDC', 50, user);
-    await mangoAccount.reload(client, group);
 
-    console.log(`...depositing 0.0005 BTC`);
-    await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005, user);
-    await mangoAccount.reload(client, group);
+    try {
+      console.log(`...depositing 50 USDC`);
+      await client.tokenDeposit(group, mangoAccount, 'USDC', 50, user);
+      await mangoAccount.reload(client, group);
+
+      console.log(`...depositing 0.0005 BTC`);
+      await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005, user);
+      await mangoAccount.reload(client, group);
+    } catch (error) {
+      console.log(error);
+    }
 
     // witdrawing fails if no (other) user has deposited ORCA in the group
     // console.log(`Withdrawing...0.1 ORCA`);

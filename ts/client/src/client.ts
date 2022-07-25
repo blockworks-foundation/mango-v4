@@ -30,7 +30,11 @@ import bs58 from 'bs58';
 import { Bank, MintInfo } from './accounts/bank';
 import { Group } from './accounts/group';
 import { I80F48 } from './accounts/I80F48';
-import { MangoAccount, MangoAccountData } from './accounts/mangoAccount';
+import {
+  AccountSize,
+  MangoAccount,
+  MangoAccountData,
+} from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
 import { OrderType, PerpMarket, Side } from './accounts/perp';
 import {
@@ -425,11 +429,19 @@ export class MangoClient {
     ownerPk: PublicKey,
     payer: web3.Keypair,
     accountNumber?: number,
-    name?: string
+    accountSize?: AccountSize,
+    name?: string,
   ): Promise<MangoAccount> {
     let mangoAccounts = await this.getMangoAccountForOwner(group, ownerPk);
     if (mangoAccounts.length === 0) {
-      await this.createMangoAccount(group, ownerPk, payer, accountNumber ?? 0, name ?? '', );
+      await this.createMangoAccount(
+        group,
+        ownerPk,
+        payer,
+        accountNumber ?? 0,
+        accountSize ?? AccountSize.small,
+        name ?? '',
+      );
       mangoAccounts = await this.getMangoAccountForOwner(group, ownerPk);
     }
     return mangoAccounts[0];
@@ -440,16 +452,32 @@ export class MangoClient {
     ownerPk: PublicKey,
     payer: web3.Keypair,
     accountNumber: number,
-    name?: string
+    accountSize: AccountSize,
+    name?: string,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .accountCreate(accountNumber, name ?? '')
+      .accountCreate(accountNumber, accountSize, name ?? '')
       .accounts({
         group: group.publicKey,
         owner: ownerPk,
         payer: payer.publicKey,
       })
       .signers([payer])
+      .rpc();
+  }
+
+  public async expandMangoAccount(
+    group: Group,
+    account: MangoAccount,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .accountExpand()
+      .accounts({
+        group: group.publicKey,
+        account: account.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
       .rpc();
   }
 
@@ -466,7 +494,7 @@ export class MangoClient {
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
-      .rpc();
+      .rpc({ skipPreflight: true });
   }
 
   public async getMangoAccount(mangoAccount: MangoAccount) {
@@ -601,7 +629,7 @@ export class MangoClient {
         bank: bank.publicKey,
         vault: bank.vault,
         tokenAccount: wrappedSolAccount?.publicKey ?? tokenAccountPk,
-        tokenAuthority: mangoAccount.owner,
+        tokenAuthority: mangoAccount.owner
       })
       .remainingAccounts(
         healthRemainingAccounts.map(
@@ -657,7 +685,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     tokenName: string,
-    nativeAmount: number,
+    amount: number,
     allowBorrow: boolean,
     signer: Signer
   ) {
@@ -672,7 +700,7 @@ export class MangoClient {
       this.buildHealthRemainingAccounts(group, mangoAccount, [bank]);
 
     return await this.program.methods
-      .tokenWithdraw(toNativeDecimals(nativeAmount, bank.mintDecimals), allowBorrow)
+      .tokenWithdraw(toNativeDecimals(amount, bank.mintDecimals), allowBorrow)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -1649,36 +1677,19 @@ export class MangoClient {
     tx.add(flashLoanEndIx);
     return this.program.provider.sendAndConfirm(tx);
   }
-
   /// liquidations
-  // public async liqTokenWithToken(group: Group, liqor: MangoAccount, liqee: MangoAccount, liqorOwner: Signer, assetTokenName: string, liabTokenName: string, maxLiabTransfer: number) {
-  //   let assetBank = group.banksMap.get(assetTokenName)!;
-  //   let liabBank = group.banksMap.get(liabTokenName)!;
 
-  //   console.log(`asset index ${assetBank.tokenIndex}`);
-  //   console.log(`liab index ${liabBank.tokenIndex}`);
-
-
-  //   const healthRemainingAccounts: PublicKey[] =
-  //   this.buildHealthRemainingAccounts(group, [liqor, liqee], [assetBank, liabBank]);
-
-
+  // TODO
+  // async liqTokenWithToken(
+  //   assetTokenIndex: number,
+  //   liabTokenIndex: number,
+  //   maxLiabTransfer: number,
+  // ): Promise<TransactionSignature> {
   //   return await this.program.methods
-  //   .liqTokenWithToken(assetBank.tokenIndex, liabBank.tokenIndex, { val: I80F48.fromNumber(maxLiabTransfer).getData()})
-  //   .accounts({
-  //     group: group.publicKey,
-  //     liqor: liqor.publicKey,
-  //     liqorOwner: liqorOwner.publicKey,
-  //     liqee: liqee.publicKey
-  //   })
-  //   .remainingAccounts(
-  //     healthRemainingAccounts.map(
-  //       (pk) =>
-  //         ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
-  //     ),
-  //   )
-  //   .signers([liqorOwner])
-  //   .rpc()
+  //     .liqTokenWithToken(assetTokenIndex, liabTokenIndex, {
+  //       val: I80F48.fromNumber(maxLiabTransfer).getData(),
+  //     })
+  //     .rpc();
   // }
 
   /// static

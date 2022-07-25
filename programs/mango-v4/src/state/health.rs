@@ -11,8 +11,10 @@ use std::collections::HashMap;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::serum3_cpi;
-use crate::state::{oracle_price, Bank, MangoAccount, PerpMarket, PerpMarketIndex, TokenIndex};
+use crate::state::{oracle_price, Bank, PerpMarket, PerpMarketIndex, TokenIndex};
 use crate::util::checked_math as cm;
+
+use super::MangoAccountRef;
 
 const BANKRUPTCY_DUST_THRESHOLD: I80F48 = I80F48!(0.000001);
 
@@ -59,11 +61,11 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
 
 pub fn new_fixed_order_account_retriever<'a, 'info>(
     ais: &'a [AccountInfo<'info>],
-    account: &MangoAccount,
+    account: &MangoAccountRef,
 ) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
-    let active_token_len = account.tokens.iter_active().count();
-    let active_serum3_len = account.serum3.iter_active().count();
-    let active_perp_len = account.perps.iter_active_accounts().count();
+    let active_token_len = account.token_iter_active().count();
+    let active_serum3_len = account.serum3_iter_active().count();
+    let active_perp_len = account.perp_iter_active_accounts().count();
     let expected_ais = cm!(active_token_len * 2 // banks + oracles
         + active_perp_len // PerpMarkets
         + active_serum3_len); // open_orders
@@ -377,13 +379,13 @@ pub enum HealthType {
 ///
 /// These account infos must fit the fixed layout defined by FixedOrderAccountRetriever.
 pub fn compute_health_from_fixed_accounts(
-    account: &MangoAccount,
+    account: &MangoAccountRef,
     health_type: HealthType,
     ais: &[AccountInfo],
 ) -> Result<I80F48> {
-    let active_token_len = account.tokens.iter_active().count();
-    let active_serum3_len = account.serum3.iter_active().count();
-    let active_perp_len = account.perps.iter_active_accounts().count();
+    let active_token_len = account.token_iter_active().count();
+    let active_serum3_len = account.serum3_iter_active().count();
+    let active_perp_len = account.perp_iter_active_accounts().count();
     let expected_ais = cm!(active_token_len * 2 // banks + oracles
         + active_perp_len // PerpMarkets
         + active_serum3_len); // open_orders
@@ -403,7 +405,7 @@ pub fn compute_health_from_fixed_accounts(
 
 /// Compute health with an arbitrary AccountRetriever
 pub fn compute_health(
-    account: &MangoAccount,
+    account: &MangoAccountRef,
     health_type: HealthType,
     retriever: &impl AccountRetriever,
 ) -> Result<I80F48> {
@@ -453,7 +455,7 @@ impl TokenInfo {
 }
 
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
-struct Serum3Info {
+pub struct Serum3Info {
     reserved: I80F48,
     base_index: usize,
     quote_index: usize,
@@ -499,7 +501,7 @@ impl Serum3Info {
 }
 
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
-struct PerpInfo {
+pub struct PerpInfo {
     maint_asset_weight: I80F48,
     init_asset_weight: I80F48,
     maint_liab_weight: I80F48,
@@ -785,15 +787,15 @@ fn find_token_info_index(infos: &[TokenInfo], token_index: TokenIndex) -> Result
 
 /// Generate a HealthCache for an account and its health accounts.
 pub fn new_health_cache(
-    account: &MangoAccount,
+    account: &MangoAccountRef,
     retriever: &impl AccountRetriever,
 ) -> Result<HealthCache> {
     // token contribution from token accounts
     let mut token_infos = vec![];
 
-    for (i, position) in account.tokens.iter_active().enumerate() {
+    for (i, position) in account.token_iter_active().enumerate() {
         let (bank, oracle_price) =
-            retriever.bank_and_oracle(&account.group, i, position.token_index)?;
+            retriever.bank_and_oracle(&account.fixed.group, i, position.token_index)?;
 
         // converts the token value to the basis token value for health computations
         // TODO: health basis token == USDC?
@@ -814,7 +816,7 @@ pub fn new_health_cache(
     // Fill the TokenInfo balance with free funds in serum3 oo accounts, and fill
     // the serum3_max_reserved with their reserved funds. Also build Serum3Infos.
     let mut serum3_infos = vec![];
-    for (i, serum_account) in account.serum3.iter_active().enumerate() {
+    for (i, serum_account) in account.serum3_iter_active().enumerate() {
         let oo = retriever.serum_oo(i, &serum_account.open_orders)?;
 
         // find the TokenInfos for the market's base and quote tokens
@@ -851,9 +853,10 @@ pub fn new_health_cache(
 
     // TODO: also account for perp funding in health
     // health contribution from perp accounts
-    let mut perp_infos = Vec::with_capacity(account.perps.iter_active_accounts().count());
-    for (i, perp_account) in account.perps.iter_active_accounts().enumerate() {
-        let perp_market = retriever.perp_market(&account.group, i, perp_account.market_index)?;
+    let mut perp_infos = Vec::with_capacity(account.perp_iter_active_accounts().count());
+    for (i, perp_account) in account.perp_iter_active_accounts().enumerate() {
+        let perp_market =
+            retriever.perp_market(&account.fixed.group, i, perp_account.market_index)?;
 
         // find the TokenInfos for the market's base and quote tokens
         let base_index = find_token_info_index(&token_infos, perp_market.base_token_index)?;
@@ -947,6 +950,7 @@ pub fn new_health_cache(
 mod tests {
     use super::*;
     use crate::state::oracle::StubOracle;
+    use crate::state::{MangoAccount, MangoAccountValue};
     use std::cell::RefCell;
     use std::convert::identity;
     use std::mem::size_of;
@@ -1065,7 +1069,9 @@ mod tests {
     // Run a health test that includes all the side values (like referrer_rebates_accrued)
     #[test]
     fn test_health0() {
-        let mut account = MangoAccount::default();
+        let buffer = MangoAccount::default().try_to_vec().unwrap();
+        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
+
         let group = Pubkey::new_unique();
 
         let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
@@ -1073,20 +1079,20 @@ mod tests {
         bank1
             .data()
             .deposit(
-                account.tokens.get_mut_or_create(1).unwrap().0,
+                account.token_get_mut_or_create(1).unwrap().0,
                 I80F48::from(100),
             )
             .unwrap();
         bank2
             .data()
             .withdraw_without_fee(
-                account.tokens.get_mut_or_create(4).unwrap().0,
+                account.token_get_mut_or_create(4).unwrap().0,
                 I80F48::from(10),
             )
             .unwrap();
 
         let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
-        let serum3account = account.serum3.create(2).unwrap();
+        let serum3account = account.serum3_create(2).unwrap();
         serum3account.open_orders = oo1.pubkey;
         serum3account.base_token_index = 4;
         serum3account.quote_token_index = 1;
@@ -1106,7 +1112,7 @@ mod tests {
         perp1.data().maint_liab_weight = I80F48::from_num(1.0 + 0.1f64);
         perp1.data().quote_lot_size = 100;
         perp1.data().base_lot_size = 10;
-        let perpaccount = account.perps.get_account_mut_or_create(9).unwrap().0;
+        let perpaccount = account.perp_get_account_mut_or_create(9).unwrap().0;
         perpaccount.base_position_lots = 3;
         perpaccount.quote_position_native = -I80F48::from(310u16);
         perpaccount.bids_base_lots = 7;
@@ -1142,7 +1148,7 @@ mod tests {
         let health3 =
             (3.0 + 7.0 + 1.0) * 10.0 * 5.0 * 0.8 + (-310.0 + 2.0 * 100.0 - 7.0 * 10.0 * 5.0);
         assert!(health_eq(
-            compute_health(&account, HealthType::Init, &retriever).unwrap(),
+            compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
             health1 + health2 + health3
         ));
     }
@@ -1226,7 +1232,9 @@ mod tests {
         expected_health: f64,
     }
     fn test_health1_runner(testcase: &TestHealth1Case) {
-        let mut account = MangoAccount::default();
+        let buffer = MangoAccount::default().try_to_vec().unwrap();
+        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
+
         let group = Pubkey::new_unique();
 
         let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
@@ -1235,27 +1243,27 @@ mod tests {
         bank1
             .data()
             .change_without_fee(
-                account.tokens.get_mut_or_create(1).unwrap().0,
+                account.token_get_mut_or_create(1).unwrap().0,
                 I80F48::from(testcase.token1),
             )
             .unwrap();
         bank2
             .data()
             .change_without_fee(
-                account.tokens.get_mut_or_create(4).unwrap().0,
+                account.token_get_mut_or_create(4).unwrap().0,
                 I80F48::from(testcase.token2),
             )
             .unwrap();
         bank3
             .data()
             .change_without_fee(
-                account.tokens.get_mut_or_create(5).unwrap().0,
+                account.token_get_mut_or_create(5).unwrap().0,
                 I80F48::from(testcase.token3),
             )
             .unwrap();
 
         let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
-        let serum3account1 = account.serum3.create(2).unwrap();
+        let serum3account1 = account.serum3_create(2).unwrap();
         serum3account1.open_orders = oo1.pubkey;
         serum3account1.base_token_index = 4;
         serum3account1.quote_token_index = 1;
@@ -1263,7 +1271,7 @@ mod tests {
         oo1.data().native_coin_total = testcase.oo_1_2.1;
 
         let mut oo2 = TestAccount::<OpenOrders>::new_zeroed();
-        let serum3account2 = account.serum3.create(3).unwrap();
+        let serum3account2 = account.serum3_create(3).unwrap();
         serum3account2.open_orders = oo2.pubkey;
         serum3account2.base_token_index = 5;
         serum3account2.quote_token_index = 1;
@@ -1280,7 +1288,7 @@ mod tests {
         perp1.data().maint_liab_weight = I80F48::from_num(1.0 + 0.1f64);
         perp1.data().quote_lot_size = 100;
         perp1.data().base_lot_size = 10;
-        let perpaccount = account.perps.get_account_mut_or_create(9).unwrap().0;
+        let perpaccount = account.perp_get_account_mut_or_create(9).unwrap().0;
         perpaccount.base_position_lots = testcase.perp1.0;
         perpaccount.quote_position_native = I80F48::from(testcase.perp1.1);
         perpaccount.bids_base_lots = testcase.perp1.2;
@@ -1310,7 +1318,7 @@ mod tests {
         };
 
         assert!(health_eq(
-            compute_health(&account, HealthType::Init, &retriever).unwrap(),
+            compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
             testcase.expected_health
         ));
     }

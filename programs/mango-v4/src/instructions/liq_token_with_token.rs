@@ -12,19 +12,12 @@ use crate::util::checked_math as cm;
 pub struct LiqTokenWithToken<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        has_one = group,
-        constraint = liqor.load()?.is_owner_or_delegate(liqor_owner.key()),
-    )]
-    pub liqor: AccountLoader<'info, MangoAccount>,
+    #[account(mut, has_one = group)]
+    pub liqor: AccountLoaderDynamic<'info, MangoAccount>,
     pub liqor_owner: Signer<'info>,
 
-    #[account(
-        mut,
-        has_one = group,
-    )]
-    pub liqee: AccountLoader<'info, MangoAccount>,
+    #[account(mut, has_one = group)]
+    pub liqee: AccountLoaderDynamic<'info, MangoAccount>,
 }
 
 pub fn liq_token_with_token(
@@ -40,25 +33,34 @@ pub fn liq_token_with_token(
         .context("create account retriever")?;
 
     let mut liqor = ctx.accounts.liqor.load_mut()?;
-    require!(!liqor.is_bankrupt(), MangoError::IsBankrupt);
+    require!(
+        liqor
+            .fixed
+            .is_owner_or_delegate(ctx.accounts.liqor_owner.key()),
+        MangoError::SomeError
+    );
+    require!(!liqor.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
     let mut liqee = ctx.accounts.liqee.load_mut()?;
-    require!(!liqee.is_bankrupt(), MangoError::IsBankrupt);
+    require!(!liqee.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
     // Initial liqee health check
-    let mut liqee_health_cache =
-        new_health_cache(&liqee, &account_retriever).context("create liqee health cache")?;
+    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
+        .context("create liqee health cache")?;
     let init_health = liqee_health_cache.health(HealthType::Init);
     if liqee.being_liquidated() {
         if init_health > I80F48::ZERO {
-            liqee.set_being_liquidated(false);
+            liqee.fixed.set_being_liquidated(false);
             msg!("Liqee init_health above zero");
             return Ok(());
         }
     } else {
         let maint_health = liqee_health_cache.health(HealthType::Maint);
-        require!(maint_health < I80F48::ZERO, MangoError::SomeError);
-        liqee.set_being_liquidated(true);
+        require!(
+            maint_health < I80F48::ZERO,
+            MangoError::HealthMustBeNegative
+        );
+        liqee.fixed.set_being_liquidated(true);
     }
 
     //
@@ -76,11 +78,11 @@ pub fn liq_token_with_token(
 
         // The main complication here is that we can't keep the liqee_asset_position and liqee_liab_position
         // borrows alive at the same time. Possibly adding get_mut_pair() would be helpful.
-        let (liqee_asset_position, liqee_asset_raw_index) = liqee.tokens.get(asset_token_index)?;
+        let (liqee_asset_position, liqee_asset_raw_index) = liqee.token_get(asset_token_index)?;
         let liqee_assets_native = liqee_asset_position.native(&asset_bank);
         require!(liqee_assets_native.is_positive(), MangoError::SomeError);
 
-        let (liqee_liab_position, liqee_liab_raw_index) = liqee.tokens.get(liab_token_index)?;
+        let (liqee_liab_position, liqee_liab_raw_index) = liqee.token_get(liab_token_index)?;
         let liqee_liab_native = liqee_liab_position.native(&liab_bank);
         require!(liqee_liab_native.is_negative(), MangoError::SomeError);
 
@@ -119,21 +121,21 @@ pub fn liq_token_with_token(
         let asset_transfer = cm!(liab_transfer * liab_price_adjusted / asset_price);
 
         // Apply the balance changes to the liqor and liqee accounts
-        let liqee_liab_position = liqee.tokens.get_mut_raw(liqee_liab_raw_index);
+        let liqee_liab_position = liqee.token_get_mut_raw(liqee_liab_raw_index);
         let liqee_liab_active = liab_bank.deposit(liqee_liab_position, liab_transfer)?;
         let liqee_liab_position_indexed = liqee_liab_position.indexed_position;
 
         let (liqor_liab_position, liqor_liab_raw_index, _) =
-            liqor.tokens.get_mut_or_create(liab_token_index)?;
+            liqor.token_get_mut_or_create(liab_token_index)?;
         let liqor_liab_active = liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer)?;
         let liqor_liab_position_indexed = liqor_liab_position.indexed_position;
 
         let (liqor_asset_position, liqor_asset_raw_index, _) =
-            liqor.tokens.get_mut_or_create(asset_token_index)?;
+            liqor.token_get_mut_or_create(asset_token_index)?;
         let liqor_asset_active = asset_bank.deposit(liqor_asset_position, asset_transfer)?;
         let liqor_asset_position_indexed = liqor_asset_position.indexed_position;
 
-        let liqee_asset_position = liqee.tokens.get_mut_raw(liqee_asset_raw_index);
+        let liqee_asset_position = liqee.token_get_mut_raw(liqee_asset_raw_index);
         let liqee_asset_active =
             asset_bank.withdraw_without_fee(liqee_asset_position, asset_transfer)?;
         let liqee_asset_position_indexed = liqee_asset_position.indexed_position;
@@ -151,8 +153,8 @@ pub fn liq_token_with_token(
         emit!(LiquidateTokenAndTokenLog {
             liqee: ctx.accounts.liqee.key(),
             liqor: ctx.accounts.liqor.key(),
-            asset_token_index: asset_token_index,
-            liab_token_index: liab_token_index,
+            asset_token_index,
+            liab_token_index,
             asset_transfer: asset_transfer.to_bits(),
             liab_transfer: liab_transfer.to_bits(),
             asset_price: asset_price.to_bits(),
@@ -199,33 +201,35 @@ pub fn liq_token_with_token(
 
         // Since we use a scanning account retriever, it's safe to deactivate inactive token positions
         if !liqee_asset_active {
-            liqee.tokens.deactivate(liqee_asset_raw_index);
+            liqee.token_deactivate(liqee_asset_raw_index);
         }
         if !liqee_liab_active {
-            liqee.tokens.deactivate(liqee_liab_raw_index);
+            liqee.token_deactivate(liqee_liab_raw_index);
         }
         if !liqor_asset_active {
-            liqor.tokens.deactivate(liqor_asset_raw_index);
+            liqor.token_deactivate(liqor_asset_raw_index);
         }
         if !liqor_liab_active {
-            liqor.tokens.deactivate(liqor_liab_raw_index)
+            liqor.token_deactivate(liqor_liab_raw_index)
         }
     }
 
     // Check liqee health again
     let maint_health = liqee_health_cache.health(HealthType::Maint);
     if maint_health < I80F48::ZERO {
-        liqee.set_bankrupt(!liqee_health_cache.has_liquidatable_assets());
+        liqee
+            .fixed
+            .set_bankrupt(!liqee_health_cache.has_liquidatable_assets());
     } else {
         let init_health = liqee_health_cache.health(HealthType::Init);
 
         // this is equivalent to one native USDC or 1e-6 USDC
         // This is used as threshold to flip flag instead of 0 because of dust issues
-        liqee.set_being_liquidated(init_health < -I80F48::ONE);
+        liqee.fixed.set_being_liquidated(init_health < -I80F48::ONE);
     }
 
     // Check liqor's health
-    let liqor_health = compute_health(&liqor, HealthType::Init, &account_retriever)
+    let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
         .context("compute liqor health")?;
     require!(liqor_health >= 0, MangoError::HealthMustBePositive);
 

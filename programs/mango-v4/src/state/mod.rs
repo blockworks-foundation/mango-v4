@@ -1,8 +1,10 @@
 pub use bank::*;
+pub use dynamic_account::*;
 pub use equity::*;
 pub use group::*;
 pub use health::*;
 pub use mango_account::*;
+pub use mango_account_components::*;
 pub use mint_info::*;
 pub use oracle::*;
 pub use orderbook::*;
@@ -10,10 +12,12 @@ pub use perp_market::*;
 pub use serum3_market::*;
 
 mod bank;
+mod dynamic_account;
 mod equity;
 mod group;
 mod health;
 mod mango_account;
+mod mango_account_components;
 mod mint_info;
 mod oracle;
 mod orderbook;

@@ -21,19 +21,12 @@ pub struct LiqTokenBankruptcy<'info> {
     )]
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        has_one = group,
-        constraint = liqor.load()?.is_owner_or_delegate(liqor_owner.key()),
-    )]
-    pub liqor: AccountLoader<'info, MangoAccount>,
+    #[account(mut, has_one = group)]
+    pub liqor: AccountLoaderDynamic<'info, MangoAccount>,
     pub liqor_owner: Signer<'info>,
 
-    #[account(
-        mut,
-        has_one = group,
-    )]
-    pub liqee: AccountLoader<'info, MangoAccount>,
+    #[account(mut, has_one = group)]
+    pub liqee: AccountLoaderDynamic<'info, MangoAccount>,
 
     #[account(
         has_one = group,
@@ -80,14 +73,20 @@ pub fn liq_token_bankruptcy(
     );
 
     let mut liqor = ctx.accounts.liqor.load_mut()?;
-    require!(!liqor.is_bankrupt(), MangoError::IsBankrupt);
+    require!(
+        liqor
+            .fixed
+            .is_owner_or_delegate(ctx.accounts.liqor_owner.key()),
+        MangoError::SomeError
+    );
+    require!(!liqor.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
     let mut liqee = ctx.accounts.liqee.load_mut()?;
-    require!(liqee.is_bankrupt(), MangoError::IsNotBankrupt);
+    require!(liqee.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
     let liab_bank = bank_ais[0].load::<Bank>()?;
     let liab_deposit_index = liab_bank.deposit_index;
-    let (liqee_liab, liqee_raw_token_index) = liqee.tokens.get_mut(liab_token_index)?;
+    let (liqee_liab, liqee_raw_token_index) = liqee.token_get_mut(liab_token_index)?;
     let mut remaining_liab_loss = -liqee_liab.native(&liab_bank);
     require_gt!(remaining_liab_loss, I80F48::ZERO);
     drop(liab_bank);
@@ -140,23 +139,24 @@ pub fn liq_token_bankruptcy(
 
             // credit the liqor
             let (liqor_quote, liqor_quote_raw_token_index, _) =
-                liqor.tokens.get_mut_or_create(QUOTE_TOKEN_INDEX)?;
+                liqor.token_get_mut_or_create(QUOTE_TOKEN_INDEX)?;
             let liqor_quote_active = quote_bank.deposit(liqor_quote, insurance_transfer_i80f48)?;
 
             // transfer liab from liqee to liqor
             let (liqor_liab, liqor_liab_raw_token_index, _) =
-                liqor.tokens.get_mut_or_create(liab_token_index)?;
+                liqor.token_get_mut_or_create(liab_token_index)?;
             let liqor_liab_active = liab_bank.withdraw_with_fee(liqor_liab, liab_transfer)?;
 
             // Check liqor's health
-            let liqor_health = compute_health(&liqor, HealthType::Init, &account_retriever)?;
+            let liqor_health =
+                compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)?;
             require!(liqor_health >= 0, MangoError::HealthMustBePositive);
 
             if !liqor_quote_active {
-                liqor.tokens.deactivate(liqor_quote_raw_token_index);
+                liqor.token_deactivate(liqor_quote_raw_token_index);
             }
             if !liqor_liab_active {
-                liqor.tokens.deactivate(liqor_liab_raw_token_index);
+                liqor.token_deactivate(liqor_liab_raw_token_index);
             }
         } else {
             // For liab_token_index == QUOTE_TOKEN_INDEX: the insurance fund deposits directly into liqee,
@@ -205,12 +205,16 @@ pub fn liq_token_bankruptcy(
     }
 
     // If the account has no more borrows then it's no longer bankrupt
+    // and should (always?) no longer be liquidated.
     let account_retriever = ScanningAccountRetriever::new(health_ais, group_pk)?;
-    let liqee_health_cache = new_health_cache(&liqee, &account_retriever)?;
-    liqee.set_bankrupt(liqee_health_cache.has_borrows());
+    let liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)?;
+    liqee.fixed.set_bankrupt(liqee_health_cache.has_borrows());
+    if !liqee.is_bankrupt() && liqee_health_cache.health(HealthType::Init) >= 0 {
+        liqee.fixed.set_being_liquidated(false);
+    }
 
     if !liqee_liab_active {
-        liqee.tokens.deactivate(liqee_raw_token_index);
+        liqee.token_deactivate(liqee_raw_token_index);
     }
 
     Ok(())
