@@ -4,7 +4,7 @@ use crate::ChainDataAccountFetcher;
 use client::{AccountFetcher, MangoClient, MangoClientError, MangoGroupContext};
 use mango_v4::state::{
     new_health_cache, oracle_price, Bank, FixedOrderAccountRetriever, HealthCache, HealthType,
-    MangoAccount, TokenIndex,
+    MangoAccountValue, TokenIndex,
 };
 
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
@@ -12,10 +12,10 @@ use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 pub fn new_health_cache_(
     context: &MangoGroupContext,
     account_fetcher: &ChainDataAccountFetcher,
-    account: &MangoAccount,
+    account: &MangoAccountValue,
 ) -> anyhow::Result<HealthCache> {
-    let active_token_len = account.tokens.iter_active().count();
-    let active_perp_len = account.perps.iter_active_accounts().count();
+    let active_token_len = account.token_iter_active().count();
+    let active_perp_len = account.perp_iter_active_accounts().count();
 
     let metas = context.derive_health_check_remaining_account_metas(account, None, false)?;
     let accounts = metas
@@ -34,7 +34,7 @@ pub fn new_health_cache_(
         begin_perp: active_token_len * 2,
         begin_serum3: active_token_len * 2 + active_perp_len,
     };
-    new_health_cache(account, &retriever).context("make health cache")
+    new_health_cache(&account.borrow(), &retriever).context("make health cache")
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -47,7 +47,7 @@ pub fn process_account(
     let min_health_ratio = I80F48::from_num(50.0f64);
     let quote_token_index = 0;
 
-    let account = account_fetcher.fetch::<MangoAccount>(pubkey)?;
+    let account = account_fetcher.fetch_mango_account(pubkey)?;
     let maint_health = new_health_cache_(&mango_client.context, account_fetcher, &account)
         .expect("always ok")
         .health(HealthType::Maint);
@@ -59,7 +59,7 @@ pub fn process_account(
     log::trace!(
         "possible candidate: {}, with owner: {}, maint health: {}, bankrupt: {}",
         pubkey,
-        account.owner,
+        account.fixed.owner,
         maint_health,
         account.is_bankrupt(),
     );
@@ -67,15 +67,14 @@ pub fn process_account(
     // Fetch a fresh account and re-compute
     // This is -- unfortunately -- needed because the websocket streams seem to not
     // be great at providing timely updates to the account data.
-    let account = account_fetcher.fetch_fresh::<MangoAccount>(pubkey)?;
+    let account = account_fetcher.fetch_fresh_mango_account(pubkey)?;
     let maint_health = new_health_cache_(&mango_client.context, account_fetcher, &account)
         .expect("always ok")
         .health(HealthType::Maint);
 
     // find asset and liab tokens
     let mut tokens = account
-        .tokens
-        .iter_active()
+        .token_iter_active()
         .map(|token_position| {
             let token = mango_client.context.token(token_position.token_index);
             let bank = account_fetcher.fetch::<Bank>(&token.mint_info.first_bank())?;
@@ -96,14 +95,14 @@ pub fn process_account(
 
     let get_max_liab_transfer = |source, target| -> anyhow::Result<I80F48> {
         let mut liqor = account_fetcher
-            .fetch_fresh::<MangoAccount>(&mango_client.mango_account_address)
+            .fetch_fresh_mango_account(&mango_client.mango_account_address)
             .context("getting liquidator account")?
             .clone();
 
         // Ensure the tokens are activated, so they appear in the health cache and
         // max_swap_source() will work.
-        liqor.tokens.get_mut_or_create(source)?;
-        liqor.tokens.get_mut_or_create(target)?;
+        liqor.token_get_mut_or_create(source)?;
+        liqor.token_get_mut_or_create(target)?;
 
         let health_cache =
             new_health_cache_(&mango_client.context, account_fetcher, &liqor).expect("always ok");

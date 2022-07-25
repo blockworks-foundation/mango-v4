@@ -54,6 +54,7 @@ async fn test_margin_trade1() -> Result<(), BanksClientError> {
         solana,
         AccountCreateInstruction {
             account_num: 1,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -96,6 +97,7 @@ async fn test_margin_trade1() -> Result<(), BanksClientError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -227,8 +229,8 @@ async fn test_margin_trade1() -> Result<(), BanksClientError> {
         margin_account_initial + withdraw_amount
     );
     // Check that position is fully deactivated
-    let account_data: MangoAccount = solana.get_account(account).await;
-    assert_eq!(account_data.tokens.iter_active().count(), 0);
+    let account_data = get_mango_account(solana, account).await;
+    assert_eq!(account_data.token_iter_active().count(), 0);
 
     //
     // TEST: Activating a token via margin trade
@@ -370,6 +372,7 @@ async fn test_margin_trade2() -> Result<(), BanksClientError> {
         solana,
         AccountCreateInstruction {
             account_num: 1,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -412,6 +415,7 @@ async fn test_margin_trade2() -> Result<(), BanksClientError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -540,8 +544,8 @@ async fn test_margin_trade2() -> Result<(), BanksClientError> {
         margin_account_initial + withdraw_amount
     );
     // Check that position is fully deactivated
-    let account_data: MangoAccount = solana.get_account(account).await;
-    assert_eq!(account_data.tokens.iter_active().count(), 0);
+    let account_data = get_mango_account(solana, account).await;
+    assert_eq!(account_data.token_iter_active().count(), 0);
 
     //
     // TEST: Activating a token via margin trade
@@ -631,6 +635,7 @@ async fn test_margin_trade3() -> Result<(), BanksClientError> {
         solana,
         AccountCreateInstruction {
             account_num: 1,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -673,6 +678,7 @@ async fn test_margin_trade3() -> Result<(), BanksClientError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -801,8 +807,8 @@ async fn test_margin_trade3() -> Result<(), BanksClientError> {
         margin_account_initial + withdraw_amount
     );
     // Check that position is fully deactivated
-    let account_data: MangoAccount = solana.get_account(account).await;
-    assert_eq!(account_data.tokens.iter_active().count(), 0);
+    let account_data = get_mango_account(solana, account).await;
+    assert_eq!(account_data.token_iter_active().count(), 0);
 
     //
     // TEST: Activating a token via margin trade

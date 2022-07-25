@@ -37,6 +37,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -101,6 +102,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -212,6 +214,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,

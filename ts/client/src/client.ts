@@ -30,7 +30,11 @@ import bs58 from 'bs58';
 import { Bank, MintInfo } from './accounts/bank';
 import { Group } from './accounts/group';
 import { I80F48 } from './accounts/I80F48';
-import { MangoAccount, MangoAccountData } from './accounts/mangoAccount';
+import {
+  AccountSize,
+  MangoAccount,
+  MangoAccountData,
+} from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
 import { OrderType, PerpMarket, Side } from './accounts/perp';
 import {
@@ -424,11 +428,17 @@ export class MangoClient {
     group: Group,
     ownerPk: PublicKey,
     accountNumber?: number,
+    accountSize?: AccountSize,
     name?: string,
   ): Promise<MangoAccount> {
     let mangoAccounts = await this.getMangoAccountForOwner(group, ownerPk);
     if (mangoAccounts.length === 0) {
-      await this.createMangoAccount(group, accountNumber ?? 0, name ?? '');
+      await this.createMangoAccount(
+        group,
+        accountNumber ?? 0,
+        accountSize ?? AccountSize.small,
+        name ?? '',
+      );
       mangoAccounts = await this.getMangoAccountForOwner(group, ownerPk);
     }
     return mangoAccounts[0];
@@ -437,12 +447,28 @@ export class MangoClient {
   public async createMangoAccount(
     group: Group,
     accountNumber: number,
+    accountSize: AccountSize,
     name?: string,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .accountCreate(accountNumber, name ?? '')
+      .accountCreate(accountNumber, accountSize, name ?? '')
       .accounts({
         group: group.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
+  }
+
+  public async expandMangoAccount(
+    group: Group,
+    account: MangoAccount,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .accountExpand()
+      .accounts({
+        group: group.publicKey,
+        account: account.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
@@ -462,7 +488,7 @@ export class MangoClient {
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
-      .rpc();
+      .rpc({ skipPreflight: true });
   }
 
   public async getMangoAccount(mangoAccount: MangoAccount) {

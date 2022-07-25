@@ -40,6 +40,7 @@ async function main() {
     group,
     user1.publicKey,
     0,
+    AccountSize.small,
     'my_mango_account',
   );
 
@@ -72,6 +73,7 @@ async function main() {
     group,
     user2.publicKey,
     0,
+    AccountSize.small,
     'my_mango_account',
   );
   console.log(`...mangoAccount2 ${user2MangoAccount.publicKey}`);

@@ -9,11 +9,8 @@ use crate::state::*;
 pub struct Serum3LiqForceCancelOrders<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        has_one = group,
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut, has_one = group)]
+    pub account: AccountLoaderDynamic<'info, MangoAccount>,
 
     #[account(mut)]
     /// CHECK: Validated inline by checking against the pubkey stored in the account
@@ -73,14 +70,13 @@ pub fn serum3_liq_force_cancel_orders(
     //
     {
         let account = ctx.accounts.account.load()?;
-        require!(!account.is_bankrupt(), MangoError::IsBankrupt);
+        require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
         let serum_market = ctx.accounts.serum_market.load()?;
 
         // Validate open_orders
         require!(
             account
-                .serum3
-                .find(serum_market.market_index)
+                .serum3_find(serum_market.market_index)
                 .ok_or_else(|| error!(MangoError::SomeError))?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
@@ -112,8 +108,9 @@ pub fn serum3_liq_force_cancel_orders(
     {
         let account = ctx.accounts.account.load()?;
 
-        let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account)?;
-        let health = compute_health(&account, HealthType::Maint, &retriever)?;
+        let retriever =
+            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
+        let health = compute_health(&account.borrow(), HealthType::Maint, &retriever)?;
         msg!("health: {}", health);
         require!(health < 0, MangoError::SomeError);
     }
@@ -143,7 +140,7 @@ pub fn serum3_liq_force_cancel_orders(
     let mut base_bank = ctx.accounts.base_bank.load_mut()?;
     let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
     apply_vault_difference(
-        &mut account,
+        &mut account.borrow_mut(),
         &mut base_bank,
         after_base_vault,
         before_base_vault,
@@ -151,7 +148,7 @@ pub fn serum3_liq_force_cancel_orders(
         after_quote_vault,
         before_quote_vault,
     )?
-    .deactivate_inactive_token_accounts(&mut account);
+    .deactivate_inactive_token_accounts(&mut account.borrow_mut());
 
     Ok(())
 }
