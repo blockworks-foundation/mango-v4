@@ -9,7 +9,7 @@ pub struct AccountEdit<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group, has_one = owner)]
-    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
+    pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
 }
 

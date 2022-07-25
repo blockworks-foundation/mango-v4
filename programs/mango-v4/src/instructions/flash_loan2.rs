@@ -4,7 +4,7 @@ use crate::group_seeds;
 use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
 use crate::state::{
     compute_health, compute_health_from_fixed_accounts, new_fixed_order_account_retriever,
-    AccountRetriever, Bank, Group, HealthType, MangoAccount, MangoAccountAnchorLoader, TokenIndex,
+    AccountLoaderDynamic, AccountRetriever, Bank, Group, HealthType, MangoAccount, TokenIndex,
 };
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
@@ -36,7 +36,7 @@ pub struct FlashLoan2Begin<'info> {
 pub struct FlashLoan2End<'info> {
     pub group: AccountLoader<'info, Group>,
     #[account(mut, has_one = group, has_one = owner)]
-    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
+    pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     pub token_program: Program<'info, Token>,

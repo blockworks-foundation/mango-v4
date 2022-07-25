@@ -13,11 +13,11 @@ pub struct LiqTokenWithToken<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group)]
-    pub liqor: MangoAccountAnchorLoader<'info, MangoAccount>,
+    pub liqor: AccountLoaderDynamic<'info, MangoAccount>,
     pub liqor_owner: Signer<'info>,
 
     #[account(mut, has_one = group)]
-    pub liqee: MangoAccountAnchorLoader<'info, MangoAccount>,
+    pub liqee: AccountLoaderDynamic<'info, MangoAccount>,
 }
 
 pub fn liq_token_with_token(

@@ -101,7 +101,7 @@ mod tests {
         let mut new_order =
             |book: &mut Book, event_queue: &mut EventQueue, side, price, now_ts| -> i128 {
                 let buffer = MangoAccount::default().try_to_vec().unwrap();
-                let mut account = MangoAccountValue::try_new(&buffer).unwrap();
+                let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
 
                 let quantity = 1;
                 let tif = 100;
@@ -196,8 +196,8 @@ mod tests {
         market.taker_fee = I80F48::from_num(0.01f64);
 
         let buffer = MangoAccount::default().try_to_vec().unwrap();
-        let mut maker = MangoAccountValue::try_new(&buffer).unwrap();
-        let mut taker = MangoAccountValue::try_new(&buffer).unwrap();
+        let mut maker = MangoAccountValue::from_bytes(&buffer).unwrap();
+        let mut taker = MangoAccountValue::from_bytes(&buffer).unwrap();
 
         let maker_pk = Pubkey::new_unique();
         let taker_pk = Pubkey::new_unique();

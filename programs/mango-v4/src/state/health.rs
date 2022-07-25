@@ -1070,7 +1070,7 @@ mod tests {
     #[test]
     fn test_health0() {
         let buffer = MangoAccount::default().try_to_vec().unwrap();
-        let mut account = MangoAccountValue::try_new(&buffer).unwrap();
+        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
 
         let group = Pubkey::new_unique();
 
@@ -1233,7 +1233,7 @@ mod tests {
     }
     fn test_health1_runner(testcase: &TestHealth1Case) {
         let buffer = MangoAccount::default().try_to_vec().unwrap();
-        let mut account = MangoAccountValue::try_new(&buffer).unwrap();
+        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
 
         let group = Pubkey::new_unique();
 

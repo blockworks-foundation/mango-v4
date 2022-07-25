@@ -8,7 +8,7 @@ pub struct Serum3CancelAllOrders<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(has_one = group)]
-    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
+    pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     #[account(mut)]

@@ -21,7 +21,7 @@ pub fn is_mango_account<'a>(
         return None;
     }
 
-    let mango_account = MangoAccountAccWithHeader::try_new(&data[8..]).expect("always ok");
+    let mango_account = MangoAccountAccWithHeader::from_bytes(&data[8..]).expect("always ok");
     if mango_account.fixed.group != *group_id {
         return None;
     }

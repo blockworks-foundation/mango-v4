@@ -34,7 +34,7 @@ pub fn account_fetcher_fetch_mango_account(
 ) -> anyhow::Result<MangoAccountValue> {
     let account = fetcher.fetch_raw_account(address)?;
     let data: &[u8] = &account.data;
-    MangoAccountValue::try_new(&data[8..])
+    MangoAccountValue::from_bytes(&data[8..])
         .with_context(|| format!("deserializing mango account {}", address))
 }
 

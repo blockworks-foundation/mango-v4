@@ -18,7 +18,7 @@ pub struct AccountCreate<'info> {
     )]
     // borsh smashes the stack, and zero copy doesnt work out of the box
     // deserialize manually
-    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
+    pub account: AccountLoaderDynamic<'info, MangoAccount>,
 
     pub owner: Signer<'info>,
 

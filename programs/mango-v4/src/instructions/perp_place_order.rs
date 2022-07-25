@@ -4,8 +4,8 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::state::MangoAccount;
 use crate::state::{
-    compute_health, new_fixed_order_account_retriever, oracle_price, Book, BookSide, EventQueue,
-    Group, HealthType, MangoAccountAnchorLoader, OrderType, PerpMarket, Side,
+    compute_health, new_fixed_order_account_retriever, oracle_price, AccountLoaderDynamic, Book,
+    BookSide, EventQueue, Group, HealthType, OrderType, PerpMarket, Side,
 };
 
 #[derive(Accounts)]
@@ -13,7 +13,7 @@ pub struct PerpPlaceOrder<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group)]
-    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
+    pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     #[account(

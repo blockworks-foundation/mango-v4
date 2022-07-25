@@ -2,8 +2,8 @@ use crate::accounts_zerocopy::*;
 use crate::error::MangoError;
 use crate::logs::{MarginTradeLog, TokenBalanceLog};
 use crate::state::{
-    compute_health, new_fixed_order_account_retriever, AccountRetriever, Bank, Group, HealthType,
-    MangoAccount, MangoAccountAccMut, MangoAccountAnchorLoader,
+    compute_health, new_fixed_order_account_retriever, AccountLoaderDynamic, AccountRetriever,
+    Bank, Group, HealthType, MangoAccount, MangoAccountAccMut,
 };
 use crate::{group_seeds, Mango};
 use anchor_lang::prelude::*;
@@ -30,7 +30,7 @@ pub struct FlashLoan<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group, has_one = owner)]
-    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
+    pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
     pub token_program: Program<'info, Token>,
 }

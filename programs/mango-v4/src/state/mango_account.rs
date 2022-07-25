@@ -7,19 +7,6 @@ use std::mem::size_of;
 
 use crate::state::*;
 
-// todo: these are arbitrary
-// ckamm: Either we put hard limits on everything, or we have a simple model for how much
-// compute a token/serum/perp market needs, so users who don't use serum markets can have
-// more perp markets open at the same time etc
-// In particular if perp markets don't require the base token to be active on the account,
-// we could probably support 1 token (quote currency) + 15 active perp markets at the same time
-// It's a tradeoff between allowing users to trade on many markets with one account,
-// MangoAccount size and health compute needs.
-const MAX_TOKEN_POSITIONS: usize = 16;
-const MAX_SERUM3_ACCOUNTS: usize = 8;
-const MAX_PERP_ACCOUNTS: usize = 8;
-pub const MAX_PERP_OPEN_ORDERS: usize = 8;
-
 pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 
 #[zero_copy]

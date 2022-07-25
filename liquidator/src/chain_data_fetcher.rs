@@ -32,7 +32,7 @@ impl ChainDataAccountFetcher {
 
     pub fn fetch_mango_account(&self, address: &Pubkey) -> anyhow::Result<MangoAccountValue> {
         let acc = self.fetch_raw(address)?;
-        Ok(MangoAccountValue::try_new(acc.data())
+        Ok(MangoAccountValue::from_bytes(acc.data())
             .with_context(|| format!("loading mango account {}", address))?)
     }
 

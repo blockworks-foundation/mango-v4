@@ -32,7 +32,7 @@ pub trait ClientAccountLoader {
     async fn load_mango_account(&self, pubkey: &Pubkey) -> Option<MangoAccountValue> {
         self.load_bytes(pubkey)
             .await
-            .map(|v| MangoAccountValue::try_new(&v[8..]).unwrap())
+            .map(|v| MangoAccountValue::from_bytes(&v[8..]).unwrap())
     }
 }
 
@@ -310,7 +310,7 @@ fn from_serum_style_pubkey(d: &[u64; 4]) -> Pubkey {
 
 pub async fn get_mango_account(solana: &SolanaCookie, account: Pubkey) -> MangoAccountValue {
     let bytes = solana.get_account_data(account).await.unwrap();
-    MangoAccountValue::try_new(&bytes[8..]).unwrap()
+    MangoAccountValue::from_bytes(&bytes[8..]).unwrap()
 }
 
 pub async fn account_position(solana: &SolanaCookie, account: Pubkey, bank: Pubkey) -> i64 {

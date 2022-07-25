@@ -41,7 +41,7 @@ pub fn fetch_mango_accounts(
         .rpc()
         .get_program_accounts_with_config(&program.id(), config)?
         .into_iter()
-        .map(|(key, account)| Ok((key, MangoAccountValue::try_new(&account.data[8..])?)))
+        .map(|(key, account)| Ok((key, MangoAccountValue::from_bytes(&account.data[8..])?)))
         .collect::<Result<Vec<_>, _>>()
 }
 

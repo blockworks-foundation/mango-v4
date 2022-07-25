@@ -10,7 +10,7 @@ pub struct Serum3LiqForceCancelOrders<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group)]
-    pub account: MangoAccountAnchorLoader<'info, MangoAccount>,
+    pub account: AccountLoaderDynamic<'info, MangoAccount>,
 
     #[account(mut)]
     /// CHECK: Validated inline by checking against the pubkey stored in the account
