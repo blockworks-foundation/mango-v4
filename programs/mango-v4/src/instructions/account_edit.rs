@@ -24,7 +24,6 @@ pub fn account_edit(
         MangoError::SomeError
     );
 
-    //let mut mal: MangoAccountLoader<MangoAccount> = MangoAccountLoader::new(&ctx.accounts.account)?;
     let mut account = ctx.accounts.account.load_mut()?;
 
     // note: unchanged fields are inline, and match exact definition in create_account
