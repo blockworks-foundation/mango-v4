@@ -304,7 +304,7 @@ pub fn serum3_place_order(
 // if reserved has increased, then increase cached value by the increase in reserved
 pub fn inc_maybe_loan(
     market_index: Serum3MarketIndex,
-    account: &mut MangoAccountAccMut,
+    account: &mut MangoAccountRefMut,
     before_oo: &OpenOrdersSlim,
     after_oo: &OpenOrdersSlim,
 ) {
@@ -332,7 +332,7 @@ pub struct VaultDifferenceResult {
 }
 
 impl VaultDifferenceResult {
-    pub fn deactivate_inactive_token_accounts(&self, account: &mut MangoAccountAccMut) {
+    pub fn deactivate_inactive_token_accounts(&self, account: &mut MangoAccountRefMut) {
         if !self.base_active {
             account.token_deactivate(self.base_raw_index);
         }
@@ -343,7 +343,7 @@ impl VaultDifferenceResult {
 }
 
 pub fn apply_vault_difference(
-    account: &mut MangoAccountAccMut,
+    account: &mut MangoAccountRefMut,
     base_bank: &mut Bank,
     after_base_vault: u64,
     before_base_vault: u64,

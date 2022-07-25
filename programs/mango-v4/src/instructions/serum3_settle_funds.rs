@@ -171,7 +171,7 @@ pub fn charge_maybe_fees(
     market_index: Serum3MarketIndex,
     coin_bank: &mut Bank,
     pc_bank: &mut Bank,
-    account: &mut MangoAccountAccMut,
+    account: &mut MangoAccountRefMut,
     after_oo: &OpenOrdersSlim,
 ) -> Result<()> {
     let serum3_account = account.serum3_find_mut(market_index).unwrap();

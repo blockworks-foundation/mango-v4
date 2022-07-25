@@ -14,7 +14,7 @@ use crate::serum3_cpi;
 use crate::state::{oracle_price, Bank, PerpMarket, PerpMarketIndex, TokenIndex};
 use crate::util::checked_math as cm;
 
-use super::MangoAccountAcc;
+use super::MangoAccountRef;
 
 const BANKRUPTCY_DUST_THRESHOLD: I80F48 = I80F48!(0.000001);
 
@@ -61,7 +61,7 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
 
 pub fn new_fixed_order_account_retriever<'a, 'info>(
     ais: &'a [AccountInfo<'info>],
-    account: &MangoAccountAcc,
+    account: &MangoAccountRef,
 ) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
     let active_token_len = account.token_iter_active().count();
     let active_serum3_len = account.serum3_iter_active().count();
@@ -379,7 +379,7 @@ pub enum HealthType {
 ///
 /// These account infos must fit the fixed layout defined by FixedOrderAccountRetriever.
 pub fn compute_health_from_fixed_accounts(
-    account: &MangoAccountAcc,
+    account: &MangoAccountRef,
     health_type: HealthType,
     ais: &[AccountInfo],
 ) -> Result<I80F48> {
@@ -405,7 +405,7 @@ pub fn compute_health_from_fixed_accounts(
 
 /// Compute health with an arbitrary AccountRetriever
 pub fn compute_health(
-    account: &MangoAccountAcc,
+    account: &MangoAccountRef,
     health_type: HealthType,
     retriever: &impl AccountRetriever,
 ) -> Result<I80F48> {
@@ -787,7 +787,7 @@ fn find_token_info_index(infos: &[TokenInfo], token_index: TokenIndex) -> Result
 
 /// Generate a HealthCache for an account and its health accounts.
 pub fn new_health_cache(
-    account: &MangoAccountAcc,
+    account: &MangoAccountRef,
     retriever: &impl AccountRetriever,
 ) -> Result<HealthCache> {
     // token contribution from token accounts

@@ -3,7 +3,7 @@ use crate::error::MangoError;
 use crate::logs::{MarginTradeLog, TokenBalanceLog};
 use crate::state::{
     compute_health, new_fixed_order_account_retriever, AccountLoaderDynamic, AccountRetriever,
-    Bank, Group, HealthType, MangoAccount, MangoAccountAccMut,
+    Bank, Group, HealthType, MangoAccount, MangoAccountRefMut,
 };
 use crate::{group_seeds, Mango};
 use anchor_lang::prelude::*;
@@ -374,7 +374,7 @@ fn adjust_for_post_cpi_vault_amounts(
     health_ais: &[AccountInfo],
     cpi_ais: &[AccountInfo],
     used_vaults: &HashMap<&Pubkey, AllowedVault>,
-    account: &mut MangoAccountAccMut,
+    account: &mut MangoAccountRefMut,
 ) -> Result<Vec<usize>> {
     let mut inactive_token_raw_indexes = Vec::with_capacity(used_vaults.len());
     for (_, info) in used_vaults.iter() {

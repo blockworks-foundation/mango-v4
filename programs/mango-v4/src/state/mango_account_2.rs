@@ -253,7 +253,7 @@ impl MangoAccountFixed {
 
 // Header is created by scanning and parsing dynamic portion of the account
 // Header stores useful information e.g. offsets to easily seek into dynamic content
-pub trait Header: Sized {
+pub trait DynamicHeader: Sized {
     // build header by scanning and parsing dynamic portion of the account
     fn from_bytes(data: &[u8]) -> Result<Self>;
 
@@ -261,12 +261,12 @@ pub trait Header: Sized {
     fn initialize(data: &mut [u8]) -> Result<()>;
 }
 
-pub trait DynamicAccount: Owner + Discriminator {
-    type Header: Header;
+pub trait DynamicAccountType: Owner + Discriminator {
+    type Header: DynamicHeader;
     type Fixed: bytemuck::Pod;
 }
 
-impl DynamicAccount for MangoAccount {
+impl DynamicAccountType for MangoAccount {
     type Header = MangoAccountDynamicHeader;
     type Fixed = MangoAccountFixed;
 }
@@ -335,27 +335,30 @@ impl MangoAccountDynamicHeader {
 }
 
 #[derive(Clone)]
-pub struct DynamicAccessor<Header, Fixed, Dynamic> {
+pub struct DynamicAccount<Header, Fixed, Dynamic> {
     pub header: Header,
     pub fixed: Fixed,
     pub dynamic: Dynamic,
 }
 
-type DynamicAccessorValue<D> =
-    DynamicAccessor<<D as DynamicAccount>::Header, <D as DynamicAccount>::Fixed, Vec<u8>>;
-type DynamicAccessorRef<'a, D> =
-    DynamicAccessor<&'a <D as DynamicAccount>::Header, &'a <D as DynamicAccount>::Fixed, &'a [u8]>;
-type DynamicAccessorRefMut<'a, D> = DynamicAccessor<
-    &'a mut <D as DynamicAccount>::Header,
-    &'a mut <D as DynamicAccount>::Fixed,
+type DynamicAccountValue<D> =
+    DynamicAccount<<D as DynamicAccountType>::Header, <D as DynamicAccountType>::Fixed, Vec<u8>>;
+type DynamicAccountRef<'a, D> = DynamicAccount<
+    &'a <D as DynamicAccountType>::Header,
+    &'a <D as DynamicAccountType>::Fixed,
+    &'a [u8],
+>;
+type DynamicAccountRefMut<'a, D> = DynamicAccount<
+    &'a mut <D as DynamicAccountType>::Header,
+    &'a mut <D as DynamicAccountType>::Fixed,
     &'a mut [u8],
 >;
 
-pub type MangoAccountValue = DynamicAccessorValue<MangoAccount>;
-pub type MangoAccountAcc<'a> = DynamicAccessorRef<'a, MangoAccount>;
-pub type MangoAccountAccWithHeader<'a> =
-    DynamicAccessor<MangoAccountDynamicHeader, &'a MangoAccountFixed, &'a [u8]>;
-pub type MangoAccountAccMut<'a> = DynamicAccessorRefMut<'a, MangoAccount>;
+pub type MangoAccountValue = DynamicAccountValue<MangoAccount>;
+pub type MangoAccountRef<'a> = DynamicAccountRef<'a, MangoAccount>;
+pub type MangoAccountRefMut<'a> = DynamicAccountRefMut<'a, MangoAccount>;
+pub type MangoAccountRefWithHeader<'a> =
+    DynamicAccount<MangoAccountDynamicHeader, &'a MangoAccountFixed, &'a [u8]>;
 
 impl MangoAccountValue {
     // bytes without discriminator
@@ -369,7 +372,7 @@ impl MangoAccountValue {
     }
 }
 
-impl<'a> MangoAccountAccWithHeader<'a> {
+impl<'a> MangoAccountRefWithHeader<'a> {
     // bytes without discriminator
     pub fn from_bytes(bytes: &'a [u8]) -> Result<Self> {
         let (fixed, dynamic) = bytes.split_at(size_of::<MangoAccountFixed>());
@@ -381,6 +384,10 @@ impl<'a> MangoAccountAccWithHeader<'a> {
     }
 }
 
+// Want to generalize over:
+// - T (which is Borrow<T>)
+// - &T (which is Borrow<T> and Deref<Target=T>)
+// - Ref<T> (which is Deref<T>)
 pub trait DerefOrBorrow<T: ?Sized> {
     fn deref_or_borrow(&self) -> &T;
 }
@@ -449,12 +456,13 @@ impl<T: Sized> DerefOrBorrowMut<[T]> for Vec<T> {
     }
 }
 
-// This generic impl covers MangoAccountAcc and MangoAccountAccMut
+// This generic impl covers MangoAccountRef, MangoAccountRefMut and other
+// DynamicAccountValue variants that allow read access.
 impl<
         Header: DerefOrBorrow<MangoAccountDynamicHeader>,
         Fixed: DerefOrBorrow<MangoAccountFixed>,
         Dynamic: DerefOrBorrow<[u8]>,
-    > DynamicAccessor<Header, Fixed, Dynamic>
+    > DynamicAccount<Header, Fixed, Dynamic>
 {
     fn header(&self) -> &MangoAccountDynamicHeader {
         self.header.deref_or_borrow()
@@ -587,8 +595,8 @@ impl<
         self.fixed().is_bankrupt()
     }
 
-    pub fn borrow<'b>(&'b self) -> DynamicAccessorRef<'b, MangoAccount> {
-        DynamicAccessor {
+    pub fn borrow<'b>(&'b self) -> DynamicAccountRef<'b, MangoAccount> {
+        DynamicAccount {
             header: self.header(),
             fixed: self.fixed(),
             dynamic: self.dynamic(),
@@ -607,7 +615,7 @@ impl<
         Header: DerefOrBorrowMut<MangoAccountDynamicHeader> + DerefOrBorrow<MangoAccountDynamicHeader>,
         Fixed: DerefOrBorrowMut<MangoAccountFixed> + DerefOrBorrow<MangoAccountFixed>,
         Dynamic: DerefOrBorrowMut<[u8]> + DerefOrBorrow<[u8]>,
-    > DynamicAccessor<Header, Fixed, Dynamic>
+    > DynamicAccount<Header, Fixed, Dynamic>
 {
     fn header_mut(&mut self) -> &mut MangoAccountDynamicHeader {
         self.header.deref_or_borrow_mut()
@@ -616,8 +624,8 @@ impl<
         self.dynamic.deref_or_borrow_mut()
     }
 
-    pub fn borrow_mut<'b>(&'b mut self) -> DynamicAccessorRefMut<'b, MangoAccount> {
-        DynamicAccessor {
+    pub fn borrow_mut<'b>(&'b mut self) -> DynamicAccountRefMut<'b, MangoAccount> {
+        DynamicAccount {
             header: self.header.deref_or_borrow_mut(),
             fixed: self.fixed.deref_or_borrow_mut(),
             dynamic: self.dynamic.deref_or_borrow_mut(),
@@ -1031,7 +1039,7 @@ impl<
     }
 }
 
-impl Header for MangoAccountDynamicHeader {
+impl DynamicHeader for MangoAccountDynamicHeader {
     fn from_bytes(data: &[u8]) -> Result<Self> {
         let token_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
             data,
@@ -1074,12 +1082,12 @@ impl Header for MangoAccountDynamicHeader {
     }
 }
 
-pub struct AccountLoaderDynamic<'info, D: DynamicAccount> {
+pub struct AccountLoaderDynamic<'info, D: DynamicAccountType> {
     acc_info: AccountInfo<'info>,
     phantom1: PhantomData<&'info D>,
 }
 
-impl<'info, D: DynamicAccount> AccountLoaderDynamic<'info, D> {
+impl<'info, D: DynamicAccountType> AccountLoaderDynamic<'info, D> {
     pub fn try_from(acc_info: &AccountInfo<'info>) -> Result<Self> {
         if acc_info.owner != &D::owner() {
             return Err(Error::from(ErrorCode::AccountOwnedByWrongProgram)
@@ -1124,12 +1132,12 @@ impl<'info, D: DynamicAccount> AccountLoaderDynamic<'info, D> {
     /// Returns a Ref to the account data structure for reading.
     pub fn load<'a>(
         &'a self,
-    ) -> Result<DynamicAccessor<D::Header, Ref<'a, D::Fixed>, Ref<'a, [u8]>>> {
+    ) -> Result<DynamicAccount<D::Header, Ref<'a, D::Fixed>, Ref<'a, [u8]>>> {
         let data = self.acc_info.try_borrow_data()?;
         let header = D::Header::from_bytes(&data[8 + size_of::<D::Fixed>()..])?;
         let (_, data) = Ref::map_split(data, |d| d.split_at(8));
         let (fixed_bytes, dynamic) = Ref::map_split(data, |d| d.split_at(size_of::<D::Fixed>()));
-        Ok(DynamicAccessor {
+        Ok(DynamicAccount {
             header,
             fixed: Ref::map(fixed_bytes, |b| bytemuck::from_bytes(b)),
             dynamic,
@@ -1138,7 +1146,7 @@ impl<'info, D: DynamicAccount> AccountLoaderDynamic<'info, D> {
 
     pub fn load_init<'a>(
         &'a self,
-    ) -> Result<DynamicAccessor<D::Header, RefMut<'a, D::Fixed>, RefMut<'a, [u8]>>> {
+    ) -> Result<DynamicAccount<D::Header, RefMut<'a, D::Fixed>, RefMut<'a, [u8]>>> {
         if !self.acc_info.is_writable {
             return Err(ErrorCode::AccountNotMutable.into());
         }
@@ -1164,7 +1172,7 @@ impl<'info, D: DynamicAccount> AccountLoaderDynamic<'info, D> {
     /// Returns a Ref to the account data structure for reading.
     pub fn load_mut<'a>(
         &'a self,
-    ) -> Result<DynamicAccessor<D::Header, RefMut<'a, D::Fixed>, RefMut<'a, [u8]>>> {
+    ) -> Result<DynamicAccount<D::Header, RefMut<'a, D::Fixed>, RefMut<'a, [u8]>>> {
         if !self.acc_info.is_writable {
             return Err(ErrorCode::AccountNotMutable.into());
         }
@@ -1174,7 +1182,7 @@ impl<'info, D: DynamicAccount> AccountLoaderDynamic<'info, D> {
         let (_, data) = RefMut::map_split(data, |d| d.split_at_mut(8));
         let (fixed_bytes, dynamic) =
             RefMut::map_split(data, |d| d.split_at_mut(size_of::<D::Fixed>()));
-        Ok(DynamicAccessor {
+        Ok(DynamicAccount {
             header,
             fixed: RefMut::map(fixed_bytes, |b| bytemuck::from_bytes_mut(b)),
             dynamic,
@@ -1182,7 +1190,7 @@ impl<'info, D: DynamicAccount> AccountLoaderDynamic<'info, D> {
     }
 }
 
-impl<'info, D: DynamicAccount> anchor_lang::Accounts<'info> for AccountLoaderDynamic<'info, D> {
+impl<'info, D: DynamicAccountType> anchor_lang::Accounts<'info> for AccountLoaderDynamic<'info, D> {
     #[inline(never)]
     fn try_accounts(
         _program_id: &Pubkey,
@@ -1201,7 +1209,9 @@ impl<'info, D: DynamicAccount> anchor_lang::Accounts<'info> for AccountLoaderDyn
     }
 }
 
-impl<'info, D: DynamicAccount> anchor_lang::AccountsExit<'info> for AccountLoaderDynamic<'info, D> {
+impl<'info, D: DynamicAccountType> anchor_lang::AccountsExit<'info>
+    for AccountLoaderDynamic<'info, D>
+{
     fn exit(&self, _program_id: &Pubkey) -> Result<()> {
         // Normally anchor writes the discriminator again here, but I don't see why
         let data = self.acc_info.try_borrow_data()?;
@@ -1216,7 +1226,7 @@ impl<'info, D: DynamicAccount> anchor_lang::AccountsExit<'info> for AccountLoade
     }
 }
 
-impl<'info, D: DynamicAccount> anchor_lang::AccountsClose<'info>
+impl<'info, D: DynamicAccountType> anchor_lang::AccountsClose<'info>
     for AccountLoaderDynamic<'info, D>
 {
     fn close(&self, sol_destination: AccountInfo<'info>) -> Result<()> {
@@ -1224,7 +1234,7 @@ impl<'info, D: DynamicAccount> anchor_lang::AccountsClose<'info>
     }
 }
 
-impl<'info, D: DynamicAccount> anchor_lang::ToAccountMetas for AccountLoaderDynamic<'info, D> {
+impl<'info, D: DynamicAccountType> anchor_lang::ToAccountMetas for AccountLoaderDynamic<'info, D> {
     fn to_account_metas(&self, is_signer: Option<bool>) -> Vec<AccountMeta> {
         let is_signer = is_signer.unwrap_or(self.acc_info.is_signer);
         let meta = match self.acc_info.is_writable {
@@ -1235,13 +1245,13 @@ impl<'info, D: DynamicAccount> anchor_lang::ToAccountMetas for AccountLoaderDyna
     }
 }
 
-impl<'info, D: DynamicAccount> AsRef<AccountInfo<'info>> for AccountLoaderDynamic<'info, D> {
+impl<'info, D: DynamicAccountType> AsRef<AccountInfo<'info>> for AccountLoaderDynamic<'info, D> {
     fn as_ref(&self) -> &AccountInfo<'info> {
         &self.acc_info
     }
 }
 
-impl<'info, D: DynamicAccount> anchor_lang::ToAccountInfos<'info>
+impl<'info, D: DynamicAccountType> anchor_lang::ToAccountInfos<'info>
     for AccountLoaderDynamic<'info, D>
 {
     fn to_account_infos(&self) -> Vec<AccountInfo<'info>> {
@@ -1249,7 +1259,7 @@ impl<'info, D: DynamicAccount> anchor_lang::ToAccountInfos<'info>
     }
 }
 
-impl<'info, D: DynamicAccount> anchor_lang::Key for AccountLoaderDynamic<'info, D> {
+impl<'info, D: DynamicAccountType> anchor_lang::Key for AccountLoaderDynamic<'info, D> {
     fn key(&self) -> Pubkey {
         *self.acc_info.key
     }

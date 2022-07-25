@@ -1,7 +1,7 @@
 use std::cell::RefMut;
 
 use crate::accounts_zerocopy::*;
-use crate::state::MangoAccountAccMut;
+use crate::state::MangoAccountRefMut;
 use crate::{
     error::MangoError,
     state::{
@@ -159,7 +159,7 @@ impl<'a> Book<'a> {
         perp_market: &mut PerpMarket,
         event_queue: &mut EventQueue,
         oracle_price: I80F48,
-        mango_account: &mut MangoAccountAccMut,
+        mango_account: &mut MangoAccountRefMut,
         mango_account_pk: &Pubkey,
         price_lots: i64,
         max_base_lots: i64,
@@ -387,7 +387,7 @@ impl<'a> Book<'a> {
 
     pub fn cancel_all_order(
         &mut self,
-        mango_account: &mut MangoAccountAccMut,
+        mango_account: &mut MangoAccountRefMut,
         perp_market: &mut PerpMarket,
         mut limit: u8,
         side_to_cancel_option: Option<Side>,
@@ -441,7 +441,7 @@ impl<'a> Book<'a> {
 /// both the maker and taker fees.
 fn apply_fees(
     market: &mut PerpMarket,
-    mango_account: &mut MangoAccountAccMut,
+    mango_account: &mut MangoAccountRefMut,
     total_quote_taken: i64,
 ) -> Result<()> {
     let taker_quote_native = I80F48::from_num(

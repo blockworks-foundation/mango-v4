@@ -6,10 +6,10 @@ use fixed::types::I80F48;
 
 use crate::events::{Equity, TokenEquity};
 
-use super::{MangoAccountAcc, ScanningAccountRetriever};
+use super::{MangoAccountRef, ScanningAccountRetriever};
 
 pub fn compute_equity(
-    account: &MangoAccountAcc,
+    account: &MangoAccountRef,
     retriever: &ScanningAccountRetriever,
 ) -> Result<Equity> {
     let mut token_equity_map = HashMap::new();

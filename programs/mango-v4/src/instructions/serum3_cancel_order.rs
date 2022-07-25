@@ -109,7 +109,7 @@ pub fn serum3_cancel_order(
 // the cached
 pub fn decrease_maybe_loan(
     market_index: Serum3MarketIndex,
-    account: &mut MangoAccountAccMut,
+    account: &mut MangoAccountRefMut,
     before_oo: &OpenOrdersSlim,
     after_oo: &OpenOrdersSlim,
 ) {

@@ -1,7 +1,7 @@
 use anchor_lang::Discriminator;
 use arrayref::array_ref;
 
-use mango_v4::state::{Bank, MangoAccount, MangoAccountAccWithHeader, MintInfo, PerpMarket};
+use mango_v4::state::{Bank, MangoAccount, MangoAccountRefWithHeader, MintInfo, PerpMarket};
 
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
 use solana_sdk::pubkey::Pubkey;
@@ -10,7 +10,7 @@ pub fn is_mango_account<'a>(
     account: &'a AccountSharedData,
     program_id: &Pubkey,
     group_id: &Pubkey,
-) -> Option<MangoAccountAccWithHeader<'a>> {
+) -> Option<MangoAccountRefWithHeader<'a>> {
     let data = account.data();
     if account.owner() != program_id || data.is_empty() {
         return None;
@@ -21,7 +21,7 @@ pub fn is_mango_account<'a>(
         return None;
     }
 
-    let mango_account = MangoAccountAccWithHeader::from_bytes(&data[8..]).expect("always ok");
+    let mango_account = MangoAccountRefWithHeader::from_bytes(&data[8..]).expect("always ok");
     if mango_account.fixed.group != *group_id {
         return None;
     }
