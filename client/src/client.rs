@@ -14,6 +14,7 @@ use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Sid
 use mango_v4::state::{AccountSize, Bank, Group, MangoAccountValue, Serum3MarketIndex, TokenIndex};
 
 use solana_client::rpc_client::RpcClient;
+use solana_client::rpc_config::RpcSendTransactionConfig;
 
 use crate::account_fetcher::*;
 use crate::context::{MangoGroupContext, Serum3MarketContext, TokenContext};
@@ -146,6 +147,7 @@ impl MangoClient {
                     ),
                 })
                 .send()
+                .map_err(prettify_client_error)
                 .context("Failed to create account...")?;
         }
         let mango_account_tuples = fetch_mango_accounts(&program, group, payer.pubkey())?;
@@ -753,7 +755,7 @@ pub enum MangoClientError {
 /// Unfortunately solana's RpcResponseError will very unhelpfully print [N log messages]
 /// instead of showing the actual log messages. This unpacks the error to provide more useful
 /// output.
-fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
+pub fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
     use solana_client::client_error::ClientErrorKind;
     use solana_client::rpc_request::{RpcError, RpcResponseErrorData};
     match &err {

@@ -33,7 +33,7 @@ struct CliDotenv {
     remaining_args: Vec<std::ffi::OsString>,
 }
 
-#[derive(Parser)]
+#[derive(Parser, Debug, Clone)]
 #[clap()]
 struct Cli {
     #[clap(short, long, env)]
@@ -64,7 +64,7 @@ fn keypair_from_path(p: &std::path::PathBuf) -> Keypair {
         .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy()))
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug, Clone)]
 enum Command {
     Crank {},
     Taker {},
