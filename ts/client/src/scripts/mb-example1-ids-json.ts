@@ -2,7 +2,7 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { HealthType } from '../accounts/mangoAccount';
-import { MangoClient } from '../client';
+import { MangoClient, AccountSize } from '../index';
 import { toUiDecimals } from '../utils';
 
 //
@@ -11,7 +11,7 @@ import { toUiDecimals } from '../utils';
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.CLUSTER_URL, options);
+  const connection = new Connection(process.env.CLUSTER_URL!, options);
 
   const user = Keypair.fromSecretKey(
     Buffer.from(
@@ -45,6 +45,7 @@ async function main() {
   const mangoAccount = await client.getOrCreateMangoAccount(
     group,
     user.publicKey,
+    user,
     0,
     AccountSize.small,
     'my_mango_account',
@@ -54,11 +55,11 @@ async function main() {
 
   if (false) {
     console.log(`...depositing 10 USDC`);
-    await client.tokenDeposit(group, mangoAccount, 'USDC', 10);
+    await client.tokenDeposit(group, mangoAccount, 'USDC', 10, user);
     await mangoAccount.reload(client, group);
 
     console.log(`...depositing 1 SOL`);
-    await client.tokenDeposit(group, mangoAccount, 'SOL', 1);
+    await client.tokenDeposit(group, mangoAccount, 'SOL', 1, user);
     await mangoAccount.reload(client, group);
   }
 

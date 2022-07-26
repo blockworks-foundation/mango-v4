@@ -44,6 +44,7 @@ async function main() {
   const mangoAccount = await client.getOrCreateMangoAccount(
     group,
     user.publicKey,
+    user,
     0,
     AccountSize.small,
     'my_mango_account',
@@ -54,11 +55,11 @@ async function main() {
   if (false) {
     // deposit and withdraw
     console.log(`Depositing...50 USDC`);
-    await client.tokenDeposit(group, mangoAccount, 'USDC', 50);
+    await client.tokenDeposit(group, mangoAccount, 'USDC', 50, user);
     await mangoAccount.reload(client, group);
 
     console.log(`Depositing...0.0005 BTC`);
-    await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005);
+    await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005, user);
     await mangoAccount.reload(client, group);
   }
   try {
