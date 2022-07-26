@@ -118,9 +118,9 @@ dependencies = [
 [[package]]
 name = "anchor-attribute-access-control"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab#1153380487706e4d8f486071cf2f519468438eab"
+source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "anyhow",
  "proc-macro2 1.0.39",
  "quote 1.0.18",
@@ -146,9 +146,9 @@ dependencies = [
 [[package]]
 name = "anchor-attribute-account"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab#1153380487706e4d8f486071cf2f519468438eab"
+source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "anyhow",
  "bs58 0.4.0",
  "proc-macro2 1.0.39",
@@ -171,9 +171,9 @@ dependencies = [
 [[package]]
 name = "anchor-attribute-constant"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab#1153380487706e4d8f486071cf2f519468438eab"
+source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "proc-macro2 1.0.39",
  "syn 1.0.95",
 ]
@@ -193,9 +193,9 @@ dependencies = [
 [[package]]
 name = "anchor-attribute-error"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab#1153380487706e4d8f486071cf2f519468438eab"
+source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "proc-macro2 1.0.39",
  "quote 1.0.18",
  "syn 1.0.95",
@@ -217,9 +217,9 @@ dependencies = [
 [[package]]
 name = "anchor-attribute-event"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab#1153380487706e4d8f486071cf2f519468438eab"
+source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "anyhow",
  "proc-macro2 1.0.39",
  "quote 1.0.18",
@@ -243,9 +243,9 @@ dependencies = [
 [[package]]
 name = "anchor-attribute-interface"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab#1153380487706e4d8f486071cf2f519468438eab"
+source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "anyhow",
  "heck 0.3.3",
  "proc-macro2 1.0.39",
@@ -269,9 +269,9 @@ dependencies = [
 [[package]]
 name = "anchor-attribute-program"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab#1153380487706e4d8f486071cf2f519468438eab"
+source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "anyhow",
  "proc-macro2 1.0.39",
  "quote 1.0.18",
@@ -294,9 +294,9 @@ dependencies = [
 [[package]]
 name = "anchor-attribute-state"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab#1153380487706e4d8f486071cf2f519468438eab"
+source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "anyhow",
  "proc-macro2 1.0.39",
  "quote 1.0.18",
@@ -306,9 +306,9 @@ dependencies = [
 [[package]]
 name = "anchor-client"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab#1153380487706e4d8f486071cf2f519468438eab"
+source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "anyhow",
  "regex",
  "serde",
@@ -335,9 +335,9 @@ dependencies = [
 [[package]]
 name = "anchor-derive-accounts"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab#1153380487706e4d8f486071cf2f519468438eab"
+source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "anyhow",
  "proc-macro2 1.0.39",
  "quote 1.0.18",
@@ -371,17 +371,17 @@ dependencies = [
 [[package]]
 name = "anchor-lang"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab#1153380487706e4d8f486071cf2f519468438eab"
+source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-attribute-access-control 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
- "anchor-attribute-account 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
- "anchor-attribute-constant 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
- "anchor-attribute-error 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
- "anchor-attribute-event 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
- "anchor-attribute-interface 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
- "anchor-attribute-program 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
- "anchor-attribute-state 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
- "anchor-derive-accounts 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-attribute-access-control 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-attribute-account 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-attribute-constant 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-attribute-error 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-attribute-event 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-attribute-interface 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-attribute-program 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-attribute-state 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-derive-accounts 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "arrayref",
  "base64 0.13.0",
  "bincode",
@@ -406,9 +406,9 @@ dependencies = [
 [[package]]
 name = "anchor-spl"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab#1153380487706e4d8f486071cf2f519468438eab"
+source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "solana-program",
  "spl-associated-token-account",
  "spl-token",
@@ -436,7 +436,7 @@ dependencies = [
 [[package]]
 name = "anchor-syn"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab#1153380487706e4d8f486071cf2f519468438eab"
+source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
  "anyhow",
  "bs58 0.3.1",
@@ -1199,8 +1199,8 @@ name = "client"
 version = "0.1.0"
 dependencies = [
  "anchor-client",
- "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
- "anchor-spl 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-spl 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "anyhow",
  "fixed",
  "fixed-macro",
@@ -2823,8 +2823,8 @@ name = "keeper"
 version = "0.1.0"
 dependencies = [
  "anchor-client",
- "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
- "anchor-spl 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-spl 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "anyhow",
  "clap 3.1.18",
  "client",
@@ -2977,7 +2977,7 @@ name = "liquidator"
 version = "0.0.1"
 dependencies = [
  "anchor-client",
- "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "anyhow",
  "arrayref",
  "async-channel",
@@ -3096,8 +3096,8 @@ dependencies = [
 name = "mango-v4"
 version = "0.1.0"
 dependencies = [
- "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
- "anchor-spl 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-spl 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "arrayref",
  "async-trait",
  "base64 0.13.0",
@@ -3133,8 +3133,8 @@ dependencies = [
 name = "margin-trade"
 version = "0.1.0"
 dependencies = [
- "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
- "anchor-spl 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=1153380487706e4d8f486071cf2f519468438eab)",
+ "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-spl 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
  "solana-program",
 ]
 
