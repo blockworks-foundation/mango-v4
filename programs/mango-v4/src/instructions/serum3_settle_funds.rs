@@ -184,7 +184,6 @@ pub fn charge_maybe_fees(
 
     if maybe_actualized_coin_loan > 0 {
         serum3_account.previous_native_coin_reserved = after_oo.native_coin_reserved();
-        drop(serum3_account);
 
         // loan origination fees
         let coin_token_account = account.token_get_mut(coin_bank.token_index)?.0;
