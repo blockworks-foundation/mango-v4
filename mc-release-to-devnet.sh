@@ -16,7 +16,7 @@ PROGRAM_ID=5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM
 
 # TODO fix need for --skip-lint
 # build program, 
-cargo run --manifest-path ../anchor/cli/Cargo.toml build --skip-lint
+cargo run --manifest-path ./anchor/cli/Cargo.toml build --skip-lint
 
 # patch types, which we want in rust, but anchor client doesn't support
 ./idl-fixup.sh
@@ -29,7 +29,7 @@ if [[ -z "${NO_DEPLOY}" ]]; then
     solana --url https://mango.devnet.rpcpool.com program deploy --program-id 5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM -k ~/.config/solana/mango-devnet.json target/deploy/mango_v4.so
 
     # publish idl
-    cargo run --manifest-path ../anchor/cli/Cargo.toml idl upgrade --provider.cluster https://mango.devnet.rpcpool.com --provider.wallet $WALLET_WITH_FUNDS --filepath target/idl/mango_v4.json $PROGRAM_ID
+    cargo run --manifest-path ./anchor/cli/Cargo.toml idl upgrade --provider.cluster https://mango.devnet.rpcpool.com --provider.wallet $WALLET_WITH_FUNDS --filepath target/idl/mango_v4.json $PROGRAM_ID
 else
     echo "Skipping deployment..."
 fi

@@ -1,0 +1,4 @@
+[submodule "anchor"]
+	path = anchor
+	url = git@github.com:blockworks-foundation/anchor.git
+	branch = v0.25.0-mangov4
