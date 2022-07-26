@@ -1,6 +1,7 @@
 mod crank;
 mod taker;
 
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -33,14 +34,14 @@ struct CliDotenv {
     remaining_args: Vec<std::ffi::OsString>,
 }
 
-#[derive(Parser)]
+#[derive(Parser, Debug, Clone)]
 #[clap()]
 struct Cli {
     #[clap(short, long, env)]
     rpc_url: String,
 
     #[clap(short, long, env = "PAYER_KEYPAIR")]
-    payer: std::path::PathBuf,
+    payer: String,
 
     #[clap(short, long, env)]
     group: Option<Pubkey>,
@@ -64,7 +65,7 @@ fn keypair_from_path(p: &std::path::PathBuf) -> Keypair {
         .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy()))
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug, Clone)]
 enum Command {
     Crank {},
     Taker {},
@@ -83,7 +84,11 @@ fn main() -> Result<(), anyhow::Error> {
     };
     let cli = Cli::parse_from(args);
 
-    let payer = keypair_from_path(&cli.payer);
+    let maybe_payer = keypair::read_keypair(&mut cli.payer.as_bytes());
+    let payer = match maybe_payer {
+        Ok(payer) => payer,
+        Err(_) => keypair_from_path(&PathBuf::from(&cli.payer)),
+    };
 
     let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss");

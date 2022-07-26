@@ -99,7 +99,9 @@ async function main() {
   await user2MangoAccount.reload(user2Client, group);
   console.log(`${user2MangoAccount.toString(group)}`);
 
-  const maxNative = await (await user2MangoAccount.getMaxWithdrawWithBorrowForToken(group, token)).toNumber();
+  const maxNative = await (
+    await user2MangoAccount.getMaxWithdrawWithBorrowForToken(group, token)
+  ).toNumber();
   amount = 0.9 * maxNative;
   console.log(`Withdrawing...${amount} native BTC'`);
   await user2Client.tokenWithdraw2(

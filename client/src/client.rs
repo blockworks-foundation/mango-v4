@@ -146,6 +146,7 @@ impl MangoClient {
                     ),
                 })
                 .send()
+                .map_err(prettify_client_error)
                 .context("Failed to create account...")?;
         }
         let mango_account_tuples = fetch_mango_accounts(&program, group, payer.pubkey())?;
@@ -753,7 +754,7 @@ pub enum MangoClientError {
 /// Unfortunately solana's RpcResponseError will very unhelpfully print [N log messages]
 /// instead of showing the actual log messages. This unpacks the error to provide more useful
 /// output.
-fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
+pub fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
     use solana_client::client_error::ClientErrorKind;
     use solana_client::rpc_request::{RpcError, RpcResponseErrorData};
     match &err {

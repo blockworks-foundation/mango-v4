@@ -48,7 +48,7 @@ pub trait AccountRetriever {
 
 /// Assumes the account infos needed for the health computation follow a strict order.
 ///
-/// 1. n_banks Bank account, in the order of account.tokens.iter_active()
+/// 1. n_banks Bank account, in the order of account.token_iter_active()
 /// 2. n_banks oracle accounts, one for each bank in the same order
 /// 3. PerpMarket accounts, in the order of account.perps.iter_active_accounts()
 /// 4. serum3 OpenOrders accounts, in the order of account.serum3.iter_active()

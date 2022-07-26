@@ -34,6 +34,7 @@ import {
   AccountSize,
   MangoAccount,
   MangoAccountData,
+  TokenPosition,
 } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
 import { OrderType, PerpMarket, Side } from './accounts/perp';
@@ -1734,9 +1735,32 @@ export class MangoClient {
   ) {
     const healthRemainingAccounts: PublicKey[] = [];
 
+    // banks for tokens need to be order of account.token_iter_active()
+    // if we are creating a new position for a token it might take an existing free slot in account.tokens
+    let maybeNewTokenPositions = mangoAccount.tokens.map(
+      (token) => token.tokenIndex,
+    );
+    if (banks) {
+      for (const bank of banks) {
+        if (!mangoAccount.tokens.find((token) => bank.tokenIndex)) {
+          // mark free slot for new token position
+          maybeNewTokenPositions[
+            mangoAccount.tokens.findIndex((token) => !token.isActive())
+          ] = bank.tokenIndex;
+        }
+      }
+    }
     const tokenIndices = mangoAccount.tokens
-      .filter((token) => token.tokenIndex !== 65535)
-      .map((token) => token.tokenIndex);
+      .filter(
+        (token, i) =>
+          // existing token position
+          token.isActive() ||
+          // or newly found free slot
+          maybeNewTokenPositions[i] !== TokenPosition.TokenIndexUnset,
+      )
+      .map((token, i) =>
+        token.isActive() ? token.tokenIndex : maybeNewTokenPositions[i],
+      );
 
     if (banks?.length) {
       for (const bank of banks) {
@@ -1755,12 +1779,12 @@ export class MangoClient {
     );
     healthRemainingAccounts.push(
       ...mangoAccount.serum3
-        .filter((serum3Account) => serum3Account.marketIndex !== 65535)
+        .filter((serum3Account) => serum3Account.isActive())
         .map((serum3Account) => serum3Account.openOrders),
     );
     healthRemainingAccounts.push(
       ...mangoAccount.perps
-        .filter((perp) => perp.marketIndex !== 65535)
+        .filter((perp) => perp.isActive())
         .map(
           (perp) =>
             Array.from(group.perpMarketsMap.values()).filter(
