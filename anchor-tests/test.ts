@@ -219,45 +219,44 @@ describe('mango-v4', () => {
     await mangoAccount.reload(client, group);
   });
 
-  // it('liquidate token and token', async () => {
+  it('liquidate token and token', async () => {
 
-  //   const mangoAccountA = await client.getOrCreateMangoAccount(
-  //     group,
-  //     users[0].keypair.publicKey,
-  //     users[0].keypair,
-  //     0,
-  //     'my_mango_account',
-  //   );
-  //   await mangoAccountA.reload(client, group);
+    const mangoAccountA = await client.getOrCreateMangoAccount(
+      group,
+      users[0].keypair.publicKey,
+      users[0].keypair,
+      0,
+      AccountSize.small,
+      'my_mango_account',
+    );
+    await mangoAccountA.reload(client, group);
 
-  //   const mangoAccountB = await client.getOrCreateMangoAccount(
-  //     group,
-  //     users[1].keypair.publicKey,
-  //     users[1].keypair,
-  //     0,
-  //     'my_mango_account',
-  //   );
-  //   await mangoAccountB.reload(client, group);
+    const mangoAccountB = await client.getOrCreateMangoAccount(
+      group,
+      users[1].keypair.publicKey,
+      users[1].keypair,
+      0,
+      AccountSize.small,
+      'my_mango_account',
+    );
+    await mangoAccountB.reload(client, group);
 
-  //   await client.stubOracleSet(group, btcOracle.publicKey, 100);
+    await client.stubOracleSet(group, btcOracle.publicKey, 100);
 
-  //   // Initialize liquidator
-  //   await client.tokenDeposit(group, mangoAccountA, 'USDC', 1000, users[0].keypair);
-  //   await client.tokenDeposit(group, mangoAccountA, 'BTC', 100, users[0].keypair);
+    // Initialize liquidator
+    await client.tokenDeposit(group, mangoAccountA, 'USDC', 1000, users[0].keypair);
+    await client.tokenDeposit(group, mangoAccountA, 'BTC', 100, users[0].keypair);
 
-  //   // Deposit collateral
-  //   await client.tokenDeposit(group, mangoAccountB, 'BTC', 100, users[1].keypair);
-  //   await mangoAccountB.reload(client, group);
-  //   // // Borrow
-  //   await client.tokenWithdraw2(group, mangoAccountB, 'USDC', 200, true, users[1].keypair);
-  //   // // Set price so health is below maintanence
-  //   await client.stubOracleSet(group, btcOracle.publicKey, 1);
+    // Deposit collateral
+    await client.tokenDeposit(group, mangoAccountB, 'BTC', 100, users[1].keypair);
+    await mangoAccountB.reload(client, group);
+    // // Borrow
+    await client.tokenWithdraw2(group, mangoAccountB, 'USDC', 200, true, users[1].keypair);
+    // // Set price so health is below maintanence
+    await client.stubOracleSet(group, btcOracle.publicKey, 1);
 
-  //   await mangoAccountB.reload(client, group);
-  //   console.log(mangoAccountB);
-  //   console.log(mangoAccountB.tokens[0].indexedPosition.toNumber());
-  //   console.log(mangoAccountB.tokens[1].indexedPosition.toNumber());
+    await mangoAccountB.reload(client, group);
 
-    // await client.liqTokenWithToken(group, mangoAccountA, mangoAccountB, users[0].keypair, 'BTC', 'USDC', 1000);
-  // });
+    await client.liqTokenWithToken(group, mangoAccountA, mangoAccountB, users[0].keypair, 'BTC', 'USDC', 1000);
+  });
 });

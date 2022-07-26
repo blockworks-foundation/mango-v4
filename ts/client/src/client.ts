@@ -27,6 +27,7 @@ import {
   TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
+import { group } from 'console';
 import { Bank, MintInfo } from './accounts/bank';
 import { Group } from './accounts/group';
 import { I80F48 } from './accounts/I80F48';
@@ -1677,20 +1678,81 @@ export class MangoClient {
     tx.add(flashLoanEndIx);
     return this.program.provider.sendAndConfirm(tx);
   }
-  /// liquidations
 
-  // TODO
-  // async liqTokenWithToken(
-  //   assetTokenIndex: number,
-  //   liabTokenIndex: number,
-  //   maxLiabTransfer: number,
-  // ): Promise<TransactionSignature> {
-  //   return await this.program.methods
-  //     .liqTokenWithToken(assetTokenIndex, liabTokenIndex, {
-  //       val: I80F48.fromNumber(maxLiabTransfer).getData(),
-  //     })
-  //     .rpc();
-  // }
+  /// liquidations
+  async liqTokenWithToken(group: Group, liqor: MangoAccount, liqee: MangoAccount, liqorOwner: Signer, assetTokenName: string, liabTokenName: string, maxLiabTransfer: number) {
+    let assetBank: Bank = group.banksMap.get(assetTokenName);
+    let liabBank: Bank = group.banksMap.get(liabTokenName);
+    
+    const healthRemainingAccounts: AccountMeta[] =
+      this.buildHealthRemainingAccountsLiqTokenWithToken(group, [liqor, liqee], [assetBank, liabBank]);
+
+    await this.program.methods
+      .liqTokenWithToken(assetBank.tokenIndex, liabBank.tokenIndex, {val: I80F48.fromNumber(maxLiabTransfer).getData()})
+      .accounts({group: group.publicKey, liqor: liqor.publicKey, liqee: liqee.publicKey, liqorOwner: liqorOwner.publicKey})
+      .remainingAccounts(healthRemainingAccounts)
+      .signers([liqorOwner])
+      .rpc()
+  }
+
+  public buildHealthRemainingAccountsLiqTokenWithToken(
+    group: Group,
+    mangoAccounts: MangoAccount[],
+    banks?: Bank[] /** TODO for serum3PlaceOrder we are just ingoring this atm */,
+  ) {
+    // Bespoke function for liq token with token for the following reasons:
+    // * liq token with token uses scanning account retriever instead of fixed account retriever
+    // * it's necessary to set the bank remaining accounts isWritable = true
+    
+    const healthRemainingAccounts: AccountMeta[] = [];
+
+    let tokenIndices = [];
+    for (let mangoAccount of mangoAccounts) {
+      tokenIndices.push(...mangoAccount.tokens
+        .filter((token) => token.tokenIndex !== 65535)
+        .map((token) => token.tokenIndex)) 
+    }
+    tokenIndices = [...new Set(tokenIndices)];
+
+    if (banks?.length) {
+      for (const bank of banks) {
+        tokenIndices.push(bank.tokenIndex);
+      }
+    }
+
+    const mintInfos = [...new Set(tokenIndices)].map(
+      (tokenIndex) => group.mintInfosMap.get(tokenIndex)!,
+    );
+    healthRemainingAccounts.push(
+      ...mintInfos.map((mintInfo) => mintInfo.firstBank()).map(pk => ({ pubkey: pk, isWritable: true, isSigner: false }) as AccountMeta),
+    );
+    healthRemainingAccounts.push(
+      ...mintInfos.map((mintInfo) => mintInfo.oracle).map(pk => ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta),
+    );
+    for (let mangoAccount of mangoAccounts) {
+      healthRemainingAccounts.push(
+        ...mangoAccount.serum3
+          .filter((serum3Account) => serum3Account.marketIndex !== 65535)
+          .map((serum3Account) => serum3Account.openOrders)
+          .map(pk => ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta),
+      );
+    }
+    for (let mangoAccount of mangoAccounts) {
+      healthRemainingAccounts.push(
+        ...mangoAccount.perps
+          .filter((perp) => perp.marketIndex !== 65535)
+          .map(
+            (perp) =>
+              Array.from(group.perpMarketsMap.values()).filter(
+                (perpMarket) => perpMarket.perpMarketIndex === perp.marketIndex,
+              )[0].publicKey,
+          )
+          .map(pk => ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta),
+      );
+    }
+
+    return healthRemainingAccounts;
+  }
 
   /// static
 
