@@ -4,8 +4,8 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
-anchor-lang = { git = "https://github.com/blockworks-foundation/anchor.git", rev = "1153380487706e4d8f486071cf2f519468438eab" }
-anchor-client = { git = "https://github.com/blockworks-foundation/anchor.git", rev = "1153380487706e4d8f486071cf2f519468438eab" }
+anchor-lang = { git = "https://github.com/blockworks-foundation/anchor.git", rev = "806faa4835fb7de2b694421569213bf0c2839d87" }
+anchor-client = { git = "https://github.com/blockworks-foundation/anchor.git", rev = "806faa4835fb7de2b694421569213bf0c2839d87" }
 anyhow = "1.0"
 arrayref = "0.3.6"
 async-channel = "1.6"

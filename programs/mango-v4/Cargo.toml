@@ -21,8 +21,8 @@ client = ["solana-sdk"]
 [dependencies]
 # todo: when to fix, when to use caret? need a regular chore to bump dependencies
 # note: possibly need init-if-needed feature
-anchor-lang = { git = "https://github.com/blockworks-foundation/anchor.git", rev = "1153380487706e4d8f486071cf2f519468438eab" }
-anchor-spl = { git = "https://github.com/blockworks-foundation/anchor.git", rev = "1153380487706e4d8f486071cf2f519468438eab" }
+anchor-lang = { git = "https://github.com/blockworks-foundation/anchor.git", rev = "806faa4835fb7de2b694421569213bf0c2839d87" }
+anchor-spl = { git = "https://github.com/blockworks-foundation/anchor.git", rev = "806faa4835fb7de2b694421569213bf0c2839d87" }
 arrayref = "0.3.6"
 bincode = "1.3.3"
 bytemuck = "^1.7.2"
