@@ -1,4 +1,10 @@
-import { AnchorProvider, BN, Program, Provider, web3 } from '@project-serum/anchor';
+import {
+  AnchorProvider,
+  BN,
+  Program,
+  Provider,
+  web3,
+} from '@project-serum/anchor';
 import { getFeeRates, getFeeTier } from '@project-serum/serum';
 import { Order } from '@project-serum/serum/lib/market';
 import {
@@ -578,7 +584,7 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     tokenName: string,
     amount: number,
-    signer: Signer
+    signer: Signer,
   ) {
     const bank = group.banksMap.get(tokenName)!;
 
@@ -630,7 +636,7 @@ export class MangoClient {
         bank: bank.publicKey,
         vault: bank.vault,
         tokenAccount: wrappedSolAccount?.publicKey ?? tokenAccountPk,
-        tokenAuthority: mangoAccount.owner
+        tokenAuthority: mangoAccount.owner,
       })
       .remainingAccounts(
         healthRemainingAccounts.map(
@@ -688,7 +694,7 @@ export class MangoClient {
     tokenName: string,
     amount: number,
     allowBorrow: boolean,
-    signer: Signer
+    signer: Signer,
   ) {
     const bank = group.banksMap.get(tokenName)!;
 
@@ -708,7 +714,7 @@ export class MangoClient {
         bank: bank.publicKey,
         vault: bank.vault,
         tokenAccount: tokenAccountPk,
-        owner: mangoAccount.owner
+        owner: mangoAccount.owner,
       })
       .remainingAccounts(
         healthRemainingAccounts.map(
@@ -1680,19 +1686,38 @@ export class MangoClient {
   }
 
   /// liquidations
-  async liqTokenWithToken(group: Group, liqor: MangoAccount, liqee: MangoAccount, liqorOwner: Signer, assetTokenName: string, liabTokenName: string, maxLiabTransfer: number) {
+  async liqTokenWithToken(
+    group: Group,
+    liqor: MangoAccount,
+    liqee: MangoAccount,
+    liqorOwner: Signer,
+    assetTokenName: string,
+    liabTokenName: string,
+    maxLiabTransfer: number,
+  ) {
     let assetBank: Bank = group.banksMap.get(assetTokenName);
     let liabBank: Bank = group.banksMap.get(liabTokenName);
-    
+
     const healthRemainingAccounts: AccountMeta[] =
-      this.buildHealthRemainingAccountsLiqTokenWithToken(group, [liqor, liqee], [assetBank, liabBank]);
+      this.buildHealthRemainingAccountsLiqTokenWithToken(
+        group,
+        [liqor, liqee],
+        [assetBank, liabBank],
+      );
 
     await this.program.methods
-      .liqTokenWithToken(assetBank.tokenIndex, liabBank.tokenIndex, {val: I80F48.fromNumber(maxLiabTransfer).getData()})
-      .accounts({group: group.publicKey, liqor: liqor.publicKey, liqee: liqee.publicKey, liqorOwner: liqorOwner.publicKey})
+      .liqTokenWithToken(assetBank.tokenIndex, liabBank.tokenIndex, {
+        val: I80F48.fromNumber(maxLiabTransfer).getData(),
+      })
+      .accounts({
+        group: group.publicKey,
+        liqor: liqor.publicKey,
+        liqee: liqee.publicKey,
+        liqorOwner: liqorOwner.publicKey,
+      })
       .remainingAccounts(healthRemainingAccounts)
       .signers([liqorOwner])
-      .rpc()
+      .rpc();
   }
 
   public buildHealthRemainingAccountsLiqTokenWithToken(
@@ -1703,14 +1728,16 @@ export class MangoClient {
     // Bespoke function for liq token with token for the following reasons:
     // * liq token with token uses scanning account retriever instead of fixed account retriever
     // * it's necessary to set the bank remaining accounts isWritable = true
-    
+
     const healthRemainingAccounts: AccountMeta[] = [];
 
     let tokenIndices = [];
     for (let mangoAccount of mangoAccounts) {
-      tokenIndices.push(...mangoAccount.tokens
-        .filter((token) => token.tokenIndex !== 65535)
-        .map((token) => token.tokenIndex)) 
+      tokenIndices.push(
+        ...mangoAccount.tokens
+          .filter((token) => token.tokenIndex !== 65535)
+          .map((token) => token.tokenIndex),
+      );
     }
     tokenIndices = [...new Set(tokenIndices)];
 
@@ -1724,17 +1751,34 @@ export class MangoClient {
       (tokenIndex) => group.mintInfosMap.get(tokenIndex)!,
     );
     healthRemainingAccounts.push(
-      ...mintInfos.map((mintInfo) => mintInfo.firstBank()).map(pk => ({ pubkey: pk, isWritable: true, isSigner: false }) as AccountMeta),
+      ...mintInfos
+        .map((mintInfo) => mintInfo.firstBank())
+        .map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: true, isSigner: false } as AccountMeta),
+        ),
     );
     healthRemainingAccounts.push(
-      ...mintInfos.map((mintInfo) => mintInfo.oracle).map(pk => ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta),
+      ...mintInfos
+        .map((mintInfo) => mintInfo.oracle)
+        .map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
     );
     for (let mangoAccount of mangoAccounts) {
       healthRemainingAccounts.push(
         ...mangoAccount.serum3
           .filter((serum3Account) => serum3Account.marketIndex !== 65535)
           .map((serum3Account) => serum3Account.openOrders)
-          .map(pk => ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta),
+          .map(
+            (pk) =>
+              ({
+                pubkey: pk,
+                isWritable: false,
+                isSigner: false,
+              } as AccountMeta),
+          ),
       );
     }
     for (let mangoAccount of mangoAccounts) {
@@ -1747,7 +1791,14 @@ export class MangoClient {
                 (perpMarket) => perpMarket.perpMarketIndex === perp.marketIndex,
               )[0].publicKey,
           )
-          .map(pk => ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta),
+          .map(
+            (pk) =>
+              ({
+                pubkey: pk,
+                isWritable: false,
+                isSigner: false,
+              } as AccountMeta),
+          ),
       );
     }
 

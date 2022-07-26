@@ -99,11 +99,12 @@ export class MangoAccount {
     sourceBank: Bank,
     nativeTokenPosition: TokenPosition,
   ): I80F48 {
-    return nativeTokenPosition ?
-      nativeTokenPosition.native(sourceBank)
-      .mul(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
-      .div(I80F48.fromNumber(Math.pow(10, sourceBank.mintDecimals)))
-      .mul(sourceBank.price)
+    return nativeTokenPosition
+      ? nativeTokenPosition
+          .native(sourceBank)
+          .mul(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
+          .div(I80F48.fromNumber(Math.pow(10, sourceBank.mintDecimals)))
+          .mul(sourceBank.price)
       : ZERO_I80F48;
   }
 

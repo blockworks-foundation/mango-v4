@@ -185,7 +185,7 @@ export class Group {
         try {
           let stubOracle = coder.decode('stubOracle', price.data);
           banks[index].price = new I80F48(stubOracle.price.val);
-        } catch (e: any)  {
+        } catch (e: any) {
           console.log(e);
           banks[index].price = I80F48.fromNumber(
             parsePriceData(price.data).previousPrice,
