@@ -5,6 +5,7 @@ members = [
     "keeper",
     "lib/*",
     "liquidator",
+    "anchor/cli",
 ]
 
 [patch.crates-io]

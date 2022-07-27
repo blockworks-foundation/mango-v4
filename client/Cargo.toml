@@ -7,9 +7,9 @@ edition = "2021"
 doctest = false
 
 [dependencies]
-anchor-client = { git = "https://github.com/blockworks-foundation/anchor.git", rev = "806faa4835fb7de2b694421569213bf0c2839d87" }
-anchor-lang = { git = "https://github.com/blockworks-foundation/anchor.git", rev = "806faa4835fb7de2b694421569213bf0c2839d87" }
-anchor-spl = { git = "https://github.com/blockworks-foundation/anchor.git", rev = "806faa4835fb7de2b694421569213bf0c2839d87" }
+anchor-client = { path = "../anchor/client" }
+anchor-lang = { path = "../anchor/lang" }
+anchor-spl = { path = "../anchor/spl" }
 anyhow = "1.0"
 fixed = { version = "=1.11.0", features = ["serde", "borsh"] }
 fixed-macro = "^1.1.1"
