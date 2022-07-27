@@ -104,6 +104,18 @@ checksum = "6b2d54853319fd101b8dd81de382bcbf3e03410a64d8928bbee85a3e7dcde483"
 [[package]]
 name = "anchor-attribute-access-control"
 version = "0.25.0"
+dependencies = [
+ "anchor-syn 0.25.0",
+ "anyhow",
+ "proc-macro2 1.0.39",
+ "quote 1.0.18",
+ "regex",
+ "syn 1.0.95",
+]
+
+[[package]]
+name = "anchor-attribute-access-control"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "70f6ee9518f50ff4d434471ccf569186022bdd5ef65a21d14da3ea5231af944f"
 dependencies = [
@@ -116,15 +128,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "anchor-attribute-access-control"
+name = "anchor-attribute-account"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-syn 0.25.0",
  "anyhow",
+ "bs58 0.4.0",
  "proc-macro2 1.0.39",
  "quote 1.0.18",
- "regex",
+ "rustversion",
  "syn 1.0.95",
 ]
 
@@ -144,16 +156,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "anchor-attribute-account"
+name = "anchor-attribute-constant"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "anyhow",
- "bs58 0.4.0",
+ "anchor-syn 0.25.0",
  "proc-macro2 1.0.39",
- "quote 1.0.18",
- "rustversion",
  "syn 1.0.95",
 ]
 
@@ -169,12 +176,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "anchor-attribute-constant"
+name = "anchor-attribute-error"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-syn 0.25.0",
  "proc-macro2 1.0.39",
+ "quote 1.0.18",
  "syn 1.0.95",
 ]
 
@@ -191,11 +198,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "anchor-attribute-error"
+name = "anchor-attribute-event"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-syn 0.25.0",
+ "anyhow",
  "proc-macro2 1.0.39",
  "quote 1.0.18",
  "syn 1.0.95",
@@ -215,12 +222,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "anchor-attribute-event"
+name = "anchor-attribute-interface"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-syn 0.25.0",
  "anyhow",
+ "heck 0.3.3",
  "proc-macro2 1.0.39",
  "quote 1.0.18",
  "syn 1.0.95",
@@ -241,13 +248,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "anchor-attribute-interface"
+name = "anchor-attribute-program"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-syn 0.25.0",
  "anyhow",
- "heck 0.3.3",
  "proc-macro2 1.0.39",
  "quote 1.0.18",
  "syn 1.0.95",
@@ -267,11 +272,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "anchor-attribute-program"
+name = "anchor-attribute-state"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-syn 0.25.0",
  "anyhow",
  "proc-macro2 1.0.39",
  "quote 1.0.18",
@@ -292,23 +296,44 @@ dependencies = [
 ]
 
 [[package]]
-name = "anchor-attribute-state"
+name = "anchor-cli"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-client",
+ "anchor-lang 0.25.0",
+ "anchor-syn 0.25.0",
  "anyhow",
- "proc-macro2 1.0.39",
- "quote 1.0.18",
+ "cargo_toml",
+ "chrono",
+ "clap 3.1.18",
+ "dirs",
+ "flate2 1.0.23",
+ "heck 0.3.3",
+ "pathdiff",
+ "portpicker",
+ "rand 0.7.3",
+ "reqwest",
+ "semver 1.0.9",
+ "serde",
+ "serde_json",
+ "shellexpand",
+ "solana-cli-config",
+ "solana-client",
+ "solana-faucet",
+ "solana-program",
+ "solana-sdk",
  "syn 1.0.95",
+ "tar",
+ "tokio",
+ "toml",
+ "walkdir",
 ]
 
 [[package]]
 name = "anchor-client"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-lang 0.25.0",
  "anyhow",
  "regex",
  "serde",
@@ -317,6 +342,17 @@ dependencies = [
  "solana-sdk",
  "thiserror",
  "url 2.2.2",
+]
+
+[[package]]
+name = "anchor-derive-accounts"
+version = "0.25.0"
+dependencies = [
+ "anchor-syn 0.25.0",
+ "anyhow",
+ "proc-macro2 1.0.39",
+ "quote 1.0.18",
+ "syn 1.0.95",
 ]
 
 [[package]]
@@ -333,15 +369,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "anchor-derive-accounts"
+name = "anchor-lang"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-syn 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "anyhow",
- "proc-macro2 1.0.39",
- "quote 1.0.18",
- "syn 1.0.95",
+ "anchor-attribute-access-control 0.25.0",
+ "anchor-attribute-account 0.25.0",
+ "anchor-attribute-constant 0.25.0",
+ "anchor-attribute-error 0.25.0",
+ "anchor-attribute-event 0.25.0",
+ "anchor-attribute-interface 0.25.0",
+ "anchor-attribute-program 0.25.0",
+ "anchor-attribute-state 0.25.0",
+ "anchor-derive-accounts 0.25.0",
+ "arrayref",
+ "base64 0.13.0",
+ "bincode",
+ "borsh",
+ "bytemuck",
+ "solana-program",
+ "thiserror",
 ]
 
 [[package]]
@@ -369,26 +415,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "anchor-lang"
+name = "anchor-spl"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
 dependencies = [
- "anchor-attribute-access-control 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "anchor-attribute-account 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "anchor-attribute-constant 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "anchor-attribute-error 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "anchor-attribute-event 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "anchor-attribute-interface 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "anchor-attribute-program 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "anchor-attribute-state 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "anchor-derive-accounts 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "arrayref",
- "base64 0.13.0",
- "bincode",
- "borsh",
- "bytemuck",
+ "anchor-lang 0.25.0",
+ "mpl-token-metadata",
+ "serum_dex 0.4.0 (git+https://github.com/project-serum/serum-dex?rev=1be91f2)",
  "solana-program",
- "thiserror",
+ "spl-associated-token-account",
+ "spl-token",
 ]
 
 [[package]]
@@ -404,21 +439,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "anchor-spl"
-version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
-dependencies = [
- "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "solana-program",
- "spl-associated-token-account",
- "spl-token",
-]
-
-[[package]]
 name = "anchor-syn"
 version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55aa1e680d9471342122ed5b6bc13bf5da473b0f7e4677d41a6954e5cc8ad155"
 dependencies = [
  "anyhow",
  "bs58 0.3.1",
@@ -436,7 +458,8 @@ dependencies = [
 [[package]]
 name = "anchor-syn"
 version = "0.25.0"
-source = "git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87#806faa4835fb7de2b694421569213bf0c2839d87"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55aa1e680d9471342122ed5b6bc13bf5da473b0f7e4677d41a6954e5cc8ad155"
 dependencies = [
  "anyhow",
  "bs58 0.3.1",
@@ -1047,6 +1070,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cargo_toml"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c3596addfb02dcdc06f5252ddda9f3785f9230f5827fb4284645240fa05ad92"
+dependencies = [
+ "serde",
+ "serde_derive",
+ "toml",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1199,15 +1233,15 @@ name = "client"
 version = "0.1.0"
 dependencies = [
  "anchor-client",
- "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "anchor-spl 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-lang 0.25.0",
+ "anchor-spl 0.25.0",
  "anyhow",
  "fixed",
  "fixed-macro",
  "itertools 0.10.3",
  "mango-v4",
  "pyth-sdk-solana",
- "serum_dex",
+ "serum_dex 0.4.0 (git+https://github.com/blockworks-foundation/serum-dex.git)",
  "solana-account-decoder",
  "solana-client",
  "solana-sdk",
@@ -1573,6 +1607,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dirs"
+version = "3.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30baa043103c9d0c2a57cf537cc2f35623889dc0d405e6c3cccfadbc81c71309"
+dependencies = [
+ "dirs-sys",
+]
+
+[[package]]
 name = "dirs-next"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1580,6 +1623,17 @@ checksum = "b98cf8ebf19c3d1b223e151f99a4f9f0690dca41414773390fc824184ac833e1"
 dependencies = [
  "cfg-if 1.0.0",
  "dirs-sys-next",
+]
+
+[[package]]
+name = "dirs-sys"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b1d1d91c932ef41c0f2663aa8b0ca0342d444d842c06914aa0a7e352d0bada6"
+dependencies = [
+ "libc",
+ "redox_users",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -2823,8 +2877,8 @@ name = "keeper"
 version = "0.1.0"
 dependencies = [
  "anchor-client",
- "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "anchor-spl 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-lang 0.25.0",
+ "anchor-spl 0.25.0",
  "anyhow",
  "clap 3.1.18",
  "client",
@@ -2836,7 +2890,7 @@ dependencies = [
  "log 0.4.17",
  "mango-v4",
  "pyth-sdk-solana",
- "serum_dex",
+ "serum_dex 0.4.0 (git+https://github.com/blockworks-foundation/serum-dex.git)",
  "shellexpand",
  "solana-client",
  "solana-sdk",
@@ -2977,7 +3031,7 @@ name = "liquidator"
 version = "0.0.1"
 dependencies = [
  "anchor-client",
- "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-lang 0.25.0",
  "anyhow",
  "arrayref",
  "async-channel",
@@ -3005,7 +3059,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "serum_dex",
+ "serum_dex 0.4.0 (git+https://github.com/blockworks-foundation/serum-dex.git)",
  "shellexpand",
  "solana-account-decoder",
  "solana-client",
@@ -3096,8 +3150,8 @@ dependencies = [
 name = "mango-v4"
 version = "0.1.0"
 dependencies = [
- "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "anchor-spl 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-lang 0.25.0",
+ "anchor-spl 0.25.0",
  "arrayref",
  "async-trait",
  "base64 0.13.0",
@@ -3115,7 +3169,7 @@ dependencies = [
  "pyth-sdk-solana",
  "rand 0.8.5",
  "serde",
- "serum_dex",
+ "serum_dex 0.4.0 (git+https://github.com/blockworks-foundation/serum-dex.git)",
  "solana-address-lookup-table-program",
  "solana-logger",
  "solana-program",
@@ -3133,8 +3187,8 @@ dependencies = [
 name = "margin-trade"
 version = "0.1.0"
 dependencies = [
- "anchor-lang 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
- "anchor-spl 0.25.0 (git+https://github.com/blockworks-foundation/anchor.git?rev=806faa4835fb7de2b694421569213bf0c2839d87)",
+ "anchor-lang 0.25.0",
+ "anchor-spl 0.25.0",
  "solana-program",
 ]
 
@@ -3206,6 +3260,16 @@ name = "mime"
 version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a60c7ce501c71e03a9c9c0d35b861413ae925bd979cc7a4e30d060069aaac8d"
+
+[[package]]
+name = "mime_guess"
+version = "2.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4192263c238a5f0d0c6bfd21f336a313a4ce1c450542449ca191bb657b4642ef"
+dependencies = [
+ "mime 0.3.16",
+ "unicase 2.6.0",
+]
 
 [[package]]
 name = "minimal-lexical"
@@ -3304,6 +3368,38 @@ dependencies = [
  "proc-macro2 1.0.39",
  "quote 1.0.18",
  "syn 1.0.95",
+]
+
+[[package]]
+name = "mpl-token-metadata"
+version = "1.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b73a2070e1acf3a42357e7580ae1905795cbee0a77858f8e0c44df885cbc4814"
+dependencies = [
+ "arrayref",
+ "borsh",
+ "mpl-token-vault",
+ "num-derive",
+ "num-traits",
+ "shank",
+ "solana-program",
+ "spl-associated-token-account",
+ "spl-token",
+ "thiserror",
+]
+
+[[package]]
+name = "mpl-token-vault"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ade4ef15bc06a6033076c4ff28cba9b42521df5ec61211d6f419415ace2746a"
+dependencies = [
+ "borsh",
+ "num-derive",
+ "num-traits",
+ "solana-program",
+ "spl-token",
+ "thiserror",
 ]
 
 [[package]]
@@ -3728,6 +3824,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c520e05135d6e763148b6426a837e239041653ba7becd2e538c076c738025fc"
 
 [[package]]
+name = "pathdiff"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8835116a5c179084a830efb3adc117ab007512b535bc1a21c991d3b32a6b44dd"
+
+[[package]]
 name = "pbkdf2"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3865,6 +3967,15 @@ dependencies = [
  "cpufeatures",
  "opaque-debug 0.3.0",
  "universal-hash",
+]
+
+[[package]]
+name = "portpicker"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be97d76faf1bfab666e1375477b23fde79eccf0276e9b63b92a39d676a889ba9"
+dependencies = [
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -4466,6 +4577,7 @@ dependencies = [
  "lazy_static",
  "log 0.4.17",
  "mime 0.3.16",
+ "mime_guess",
  "native-tls",
  "percent-encoding 2.1.0",
  "pin-project-lite",
@@ -4886,6 +4998,29 @@ dependencies = [
 [[package]]
 name = "serum_dex"
 version = "0.4.0"
+source = "git+https://github.com/project-serum/serum-dex?rev=1be91f2#1be91f2863d8ecede32daaae7e768034e24bbc79"
+dependencies = [
+ "arrayref",
+ "bincode",
+ "bytemuck",
+ "byteorder",
+ "enumflags2",
+ "field-offset",
+ "itertools 0.9.0",
+ "num-traits",
+ "num_enum",
+ "safe-transmute",
+ "serde",
+ "solana-program",
+ "spl-token",
+ "static_assertions",
+ "thiserror",
+ "without-alloc",
+]
+
+[[package]]
+name = "serum_dex"
+version = "0.4.0"
 source = "git+https://github.com/blockworks-foundation/serum-dex.git#3104f424ee38a415418a1cdef67970771f832857"
 dependencies = [
  "arrayref",
@@ -5001,6 +5136,40 @@ checksum = "881bf8156c87b6301fc5ca6b27f11eeb2761224c7081e69b409d5a1951a70c86"
 dependencies = [
  "digest 0.10.3",
  "keccak",
+]
+
+[[package]]
+name = "shank"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85a6c6cad96abd1fd950d1df186ec02e786566161f03adadbb7cf157ae9a82d8"
+dependencies = [
+ "shank_macro",
+]
+
+[[package]]
+name = "shank_macro"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0b3bf722b43cea02627c7fd89925f5861f7aa27604c1852720f8eee1a73523d"
+dependencies = [
+ "proc-macro2 1.0.39",
+ "quote 1.0.18",
+ "shank_macro_impl",
+ "syn 1.0.95",
+]
+
+[[package]]
+name = "shank_macro_impl"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90a37f762b0529d64a9e3401ac3829e132f58fa9bc50b1fd6ad7b5a1a414a228"
+dependencies = [
+ "anyhow",
+ "proc-macro2 1.0.39",
+ "quote 1.0.18",
+ "serde",
+ "syn 1.0.95",
 ]
 
 [[package]]
