@@ -1735,42 +1735,21 @@ export class MangoClient {
   ) {
     const healthRemainingAccounts: PublicKey[] = [];
 
-    // banks for tokens need to be order of account.token_iter_active()
-    // if we are creating a new position for a token it might take an existing free slot in account.tokens
-    let maybeNewTokenPositions = mangoAccount.tokens.map(
-      (token) => token.tokenIndex,
-    );
+    // allTokenIndices will contain tokenIndices from existing token positions, and,
+    // tokenIndices from possibly new token positons which will take earliest free slot available
+    let allTokenIndices = mangoAccount.tokens.map((token) => token.tokenIndex);
     if (banks) {
       for (const bank of banks) {
-        if (!mangoAccount.tokens.find((token) => bank.tokenIndex)) {
-          // mark free slot for new token position
-          maybeNewTokenPositions[
+        if (allTokenIndices.indexOf(bank.tokenIndex) == -1) {
+          allTokenIndices[
             mangoAccount.tokens.findIndex((token) => !token.isActive())
           ] = bank.tokenIndex;
         }
       }
     }
-    const tokenIndices = mangoAccount.tokens
-      .filter(
-        (token, i) =>
-          // existing token position
-          token.isActive() ||
-          // or newly found free slot
-          maybeNewTokenPositions[i] !== TokenPosition.TokenIndexUnset,
-      )
-      .map((token, i) =>
-        token.isActive() ? token.tokenIndex : maybeNewTokenPositions[i],
-      );
-
-    if (banks?.length) {
-      for (const bank of banks) {
-        tokenIndices.push(bank.tokenIndex);
-      }
-    }
-
-    const mintInfos = [...new Set(tokenIndices)].map(
-      (tokenIndex) => group.mintInfosMap.get(tokenIndex)!,
-    );
+    const mintInfos = allTokenIndices
+      .filter((index) => index != TokenPosition.TokenIndexUnset)
+      .map((tokenIndex) => group.mintInfosMap.get(tokenIndex)!);
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.firstBank()),
     );

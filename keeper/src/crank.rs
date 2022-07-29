@@ -12,6 +12,8 @@ use solana_sdk::{
 };
 use tokio::time;
 
+// TODO: move instructions into the client proper
+
 pub async fn runner(
     mango_client: Arc<MangoClient>,
     debugging_handle: impl Future,

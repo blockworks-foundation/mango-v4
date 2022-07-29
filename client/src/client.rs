@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use std::sync::Arc;
 
 use anchor_client::{Client, ClientError, Cluster, Program};
@@ -14,6 +15,7 @@ use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Sid
 use mango_v4::state::{AccountSize, Bank, Group, MangoAccountValue, Serum3MarketIndex, TokenIndex};
 
 use solana_client::rpc_client::RpcClient;
+use solana_sdk::signer::keypair;
 
 use crate::account_fetcher::*;
 use crate::context::{MangoGroupContext, Serum3MarketContext, TokenContext};
@@ -777,4 +779,16 @@ pub fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
         _ => {}
     };
     err.into()
+}
+
+pub fn keypair_from_cli(keypair: &str) -> Keypair {
+    let maybe_keypair = keypair::read_keypair(&mut keypair.as_bytes());
+    match maybe_keypair {
+        Ok(keypair) => keypair,
+        Err(_) => {
+            let path = std::path::PathBuf::from_str(&*shellexpand::tilde(keypair)).unwrap();
+            keypair::read_keypair_file(path)
+                .unwrap_or_else(|_| panic!("Failed to read keypair from {}", keypair))
+        }
+    }
 }

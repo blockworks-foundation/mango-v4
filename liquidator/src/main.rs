@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use anchor_client::Cluster;
 use clap::Parser;
-use client::{MangoClient, MangoGroupContext};
+use client::{keypair_from_cli, MangoClient, MangoGroupContext};
 use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 
@@ -13,12 +13,8 @@ use once_cell::sync::OnceCell;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
-use solana_sdk::signer::{
-    keypair::{self, Keypair},
-    Signer,
-};
+use solana_sdk::signer::Signer;
 use std::collections::HashSet;
-use std::str::FromStr;
 
 pub mod account_shared_data;
 pub mod chain_data;
@@ -74,7 +70,8 @@ struct Cli {
 
     // These exist only as a shorthand to make testing easier. Normal users would provide the group.
     #[clap(long, env)]
-    group_from_admin_keypair: Option<std::path::PathBuf>,
+    group_from_admin_keypair: Option<String>,
+
     #[clap(long, env, default_value = "0")]
     group_from_admin_num: u32,
 
@@ -87,7 +84,7 @@ struct Cli {
     serum_program: Pubkey,
 
     #[clap(long, env)]
-    liqor_owner: std::path::PathBuf,
+    liqor_owner: String,
 
     #[clap(long, env)]
     liqor_mango_account_name: String,
@@ -102,12 +99,6 @@ struct Cli {
     // typically 100 is the max number for getMultipleAccounts
     #[clap(long, env, default_value = "100")]
     get_multiple_accounts_count: usize,
-}
-
-fn keypair_from_path(p: &std::path::PathBuf) -> Keypair {
-    let path = std::path::PathBuf::from_str(&*shellexpand::tilde(p.to_str().unwrap())).unwrap();
-    keypair::read_keypair_file(path)
-        .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy()))
 }
 
 pub fn encode_address(addr: &Pubkey) -> String {
@@ -125,12 +116,12 @@ async fn main() -> anyhow::Result<()> {
     };
     let cli = Cli::parse_from(args);
 
-    let liqor_owner = keypair_from_path(&cli.liqor_owner);
+    let liqor_owner = keypair_from_cli(&cli.liqor_owner);
 
     let mango_group = if let Some(group) = cli.group {
         group
     } else if let Some(p) = cli.group_from_admin_keypair {
-        let admin = keypair_from_path(&p);
+        let admin = keypair_from_cli(&p);
         MangoClient::group_for_admin(admin.pubkey(), cli.group_from_admin_num)
     } else {
         panic!("Must provide either group or group_from_admin_keypair");
