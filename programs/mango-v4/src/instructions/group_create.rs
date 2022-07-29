@@ -18,8 +18,6 @@ pub struct GroupCreate<'info> {
 
     pub creator: Signer<'info>,
 
-    pub admin: UncheckedAccount<'info>,
-
     pub insurance_mint: Account<'info, Mint>,
 
     #[account(
@@ -43,7 +41,7 @@ pub struct GroupCreate<'info> {
 pub fn group_create(ctx: Context<GroupCreate>, group_num: u32, testing: u8) -> Result<()> {
     let mut group = ctx.accounts.group.load_init()?;
     group.creator = ctx.accounts.creator.key();
-    group.admin = ctx.accounts.admin.key();
+    group.admin = ctx.accounts.creator.key();
     group.fast_listing_admin = Pubkey::default();
     group.insurance_vault = ctx.accounts.insurance_vault.key();
     group.insurance_mint = ctx.accounts.insurance_mint.key();

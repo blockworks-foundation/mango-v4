@@ -36,8 +36,12 @@ pub mod mango_v4 {
         instructions::group_create(ctx, group_num, testing)
     }
 
-    pub fn group_edit(ctx: Context<GroupEdit>) -> Result<()> {
-        instructions::group_edit(ctx)
+    pub fn group_edit(
+        ctx: Context<GroupEdit>,
+        new_admin: Pubkey,
+        new_fast_listing_admin: Pubkey,
+    ) -> Result<()> {
+        instructions::group_edit(ctx, new_admin, new_fast_listing_admin)
     }
 
     pub fn group_close(ctx: Context<GroupClose>) -> Result<()> {

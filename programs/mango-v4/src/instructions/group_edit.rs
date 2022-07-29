@@ -4,20 +4,23 @@ use crate::state::*;
 
 #[derive(Accounts)]
 pub struct GroupEdit<'info> {
-    #[account(mut)]
+    #[account(
+        mut,
+        has_one = admin,
+    )]
     pub group: AccountLoader<'info, Group>,
-
-    pub new_admin: UncheckedAccount<'info>,
-    pub new_fast_listing_admin: UncheckedAccount<'info>,
-
     pub admin: Signer<'info>,
 }
 
 // use case - transfer group ownership to governance, where
 // new_admin and new_fast_listing_admin are PDAs
-pub fn group_edit(ctx: Context<GroupEdit>) -> Result<()> {
+pub fn group_edit(
+    ctx: Context<GroupEdit>,
+    new_admin: Pubkey,
+    new_fast_listing_admin: Pubkey,
+) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
-    group.admin = ctx.accounts.new_admin.key();
-    group.fast_listing_admin = ctx.accounts.new_fast_listing_admin.key();
+    group.admin = new_admin;
+    group.fast_listing_admin = new_fast_listing_admin;
     Ok(())
 }
