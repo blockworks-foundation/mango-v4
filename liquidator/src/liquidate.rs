@@ -96,8 +96,7 @@ pub fn process_account(
     let get_max_liab_transfer = |source, target| -> anyhow::Result<I80F48> {
         let mut liqor = account_fetcher
             .fetch_fresh_mango_account(&mango_client.mango_account_address)
-            .context("getting liquidator account")?
-            .clone();
+            .context("getting liquidator account")?;
 
         // Ensure the tokens are activated, so they appear in the health cache and
         // max_swap_source() will work.
