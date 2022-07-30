@@ -2,7 +2,7 @@ name: Cargo Audit
 
 on:
   push:
-    branches: 
+    branches:
       - main
       - dev
   pull_request:
@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - name: Checkout submodules
+        run: git submodule update --init
       # Install cargo audit
       - name: Install Cargo Audit
         uses: actions-rs/install@v0.1
