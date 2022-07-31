@@ -288,7 +288,7 @@ async function main() {
     );
     console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
     await group.reloadAll(client);
-    console.log(group.banksMap.get('USDC').toString());
+    console.log(group.banksMap.get('USDC')!.toString());
   } catch (error) {
     throw error;
   }
