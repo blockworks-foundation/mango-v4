@@ -1214,7 +1214,7 @@ impl<'keypair> ClientInstruction for StubOracleCloseInstruction<'keypair> {
 }
 
 pub struct GroupCreateInstruction<'keypair> {
-    pub admin: &'keypair Keypair,
+    pub creator: &'keypair Keypair,
     pub payer: &'keypair Keypair,
     pub insurance_mint: Pubkey,
 }
@@ -1235,7 +1235,7 @@ impl<'keypair> ClientInstruction for GroupCreateInstruction<'keypair> {
         let group = Pubkey::find_program_address(
             &[
                 b"Group".as_ref(),
-                self.admin.pubkey().as_ref(),
+                self.creator.pubkey().as_ref(),
                 &instruction.group_num.to_le_bytes(),
             ],
             &program_id,
@@ -1250,7 +1250,8 @@ impl<'keypair> ClientInstruction for GroupCreateInstruction<'keypair> {
 
         let accounts = Self::Accounts {
             group,
-            admin: self.admin.pubkey(),
+            creator: self.creator.pubkey(),
+            admin: self.creator.pubkey(),
             insurance_mint: self.insurance_mint,
             insurance_vault,
             payer: self.payer.pubkey(),
@@ -1264,7 +1265,7 @@ impl<'keypair> ClientInstruction for GroupCreateInstruction<'keypair> {
     }
 
     fn signers(&self) -> Vec<&Keypair> {
-        vec![self.admin, self.payer]
+        vec![self.creator, self.payer]
     }
 }
 

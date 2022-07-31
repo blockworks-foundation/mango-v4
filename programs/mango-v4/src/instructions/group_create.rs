@@ -9,14 +9,14 @@ use crate::state::*;
 pub struct GroupCreate<'info> {
     #[account(
         init,
-        seeds = [b"Group".as_ref(), admin.key().as_ref(), &group_num.to_le_bytes()],
+        seeds = [b"Group".as_ref(), creator.key().as_ref(), &group_num.to_le_bytes()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<Group>(),
     )]
     pub group: AccountLoader<'info, Group>,
 
-    pub admin: Signer<'info>,
+    pub creator: Signer<'info>,
 
     pub insurance_mint: Account<'info, Mint>,
 
@@ -40,7 +40,9 @@ pub struct GroupCreate<'info> {
 
 pub fn group_create(ctx: Context<GroupCreate>, group_num: u32, testing: u8) -> Result<()> {
     let mut group = ctx.accounts.group.load_init()?;
-    group.admin = ctx.accounts.admin.key();
+    group.creator = ctx.accounts.creator.key();
+    group.admin = ctx.accounts.creator.key();
+    group.fast_listing_admin = Pubkey::default();
     group.insurance_vault = ctx.accounts.insurance_vault.key();
     group.insurance_mint = ctx.accounts.insurance_mint.key();
     group.bump = *ctx.bumps.get("group").ok_or(MangoError::SomeError)?;
