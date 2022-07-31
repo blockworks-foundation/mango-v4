@@ -41,7 +41,7 @@ export type MangoV4 = {
         },
         {
           "name": "insuranceVault",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false,
           "pda": {
             "seeds": [
@@ -127,6 +127,11 @@ export type MangoV4 = {
           "name": "admin",
           "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
         },
         {
           "name": "solDestination",
@@ -4945,7 +4950,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "insuranceVault",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false,
           "pda": {
             "seeds": [
@@ -5031,6 +5036,11 @@ export const IDL: MangoV4 = {
           "name": "admin",
           "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
         },
         {
           "name": "solDestination",

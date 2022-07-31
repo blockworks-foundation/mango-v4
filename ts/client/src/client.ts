@@ -95,6 +95,7 @@ export class MangoClient {
       .groupClose()
       .accounts({
         group: group.publicKey,
+        insuranceVault: group.insuranceVault,
         admin: adminPk,
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,

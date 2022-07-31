@@ -1251,7 +1251,6 @@ impl<'keypair> ClientInstruction for GroupCreateInstruction<'keypair> {
         let accounts = Self::Accounts {
             group,
             creator: self.creator.pubkey(),
-            admin: self.creator.pubkey(),
             insurance_mint: self.insurance_mint,
             insurance_vault,
             payer: self.payer.pubkey(),
@@ -1285,9 +1284,16 @@ impl<'keypair> ClientInstruction for GroupCloseInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
 
+        let insurance_vault = Pubkey::find_program_address(
+            &[self.group.as_ref(), b"InsuranceVault".as_ref()],
+            &program_id,
+        )
+        .0;
+
         let accounts = Self::Accounts {
             group: self.group,
             admin: self.admin.pubkey(),
+            insurance_vault,
             sol_destination: self.sol_destination,
             token_program: Token::id(),
         };

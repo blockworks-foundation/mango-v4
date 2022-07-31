@@ -16,6 +16,8 @@ export class Group {
       creator: PublicKey;
       admin: PublicKey;
       fastListingAdmin: PublicKey;
+      insuranceMint: PublicKey;
+      insuranceVault: PublicKey;
       groupNum: number;
     },
   ): Group {
@@ -24,6 +26,8 @@ export class Group {
       obj.creator,
       obj.admin,
       obj.fastListingAdmin,
+      obj.insuranceMint,
+      obj.insuranceVault,
       obj.groupNum,
       new Map(),
       new Map(),
@@ -39,6 +43,8 @@ export class Group {
     public creator: PublicKey,
     public admin: PublicKey,
     public fastListingAdmin: PublicKey,
+    public insuranceMint: PublicKey,
+    public insuranceVault: PublicKey,
     public groupNum: number,
     public banksMap: Map<string, Bank>,
     public serum3MarketsMap: Map<string, Serum3Market>,
