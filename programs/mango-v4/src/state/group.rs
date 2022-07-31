@@ -15,12 +15,8 @@ pub struct Group {
     // ABI: Clients rely on this being at offset 40
     pub group_num: u32,
 
-    // public key of a keypair
-    // or
-    // pda belonging to governance
     pub admin: Pubkey,
 
-    // pda belonging to governance, initially unset, since group will most probably be created by a keypair
     // TODO: unused, use case - listing shit tokens with conservative parameters (mostly defaults)
     pub fast_listing_admin: Pubkey,
 
