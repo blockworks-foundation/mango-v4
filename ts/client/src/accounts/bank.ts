@@ -169,9 +169,9 @@ export class Bank {
       '\n cachedIndexedTotalBorrows - ' +
       this.cachedIndexedTotalBorrows.toNumber() +
       '\n indexLastUpdated - ' +
-      new Date(this.indexLastUpdated * 1000) +
+      new Date(this.indexLastUpdated.toNumber() * 1000) +
       '\n bankRateLastUpdated - ' +
-      new Date(this.bankRateLastUpdated * 1000) +
+      new Date(this.bankRateLastUpdated.toNumber() * 1000) +
       '\n avgUtilization - ' +
       this.avgUtilization.toNumber() +
       '\n adjustmentFactor - ' +

@@ -19,7 +19,7 @@ export type MangoV4 = {
               {
                 "kind": "account",
                 "type": "publicKey",
-                "path": "admin"
+                "path": "creator"
               },
               {
                 "kind": "arg",
@@ -30,7 +30,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "admin",
+          "name": "creator",
           "isMut": false,
           "isSigner": true
         },
@@ -87,6 +87,31 @@ export type MangoV4 = {
         {
           "name": "testing",
           "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "groupEdit",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "newAdmin",
+          "type": "publicKey"
+        },
+        {
+          "name": "newFastListingAdmin",
+          "type": "publicKey"
         }
       ]
     },
@@ -2795,12 +2820,20 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
-            "name": "admin",
+            "name": "creator",
             "type": "publicKey"
           },
           {
             "name": "groupNum",
             "type": "u32"
+          },
+          {
+            "name": "admin",
+            "type": "publicKey"
+          },
+          {
+            "name": "fastListingAdmin",
+            "type": "publicKey"
           },
           {
             "name": "padding",
@@ -4890,7 +4923,7 @@ export const IDL: MangoV4 = {
               {
                 "kind": "account",
                 "type": "publicKey",
-                "path": "admin"
+                "path": "creator"
               },
               {
                 "kind": "arg",
@@ -4901,7 +4934,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "admin",
+          "name": "creator",
           "isMut": false,
           "isSigner": true
         },
@@ -4958,6 +4991,31 @@ export const IDL: MangoV4 = {
         {
           "name": "testing",
           "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "groupEdit",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "newAdmin",
+          "type": "publicKey"
+        },
+        {
+          "name": "newFastListingAdmin",
+          "type": "publicKey"
         }
       ]
     },
@@ -7666,12 +7724,20 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
-            "name": "admin",
+            "name": "creator",
             "type": "publicKey"
           },
           {
             "name": "groupNum",
             "type": "u32"
+          },
+          {
+            "name": "admin",
+            "type": "publicKey"
+          },
+          {
+            "name": "fastListingAdmin",
+            "type": "publicKey"
           },
           {
             "name": "padding",

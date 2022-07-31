@@ -12,11 +12,18 @@ import { Serum3Market } from './serum3';
 export class Group {
   static from(
     publicKey: PublicKey,
-    obj: { admin: PublicKey; groupNum: number },
+    obj: {
+      creator: PublicKey;
+      admin: PublicKey;
+      fastListingAdmin: PublicKey;
+      groupNum: number;
+    },
   ): Group {
     return new Group(
       publicKey,
+      obj.creator,
       obj.admin,
+      obj.fastListingAdmin,
       obj.groupNum,
       new Map(),
       new Map(),
@@ -29,7 +36,9 @@ export class Group {
 
   constructor(
     public publicKey: PublicKey,
+    public creator: PublicKey,
     public admin: PublicKey,
+    public fastListingAdmin: PublicKey,
     public groupNum: number,
     public banksMap: Map<string, Bank>,
     public serum3MarketsMap: Map<string, Serum3Market>,

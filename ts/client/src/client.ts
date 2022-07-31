@@ -82,7 +82,7 @@ export class MangoClient {
     return await this.program.methods
       .groupCreate(groupNum, testing ? 1 : 0)
       .accounts({
-        admin: adminPk,
+        creator: adminPk,
         payer: adminPk,
         insuranceMint: insuranceMintPk,
       })
