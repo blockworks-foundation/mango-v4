@@ -640,7 +640,7 @@ impl<
                     token_index,
                     in_use_count: 0,
                     padding: Default::default(),
-                    reserved: [0; 64],
+                    reserved: [0; 40],
                 };
             }
             Ok((v, raw_index, bank_index))
