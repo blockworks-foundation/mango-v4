@@ -196,14 +196,6 @@ async fn derive_health_check_remaining_account_metas(
     for position in adjusted_account.token_iter_active() {
         let mint_info =
             get_mint_info_by_token_index(account_loader, account, position.token_index).await;
-        // TODO: ALTs are unavailable
-        // let lookup_table = account_loader
-        //     .load_bytes(&mint_info.address_lookup_table)
-        //     .await
-        //     .unwrap();
-        // let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
-        // banks.push(addresses[mint_info.address_lookup_table_bank_index as usize]);
-        // oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
         banks.push(mint_info.first_bank());
         oracles.push(mint_info.oracle);
     }
@@ -258,17 +250,6 @@ async fn derive_liquidation_remaining_account_metas(
         } else {
             (0, false)
         };
-        // TODO: ALTs are unavailable
-        // let lookup_table = account_loader
-        //     .load_bytes(&mint_info.address_lookup_table)
-        //     .await
-        //     .unwrap();
-        // let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
-        // banks.push((
-        //     addresses[mint_info.address_lookup_table_bank_index as usize],
-        //     writable_bank,
-        // ));
-        // oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
         banks.push((mint_info.banks[bank_index], writable_bank));
         oracles.push(mint_info.oracle);
     }
@@ -612,7 +593,6 @@ pub struct TokenRegisterInstruction<'keypair> {
     pub group: Pubkey,
     pub admin: &'keypair Keypair,
     pub mint: Pubkey,
-    pub address_lookup_table: Pubkey,
     pub payer: &'keypair Keypair,
 }
 #[async_trait::async_trait(?Send)]
@@ -700,13 +680,9 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
             vault,
             mint_info,
             oracle,
-            // TODO: ALTs are unavailable
-            //address_lookup_table: self.address_lookup_table,
             payer: self.payer.pubkey(),
             token_program: Token::id(),
             system_program: System::id(),
-            // TODO: ALTs are unavailable
-            //address_lookup_table_program: mango_v4::address_lookup_table::id(),
             rent: sysvar::rent::Rent::id(),
         };
 
@@ -725,7 +701,6 @@ pub struct TokenAddBankInstruction<'keypair> {
 
     pub group: Pubkey,
     pub admin: &'keypair Keypair,
-    pub address_lookup_table: Pubkey,
     pub payer: &'keypair Keypair,
 }
 #[async_trait::async_trait(?Send)]
@@ -785,18 +760,14 @@ impl<'keypair> ClientInstruction for TokenAddBankInstruction<'keypair> {
         let accounts = Self::Accounts {
             group: self.group,
             admin: self.admin.pubkey(),
-            mint: mint,
+            mint,
             existing_bank,
             bank,
             vault,
             mint_info,
-            // TODO: ALTs are unavailable
-            //address_lookup_table: self.address_lookup_table,
             payer: self.payer.pubkey(),
             token_program: Token::id(),
             system_program: System::id(),
-            // TODO: ALTs are unavailable
-            //address_lookup_table_program: mango_v4::address_lookup_table::id(),
             rent: sysvar::rent::Rent::id(),
         };
 
