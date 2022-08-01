@@ -112,7 +112,7 @@ impl MangoClient {
             });
             let account_num = match mango_account_tuples.last() {
                 Some(tuple) => tuple.1.fixed.account_num + 1,
-                None => 0u8,
+                None => 0u32,
             };
             program
                 .request()
