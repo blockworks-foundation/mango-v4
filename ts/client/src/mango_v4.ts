@@ -2719,10 +2719,6 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "registrationTime",
-            "type": "i64"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
@@ -3011,6 +3007,10 @@ export type MangoV4 = {
                 6
               ]
             }
+          },
+          {
+            "name": "registrationTime",
+            "type": "i64"
           },
           {
             "name": "reserved",
@@ -7615,10 +7615,6 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "registrationTime",
-            "type": "i64"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
@@ -7907,6 +7903,10 @@ export const IDL: MangoV4 = {
                 6
               ]
             }
+          },
+          {
+            "name": "registrationTime",
+            "type": "i64"
           },
           {
             "name": "reserved",
