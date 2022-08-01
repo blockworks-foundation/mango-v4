@@ -57,7 +57,7 @@ pub mod mango_v4 {
     pub fn token_register(
         ctx: Context<TokenRegister>,
         token_index: TokenIndex,
-        bank_num: u64,
+        bank_num: u32,
         name: String,
         oracle_config: OracleConfig,
         interest_rate_params: InterestRateParams,
@@ -121,7 +121,7 @@ pub mod mango_v4 {
     pub fn token_add_bank(
         ctx: Context<TokenAddBank>,
         token_index: TokenIndex,
-        bank_num: u64,
+        bank_num: u32,
     ) -> Result<()> {
         instructions::token_add_bank(ctx, token_index, bank_num)
     }
@@ -139,7 +139,7 @@ pub mod mango_v4 {
 
     pub fn account_create(
         ctx: Context<AccountCreate>,
-        account_num: u8,
+        account_num: u32,
         account_size: AccountSize,
         name: String,
     ) -> Result<()> {

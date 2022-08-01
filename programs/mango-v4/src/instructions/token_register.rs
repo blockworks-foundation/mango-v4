@@ -12,7 +12,7 @@ use crate::util::fill16_from_str;
 pub const INDEX_START: I80F48 = I80F48!(1_000_000);
 
 #[derive(Accounts)]
-#[instruction(token_index: TokenIndex, bank_num: u64)]
+#[instruction(token_index: TokenIndex, bank_num: u32)]
 pub struct TokenRegister<'info> {
     #[account(
         has_one = admin,
@@ -91,7 +91,7 @@ pub struct InterestRateParams {
 pub fn token_register(
     ctx: Context<TokenRegister>,
     token_index: TokenIndex,
-    bank_num: u64,
+    bank_num: u32,
     name: String,
     oracle_config: OracleConfig,
     interest_rate_params: InterestRateParams,
@@ -153,7 +153,6 @@ pub fn token_register(
         token_index,
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
-        padding: Default::default(),
         bank_num: 0,
         reserved: [0; 256],
     };

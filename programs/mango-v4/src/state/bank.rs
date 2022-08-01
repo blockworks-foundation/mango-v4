@@ -91,15 +91,13 @@ pub struct Bank {
 
     pub mint_decimals: u8,
 
-    pub padding: [u8; 4],
-
-    pub bank_num: u64,
+    pub bank_num: u32,
 
     pub reserved: [u8; 256],
 }
 const_assert_eq!(
     size_of::<Bank>(),
-    16 + 32 * 4 + 8 * 2 + 16 * 23 + 2 * 8 + 2 + 1 + 1 + 4 + 8 + 256
+    32 + 16 + 32 * 3 + 16 + 16 * 6 + 8 * 2 + 16 * 16 + 8 * 2 + 2 + 1 * 2 + 4 + 256
 );
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
@@ -153,7 +151,7 @@ impl std::fmt::Debug for Bank {
 }
 
 impl Bank {
-    pub fn from_existing_bank(existing_bank: &Bank, vault: Pubkey, bank_num: u64) -> Self {
+    pub fn from_existing_bank(existing_bank: &Bank, vault: Pubkey, bank_num: u32) -> Self {
         Self {
             name: existing_bank.name,
             group: existing_bank.group,
@@ -190,7 +188,6 @@ impl Bank {
             token_index: existing_bank.token_index,
             bump: existing_bank.bump,
             mint_decimals: existing_bank.mint_decimals,
-            padding: Default::default(),
             reserved: [0; 256],
             bank_num,
         }

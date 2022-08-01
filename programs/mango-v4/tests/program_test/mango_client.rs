@@ -148,7 +148,7 @@ async fn get_mint_info_by_token_index(
             account.fixed.group.as_ref(),
             b"Bank".as_ref(),
             &token_index.to_le_bytes(),
-            &0u64.to_le_bytes(),
+            &0u32.to_le_bytes(),
         ],
         &mango_v4::id(),
     )
@@ -657,7 +657,7 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
                 self.group.as_ref(),
                 b"Bank".as_ref(),
                 &self.token_index.to_le_bytes(),
-                &0u64.to_le_bytes(),
+                &0u32.to_le_bytes(),
             ],
             &program_id,
         )
@@ -667,7 +667,7 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
                 self.group.as_ref(),
                 b"Vault".as_ref(),
                 &self.token_index.to_le_bytes(),
-                &0u64.to_le_bytes(),
+                &0u32.to_le_bytes(),
             ],
             &program_id,
         )
@@ -721,7 +721,7 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
 
 pub struct TokenAddBankInstruction<'keypair> {
     pub token_index: TokenIndex,
-    pub bank_num: u64,
+    pub bank_num: u32,
 
     pub group: Pubkey,
     pub admin: &'keypair Keypair,
@@ -747,7 +747,7 @@ impl<'keypair> ClientInstruction for TokenAddBankInstruction<'keypair> {
                 self.group.as_ref(),
                 b"Bank".as_ref(),
                 &self.token_index.to_le_bytes(),
-                &0u64.to_le_bytes(),
+                &0u32.to_le_bytes(),
             ],
             &program_id,
         )
@@ -1112,7 +1112,7 @@ impl<'keypair> ClientInstruction for GroupCloseInstruction<'keypair> {
 }
 
 pub struct AccountCreateInstruction<'keypair> {
-    pub account_num: u8,
+    pub account_num: u32,
     pub account_size: AccountSize,
     pub group: Pubkey,
     pub owner: &'keypair Keypair,
@@ -1162,7 +1162,7 @@ impl<'keypair> ClientInstruction for AccountCreateInstruction<'keypair> {
 }
 
 pub struct AccountExpandInstruction<'keypair> {
-    pub account_num: u8,
+    pub account_num: u32,
     pub group: Pubkey,
     pub owner: &'keypair Keypair,
     pub payer: &'keypair Keypair,
@@ -1207,7 +1207,7 @@ impl<'keypair> ClientInstruction for AccountExpandInstruction<'keypair> {
 }
 
 pub struct AccountEditInstruction<'keypair> {
-    pub account_num: u8,
+    pub account_num: u32,
     pub group: Pubkey,
     pub owner: &'keypair Keypair,
     pub name: String,
