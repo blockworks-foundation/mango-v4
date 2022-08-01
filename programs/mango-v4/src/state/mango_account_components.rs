@@ -26,13 +26,15 @@ pub struct TokenPosition {
     /// incremented when a market requires this position to stay alive
     pub in_use_count: u8,
 
-    pub reserved: [u8; 5],
+    pub padding: [u8; 5],
+
+    pub reserved: [u8; 64],
 }
 
 unsafe impl bytemuck::Pod for TokenPosition {}
 unsafe impl bytemuck::Zeroable for TokenPosition {}
 
-const_assert_eq!(size_of::<TokenPosition>(), 24);
+const_assert_eq!(size_of::<TokenPosition>(), 24 + 64);
 const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
 
 impl Default for TokenPosition {
@@ -41,7 +43,8 @@ impl Default for TokenPosition {
             indexed_position: I80F48::ZERO,
             token_index: TokenIndex::MAX,
             in_use_count: 0,
-            reserved: Default::default(),
+            padding: Default::default(),
+            reserved: [0; 64],
         }
     }
 }
@@ -98,9 +101,11 @@ pub struct Serum3Orders {
     pub base_token_index: TokenIndex,
     pub quote_token_index: TokenIndex,
 
-    pub reserved: [u8; 2],
+    pub padding: [u8; 2],
+
+    pub reserved: [u8; 64],
 }
-const_assert_eq!(size_of::<Serum3Orders>(), 32 + 8 * 2 + 2 * 3 + 2); // 56
+const_assert_eq!(size_of::<Serum3Orders>(), 32 + 8 * 2 + 2 * 3 + 2 + 64);
 const_assert_eq!(size_of::<Serum3Orders>() % 8, 0);
 
 unsafe impl bytemuck::Pod for Serum3Orders {}
@@ -123,7 +128,8 @@ impl Default for Serum3Orders {
             market_index: Serum3MarketIndex::MAX,
             base_token_index: TokenIndex::MAX,
             quote_token_index: TokenIndex::MAX,
-            reserved: Default::default(),
+            reserved: [0; 64],
+            padding: Default::default(),
             previous_native_coin_reserved: 0,
             previous_native_pc_reserved: 0,
         }
@@ -134,7 +140,7 @@ impl Default for Serum3Orders {
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct PerpPositions {
     pub market_index: PerpMarketIndex,
-    pub reserved: [u8; 6],
+    pub padding: [u8; 6],
 
     /// Active position size, measured in base lots
     pub base_position_lots: i64,
@@ -157,6 +163,8 @@ pub struct PerpPositions {
     /// Amount that's on EventQueue waiting to be processed
     pub taker_base_lots: i64,
     pub taker_quote_lots: i64,
+
+    pub reserved: [u8; 64],
 }
 
 impl std::fmt::Debug for PerpPositions {
@@ -172,7 +180,7 @@ impl std::fmt::Debug for PerpPositions {
             .finish()
     }
 }
-const_assert_eq!(size_of::<PerpPositions>(), 8 + 8 * 5 + 3 * 16); // 96
+const_assert_eq!(size_of::<PerpPositions>(), 8 + 8 * 5 + 3 * 16 + 64);
 const_assert_eq!(size_of::<PerpPositions>() % 8, 0);
 
 unsafe impl bytemuck::Pod for PerpPositions {}
@@ -188,9 +196,10 @@ impl Default for PerpPositions {
             asks_base_lots: 0,
             taker_base_lots: 0,
             taker_quote_lots: 0,
-            reserved: Default::default(),
+            reserved: [0; 64],
             long_settled_funding: I80F48::ZERO,
             short_settled_funding: I80F48::ZERO,
+            padding: Default::default(),
         }
     }
 }
@@ -254,22 +263,24 @@ impl PerpPositions {
 #[derive(AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct PerpOpenOrders {
     pub order_side: Side, // TODO: storing enums isn't POD
-    pub reserved1: [u8; 1],
+    pub padding1: [u8; 1],
     pub order_market: PerpMarketIndex,
-    pub reserved2: [u8; 4],
+    pub padding2: [u8; 4],
     pub client_order_id: u64,
     pub order_id: i128,
+    pub reserved: [u8; 64],
 }
 
 impl Default for PerpOpenOrders {
     fn default() -> Self {
         Self {
             order_side: Side::Bid,
-            reserved1: Default::default(),
+            padding1: Default::default(),
             order_market: FREE_ORDER_SLOT,
-            reserved2: Default::default(),
+            padding2: Default::default(),
             client_order_id: 0,
             order_id: 0,
+            reserved: [0; 64],
         }
     }
 }
@@ -277,7 +288,7 @@ impl Default for PerpOpenOrders {
 unsafe impl bytemuck::Pod for PerpOpenOrders {}
 unsafe impl bytemuck::Zeroable for PerpOpenOrders {}
 
-const_assert_eq!(size_of::<PerpOpenOrders>(), 1 + 1 + 2 + 4 + 8 + 16);
+const_assert_eq!(size_of::<PerpOpenOrders>(), 1 + 1 + 2 + 4 + 8 + 16 + 64);
 const_assert_eq!(size_of::<PerpOpenOrders>() % 8, 0);
 
 #[macro_export]

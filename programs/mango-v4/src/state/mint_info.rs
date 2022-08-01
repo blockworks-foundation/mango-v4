@@ -21,7 +21,7 @@ pub struct MintInfo {
     // ABI: Clients rely on this being at offset 40
     pub token_index: TokenIndex,
 
-    pub padding: [u8; 6],
+    pub padding1: [u8; 6],
     pub mint: Pubkey,
     pub banks: [Pubkey; MAX_BANKS],
     pub vaults: [Pubkey; MAX_BANKS],
@@ -32,11 +32,13 @@ pub struct MintInfo {
     pub address_lookup_table_bank_index: u8,
     pub address_lookup_table_oracle_index: u8,
 
-    pub reserved: [u8; 6],
+    pub padding2: [u8; 6],
+
+    pub reserved: [u8; 128],
 }
 const_assert_eq!(
     size_of::<MintInfo>(),
-    MAX_BANKS * 2 * 32 + 4 * 32 + 2 + 6 + 2 + 6
+    MAX_BANKS * 2 * 32 + 4 * 32 + 2 + 6 + 2 + 6 + 128
 );
 const_assert_eq!(size_of::<MintInfo>() % 8, 0);
 

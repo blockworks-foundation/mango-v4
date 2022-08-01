@@ -15,7 +15,7 @@ pub struct Serum3Market {
     pub base_token_index: TokenIndex,
     // ABI: Clients rely on this being at offset 42
     pub quote_token_index: TokenIndex,
-    pub padding: [u8; 4],
+    pub padding1: [u8; 4],
     pub name: [u8; 16],
     pub serum_program: Pubkey,
     pub serum_market_external: Pubkey,
@@ -23,11 +23,14 @@ pub struct Serum3Market {
     pub market_index: Serum3MarketIndex,
 
     pub bump: u8,
-    pub reserved: [u8; 5],
+
+    pub padding2: [u8; 5],
+
+    pub reserved: [u8; 128],
 }
 const_assert_eq!(
     size_of::<Serum3Market>(),
-    32 + 2 + 2 + 4 + 16 + 2 * 32 + 2 + 1 + 5
+    32 + 2 + 2 + 4 + 16 + 2 * 32 + 2 + 1 + 5 + 128
 );
 const_assert_eq!(size_of::<Serum3Market>() % 8, 0);
 
