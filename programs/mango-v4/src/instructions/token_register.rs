@@ -12,7 +12,7 @@ use crate::util::fill16_from_str;
 pub const INDEX_START: I80F48 = I80F48!(1_000_000);
 
 #[derive(Accounts)]
-#[instruction(token_index: TokenIndex, bank_num: u64)]
+#[instruction(token_index: TokenIndex, bank_num: u32)]
 pub struct TokenRegister<'info> {
     #[account(
         has_one = admin,
@@ -91,7 +91,7 @@ pub struct InterestRateParams {
 pub fn token_register(
     ctx: Context<TokenRegister>,
     token_index: TokenIndex,
-    bank_num: u64,
+    bank_num: u32,
     name: String,
     oracle_config: OracleConfig,
     interest_rate_params: InterestRateParams,
@@ -117,8 +117,8 @@ pub fn token_register(
 
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
-        name: fill16_from_str(name)?,
         group: ctx.accounts.group.key(),
+        name: fill16_from_str(name)?,
         mint: ctx.accounts.mint.key(),
         vault: ctx.accounts.vault.key(),
         oracle: ctx.accounts.oracle.key(),
@@ -154,7 +154,6 @@ pub fn token_register(
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
-        padding: Default::default(),
         reserved: [0; 256],
     };
 
@@ -175,6 +174,7 @@ pub fn token_register(
         token_index,
         address_lookup_table_bank_index: alt_previous_size as u8,
         address_lookup_table_oracle_index: alt_previous_size as u8 + 1,
+        registration_time: Clock::get()?.unix_timestamp,
         padding1: Default::default(),
         padding2: Default::default(),
         reserved: [0; 256],

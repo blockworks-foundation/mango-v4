@@ -288,6 +288,7 @@ export class MintInfo {
       addressLookupTableBankIndex: Number;
       addressLookupTableOracleIndex: Number;
       reserved: unknown;
+      registrationTime: BN;
     },
   ) {
     return new MintInfo(
@@ -297,6 +298,7 @@ export class MintInfo {
       obj.vaults,
       obj.oracle,
       obj.tokenIndex,
+      obj.registrationTime,
     );
   }
 
@@ -307,6 +309,7 @@ export class MintInfo {
     public vaults: PublicKey[],
     public oracle: PublicKey,
     public tokenIndex: number,
+    registrationTime: BN,
   ) {}
 
   public firstBank(): PublicKey {
