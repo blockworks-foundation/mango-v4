@@ -792,3 +792,10 @@ pub fn keypair_from_cli(keypair: &str) -> Keypair {
         }
     }
 }
+
+pub fn pubkey_from_cli(pubkey: &str) -> Pubkey {
+    match Pubkey::from_str(pubkey) {
+        Ok(p) => p,
+        Err(_) => keypair_from_cli(pubkey).pubkey(),
+    }
+}

@@ -1,0 +1,26 @@
+[package]
+name = "cli"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anchor-client = { path = "../anchor/client" }
+anchor-lang = { path = "../anchor/lang" }
+anchor-spl = { path = "../anchor/spl" }
+anyhow = "1.0"
+clap = { version = "3.1.8", features = ["derive", "env"] }
+client = { path = "../client" }
+dotenv = "0.15.0"
+env_logger = "0.8.4"
+fixed = { version = "=1.11.0", features = ["serde", "borsh"] }
+fixed-macro = "^1.1.1"
+futures = "0.3.21"
+log = "0.4.0"
+mango-v4 = { path = "../programs/mango-v4" }
+pyth-sdk-solana = "0.1.0"
+serum_dex = { version = "0.4.0", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false, features = ["no-entrypoint", "program"] }
+solana-client = "~1.10.29"
+solana-sdk = "~1.10.29"
+tokio = { version = "1.14.1", features = ["rt-multi-thread", "time", "macros", "sync"] }
