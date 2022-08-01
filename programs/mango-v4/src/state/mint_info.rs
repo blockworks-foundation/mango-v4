@@ -26,13 +26,6 @@ pub struct MintInfo {
     pub banks: [Pubkey; MAX_BANKS],
     pub vaults: [Pubkey; MAX_BANKS],
     pub oracle: Pubkey,
-    pub address_lookup_table: Pubkey,
-
-    // describe what address map relevant accounts are found on
-    pub address_lookup_table_bank_index: u8,
-    pub address_lookup_table_oracle_index: u8,
-
-    pub padding2: [u8; 6],
 
     pub registration_time: i64,
 
@@ -40,7 +33,7 @@ pub struct MintInfo {
 }
 const_assert_eq!(
     size_of::<MintInfo>(),
-    MAX_BANKS * 2 * 32 + 4 * 32 + 2 + 6 + 2 + 8 + 6 + 256
+    MAX_BANKS * 2 * 32 + 3 * 32 + 2 + 8 + 6 + 256
 );
 const_assert_eq!(size_of::<MintInfo>() % 8, 0);
 

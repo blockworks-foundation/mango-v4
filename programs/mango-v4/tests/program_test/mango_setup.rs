@@ -49,8 +49,6 @@ impl<'a> GroupWithTokensConfig<'a> {
         let group = create_group_accounts.group;
         let insurance_vault = create_group_accounts.insurance_vault;
 
-        let address_lookup_table = solana.create_address_lookup_table(admin, payer).await;
-
         let mut tokens = vec![];
         for (index, mint) in mints.iter().enumerate() {
             let create_stub_oracle_accounts = send_tx(
@@ -99,7 +97,6 @@ impl<'a> GroupWithTokensConfig<'a> {
                     group,
                     admin,
                     mint: mint.pubkey,
-                    address_lookup_table,
                     payer,
                 },
             )
@@ -112,7 +109,6 @@ impl<'a> GroupWithTokensConfig<'a> {
                     bank_num: 1,
                     group,
                     admin,
-                    address_lookup_table,
                     payer,
                 },
             )
