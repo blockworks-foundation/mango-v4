@@ -1,5 +1,6 @@
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
+import BN from 'bn.js';
 
 export class Serum3Market {
   public name: string;
@@ -15,6 +16,7 @@ export class Serum3Market {
       quoteTokenIndex: number;
       bump: number;
       reserved: unknown;
+      registrationTime: BN;
     },
   ): Serum3Market {
     return new Serum3Market(
@@ -26,6 +28,7 @@ export class Serum3Market {
       obj.marketIndex,
       obj.baseTokenIndex,
       obj.quoteTokenIndex,
+      obj.registrationTime,
     );
   }
 
@@ -38,6 +41,7 @@ export class Serum3Market {
     public marketIndex: number,
     public baseTokenIndex: number,
     public quoteTokenIndex: number,
+    public registrationTime: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
   }

@@ -117,8 +117,8 @@ pub fn token_register(
 
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
-        name: fill16_from_str(name)?,
         group: ctx.accounts.group.key(),
+        name: fill16_from_str(name)?,
         mint: ctx.accounts.mint.key(),
         vault: ctx.accounts.vault.key(),
         oracle: ctx.accounts.oracle.key(),
@@ -153,8 +153,9 @@ pub fn token_register(
         token_index,
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
-        bank_num: 0,
         padding: Default::default(),
+        bank_num: 0,
+        registration_time: Clock::get()?.unix_timestamp,
         reserved: [0; 256],
     };
 

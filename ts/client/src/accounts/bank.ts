@@ -63,6 +63,7 @@ export class Bank {
       dust: Object;
       tokenIndex: number;
       mintDecimals: number;
+      registrationTime: BN;
     },
   ) {
     return new Bank(
@@ -97,6 +98,7 @@ export class Bank {
       obj.dust,
       obj.tokenIndex,
       obj.mintDecimals,
+      obj.registrationTime,
     );
   }
 
@@ -132,6 +134,7 @@ export class Bank {
     dust: Object,
     public tokenIndex: number,
     public mintDecimals: number,
+    public registrationTime: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.depositIndex = I80F48.from(depositIndex);

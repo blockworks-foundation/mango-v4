@@ -88,12 +88,14 @@ pub struct PerpMarket {
 
     pub padding2: [u8; 6],
 
+    pub registration_time: i64,
+
     pub reserved: [u8; 128],
 }
 
 const_assert_eq!(
     size_of::<PerpMarket>(),
-    32 + 2 + 2 + 4 + 16 + 32 + 16 + 32 * 3 + 8 * 2 + 16 * 11 + 8 * 2 + 8 * 2 + 16 + 2 + 6 + 128
+    32 + 2 + 2 + 4 + 16 + 32 + 16 + 32 * 3 + 8 * 2 + 16 * 11 + 8 * 2 + 8 * 2 + 16 + 2 + 6 + 8 + 128
 );
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
 
