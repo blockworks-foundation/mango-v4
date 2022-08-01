@@ -224,7 +224,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
         vaults_with_banks[vault_index] = true;
         let token_account_ai = &token_accounts[vault_index];
-        let token_account = Account::<TokenAccount>::try_from(&token_account_ai)?;
+        let token_account = Account::<TokenAccount>::try_from(token_account_ai)?;
 
         // Ensure this bank/vault combination was mentioned in the Begin instruction:
         // The Begin instruction only checks that End ends with the same vault accounts -

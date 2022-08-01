@@ -76,13 +76,13 @@ impl<T: ?Sized> DerefOrBorrow<T> for &mut T {
 
 impl<'a, T: ?Sized> DerefOrBorrow<T> for Ref<'a, T> {
     fn deref_or_borrow(&self) -> &T {
-        &self
+        self
     }
 }
 
 impl<'a, T: ?Sized> DerefOrBorrow<T> for RefMut<'a, T> {
     fn deref_or_borrow(&self) -> &T {
-        &self
+        self
     }
 }
 

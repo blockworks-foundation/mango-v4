@@ -114,7 +114,7 @@ macro_rules! error_msg {
 macro_rules! require_msg {
     ($invariant:expr, $($arg:tt)*) => {
         if !($invariant) {
-            Err(error_msg!($($arg)*))?;
+            return Err(error_msg!($($arg)*));
         }
     };
 }

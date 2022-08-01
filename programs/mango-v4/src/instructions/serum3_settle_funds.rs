@@ -212,7 +212,7 @@ pub fn charge_maybe_fees(
 
         // loan origination fees
         let pc_token_account = account.token_get_mut(pc_bank.token_index)?.0;
-        let pc_token_native = pc_token_account.native(&pc_bank);
+        let pc_token_native = pc_token_account.native(pc_bank);
 
         if pc_token_native.is_negative() {
             let actualized_loan = pc_token_native.abs().min(maybe_actualized_pc_loan);
