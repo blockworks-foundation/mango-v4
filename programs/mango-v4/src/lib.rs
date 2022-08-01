@@ -32,8 +32,13 @@ pub mod mango_v4 {
 
     use super::*;
 
-    pub fn group_create(ctx: Context<GroupCreate>, group_num: u32, testing: u8) -> Result<()> {
-        instructions::group_create(ctx, group_num, testing)
+    pub fn group_create(
+        ctx: Context<GroupCreate>,
+        group_num: u32,
+        testing: u8,
+        version: u8,
+    ) -> Result<()> {
+        instructions::group_create(ctx, group_num, testing, version)
     }
 
     pub fn group_edit(

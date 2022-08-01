@@ -38,7 +38,12 @@ pub struct GroupCreate<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn group_create(ctx: Context<GroupCreate>, group_num: u32, testing: u8) -> Result<()> {
+pub fn group_create(
+    ctx: Context<GroupCreate>,
+    group_num: u32,
+    testing: u8,
+    version: u8,
+) -> Result<()> {
     let mut group = ctx.accounts.group.load_init()?;
     group.creator = ctx.accounts.creator.key();
     group.admin = ctx.accounts.creator.key();
@@ -48,5 +53,6 @@ pub fn group_create(ctx: Context<GroupCreate>, group_num: u32, testing: u8) -> R
     group.bump = *ctx.bumps.get("group").ok_or(MangoError::SomeError)?;
     group.group_num = group_num;
     group.testing = testing;
+    group.version = version;
     Ok(())
 }

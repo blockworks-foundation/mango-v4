@@ -76,11 +76,12 @@ export class MangoClient {
   public async groupCreate(
     groupNum: number,
     testing: boolean,
+    version: number,
     insuranceMintPk: PublicKey,
   ): Promise<TransactionSignature> {
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
     return await this.program.methods
-      .groupCreate(groupNum, testing ? 1 : 0)
+      .groupCreate(groupNum, testing ? 1 : 0, version)
       .accounts({
         creator: adminPk,
         payer: adminPk,
