@@ -28,13 +28,13 @@ pub struct TokenPosition {
 
     pub padding: [u8; 5],
 
-    pub reserved: [u8; 64],
+    pub reserved: [u8; 40],
 }
 
 unsafe impl bytemuck::Pod for TokenPosition {}
 unsafe impl bytemuck::Zeroable for TokenPosition {}
 
-const_assert_eq!(size_of::<TokenPosition>(), 24 + 64);
+const_assert_eq!(size_of::<TokenPosition>(), 24 + 40);
 const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
 
 impl Default for TokenPosition {
@@ -44,7 +44,7 @@ impl Default for TokenPosition {
             token_index: TokenIndex::MAX,
             in_use_count: 0,
             padding: Default::default(),
-            reserved: [0; 64],
+            reserved: [0; 40],
         }
     }
 }

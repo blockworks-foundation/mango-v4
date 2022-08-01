@@ -7,6 +7,8 @@ use core::fmt::Display;
 pub enum MangoError {
     #[msg("")]
     SomeError,
+    #[msg("")]
+    NotImplementedError,
     #[msg("checked math error")]
     MathError,
     #[msg("")]

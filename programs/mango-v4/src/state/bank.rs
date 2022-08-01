@@ -95,11 +95,11 @@ pub struct Bank {
 
     pub bank_num: u64,
 
-    pub reserved: [u8; 128],
+    pub reserved: [u8; 256],
 }
 const_assert_eq!(
     size_of::<Bank>(),
-    16 + 32 * 4 + 8 * 2 + 16 * 23 + 2 * 8 + 2 + 1 + 1 + 4 + 8 + 128
+    16 + 32 * 4 + 8 * 2 + 16 * 23 + 2 * 8 + 2 + 1 + 1 + 4 + 8 + 256
 );
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
@@ -191,7 +191,7 @@ impl Bank {
             bump: existing_bank.bump,
             mint_decimals: existing_bank.mint_decimals,
             padding: Default::default(),
-            reserved: [0; 128],
+            reserved: [0; 256],
             bank_num,
         }
     }
@@ -593,7 +593,7 @@ mod tests {
                     token_index: 0,
                     in_use_count: if is_in_use { 1 } else { 0 },
                     padding: Default::default(),
-                    reserved: [0; 64],
+                    reserved: [0; 40],
                 };
 
                 account.indexed_position = indexed(I80F48::from_num(start), &bank);

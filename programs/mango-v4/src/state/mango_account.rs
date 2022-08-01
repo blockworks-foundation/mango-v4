@@ -31,6 +31,7 @@ use checked_math as cm;
 type BorshVecLength = u32;
 const BORSH_VEC_PADDING_BYTES: usize = 4;
 const BORSH_VEC_SIZE_BYTES: usize = 4;
+const DEFAULT_MANGO_ACCOUNT_VERSION: u8 = 0;
 
 #[derive(
     Debug,
@@ -109,6 +110,8 @@ pub struct MangoAccount {
     pub reserved: [u8; 256],
 
     // dynamic
+    pub header_version: u8,
+    pub padding0: [u8; 7],
     // note: padding is required for TokenPosition, etc. to be aligned
     pub padding1: u32,
     // Maps token_index -> deposit/borrow account for each token
@@ -139,6 +142,8 @@ impl Default for MangoAccount {
             net_deposits: 0.0,
             net_settled: 0.0,
             reserved: [0; 256],
+            header_version: 0,
+            padding0: Default::default(),
             padding1: Default::default(),
             tokens: vec![TokenPosition::default(); 3],
             padding2: Default::default(),
@@ -160,7 +165,8 @@ impl MangoAccount {
     }
 
     pub fn dynamic_token_vec_offset() -> usize {
-        BORSH_VEC_PADDING_BYTES
+        8 // header version + padding
+            + BORSH_VEC_PADDING_BYTES
     }
 
     pub fn dynamic_serum3_vec_offset(token_count: u8) -> usize {
@@ -270,43 +276,52 @@ pub struct MangoAccountDynamicHeader {
 
 impl DynamicHeader for MangoAccountDynamicHeader {
     fn from_bytes(data: &[u8]) -> Result<Self> {
-        let token_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
-            data,
-            MangoAccount::dynamic_token_vec_offset(),
-            BORSH_VEC_SIZE_BYTES
-        ]))
-        .unwrap();
+        let header_version = u8::from_le_bytes(*array_ref![data, 0, size_of::<u8>()]);
 
-        let serum3_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
-            data,
-            MangoAccount::dynamic_serum3_vec_offset(token_count),
-            BORSH_VEC_SIZE_BYTES
-        ]))
-        .unwrap();
+        match header_version {
+            0 => {
+                let token_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
+                    data,
+                    MangoAccount::dynamic_token_vec_offset(),
+                    BORSH_VEC_SIZE_BYTES
+                ]))
+                .unwrap();
 
-        let perp_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
-            data,
-            MangoAccount::dynamic_perp_vec_offset(token_count, serum3_count),
-            BORSH_VEC_SIZE_BYTES
-        ]))
-        .unwrap();
+                let serum3_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
+                    data,
+                    MangoAccount::dynamic_serum3_vec_offset(token_count),
+                    BORSH_VEC_SIZE_BYTES
+                ]))
+                .unwrap();
 
-        let perp_oo_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
-            data,
-            MangoAccount::dynamic_perp_oo_vec_offset(token_count, serum3_count, perp_count),
-            BORSH_VEC_SIZE_BYTES
-        ]))
-        .unwrap();
+                let perp_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
+                    data,
+                    MangoAccount::dynamic_perp_vec_offset(token_count, serum3_count),
+                    BORSH_VEC_SIZE_BYTES
+                ]))
+                .unwrap();
 
-        Ok(Self {
-            token_count,
-            serum3_count,
-            perp_count,
-            perp_oo_count,
-        })
+                let perp_oo_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
+                    data,
+                    MangoAccount::dynamic_perp_oo_vec_offset(token_count, serum3_count, perp_count),
+                    BORSH_VEC_SIZE_BYTES
+                ]))
+                .unwrap();
+
+                Ok(Self {
+                    token_count,
+                    serum3_count,
+                    perp_count,
+                    perp_oo_count,
+                })
+            }
+            _ => err!(MangoError::NotImplementedError).context("unexpected header version number"),
+        }
     }
 
-    fn initialize(_data: &mut [u8]) -> Result<()> {
+    fn initialize(data: &mut [u8]) -> Result<()> {
+        let dst: &mut [u8] = &mut data[0..1];
+        dst.copy_from_slice(&DEFAULT_MANGO_ACCOUNT_VERSION.to_le_bytes());
         Ok(())
     }
 }
@@ -624,7 +639,7 @@ impl<
                     token_index,
                     in_use_count: 0,
                     padding: Default::default(),
-                    reserved: [0; 64],
+                    reserved: [0; 40],
                 };
             }
             Ok((v, raw_index, bank_index))

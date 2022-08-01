@@ -6,7 +6,7 @@ use anchor_spl::token::{self, CloseAccount, Token, TokenAccount};
 pub struct GroupClose<'info> {
     #[account(
         mut,
-        constraint = group.load()?.testing == 1,
+        constraint = group.load()?.is_testing(),
         has_one = admin,
         has_one = insurance_vault,
         close = sol_destination
