@@ -31,7 +31,7 @@ use checked_math as cm;
 type BorshVecLength = u32;
 const BORSH_VEC_PADDING_BYTES: usize = 4;
 const BORSH_VEC_SIZE_BYTES: usize = 4;
-const DEFAULT_MANGO_ACCOUNT_VERSION: u8 = 0;
+const DEFAULT_MANGO_ACCOUNT_VERSION: u8 = 1;
 
 #[derive(
     Debug,
@@ -142,7 +142,7 @@ impl Default for MangoAccount {
             net_deposits: 0.0,
             net_settled: 0.0,
             reserved: [0; 256],
-            header_version: 0,
+            header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding0: Default::default(),
             padding1: Default::default(),
             tokens: vec![TokenPosition::default(); 3],
@@ -279,7 +279,7 @@ impl DynamicHeader for MangoAccountDynamicHeader {
         let header_version = u8::from_le_bytes(*array_ref![data, 0, size_of::<u8>()]);
 
         match header_version {
-            0 => {
+            1 => {
                 let token_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
                     data,
                     MangoAccount::dynamic_token_vec_offset(),
