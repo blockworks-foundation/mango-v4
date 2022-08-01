@@ -6,9 +6,9 @@ use std::sync::Arc;
 use anchor_client::Cluster;
 
 use clap::{Parser, Subcommand};
-use client::{keypair_from_cli, MangoClient};
+use client::{keypair_from_cli, Client, MangoClient};
+use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
-use solana_sdk::{commitment_config::CommitmentConfig, signature::Signer};
 use tokio::time;
 
 // TODO
@@ -34,21 +34,11 @@ struct Cli {
     #[clap(short, long, env)]
     rpc_url: String,
 
-    #[clap(short, long, env = "PAYER_KEYPAIR")]
-    payer: String,
+    #[clap(short, long, env)]
+    mango_account: Pubkey,
 
     #[clap(short, long, env)]
-    group: Option<Pubkey>,
-
-    // These exist only as a shorthand to make testing easier. Normal users would provide the group.
-    #[clap(long, env)]
-    group_from_admin_keypair: Option<String>,
-
-    #[clap(long, env, default_value = "0")]
-    group_from_admin_num: u32,
-
-    #[clap(short, long, env)]
-    mango_account_name: String,
+    owner: String,
 
     #[clap(subcommand)]
     command: Command,
@@ -73,7 +63,7 @@ fn main() -> Result<(), anyhow::Error> {
     };
     let cli = Cli::parse_from(args);
 
-    let payer = keypair_from_cli(&cli.payer);
+    let owner = keypair_from_cli(&cli.owner);
 
     let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss");
@@ -84,21 +74,10 @@ fn main() -> Result<(), anyhow::Error> {
         Command::Taker { .. } => CommitmentConfig::confirmed(),
     };
 
-    let group = if let Some(group) = cli.group {
-        group
-    } else if let Some(p) = cli.group_from_admin_keypair {
-        let admin = keypair_from_cli(&p);
-        MangoClient::group_for_admin(admin.pubkey(), cli.group_from_admin_num)
-    } else {
-        panic!("Must provide either group or group_from_admin_keypair");
-    };
-
-    let mango_client = Arc::new(MangoClient::new(
-        cluster,
-        commitment,
-        group,
-        payer,
-        &cli.mango_account_name,
+    let mango_client = Arc::new(MangoClient::new_for_existing_account(
+        Client::new(cluster, commitment, &owner),
+        cli.mango_account,
+        owner,
     )?);
 
     let rt = tokio::runtime::Builder::new_multi_thread()

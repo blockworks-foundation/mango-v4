@@ -1,7 +1,9 @@
+use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 
-use anchor_client::{Client, ClientError, Cluster, Program};
+use anchor_client::{ClientError, Cluster, Program};
 
 use anchor_lang::__private::bytemuck;
 use anchor_lang::prelude::System;
@@ -28,17 +30,45 @@ use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::sysvar;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer};
 
+// very close to anchor_client::Client, which unfortunately has no accessors or Clone
+#[derive(Clone, Debug)]
+pub struct Client {
+    pub cluster: Cluster,
+    pub fee_payer: Arc<Keypair>,
+    pub commitment: CommitmentConfig,
+}
+
+impl Client {
+    pub fn new(cluster: Cluster, commitment: CommitmentConfig, fee_payer: &Keypair) -> Self {
+        Self {
+            cluster,
+            fee_payer: Arc::new(fee_payer.clone()),
+            commitment,
+        }
+    }
+
+    pub fn anchor_client(&self) -> anchor_client::Client {
+        anchor_client::Client::new_with_options(
+            self.cluster.clone(),
+            Rc::new((*self.fee_payer).clone()),
+            self.commitment,
+        )
+    }
+
+    pub fn rpc_with_timeout(&self, timeout: Duration) -> RpcClient {
+        RpcClient::new_with_timeout_and_commitment(self.cluster.clone(), timeout, self.commitment)
+    }
+}
+
 // todo: might want to integrate geyser, websockets, or simple http polling for keeping data fresh
 pub struct MangoClient {
-    pub rpc: RpcClient,
-    pub cluster: Cluster,
-    pub commitment: CommitmentConfig,
+    pub client: Client,
 
     // todo: possibly this object should have cache-functions, so there can be one getMultipleAccounts
     // call to refresh banks etc -- if it's backed by websockets, these could just do nothing
     pub account_fetcher: Arc<dyn AccountFetcher>,
 
-    pub payer: Keypair,
+    pub owner: Keypair,
     pub mango_account_address: Pubkey,
 
     pub context: MangoGroupContext,
@@ -58,48 +88,17 @@ impl MangoClient {
         .0
     }
 
-    /// Conveniently creates a RPC based client
-    pub fn new(
-        cluster: Cluster,
-        commitment: CommitmentConfig,
+    pub fn find_or_create_account(
+        client: &Client,
         group: Pubkey,
-        payer: Keypair,
+        owner: Keypair,
+        payer: Keypair, // pays the SOL for the new account
         mango_account_name: &str,
-    ) -> anyhow::Result<Self> {
-        let group_context = MangoGroupContext::new_from_rpc(group, cluster.clone(), commitment)?;
-
-        let rpc = RpcClient::new_with_commitment(cluster.url().to_string(), commitment);
-        let account_fetcher = Arc::new(CachedAccountFetcher::new(RpcAccountFetcher { rpc }));
-
-        Self::new_detail(
-            cluster,
-            commitment,
-            payer,
-            mango_account_name,
-            group_context,
-            account_fetcher,
-        )
-    }
-
-    /// Allows control of AccountFetcher and externally created MangoGroupContext
-    pub fn new_detail(
-        cluster: Cluster,
-        commitment: CommitmentConfig,
-        payer: Keypair,
-        mango_account_name: &str,
-        // future: maybe pass Arc<MangoGroupContext>, so it can be extenally updated?
-        group_context: MangoGroupContext,
-        account_fetcher: Arc<dyn AccountFetcher>,
-    ) -> anyhow::Result<Self> {
-        let program =
-            Client::new_with_options(cluster.clone(), std::rc::Rc::new(payer.clone()), commitment)
-                .program(mango_v4::ID);
-
-        let rpc = program.rpc();
-        let group = group_context.group;
+    ) -> anyhow::Result<Pubkey> {
+        let program = client.anchor_client().program(mango_v4::ID);
 
         // Mango Account
-        let mut mango_account_tuples = fetch_mango_accounts(&program, group, payer.pubkey())?;
+        let mut mango_account_tuples = fetch_mango_accounts(&program, group, owner.pubkey())?;
         let mango_account_opt = mango_account_tuples
             .iter()
             .find(|(_, account)| account.fixed.name() == mango_account_name);
@@ -121,13 +120,13 @@ impl MangoClient {
                     accounts: anchor_lang::ToAccountMetas::to_account_metas(
                         &mango_v4::accounts::AccountCreate {
                             group,
-                            owner: payer.pubkey(),
+                            owner: owner.pubkey(),
                             account: {
                                 Pubkey::find_program_address(
                                     &[
                                         group.as_ref(),
                                         b"MangoAccount".as_ref(),
-                                        payer.pubkey().as_ref(),
+                                        owner.pubkey().as_ref(),
                                         &account_num.to_le_bytes(),
                                     ],
                                     &mango_v4::id(),
@@ -147,42 +146,72 @@ impl MangoClient {
                         },
                     ),
                 })
+                .signer(&owner)
+                .signer(&payer)
                 .send()
                 .map_err(prettify_client_error)
                 .context("Failed to create account...")?;
         }
-        let mango_account_tuples = fetch_mango_accounts(&program, group, payer.pubkey())?;
+        let mango_account_tuples = fetch_mango_accounts(&program, group, owner.pubkey())?;
         let index = mango_account_tuples
             .iter()
             .position(|tuple| tuple.1.fixed.name() == mango_account_name)
             .unwrap();
-        let mango_account_cache = &mango_account_tuples[index];
+        Ok(mango_account_tuples[index].0)
+    }
 
+    /// Conveniently creates a RPC based client
+    pub fn new_for_existing_account(
+        client: Client,
+        account: Pubkey,
+        owner: Keypair,
+    ) -> anyhow::Result<Self> {
+        let rpc = client.rpc_with_timeout(Duration::from_secs(60));
+        let account_fetcher = Arc::new(CachedAccountFetcher::new(RpcAccountFetcher { rpc }));
+        let mango_account = account_fetcher_fetch_mango_account(&*account_fetcher, account)?;
+        let group = mango_account.fixed.group;
+        if mango_account.fixed.owner != owner.pubkey() {
+            anyhow::bail!(
+                "bad owner for account: expected {} got {}",
+                mango_account.fixed.owner,
+                owner.pubkey()
+            );
+        }
+
+        let group_context =
+            MangoGroupContext::new_from_rpc(group, client.cluster.clone(), client.commitment)?;
+
+        Self::new_detail(client, account, owner, group_context, account_fetcher)
+    }
+
+    /// Allows control of AccountFetcher and externally created MangoGroupContext
+    pub fn new_detail(
+        client: Client,
+        account: Pubkey,
+        owner: Keypair,
+        // future: maybe pass Arc<MangoGroupContext>, so it can be extenally updated?
+        group_context: MangoGroupContext,
+        account_fetcher: Arc<dyn AccountFetcher>,
+    ) -> anyhow::Result<Self> {
         Ok(Self {
-            rpc,
-            cluster,
-            commitment,
+            client,
             account_fetcher,
-            payer,
-            mango_account_address: mango_account_cache.0,
+            owner,
+            mango_account_address: account,
             context: group_context,
         })
     }
 
-    pub fn client(&self) -> Client {
-        Client::new_with_options(
-            self.cluster.clone(),
-            std::rc::Rc::new(self.payer.clone()),
-            self.commitment,
-        )
+    pub fn anchor_client(&self) -> anchor_client::Client {
+        self.client.anchor_client()
     }
 
     pub fn program(&self) -> Program {
-        self.client().program(mango_v4::ID)
+        self.anchor_client().program(mango_v4::ID)
     }
 
-    pub fn payer(&self) -> Pubkey {
-        self.payer.pubkey()
+    pub fn owner(&self) -> Pubkey {
+        self.owner.pubkey()
     }
 
     pub fn group(&self) -> Pubkey {
@@ -282,10 +311,10 @@ impl MangoClient {
                             bank: mint_info.first_bank(),
                             vault: mint_info.first_vault(),
                             token_account: get_associated_token_address(
-                                &self.payer(),
+                                &self.owner(),
                                 &mint_info.mint,
                             ),
-                            token_authority: self.payer(),
+                            token_authority: self.owner(),
                             token_program: Token::id(),
                         },
                         None,
@@ -297,6 +326,7 @@ impl MangoClient {
                     amount,
                 }),
             })
+            .signer(&self.owner)
             .send()
             .map_err(prettify_client_error)
     }
@@ -348,8 +378,8 @@ impl MangoClient {
                         serum_program: serum3_info.market.serum_program,
                         serum_market_external: serum3_info.market.serum_market_external,
                         open_orders,
-                        owner: self.payer(),
-                        payer: self.payer(),
+                        owner: self.owner(),
+                        payer: self.owner(),
                         system_program: System::id(),
                         rent: sysvar::rent::id(),
                     },
@@ -359,6 +389,7 @@ impl MangoClient {
                     &mango_v4::instruction::Serum3CreateOpenOrders {},
                 ),
             })
+            .signer(&self.owner)
             .send()
             .map_err(prettify_client_error)
     }
@@ -482,7 +513,7 @@ impl MangoClient {
                             market_base_vault: s3.market.coin_vault,
                             market_quote_vault: s3.market.pc_vault,
                             market_vault_signer: s3.market.vault_signer,
-                            owner: self.payer(),
+                            owner: self.owner(),
                             token_program: Token::id(),
                         },
                         None,
@@ -503,6 +534,7 @@ impl MangoClient {
                     },
                 ),
             })
+            .signer(&self.owner)
             .send()
             .map_err(prettify_client_error)
     }
@@ -532,7 +564,7 @@ impl MangoClient {
                         market_base_vault: s3.market.coin_vault,
                         market_quote_vault: s3.market.pc_vault,
                         market_vault_signer: s3.market.vault_signer,
-                        owner: self.payer(),
+                        owner: self.owner(),
                         token_program: Token::id(),
                     },
                     None,
@@ -541,6 +573,7 @@ impl MangoClient {
                     &mango_v4::instruction::Serum3SettleFunds {},
                 ),
             })
+            .signer(&self.owner)
             .send()
             .map_err(prettify_client_error)
     }
@@ -602,7 +635,7 @@ impl MangoClient {
                             market_bids: s3.market.bids,
                             market_asks: s3.market.asks,
                             market_event_queue: s3.market.event_q,
-                            owner: self.payer(),
+                            owner: self.owner(),
                         },
                         None,
                     )
@@ -611,6 +644,7 @@ impl MangoClient {
                     &mango_v4::instruction::Serum3CancelOrder { side, order_id },
                 ),
             })
+            .signer(&self.owner)
             .send()
             .map_err(prettify_client_error)?;
 
@@ -650,7 +684,7 @@ impl MangoClient {
                             group: self.group(),
                             liqee: *liqee.0,
                             liqor: self.mango_account_address,
-                            liqor_owner: self.payer.pubkey(),
+                            liqor_owner: self.owner(),
                         },
                         None,
                     );
@@ -665,6 +699,7 @@ impl MangoClient {
                     },
                 ),
             })
+            .signer(&self.owner)
             .send()
             .map_err(prettify_client_error)
     }
@@ -714,7 +749,7 @@ impl MangoClient {
                             group: self.group(),
                             liqee: *liqee.0,
                             liqor: self.mango_account_address,
-                            liqor_owner: self.payer.pubkey(),
+                            liqor_owner: self.owner(),
                             liab_mint_info: liab_info.mint_info_address,
                             quote_vault: quote_info.mint_info.first_vault(),
                             insurance_vault: group.insurance_vault,
@@ -733,6 +768,7 @@ impl MangoClient {
                     },
                 ),
             })
+            .signer(&self.owner)
             .send()
             .map_err(prettify_client_error)
     }

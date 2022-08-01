@@ -4,14 +4,12 @@ use std::time::Duration;
 
 use anchor_client::Cluster;
 use clap::Parser;
-use client::{chain_data, keypair_from_cli, MangoClient, MangoGroupContext};
+use client::{chain_data, keypair_from_cli, Client, MangoClient, MangoGroupContext};
 use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 
-use solana_client::rpc_client::RpcClient;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
-use solana_sdk::signer::Signer;
 use std::collections::HashSet;
 
 pub mod account_shared_data;
@@ -56,29 +54,15 @@ struct Cli {
     #[clap(short, long, env)]
     rpc_url: String,
 
-    #[clap(long, env)]
-    group: Option<Pubkey>,
-
-    // These exist only as a shorthand to make testing easier. Normal users would provide the group.
-    #[clap(long, env)]
-    group_from_admin_keypair: Option<String>,
-
-    #[clap(long, env, default_value = "0")]
-    group_from_admin_num: u32,
-
-    // TODO: maybe store this in the group, so it's easy to start without providing it?
-    #[clap(long, env)]
-    pyth_program: Pubkey,
-
     // TODO: different serum markets could use different serum programs, should come from registered markets
     #[clap(long, env)]
     serum_program: Pubkey,
 
     #[clap(long, env)]
-    liqor_owner: String,
+    liqor_mango_account: Pubkey,
 
     #[clap(long, env)]
-    liqor_mango_account_name: String,
+    liqor_owner: String,
 
     #[clap(long, env, default_value = "300")]
     snapshot_interval_secs: u64,
@@ -109,21 +93,25 @@ async fn main() -> anyhow::Result<()> {
 
     let liqor_owner = keypair_from_cli(&cli.liqor_owner);
 
-    let mango_group = if let Some(group) = cli.group {
-        group
-    } else if let Some(p) = cli.group_from_admin_keypair {
-        let admin = keypair_from_cli(&p);
-        MangoClient::group_for_admin(admin.pubkey(), cli.group_from_admin_num)
-    } else {
-        panic!("Must provide either group or group_from_admin_keypair");
-    };
-
     let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss");
 
     let rpc_timeout = Duration::from_secs(1);
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
     let commitment = CommitmentConfig::processed();
+    let client = Client::new(cluster.clone(), commitment, &liqor_owner);
+
+    // The representation of current on-chain account data
+    let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
+    // Reading accounts from chain_data
+    let account_fetcher = Arc::new(chain_data::AccountFetcher {
+        chain_data: chain_data.clone(),
+        rpc: client.rpc_with_timeout(rpc_timeout),
+    });
+
+    let mango_account = account_fetcher.fetch_fresh_mango_account(&cli.liqor_mango_account)?;
+    let mango_group = mango_account.fixed.group;
+
     let group_context = MangoGroupContext::new_from_rpc(mango_group, cluster.clone(), commitment)?;
 
     // TODO: this is all oracles, not just pyth!
@@ -185,18 +173,6 @@ async fn main() -> anyhow::Result<()> {
         snapshot_sender,
     );
 
-    // The representation of current on-chain account data
-    let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
-    // Reading accounts from chain_data
-    let account_fetcher = Arc::new(chain_data::AccountFetcher {
-        chain_data: chain_data.clone(),
-        rpc: RpcClient::new_with_timeout_and_commitment(
-            cluster.url().to_string(),
-            rpc_timeout,
-            commitment,
-        ),
-    });
-
     start_chain_data_metrics(chain_data.clone(), &metrics);
 
     // Addresses of the MangoAccounts belonging to the mango program.
@@ -227,10 +203,9 @@ async fn main() -> anyhow::Result<()> {
     //
     let mango_client = {
         Arc::new(MangoClient::new_detail(
-            cluster,
-            commitment,
+            client,
+            cli.liqor_mango_account,
             liqor_owner,
-            &cli.liqor_mango_account_name,
             group_context,
             account_fetcher.clone(),
         )?)
