@@ -57,7 +57,7 @@ async function main() {
   console.log(`Creating Group...`);
   const insuranceMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
-    await client.groupCreate(GROUP_NUM, true, insuranceMint, 0);
+    await client.groupCreate(GROUP_NUM, true, 0, insuranceMint);
   } catch (error) {
     console.log(error);
   }

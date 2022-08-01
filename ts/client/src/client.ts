@@ -1116,12 +1116,14 @@ export class MangoClient {
       })
       .preInstructions([
         // TODO: try to pick up sizes of bookside and eventqueue from IDL, so we can stay in sync with program
+
+        // book sides
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: 8 + 90136,
+          space: 8 + 98584,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              90144,
+              8 + 98584,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,
@@ -1129,21 +1131,22 @@ export class MangoClient {
         }),
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: 8 + 90136,
+          space: 8 + 98584,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              90144,
+              8 + 98584,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,
           newAccountPubkey: asks.publicKey,
         }),
+        // event queue
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: 8 + 102416,
+          space: 8 + 4 * 2 + 8 + 488 * 208,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              102424,
+              8 + 4 * 2 + 8 + 488 * 208,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,
