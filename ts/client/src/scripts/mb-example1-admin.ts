@@ -42,7 +42,7 @@ async function main() {
   console.log(`Creating Group...`);
   try {
     const insuranceMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
-    await client.groupCreate(0, true, insuranceMint, 0);
+    await client.groupCreate(0, true, 0, insuranceMint);
   } catch (error) {
     console.log(error);
   }

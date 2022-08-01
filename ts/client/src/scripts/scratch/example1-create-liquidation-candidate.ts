@@ -1,6 +1,7 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
+import { AccountSize } from '../../accounts/mangoAccount';
 import { MangoClient } from '../../client';
 import { MANGO_V4_ID } from '../../constants';
 
