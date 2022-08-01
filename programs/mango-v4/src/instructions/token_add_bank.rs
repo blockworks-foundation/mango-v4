@@ -7,7 +7,7 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use crate::state::*;
 
 #[derive(Accounts)]
-#[instruction(token_index: TokenIndex, bank_num: u64)]
+#[instruction(token_index: TokenIndex, bank_num: u32)]
 pub struct TokenAddBank<'info> {
     #[account(
         has_one = admin,
@@ -75,10 +75,11 @@ pub struct TokenAddBank<'info> {
 // TODO: should this be "configure_mint", we pass an explicit index, and allow
 // overwriting config as long as the mint account stays the same?
 #[allow(clippy::too_many_arguments)]
+#[allow(unused_variables)]
 pub fn token_add_bank(
     ctx: Context<TokenAddBank>,
-    _token_index: TokenIndex,
-    bank_num: u64,
+    token_index: TokenIndex,
+    bank_num: u32,
 ) -> Result<()> {
     // TODO: Error if mint is already configured (technically, init of vault will fail)
 

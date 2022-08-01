@@ -221,16 +221,16 @@ pub struct MangoAccountFixed {
     pub owner: Pubkey,
     pub name: [u8; 32],
     pub delegate: Pubkey,
+    pub account_num: u32,
     being_liquidated: u8,
     is_bankrupt: u8,
-    pub account_num: u8,
     pub bump: u8,
-    pub padding: [u8; 4],
+    pub padding: [u8; 1],
     pub net_deposits: f32,
     pub net_settled: f32,
     pub reserved: [u8; 256],
 }
-const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 4 + 4 + 2 * 4 + 256);
+const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 2 * 4 + 256);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
 
 impl MangoAccountFixed {
