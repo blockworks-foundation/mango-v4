@@ -84,12 +84,7 @@ pub fn token_add_bank(
 
     let existing_bank = ctx.accounts.existing_bank.load()?;
     let mut bank = ctx.accounts.bank.load_init()?;
-    *bank = Bank::from_existing_bank(
-        &existing_bank,
-        ctx.accounts.vault.key(),
-        bank_num,
-        Clock::get()?.unix_timestamp,
-    );
+    *bank = Bank::from_existing_bank(&existing_bank, ctx.accounts.vault.key(), bank_num);
 
     // TODO: ALTs are unavailable
     // let alt_previous_size =

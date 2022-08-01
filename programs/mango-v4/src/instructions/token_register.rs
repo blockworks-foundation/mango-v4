@@ -155,7 +155,6 @@ pub fn token_register(
         mint_decimals: ctx.accounts.mint.decimals,
         padding: Default::default(),
         bank_num: 0,
-        registration_time: Clock::get()?.unix_timestamp,
         reserved: [0; 256],
     };
 
@@ -176,6 +175,7 @@ pub fn token_register(
         token_index,
         address_lookup_table_bank_index: alt_previous_size as u8,
         address_lookup_table_oracle_index: alt_previous_size as u8 + 1,
+        registration_time: Clock::get()?.unix_timestamp,
         padding1: Default::default(),
         padding2: Default::default(),
         reserved: [0; 256],
