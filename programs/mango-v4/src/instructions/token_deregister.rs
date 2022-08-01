@@ -8,7 +8,7 @@ use anchor_lang::AccountsClose;
 #[instruction(token_index: TokenIndex)]
 pub struct TokenDeregister<'info> {
     #[account(
-        constraint = group.load()?.testing == 1,
+        constraint = group.load()?.is_testing(),
         has_one = admin,
     )]
     pub group: AccountLoader<'info, Group>,
