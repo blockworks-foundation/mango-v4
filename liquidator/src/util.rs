@@ -21,11 +21,14 @@ pub fn is_mango_account<'a>(
         return None;
     }
 
-    let mango_account = MangoAccountRefWithHeader::from_bytes(&data[8..]).expect("always ok");
-    if mango_account.fixed.group != *group_id {
-        return None;
+    if let Ok(mango_account) = MangoAccountRefWithHeader::from_bytes(&data[8..]) {
+        if mango_account.fixed.group != *group_id {
+            return None;
+        }
+        Some(mango_account)
+    } else {
+        None
     }
-    Some(mango_account)
 }
 
 pub fn is_mango_bank<'a>(
