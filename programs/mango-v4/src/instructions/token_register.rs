@@ -154,7 +154,8 @@ pub fn token_register(
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
-        reserved: Default::default(),
+        padding: Default::default(),
+        reserved: [0; 128],
     };
 
     // TODO: ALTs are unavailable
@@ -174,8 +175,9 @@ pub fn token_register(
         token_index,
         address_lookup_table_bank_index: alt_previous_size as u8,
         address_lookup_table_oracle_index: alt_previous_size as u8 + 1,
-        padding: Default::default(),
-        reserved: Default::default(),
+        padding1: Default::default(),
+        padding2: Default::default(),
+        reserved: [0; 128],
     };
 
     mint_info.banks[0] = ctx.accounts.bank.key();

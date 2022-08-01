@@ -96,8 +96,7 @@ pub struct MangoAccount {
     pub account_num: u8,
     pub bump: u8,
 
-    // pub info: [u8; INFO_LEN], // TODO: Info could be in a separate PDA?
-    pub reserved: [u8; 4],
+    pub padding: [u8; 4],
 
     // Cumulative (deposits - withdraws)
     // using USD prices at the time of the deposit/withdraw
@@ -106,6 +105,8 @@ pub struct MangoAccount {
     // Cumulative settles on perp positions
     // TODO: unimplemented
     pub net_settled: f32,
+
+    pub reserved: [u8; 256],
 
     // dynamic
     // note: padding is required for TokenPosition, etc. to be aligned
@@ -134,9 +135,10 @@ impl Default for MangoAccount {
             is_bankrupt: 0,
             account_num: 0,
             bump: 0,
-            reserved: Default::default(),
+            padding: Default::default(),
             net_deposits: 0.0,
             net_settled: 0.0,
+            reserved: [0; 256],
             padding1: Default::default(),
             tokens: vec![TokenPosition::default(); 3],
             padding2: Default::default(),
@@ -217,11 +219,12 @@ pub struct MangoAccountFixed {
     is_bankrupt: u8,
     pub account_num: u8,
     pub bump: u8,
-    pub reserved: [u8; 4],
+    pub padding: [u8; 4],
     pub net_deposits: f32,
     pub net_settled: f32,
+    pub reserved: [u8; 256],
 }
-const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 4 + 4 + 2 * 4);
+const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 4 + 4 + 2 * 4 + 256);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
 
 impl MangoAccountFixed {
@@ -620,7 +623,8 @@ impl<
                     indexed_position: I80F48::ZERO,
                     token_index,
                     in_use_count: 0,
-                    reserved: Default::default(),
+                    padding: Default::default(),
+                    reserved: [0; 64],
                 };
             }
             Ok((v, raw_index, bank_index))
