@@ -49,7 +49,7 @@ pub struct BookSide {
 }
 const_assert_eq!(
     std::mem::size_of::<BookSide>(),
-    1 + 3 + 4 * 2 + 4 + 4 + 4 + 88 * 1024 + 128
+    1 + 3 + 4 * 2 + 4 + 4 + 4 + 96 * 1024 + 128 // 98456
 );
 const_assert_eq!(std::mem::size_of::<BookSide>() % 8, 0);
 
@@ -263,7 +263,7 @@ impl BookSide {
                 NodeTag::FreeNode.into()
             },
             next: self.free_list_head,
-            reserved: [0; 80],
+            reserved: [0; 88],
         });
 
         self.free_list_len += 1;

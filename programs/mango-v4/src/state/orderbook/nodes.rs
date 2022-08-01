@@ -9,7 +9,7 @@ use static_assertions::const_assert_eq;
 use super::order_type::OrderType;
 
 pub type NodeHandle = u32;
-const NODE_SIZE: usize = 88;
+const NODE_SIZE: usize = 96;
 
 #[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(u32)]
@@ -165,7 +165,7 @@ pub struct FreeNode {
 #[derive(Pod)]
 pub struct AnyNode {
     pub tag: u32,
-    pub data: [u8; 84], // note: anchor can't parse the struct for IDL when it includes non numbers, NODE_SIZE == 88, 84 == 88 - 4
+    pub data: [u8; 92], // note: anchor can't parse the struct for IDL when it includes non numbers, NODE_SIZE == 96, 92 == 96 - 4
 }
 
 const_assert_eq!(size_of::<AnyNode>(), NODE_SIZE);
