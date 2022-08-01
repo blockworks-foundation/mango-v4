@@ -45,10 +45,11 @@ pub struct BookSide {
     pub root_node: NodeHandle,
     pub leaf_count: u32,
     pub nodes: [AnyNode; MAX_BOOK_NODES],
+    pub reserved: [u8; 256],
 }
 const_assert_eq!(
     std::mem::size_of::<BookSide>(),
-    1 + 3 + 4 * 2 + 4 + 4 + 4 + 88 * 1024
+    1 + 3 + 4 * 2 + 4 + 4 + 4 + 96 * 1024 + 256 // 98584
 );
 const_assert_eq!(std::mem::size_of::<BookSide>() % 8, 0);
 
@@ -262,7 +263,7 @@ impl BookSide {
                 NodeTag::FreeNode.into()
             },
             next: self.free_list_head,
-            reserve: [0; 80],
+            reserved: [0; 88],
         });
 
         self.free_list_len += 1;
@@ -458,6 +459,7 @@ mod tests {
             root_node: 0,
             leaf_count: 0,
             nodes: [AnyNode::zeroed(); MAX_BOOK_NODES],
+            reserved: [0; 256],
         }
     }
 

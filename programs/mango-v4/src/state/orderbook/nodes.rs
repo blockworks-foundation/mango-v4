@@ -9,7 +9,7 @@ use static_assertions::const_assert_eq;
 use super::order_type::OrderType;
 
 pub type NodeHandle = u32;
-const NODE_SIZE: usize = 88;
+const NODE_SIZE: usize = 96;
 
 #[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(u32)]
@@ -46,7 +46,7 @@ pub struct InnerNode {
     /// iterate through the whole bookside.
     pub child_earliest_expiry: [u64; 2],
 
-    pub reserve: [u8; NODE_SIZE - 48],
+    pub reserved: [u8; NODE_SIZE - 48],
 }
 
 impl InnerNode {
@@ -57,7 +57,7 @@ impl InnerNode {
             key,
             children: [0; 2],
             child_earliest_expiry: [u64::MAX; 2],
-            reserve: [0; NODE_SIZE - 48],
+            reserved: [0; NODE_SIZE - 48],
         }
     }
 
@@ -98,7 +98,7 @@ pub struct LeafNode {
     // The time the order was placed
     pub timestamp: u64,
 
-    pub reserve: [u8; NODE_SIZE - 81],
+    pub reserved: [u8; NODE_SIZE - 81],
 }
 
 #[inline(always)]
@@ -128,7 +128,7 @@ impl LeafNode {
             quantity,
             client_order_id,
             timestamp,
-            reserve: [0; NODE_SIZE - 81],
+            reserved: [0; NODE_SIZE - 81],
         }
     }
 
@@ -158,14 +158,14 @@ impl LeafNode {
 pub struct FreeNode {
     pub(crate) tag: u32,
     pub(crate) next: NodeHandle,
-    pub(crate) reserve: [u8; NODE_SIZE - 8],
+    pub(crate) reserved: [u8; NODE_SIZE - 8],
 }
 
 #[zero_copy]
 #[derive(Pod)]
 pub struct AnyNode {
     pub tag: u32,
-    pub data: [u8; 84], // note: anchor can't parse the struct for IDL when it includes non numbers, NODE_SIZE == 88, 84 == 88 - 4
+    pub data: [u8; 92], // note: anchor can't parse the struct for IDL when it includes non numbers, NODE_SIZE == 96, 92 == 96 - 4
 }
 
 const_assert_eq!(size_of::<AnyNode>(), NODE_SIZE);
