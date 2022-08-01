@@ -47,12 +47,10 @@ import {
 import { SERUM3_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
-import { FlashLoanWithdraw } from './types';
 import {
   getAssociatedTokenAddress,
   I64_MAX_BN,
   toNativeDecimals,
-  toU64,
 } from './utils';
 import { simulate } from './utils/anchor';
 
@@ -1344,187 +1342,6 @@ export class MangoClient {
       (pk) =>
         ({
           pubkey: pk,
-          isWritable:
-            pk.equals(inputBank.publicKey) || pk.equals(outputBank.publicKey)
-              ? true
-              : false,
-          isSigner: false,
-        } as AccountMeta),
-    );
-
-    /*
-     * Find or create associated token accounts
-     */
-    let inputTokenAccountPk = await getAssociatedTokenAddress(
-      inputBank.mint,
-      mangoAccount.owner,
-    );
-    const inputTokenAccExists =
-      await this.program.provider.connection.getAccountInfo(
-        inputTokenAccountPk,
-      );
-    let preInstructions = [];
-    if (!inputTokenAccExists) {
-      preInstructions.push(
-        Token.createAssociatedTokenAccountInstruction(
-          mangoAccount.owner,
-          inputTokenAccountPk,
-          mangoAccount.owner,
-          inputBank.mint,
-          TOKEN_PROGRAM_ID,
-          ASSOCIATED_TOKEN_PROGRAM_ID,
-        ),
-      );
-    }
-
-    let outputTokenAccountPk = await getAssociatedTokenAddress(
-      outputBank.mint,
-      mangoAccount.owner,
-    );
-    const outputTokenAccExists =
-      await this.program.provider.connection.getAccountInfo(
-        outputTokenAccountPk,
-      );
-    if (!outputTokenAccExists) {
-      preInstructions.push(
-        Token.createAssociatedTokenAccountInstruction(
-          mangoAccount.owner,
-          outputTokenAccountPk,
-          mangoAccount.owner,
-          outputBank.mint,
-          TOKEN_PROGRAM_ID,
-          ASSOCIATED_TOKEN_PROGRAM_ID,
-        ),
-      );
-    }
-
-    /*
-     * Transfer input token to users wallet, then concat the passed in instructions
-     */
-    const nativeInputAmount = toU64(
-      amountIn,
-      inputBank.mintDecimals,
-    ).toNumber();
-    const instructions: TransactionInstruction[] = [];
-
-    const transferIx = Token.createTransferInstruction(
-      TOKEN_PROGRAM_ID,
-      inputBank.vault,
-      inputTokenAccountPk,
-      inputBank.publicKey,
-      [],
-      nativeInputAmount,
-    );
-    const inputBankKey = transferIx.keys[2];
-    transferIx.keys[2] = { ...inputBankKey, isWritable: true, isSigner: false };
-    instructions.push(transferIx);
-
-    instructions.concat(userDefinedInstructions);
-
-    const transferIx2 = Token.createTransferInstruction(
-      TOKEN_PROGRAM_ID,
-      outputTokenAccountPk,
-      outputBank.vault,
-      mangoAccount.owner,
-      [],
-      0, // todo: use this for testing, this should be the amount to transfer back
-    );
-    instructions.push(transferIx2);
-
-    /*
-     * Create object of amounts that will be withdrawn from bank vaults
-     */
-    const targetRemainingAccounts = instructions
-      .map((ix) => [
-        {
-          pubkey: ix.programId,
-          isWritable: false,
-          isSigner: false,
-        } as AccountMeta,
-        ...ix.keys,
-      ])
-      .flat();
-
-    const vaultIndex = targetRemainingAccounts
-      .map((x) => x.pubkey.toString())
-      .lastIndexOf(inputBank.vault.toString());
-
-    const withdraws: FlashLoanWithdraw[] = [
-      {
-        index: vaultIndex,
-        amount: toU64(amountIn, inputBank.mintDecimals),
-      },
-    ];
-
-    /*
-     * Build cpi data objects for instructions
-     */
-    let cpiDatas = [];
-    for (const [index, ix] of instructions.entries()) {
-      if (index === 0) {
-        cpiDatas.push({
-          accountStart: new BN(parsedHealthAccounts.length),
-          data: ix.data,
-        });
-      } else {
-        cpiDatas.push({
-          accountStart: cpiDatas[index - 1].accountStart.add(
-            new BN(instructions[index - 1].keys.length + 1),
-          ),
-          data: ix.data,
-        });
-      }
-    }
-
-    if (preInstructions.length) {
-      const tx = new Transaction();
-      for (const ix of preInstructions) {
-        tx.add(ix);
-      }
-
-      await this.program.provider.sendAndConfirm(tx);
-    }
-
-    return await this.program.methods
-      .flashLoan(withdraws, cpiDatas)
-      .accounts({
-        group: group.publicKey,
-        account: mangoAccount.publicKey,
-        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-      })
-      .remainingAccounts([...parsedHealthAccounts, ...targetRemainingAccounts])
-      .rpc({ skipPreflight: true });
-  }
-
-  public async marginTrade3({
-    group,
-    mangoAccount,
-    inputToken,
-    amountIn,
-    outputToken,
-    userDefinedInstructions,
-  }: {
-    group: Group;
-    mangoAccount: MangoAccount;
-    inputToken: string;
-    amountIn: number;
-    outputToken: string;
-    userDefinedInstructions: TransactionInstruction[];
-  }): Promise<TransactionSignature> {
-    const inputBank = group.banksMap.get(inputToken);
-    const outputBank = group.banksMap.get(outputToken);
-
-    if (!inputBank || !outputBank) throw new Error('Invalid token');
-
-    const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(group, mangoAccount, [
-        inputBank,
-        outputBank,
-      ]);
-    const parsedHealthAccounts = healthRemainingAccounts.map(
-      (pk) =>
-        ({
-          pubkey: pk,
           isWritable: false,
           isSigner: false,
         } as AccountMeta),
@@ -1621,7 +1438,7 @@ export class MangoClient {
     };
 
     const flashLoanEndIx = await this.program.methods
-      .flashLoan3End()
+      .flashLoanEnd()
       .accounts({
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -1643,7 +1460,7 @@ export class MangoClient {
     // userDefinedInstructions.push(flashLoanEndIx);
 
     const flashLoanBeginIx = await this.program.methods
-      .flashLoan3Begin([
+      .flashLoanBegin([
         toNativeDecimals(amountIn, inputBank.mintDecimals),
         new BN(
           0,
