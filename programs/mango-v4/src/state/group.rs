@@ -26,14 +26,34 @@ pub struct Group {
     pub insurance_mint: Pubkey,
 
     pub bump: u8,
-    // Only support closing/deregistering groups, stub oracles, tokens, and markets
-    // if testing == 1
+
     pub testing: u8,
-    pub padding2: [u8; 6],
+
+    pub version: u8,
+
+    pub padding2: [u8; 5],
     pub reserved: [u8; 8],
 }
 const_assert_eq!(size_of::<Group>(), 32 * 5 + 4 + 4 + 1 * 2 + 6 + 8);
 const_assert_eq!(size_of::<Group>() % 8, 0);
+
+impl Group {
+    pub fn is_testing(&self) -> bool {
+        self.testing == 1
+    }
+
+    pub fn multiple_banks_supported(&self) -> bool {
+        self.is_testing() || self.version > 0
+    }
+
+    pub fn serum3_supported(&self) -> bool {
+        self.is_testing() || self.version > 0
+    }
+
+    pub fn perps_supported(&self) -> bool {
+        self.is_testing() || self.version > 0
+    }
+}
 
 // note: using creator instead of admin, since admin can be changed
 #[macro_export]

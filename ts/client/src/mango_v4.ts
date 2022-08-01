@@ -41,7 +41,7 @@ export type MangoV4 = {
         },
         {
           "name": "insuranceVault",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "pda": {
             "seeds": [
@@ -86,6 +86,10 @@ export type MangoV4 = {
         },
         {
           "name": "testing",
+          "type": "u8"
+        },
+        {
+          "name": "version",
           "type": "u8"
         }
       ]
@@ -2866,11 +2870,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "version",
+            "type": "u8"
+          },
+          {
             "name": "padding2",
             "type": {
               "array": [
                 "u8",
-                6
+                5
               ]
             }
           },
@@ -4950,7 +4958,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "insuranceVault",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "pda": {
             "seeds": [
@@ -4995,6 +5003,10 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "testing",
+          "type": "u8"
+        },
+        {
+          "name": "version",
           "type": "u8"
         }
       ]
@@ -7775,11 +7787,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "version",
+            "type": "u8"
+          },
+          {
             "name": "padding2",
             "type": {
               "array": [
                 "u8",
-                6
+                5
               ]
             }
           },

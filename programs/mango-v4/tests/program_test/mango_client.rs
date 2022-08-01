@@ -1230,6 +1230,7 @@ impl<'keypair> ClientInstruction for GroupCreateInstruction<'keypair> {
         let instruction = Self::Instruction {
             group_num: 0,
             testing: 1,
+            version: 0,
         };
 
         let group = Pubkey::find_program_address(

@@ -11,6 +11,7 @@ use crate::util::fill16_from_str;
 pub struct PerpCreateMarket<'info> {
     #[account(
         has_one = admin,
+        constraint = group.load()?.perps_supported()
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
