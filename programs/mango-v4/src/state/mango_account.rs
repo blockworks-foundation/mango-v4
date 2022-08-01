@@ -276,7 +276,6 @@ pub struct MangoAccountDynamicHeader {
 impl DynamicHeader for MangoAccountDynamicHeader {
     fn from_bytes(data: &[u8]) -> Result<Self> {
         let header_version = u8::from_le_bytes(*array_ref![data, 0, size_of::<u8>()]);
-        dbg!(header_version);
 
         match header_version {
             0 => {
@@ -293,7 +292,6 @@ impl DynamicHeader for MangoAccountDynamicHeader {
                     BORSH_VEC_SIZE_BYTES
                 ]))
                 .unwrap();
-                dbg!(serum3_count);
 
                 let perp_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
                     data,
