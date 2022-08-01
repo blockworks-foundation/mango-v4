@@ -2723,7 +2723,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                128
+                256
               ]
             }
           }
@@ -2794,7 +2794,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                128
+                256
               ]
             }
           }
@@ -2872,6 +2872,19 @@ export type MangoV4 = {
               "array": [
                 "u8",
                 256
+              ]
+            }
+          },
+          {
+            "name": "headerVersion",
+            "type": "u8"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                7
               ]
             }
           },
@@ -3000,7 +3013,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                128
+                256
               ]
             }
           }
@@ -3103,7 +3116,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                128
+                256
               ]
             }
           }
@@ -3740,7 +3753,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                64
+                40
               ]
             }
           }
@@ -4798,66 +4811,71 @@ export type MangoV4 = {
     },
     {
       "code": 6001,
+      "name": "NotImplementedError",
+      "msg": ""
+    },
+    {
+      "code": 6002,
       "name": "MathError",
       "msg": "checked math error"
     },
     {
-      "code": 6002,
+      "code": 6003,
       "name": "UnexpectedOracle",
       "msg": ""
     },
     {
-      "code": 6003,
+      "code": 6004,
       "name": "UnknownOracleType",
       "msg": "oracle type cannot be determined"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "InvalidFlashLoanTargetCpiProgram",
       "msg": ""
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "HealthMustBePositive",
       "msg": "health must be positive"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "HealthMustBeNegative",
       "msg": "health must be negative"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "IsBankrupt",
       "msg": "the account is bankrupt"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "IsNotBankrupt",
       "msg": "the account is not bankrupt"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "NoFreeTokenPositionIndex",
       "msg": "no free token position index"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "NoFreeSerum3OpenOrdersIndex",
       "msg": "no free serum3 open orders index"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "NoFreePerpPositionIndex",
       "msg": "no free perp position index"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "Serum3OpenOrdersExistAlready",
       "msg": "serum3 open orders exist already"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "InsufficentBankVaultFunds",
       "msg": "bank vault has insufficent funds"
     }
@@ -7589,7 +7607,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                128
+                256
               ]
             }
           }
@@ -7660,7 +7678,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                128
+                256
               ]
             }
           }
@@ -7738,6 +7756,19 @@ export const IDL: MangoV4 = {
               "array": [
                 "u8",
                 256
+              ]
+            }
+          },
+          {
+            "name": "headerVersion",
+            "type": "u8"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                7
               ]
             }
           },
@@ -7866,7 +7897,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                128
+                256
               ]
             }
           }
@@ -7969,7 +8000,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                128
+                256
               ]
             }
           }
@@ -8606,7 +8637,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                64
+                40
               ]
             }
           }
@@ -9664,66 +9695,71 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6001,
+      "name": "NotImplementedError",
+      "msg": ""
+    },
+    {
+      "code": 6002,
       "name": "MathError",
       "msg": "checked math error"
     },
     {
-      "code": 6002,
+      "code": 6003,
       "name": "UnexpectedOracle",
       "msg": ""
     },
     {
-      "code": 6003,
+      "code": 6004,
       "name": "UnknownOracleType",
       "msg": "oracle type cannot be determined"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "InvalidFlashLoanTargetCpiProgram",
       "msg": ""
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "HealthMustBePositive",
       "msg": "health must be positive"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "HealthMustBeNegative",
       "msg": "health must be negative"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "IsBankrupt",
       "msg": "the account is bankrupt"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "IsNotBankrupt",
       "msg": "the account is not bankrupt"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "NoFreeTokenPositionIndex",
       "msg": "no free token position index"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "NoFreeSerum3OpenOrdersIndex",
       "msg": "no free serum3 open orders index"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "NoFreePerpPositionIndex",
       "msg": "no free perp position index"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "Serum3OpenOrdersExistAlready",
       "msg": "serum3 open orders exist already"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "InsufficentBankVaultFunds",
       "msg": "bank vault has insufficent funds"
     }
