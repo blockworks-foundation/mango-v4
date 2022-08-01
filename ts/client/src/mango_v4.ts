@@ -1012,7 +1012,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "flashLoan3Begin",
+      "name": "flashLoanBegin",
       "accounts": [
         {
           "name": "group",
@@ -1043,7 +1043,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "flashLoan3End",
+      "name": "flashLoanEnd",
       "accounts": [
         {
           "name": "account",
@@ -5878,7 +5878,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "flashLoan3Begin",
+      "name": "flashLoanBegin",
       "accounts": [
         {
           "name": "group",
@@ -5909,7 +5909,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "flashLoan3End",
+      "name": "flashLoanEnd",
       "accounts": [
         {
           "name": "account",

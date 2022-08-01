@@ -6,8 +6,7 @@ use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
 use mango_v4::instructions::{
-    CpiData, FlashLoanWithdraw, InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior,
-    Serum3Side,
+    InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
 };
 use mango_v4::state::{MangoAccount, MangoAccountValue};
 use solana_program::instruction::Instruction;
@@ -344,7 +343,7 @@ pub async fn account_position_f64(solana: &SolanaCookie, account: Pubkey, bank: 
 // ClientInstruction impl
 //
 
-pub struct FlashLoan3BeginInstruction {
+pub struct FlashLoanBeginInstruction {
     pub group: Pubkey,
     pub mango_token_bank: Pubkey,
     pub mango_token_vault: Pubkey,
@@ -352,9 +351,9 @@ pub struct FlashLoan3BeginInstruction {
     pub withdraw_amount: u64,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for FlashLoan3BeginInstruction {
-    type Accounts = mango_v4::accounts::FlashLoan3Begin;
-    type Instruction = mango_v4::instruction::FlashLoan3Begin;
+impl ClientInstruction for FlashLoanBeginInstruction {
+    type Accounts = mango_v4::accounts::FlashLoanBegin;
+    type Instruction = mango_v4::instruction::FlashLoanBegin;
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
@@ -396,7 +395,7 @@ impl ClientInstruction for FlashLoan3BeginInstruction {
     }
 }
 
-pub struct FlashLoan3EndInstruction<'keypair> {
+pub struct FlashLoanEndInstruction<'keypair> {
     pub account: Pubkey,
     pub owner: &'keypair Keypair,
     pub mango_token_bank: Pubkey,
@@ -404,9 +403,9 @@ pub struct FlashLoan3EndInstruction<'keypair> {
     pub target_token_account: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for FlashLoan3EndInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::FlashLoan3End;
-    type Instruction = mango_v4::instruction::FlashLoan3End;
+impl<'keypair> ClientInstruction for FlashLoanEndInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::FlashLoanEnd;
+    type Instruction = mango_v4::instruction::FlashLoanEnd;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,

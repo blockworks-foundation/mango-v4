@@ -1313,7 +1313,7 @@ export class MangoClient {
       .rpc();
   }
 
-  public async marginTrade3({
+  public async marginTrade({
     group,
     mangoAccount,
     inputToken,
@@ -1438,7 +1438,7 @@ export class MangoClient {
     };
 
     const flashLoanEndIx = await this.program.methods
-      .flashLoan3End()
+      .flashLoanEnd()
       .accounts({
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -1460,7 +1460,7 @@ export class MangoClient {
     // userDefinedInstructions.push(flashLoanEndIx);
 
     const flashLoanBeginIx = await this.program.methods
-      .flashLoan3Begin([
+      .flashLoanBegin([
         toNativeDecimals(amountIn, inputBank.mintDecimals),
         new BN(
           0,

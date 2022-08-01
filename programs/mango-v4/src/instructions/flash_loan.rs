@@ -21,7 +21,7 @@ use fixed::types::I80F48;
 /// 3. N token accounts (writable), in the same order as the vaults,
 ///    the loaned funds are transfered into these
 #[derive(Accounts)]
-pub struct FlashLoan3Begin<'info> {
+pub struct FlashLoanBegin<'info> {
     pub group: AccountLoader<'info, Group>,
     pub token_program: Program<'info, Token>,
 
@@ -33,12 +33,12 @@ pub struct FlashLoan3Begin<'info> {
 /// Finalizes a flash loan
 ///
 /// In addition to these accounts, there must be remaining_accounts:
-/// 1. health accounts, and every bank that also appeared in FlashLoan3Begin must be writable
-/// 2. N vaults (writable), matching what was in FlashLoan3Begin
-/// 3. N token accounts (writable), matching what was in FlashLoan3Begin;
+/// 1. health accounts, and every bank that also appeared in FlashLoanBegin must be writable
+/// 2. N vaults (writable), matching what was in FlashLoanBegin
+/// 3. N token accounts (writable), matching what was in FlashLoanBegin;
 ///    the `owner` must have authority to transfer tokens out of them
 #[derive(Accounts)]
-pub struct FlashLoan3End<'info> {
+pub struct FlashLoanEnd<'info> {
     #[account(mut, has_one = owner)]
     pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
@@ -48,8 +48,8 @@ pub struct FlashLoan3End<'info> {
 
 /// The `loan_amounts` argument lists the amount to be loaned from each bank/vault and
 /// the order matches the order of bank accounts.
-pub fn flash_loan3_begin<'key, 'accounts, 'remaining, 'info>(
-    ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan3Begin<'info>>,
+pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
+    ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanBegin<'info>>,
     loan_amounts: Vec<u64>,
 ) -> Result<()> {
     let num_loans = loan_amounts.len();
@@ -108,15 +108,15 @@ pub fn flash_loan3_begin<'key, 'accounts, 'remaining, 'info>(
         let ixs = ctx.accounts.instructions.as_ref();
         let current_index = tx_instructions::load_current_index_checked(ixs)? as usize;
 
-        // Forbid FlashLoan3Begin to be called from CPI (it does not have to be the first instruction)
+        // Forbid FlashLoanBegin to be called from CPI (it does not have to be the first instruction)
         let current_ix = tx_instructions::load_instruction_at_checked(current_index, ixs)?;
         require_msg!(
             current_ix.program_id == *ctx.program_id,
-            "FlashLoan3Begin must be a top-level instruction"
+            "FlashLoanBegin must be a top-level instruction"
         );
 
         // The only other mango instruction that must appear before the end of the tx is
-        // the FlashLoan3End instruction. No other mango instructions are allowed.
+        // the FlashLoanEnd instruction. No other mango instructions are allowed.
         let mut index = current_index + 1;
         let mut found_end = false;
         loop {
@@ -132,11 +132,11 @@ pub fn flash_loan3_begin<'key, 'accounts, 'remaining, 'info>(
                 // we need to guard against multiple FlashLoanEnds
                 require_msg!(
                     !found_end,
-                    "the transaction must not contain a Mango instruction after FlashLoan3End"
+                    "the transaction must not contain a Mango instruction after FlashLoanEnd"
                 );
                 found_end = true;
 
-                // must be the FlashLoan3End instruction
+                // must be the FlashLoanEnd instruction
                 require!(
                     ix.data[0..8] == [163, 231, 155, 56, 201, 68, 84, 148],
                     MangoError::SomeError
@@ -146,12 +146,12 @@ pub fn flash_loan3_begin<'key, 'accounts, 'remaining, 'info>(
                 let begin_accounts = &ctx.remaining_accounts[num_loans..];
                 let end_accounts = &ix.accounts[ix.accounts.len() - 2 * num_loans..];
                 for (begin_account, end_account) in begin_accounts.iter().zip(end_accounts.iter()) {
-                    require_msg!(*begin_account.key == end_account.pubkey, "the trailing accounts passed to FlashLoan3Begin and End must match, found {} on begin and {} on end", begin_account.key, end_account.pubkey);
+                    require_msg!(*begin_account.key == end_account.pubkey, "the trailing accounts passed to FlashLoanBegin and End must match, found {} on begin and {} on end", begin_account.key, end_account.pubkey);
                 }
             } else {
                 // ensure no one can cpi into mango either
                 for meta in ix.accounts.iter() {
-                    require_msg!(meta.pubkey != crate::id(), "instructions between FlashLoan3Begin and End may not use the Mango program account");
+                    require_msg!(meta.pubkey != crate::id(), "instructions between FlashLoanBegin and End may not use the Mango program account");
                 }
             }
 
@@ -159,7 +159,7 @@ pub fn flash_loan3_begin<'key, 'accounts, 'remaining, 'info>(
         }
         require_msg!(
             found_end,
-            "found no FlashLoan3End instruction in transaction"
+            "found no FlashLoanEnd instruction in transaction"
         );
     }
 
@@ -173,8 +173,8 @@ struct TokenVaultChange {
     amount: I80F48,
 }
 
-pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
-    ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan3End<'info>>,
+pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
+    ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_mut()?;
 
