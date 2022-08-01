@@ -155,7 +155,7 @@ pub fn token_register(
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
         padding: Default::default(),
-        reserved: [0; 128],
+        reserved: [0; 256],
     };
 
     // TODO: ALTs are unavailable
