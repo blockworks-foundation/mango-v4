@@ -64,7 +64,7 @@ impl<T: ?Sized> DerefOrBorrow<T> for &T {
 
 impl<T: Sized> DerefOrBorrow<[T]> for Vec<T> {
     fn deref_or_borrow(&self) -> &[T] {
-        &self
+        self
     }
 }
 
@@ -153,7 +153,7 @@ impl<'info, D: DynamicAccountType> AccountLoaderDynamic<'info, D> {
     }
 
     /// Returns a Ref to the account data structure for reading.
-    pub fn load_fixed<'a>(&'a self) -> Result<Ref<'a, D::Fixed>> {
+    pub fn load_fixed(&self) -> Result<Ref<D::Fixed>> {
         let data = self.acc_info.try_borrow_data()?;
         let fixed = Ref::map(data, |d| {
             bytemuck::from_bytes(&d[8..8 + size_of::<D::Fixed>()])
@@ -161,10 +161,9 @@ impl<'info, D: DynamicAccountType> AccountLoaderDynamic<'info, D> {
         Ok(fixed)
     }
 
+    #[allow(clippy::type_complexity)]
     /// Returns a Ref to the account data structure for reading.
-    pub fn load<'a>(
-        &'a self,
-    ) -> Result<DynamicAccount<D::Header, Ref<'a, D::Fixed>, Ref<'a, [u8]>>> {
+    pub fn load(&self) -> Result<DynamicAccount<D::Header, Ref<D::Fixed>, Ref<[u8]>>> {
         let data = self.acc_info.try_borrow_data()?;
         let header = D::Header::from_bytes(&data[8 + size_of::<D::Fixed>()..])?;
         let (_, data) = Ref::map_split(data, |d| d.split_at(8));
@@ -176,9 +175,8 @@ impl<'info, D: DynamicAccountType> AccountLoaderDynamic<'info, D> {
         })
     }
 
-    pub fn load_init<'a>(
-        &'a self,
-    ) -> Result<DynamicAccount<D::Header, RefMut<'a, D::Fixed>, RefMut<'a, [u8]>>> {
+    #[allow(clippy::type_complexity)]
+    pub fn load_init(&self) -> Result<DynamicAccount<D::Header, RefMut<D::Fixed>, RefMut<[u8]>>> {
         if !self.acc_info.is_writable {
             return Err(ErrorCode::AccountNotMutable.into());
         }
@@ -202,9 +200,8 @@ impl<'info, D: DynamicAccountType> AccountLoaderDynamic<'info, D> {
     }
 
     /// Returns a Ref to the account data structure for reading.
-    pub fn load_mut<'a>(
-        &'a self,
-    ) -> Result<DynamicAccount<D::Header, RefMut<'a, D::Fixed>, RefMut<'a, [u8]>>> {
+    #[allow(clippy::type_complexity)]
+    pub fn load_mut(&self) -> Result<DynamicAccount<D::Header, RefMut<D::Fixed>, RefMut<[u8]>>> {
         if !self.acc_info.is_writable {
             return Err(ErrorCode::AccountNotMutable.into());
         }

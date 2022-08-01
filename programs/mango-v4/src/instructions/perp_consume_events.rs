@@ -155,7 +155,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     }
                     Some(ai) => {
                         let mal: AccountLoaderDynamic<MangoAccount> =
-                            AccountLoaderDynamic::try_from(&ai)?;
+                            AccountLoaderDynamic::try_from(ai)?;
                         let mut ma = mal.load_mut()?;
 
                         ma.perp_remove_order(out.owner_slot as usize, out.quantity)?;
