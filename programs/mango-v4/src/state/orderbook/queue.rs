@@ -8,7 +8,7 @@ use std::mem::size_of;
 
 use super::Side;
 
-pub const MAX_NUM_EVENTS: u32 = 512;
+pub const MAX_NUM_EVENTS: u32 = 488;
 
 pub trait QueueHeader: bytemuck::Pod {
     type Item: bytemuck::Pod + Copy;
@@ -153,15 +153,15 @@ impl QueueHeader for EventQueueHeader {
     }
 }
 
-const_assert_eq!(std::mem::size_of::<EventQueue>(), 4 * 2 + 8 + 512 * 256);
+const_assert_eq!(std::mem::size_of::<EventQueue>(), 4 * 2 + 8 + 488 * 208);
 const_assert_eq!(std::mem::size_of::<EventQueue>() % 8, 0);
 
-const EVENT_SIZE: usize = 256;
+const EVENT_SIZE: usize = 208;
 #[zero_copy]
 #[derive(Debug, Pod)]
 pub struct AnyEvent {
     pub event_type: u8,
-    pub padding: [u8; 255], // note: anchor can't parse the struct for IDL when it includes non numbers, EVENT_SIZE == 256, 255 == 256 - 1
+    pub padding: [u8; 207], // note: anchor can't parse the struct for IDL when it includes non numbers, EVENT_SIZE == 208, 207 == 208 - 1
 }
 
 const_assert_eq!(size_of::<AnyEvent>(), EVENT_SIZE);
@@ -201,7 +201,7 @@ pub struct FillEvent {
 
     pub price: i64,
     pub quantity: i64, // number of quote lots
-    pub reserved: [u8; 64],
+    pub reserved: [u8; 16],
 }
 const_assert_eq!(size_of::<FillEvent>(), EVENT_SIZE);
 
@@ -246,7 +246,7 @@ impl FillEvent {
             taker_fee,
             price,
             quantity,
-            reserved: [0; 64],
+            reserved: [0; 16],
         }
     }
 
