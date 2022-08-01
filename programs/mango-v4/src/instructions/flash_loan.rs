@@ -138,7 +138,7 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
 
                 // must be the FlashLoanEnd instruction
                 require!(
-                    ix.data[0..8] == [163, 231, 155, 56, 201, 68, 84, 148],
+                    ix.data[0..8] == [178, 170, 2, 78, 240, 23, 190, 178],
                     MangoError::SomeError
                 );
 
