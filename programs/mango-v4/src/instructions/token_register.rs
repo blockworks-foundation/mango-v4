@@ -177,7 +177,7 @@ pub fn token_register(
         address_lookup_table_oracle_index: alt_previous_size as u8 + 1,
         padding1: Default::default(),
         padding2: Default::default(),
-        reserved: [0; 128],
+        reserved: [0; 256],
     };
 
     mint_info.banks[0] = ctx.accounts.bank.key();

@@ -593,7 +593,7 @@ mod tests {
                     token_index: 0,
                     in_use_count: if is_in_use { 1 } else { 0 },
                     padding: Default::default(),
-                    reserved: [0; 64],
+                    reserved: [0; 40],
                 };
 
                 account.indexed_position = indexed(I80F48::from_num(start), &bank);

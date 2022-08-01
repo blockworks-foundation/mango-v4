@@ -31,6 +31,7 @@ use checked_math as cm;
 type BorshVecLength = u32;
 const BORSH_VEC_PADDING_BYTES: usize = 4;
 const BORSH_VEC_SIZE_BYTES: usize = 4;
+const DEFAULT_MANGO_ACCOUNT_VERSION: u8 = 0;
 
 #[derive(
     Debug,
@@ -314,13 +315,13 @@ impl DynamicHeader for MangoAccountDynamicHeader {
                     perp_oo_count,
                 })
             }
-            _ => {
-                return err!(MangoError::NotImplementedError);
-            }
+            _ => err!(MangoError::NotImplementedError).context("unexpected header version number"),
         }
     }
 
-    fn initialize(_data: &mut [u8]) -> Result<()> {
+    fn initialize(data: &mut [u8]) -> Result<()> {
+        let dst: &mut [u8] = &mut data[0..1];
+        dst.copy_from_slice(&DEFAULT_MANGO_ACCOUNT_VERSION.to_le_bytes());
         Ok(())
     }
 }
