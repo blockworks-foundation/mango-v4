@@ -45,7 +45,7 @@ jobs:
           context: .
           push: true
           tags: |
-            gcr.io/$PROJECT_ID/$IMAGE:$GITHUB_SHA
-            gcr.io/$PROJECT_ID/$IMAGE:latest
+            gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE }}:${{ env.GITHUB_SHA }}
+            gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
