@@ -191,7 +191,7 @@ export type MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u64",
+                "type": "u32",
                 "path": "bank_num"
               }
             ]
@@ -220,7 +220,7 @@ export type MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u64",
+                "type": "u32",
                 "path": "bank_num"
               }
             ]
@@ -284,7 +284,7 @@ export type MangoV4 = {
         },
         {
           "name": "bankNum",
-          "type": "u64"
+          "type": "u32"
         },
         {
           "name": "name",
@@ -468,7 +468,7 @@ export type MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u64",
+                "type": "u32",
                 "path": "bank_num"
               }
             ]
@@ -497,7 +497,7 @@ export type MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u64",
+                "type": "u32",
                 "path": "bank_num"
               }
             ]
@@ -556,7 +556,7 @@ export type MangoV4 = {
         },
         {
           "name": "bankNum",
-          "type": "u64"
+          "type": "u32"
         }
       ]
     },
@@ -653,7 +653,7 @@ export type MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u8",
+                "type": "u32",
                 "path": "account_num"
               }
             ]
@@ -678,7 +678,7 @@ export type MangoV4 = {
       "args": [
         {
           "name": "accountNum",
-          "type": "u8"
+          "type": "u32"
         },
         {
           "name": "accountSize",
@@ -2706,17 +2706,8 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                4
-              ]
-            }
-          },
-          {
             "name": "bankNum",
-            "type": "u64"
+            "type": "u32"
           },
           {
             "name": "reserved",
@@ -2986,27 +2977,6 @@ export type MangoV4 = {
           {
             "name": "oracle",
             "type": "publicKey"
-          },
-          {
-            "name": "addressLookupTable",
-            "type": "publicKey"
-          },
-          {
-            "name": "addressLookupTableBankIndex",
-            "type": "u8"
-          },
-          {
-            "name": "addressLookupTableOracleIndex",
-            "type": "u8"
-          },
-          {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                6
-              ]
-            }
           },
           {
             "name": "registrationTime",
@@ -5087,7 +5057,7 @@ export const IDL: MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u64",
+                "type": "u32",
                 "path": "bank_num"
               }
             ]
@@ -5116,7 +5086,7 @@ export const IDL: MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u64",
+                "type": "u32",
                 "path": "bank_num"
               }
             ]
@@ -5180,7 +5150,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "bankNum",
-          "type": "u64"
+          "type": "u32"
         },
         {
           "name": "name",
@@ -5364,7 +5334,7 @@ export const IDL: MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u64",
+                "type": "u32",
                 "path": "bank_num"
               }
             ]
@@ -5393,7 +5363,7 @@ export const IDL: MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u64",
+                "type": "u32",
                 "path": "bank_num"
               }
             ]
@@ -5452,7 +5422,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "bankNum",
-          "type": "u64"
+          "type": "u32"
         }
       ]
     },
@@ -5549,7 +5519,7 @@ export const IDL: MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u8",
+                "type": "u32",
                 "path": "account_num"
               }
             ]
@@ -5574,7 +5544,7 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "accountNum",
-          "type": "u8"
+          "type": "u32"
         },
         {
           "name": "accountSize",
@@ -7602,17 +7572,8 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                4
-              ]
-            }
-          },
-          {
             "name": "bankNum",
-            "type": "u64"
+            "type": "u32"
           },
           {
             "name": "reserved",
@@ -7882,27 +7843,6 @@ export const IDL: MangoV4 = {
           {
             "name": "oracle",
             "type": "publicKey"
-          },
-          {
-            "name": "addressLookupTable",
-            "type": "publicKey"
-          },
-          {
-            "name": "addressLookupTableBankIndex",
-            "type": "u8"
-          },
-          {
-            "name": "addressLookupTableOracleIndex",
-            "type": "u8"
-          },
-          {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                6
-              ]
-            }
           },
           {
             "name": "registrationTime",

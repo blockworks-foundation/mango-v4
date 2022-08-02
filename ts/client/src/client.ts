@@ -166,7 +166,7 @@ export class MangoClient {
     return await this.program.methods
       .tokenRegister(
         tokenIndex,
-        new BN(0),
+        0,
         name,
         {
           confFilter: {

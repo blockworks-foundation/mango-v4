@@ -283,11 +283,7 @@ export class MintInfo {
       banks: PublicKey[];
       vaults: PublicKey[];
       oracle: PublicKey;
-      addressLookupTable: PublicKey;
       tokenIndex: number;
-      addressLookupTableBankIndex: Number;
-      addressLookupTableOracleIndex: Number;
-      reserved: unknown;
       registrationTime: BN;
     },
   ) {
