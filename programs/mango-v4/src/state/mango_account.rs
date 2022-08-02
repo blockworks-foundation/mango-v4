@@ -209,7 +209,7 @@ fn test_dynamic_offsets() {
         .resize(8, PerpOpenOrders::default());
     assert_eq!(
         8 + AnchorSerialize::try_to_vec(&account).unwrap().len(),
-        MangoAccount::space(AccountSize::Large.try_into().unwrap())
+        MangoAccount::space(AccountSize::Large)
     );
 }
 
@@ -392,7 +392,7 @@ impl MangoAccountValue {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let (fixed, dynamic) = bytes.split_at(size_of::<MangoAccountFixed>());
         Ok(Self {
-            fixed: *bytemuck::from_bytes(&fixed),
+            fixed: *bytemuck::from_bytes(fixed),
             header: MangoAccountDynamicHeader::from_bytes(dynamic)?,
             dynamic: dynamic.to_vec(),
         })
@@ -404,7 +404,7 @@ impl<'a> MangoAccountRefWithHeader<'a> {
     pub fn from_bytes(bytes: &'a [u8]) -> Result<Self> {
         let (fixed, dynamic) = bytes.split_at(size_of::<MangoAccountFixed>());
         Ok(Self {
-            fixed: bytemuck::from_bytes(&fixed),
+            fixed: bytemuck::from_bytes(fixed),
             header: MangoAccountDynamicHeader::from_bytes(dynamic)?,
             dynamic,
         })
@@ -550,7 +550,7 @@ impl<
         self.fixed().is_bankrupt()
     }
 
-    pub fn borrow<'b>(&'b self) -> DynamicAccountRef<'b, MangoAccount> {
+    pub fn borrow(&self) -> DynamicAccountRef<MangoAccount> {
         DynamicAccount {
             header: self.header(),
             fixed: self.fixed(),
@@ -579,7 +579,7 @@ impl<
         self.dynamic.deref_or_borrow_mut()
     }
 
-    pub fn borrow_mut<'b>(&'b mut self) -> DynamicAccountRefMut<'b, MangoAccount> {
+    pub fn borrow_mut(&mut self) -> DynamicAccountRefMut<MangoAccount> {
         DynamicAccount {
             header: self.header.deref_or_borrow_mut(),
             fixed: self.fixed.deref_or_borrow_mut(),

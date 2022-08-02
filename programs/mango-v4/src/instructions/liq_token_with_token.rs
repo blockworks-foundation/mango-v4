@@ -79,11 +79,11 @@ pub fn liq_token_with_token(
         // The main complication here is that we can't keep the liqee_asset_position and liqee_liab_position
         // borrows alive at the same time. Possibly adding get_mut_pair() would be helpful.
         let (liqee_asset_position, liqee_asset_raw_index) = liqee.token_get(asset_token_index)?;
-        let liqee_assets_native = liqee_asset_position.native(&asset_bank);
+        let liqee_assets_native = liqee_asset_position.native(asset_bank);
         require!(liqee_assets_native.is_positive(), MangoError::SomeError);
 
         let (liqee_liab_position, liqee_liab_raw_index) = liqee.token_get(liab_token_index)?;
-        let liqee_liab_native = liqee_liab_position.native(&liab_bank);
+        let liqee_liab_native = liqee_liab_position.native(liab_bank);
         require!(liqee_liab_native.is_negative(), MangoError::SomeError);
 
         // TODO why sum of both tokens liquidation fees? Add comment
