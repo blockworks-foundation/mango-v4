@@ -432,7 +432,7 @@ export class MangoClient {
     accountSize?: AccountSize,
     name?: string,
   ): Promise<MangoAccount> {
-    let mangoAccounts = await this.getMangoAccountForOwner(group, ownerPk);
+    let mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
     if (mangoAccounts.length === 0) {
       await this.createMangoAccount(
         group,
@@ -440,7 +440,7 @@ export class MangoClient {
         accountSize ?? AccountSize.small,
         name ?? '',
       );
-      mangoAccounts = await this.getMangoAccountForOwner(group, ownerPk);
+      mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
     }
     return mangoAccounts[0];
   }
@@ -499,7 +499,7 @@ export class MangoClient {
     );
   }
 
-  public async getMangoAccountForOwner(
+  public async getMangoAccountsForOwner(
     group: Group,
     ownerPk: PublicKey,
   ): Promise<MangoAccount[]> {
