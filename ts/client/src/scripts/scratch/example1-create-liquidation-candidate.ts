@@ -1,8 +1,8 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
-import { AccountSize, MangoClient } from '../../index';
-
+import { AccountSize } from '../../accounts/mangoAccount';
+import { MangoClient } from '../../client';
 import { MANGO_V4_ID } from '../../constants';
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
@@ -43,7 +43,7 @@ async function main() {
     user1,
     0,
     AccountSize.small,
-    'my_mango_account'
+    'my_mango_account',
   );
 
   console.log(`...mangoAccount1 ${user1MangoAccount.publicKey}`);

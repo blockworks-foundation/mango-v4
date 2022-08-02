@@ -117,7 +117,7 @@ describe('mango-v4', () => {
     // Passing devnet as the cluster here - client cannot accept localnet
     // I think this is only for getting the serum market though?
     envClient = await MangoClient.connect(envProvider, 'devnet', programId);
-    await envClient.groupCreate(groupNum, false, insuranceMintPk);
+    await envClient.groupCreate(groupNum, false, 1, insuranceMintPk);
     group = await envClient.getGroupForAdmin(adminPk, groupNum);
 
     await envClient.stubOracleCreate(group, mintsMap['USDC']!.publicKey, 1.0);

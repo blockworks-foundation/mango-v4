@@ -3,6 +3,7 @@ use std::{sync::Arc, time::Duration};
 use crate::MangoClient;
 
 use anchor_lang::{__private::bytemuck::cast_ref, solana_program};
+use client::prettify_client_error;
 use futures::Future;
 use mango_v4::state::{EventQueue, EventType, FillEvent, OutEvent, PerpMarket, TokenIndex};
 use solana_sdk::{
@@ -10,6 +11,8 @@ use solana_sdk::{
     pubkey::Pubkey,
 };
 use tokio::time;
+
+// TODO: move instructions into the client proper
 
 pub async fn runner(
     mango_client: Arc<MangoClient>,
@@ -88,7 +91,8 @@ pub async fn loop_update_index_and_rate(mango_client: Arc<MangoClient>, token_in
                     ix.accounts.append(&mut banks);
                     ix
                 })
-                .send();
+                .send()
+                .map_err(prettify_client_error);
 
             if let Err(e) = sig_result {
                 log::error!("{:?}", e)
@@ -188,7 +192,8 @@ pub async fn loop_consume_events(
                         &mango_v4::instruction::PerpConsumeEvents { limit: 10 },
                     ),
                 })
-                .send();
+                .send()
+                .map_err(prettify_client_error);
 
             if let Err(e) = sig_result {
                 log::error!("{:?}", e)
@@ -246,7 +251,8 @@ pub async fn loop_update_funding(
                         &mango_v4::instruction::PerpUpdateFunding {},
                     ),
                 })
-                .send();
+                .send()
+                .map_err(prettify_client_error);
             if let Err(e) = sig_result {
                 log::error!("{:?}", e)
             } else {

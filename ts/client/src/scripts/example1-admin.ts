@@ -57,7 +57,7 @@ async function main() {
   console.log(`Creating Group...`);
   const insuranceMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
-    await client.groupCreate(GROUP_NUM, true, insuranceMint);
+    await client.groupCreate(GROUP_NUM, true, 0, insuranceMint);
   } catch (error) {
     console.log(error);
   }
@@ -288,7 +288,7 @@ async function main() {
     );
     console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
     await group.reloadAll(client);
-    console.log(group.banksMap.get('USDC').toString());
+    console.log(group.banksMap.get('USDC')!.toString());
   } catch (error) {
     throw error;
   }

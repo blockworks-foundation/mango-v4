@@ -10,9 +10,12 @@ use solana_client::{
 use solana_rpc::rpc_pubsub::RpcSolPubSubClient;
 use solana_sdk::{account::AccountSharedData, commitment_config::CommitmentConfig, pubkey::Pubkey};
 
+use anyhow::Context;
 use log::*;
 use std::{str::FromStr, sync::Arc, time::Duration};
 use tokio_stream::StreamMap;
+
+use client::chain_data;
 
 use crate::AnyhowWrap;
 
@@ -181,4 +184,90 @@ pub fn start(
             let _ = out.await;
         }
     });
+}
+
+pub fn update_chain_data(chain: &mut chain_data::ChainData, message: Message) {
+    use chain_data::*;
+    match message {
+        Message::Account(account_write) => {
+            trace!("websocket account message");
+            chain.update_account(
+                account_write.pubkey,
+                AccountAndSlot {
+                    slot: account_write.slot,
+                    account: account_write.account,
+                },
+            );
+        }
+        Message::Slot(slot_update) => {
+            trace!("websocket slot message");
+            let slot_update = match *slot_update {
+                solana_client::rpc_response::SlotUpdate::CreatedBank { slot, parent, .. } => {
+                    Some(SlotData {
+                        slot,
+                        parent: Some(parent),
+                        status: SlotStatus::Processed,
+                        chain: 0,
+                    })
+                }
+                solana_client::rpc_response::SlotUpdate::OptimisticConfirmation {
+                    slot, ..
+                } => Some(SlotData {
+                    slot,
+                    parent: None,
+                    status: SlotStatus::Confirmed,
+                    chain: 0,
+                }),
+                solana_client::rpc_response::SlotUpdate::Root { slot, .. } => Some(SlotData {
+                    slot,
+                    parent: None,
+                    status: SlotStatus::Rooted,
+                    chain: 0,
+                }),
+                _ => None,
+            };
+            if let Some(update) = slot_update {
+                chain.update_slot(update);
+            }
+        }
+    }
+}
+
+pub async fn get_next_create_bank_slot(
+    receiver: async_channel::Receiver<Message>,
+    timeout: Duration,
+) -> anyhow::Result<u64> {
+    let start = std::time::Instant::now();
+    loop {
+        let elapsed = start.elapsed();
+        if elapsed > timeout {
+            anyhow::bail!(
+                "did not receive a slot from the websocket connection in {}s",
+                timeout.as_secs()
+            );
+        }
+        let remaining_timeout = timeout - elapsed;
+
+        let msg = match tokio::time::timeout(remaining_timeout, receiver.recv()).await {
+            // timeout
+            Err(_) => continue,
+            // channel close
+            Ok(Err(err)) => {
+                return Err(err).context("while waiting for first slot from websocket connection");
+            }
+            // success
+            Ok(Ok(msg)) => msg,
+        };
+
+        match msg {
+            Message::Slot(slot_update) => {
+                if let solana_client::rpc_response::SlotUpdate::CreatedBank { slot, .. } =
+                    *slot_update
+                {
+                    return Ok(slot);
+                }
+            }
+            _ => {}
+        }
+    }
 }

@@ -1229,6 +1229,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "cli"
+version = "0.1.0"
+dependencies = [
+ "anchor-client",
+ "anchor-lang 0.25.0",
+ "anchor-spl 0.25.0",
+ "anyhow",
+ "clap 3.1.18",
+ "client",
+ "dotenv",
+ "env_logger 0.8.4",
+ "fixed",
+ "fixed-macro",
+ "futures 0.3.21",
+ "log 0.4.17",
+ "mango-v4",
+ "pyth-sdk-solana",
+ "serum_dex 0.4.0 (git+https://github.com/blockworks-foundation/serum-dex.git)",
+ "solana-client",
+ "solana-sdk",
+ "tokio",
+]
+
+[[package]]
 name = "client"
 version = "0.1.0"
 dependencies = [
@@ -1242,6 +1266,7 @@ dependencies = [
  "mango-v4",
  "pyth-sdk-solana",
  "serum_dex 0.4.0 (git+https://github.com/blockworks-foundation/serum-dex.git)",
+ "shellexpand",
  "solana-account-decoder",
  "solana-client",
  "solana-sdk",
@@ -2891,7 +2916,6 @@ dependencies = [
  "mango-v4",
  "pyth-sdk-solana",
  "serum_dex 0.4.0 (git+https://github.com/blockworks-foundation/serum-dex.git)",
- "shellexpand",
  "solana-client",
  "solana-sdk",
  "tokio",
@@ -3156,6 +3180,7 @@ dependencies = [
  "async-trait",
  "base64 0.13.0",
  "bincode",
+ "borsh",
  "bytemuck",
  "checked_math",
  "env_logger 0.9.0",

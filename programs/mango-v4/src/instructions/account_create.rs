@@ -5,7 +5,7 @@ use crate::state::*;
 use crate::util::fill32_from_str;
 
 #[derive(Accounts)]
-#[instruction(account_num: u8, account_size: AccountSize)]
+#[instruction(account_num: u32, account_size: AccountSize)]
 pub struct AccountCreate<'info> {
     pub group: AccountLoader<'info, Group>,
 
@@ -28,7 +28,7 @@ pub struct AccountCreate<'info> {
 
 pub fn account_create(
     ctx: Context<AccountCreate>,
-    account_num: u8,
+    account_num: u32,
     account_size: AccountSize,
     name: String,
 ) -> Result<()> {

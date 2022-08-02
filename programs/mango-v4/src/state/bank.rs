@@ -91,15 +91,13 @@ pub struct Bank {
 
     pub mint_decimals: u8,
 
-    pub reserved: [u8; 4],
+    pub bank_num: u32,
 
-    pub bank_num: u64,
-    // TODO: add space for an oracle which services interest rate for the bank's mint
-    // interest rate tied to oracle might help reduce spreads between deposits and borrows
+    pub reserved: [u8; 256],
 }
 const_assert_eq!(
     size_of::<Bank>(),
-    16 + 32 * 4 + 8 * 2 + 16 * 23 + 2 * 8 + 2 + 1 + 1 + 4 + 8
+    32 + 16 + 32 * 3 + 16 + 16 * 6 + 8 * 2 + 16 * 16 + 8 * 2 + 2 + 1 + 1 + 4 + 256
 );
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
@@ -153,12 +151,12 @@ impl std::fmt::Debug for Bank {
 }
 
 impl Bank {
-    pub fn from_existing_bank(existing_bank: &Bank, vault: Pubkey, bank_num: u64) -> Self {
+    pub fn from_existing_bank(existing_bank: &Bank, vault: Pubkey, bank_num: u32) -> Self {
         Self {
             name: existing_bank.name,
             group: existing_bank.group,
             mint: existing_bank.mint,
-            vault: vault,
+            vault,
             oracle: existing_bank.oracle,
             oracle_config: existing_bank.oracle_config,
             deposit_index: existing_bank.deposit_index,
@@ -190,7 +188,7 @@ impl Bank {
             token_index: existing_bank.token_index,
             bump: existing_bank.bump,
             mint_decimals: existing_bank.mint_decimals,
-            reserved: Default::default(),
+            reserved: [0; 256],
             bank_num,
         }
     }
@@ -591,7 +589,8 @@ mod tests {
                     indexed_position: I80F48::ZERO,
                     token_index: 0,
                     in_use_count: if is_in_use { 1 } else { 0 },
-                    reserved: Default::default(),
+                    padding: Default::default(),
+                    reserved: [0; 40],
                 };
 
                 account.indexed_position = indexed(I80F48::from_num(start), &bank);

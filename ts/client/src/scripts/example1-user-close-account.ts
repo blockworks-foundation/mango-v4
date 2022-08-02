@@ -48,7 +48,7 @@ async function main() {
 
     // fetch account
     const mangoAccount = (
-      await client.getMangoAccountForOwner(group, user.publicKey)
+      await client.getMangoAccountsForOwner(group, user.publicKey)[0]
     )[0];
     console.log(`...found mangoAccount ${mangoAccount.publicKey}`);
     console.log(mangoAccount.toString());

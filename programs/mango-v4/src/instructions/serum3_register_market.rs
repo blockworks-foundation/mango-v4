@@ -10,6 +10,7 @@ pub struct Serum3RegisterMarket<'info> {
     #[account(
         mut,
         has_one = admin,
+        constraint = group.load()?.serum3_supported()
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
@@ -74,8 +75,10 @@ pub fn serum3_register_market(
         base_token_index: base_bank.token_index,
         quote_token_index: quote_bank.token_index,
         bump: *ctx.bumps.get("serum_market").ok_or(MangoError::SomeError)?,
-        padding: Default::default(),
-        reserved: Default::default(),
+        padding1: Default::default(),
+        padding2: Default::default(),
+        registration_time: Clock::get()?.unix_timestamp,
+        reserved: [0; 128],
     };
 
     Ok(())

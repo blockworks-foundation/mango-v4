@@ -16,6 +16,8 @@ export class Bank {
   public borrowIndex: I80F48;
   public cachedIndexedTotalDeposits: I80F48;
   public cachedIndexedTotalBorrows: I80F48;
+  public avgUtilization: I80F48;
+  public adjustmentFactor: I80F48;
   public maxRate: I80F48;
   public rate0: I80F48;
   public rate1: I80F48;
@@ -41,7 +43,10 @@ export class Bank {
       borrowIndex: I80F48Dto;
       cachedIndexedTotalDeposits: I80F48Dto;
       cachedIndexedTotalBorrows: I80F48Dto;
-      lastUpdated: BN;
+      indexLastUpdated: BN;
+      bankRateLastUpdated: BN;
+      avgUtilization: I80F48Dto;
+      adjustmentFactor: I80F48Dto;
       util0: I80F48Dto;
       rate0: I80F48Dto;
       util1: I80F48Dto;
@@ -72,7 +77,10 @@ export class Bank {
       obj.borrowIndex,
       obj.cachedIndexedTotalDeposits,
       obj.cachedIndexedTotalBorrows,
-      obj.lastUpdated,
+      obj.indexLastUpdated,
+      obj.bankRateLastUpdated,
+      obj.avgUtilization,
+      obj.adjustmentFactor,
       obj.util0,
       obj.rate0,
       obj.util1,
@@ -104,7 +112,10 @@ export class Bank {
     borrowIndex: I80F48Dto,
     indexedTotalDeposits: I80F48Dto,
     indexedTotalBorrows: I80F48Dto,
-    lastUpdated: BN,
+    public indexLastUpdated: BN,
+    public bankRateLastUpdated: BN,
+    avgUtilization: I80F48Dto,
+    adjustmentFactor: I80F48Dto,
     util0: I80F48Dto,
     rate0: I80F48Dto,
     util1: I80F48Dto,
@@ -127,6 +138,8 @@ export class Bank {
     this.borrowIndex = I80F48.from(borrowIndex);
     this.cachedIndexedTotalDeposits = I80F48.from(indexedTotalDeposits);
     this.cachedIndexedTotalBorrows = I80F48.from(indexedTotalBorrows);
+    this.avgUtilization = I80F48.from(avgUtilization);
+    this.adjustmentFactor = I80F48.from(adjustmentFactor);
     this.maxRate = I80F48.from(maxRate);
     this.util0 = I80F48.from(util0);
     this.rate0 = I80F48.from(rate0);
@@ -155,6 +168,14 @@ export class Bank {
       this.cachedIndexedTotalDeposits.toNumber() +
       '\n cachedIndexedTotalBorrows - ' +
       this.cachedIndexedTotalBorrows.toNumber() +
+      '\n indexLastUpdated - ' +
+      new Date(this.indexLastUpdated.toNumber() * 1000) +
+      '\n bankRateLastUpdated - ' +
+      new Date(this.bankRateLastUpdated.toNumber() * 1000) +
+      '\n avgUtilization - ' +
+      this.avgUtilization.toNumber() +
+      '\n adjustmentFactor - ' +
+      this.adjustmentFactor.toNumber() +
       '\n maxRate - ' +
       this.maxRate.toNumber() +
       '\n util0 - ' +
@@ -174,7 +195,15 @@ export class Bank {
       '\n initLiabWeight - ' +
       this.initLiabWeight.toNumber() +
       '\n liquidationFee - ' +
-      this.liquidationFee.toNumber()
+      this.liquidationFee.toNumber() +
+      '\n uiDeposits() - ' +
+      this.uiDeposits() +
+      '\n uiBorrows() - ' +
+      this.uiBorrows() +
+      '\n getDepositRate() - ' +
+      this.getDepositRate().toNumber() +
+      '\n getBorrowRate() - ' +
+      this.getBorrowRate().toNumber()
     );
   }
 
@@ -254,11 +283,8 @@ export class MintInfo {
       banks: PublicKey[];
       vaults: PublicKey[];
       oracle: PublicKey;
-      addressLookupTable: PublicKey;
       tokenIndex: number;
-      addressLookupTableBankIndex: Number;
-      addressLookupTableOracleIndex: Number;
-      reserved: unknown;
+      registrationTime: BN;
     },
   ) {
     return new MintInfo(
@@ -268,6 +294,7 @@ export class MintInfo {
       obj.vaults,
       obj.oracle,
       obj.tokenIndex,
+      obj.registrationTime,
     );
   }
 
@@ -278,6 +305,7 @@ export class MintInfo {
     public vaults: PublicKey[],
     public oracle: PublicKey,
     public tokenIndex: number,
+    registrationTime: BN,
   ) {}
 
   public firstBank(): PublicKey {

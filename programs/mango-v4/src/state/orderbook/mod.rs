@@ -32,6 +32,7 @@ mod tests {
             root_node: 0,
             leaf_count: 0,
             nodes: [AnyNode::zeroed(); MAX_BOOK_NODES],
+            reserved: [0; 256],
         }
     }
 

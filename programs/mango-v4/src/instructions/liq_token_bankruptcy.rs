@@ -123,7 +123,7 @@ pub fn liq_token_bankruptcy(
     if insurance_transfer > 0 {
         // in the end, the liqee gets liab assets
         liqee_liab_active = liab_bank.deposit(liqee_liab, liab_transfer)?;
-        remaining_liab_loss = -liqee_liab.native(&liab_bank);
+        remaining_liab_loss = -liqee_liab.native(liab_bank);
 
         // move insurance assets into quote bank
         let group_seeds = group_seeds!(group);
