@@ -113,7 +113,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     emit!(DepositLog {
         mango_account: ctx.accounts.account.key(),
         signer: ctx.accounts.token_authority.key(),
-        token_index: token_index,
+        token_index,
         quantity: amount,
         price: oracle_price.to_bits(),
     });

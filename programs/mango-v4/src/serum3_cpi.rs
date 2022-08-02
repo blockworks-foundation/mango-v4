@@ -11,7 +11,7 @@ use crate::error::*;
 use crate::state::*;
 
 /// Serum padding is "serum" + data + "padding"
-fn strip_dex_padding<'a>(data: &[u8]) -> Result<&[u8]> {
+fn strip_dex_padding(data: &[u8]) -> Result<&[u8]> {
     require!(data.len() >= 12, MangoError::SomeError);
     Ok(&data[5..data.len() - 7])
 }
@@ -117,7 +117,7 @@ pub fn load_open_orders_ref<'a>(
     Ok(Ref::map(strip_dex_padding_ref(acc)?, bytemuck::from_bytes))
 }
 
-pub fn load_open_orders<'a>(acc: &impl AccountReader) -> Result<&serum_dex::state::OpenOrders> {
+pub fn load_open_orders(acc: &impl AccountReader) -> Result<&serum_dex::state::OpenOrders> {
     Ok(bytemuck::from_bytes(strip_dex_padding(acc.data())?))
 }
 
