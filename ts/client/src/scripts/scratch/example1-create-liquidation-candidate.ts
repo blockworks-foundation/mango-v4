@@ -107,7 +107,7 @@ async function main() {
   ).toNumber();
   amount = 0.9 * maxNative;
   console.log(`Withdrawing...${amount} native BTC'`);
-  await user2Client.tokenWithdraw2(
+  await user2Client.tokenWithdrawNative(
     group,
     user2MangoAccount,
     token,

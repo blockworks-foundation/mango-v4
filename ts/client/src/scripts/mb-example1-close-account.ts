@@ -95,7 +95,7 @@ async function main() {
         continue;
       }
 
-      await client.tokenWithdraw2(
+      await client.tokenWithdrawNative(
         group,
         mangoAccount,
         group.findBank(token.tokenIndex)!.name,

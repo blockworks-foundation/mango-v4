@@ -1,9 +1,9 @@
 import * as anchor from '@project-serum/anchor';
-import { Program } from '@project-serum/anchor';
+import { Program, AnchorProvider } from '@project-serum/anchor';
 import { MangoV4 } from '../target/types/mango_v4';
 import * as spl from '@solana/spl-token';
 import NodeWallet from '@project-serum/anchor/dist/cjs/nodewallet';
-import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { PublicKey, LAMPORTS_PER_SOL, Connection } from '@solana/web3.js';
 import {
   Group,
   MangoClient,
@@ -80,10 +80,16 @@ async function createUsers(
 describe('mango-v4', () => {
   let programId = new PublicKey('m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD');
   // Configure the client to use the local cluster.
-  const provider = anchor.AnchorProvider.env();
-  anchor.setProvider(provider);
-  let providerWallet = provider.wallet;
-  let providerPayer = (providerWallet as NodeWallet).payer;
+  const envProvider = anchor.AnchorProvider.env();
+  anchor.setProvider(envProvider);
+  let envProviderWallet = envProvider.wallet;
+  let envProviderPayer = (envProviderWallet as NodeWallet).payer;
+
+  const options = AnchorProvider.defaultOptions();
+  const connection = new Connection(
+    process.env.ANCHOR_PROVIDER_URL!,
+    options.commitment,
+  );
 
   const program = anchor.workspace.MangoV4 as Program<MangoV4>;
   let users: {
@@ -94,37 +100,32 @@ describe('mango-v4', () => {
   let mintsMap: Partial<Record<keyof typeof MINTS, spl.Token>>;
 
   let group: Group;
-  let client: MangoClient;
   let usdcOracle: StubOracle;
   let btcOracle: StubOracle;
+  let envClient: MangoClient;
 
   it('Initialize group and users', async () => {
-    console.log(`provider ${providerWallet.publicKey.toString()}`);
+    console.log(`provider ${envProviderWallet.publicKey.toString()}`);
 
-    mintsMap = await createMints(program, providerPayer, providerWallet);
-    users = await createUsers(mintsMap, providerPayer, provider);
+    mintsMap = await createMints(program, envProviderPayer, envProviderWallet);
+    users = await createUsers(mintsMap, envProviderPayer, envProvider);
 
-    let groupNum = 0;
-    let testing = 0;
-    let insuranceMintPk = mintsMap['USDC']!.publicKey;
-    const adminPk = providerWallet.publicKey;
+    const groupNum = 0;
+    const insuranceMintPk = mintsMap['USDC']!.publicKey;
+    const adminPk = envProviderWallet.publicKey;
 
     // Passing devnet as the cluster here - client cannot accept localnet
     // I think this is only for getting the serum market though?
-    client = await MangoClient.connect(provider, 'devnet', programId);
-    await client.groupCreate(
-      groupNum,
-      testing === 1 ? true : false,
-      insuranceMintPk,
-    );
-    group = await client.getGroupForAdmin(adminPk, groupNum);
+    envClient = await MangoClient.connect(envProvider, 'devnet', programId);
+    await envClient.groupCreate(groupNum, false, insuranceMintPk);
+    group = await envClient.getGroupForAdmin(adminPk, groupNum);
 
-    await client.stubOracleCreate(group, mintsMap['USDC']!.publicKey, 1.0);
+    await envClient.stubOracleCreate(group, mintsMap['USDC']!.publicKey, 1.0);
     usdcOracle = (
-      await client.getStubOracle(group, mintsMap['USDC']!.publicKey)
+      await envClient.getStubOracle(group, mintsMap['USDC']!.publicKey)
     )[0];
 
-    await client.tokenRegister(
+    await envClient.tokenRegister(
       group,
       mintsMap['USDC']!.publicKey,
       usdcOracle.publicKey,
@@ -145,14 +146,14 @@ describe('mango-v4', () => {
       1.4,
       0.02,
     );
-    await group.reloadAll(client);
+    await group.reloadAll(envClient);
 
-    await client.stubOracleCreate(group, mintsMap['BTC']!.publicKey, 100.0);
+    await envClient.stubOracleCreate(group, mintsMap['BTC']!.publicKey, 100.0);
     btcOracle = (
-      await client.getStubOracle(group, mintsMap['BTC']!.publicKey)
+      await envClient.getStubOracle(group, mintsMap['BTC']!.publicKey)
     )[0];
 
-    await client.tokenRegister(
+    await envClient.tokenRegister(
       group,
       mintsMap['BTC']!.publicKey,
       btcOracle.publicKey,
@@ -173,9 +174,9 @@ describe('mango-v4', () => {
       1.4,
       0.02,
     );
-    await group.reloadAll(client);
+    await group.reloadAll(envClient);
 
-    await client.perpCreateMarket(
+    await envClient.perpCreateMarket(
       group,
       btcOracle.publicKey,
       0,
@@ -197,10 +198,20 @@ describe('mango-v4', () => {
       0.05,
       100,
     );
-    await group.reloadAll(client);
+    await group.reloadAll(envClient);
   });
 
   it('Basic', async () => {
+    const client = await MangoClient.connect(
+      new anchor.AnchorProvider(
+        connection,
+        new NodeWallet(users[0].keypair),
+        options,
+      ),
+      'devnet',
+      programId,
+    );
+
     const mangoAccount = await client.getOrCreateMangoAccount(
       group,
       users[0].keypair.publicKey,
@@ -229,7 +240,7 @@ describe('mango-v4', () => {
     );
     await mangoAccount.reload(client, group);
 
-    await client.tokenWithdraw2(
+    await client.tokenWithdraw(
       group,
       mangoAccount,
       'USDC',
@@ -239,7 +250,7 @@ describe('mango-v4', () => {
     );
     await mangoAccount.reload(client, group);
 
-    await client.tokenWithdraw2(
+    await client.tokenWithdraw(
       group,
       mangoAccount,
       'BTC',
@@ -251,7 +262,26 @@ describe('mango-v4', () => {
   });
 
   it('liquidate token and token', async () => {
-    const mangoAccountA = await client.getOrCreateMangoAccount(
+    const clientA = await MangoClient.connect(
+      new anchor.AnchorProvider(
+        connection,
+        new NodeWallet(users[0].keypair),
+        options,
+      ),
+      'devnet',
+      programId,
+    );
+    const clientB = await MangoClient.connect(
+      new anchor.AnchorProvider(
+        connection,
+        new NodeWallet(users[1].keypair),
+        options,
+      ),
+      'devnet',
+      programId,
+    );
+
+    const mangoAccountA = await clientA.getOrCreateMangoAccount(
       group,
       users[0].keypair.publicKey,
       users[0].keypair,
@@ -259,9 +289,9 @@ describe('mango-v4', () => {
       AccountSize.small,
       'my_mango_account',
     );
-    await mangoAccountA.reload(client, group);
+    await mangoAccountA.reload(clientA, group);
 
-    const mangoAccountB = await client.getOrCreateMangoAccount(
+    const mangoAccountB = await clientB.getOrCreateMangoAccount(
       group,
       users[1].keypair.publicKey,
       users[1].keypair,
@@ -269,19 +299,19 @@ describe('mango-v4', () => {
       AccountSize.small,
       'my_mango_account',
     );
-    await mangoAccountB.reload(client, group);
+    await mangoAccountB.reload(clientB, group);
 
-    await client.stubOracleSet(group, btcOracle.publicKey, 100);
+    await envClient.stubOracleSet(group, btcOracle.publicKey, 100);
 
     // Initialize liquidator
-    await client.tokenDeposit(
+    await clientA.tokenDeposit(
       group,
       mangoAccountA,
       'USDC',
       1000,
       users[0].keypair,
     );
-    await client.tokenDeposit(
+    await clientA.tokenDeposit(
       group,
       mangoAccountA,
       'BTC',
@@ -290,16 +320,16 @@ describe('mango-v4', () => {
     );
 
     // Deposit collateral
-    await client.tokenDeposit(
+    await clientB.tokenDeposit(
       group,
       mangoAccountB,
       'BTC',
       100,
       users[1].keypair,
     );
-    await mangoAccountB.reload(client, group);
+    await mangoAccountB.reload(clientB, group);
     // // Borrow
-    await client.tokenWithdraw2(
+    await clientB.tokenWithdraw(
       group,
       mangoAccountB,
       'USDC',
@@ -308,11 +338,11 @@ describe('mango-v4', () => {
       users[1].keypair,
     );
     // // Set price so health is below maintanence
-    await client.stubOracleSet(group, btcOracle.publicKey, 1);
+    await envClient.stubOracleSet(group, btcOracle.publicKey, 1);
 
-    await mangoAccountB.reload(client, group);
+    await mangoAccountB.reload(clientB, group);
 
-    await client.liqTokenWithToken(
+    await clientA.liqTokenWithToken(
       group,
       mangoAccountA,
       mangoAccountB,
