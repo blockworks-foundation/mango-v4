@@ -14,3 +14,8 @@ for pair_str in \
     perl -0777 -pi -e "s/\{\s*\"defined\":\s*\"${pair[0]}\"\s*\}/\"${pair[1]}\"/g" \
         target/idl/mango_v4.json target/types/mango_v4.ts;
 done
+
+# Anchor puts all enums in the IDL, independent of visibility. And then it
+# errors on enums that have tuple variants. This hack drops these from the idl.
+perl -0777 -pi -e 's/ *{\s*"name": "NodeRef(?<nested>(?:[^{}[\]]+|\{(?&nested)\}|\[(?&nested)\])*)\},\n//g' \
+	target/idl/mango_v4.json target/types/mango_v4.ts;

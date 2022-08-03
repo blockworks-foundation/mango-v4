@@ -4092,54 +4092,6 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "NodeRef",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Inner",
-            "fields": [
-              {
-                "defined": "&'aInnerNode"
-              }
-            ]
-          },
-          {
-            "name": "Leaf",
-            "fields": [
-              {
-                "defined": "&'aLeafNode"
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "name": "NodeRefMut",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Inner",
-            "fields": [
-              {
-                "defined": "&'amutInnerNode"
-              }
-            ]
-          },
-          {
-            "name": "Leaf",
-            "fields": [
-              {
-                "defined": "&'amutLeafNode"
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
       "name": "OrderType",
       "type": {
         "kind": "enum",
@@ -8867,54 +8819,6 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "LastFreeNode"
-          }
-        ]
-      }
-    },
-    {
-      "name": "NodeRef",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Inner",
-            "fields": [
-              {
-                "defined": "&'aInnerNode"
-              }
-            ]
-          },
-          {
-            "name": "Leaf",
-            "fields": [
-              {
-                "defined": "&'aLeafNode"
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "name": "NodeRefMut",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Inner",
-            "fields": [
-              {
-                "defined": "&'amutInnerNode"
-              }
-            ]
-          },
-          {
-            "name": "Leaf",
-            "fields": [
-              {
-                "defined": "&'amutLeafNode"
-              }
-            ]
           }
         ]
       }
