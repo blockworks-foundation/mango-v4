@@ -28,12 +28,13 @@ pub struct MintInfo {
     pub oracle: Pubkey,
 
     pub registration_time: i64,
+    pub group_insurance_fund: u8,
 
-    pub reserved: [u8; 256],
+    pub reserved: [u8; 255],
 }
 const_assert_eq!(
     size_of::<MintInfo>(),
-    MAX_BANKS * 2 * 32 + 3 * 32 + 2 + 8 + 6 + 256
+    MAX_BANKS * 2 * 32 + 3 * 32 + 2 + 8 + 6 + 1 + 255
 );
 const_assert_eq!(size_of::<MintInfo>() % 8, 0);
 
@@ -66,5 +67,9 @@ impl MintInfo {
             self.banks()
         );
         Ok(())
+    }
+
+    pub fn elligible_for_group_insurance_fund(&self) -> bool {
+        self.group_insurance_fund == 1
     }
 }
