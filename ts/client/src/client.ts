@@ -88,6 +88,20 @@ export class MangoClient {
       .rpc();
   }
 
+  public async groupEdit(
+    group: Group,
+    newAdmin: PublicKey,
+    newFastListingAdmin: PublicKey,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .groupEdit(newAdmin, newFastListingAdmin)
+      .accounts({
+        group: group.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .rpc();
+  }
+
   public async groupClose(group: Group): Promise<TransactionSignature> {
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
     return await this.program.methods
@@ -185,6 +199,27 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        mint: mintPk,
+        oracle: oraclePk,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+        rent: SYSVAR_RENT_PUBKEY,
+      })
+      .rpc();
+  }
+
+  public async tokenRegisterTrustless(
+    group: Group,
+    mintPk: PublicKey,
+    oraclePk: PublicKey,
+    tokenIndex: number,
+    name: string,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .tokenRegisterTrustless(tokenIndex, 0, name)
+      .accounts({
+        group: group.publicKey,
+        fastListingAdmin: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
         mint: mintPk,
         oracle: oraclePk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
