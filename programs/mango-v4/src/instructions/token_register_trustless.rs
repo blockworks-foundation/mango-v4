@@ -98,7 +98,7 @@ pub fn token_register_trustless(
         maint_asset_weight: I80F48::from_num(0),
         init_asset_weight: I80F48::from_num(0),
         maint_liab_weight: I80F48::from_num(1.25),
-        init_liab_weight: I80F48::from_num(2.0),
+        init_liab_weight: I80F48::from_num(1.5),
         liquidation_fee: I80F48::from_num(0.125),
         dust: I80F48::ZERO,
         flash_loan_vault_initial: u64::MAX,
