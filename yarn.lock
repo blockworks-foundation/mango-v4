@@ -2591,10 +2591,10 @@ traverse-chain@~0.1.0:
   resolved "https://registry.yarnpkg.com/traverse-chain/-/traverse-chain-0.1.0.tgz#61dbc2d53b69ff6091a12a168fd7d433107e40f1"
   integrity sha512-up6Yvai4PYKhpNp5PkYtx50m3KbwQrqDwbuZP/ItyL64YEWHAvH6Md83LFLV/GRSk/BoUVwwgUzX6SOQSbsfAg==
 
-ts-mocha@^8.0.0:
-  version "8.0.0"
-  resolved "https://registry.yarnpkg.com/ts-mocha/-/ts-mocha-8.0.0.tgz#962d0fa12eeb6468aa1a6b594bb3bbc818da3ef0"
-  integrity sha512-Kou1yxTlubLnD5C3unlCVO7nh0HERTezjoVhVw/M5S1SqoUec0WgllQvPk3vzPMc6by8m6xD1uR1yRf8lnVUbA==
+ts-mocha@^10.0.0:
+  version "10.0.0"
+  resolved "https://registry.yarnpkg.com/ts-mocha/-/ts-mocha-10.0.0.tgz#41a8d099ac90dbbc64b06976c5025ffaebc53cb9"
+  integrity sha512-VRfgDO+iiuJFlNB18tzOfypJ21xn2xbuZyDvJvqpTbWgkAgD17ONGr8t+Tl8rcBtOBdjXp5e/Rk+d39f7XBHRw==
   dependencies:
     ts-node "7.0.1"
   optionalDependencies:

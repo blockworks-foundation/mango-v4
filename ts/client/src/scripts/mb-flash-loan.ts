@@ -10,7 +10,7 @@ import {
 import BN from 'bn.js';
 import fs from 'fs';
 import { QUOTE_DECIMALS } from '../accounts/bank';
-import { MangoClient } from '../client';
+import { MangoClient, AccountSize } from '../index';
 import { getAssociatedTokenAddress } from '../utils';
 
 const CLUSTER_URL =
@@ -60,6 +60,7 @@ async function main() {
   const mangoAccount = await client.getOrCreateMangoAccount(
     group,
     user.publicKey,
+    user,
     0,
     AccountSize.small,
     'my_mango_account',
