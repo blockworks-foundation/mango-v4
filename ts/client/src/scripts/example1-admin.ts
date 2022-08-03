@@ -64,37 +64,6 @@ async function main() {
   const group = await client.getGroupForAdmin(admin.publicKey, GROUP_NUM);
   console.log(`...registered group ${group.publicKey}`);
 
-  // register token 1
-  console.log(`Registering BTC...`);
-  const btcDevnetMint = new PublicKey(DEVNET_MINTS.get('BTC')!);
-  const btcDevnetOracle = new PublicKey(DEVNET_ORACLES.get('BTC')!);
-  try {
-    await client.tokenRegister(
-      group,
-      btcDevnetMint,
-      btcDevnetOracle,
-      0.1,
-      1, // tokenIndex
-      'BTC',
-      0.01,
-      0.4,
-      0.07,
-      0.8,
-      0.9,
-      0.88,
-      0.0005,
-      0.0005,
-      0.8,
-      0.6,
-      1.2,
-      1.4,
-      0.02,
-    );
-    await group.reloadAll(client);
-  } catch (error) {
-    console.log(error);
-  }
-
   // stub oracle + register token 0
   console.log(`Registering USDC...`);
   const usdcDevnetMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
@@ -131,6 +100,37 @@ async function main() {
     );
     await group.reloadAll(client);
   } catch (error) {}
+
+  // register token 1
+  console.log(`Registering BTC...`);
+  const btcDevnetMint = new PublicKey(DEVNET_MINTS.get('BTC')!);
+  const btcDevnetOracle = new PublicKey(DEVNET_ORACLES.get('BTC')!);
+  try {
+    await client.tokenRegister(
+      group,
+      btcDevnetMint,
+      btcDevnetOracle,
+      0.1,
+      1, // tokenIndex
+      'BTC',
+      0.01,
+      0.4,
+      0.07,
+      0.8,
+      0.9,
+      0.88,
+      0.0005,
+      0.0005,
+      0.8,
+      0.6,
+      1.2,
+      1.4,
+      0.02,
+    );
+    await group.reloadAll(client);
+  } catch (error) {
+    console.log(error);
+  }
 
   // register token 2
   console.log(`Registering SOL...`);
