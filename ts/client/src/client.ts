@@ -180,7 +180,6 @@ export class MangoClient {
     return await this.program.methods
       .tokenRegister(
         tokenIndex,
-        0,
         name,
         {
           confFilter: {
@@ -215,7 +214,7 @@ export class MangoClient {
     name: string,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .tokenRegisterTrustless(tokenIndex, 0, name)
+      .tokenRegisterTrustless(tokenIndex, name)
       .accounts({
         group: group.publicKey,
         fastListingAdmin: (this.program.provider as AnchorProvider).wallet

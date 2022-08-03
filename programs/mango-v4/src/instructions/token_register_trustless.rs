@@ -1,15 +1,14 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use fixed::types::I80F48;
-use fixed_macro::types::I80F48;
 
 use crate::error::*;
-use crate::instructions::{InterestRateParams, INDEX_START};
+use crate::instructions::INDEX_START;
 use crate::state::*;
 use crate::util::fill16_from_str;
 
 #[derive(Accounts)]
-#[instruction(token_index: TokenIndex, bank_num: u32)]
+#[instruction(token_index: TokenIndex)]
 pub struct TokenRegisterTrustless<'info> {
     #[account(
         has_one = fast_listing_admin,
@@ -22,7 +21,7 @@ pub struct TokenRegisterTrustless<'info> {
     #[account(
         init,
         // using the token_index in this seed guards against reusing it
-        seeds = [group.key().as_ref(), b"Bank".as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
+        seeds = [group.key().as_ref(), b"Bank".as_ref(), &token_index.to_le_bytes(), &0u32.to_le_bytes()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<Bank>(),
@@ -31,7 +30,7 @@ pub struct TokenRegisterTrustless<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"Vault".as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
+        seeds = [group.key().as_ref(), b"Vault".as_ref(), &token_index.to_le_bytes(), &0u32.to_le_bytes()],
         bump,
         token::authority = group,
         token::mint = mint,
@@ -64,10 +63,8 @@ pub struct TokenRegisterTrustless<'info> {
 pub fn token_register_trustless(
     ctx: Context<TokenRegisterTrustless>,
     token_index: TokenIndex,
-    bank_num: u32,
     name: String,
 ) -> Result<()> {
-    require_eq!(bank_num, 0);
     require_neq!(token_index, 0);
 
     let mut bank = ctx.accounts.bank.load_init()?;
@@ -89,20 +86,20 @@ pub fn token_register_trustless(
         index_last_updated: Clock::get()?.unix_timestamp,
         bank_rate_last_updated: Clock::get()?.unix_timestamp,
         avg_utilization: I80F48::ZERO,
-        adjustment_factor: I80F48::from_num(0.001),
-        util0: I80F48::from_num(0.6),
-        rate0: I80F48::from_num(0.15),
+        adjustment_factor: I80F48::from_num(0.02),
+        util0: I80F48::from_num(0.7),
+        rate0: I80F48::from_num(0.1),
         util1: I80F48::from_num(0.8),
-        rate1: I80F48::from_num(0.95),
-        max_rate: I80F48::from_num(3.0),
+        rate1: I80F48::from_num(0.2),
+        max_rate: I80F48::from_num(2.0),
         collected_fees_native: I80F48::ZERO,
-        loan_origination_fee_rate: I80F48::from_num(0.005),
+        loan_origination_fee_rate: I80F48::from_num(0.001),
         loan_fee_rate: I80F48::from_num(0.005),
         maint_asset_weight: I80F48::from_num(0),
         init_asset_weight: I80F48::from_num(0),
-        maint_liab_weight: I80F48::from_num(1.4),
-        init_liab_weight: I80F48::from_num(1.5),
-        liquidation_fee: I80F48::from_num(0.2),
+        maint_liab_weight: I80F48::from_num(1.25),
+        init_liab_weight: I80F48::from_num(2.0),
+        liquidation_fee: I80F48::from_num(0.125),
         dust: I80F48::ZERO,
         flash_loan_vault_initial: u64::MAX,
         flash_loan_approved_amount: 0,

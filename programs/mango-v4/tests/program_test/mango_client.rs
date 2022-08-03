@@ -611,7 +611,6 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
                 self.token_index.to_string()
             ),
             token_index: self.token_index,
-            bank_num: 0,
             oracle_config: OracleConfig {
                 conf_filter: I80F48::from_num::<f32>(0.10),
             },
