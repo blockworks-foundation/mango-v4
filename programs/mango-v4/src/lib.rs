@@ -57,7 +57,6 @@ pub mod mango_v4 {
     pub fn token_register(
         ctx: Context<TokenRegister>,
         token_index: TokenIndex,
-        bank_num: u32,
         name: String,
         oracle_config: OracleConfig,
         interest_rate_params: InterestRateParams,
@@ -72,7 +71,6 @@ pub mod mango_v4 {
         instructions::token_register(
             ctx,
             token_index,
-            bank_num,
             name,
             oracle_config,
             interest_rate_params,
@@ -89,10 +87,9 @@ pub mod mango_v4 {
     pub fn token_register_trustless(
         ctx: Context<TokenRegisterTrustless>,
         token_index: TokenIndex,
-        bank_num: u32,
         name: String,
     ) -> Result<()> {
-        instructions::token_register_trustless(ctx, token_index, bank_num, name)
+        instructions::token_register_trustless(ctx, token_index, name)
     }
 
     #[allow(clippy::too_many_arguments)]

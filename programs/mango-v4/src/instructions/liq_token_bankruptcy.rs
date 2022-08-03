@@ -31,13 +31,14 @@ pub struct LiqTokenBankruptcy<'info> {
     #[account(
         has_one = group,
         constraint = liab_mint_info.load()?.token_index == liab_token_index,
-        constraint = liab_mint_info.load()?.elligible_for_group_insurance_fund()
     )]
     pub liab_mint_info: AccountLoader<'info, MintInfo>,
 
     #[account(mut)]
     pub quote_vault: Account<'info, TokenAccount>,
 
+    // future: this would be an insurance fund vault specific to a
+    // trustless token, separate from the shared one on the group
     #[account(mut)]
     pub insurance_vault: Account<'info, TokenAccount>,
 
@@ -105,12 +106,17 @@ pub fn liq_token_bankruptcy(
     let liab_price_adjusted = cm!(liab_price * liab_fee_factor);
 
     let liab_transfer_unrounded = remaining_liab_loss.min(max_liab_transfer);
-    let insurance_transfer = cm!(liab_transfer_unrounded * liab_price_adjusted)
-        .checked_ceil()
-        .unwrap()
-        .checked_to_num::<u64>()
-        .unwrap()
-        .min(ctx.accounts.insurance_vault.amount);
+
+    let insurance_transfer = if liab_mint_info.elligible_for_group_insurance_fund() {
+        cm!(liab_transfer_unrounded * liab_price_adjusted)
+            .checked_ceil()
+            .unwrap()
+            .checked_to_num::<u64>()
+            .unwrap()
+            .min(ctx.accounts.insurance_vault.amount)
+    } else {
+        0
+    };
     let insurance_fund_exhausted = insurance_transfer == ctx.accounts.insurance_vault.amount;
 
     let insurance_transfer_i80f48 = I80F48::from(insurance_transfer);
@@ -170,7 +176,9 @@ pub fn liq_token_bankruptcy(
     drop(account_retriever);
 
     // Socialize loss
-    if insurance_fund_exhausted && remaining_liab_loss.is_positive() {
+    if (insurance_fund_exhausted || !liab_mint_info.elligible_for_group_insurance_fund())
+        && remaining_liab_loss.is_positive()
+    {
         // find the total deposits
         let mut indexed_total_deposits = I80F48::ZERO;
         for bank_ai in bank_ais.iter() {

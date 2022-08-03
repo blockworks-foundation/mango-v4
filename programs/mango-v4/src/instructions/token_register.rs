@@ -10,7 +10,7 @@ use crate::util::fill16_from_str;
 pub const INDEX_START: I80F48 = I80F48!(1_000_000);
 
 #[derive(Accounts)]
-#[instruction(token_index: TokenIndex, bank_num: u32)]
+#[instruction(token_index: TokenIndex)]
 pub struct TokenRegister<'info> {
     #[account(
         has_one = admin,
@@ -23,7 +23,7 @@ pub struct TokenRegister<'info> {
     #[account(
         init,
         // using the token_index in this seed guards against reusing it
-        seeds = [group.key().as_ref(), b"Bank".as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
+        seeds = [group.key().as_ref(), b"Bank".as_ref(), &token_index.to_le_bytes(), &0u32.to_le_bytes()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<Bank>(),
@@ -32,7 +32,7 @@ pub struct TokenRegister<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"Vault".as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
+        seeds = [group.key().as_ref(), b"Vault".as_ref(), &token_index.to_le_bytes(), &0u32.to_le_bytes()],
         bump,
         token::authority = group,
         token::mint = mint,
@@ -77,7 +77,6 @@ pub struct InterestRateParams {
 pub fn token_register(
     ctx: Context<TokenRegister>,
     token_index: TokenIndex,
-    bank_num: u32,
     name: String,
     oracle_config: OracleConfig,
     interest_rate_params: InterestRateParams,
@@ -89,10 +88,6 @@ pub fn token_register(
     init_liab_weight: f32,
     liquidation_fee: f32,
 ) -> Result<()> {
-    // TODO: Error if mint is already configured (technically, init of vault will fail)
-
-    require_eq!(bank_num, 0);
-
     // Require token 0 to be in the insurance token
     if token_index == QUOTE_TOKEN_INDEX {
         require_keys_eq!(

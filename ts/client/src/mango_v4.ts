@@ -171,60 +171,12 @@ export type MangoV4 = {
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "Bank"
-              },
-              {
-                "kind": "arg",
-                "type": "u16",
-                "path": "token_index"
-              },
-              {
-                "kind": "arg",
-                "type": "u32",
-                "path": "bank_num"
-              }
-            ]
-          }
+          "isSigner": false
         },
         {
           "name": "vault",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "Vault"
-              },
-              {
-                "kind": "arg",
-                "type": "u16",
-                "path": "token_index"
-              },
-              {
-                "kind": "arg",
-                "type": "u32",
-                "path": "bank_num"
-              }
-            ]
-          }
+          "isSigner": false
         },
         {
           "name": "mintInfo",
@@ -281,10 +233,6 @@ export type MangoV4 = {
         {
           "name": "tokenIndex",
           "type": "u16"
-        },
-        {
-          "name": "bankNum",
-          "type": "u32"
         },
         {
           "name": "name",
@@ -353,60 +301,12 @@ export type MangoV4 = {
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "Bank"
-              },
-              {
-                "kind": "arg",
-                "type": "u16",
-                "path": "token_index"
-              },
-              {
-                "kind": "arg",
-                "type": "u32",
-                "path": "bank_num"
-              }
-            ]
-          }
+          "isSigner": false
         },
         {
           "name": "vault",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "Vault"
-              },
-              {
-                "kind": "arg",
-                "type": "u16",
-                "path": "token_index"
-              },
-              {
-                "kind": "arg",
-                "type": "u32",
-                "path": "bank_num"
-              }
-            ]
-          }
+          "isSigner": false
         },
         {
           "name": "mintInfo",
@@ -463,10 +363,6 @@ export type MangoV4 = {
         {
           "name": "tokenIndex",
           "type": "u16"
-        },
-        {
-          "name": "bankNum",
-          "type": "u32"
         },
         {
           "name": "name",
@@ -3125,11 +3021,15 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "groupInsuranceFund",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                256
+                255
               ]
             }
           }
@@ -5179,60 +5079,12 @@ export const IDL: MangoV4 = {
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "Bank"
-              },
-              {
-                "kind": "arg",
-                "type": "u16",
-                "path": "token_index"
-              },
-              {
-                "kind": "arg",
-                "type": "u32",
-                "path": "bank_num"
-              }
-            ]
-          }
+          "isSigner": false
         },
         {
           "name": "vault",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "Vault"
-              },
-              {
-                "kind": "arg",
-                "type": "u16",
-                "path": "token_index"
-              },
-              {
-                "kind": "arg",
-                "type": "u32",
-                "path": "bank_num"
-              }
-            ]
-          }
+          "isSigner": false
         },
         {
           "name": "mintInfo",
@@ -5289,10 +5141,6 @@ export const IDL: MangoV4 = {
         {
           "name": "tokenIndex",
           "type": "u16"
-        },
-        {
-          "name": "bankNum",
-          "type": "u32"
         },
         {
           "name": "name",
@@ -5361,60 +5209,12 @@ export const IDL: MangoV4 = {
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "Bank"
-              },
-              {
-                "kind": "arg",
-                "type": "u16",
-                "path": "token_index"
-              },
-              {
-                "kind": "arg",
-                "type": "u32",
-                "path": "bank_num"
-              }
-            ]
-          }
+          "isSigner": false
         },
         {
           "name": "vault",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "Vault"
-              },
-              {
-                "kind": "arg",
-                "type": "u16",
-                "path": "token_index"
-              },
-              {
-                "kind": "arg",
-                "type": "u32",
-                "path": "bank_num"
-              }
-            ]
-          }
+          "isSigner": false
         },
         {
           "name": "mintInfo",
@@ -5471,10 +5271,6 @@ export const IDL: MangoV4 = {
         {
           "name": "tokenIndex",
           "type": "u16"
-        },
-        {
-          "name": "bankNum",
-          "type": "u32"
         },
         {
           "name": "name",
@@ -8133,11 +7929,15 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "groupInsuranceFund",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                256
+                255
               ]
             }
           }
