@@ -4,19 +4,18 @@ use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
 use crate::error::*;
+use crate::instructions::{InterestRateParams, INDEX_START};
 use crate::state::*;
 use crate::util::fill16_from_str;
 
-pub const INDEX_START: I80F48 = I80F48!(1_000_000);
-
 #[derive(Accounts)]
 #[instruction(token_index: TokenIndex, bank_num: u32)]
-pub struct TokenRegister<'info> {
+pub struct TokenRegisterTrustless<'info> {
     #[account(
-        has_one = admin,
+        has_one = fast_listing_admin,
     )]
     pub group: AccountLoader<'info, Group>,
-    pub admin: Signer<'info>,
+    pub fast_listing_admin: Signer<'info>,
 
     pub mint: Account<'info, Mint>,
 
@@ -61,45 +60,15 @@ pub struct TokenRegister<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct InterestRateParams {
-    pub util0: f32,
-    pub rate0: f32,
-    pub util1: f32,
-    pub rate1: f32,
-    pub max_rate: f32,
-    pub adjustment_factor: f32,
-}
-
-// TODO: should this be "configure_mint", we pass an explicit index, and allow
-// overwriting config as long as the mint account stays the same?
 #[allow(clippy::too_many_arguments)]
-pub fn token_register(
-    ctx: Context<TokenRegister>,
+pub fn token_register_trustless(
+    ctx: Context<TokenRegisterTrustless>,
     token_index: TokenIndex,
     bank_num: u32,
     name: String,
-    oracle_config: OracleConfig,
-    interest_rate_params: InterestRateParams,
-    loan_fee_rate: f32,
-    loan_origination_fee_rate: f32,
-    maint_asset_weight: f32,
-    init_asset_weight: f32,
-    maint_liab_weight: f32,
-    init_liab_weight: f32,
-    liquidation_fee: f32,
 ) -> Result<()> {
-    // TODO: Error if mint is already configured (technically, init of vault will fail)
-
     require_eq!(bank_num, 0);
-
-    // Require token 0 to be in the insurance token
-    if token_index == QUOTE_TOKEN_INDEX {
-        require_keys_eq!(
-            ctx.accounts.group.load()?.insurance_mint,
-            ctx.accounts.mint.key()
-        );
-    }
+    require_neq!(token_index, 0);
 
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
@@ -108,7 +77,9 @@ pub fn token_register(
         mint: ctx.accounts.mint.key(),
         vault: ctx.accounts.vault.key(),
         oracle: ctx.accounts.oracle.key(),
-        oracle_config,
+        oracle_config: OracleConfig {
+            conf_filter: I80F48::from_num(0.10),
+        },
         deposit_index: INDEX_START,
         borrow_index: INDEX_START,
         cached_indexed_total_deposits: I80F48::ZERO,
@@ -117,22 +88,21 @@ pub fn token_register(
         indexed_borrows: I80F48::ZERO,
         index_last_updated: Clock::get()?.unix_timestamp,
         bank_rate_last_updated: Clock::get()?.unix_timestamp,
-        // TODO: add a require! verifying relation between the parameters
         avg_utilization: I80F48::ZERO,
-        adjustment_factor: I80F48::from_num(interest_rate_params.adjustment_factor),
-        util0: I80F48::from_num(interest_rate_params.util0),
-        rate0: I80F48::from_num(interest_rate_params.rate0),
-        util1: I80F48::from_num(interest_rate_params.util1),
-        rate1: I80F48::from_num(interest_rate_params.rate1),
-        max_rate: I80F48::from_num(interest_rate_params.max_rate),
+        adjustment_factor: I80F48::from_num(0.001),
+        util0: I80F48::from_num(0.6),
+        rate0: I80F48::from_num(0.15),
+        util1: I80F48::from_num(0.8),
+        rate1: I80F48::from_num(0.95),
+        max_rate: I80F48::from_num(3.0),
         collected_fees_native: I80F48::ZERO,
-        loan_origination_fee_rate: I80F48::from_num(loan_origination_fee_rate),
-        loan_fee_rate: I80F48::from_num(loan_fee_rate),
-        maint_asset_weight: I80F48::from_num(maint_asset_weight),
-        init_asset_weight: I80F48::from_num(init_asset_weight),
-        maint_liab_weight: I80F48::from_num(maint_liab_weight),
-        init_liab_weight: I80F48::from_num(init_liab_weight),
-        liquidation_fee: I80F48::from_num(liquidation_fee),
+        loan_origination_fee_rate: I80F48::from_num(0.005),
+        loan_fee_rate: I80F48::from_num(0.005),
+        maint_asset_weight: I80F48::from_num(0),
+        init_asset_weight: I80F48::from_num(0),
+        maint_liab_weight: I80F48::from_num(1.4),
+        init_liab_weight: I80F48::from_num(1.5),
+        liquidation_fee: I80F48::from_num(0.2),
         dust: I80F48::ZERO,
         flash_loan_vault_initial: u64::MAX,
         flash_loan_approved_amount: 0,
