@@ -11,6 +11,7 @@ pub const HOUR: i64 = 3600;
 pub const DAY: i64 = 86400;
 pub const DAY_I80F48: I80F48 = I80F48!(86400);
 pub const YEAR_I80F48: I80F48 = I80F48!(31536000);
+pub const MINIMUM_MAX_RATE: I80F48 = I80F48!(0.5);
 
 #[account(zero_copy)]
 pub struct Bank {
@@ -497,18 +498,27 @@ impl Bank {
 
     // computes new optimal rates and max rate
     pub fn compute_rates(&self) -> (I80F48, I80F48, I80F48) {
-        // since we have 3 interest rate legs, consider the middle point of the middle leg as the optimal util
-        let optimal_util = (self.util0 + self.util1) / 2;
+        // interest rate legs 2 and 3 are seen as punitive legs, encouraging utilization to move towards optimal utilization
+        // lets choose util0 as optimal utilization and 0 to utli0 as the leg where we want the utlization to preferably be
+        let optimal_util = self.util0;
         // use avg_utilization and not instantaneous_utilization so that rates cannot be manupulated easily
         let util_diff = self.avg_utilization - optimal_util;
         // move rates up when utilization is above optimal utilization, and vice versa
         let adjustment = I80F48::ONE + self.adjustment_factor * util_diff;
-        // irrespective of which leg current utilization is in, update all rates
-        (
-            cm!(self.rate0 * adjustment),
-            cm!(self.rate1 * adjustment),
-            cm!(self.max_rate * adjustment),
-        )
+
+        // 1. irrespective of which leg current utilization is in, update all rates
+        // 2. only update rates as long as new adjusted rates are above MINIMUM_MAX_RATE,
+        //  since we don't want to fall to such low rates that it would take a long time to
+        //  recover to high rates if utilization suddently increases to a high value
+        if cm!(self.max_rate * adjustment) > MINIMUM_MAX_RATE {
+            (
+                cm!(self.rate0 * adjustment),
+                cm!(self.rate1 * adjustment),
+                cm!(self.max_rate * adjustment),
+            )
+        } else {
+            (self.rate0, self.rate1, self.max_rate)
+        }
     }
 }
 
