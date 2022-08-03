@@ -109,6 +109,7 @@ pub fn token_register_trustless(
         bank_num: 0,
         reserved: [0; 256],
     };
+    require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {
