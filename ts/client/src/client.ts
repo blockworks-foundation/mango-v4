@@ -193,6 +193,27 @@ export class MangoClient {
       .rpc();
   }
 
+  public async tokenRegisterTrustless(
+    group: Group,
+    mintPk: PublicKey,
+    oraclePk: PublicKey,
+    tokenIndex: number,
+    name: string,
+  ): Promise<TransactionSignature> {
+    return await this.program.methods
+      .tokenRegisterTrustless(tokenIndex, 0, name)
+      .accounts({
+        group: group.publicKey,
+        fastListingAdmin: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
+        mint: mintPk,
+        oracle: oraclePk,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+        rent: SYSVAR_RENT_PUBKEY,
+      })
+      .rpc();
+  }
+
   public async tokenEdit(
     group: Group,
     tokenName: string,

@@ -86,6 +86,15 @@ pub mod mango_v4 {
         )
     }
 
+    pub fn token_register_trustless(
+        ctx: Context<TokenRegisterTrustless>,
+        token_index: TokenIndex,
+        bank_num: u32,
+        name: String,
+    ) -> Result<()> {
+        instructions::token_register_trustless(ctx, token_index, bank_num, name)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn token_edit(
         ctx: Context<TokenEdit>,
