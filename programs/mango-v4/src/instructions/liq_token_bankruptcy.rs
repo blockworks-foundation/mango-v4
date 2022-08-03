@@ -31,6 +31,7 @@ pub struct LiqTokenBankruptcy<'info> {
     #[account(
         has_one = group,
         constraint = liab_mint_info.load()?.token_index == liab_token_index,
+        constraint = liab_mint_info.load()?.elligible_for_group_insurance_fund()
     )]
     pub liab_mint_info: AccountLoader<'info, MintInfo>,
 
