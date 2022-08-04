@@ -133,14 +133,14 @@ export class MangoClient {
     return group;
   }
 
-  public async getGroupForAdmin(
-    adminPk: PublicKey,
+  public async getGroupForCreator(
+    creatorPk: PublicKey,
     groupNum?: number,
   ): Promise<Group> {
     const filters: MemcmpFilter[] = [
       {
         memcmp: {
-          bytes: adminPk.toBase58(),
+          bytes: creatorPk.toBase58(),
           offset: 8,
         },
       },

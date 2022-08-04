@@ -37,7 +37,7 @@ async function main() {
   );
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
-  const group = await client.getGroupForAdmin(admin.publicKey, 0);
+  const group = await client.getGroupForCreator(admin.publicKey, 0);
   console.log(`${group.toString()}`);
 
   // create + fetch account
@@ -53,7 +53,7 @@ async function main() {
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString(group));
 
-  if (true) {
+  if (false) {
     console.log(`...depositing 10 USDC`);
     await client.tokenDeposit(group, mangoAccount, 'USDC', 10, user);
     await mangoAccount.reload(client, group);
