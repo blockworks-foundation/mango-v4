@@ -1,3 +1,4 @@
+import { BorshAccountsCoder } from '@project-serum/anchor';
 import { Market } from '@project-serum/serum';
 import { parsePriceData, PriceData } from '@pythnetwork/client';
 import { PublicKey } from '@solana/web3.js';
@@ -8,7 +9,6 @@ import { Bank, MintInfo } from './bank';
 import { I80F48, ONE_I80F48 } from './I80F48';
 import { PerpMarket } from './perp';
 import { Serum3Market } from './serum3';
-import { BorshAccountsCoder } from '@project-serum/anchor';
 
 export class Group {
   static from(
@@ -195,13 +195,15 @@ export class Group {
       if (banks[index].name === 'USDC') {
         banks[index].price = ONE_I80F48;
       } else {
-        // Try and deserialize to stubOracle - if it fails then assume oracle type is pyth
         // TODO: Implement switchboard oracle type
-        try {
+        if (
+          !BorshAccountsCoder.accountDiscriminator('stubOracle').compare(
+            price.data.slice(0, 8),
+          )
+        ) {
           let stubOracle = coder.decode('stubOracle', price.data);
           banks[index].price = new I80F48(stubOracle.price.val);
-        } catch (e: any) {
-          console.log(e);
+        } else {
           banks[index].price = I80F48.fromNumber(
             parsePriceData(price.data).previousPrice,
           );
