@@ -2,7 +2,7 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { HealthType } from '../accounts/mangoAccount';
-import { MangoClient, AccountSize } from '../index';
+import { AccountSize, MangoClient } from '../index';
 import { toUiDecimals } from '../utils';
 
 //

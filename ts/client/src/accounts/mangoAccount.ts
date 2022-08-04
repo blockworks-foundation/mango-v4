@@ -29,6 +29,7 @@ export class MangoAccount {
       accountNum: number;
       bump: number;
       reserved: number[];
+      headerVersion: number;
     },
   ) {
     return new MangoAccount(
