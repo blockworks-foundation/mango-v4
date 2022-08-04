@@ -422,9 +422,15 @@ impl<
     fn header(&self) -> &MangoAccountDynamicHeader {
         self.header.deref_or_borrow()
     }
+
+    pub fn header_version(&self) -> &u8 {
+        get_helper(self.dynamic(), 0)
+    }
+
     fn fixed(&self) -> &MangoAccountFixed {
         self.fixed.deref_or_borrow()
     }
+
     fn dynamic(&self) -> &[u8] {
         self.dynamic.deref_or_borrow()
     }

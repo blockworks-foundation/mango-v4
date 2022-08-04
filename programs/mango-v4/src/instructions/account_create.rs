@@ -34,6 +34,11 @@ pub fn account_create(
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_init()?;
 
+    msg!(
+        "Initialized account with header version {}",
+        account.header_version()
+    );
+
     account.fixed.name = fill32_from_str(name)?;
     account.fixed.group = ctx.accounts.group.key();
     account.fixed.owner = ctx.accounts.owner.key();
