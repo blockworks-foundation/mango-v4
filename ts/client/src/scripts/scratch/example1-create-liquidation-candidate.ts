@@ -39,7 +39,7 @@ async function main() {
 
   const user1MangoAccount = await user1Client.getOrCreateMangoAccount(
     group,
-    user1.publicKey
+    user1.publicKey,
   );
 
   console.log(`...mangoAccount1 ${user1MangoAccount.publicKey}`);

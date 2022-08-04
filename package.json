@@ -23,13 +23,13 @@
     "example1-user": "ts-node ts/client/src/scripts/example1-user.ts",
     "example1-admin": "ts-node ts/client/src/scripts/example1-admin.ts",
     "scratch": "ts-node ts/client/src/scripts/scratch/scratch.ts",
-    "format": "prettier --check .",
+    "format": "prettier --check ./ts",
     "lint": "eslint ./ts --ext ts --ext tsx --ext js --quiet",
     "typecheck": "tsc --noEmit --pretty",
     "prepare": "yarn build",
     "prebuild": "npm run clean",
     "prepublishOnly": "npm run validate && npm run build",
-    "validate": "npm run typecheck && npm run lint && npm run format-check"
+    "validate": "npm run typecheck && npm run lint && npm run format"
   },
   "devDependencies": {
     "@jup-ag/core": "^1.0.0-beta.28",
