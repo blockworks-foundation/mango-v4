@@ -29,6 +29,7 @@ jobs:
         id: buildx
         with:
           install: true
+          buildkitd-flags: --debug
 
       # Login to GCR
       - name: Login to GCR
