@@ -22,6 +22,22 @@ jobs:
         uses: actions/checkout@v2
         with:
           submodules: recursive
+      
+      # Use docker buildx
+      - name: Use docker buildx
+        uses: docker/setup-buildx-action@v2
+        id: buildx
+        with:
+          install: true
+
+      # Cache docker layers
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
 
       # Login to GCR
       - name: Login to GCR
@@ -30,13 +46,6 @@ jobs:
           registry: gcr.io
           username: _json_key
           password: ${{ secrets.GCR_SA_KEY }}
-
-      # Use docker buildx
-      - name: Use docker buildx
-        uses: docker/setup-buildx-action@v2
-        id: buildx
-        with:
-          install: true
 
       # Build and push the image, leveraging layer caching
       - name: Build and Push
@@ -47,5 +56,13 @@ jobs:
           tags: |
             gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE }}:${{ github.sha }}
             gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+      
+      # Temp fix
+      # https://github.com/docker/build-push-action/issues/252
+      # https://github.com/moby/buildkit/issues/1896
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
