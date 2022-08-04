@@ -43,7 +43,7 @@ async function main() {
 
   // account
   const mangoAccount = (
-    await client.getMangoAccountForOwner(group, user.publicKey)
+    await client.getMangoAccountsForOwner(group, user.publicKey)
   )[0];
   console.log(`...found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString(group));
@@ -101,7 +101,7 @@ async function main() {
         group.findBank(token.tokenIndex)!.name,
         token.native(group.findBank(token.tokenIndex)!).toNumber(),
         false,
-        user
+        user,
       );
     }
   } catch (error) {
