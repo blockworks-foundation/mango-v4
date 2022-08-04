@@ -1,10 +1,4 @@
-import {
-  AnchorProvider,
-  BN,
-  Program,
-  Provider,
-  web3,
-} from '@project-serum/anchor';
+import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
 import { getFeeRates, getFeeTier } from '@project-serum/serum';
 import { Order } from '@project-serum/serum/lib/market';
 import {
@@ -472,20 +466,13 @@ export class MangoClient {
   public async getOrCreateMangoAccount(
     group: Group,
     ownerPk: PublicKey,
-    payer: web3.Keypair,
     accountNumber?: number,
     accountSize?: AccountSize,
     name?: string,
   ): Promise<MangoAccount> {
     let mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
     if (mangoAccounts.length === 0) {
-      await this.createMangoAccount(
-        group,
-        payer,
-        accountNumber ?? 0,
-        accountSize ?? AccountSize.small,
-        name ?? '',
-      );
+      await this.createMangoAccount(group, accountNumber, accountSize, name);
       mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
     }
     return mangoAccounts[0];
@@ -493,19 +480,21 @@ export class MangoClient {
 
   public async createMangoAccount(
     group: Group,
-    payer: web3.Keypair,
-    accountNumber: number,
-    accountSize: AccountSize,
+    accountNumber?: number,
+    accountSize?: AccountSize,
     name?: string,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .accountCreate(accountNumber, accountSize, name ?? '')
+      .accountCreate(
+        accountNumber ?? 0,
+        accountSize ?? AccountSize.small,
+        name ?? '',
+      )
       .accounts({
         group: group.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        payer: payer.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
-      .signers([payer])
       .rpc();
   }
 
@@ -631,7 +620,6 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     tokenName: string,
     amount: number,
-    signer: Signer,
   ) {
     const bank = group.banksMap.get(tokenName)!;
 
@@ -698,7 +686,7 @@ export class MangoClient {
       )
       .preInstructions(preInstructions)
       .postInstructions(postInstructions)
-      .signers([signer].concat(additionalSigners))
+      .signers(additionalSigners)
       .rpc({ skipPreflight: true });
   }
 
@@ -708,7 +696,6 @@ export class MangoClient {
     tokenName: string,
     amount: number,
     allowBorrow: boolean,
-    signer: Signer,
   ) {
     const bank = group.banksMap.get(tokenName)!;
 
@@ -741,7 +728,6 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-      .signers([signer])
       .rpc({ skipPreflight: true });
   }
 
@@ -751,7 +737,6 @@ export class MangoClient {
     tokenName: string,
     nativeAmount: number,
     allowBorrow: boolean,
-    signer: Signer,
   ) {
     const bank = group.banksMap.get(tokenName)!;
 
@@ -784,7 +769,6 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-      .signers([signer])
       .rpc({ skipPreflight: true });
   }
 
@@ -1581,7 +1565,6 @@ export class MangoClient {
     group: Group,
     liqor: MangoAccount,
     liqee: MangoAccount,
-    liqorOwner: Signer,
     assetTokenName: string,
     liabTokenName: string,
     maxLiabTransfer: number,
@@ -1617,10 +1600,9 @@ export class MangoClient {
         group: group.publicKey,
         liqor: liqor.publicKey,
         liqee: liqee.publicKey,
-        liqorOwner: liqorOwner.publicKey,
+        liqorOwner: liqor.owner,
       })
       .remainingAccounts(parsedHealthAccounts)
-      .signers([liqorOwner])
       .rpc();
   }
 

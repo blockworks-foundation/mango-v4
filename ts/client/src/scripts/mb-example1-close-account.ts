@@ -101,7 +101,6 @@ async function main() {
         group.findBank(token.tokenIndex)!.name,
         token.native(group.findBank(token.tokenIndex)!).toNumber(),
         false,
-        user,
       );
     }
   } catch (error) {
