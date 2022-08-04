@@ -31,13 +31,10 @@ jobs:
           install: true
 
       # Cache docker layers
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
+      - uses: satackey/action-docker-layer-caching@v0.0.11
+        name: Cache Docker Layers
+        # Ignore the failure of a step and avoid terminating the job.
+        continue-on-error: true
 
       # Login to GCR
       - name: Login to GCR
@@ -56,13 +53,3 @@ jobs:
           tags: |
             gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE }}:${{ github.sha }}
             gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE }}:latest
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-      
-      # Temp fix
-      # https://github.com/docker/build-push-action/issues/252
-      # https://github.com/moby/buildkit/issues/1896
-      - name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
