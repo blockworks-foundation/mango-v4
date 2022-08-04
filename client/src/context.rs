@@ -9,6 +9,8 @@ use mango_v4::state::{
     TokenIndex,
 };
 
+use fixed::types::I80F48;
+
 use crate::gpa::*;
 
 use solana_sdk::account::Account;
@@ -16,11 +18,19 @@ use solana_sdk::instruction::AccountMeta;
 use solana_sdk::signature::Keypair;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
 
+#[derive(Clone)]
 pub struct TokenContext {
+    pub token_index: TokenIndex,
     pub name: String,
     pub mint_info: MintInfo,
     pub mint_info_address: Pubkey,
     pub decimals: u8,
+}
+
+impl TokenContext {
+    pub fn native_to_ui(&self, native: I80F48) -> f64 {
+        (native / I80F48::from(10u64.pow(self.decimals.into()))).to_num()
+    }
 }
 
 pub struct Serum3MarketContext {
@@ -68,6 +78,13 @@ impl MangoGroupContext {
         self.tokens.get(&token_index).unwrap()
     }
 
+    pub fn token_by_mint(&self, mint: &Pubkey) -> anyhow::Result<&TokenContext> {
+        self.tokens
+            .iter()
+            .find_map(|(_, tc)| (tc.mint_info.mint == *mint).then(|| tc))
+            .ok_or(anyhow::anyhow!("no token for mint {}", mint))
+    }
+
     pub fn perp_market_address(&self, perp_market_index: PerpMarketIndex) -> Pubkey {
         self.perp_markets.get(&perp_market_index).unwrap().address
     }
@@ -89,6 +106,7 @@ impl MangoGroupContext {
                 (
                     mi.token_index,
                     TokenContext {
+                        token_index: mi.token_index,
                         name: String::new(),
                         mint_info: *mi,
                         mint_info_address: *pk,
@@ -187,7 +205,7 @@ impl MangoGroupContext {
     pub fn derive_health_check_remaining_account_metas(
         &self,
         account: &MangoAccountValue,
-        affected_token: Option<TokenIndex>,
+        affected_tokens: Vec<TokenIndex>,
         writable_banks: bool,
     ) -> anyhow::Result<Vec<AccountMeta>> {
         // figure out all the banks/oracles that need to be passed for the health check
@@ -198,7 +216,7 @@ impl MangoGroupContext {
             banks.push(mint_info.first_bank());
             oracles.push(mint_info.oracle);
         }
-        if let Some(affected_token_index) = affected_token {
+        for affected_token_index in affected_tokens {
             if account
                 .token_iter_active()
                 .find(|p| p.token_index == affected_token_index)

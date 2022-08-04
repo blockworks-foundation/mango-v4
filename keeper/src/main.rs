@@ -2,6 +2,7 @@ mod crank;
 mod taker;
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use anchor_client::Cluster;
 
@@ -75,7 +76,7 @@ fn main() -> Result<(), anyhow::Error> {
     };
 
     let mango_client = Arc::new(MangoClient::new_for_existing_account(
-        Client::new(cluster, commitment, &owner),
+        Client::new(cluster, commitment, &owner, Some(Duration::from_secs(1))),
         cli.mango_account,
         owner,
     )?);

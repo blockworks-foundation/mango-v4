@@ -11,17 +11,20 @@ use anchor_lang::Id;
 use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::Token;
 
+use bincode::Options;
 use fixed::types::I80F48;
 use itertools::Itertools;
 use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{AccountSize, Bank, Group, MangoAccountValue, Serum3MarketIndex, TokenIndex};
 
+use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::signer::keypair;
 
 use crate::account_fetcher::*;
 use crate::context::{MangoGroupContext, Serum3MarketContext, TokenContext};
 use crate::gpa::fetch_mango_accounts;
+use crate::jupiter;
 use crate::util::MyClone;
 
 use anyhow::Context;
@@ -36,14 +39,21 @@ pub struct Client {
     pub cluster: Cluster,
     pub fee_payer: Arc<Keypair>,
     pub commitment: CommitmentConfig,
+    pub timeout: Option<Duration>,
 }
 
 impl Client {
-    pub fn new(cluster: Cluster, commitment: CommitmentConfig, fee_payer: &Keypair) -> Self {
+    pub fn new(
+        cluster: Cluster,
+        commitment: CommitmentConfig,
+        fee_payer: &Keypair,
+        timeout: Option<Duration>,
+    ) -> Self {
         Self {
             cluster,
             fee_payer: Arc::new(fee_payer.clone()),
             commitment,
+            timeout,
         }
     }
 
@@ -55,8 +65,22 @@ impl Client {
         )
     }
 
-    pub fn rpc_with_timeout(&self, timeout: Duration) -> RpcClient {
-        RpcClient::new_with_timeout_and_commitment(self.cluster.clone(), timeout, self.commitment)
+    pub fn rpc(&self) -> RpcClient {
+        let url = self.cluster.url().to_string();
+        if let Some(timeout) = self.timeout.as_ref() {
+            RpcClient::new_with_timeout_and_commitment(url, *timeout, self.commitment)
+        } else {
+            RpcClient::new_with_commitment(url, self.commitment)
+        }
+    }
+
+    pub fn rpc_async(&self) -> RpcClientAsync {
+        let url = self.cluster.url().to_string();
+        if let Some(timeout) = self.timeout.as_ref() {
+            RpcClientAsync::new_with_timeout_and_commitment(url, *timeout, self.commitment)
+        } else {
+            RpcClientAsync::new_with_commitment(url, self.commitment)
+        }
     }
 }
 
@@ -72,6 +96,19 @@ pub struct MangoClient {
     pub mango_account_address: Pubkey,
 
     pub context: MangoGroupContext,
+
+    // Since MangoClient currently provides a blocking interface, we'd prefer to use reqwest::blocking::Client
+    // but that doesn't work inside async contexts. Hence we use the async reqwest Client instead and use
+    // a manual runtime to bridge into async code from both sync and async contexts.
+    // That doesn't work perfectly, see MangoClient::invoke().
+    pub http_client: reqwest::Client,
+    runtime: Option<tokio::runtime::Runtime>,
+}
+
+impl Drop for MangoClient {
+    fn drop(&mut self) {
+        self.runtime.take().expect("runtime").shutdown_background();
+    }
 }
 
 // TODO: add retry framework for sending tx and rpc calls
@@ -88,11 +125,20 @@ impl MangoClient {
         .0
     }
 
+    pub fn find_accounts(
+        client: &Client,
+        group: Pubkey,
+        owner: &Keypair,
+    ) -> anyhow::Result<Vec<(Pubkey, MangoAccountValue)>> {
+        let program = client.anchor_client().program(mango_v4::ID);
+        fetch_mango_accounts(&program, group, owner.pubkey()).map_err(Into::into)
+    }
+
     pub fn find_or_create_account(
         client: &Client,
         group: Pubkey,
-        owner: Keypair,
-        payer: Keypair, // pays the SOL for the new account
+        owner: &Keypair,
+        payer: &Keypair, // pays the SOL for the new account
         mango_account_name: &str,
     ) -> anyhow::Result<Pubkey> {
         let program = client.anchor_client().program(mango_v4::ID);
@@ -113,43 +159,7 @@ impl MangoClient {
                 Some(tuple) => tuple.1.fixed.account_num + 1,
                 None => 0u32,
             };
-            program
-                .request()
-                .instruction(Instruction {
-                    program_id: mango_v4::id(),
-                    accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                        &mango_v4::accounts::AccountCreate {
-                            group,
-                            owner: owner.pubkey(),
-                            account: {
-                                Pubkey::find_program_address(
-                                    &[
-                                        group.as_ref(),
-                                        b"MangoAccount".as_ref(),
-                                        owner.pubkey().as_ref(),
-                                        &account_num.to_le_bytes(),
-                                    ],
-                                    &mango_v4::id(),
-                                )
-                                .0
-                            },
-                            payer: payer.pubkey(),
-                            system_program: System::id(),
-                        },
-                        None,
-                    ),
-                    data: anchor_lang::InstructionData::data(
-                        &mango_v4::instruction::AccountCreate {
-                            account_num,
-                            name: mango_account_name.to_owned(),
-                            account_size: AccountSize::Small,
-                        },
-                    ),
-                })
-                .signer(&owner)
-                .signer(&payer)
-                .send()
-                .map_err(prettify_client_error)
+            Self::create_account(client, group, owner, payer, account_num, mango_account_name)
                 .context("Failed to create account...")?;
         }
         let mango_account_tuples = fetch_mango_accounts(&program, group, owner.pubkey())?;
@@ -160,13 +170,60 @@ impl MangoClient {
         Ok(mango_account_tuples[index].0)
     }
 
+    pub fn create_account(
+        client: &Client,
+        group: Pubkey,
+        owner: &Keypair,
+        payer: &Keypair, // pays the SOL for the new account
+        account_num: u32,
+        mango_account_name: &str,
+    ) -> anyhow::Result<(Pubkey, Signature)> {
+        let program = client.anchor_client().program(mango_v4::ID);
+        let account = Pubkey::find_program_address(
+            &[
+                group.as_ref(),
+                b"MangoAccount".as_ref(),
+                owner.pubkey().as_ref(),
+                &account_num.to_le_bytes(),
+            ],
+            &mango_v4::id(),
+        )
+        .0;
+        let txsig = program
+            .request()
+            .instruction(Instruction {
+                program_id: mango_v4::id(),
+                accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::AccountCreate {
+                        group,
+                        owner: owner.pubkey(),
+                        account,
+                        payer: payer.pubkey(),
+                        system_program: System::id(),
+                    },
+                    None,
+                ),
+                data: anchor_lang::InstructionData::data(&mango_v4::instruction::AccountCreate {
+                    account_num,
+                    name: mango_account_name.to_owned(),
+                    account_size: AccountSize::Small,
+                }),
+            })
+            .signer(owner)
+            .signer(payer)
+            .send()
+            .map_err(prettify_client_error)?;
+
+        Ok((account, txsig))
+    }
+
     /// Conveniently creates a RPC based client
     pub fn new_for_existing_account(
         client: Client,
         account: Pubkey,
         owner: Keypair,
     ) -> anyhow::Result<Self> {
-        let rpc = client.rpc_with_timeout(Duration::from_secs(60));
+        let rpc = client.rpc();
         let account_fetcher = Arc::new(CachedAccountFetcher::new(RpcAccountFetcher { rpc }));
         let mango_account = account_fetcher_fetch_mango_account(&*account_fetcher, account)?;
         let group = mango_account.fixed.group;
@@ -199,6 +256,15 @@ impl MangoClient {
             owner,
             mango_account_address: account,
             context: group_context,
+            http_client: reqwest::Client::new(),
+            runtime: Some(
+                tokio::runtime::Builder::new_current_thread()
+                    .thread_name("mango-client")
+                    .enable_io()
+                    .enable_time()
+                    .build()
+                    .unwrap(),
+            ),
         })
     }
 
@@ -229,13 +295,13 @@ impl MangoClient {
 
     pub fn derive_health_check_remaining_account_metas(
         &self,
-        affected_token: Option<TokenIndex>,
+        affected_tokens: Vec<TokenIndex>,
         writable_banks: bool,
     ) -> anyhow::Result<Vec<AccountMeta>> {
         let account = self.mango_account()?;
         self.context.derive_health_check_remaining_account_metas(
             &account,
-            affected_token,
+            affected_tokens,
             writable_banks,
         )
     }
@@ -273,12 +339,6 @@ impl MangoClient {
             .chain(account.perp_iter_active_accounts())
             .map(|&pa| self.context.perp_market_address(pa.market_index));
 
-        let to_account_meta = |pubkey| AccountMeta {
-            pubkey,
-            is_writable: false,
-            is_signer: false,
-        };
-
         Ok(banks
             .iter()
             .map(|(pubkey, is_writable)| AccountMeta {
@@ -286,18 +346,19 @@ impl MangoClient {
                 is_writable: *is_writable,
                 is_signer: false,
             })
-            .chain(oracles.into_iter().map(to_account_meta))
-            .chain(perp_markets.map(to_account_meta))
-            .chain(serum_oos.map(to_account_meta))
+            .chain(oracles.into_iter().map(to_readonly_account_meta))
+            .chain(perp_markets.map(to_readonly_account_meta))
+            .chain(serum_oos.map(to_readonly_account_meta))
             .collect())
     }
 
-    pub fn token_deposit(&self, token_name: &str, amount: u64) -> anyhow::Result<Signature> {
-        let token_index = *self.context.token_indexes_by_name.get(token_name).unwrap();
-        let mint_info = self.context.mint_info(token_index);
+    pub fn token_deposit(&self, mint: Pubkey, amount: u64) -> anyhow::Result<Signature> {
+        let token = self.context.token_by_mint(&mint)?;
+        let token_index = token.token_index;
+        let mint_info = token.mint_info;
 
         let health_check_metas =
-            self.derive_health_check_remaining_account_metas(Some(token_index), false)?;
+            self.derive_health_check_remaining_account_metas(vec![token_index], false)?;
 
         self.program()
             .request()
@@ -430,7 +491,7 @@ impl MangoClient {
         let account = self.mango_account()?;
         let open_orders = account.serum3_find(s3.market_index).unwrap().open_orders;
 
-        let health_check_metas = self.derive_health_check_remaining_account_metas(None, false)?;
+        let health_check_metas = self.derive_health_check_remaining_account_metas(vec![], false)?;
 
         // https://github.com/project-serum/serum-ts/blob/master/packages/serum/src/market.ts#L1306
         let limit_price = {
@@ -719,11 +780,7 @@ impl MangoClient {
             .mint_info
             .banks()
             .iter()
-            .map(|bank_pubkey| AccountMeta {
-                pubkey: *bank_pubkey,
-                is_signer: false,
-                is_writable: true,
-            })
+            .map(|bank_pubkey| to_writable_account_meta(*bank_pubkey))
             .collect::<Vec<_>>();
 
         let health_remaining_ams = self
@@ -772,6 +829,223 @@ impl MangoClient {
             .send()
             .map_err(prettify_client_error)
     }
+
+    pub fn jupiter_swap(
+        &self,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        source_amount: u64,
+        slippage: f64,
+    ) -> anyhow::Result<Signature> {
+        self.invoke(self.jupiter_swap_async(input_mint, output_mint, source_amount, slippage))
+    }
+
+    // Not actually fully async, since it uses the blocking RPC client to send the actual tx
+    pub async fn jupiter_swap_async(
+        &self,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        source_amount: u64,
+        slippage: f64,
+    ) -> anyhow::Result<Signature> {
+        let source_token = self.context.token_by_mint(&input_mint)?;
+        let target_token = self.context.token_by_mint(&output_mint)?;
+
+        let quote = self
+            .http_client
+            .get("https://quote-api.jup.ag/v1/quote")
+            .query(&[
+                ("inputMint", input_mint.to_string()),
+                ("outputMint", output_mint.to_string()),
+                ("amount", format!("{}", source_amount)),
+                ("onlyDirectRoutes", "true".into()),
+                ("filterTopNResult", "10".into()),
+                ("slippage", format!("{}", slippage)),
+            ])
+            .send()
+            .await
+            .context("quote request to jupiter")?
+            .json::<jupiter::QueryResult>()
+            .await
+            .context("receiving json response from jupiter quote request")?;
+
+        // Find the top route that doesn't involve Raydium (that has too many accounts)
+        let route = quote
+            .data
+            .iter()
+            .find(|route| {
+                !route
+                    .market_infos
+                    .iter()
+                    .any(|mi| mi.label.contains("Raydium"))
+            })
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "no route for swap. found {} routes, but none were usable",
+                    quote.data.len()
+                )
+            })?;
+
+        let swap = self
+            .http_client
+            .post("https://quote-api.jup.ag/v1/swap")
+            .json(&jupiter::SwapRequest {
+                route: route.clone(),
+                user_public_key: self.owner.pubkey().to_string(),
+                wrap_unwrap_sol: false,
+            })
+            .send()
+            .await
+            .context("swap transaction request to jupiter")?
+            .json::<jupiter::SwapResponse>()
+            .await
+            .context("receiving json response from jupiter swap transaction request")?;
+
+        if swap.setup_transaction.is_some() || swap.cleanup_transaction.is_some() {
+            anyhow::bail!(
+                "chosen jupiter route requires setup or cleanup transactions, can't execute"
+            );
+        }
+
+        // TODO: deal with versioned transaction!
+        let jup_tx = bincode::options()
+            .with_fixint_encoding()
+            .reject_trailing_bytes()
+            .deserialize::<solana_sdk::transaction::Transaction>(
+                &base64::decode(&swap.swap_transaction)
+                    .context("base64 decoding jupiter transaction")?,
+            )
+            .context("parsing jupiter transaction")?;
+        let jup_ixs = deserialize_instructions(&jup_tx.message)
+            .into_iter()
+            // TODO: possibly creating associated token accounts if they don't exist yet is good?!
+            // we could squeeze the FlashLoan instructions in the middle:
+            //   - beginning AToken...
+            //   - FlashLoanBegin
+            //   - other JUP ix
+            //   - FlashLoanEnd
+            //   - ending AToken
+            .filter(|ix| {
+                ix.program_id
+                    != Pubkey::from_str("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL").unwrap()
+            })
+            .collect::<Vec<_>>();
+
+        let bank_ams = [
+            source_token.mint_info.first_bank(),
+            target_token.mint_info.first_bank(),
+        ]
+        .into_iter()
+        .map(to_writable_account_meta)
+        .collect::<Vec<_>>();
+
+        let vault_ams = [
+            source_token.mint_info.first_vault(),
+            target_token.mint_info.first_vault(),
+        ]
+        .into_iter()
+        .map(to_writable_account_meta)
+        .collect::<Vec<_>>();
+
+        let token_ams = [source_token.mint_info.mint, target_token.mint_info.mint]
+            .into_iter()
+            .map(|mint| {
+                to_writable_account_meta(
+                    anchor_spl::associated_token::get_associated_token_address(
+                        &self.owner(),
+                        &mint,
+                    ),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let loan_amounts = vec![source_amount, 0u64];
+
+        // This relies on the fact that health account banks will be identical to the first_bank above!
+        let health_ams = self
+            .derive_health_check_remaining_account_metas(
+                vec![source_token.token_index, target_token.token_index],
+                true,
+            )
+            .context("building health accounts")?;
+
+        let program = self.program();
+        let mut builder = program.request().instruction(Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::FlashLoanBegin {
+                        group: self.group(),
+                        token_program: Token::id(),
+                        instructions: solana_sdk::sysvar::instructions::id(),
+                    },
+                    None,
+                );
+                ams.extend(bank_ams);
+                ams.extend(vault_ams.clone());
+                ams.extend(token_ams.clone());
+                ams
+            },
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanBegin {
+                loan_amounts,
+            }),
+        });
+        for ix in jup_ixs {
+            builder = builder.instruction(ix);
+        }
+        builder = builder.instruction(Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::FlashLoanEnd {
+                        account: self.mango_account_address,
+                        owner: self.owner(),
+                        token_program: Token::id(),
+                    },
+                    None,
+                );
+                ams.extend(health_ams);
+                ams.extend(vault_ams);
+                ams.extend(token_ams);
+                ams
+            },
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanEnd {}),
+        });
+
+        let rpc = self.client.rpc_async();
+        builder
+            .signer(&self.owner)
+            .send_rpc_async(&rpc)
+            .await
+            .map_err(prettify_client_error)
+    }
+
+    fn invoke<T, F: std::future::Future<Output = T>>(&self, f: F) -> T {
+        // `block_on()` panics if called within an asynchronous execution context. Whereas
+        // `block_in_place()` only panics if called from a current_thread runtime, which is the
+        // lesser evil.
+        tokio::task::block_in_place(move || self.runtime.as_ref().expect("runtime").block_on(f))
+    }
+}
+
+fn deserialize_instructions(message: &solana_sdk::message::Message) -> Vec<Instruction> {
+    message
+        .instructions
+        .iter()
+        .map(|ci| solana_sdk::instruction::Instruction {
+            program_id: *ci.program_id(&message.account_keys),
+            accounts: ci
+                .accounts
+                .iter()
+                .map(|&index| AccountMeta {
+                    pubkey: message.account_keys[index as usize],
+                    is_signer: message.is_signer(index.into()),
+                    is_writable: message.is_writable(index.into()),
+                })
+                .collect(),
+            data: ci.data.clone(),
+        })
+        .collect()
 }
 
 struct Serum3Data<'a> {
@@ -833,5 +1107,21 @@ pub fn pubkey_from_cli(pubkey: &str) -> Pubkey {
     match Pubkey::from_str(pubkey) {
         Ok(p) => p,
         Err(_) => keypair_from_cli(pubkey).pubkey(),
+    }
+}
+
+fn to_readonly_account_meta(pubkey: Pubkey) -> AccountMeta {
+    AccountMeta {
+        pubkey,
+        is_writable: false,
+        is_signer: false,
+    }
+}
+
+fn to_writable_account_meta(pubkey: Pubkey) -> AccountMeta {
+    AccountMeta {
+        pubkey,
+        is_writable: true,
+        is_signer: false,
     }
 }
