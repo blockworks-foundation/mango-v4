@@ -17,7 +17,6 @@ pub struct AccountCreate<'info> {
         space = MangoAccount::space(account_size),
     )]
     pub account: AccountLoaderDynamic<'info, MangoAccount>,
-
     pub owner: Signer<'info>,
 
     #[account(mut)]

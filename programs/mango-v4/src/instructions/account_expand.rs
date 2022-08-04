@@ -12,7 +12,6 @@ pub struct AccountExpand<'info> {
         has_one = owner
     )]
     pub account: AccountLoaderDynamic<'info, MangoAccount>,
-
     pub owner: Signer<'info>,
 
     #[account(mut)]

@@ -39,7 +39,10 @@ pub struct FlashLoanBegin<'info> {
 ///    the `owner` must have authority to transfer tokens out of them
 #[derive(Accounts)]
 pub struct FlashLoanEnd<'info> {
-    #[account(mut, has_one = owner)]
+    #[account(
+        mut,
+        has_one = owner
+    )]
     pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
