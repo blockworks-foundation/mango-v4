@@ -6,7 +6,7 @@ import { I80F48, I80F48Dto, ZERO_I80F48 } from './I80F48';
 
 export const QUOTE_DECIMALS = 6;
 
-type OracleConfig = {
+export type OracleConfig = {
   confFilter: I80F48Dto;
 };
 
@@ -33,8 +33,8 @@ export class Bank {
   static from(
     publicKey: PublicKey,
     obj: {
-      name: number[];
       group: PublicKey;
+      name: number[];
       mint: PublicKey;
       vault: PublicKey;
       oracle: PublicKey;
@@ -43,6 +43,8 @@ export class Bank {
       borrowIndex: I80F48Dto;
       cachedIndexedTotalDeposits: I80F48Dto;
       cachedIndexedTotalBorrows: I80F48Dto;
+      indexedDeposits: I80F48Dto;
+      indexedBorrows: I80F48Dto;
       indexLastUpdated: BN;
       bankRateLastUpdated: BN;
       avgUtilization: I80F48Dto;
@@ -60,9 +62,12 @@ export class Bank {
       maintLiabWeight: I80F48Dto;
       initLiabWeight: I80F48Dto;
       liquidationFee: I80F48Dto;
-      dust: Object;
+      dust: I80F48Dto;
+      flashLoanVaultInitial: BN;
+      flashLoanApprovedAmount: BN;
       tokenIndex: number;
       mintDecimals: number;
+      bankNum: number;
     },
   ) {
     return new Bank(
@@ -77,6 +82,8 @@ export class Bank {
       obj.borrowIndex,
       obj.cachedIndexedTotalDeposits,
       obj.cachedIndexedTotalBorrows,
+      obj.indexedDeposits,
+      obj.indexedBorrows,
       obj.indexLastUpdated,
       obj.bankRateLastUpdated,
       obj.avgUtilization,
@@ -95,8 +102,11 @@ export class Bank {
       obj.initLiabWeight,
       obj.liquidationFee,
       obj.dust,
+      obj.flashLoanVaultInitial,
+      obj.flashLoanApprovedAmount,
       obj.tokenIndex,
       obj.mintDecimals,
+      obj.bankNum,
     );
   }
 
@@ -112,6 +122,8 @@ export class Bank {
     borrowIndex: I80F48Dto,
     indexedTotalDeposits: I80F48Dto,
     indexedTotalBorrows: I80F48Dto,
+    indexedDeposits: I80F48Dto,
+    indexedBorrows: I80F48Dto,
     public indexLastUpdated: BN,
     public bankRateLastUpdated: BN,
     avgUtilization: I80F48Dto,
@@ -130,8 +142,11 @@ export class Bank {
     initLiabWeight: I80F48Dto,
     liquidationFee: I80F48Dto,
     dust: Object,
+    flashLoanVaultInitial: Object,
+    flashLoanApprovedAmount: Object,
     public tokenIndex: number,
     public mintDecimals: number,
+    public bankNum: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.depositIndex = I80F48.from(depositIndex);
@@ -279,33 +294,39 @@ export class MintInfo {
   static from(
     publicKey: PublicKey,
     obj: {
+      group: PublicKey;
+      tokenIndex: number;
       mint: PublicKey;
       banks: PublicKey[];
       vaults: PublicKey[];
       oracle: PublicKey;
-      tokenIndex: number;
       registrationTime: BN;
+      groupInsuranceFund: number;
     },
   ) {
     return new MintInfo(
       publicKey,
+      obj.group,
+      obj.tokenIndex,
       obj.mint,
       obj.banks,
       obj.vaults,
       obj.oracle,
-      obj.tokenIndex,
       obj.registrationTime,
+      obj.groupInsuranceFund,
     );
   }
 
   constructor(
     public publicKey: PublicKey,
+    public group: PublicKey,
+    public tokenIndex: number,
     public mint: PublicKey,
     public banks: PublicKey[],
     public vaults: PublicKey[],
     public oracle: PublicKey,
-    public tokenIndex: number,
-    registrationTime: BN,
+    public registrationTime: BN,
+    public groupInsuranceFund: number,
   ) {}
 
   public firstBank(): PublicKey {

@@ -15,21 +15,25 @@ export class Group {
     publicKey: PublicKey,
     obj: {
       creator: PublicKey;
+      groupNum: number;
       admin: PublicKey;
       fastListingAdmin: PublicKey;
       insuranceMint: PublicKey;
       insuranceVault: PublicKey;
-      groupNum: number;
+      testing: number;
+      version: number;
     },
   ): Group {
     return new Group(
       publicKey,
       obj.creator,
+      obj.groupNum,
       obj.admin,
       obj.fastListingAdmin,
       obj.insuranceMint,
       obj.insuranceVault,
-      obj.groupNum,
+      obj.testing,
+      obj.version,
       new Map(),
       new Map(),
       new Map(),
@@ -42,11 +46,13 @@ export class Group {
   constructor(
     public publicKey: PublicKey,
     public creator: PublicKey,
+    public groupNum: number,
     public admin: PublicKey,
     public fastListingAdmin: PublicKey,
     public insuranceMint: PublicKey,
     public insuranceVault: PublicKey,
-    public groupNum: number,
+    public testing: number,
+    public version: number,
     public banksMap: Map<string, Bank>,
     public serum3MarketsMap: Map<string, Serum3Market>,
     public serum3MarketExternalsMap: Map<string, Market>,

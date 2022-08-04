@@ -1,7 +1,7 @@
 import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
-import { QUOTE_DECIMALS } from './bank';
+import { OracleConfig, QUOTE_DECIMALS } from './bank';
 import { I80F48, I80F48Dto } from './I80F48';
 
 export class PerpMarket {
@@ -20,9 +20,13 @@ export class PerpMarket {
   static from(
     publicKey: PublicKey,
     obj: {
-      name: number[];
       group: PublicKey;
+      baseTokenIndex: number;
+      quoteTokenIndex: number;
+      perpMarketIndex: number;
+      name: number[];
       oracle: PublicKey;
+      oracleConfig: OracleConfig;
       bids: PublicKey;
       asks: PublicKey;
       eventQueue: PublicKey;
@@ -35,22 +39,29 @@ export class PerpMarket {
       liquidationFee: I80F48Dto;
       makerFee: I80F48Dto;
       takerFee: I80F48Dto;
+      minFunding: I80F48Dto;
+      maxFunding: I80F48Dto;
+      impactQuantity: BN;
+      longFunding: I80F48Dto;
+      shortFunding: I80F48Dto;
+      fundingLastUpdated: BN;
       openInterest: BN;
       seqNum: any; // TODO: ts complains that this is unknown for whatever reason
       feesAccrued: I80F48Dto;
       bump: number;
       baseTokenDecimals: number;
-      perpMarketIndex: number;
-      baseTokenIndex: number;
-      quoteTokenIndex: number;
       registrationTime: BN;
     },
   ): PerpMarket {
     return new PerpMarket(
       publicKey,
-      obj.name,
       obj.group,
+      obj.baseTokenIndex,
+      obj.quoteTokenIndex,
+      obj.perpMarketIndex,
+      obj.name,
       obj.oracle,
+      obj.oracleConfig,
       obj.bids,
       obj.asks,
       obj.eventQueue,
@@ -63,23 +74,30 @@ export class PerpMarket {
       obj.liquidationFee,
       obj.makerFee,
       obj.takerFee,
+      obj.minFunding,
+      obj.maxFunding,
+      obj.impactQuantity,
+      obj.longFunding,
+      obj.shortFunding,
+      obj.fundingLastUpdated,
       obj.openInterest,
       obj.seqNum,
       obj.feesAccrued,
       obj.bump,
       obj.baseTokenDecimals,
-      obj.perpMarketIndex,
-      obj.baseTokenIndex,
-      obj.quoteTokenIndex,
       obj.registrationTime,
     );
   }
 
   constructor(
     public publicKey: PublicKey,
-    name: number[],
     public group: PublicKey,
+    public baseTokenIndex: number,
+    public quoteTokenIndex: number,
+    public perpMarketIndex: number,
+    name: number[],
     public oracle: PublicKey,
+    oracleConfig: OracleConfig,
     public bids: PublicKey,
     public asks: PublicKey,
     public eventQueue: PublicKey,
@@ -92,14 +110,17 @@ export class PerpMarket {
     liquidationFee: I80F48Dto,
     makerFee: I80F48Dto,
     takerFee: I80F48Dto,
+    minFunding: I80F48Dto,
+    maxFundingI80F48Dto,
+    impactQuantity: BN,
+    longFunding: I80F48Dto,
+    shortFunding: I80F48Dto,
+    fundingLastUpdated: BN,
     openInterest: BN,
     seqNum: BN,
     feesAccrued: I80F48Dto,
     bump: number,
     public baseTokenDecimals: number,
-    public perpMarketIndex: number,
-    public baseTokenIndex: number,
-    public quoteTokenIndex: number,
     public registrationTime: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];

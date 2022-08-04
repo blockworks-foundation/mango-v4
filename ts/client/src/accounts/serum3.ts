@@ -7,40 +7,39 @@ export class Serum3Market {
   static from(
     publicKey: PublicKey,
     obj: {
-      name: number[];
       group: PublicKey;
+      baseTokenIndex: number;
+      quoteTokenIndex: number;
+      name: number[];
       serumProgram: PublicKey;
       serumMarketExternal: PublicKey;
       marketIndex: number;
-      baseTokenIndex: number;
-      quoteTokenIndex: number;
       bump: number;
-      reserved: unknown;
       registrationTime: BN;
     },
   ): Serum3Market {
     return new Serum3Market(
       publicKey,
-      obj.name,
       obj.group,
+      obj.baseTokenIndex,
+      obj.quoteTokenIndex,
+      obj.name,
       obj.serumProgram,
       obj.serumMarketExternal,
       obj.marketIndex,
-      obj.baseTokenIndex,
-      obj.quoteTokenIndex,
       obj.registrationTime,
     );
   }
 
   constructor(
     public publicKey: PublicKey,
-    name: number[],
     public group: PublicKey,
+    public baseTokenIndex: number,
+    public quoteTokenIndex: number,
+    name: number[],
     public serumProgram: PublicKey,
     public serumMarketExternal: PublicKey,
     public marketIndex: number,
-    public baseTokenIndex: number,
-    public quoteTokenIndex: number,
     public registrationTime: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];

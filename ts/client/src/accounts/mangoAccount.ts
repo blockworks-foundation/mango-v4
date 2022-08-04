@@ -16,56 +16,61 @@ export class MangoAccount {
   static from(
     publicKey: PublicKey,
     obj: {
-      name: number[];
       group: PublicKey;
       owner: PublicKey;
+      name: number[];
       delegate: PublicKey;
-      tokens: unknown;
-      serum3: Object;
-      perps: unknown;
-      perpOpenOrders: unknown;
       beingLiquidated: number;
       isBankrupt: number;
       accountNum: number;
       bump: number;
-      reserved: number[];
+      netDeposits: number;
+      netSettled: number;
       headerVersion: number;
+      tokens: unknown;
+      serum3: Object;
+      perps: unknown;
+      perpOpenOrders: unknown;
     },
   ) {
     return new MangoAccount(
       publicKey,
-      obj.name,
       obj.group,
       obj.owner,
+      obj.name,
       obj.delegate,
-      obj.tokens as TokenPositionDto[],
-      obj.serum3 as Serum3PositionDto[],
-      obj.perps as PerpPositionDto[],
-      obj.perpOpenOrders as any, // TODO
       obj.beingLiquidated,
       obj.isBankrupt,
       obj.accountNum,
       obj.bump,
-      obj.reserved,
+      obj.netDeposits,
+      obj.netSettled,
+      obj.headerVersion,
+      obj.tokens as TokenPositionDto[],
+      obj.serum3 as Serum3PositionDto[],
+      obj.perps as PerpPositionDto[],
+      obj.perpOpenOrders as any,
       {},
     );
   }
 
   constructor(
     public publicKey: PublicKey,
-    name: number[],
     public group: PublicKey,
     public owner: PublicKey,
+    name: number[],
     public delegate: PublicKey,
+    beingLiquidated: number,
+    isBankrupt: number,
+    public accountNum: number,
+    bump: number,
+    netDeposits: number,
+    netSettled: number,
+    headerVersion: number,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
     perps: PerpPositionDto[],
     perpOpenOrders: PerpPositionDto[],
-    beingLiquidated: number,
-    isBankrupt: number,
-    accountNum: number,
-    bump: number,
-    reserved: number[],
     public accountData: {},
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
