@@ -12,27 +12,27 @@ Aug 4, 2022 at 09:30:00 Central European Summer Time
 
 ts/client changes
 
-- rename getGroupForAdmin -> getGroupForCreator
-- rename getInNativeUsdcUnits -> getEquivalentNativeUsdcPosition
-- rename getMangoAccountForOwner-> getMangoAccountsForOwner
-- getOrCreateMangoAccount and createMangoAccount take an explicit payer, previously it was just implicitly using the client provider's wallet
-- upgraded anchor npm package to latest
-- anchor is now a git submodule
+- Renamed `getGroupForAdmin` to `getGroupForCreator`.
+- Renamd `getInNativeUsdcUnits` to `getEquivalentNativeUsdcPosition`.
+- Renamd `getMangoAccountForOwner` to `getMangoAccountsForOwner`.
+- `getOrCreateMangoAccount` and c`reateMangoAccount` take an explicit payer, previously it was just implicitly using the client provider's wallet
+- Upgraded anchor npm package to latest.
+- Anchor is now a git submodule.
 
-new features
+New features
 
-- many rust liquidator improvements
-- mango account is now dynamically sized and is expandable, there is a new account_expand ix, default size of account is 8 token positions, and 2 serum3 and 2 perp positions, expanded account has 16 token positions and 8 serum3 and 8 perps for now
-- group account - has a creator field which is set on creation and should never change, is used for pda derivation, has a new fast_listing_admin field for governance, and also has a group_edit ix to change both the admin keys
-- group account - has a version field, version 0 which is used in the setup scripts for now, means serum3 and perp market registration is forbidden, and multiple banks are prevented from been added
-- each account now has a reserved space of around 256 bytes
-- flash loan ix 1 and 2 are removed, flash loan 3 has been renamed to just flash loan
-- mint_info, serum3 markets and perp markets have a field called registration_time which is seconds from epoch, e.g. use case how freshly has the market been added, if it was recently added then liquidity might need some time to improve
-- removed fields and commented out code for address lookup tables
-- new ix to register tokens trustlessly
-- insurance fund for trustless vs not trustful
-- token registration ixs dont take a bank_num anymore, hardcoded to 0
-- enforced a minimum maximum rate of 50% so that rates don't fall so low that they cannot recover
+- Many rust liquidator improvements.
+- MangoAccount is now dynamically sized and is expandable, there is a new `AccountExpand` ix, default size of account is 8 token positions, and 2 serum3 and 2 perp positions, expanded account has 16 token positions and 8 serum3 and 8 perps for now.
+- Group account - has a `creator` field which is set on creation and should never change, is used for pda derivation, has a new `fast_listing_admin` field for governance, and also has a `GroupEdit` ix to change both the admin keys.
+- Group account - has a `version` field, version 0 which is used in the setup scripts for now, means serum3 and perp market registration is forbidden, and multiple banks are prevented from been added.
+- Each account now has a reserved space of around 256 bytes.
+- flash_loan ix 1 and 2 are removed, flash loan 3 has been renamed to just `FlashLoan`.
+- `MintInfo`, `Serum3Market`, and `PerpMarket` have a field called `registration_time` which is seconds from epoch, e.g. use case how freshly has the market been added, if it was recently added then liquidity might need some time to improve
+- Removed fields and commented out code for address lookup tables.
+- New `TokenRegisterTrustless` ix to register tokens trustlessly.
+- Insurance fund is now disabled for trustless tokens.
+- `TokenRegistration` and `TokenRegisterTrustless` ixs dont take a bank_num anymore, hardcoded to 0.
+- Enforced a minimum maximum rate of 50% so that rates don't fall so low that they cannot recover.
 
 Jul 14, 2022 at 09:33:52 Central European Summer Time
 https://explorer.solana.com/tx/vZ5hP1vGp37fgzBfG9nb4nfA5ZdmYgk8meq53YPR4ReFxrcTwBUxTYBQUgnfAnq9u5fH36S3QTfb9mVkBXt5A6C
