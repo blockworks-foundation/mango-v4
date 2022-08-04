@@ -12,11 +12,17 @@ use crate::util::checked_math as cm;
 pub struct LiqTokenWithToken<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group
+    )]
     pub liqor: AccountLoaderDynamic<'info, MangoAccount>,
     pub liqor_owner: Signer<'info>,
 
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group
+    )]
     pub liqee: AccountLoaderDynamic<'info, MangoAccount>,
 }
 
