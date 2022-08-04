@@ -5,7 +5,7 @@ use crate::logs::{UpdateIndexLog, UpdateRateLog};
 use crate::state::HOUR;
 use crate::{
     accounts_zerocopy::{AccountInfoRef, LoadMutZeroCopyRef, LoadZeroCopyRef},
-    state::{oracle_price, Bank, MintInfo},
+    state::{oracle_price, Bank, Group, MintInfo},
 };
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
 use checked_math as cm;
@@ -13,8 +13,11 @@ use fixed::types::I80F48;
 
 #[derive(Accounts)]
 pub struct TokenUpdateIndexAndRate<'info> {
+    pub group: AccountLoader<'info, Group>, // Required for group metadata parsing
+
     #[account(
-        has_one = oracle
+        has_one = oracle,
+        constraint = mint_info.load()?.group.key() == group.key(),
     )]
     pub mint_info: AccountLoader<'info, MintInfo>,
 

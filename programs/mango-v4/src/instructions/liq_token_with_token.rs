@@ -157,6 +157,7 @@ pub fn liq_token_with_token(
         );
 
         emit!(LiquidateTokenAndTokenLog {
+            mango_group: ctx.accounts.group.key(),
             liqee: ctx.accounts.liqee.key(),
             liqor: ctx.accounts.liqor.key(),
             asset_token_index,
@@ -170,6 +171,7 @@ pub fn liq_token_with_token(
 
         // liqee asset
         emit!(TokenBalanceLog {
+            mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.liqee.key(),
             token_index: asset_token_index,
             indexed_position: liqee_asset_position_indexed.to_bits(),
@@ -179,6 +181,7 @@ pub fn liq_token_with_token(
         });
         // liqee liab
         emit!(TokenBalanceLog {
+            mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.liqee.key(),
             token_index: liab_token_index,
             indexed_position: liqee_liab_position_indexed.to_bits(),
@@ -188,6 +191,7 @@ pub fn liq_token_with_token(
         });
         // liqor asset
         emit!(TokenBalanceLog {
+            mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.liqor.key(),
             token_index: asset_token_index,
             indexed_position: liqor_asset_position_indexed.to_bits(),
@@ -197,6 +201,7 @@ pub fn liq_token_with_token(
         });
         // liqor liab
         emit!(TokenBalanceLog {
+            mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.liqor.key(),
             token_index: liab_token_index,
             indexed_position: liqor_liab_position_indexed.to_bits(),

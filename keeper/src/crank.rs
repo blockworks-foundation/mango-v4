@@ -70,6 +70,7 @@ pub async fn loop_update_index_and_rate(mango_client: Arc<MangoClient>, token_in
                         program_id: mango_v4::id(),
                         accounts: anchor_lang::ToAccountMetas::to_account_metas(
                             &mango_v4::accounts::TokenUpdateIndexAndRate {
+                                group: token.mint_info.group,
                                 mint_info: token.mint_info_address,
                                 oracle,
                                 instructions: solana_program::sysvar::instructions::id(),
@@ -240,6 +241,7 @@ pub async fn loop_update_funding(
                     program_id: mango_v4::id(),
                     accounts: anchor_lang::ToAccountMetas::to_account_metas(
                         &mango_v4::accounts::PerpUpdateFunding {
+                            group: perp_market.group,
                             perp_market: pk,
                             asks: perp_market.asks,
                             bids: perp_market.bids,

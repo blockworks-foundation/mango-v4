@@ -4,6 +4,7 @@ use borsh::BorshSerialize;
 
 /// Warning: This function needs 512+ bytes free on the stack
 pub fn emit_perp_balances(
+    mango_group: Pubkey,
     mango_account: Pubkey,
     market_index: u64,
     price: i64,
@@ -11,6 +12,7 @@ pub fn emit_perp_balances(
     pm: &PerpMarket,
 ) {
     emit!(PerpBalanceLog {
+        mango_group,
         mango_account,
         market_index,
         base_position: pp.base_position_lots,
@@ -25,6 +27,7 @@ pub fn emit_perp_balances(
 
 #[event]
 pub struct PerpBalanceLog {
+    pub mango_group: Pubkey,
     pub mango_account: Pubkey,
     pub market_index: u64, // IDL doesn't support usize
     pub base_position: i64,
@@ -38,20 +41,13 @@ pub struct PerpBalanceLog {
 
 #[event]
 pub struct TokenBalanceLog {
+    pub mango_group: Pubkey,
     pub mango_account: Pubkey,
     pub token_index: u16,       // IDL doesn't support usize
     pub indexed_position: i128, // on client convert i128 to I80F48 easily by passing in the BN to I80F48 ctor
     pub deposit_index: i128,    // I80F48
     pub borrow_index: i128,     // I80F48
     pub price: i128,            // I80F48
-}
-
-#[event]
-pub struct MarginTradeLog {
-    pub mango_account: Pubkey,
-    pub token_indexes: Vec<u16>,
-    pub pre_indexed_positions: Vec<i128>,
-    pub post_indexed_positions: Vec<i128>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -67,12 +63,14 @@ pub struct FlashLoanTokenDetail {
 
 #[event]
 pub struct FlashLoanLog {
+    pub mango_group: Pubkey,
     pub mango_account: Pubkey,
     pub token_loan_details: Vec<FlashLoanTokenDetail>,
 }
 
 #[event]
 pub struct WithdrawLog {
+    pub mango_group: Pubkey,
     pub mango_account: Pubkey,
     pub signer: Pubkey,
     pub token_index: u16,
@@ -82,6 +80,7 @@ pub struct WithdrawLog {
 
 #[event]
 pub struct DepositLog {
+    pub mango_group: Pubkey,
     pub mango_account: Pubkey,
     pub signer: Pubkey,
     pub token_index: u16,
@@ -147,6 +146,7 @@ pub struct UpdateRateLog {
 
 #[event]
 pub struct LiquidateTokenAndTokenLog {
+    pub mango_group: Pubkey,
     pub liqee: Pubkey,
     pub liqor: Pubkey,
     pub asset_token_index: u16,
