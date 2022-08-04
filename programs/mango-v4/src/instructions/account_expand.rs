@@ -6,7 +6,11 @@ use crate::state::*;
 pub struct AccountExpand<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut, has_one = group, has_one = owner)]
+    #[account(
+        mut,
+        has_one = group,
+        has_one = owner
+    )]
     pub account: AccountLoaderDynamic<'info, MangoAccount>,
 
     pub owner: Signer<'info>,
