@@ -39,15 +39,18 @@ export class HealthCache {
   public health(healthType: HealthType): I80F48 {
     let health = ZERO_I80F48;
     for (const tokenInfo of this.tokenInfos) {
-      let contrib = tokenInfo.healthContribution(healthType);
+      const contrib = tokenInfo.healthContribution(healthType);
       health = health.add(contrib);
     }
     for (const serum3Info of this.serum3Infos) {
-      let contrib = serum3Info.healthContribution(healthType, this.tokenInfos);
+      const contrib = serum3Info.healthContribution(
+        healthType,
+        this.tokenInfos,
+      );
       health = health.add(contrib);
     }
     for (const perpInfo of this.perpInfos) {
-      let contrib = perpInfo.healthContribution(healthType);
+      const contrib = perpInfo.healthContribution(healthType);
       health = health.add(contrib);
     }
     return health;
@@ -110,9 +113,9 @@ export class Serum3Info {
   quoteIndex: number;
 
   healthContribution(healthType: HealthType, tokenInfos: TokenInfo[]): I80F48 {
-    let baseInfo = tokenInfos[this.baseIndex];
-    let quoteInfo = tokenInfos[this.quoteIndex];
-    let reserved = this.reserved;
+    const baseInfo = tokenInfos[this.baseIndex];
+    const quoteInfo = tokenInfos[this.quoteIndex];
+    const reserved = this.reserved;
 
     if (reserved.isZero()) {
       return ZERO_I80F48;
@@ -120,10 +123,10 @@ export class Serum3Info {
 
     // How much the health would increase if the reserved balance were applied to the passed
     // token info?
-    let computeHealthEffect = function (tokenInfo: TokenInfo) {
+    const computeHealthEffect = function (tokenInfo: TokenInfo) {
       // This balance includes all possible reserved funds from markets that relate to the
       // token, including this market itself: `reserved` is already included in `max_balance`.
-      let maxBalance = tokenInfo.balance.add(tokenInfo.serum3MaxReserved);
+      const maxBalance = tokenInfo.balance.add(tokenInfo.serum3MaxReserved);
 
       // Assuming `reserved` was added to `max_balance` last (because that gives the smallest
       // health effects): how much did health change because of it?
@@ -139,13 +142,13 @@ export class Serum3Info {
         liabPart = reserved.sub(maxBalance);
       }
 
-      let assetWeight = tokenInfo.assetWeight(healthType);
-      let liabWeight = tokenInfo.liabWeight(healthType);
+      const assetWeight = tokenInfo.assetWeight(healthType);
+      const liabWeight = tokenInfo.liabWeight(healthType);
       return assetWeight.mul(assetPart).add(liabWeight.mul(liabPart));
     };
 
-    let reservedAsBase = computeHealthEffect(baseInfo);
-    let reservedAsQuote = computeHealthEffect(quoteInfo);
+    const reservedAsBase = computeHealthEffect(baseInfo);
+    const reservedAsQuote = computeHealthEffect(quoteInfo);
     return reservedAsBase.min(reservedAsQuote);
   }
 }

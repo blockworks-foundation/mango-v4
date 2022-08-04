@@ -23,9 +23,9 @@ export function debugAccountMetas(ams: AccountMeta[]) {
 
 export async function findOrCreate<T>(
   entityName: string,
-  findMethod: Function,
+  findMethod: (...x: any) => any,
   findArgs: any[],
-  createMethod: Function,
+  createMethod: (...x: any) => any,
   createArgs: any[],
 ): Promise<T> {
   let many: T[] = await findMethod(...findArgs);

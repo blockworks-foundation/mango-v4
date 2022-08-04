@@ -50,7 +50,7 @@ export class Id {
   }
 
   static fromIds(name: string): Id {
-    let groupConfig = ids.groups.find((id) => id['name'] === name);
+    const groupConfig = ids.groups.find((id) => id['name'] === name);
     return new Id(
       groupConfig.cluster as Cluster,
       name,
