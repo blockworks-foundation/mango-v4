@@ -1058,7 +1058,10 @@ export type MangoV4 = {
         {
           "name": "instructions",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "Instructions Sysvar for instruction introspection"
+          ]
         }
       ],
       "args": [
@@ -1093,6 +1096,11 @@ export type MangoV4 = {
     },
     {
       "name": "serum3RegisterMarket",
+      "docs": [
+        "",
+        "Serum",
+        ""
+      ],
       "accounts": [
         {
           "name": "group",
@@ -1393,7 +1401,10 @@ export type MangoV4 = {
         {
           "name": "marketVaultSigner",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "needed for the automatic settle_funds call"
+          ]
         },
         {
           "name": "quoteBank",
@@ -1641,7 +1652,10 @@ export type MangoV4 = {
         {
           "name": "marketVaultSigner",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "needed for the automatic settle_funds call"
+          ]
         },
         {
           "name": "quoteBank",
@@ -1867,6 +1881,11 @@ export type MangoV4 = {
     },
     {
       "name": "perpCreateMarket",
+      "docs": [
+        "",
+        "Perps",
+        ""
+      ],
       "accounts": [
         {
           "name": "group",
@@ -1910,7 +1929,11 @@ export type MangoV4 = {
         {
           "name": "bids",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "Accounts are initialised by client,",
+            "anchor discriminator is set first when ix exits,"
+          ]
         },
         {
           "name": "asks",
@@ -2487,6 +2510,11 @@ export type MangoV4 = {
     },
     {
       "name": "benchmark",
+      "docs": [
+        "",
+        "benchmark",
+        ""
+      ],
       "accounts": [],
       "args": []
     }
@@ -2530,6 +2558,10 @@ export type MangoV4 = {
           },
           {
             "name": "depositIndex",
+            "docs": [
+              "the index used to scale the value of an IndexedPosition",
+              "TODO: should always be >= 0, add checks?"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -2542,6 +2574,11 @@ export type MangoV4 = {
           },
           {
             "name": "cachedIndexedTotalDeposits",
+            "docs": [
+              "total deposits/borrows, only updated during UpdateIndexAndRate",
+              "TODO: These values could be dropped from the bank, they're written in UpdateIndexAndRate",
+              "and never read."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -2554,6 +2591,17 @@ export type MangoV4 = {
           },
           {
             "name": "indexedDeposits",
+            "docs": [
+              "deposits/borrows for this bank",
+              "",
+              "Note that these may become negative. It's perfectly fine for users to borrow one one bank",
+              "(increasing indexed_borrows there) and paying back on another (possibly decreasing indexed_borrows",
+              "below zero).",
+              "",
+              "The vault amount is not deducable from these values.",
+              "",
+              "These become meaningful when summed over all banks (like in update_index_and_rate)."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -2809,10 +2857,16 @@ export type MangoV4 = {
           },
           {
             "name": "beingLiquidated",
+            "docs": [
+              "This account cannot open new positions or borrow until `init_health >= 0`"
+            ],
             "type": "u8"
           },
           {
             "name": "isBankrupt",
+            "docs": [
+              "This account cannot do anything except go through `resolve_bankruptcy`"
+            ],
             "type": "u8"
           },
           {
@@ -2952,6 +3006,11 @@ export type MangoV4 = {
     },
     {
       "name": "bookSide",
+      "docs": [
+        "A binary tree on AnyNode::key()",
+        "",
+        "The key encodes the price in the top 64 bits."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -3044,6 +3103,9 @@ export type MangoV4 = {
           },
           {
             "name": "perpMarketIndex",
+            "docs": [
+              "Lookup indices"
+            ],
             "type": "u16"
           },
           {
@@ -3088,10 +3150,18 @@ export type MangoV4 = {
           },
           {
             "name": "quoteLotSize",
+            "docs": [
+              "Number of quote native that reresents min tick"
+            ],
             "type": "i64"
           },
           {
             "name": "baseLotSize",
+            "docs": [
+              "Represents number of base native quantity",
+              "e.g. if base decimals for underlying asset are 6, base lot size is 100, and base position is 10000, then",
+              "UI position is 1"
+            ],
             "type": "i64"
           },
           {
@@ -3170,20 +3240,36 @@ export type MangoV4 = {
           },
           {
             "name": "openInterest",
+            "docs": [
+              ""
+            ],
             "type": "i64"
           },
           {
             "name": "seqNum",
+            "docs": [
+              "Total number of orders seen"
+            ],
             "type": "u64"
           },
           {
             "name": "feesAccrued",
+            "docs": [
+              "Fees accrued in native quote currency"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "bump",
+            "docs": [
+              "Liquidity mining metadata",
+              "pub liquidity_mining_info: LiquidityMiningInfo,",
+              "Token vault which holds mango tokens to be disbursed as liquidity incentives for this perp market",
+              "pub mngo_vault: Pubkey,",
+              "PDA bump"
+            ],
             "type": "u8"
           },
           {
@@ -3334,10 +3420,17 @@ export type MangoV4 = {
         "fields": [
           {
             "name": "index",
+            "docs": [
+              "Account index of the vault to withdraw from in the target_accounts section.",
+              "Index is counted after health accounts."
+            ],
             "type": "u8"
           },
           {
             "name": "amount",
+            "docs": [
+              "Requested withdraw amount."
+            ],
             "type": "u64"
           }
         ]
@@ -3586,16 +3679,25 @@ export type MangoV4 = {
         "fields": [
           {
             "name": "indexedPosition",
+            "docs": [
+              "The deposit_index (if positive) or borrow_index (if negative) scaled position"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "tokenIndex",
+            "docs": [
+              "index into Group.tokens"
+            ],
             "type": "u16"
           },
           {
             "name": "inUseCount",
+            "docs": [
+              "incremented when a market requires this position to stay alive"
+            ],
             "type": "u8"
           },
           {
@@ -3652,6 +3754,11 @@ export type MangoV4 = {
           },
           {
             "name": "baseTokenIndex",
+            "docs": [
+              "Store the base/quote token index, so health computations don't need",
+              "to get passed the static SerumMarket to find which tokens a market",
+              "uses and look up the correct oracles."
+            ],
             "type": "u16"
           },
           {
@@ -3709,16 +3816,26 @@ export type MangoV4 = {
           },
           {
             "name": "basePositionLots",
+            "docs": [
+              "Active position size, measured in base lots"
+            ],
             "type": "i64"
           },
           {
             "name": "quotePositionNative",
+            "docs": [
+              "Active position in quote (conversation rate is that of the time the order was settled)",
+              "measured in native quote"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "longSettledFunding",
+            "docs": [
+              "Already settled funding"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -3731,14 +3848,24 @@ export type MangoV4 = {
           },
           {
             "name": "bidsBaseLots",
+            "docs": [
+              "Base lots in bids"
+            ],
             "type": "i64"
           },
           {
             "name": "asksBaseLots",
+            "docs": [
+              "Base lots in asks"
+            ],
             "type": "i64"
           },
           {
             "name": "takerBaseLots",
+            "docs": [
+              "Liquidity mining rewards",
+              "Amount that's on EventQueue waiting to be processed"
+            ],
             "type": "i64"
           },
           {
@@ -3883,6 +4010,10 @@ export type MangoV4 = {
     },
     {
       "name": "TokenIndex",
+      "docs": [
+        "Nothing in Rust shall use these types. They only exist so that the Anchor IDL",
+        "knows about them and typescript can deserialize it."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -3939,12 +4070,24 @@ export type MangoV4 = {
             "fields": [
               {
                 "name": "recent_slot",
+                "docs": [
+                  "A recent slot must be used in the derivation path",
+                  "for each initialized table. When closing table accounts,",
+                  "the initialization slot must no longer be \"recent\" to prevent",
+                  "address tables from being recreated with reordered or",
+                  "otherwise malicious addresses."
+                ],
                 "type": {
                   "defined": "Slot"
                 }
               },
               {
                 "name": "bump_seed",
+                "docs": [
+                  "Address tables are always initialized at program-derived",
+                  "addresses using the funding address, recent blockhash, and",
+                  "the user-passed `bump_seed`."
+                ],
                 "type": "u8"
               }
             ]
@@ -3974,6 +4117,9 @@ export type MangoV4 = {
     },
     {
       "name": "Serum3SelfTradeBehavior",
+      "docs": [
+        "Copy paste a bunch of enums so that we could AnchorSerialize & AnchorDeserialize them"
+      ],
       "type": {
         "kind": "enum",
         "variants": [
@@ -4022,6 +4168,14 @@ export type MangoV4 = {
     },
     {
       "name": "HealthType",
+      "docs": [
+        "There are two types of health, initial health used for opening new positions and maintenance",
+        "health used for liquidations. They are both calculated as a weighted sum of the assets",
+        "minus the liabilities but the maint. health uses slightly larger weights for assets and",
+        "slightly smaller weights for the liabilities. Zero is used as the bright line for both",
+        "i.e. if your init health falls below zero, you cannot open new positions and if your maint. health",
+        "falls below zero you will be liquidated."
+      ],
       "type": {
         "kind": "enum",
         "variants": [
@@ -5838,7 +5992,10 @@ export const IDL: MangoV4 = {
         {
           "name": "instructions",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "Instructions Sysvar for instruction introspection"
+          ]
         }
       ],
       "args": [
@@ -5873,6 +6030,11 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "serum3RegisterMarket",
+      "docs": [
+        "",
+        "Serum",
+        ""
+      ],
       "accounts": [
         {
           "name": "group",
@@ -6173,7 +6335,10 @@ export const IDL: MangoV4 = {
         {
           "name": "marketVaultSigner",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "needed for the automatic settle_funds call"
+          ]
         },
         {
           "name": "quoteBank",
@@ -6421,7 +6586,10 @@ export const IDL: MangoV4 = {
         {
           "name": "marketVaultSigner",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "needed for the automatic settle_funds call"
+          ]
         },
         {
           "name": "quoteBank",
@@ -6647,6 +6815,11 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "perpCreateMarket",
+      "docs": [
+        "",
+        "Perps",
+        ""
+      ],
       "accounts": [
         {
           "name": "group",
@@ -6690,7 +6863,11 @@ export const IDL: MangoV4 = {
         {
           "name": "bids",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "Accounts are initialised by client,",
+            "anchor discriminator is set first when ix exits,"
+          ]
         },
         {
           "name": "asks",
@@ -7267,6 +7444,11 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "benchmark",
+      "docs": [
+        "",
+        "benchmark",
+        ""
+      ],
       "accounts": [],
       "args": []
     }
@@ -7310,6 +7492,10 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "depositIndex",
+            "docs": [
+              "the index used to scale the value of an IndexedPosition",
+              "TODO: should always be >= 0, add checks?"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7322,6 +7508,11 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "cachedIndexedTotalDeposits",
+            "docs": [
+              "total deposits/borrows, only updated during UpdateIndexAndRate",
+              "TODO: These values could be dropped from the bank, they're written in UpdateIndexAndRate",
+              "and never read."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7334,6 +7525,17 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "indexedDeposits",
+            "docs": [
+              "deposits/borrows for this bank",
+              "",
+              "Note that these may become negative. It's perfectly fine for users to borrow one one bank",
+              "(increasing indexed_borrows there) and paying back on another (possibly decreasing indexed_borrows",
+              "below zero).",
+              "",
+              "The vault amount is not deducable from these values.",
+              "",
+              "These become meaningful when summed over all banks (like in update_index_and_rate)."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7589,10 +7791,16 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "beingLiquidated",
+            "docs": [
+              "This account cannot open new positions or borrow until `init_health >= 0`"
+            ],
             "type": "u8"
           },
           {
             "name": "isBankrupt",
+            "docs": [
+              "This account cannot do anything except go through `resolve_bankruptcy`"
+            ],
             "type": "u8"
           },
           {
@@ -7732,6 +7940,11 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "bookSide",
+      "docs": [
+        "A binary tree on AnyNode::key()",
+        "",
+        "The key encodes the price in the top 64 bits."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -7824,6 +8037,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "perpMarketIndex",
+            "docs": [
+              "Lookup indices"
+            ],
             "type": "u16"
           },
           {
@@ -7868,10 +8084,18 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "quoteLotSize",
+            "docs": [
+              "Number of quote native that reresents min tick"
+            ],
             "type": "i64"
           },
           {
             "name": "baseLotSize",
+            "docs": [
+              "Represents number of base native quantity",
+              "e.g. if base decimals for underlying asset are 6, base lot size is 100, and base position is 10000, then",
+              "UI position is 1"
+            ],
             "type": "i64"
           },
           {
@@ -7950,20 +8174,36 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "openInterest",
+            "docs": [
+              ""
+            ],
             "type": "i64"
           },
           {
             "name": "seqNum",
+            "docs": [
+              "Total number of orders seen"
+            ],
             "type": "u64"
           },
           {
             "name": "feesAccrued",
+            "docs": [
+              "Fees accrued in native quote currency"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "bump",
+            "docs": [
+              "Liquidity mining metadata",
+              "pub liquidity_mining_info: LiquidityMiningInfo,",
+              "Token vault which holds mango tokens to be disbursed as liquidity incentives for this perp market",
+              "pub mngo_vault: Pubkey,",
+              "PDA bump"
+            ],
             "type": "u8"
           },
           {
@@ -8114,10 +8354,17 @@ export const IDL: MangoV4 = {
         "fields": [
           {
             "name": "index",
+            "docs": [
+              "Account index of the vault to withdraw from in the target_accounts section.",
+              "Index is counted after health accounts."
+            ],
             "type": "u8"
           },
           {
             "name": "amount",
+            "docs": [
+              "Requested withdraw amount."
+            ],
             "type": "u64"
           }
         ]
@@ -8366,16 +8613,25 @@ export const IDL: MangoV4 = {
         "fields": [
           {
             "name": "indexedPosition",
+            "docs": [
+              "The deposit_index (if positive) or borrow_index (if negative) scaled position"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "tokenIndex",
+            "docs": [
+              "index into Group.tokens"
+            ],
             "type": "u16"
           },
           {
             "name": "inUseCount",
+            "docs": [
+              "incremented when a market requires this position to stay alive"
+            ],
             "type": "u8"
           },
           {
@@ -8432,6 +8688,11 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "baseTokenIndex",
+            "docs": [
+              "Store the base/quote token index, so health computations don't need",
+              "to get passed the static SerumMarket to find which tokens a market",
+              "uses and look up the correct oracles."
+            ],
             "type": "u16"
           },
           {
@@ -8489,16 +8750,26 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "basePositionLots",
+            "docs": [
+              "Active position size, measured in base lots"
+            ],
             "type": "i64"
           },
           {
             "name": "quotePositionNative",
+            "docs": [
+              "Active position in quote (conversation rate is that of the time the order was settled)",
+              "measured in native quote"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "longSettledFunding",
+            "docs": [
+              "Already settled funding"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -8511,14 +8782,24 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "bidsBaseLots",
+            "docs": [
+              "Base lots in bids"
+            ],
             "type": "i64"
           },
           {
             "name": "asksBaseLots",
+            "docs": [
+              "Base lots in asks"
+            ],
             "type": "i64"
           },
           {
             "name": "takerBaseLots",
+            "docs": [
+              "Liquidity mining rewards",
+              "Amount that's on EventQueue waiting to be processed"
+            ],
             "type": "i64"
           },
           {
@@ -8663,6 +8944,10 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "TokenIndex",
+      "docs": [
+        "Nothing in Rust shall use these types. They only exist so that the Anchor IDL",
+        "knows about them and typescript can deserialize it."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -8719,12 +9004,24 @@ export const IDL: MangoV4 = {
             "fields": [
               {
                 "name": "recent_slot",
+                "docs": [
+                  "A recent slot must be used in the derivation path",
+                  "for each initialized table. When closing table accounts,",
+                  "the initialization slot must no longer be \"recent\" to prevent",
+                  "address tables from being recreated with reordered or",
+                  "otherwise malicious addresses."
+                ],
                 "type": {
                   "defined": "Slot"
                 }
               },
               {
                 "name": "bump_seed",
+                "docs": [
+                  "Address tables are always initialized at program-derived",
+                  "addresses using the funding address, recent blockhash, and",
+                  "the user-passed `bump_seed`."
+                ],
                 "type": "u8"
               }
             ]
@@ -8754,6 +9051,9 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "Serum3SelfTradeBehavior",
+      "docs": [
+        "Copy paste a bunch of enums so that we could AnchorSerialize & AnchorDeserialize them"
+      ],
       "type": {
         "kind": "enum",
         "variants": [
@@ -8802,6 +9102,14 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "HealthType",
+      "docs": [
+        "There are two types of health, initial health used for opening new positions and maintenance",
+        "health used for liquidations. They are both calculated as a weighted sum of the assets",
+        "minus the liabilities but the maint. health uses slightly larger weights for assets and",
+        "slightly smaller weights for the liabilities. Zero is used as the bright line for both",
+        "i.e. if your init health falls below zero, you cannot open new positions and if your maint. health",
+        "falls below zero you will be liquidated."
+      ],
       "type": {
         "kind": "enum",
         "variants": [
