@@ -82,7 +82,7 @@ impl MangoGroupContext {
         self.tokens
             .iter()
             .find_map(|(_, tc)| (tc.mint_info.mint == *mint).then(|| tc))
-            .ok_or(anyhow::anyhow!("no token for mint {}", mint))
+            .ok_or_else(|| anyhow::anyhow!("no token for mint {}", mint))
     }
 
     pub fn perp_market_address(&self, perp_market_index: PerpMarketIndex) -> Pubkey {
