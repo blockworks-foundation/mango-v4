@@ -7,6 +7,8 @@ use crate::instructions::INDEX_START;
 use crate::state::*;
 use crate::util::fill16_from_str;
 
+const FIRST_BANK_NUM: u32 = 0;
+
 #[derive(Accounts)]
 #[instruction(token_index: TokenIndex)]
 pub struct TokenRegisterTrustless<'info> {
@@ -21,7 +23,7 @@ pub struct TokenRegisterTrustless<'info> {
     #[account(
         init,
         // using the token_index in this seed guards against reusing it
-        seeds = [group.key().as_ref(), b"Bank".as_ref(), &token_index.to_le_bytes(), &0u32.to_le_bytes()],
+        seeds = [group.key().as_ref(), b"Bank".as_ref(), &token_index.to_le_bytes(), &FIRST_BANK_NUM.to_le_bytes()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<Bank>(),
@@ -30,7 +32,7 @@ pub struct TokenRegisterTrustless<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"Vault".as_ref(), &token_index.to_le_bytes(), &0u32.to_le_bytes()],
+        seeds = [group.key().as_ref(), b"Vault".as_ref(), &token_index.to_le_bytes(), &FIRST_BANK_NUM.to_le_bytes()],
         bump,
         token::authority = group,
         token::mint = mint,
