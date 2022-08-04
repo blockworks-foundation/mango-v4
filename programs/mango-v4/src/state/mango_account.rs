@@ -813,7 +813,7 @@ impl<
 
         let side = fill.taker_side.invert_side();
         let (base_change, quote_change) = fill.base_quote_change(side);
-        pa.change_base_position(perp_market, base_change);
+        pa.change_base_and_entry_positions(perp_market, base_change, quote_change);
         let quote = I80F48::from_num(
             perp_market
                 .quote_lot_size
@@ -855,7 +855,7 @@ impl<
 
         let (base_change, quote_change) = fill.base_quote_change(fill.taker_side);
         pa.remove_taker_trade(base_change, quote_change);
-        pa.change_base_position(perp_market, base_change);
+        pa.change_base_and_entry_positions(perp_market, base_change, quote_change);
         let quote = I80F48::from_num(perp_market.quote_lot_size * quote_change);
 
         // fees are assessed at time of trade; no need to assess fees here
