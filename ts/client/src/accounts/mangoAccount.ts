@@ -28,7 +28,7 @@ export class MangoAccount {
       netSettled: number;
       headerVersion: number;
       tokens: unknown;
-      serum3: Object;
+      serum3: unknown;
       perps: unknown;
       perpOpenOrders: unknown;
     },
@@ -50,7 +50,7 @@ export class MangoAccount {
       obj.serum3 as Serum3PositionDto[],
       obj.perps as PerpPositionDto[],
       obj.perpOpenOrders as any,
-      {},
+      {} as any,
     );
   }
 
@@ -71,7 +71,7 @@ export class MangoAccount {
     serum3: Serum3PositionDto[],
     perps: PerpPositionDto[],
     perpOpenOrders: PerpPositionDto[],
-    public accountData: {},
+    public accountData: MangoAccountData,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.tokens = tokens.map((dto) => TokenPosition.from(dto));
@@ -172,7 +172,7 @@ export class MangoAccount {
    */
   getEquity(): I80F48 {
     const equity = (this.accountData as MangoAccountData).equity;
-    let total_equity = equity.tokens.reduce(
+    const total_equity = equity.tokens.reduce(
       (a, b) => a.add(b.value),
       ZERO_I80F48,
     );
@@ -191,7 +191,7 @@ export class MangoAccount {
    */
   getAssetsVal(): I80F48 {
     const equity = (this.accountData as MangoAccountData).equity;
-    let total_equity = equity.tokens.reduce(
+    const total_equity = equity.tokens.reduce(
       (a, b) => (b.value.gt(ZERO_I80F48) ? a.add(b.value) : a),
       ZERO_I80F48,
     );
@@ -203,7 +203,7 @@ export class MangoAccount {
    */
   getLiabsVal(): I80F48 {
     const equity = (this.accountData as MangoAccountData).equity;
-    let total_equity = equity.tokens.reduce(
+    const total_equity = equity.tokens.reduce(
       (a, b) => (b.value.lt(ZERO_I80F48) ? a.add(b.value) : a),
       ZERO_I80F48,
     );
@@ -374,7 +374,7 @@ export class MangoAccount {
 }
 
 export class TokenPosition {
-  static TokenIndexUnset: number = 65535;
+  static TokenIndexUnset = 65535;
   static from(dto: TokenPositionDto) {
     return new TokenPosition(
       I80F48.from(dto.indexedPosition),
@@ -419,12 +419,12 @@ export class TokenPosition {
     ).toNumber();
   }
 
-  public toString(group?: Group): String {
-    let extra: string = '';
+  public toString(group?: Group): string {
+    let extra = '';
     if (group) {
-      let bank = group.findBank(this.tokenIndex);
+      const bank = group.findBank(this.tokenIndex);
       if (bank) {
-        let native = this.native(bank);
+        const native = this.native(bank);
         extra += ', native: ' + native.toNumber();
         extra += ', ui: ' + this.ui(bank);
         extra += ', tokenName: ' + bank.name;

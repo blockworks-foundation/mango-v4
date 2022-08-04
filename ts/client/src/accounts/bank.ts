@@ -141,9 +141,9 @@ export class Bank {
     maintLiabWeight: I80F48Dto,
     initLiabWeight: I80F48Dto,
     liquidationFee: I80F48Dto,
-    dust: Object,
-    flashLoanVaultInitial: Object,
-    flashLoanApprovedAmount: Object,
+    dust: I80F48Dto,
+    flashLoanVaultInitial: BN,
+    flashLoanApprovedAmount: BN,
     public tokenIndex: number,
     public mintDecimals: number,
     public bankNum: number,
@@ -337,7 +337,7 @@ export class MintInfo {
   }
 
   toString(): string {
-    let res =
+    const res =
       'mint ' +
       this.mint.toBase58() +
       '\n oracle ' +

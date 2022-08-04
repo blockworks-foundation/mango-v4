@@ -631,7 +631,7 @@ export class MangoClient {
     let wrappedSolAccount: Keypair | undefined;
     let preInstructions: TransactionInstruction[] = [];
     let postInstructions: TransactionInstruction[] = [];
-    let additionalSigners: Signer[] = [];
+    const additionalSigners: Signer[] = [];
     if (bank.mint.equals(WRAPPED_SOL_MINT)) {
       wrappedSolAccount = new Keypair();
       const lamports = Math.round(amount * LAMPORTS_PER_SOL) + 1e7;
@@ -885,7 +885,7 @@ export class MangoClient {
   ): Promise<TransactionSignature> {
     const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
 
-    let openOrders = mangoAccount.serum3.find(
+    const openOrders = mangoAccount.serum3.find(
       (account) => account.marketIndex === serum3Market.marketIndex,
     )?.openOrders;
 
@@ -1342,7 +1342,7 @@ export class MangoClient {
         mangoAccount,
       ]);
 
-    let [nativePrice, nativeQuantity] = perpMarket.uiToNativePriceQuantity(
+    const [nativePrice, nativeQuantity] = perpMarket.uiToNativePriceQuantity(
       price,
       quantity,
     );
@@ -1421,7 +1421,7 @@ export class MangoClient {
     /*
      * Find or create associated token accounts
      */
-    let inputTokenAccountPk = await getAssociatedTokenAddress(
+    const inputTokenAccountPk = await getAssociatedTokenAddress(
       inputBank.mint,
       mangoAccount.owner,
     );
@@ -1429,7 +1429,7 @@ export class MangoClient {
       await this.program.provider.connection.getAccountInfo(
         inputTokenAccountPk,
       );
-    let preInstructions = [];
+    const preInstructions = [];
     if (!inputTokenAccExists) {
       preInstructions.push(
         Token.createAssociatedTokenAccountInstruction(
@@ -1443,7 +1443,7 @@ export class MangoClient {
       );
     }
 
-    let outputTokenAccountPk = await getAssociatedTokenAddress(
+    const outputTokenAccountPk = await getAssociatedTokenAddress(
       outputBank.mint,
       mangoAccount.owner,
     );
@@ -1569,8 +1569,8 @@ export class MangoClient {
     liabTokenName: string,
     maxLiabTransfer: number,
   ) {
-    let assetBank: Bank = group.banksMap.get(assetTokenName);
-    let liabBank: Bank = group.banksMap.get(liabTokenName);
+    const assetBank: Bank = group.banksMap.get(assetTokenName);
+    const liabBank: Bank = group.banksMap.get(liabTokenName);
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
@@ -1616,7 +1616,7 @@ export class MangoClient {
     // TODO: use IDL on chain or in repository? decide...
     // Alternatively we could fetch IDL from chain.
     // const idl = await Program.fetchIdl(MANGO_V4_ID, provider);
-    let idl = IDL;
+    const idl = IDL;
 
     return new MangoClient(
       new Program<MangoV4>(idl as MangoV4, programId, provider),
@@ -1632,7 +1632,7 @@ export class MangoClient {
     // TODO: use IDL on chain or in repository? decide...
     // Alternatively we could fetch IDL from chain.
     // const idl = await Program.fetchIdl(MANGO_V4_ID, provider);
-    let idl = IDL;
+    const idl = IDL;
 
     const id = Id.fromIds(groupName);
 
@@ -1724,7 +1724,7 @@ export class MangoClient {
     const healthRemainingAccounts: PublicKey[] = [];
 
     let tokenIndices = [];
-    for (let mangoAccount of mangoAccounts) {
+    for (const mangoAccount of mangoAccounts) {
       tokenIndices.push(
         ...mangoAccount.tokens
           .filter((token) => token.tokenIndex !== 65535)
@@ -1747,14 +1747,14 @@ export class MangoClient {
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.oracle),
     );
-    for (let mangoAccount of mangoAccounts) {
+    for (const mangoAccount of mangoAccounts) {
       healthRemainingAccounts.push(
         ...mangoAccount.serum3
           .filter((serum3Account) => serum3Account.marketIndex !== 65535)
           .map((serum3Account) => serum3Account.openOrders),
       );
     }
-    for (let mangoAccount of mangoAccounts) {
+    for (const mangoAccount of mangoAccounts) {
       healthRemainingAccounts.push(
         ...mangoAccount.perps
           .filter((perp) => perp.marketIndex !== 65535)
