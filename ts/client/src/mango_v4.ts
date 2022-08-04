@@ -950,7 +950,7 @@ export type MangoV4 = {
                 "kind": "account",
                 "type": "publicKey",
                 "account": "Mint",
-                "path": "token_mint"
+                "path": "mint"
               }
             ]
           }
@@ -961,7 +961,7 @@ export type MangoV4 = {
           "isSigner": true
         },
         {
-          "name": "tokenMint",
+          "name": "mint",
           "isMut": false,
           "isSigner": false
         },
@@ -5954,7 +5954,7 @@ export const IDL: MangoV4 = {
                 "kind": "account",
                 "type": "publicKey",
                 "account": "Mint",
-                "path": "token_mint"
+                "path": "mint"
               }
             ]
           }
@@ -5965,7 +5965,7 @@ export const IDL: MangoV4 = {
           "isSigner": true
         },
         {
-          "name": "tokenMint",
+          "name": "mint",
           "isMut": false,
           "isSigner": false
         },

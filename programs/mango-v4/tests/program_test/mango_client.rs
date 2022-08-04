@@ -926,7 +926,7 @@ impl<'keypair> ClientInstruction for StubOracleCreate<'keypair> {
         let accounts = Self::Accounts {
             group: self.group,
             oracle,
-            token_mint: self.mint,
+            mint: self.mint,
             admin: self.admin.pubkey(),
             payer: self.payer.pubkey(),
             system_program: System::id(),

@@ -403,7 +403,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
-        tokenMint: mintPk,
+        mint: mintPk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .rpc();
