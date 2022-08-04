@@ -1,7 +1,7 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
-import { MangoClient } from '../../client';
+import { MangoClient, AccountSize } from '../../index';
 import { MANGO_V4_ID } from '../../constants';
 
 //
@@ -45,7 +45,9 @@ async function main() {
   const mangoAccount = await client.getOrCreateMangoAccount(
     group,
     user.publicKey,
+    user,
     0,
+    AccountSize.small,
     'my_mango_account',
   );
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);

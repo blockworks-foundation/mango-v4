@@ -7,6 +7,8 @@ use core::fmt::Display;
 pub enum MangoError {
     #[msg("")]
     SomeError,
+    #[msg("")]
+    NotImplementedError,
     #[msg("checked math error")]
     MathError,
     #[msg("")]
@@ -17,6 +19,8 @@ pub enum MangoError {
     InvalidFlashLoanTargetCpiProgram,
     #[msg("health must be positive")]
     HealthMustBePositive,
+    #[msg("health must be negative")]
+    HealthMustBeNegative,
     #[msg("the account is bankrupt")]
     IsBankrupt,
     #[msg("the account is not bankrupt")]
@@ -29,6 +33,8 @@ pub enum MangoError {
     NoFreePerpPositionIndex,
     #[msg("serum3 open orders exist already")]
     Serum3OpenOrdersExistAlready,
+    #[msg("bank vault has insufficent funds")]
+    InsufficentBankVaultFunds,
 }
 
 pub trait Contextable {
@@ -108,7 +114,7 @@ macro_rules! error_msg {
 macro_rules! require_msg {
     ($invariant:expr, $($arg:tt)*) => {
         if !($invariant) {
-            Err(error_msg!($($arg)*))?;
+            return Err(error_msg!($($arg)*));
         }
     };
 }

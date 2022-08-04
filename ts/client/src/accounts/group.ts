@@ -8,15 +8,27 @@ import { Bank, MintInfo } from './bank';
 import { I80F48, ONE_I80F48 } from './I80F48';
 import { PerpMarket } from './perp';
 import { Serum3Market } from './serum3';
+import { BorshAccountsCoder } from '@project-serum/anchor';
 
 export class Group {
   static from(
     publicKey: PublicKey,
-    obj: { admin: PublicKey; groupNum: number },
+    obj: {
+      creator: PublicKey;
+      admin: PublicKey;
+      fastListingAdmin: PublicKey;
+      insuranceMint: PublicKey;
+      insuranceVault: PublicKey;
+      groupNum: number;
+    },
   ): Group {
     return new Group(
       publicKey,
+      obj.creator,
       obj.admin,
+      obj.fastListingAdmin,
+      obj.insuranceMint,
+      obj.insuranceVault,
       obj.groupNum,
       new Map(),
       new Map(),
@@ -29,7 +41,11 @@ export class Group {
 
   constructor(
     public publicKey: PublicKey,
+    public creator: PublicKey,
     public admin: PublicKey,
+    public fastListingAdmin: PublicKey,
+    public insuranceMint: PublicKey,
+    public insuranceVault: PublicKey,
     public groupNum: number,
     public banksMap: Map<string, Bank>,
     public serum3MarketsMap: Map<string, Serum3Market>,
@@ -174,13 +190,22 @@ export class Group {
     const prices =
       await client.program.provider.connection.getMultipleAccountsInfo(oracles);
 
+    const coder = new BorshAccountsCoder(client.program.idl);
     for (const [index, price] of prices.entries()) {
       if (banks[index].name === 'USDC') {
         banks[index].price = ONE_I80F48;
       } else {
-        banks[index].price = I80F48.fromNumber(
-          parsePriceData(price.data).previousPrice,
-        );
+        // Try and deserialize to stubOracle - if it fails then assume oracle type is pyth
+        // TODO: Implement switchboard oracle type
+        try {
+          let stubOracle = coder.decode('stubOracle', price.data);
+          banks[index].price = new I80F48(stubOracle.price.val);
+        } catch (e: any) {
+          console.log(e);
+          banks[index].price = I80F48.fromNumber(
+            parsePriceData(price.data).previousPrice,
+          );
+        }
       }
     }
   }

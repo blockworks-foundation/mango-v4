@@ -43,6 +43,7 @@ export class PerpMarket {
       perpMarketIndex: number;
       baseTokenIndex: number;
       quoteTokenIndex: number;
+      registrationTime: BN;
     },
   ): PerpMarket {
     return new PerpMarket(
@@ -70,6 +71,7 @@ export class PerpMarket {
       obj.perpMarketIndex,
       obj.baseTokenIndex,
       obj.quoteTokenIndex,
+      obj.registrationTime,
     );
   }
 
@@ -98,6 +100,7 @@ export class PerpMarket {
     public perpMarketIndex: number,
     public baseTokenIndex: number,
     public quoteTokenIndex: number,
+    public registrationTime: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.maintAssetWeight = I80F48.from(maintAssetWeight);

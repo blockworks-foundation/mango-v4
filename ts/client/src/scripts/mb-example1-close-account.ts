@@ -9,7 +9,7 @@ import { MangoClient } from '../client';
 //
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.CLUSTER_URL, options);
+  const connection = new Connection(process.env.CLUSTER_URL!, options);
 
   // user
   const user = Keypair.fromSecretKey(
@@ -53,7 +53,7 @@ async function main() {
     for (const serum3Account of mangoAccount.serum3Active()) {
       let orders = await client.getSerum3Orders(
         group,
-        group.findSerum3Market(serum3Account.marketIndex).name,
+        group.findSerum3Market(serum3Account.marketIndex)!.name,
       );
       for (const order of orders) {
         console.log(
@@ -73,12 +73,12 @@ async function main() {
       await client.serum3SettleFunds(
         group,
         mangoAccount,
-        group.findSerum3Market(serum3Account.marketIndex).name,
+        group.findSerum3Market(serum3Account.marketIndex)!.name,
       );
       await client.serum3CloseOpenOrders(
         group,
         mangoAccount,
-        group.findSerum3Market(serum3Account.marketIndex).name,
+        group.findSerum3Market(serum3Account.marketIndex)!.name,
       );
     }
 
@@ -87,20 +87,21 @@ async function main() {
 
     // withdraw all tokens
     for (const token of mangoAccount.tokensActive()) {
-      const native = token.native(group.findBank(token.tokenIndex));
+      const native = token.native(group.findBank(token.tokenIndex)!);
       console.log(
-        `token native ${native} ${group.findBank(token.tokenIndex).name}`,
+        `token native ${native} ${group.findBank(token.tokenIndex)!.name}`,
       );
       if (native.toNumber() < 1) {
         continue;
       }
 
-      await client.tokenWithdraw2(
+      await client.tokenWithdrawNative(
         group,
         mangoAccount,
-        group.findBank(token.tokenIndex).name,
-        token.native(group.findBank(token.tokenIndex)).toNumber(),
+        group.findBank(token.tokenIndex)!.name,
+        token.native(group.findBank(token.tokenIndex)!).toNumber(),
         false,
+        user
       );
     }
   } catch (error) {

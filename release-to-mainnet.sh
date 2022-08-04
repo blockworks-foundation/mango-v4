@@ -7,7 +7,7 @@ PROGRAM_ID=m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD
 
 # TODO fix need for --skip-lint
 # build program, 
-anchor build --skip-lint
+cargo run -p anchor-cli -- build --skip-lint
 
 # patch types, which we want in rust, but anchor client doesn't support
 ./idl-fixup.sh
@@ -23,7 +23,7 @@ if [[ -z "${NO_DEPLOY}" ]]; then
         -k $WALLET_WITH_FUNDS target/deploy/mango_v4.so
 
     # publish idl
-    anchor idl upgrade --provider.cluster $CLUSTER_URL --provider.wallet $WALLET_WITH_FUNDS \
+    cargo run -p anchor-cli -- idl upgrade --provider.cluster $CLUSTER_URL --provider.wallet $WALLET_WITH_FUNDS \
         --filepath target/idl/mango_v4.json $PROGRAM_ID
 else
     echo "Skipping deployment..."

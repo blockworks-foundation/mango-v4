@@ -40,6 +40,7 @@ async fn test_serum() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -126,11 +127,10 @@ async fn test_serum() -> Result<(), TransportError> {
     .unwrap()
     .open_orders;
 
-    let account_data: MangoAccount = solana.get_account(account).await;
+    let account_data = get_mango_account(solana, account).await;
     assert_eq!(
         account_data
-            .serum3
-            .iter_active()
+            .serum3_iter_active()
             .map(|v| (v.open_orders, v.market_index))
             .collect::<Vec<_>>(),
         [(open_orders, 0)]

@@ -11,8 +11,8 @@ pub fn emit_perp_balances(
     pm: &PerpMarket,
 ) {
     emit!(PerpBalanceLog {
-        mango_account: mango_account,
-        market_index: market_index,
+        mango_account,
+        market_index,
         base_position: pp.base_position_lots,
         quote_position: pp.quote_position_native.to_bits(),
         long_settled_funding: pp.long_settled_funding.to_bits(),

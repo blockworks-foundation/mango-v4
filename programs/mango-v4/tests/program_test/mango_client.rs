@@ -6,10 +6,11 @@ use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
 use mango_v4::instructions::{
-    CpiData, FlashLoanWithdraw, InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior,
-    Serum3Side,
+    InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
 };
+use mango_v4::state::{MangoAccount, MangoAccountValue};
 use solana_program::instruction::Instruction;
+use solana_program_test::BanksClientError;
 use solana_sdk::instruction;
 use solana_sdk::signature::{Keypair, Signer};
 use solana_sdk::transport::TransportError;
@@ -26,6 +27,11 @@ pub trait ClientAccountLoader {
     async fn load<T: AccountDeserialize>(&self, pubkey: &Pubkey) -> Option<T> {
         let bytes = self.load_bytes(pubkey).await?;
         AccountDeserialize::try_deserialize(&mut &bytes[..]).ok()
+    }
+    async fn load_mango_account(&self, pubkey: &Pubkey) -> Option<MangoAccountValue> {
+        self.load_bytes(pubkey)
+            .await
+            .map(|v| MangoAccountValue::from_bytes(&v[8..]).unwrap())
     }
 }
 
@@ -83,7 +89,7 @@ impl<'a> ClientTransaction {
         self.signers.push(clone_keypair(keypair));
     }
 
-    pub async fn send(&self) -> std::result::Result<(), TransportError> {
+    pub async fn send(&self) -> std::result::Result<(), BanksClientError> {
         let signer_refs = self.signers.iter().map(|k| k).collect::<Vec<&Keypair>>();
         self.solana
             .process_transaction(&self.instructions, Some(&signer_refs[..]))
@@ -117,11 +123,15 @@ fn make_instruction(
 
 async fn get_mint_info_by_mint(
     account_loader: &impl ClientAccountLoader,
-    account: &MangoAccount,
+    account: &MangoAccountValue,
     mint: Pubkey,
 ) -> MintInfo {
     let mint_info_pk = Pubkey::find_program_address(
-        &[account.group.as_ref(), b"MintInfo".as_ref(), mint.as_ref()],
+        &[
+            account.fixed.group.as_ref(),
+            b"MintInfo".as_ref(),
+            mint.as_ref(),
+        ],
         &mango_v4::id(),
     )
     .0;
@@ -130,15 +140,15 @@ async fn get_mint_info_by_mint(
 
 async fn get_mint_info_by_token_index(
     account_loader: &impl ClientAccountLoader,
-    account: &MangoAccount,
+    account: &MangoAccountValue,
     token_index: TokenIndex,
 ) -> MintInfo {
     let bank_pk = Pubkey::find_program_address(
         &[
-            account.group.as_ref(),
+            account.fixed.group.as_ref(),
             b"Bank".as_ref(),
             &token_index.to_le_bytes(),
-            &0u64.to_le_bytes(),
+            &0u32.to_le_bytes(),
         ],
         &mango_v4::id(),
     )
@@ -162,7 +172,7 @@ fn get_perp_market_address_by_index(group: Pubkey, perp_market_index: PerpMarket
 // all the accounts that instructions like deposit/withdraw need to compute account health
 async fn derive_health_check_remaining_account_metas(
     account_loader: &impl ClientAccountLoader,
-    account: &MangoAccount,
+    account: &MangoAccountValue,
     affected_bank: Option<Pubkey>,
     writable_banks: bool,
     affected_perp_market_index: Option<PerpMarketIndex>,
@@ -171,41 +181,30 @@ async fn derive_health_check_remaining_account_metas(
     if let Some(affected_bank) = affected_bank {
         let bank: Bank = account_loader.load(&affected_bank).await.unwrap();
         adjusted_account
-            .tokens
-            .get_mut_or_create(bank.token_index)
+            .token_get_mut_or_create(bank.token_index)
             .unwrap();
     }
     if let Some(affected_perp_market_index) = affected_perp_market_index {
         adjusted_account
-            .perps
-            .get_account_mut_or_create(affected_perp_market_index)
+            .perp_get_account_mut_or_create(affected_perp_market_index)
             .unwrap();
     }
 
     // figure out all the banks/oracles that need to be passed for the health check
     let mut banks = vec![];
     let mut oracles = vec![];
-    for position in adjusted_account.tokens.iter_active() {
+    for position in adjusted_account.token_iter_active() {
         let mint_info =
             get_mint_info_by_token_index(account_loader, account, position.token_index).await;
-        // TODO: ALTs are unavailable
-        // let lookup_table = account_loader
-        //     .load_bytes(&mint_info.address_lookup_table)
-        //     .await
-        //     .unwrap();
-        // let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
-        // banks.push(addresses[mint_info.address_lookup_table_bank_index as usize]);
-        // oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
         banks.push(mint_info.first_bank());
         oracles.push(mint_info.oracle);
     }
 
     let perp_markets = adjusted_account
-        .perps
-        .iter_active_accounts()
-        .map(|perp| get_perp_market_address_by_index(account.group, perp.market_index));
+        .perp_iter_active_accounts()
+        .map(|perp| get_perp_market_address_by_index(account.fixed.group, perp.market_index));
 
-    let serum_oos = account.serum3.iter_active().map(|&s| s.open_orders);
+    let serum_oos = account.serum3_iter_active().map(|&s| s.open_orders);
 
     let to_account_meta = |pubkey| AccountMeta {
         pubkey,
@@ -228,8 +227,8 @@ async fn derive_health_check_remaining_account_metas(
 
 async fn derive_liquidation_remaining_account_metas(
     account_loader: &impl ClientAccountLoader,
-    liqee: &MangoAccount,
-    liqor: &MangoAccount,
+    liqee: &MangoAccountValue,
+    liqor: &MangoAccountValue,
     asset_token_index: TokenIndex,
     asset_bank_index: usize,
     liab_token_index: TokenIndex,
@@ -238,9 +237,8 @@ async fn derive_liquidation_remaining_account_metas(
     let mut banks = vec![];
     let mut oracles = vec![];
     let token_indexes = liqee
-        .tokens
-        .iter_active()
-        .chain(liqor.tokens.iter_active())
+        .token_iter_active()
+        .chain(liqor.token_iter_active())
         .map(|ta| ta.token_index)
         .unique();
     for token_index in token_indexes {
@@ -252,32 +250,19 @@ async fn derive_liquidation_remaining_account_metas(
         } else {
             (0, false)
         };
-        // TODO: ALTs are unavailable
-        // let lookup_table = account_loader
-        //     .load_bytes(&mint_info.address_lookup_table)
-        //     .await
-        //     .unwrap();
-        // let addresses = mango_v4::address_lookup_table::addresses(&lookup_table);
-        // banks.push((
-        //     addresses[mint_info.address_lookup_table_bank_index as usize],
-        //     writable_bank,
-        // ));
-        // oracles.push(addresses[mint_info.address_lookup_table_oracle_index as usize]);
         banks.push((mint_info.banks[bank_index], writable_bank));
         oracles.push(mint_info.oracle);
     }
 
     let perp_markets = liqee
-        .perps
-        .iter_active_accounts()
-        .chain(liqee.perps.iter_active_accounts())
-        .map(|perp| get_perp_market_address_by_index(liqee.group, perp.market_index))
+        .perp_iter_active_accounts()
+        .chain(liqee.perp_iter_active_accounts())
+        .map(|perp| get_perp_market_address_by_index(liqee.fixed.group, perp.market_index))
         .unique();
 
     let serum_oos = liqee
-        .serum3
-        .iter_active()
-        .chain(liqor.serum3.iter_active())
+        .serum3_iter_active()
+        .chain(liqor.serum3_iter_active())
         .map(|&s| s.open_orders);
 
     let to_account_meta = |pubkey| AccountMeta {
@@ -303,29 +288,32 @@ fn from_serum_style_pubkey(d: &[u64; 4]) -> Pubkey {
     Pubkey::new(bytemuck::cast_slice(d as &[_]))
 }
 
+pub async fn get_mango_account(solana: &SolanaCookie, account: Pubkey) -> MangoAccountValue {
+    let bytes = solana.get_account_data(account).await.unwrap();
+    MangoAccountValue::from_bytes(&bytes[8..]).unwrap()
+}
+
 pub async fn account_position(solana: &SolanaCookie, account: Pubkey, bank: Pubkey) -> i64 {
-    let account_data: MangoAccount = solana.get_account(account).await;
+    let account_data = get_mango_account(solana, account).await;
     let bank_data: Bank = solana.get_account(bank).await;
     let native = account_data
-        .tokens
-        .find(bank_data.token_index)
+        .token_find(bank_data.token_index)
         .unwrap()
         .native(&bank_data);
     native.round().to_num::<i64>()
 }
 
 pub async fn account_position_closed(solana: &SolanaCookie, account: Pubkey, bank: Pubkey) -> bool {
-    let account_data: MangoAccount = solana.get_account(account).await;
+    let account_data = get_mango_account(solana, account).await;
     let bank_data: Bank = solana.get_account(bank).await;
-    account_data.tokens.find(bank_data.token_index).is_none()
+    account_data.token_find(bank_data.token_index).is_none()
 }
 
 pub async fn account_position_f64(solana: &SolanaCookie, account: Pubkey, bank: Pubkey) -> f64 {
-    let account_data: MangoAccount = solana.get_account(account).await;
+    let account_data = get_mango_account(solana, account).await;
     let bank_data: Bank = solana.get_account(bank).await;
     let native = account_data
-        .tokens
-        .find(bank_data.token_index)
+        .token_find(bank_data.token_index)
         .unwrap()
         .native(&bank_data);
     native.to_num::<f64>()
@@ -336,197 +324,7 @@ pub async fn account_position_f64(solana: &SolanaCookie, account: Pubkey, bank: 
 // ClientInstruction impl
 //
 
-pub struct FlashLoanInstruction<'keypair> {
-    pub account: Pubkey,
-    pub owner: &'keypair Keypair,
-    pub mango_token_bank: Pubkey,
-    pub mango_token_vault: Pubkey,
-    pub withdraw_amount: u64,
-    pub margin_trade_program_id: Pubkey,
-    pub deposit_account: Pubkey,
-    pub deposit_account_owner: Pubkey,
-    pub margin_trade_program_ix_cpi_data: Vec<u8>,
-}
-#[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for FlashLoanInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::FlashLoan;
-    type Instruction = mango_v4::instruction::FlashLoan;
-    async fn to_instruction(
-        &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
-    ) -> (Self::Accounts, instruction::Instruction) {
-        let program_id = mango_v4::id();
-
-        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
-
-        let accounts = Self::Accounts {
-            group: account.group,
-            account: self.account,
-            owner: self.owner.pubkey(),
-            token_program: Token::id(),
-        };
-
-        let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
-            &account,
-            Some(self.mango_token_bank),
-            true,
-            None,
-        )
-        .await;
-
-        let instruction = Self::Instruction {
-            withdraws: vec![FlashLoanWithdraw {
-                index: 2,
-                amount: self.withdraw_amount,
-            }],
-            cpi_datas: vec![CpiData {
-                account_start: health_check_metas.len() as u8,
-                data: self.margin_trade_program_ix_cpi_data.clone(),
-            }],
-        };
-
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
-        instruction.accounts.extend(health_check_metas.into_iter());
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.margin_trade_program_id,
-            is_writable: false,
-            is_signer: false,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.mango_token_bank,
-            is_writable: false,
-            is_signer: false,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.mango_token_vault,
-            is_writable: true,
-            is_signer: false,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.deposit_account,
-            is_writable: true,
-            is_signer: false,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.deposit_account_owner,
-            is_writable: false,
-            is_signer: false,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: spl_token::ID,
-            is_writable: false,
-            is_signer: false,
-        });
-
-        (accounts, instruction)
-    }
-
-    fn signers(&self) -> Vec<&Keypair> {
-        vec![self.owner]
-    }
-}
-
-pub struct FlashLoan2BeginInstruction<'keypair> {
-    pub group: Pubkey,
-    pub mango_token_bank: Pubkey,
-    pub mango_token_vault: Pubkey,
-    pub withdraw_amount: u64,
-    pub temporary_vault_authority: &'keypair Keypair,
-}
-#[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for FlashLoan2BeginInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::FlashLoan2Begin;
-    type Instruction = mango_v4::instruction::FlashLoan2Begin;
-    async fn to_instruction(
-        &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
-    ) -> (Self::Accounts, instruction::Instruction) {
-        let program_id = mango_v4::id();
-
-        let accounts = Self::Accounts {
-            group: self.group,
-            temporary_vault_authority: self.temporary_vault_authority.pubkey(),
-            token_program: Token::id(),
-            instructions: solana_program::sysvar::instructions::id(),
-        };
-
-        let instruction = Self::Instruction {
-            loan_amounts: vec![self.withdraw_amount],
-        };
-
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.mango_token_bank,
-            is_writable: true,
-            is_signer: false,
-        });
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.mango_token_vault,
-            is_writable: true,
-            is_signer: false,
-        });
-
-        (accounts, instruction)
-    }
-
-    fn signers(&self) -> Vec<&Keypair> {
-        vec![self.temporary_vault_authority]
-    }
-}
-
-pub struct FlashLoan2EndInstruction<'keypair> {
-    pub account: Pubkey,
-    pub owner: &'keypair Keypair,
-    pub mango_token_bank: Pubkey,
-    pub mango_token_vault: Pubkey,
-}
-#[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for FlashLoan2EndInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::FlashLoan2End;
-    type Instruction = mango_v4::instruction::FlashLoan2End;
-    async fn to_instruction(
-        &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
-    ) -> (Self::Accounts, instruction::Instruction) {
-        let program_id = mango_v4::id();
-        let instruction = Self::Instruction {};
-
-        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
-
-        let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
-            &account,
-            Some(self.mango_token_bank),
-            true,
-            None,
-        )
-        .await;
-
-        let accounts = Self::Accounts {
-            group: account.group,
-            account: self.account,
-            owner: self.owner.pubkey(),
-            token_program: Token::id(),
-        };
-
-        let mut instruction = make_instruction(program_id, &accounts, instruction);
-        instruction.accounts.extend(health_check_metas.into_iter());
-        instruction.accounts.push(AccountMeta {
-            pubkey: self.mango_token_vault,
-            is_writable: true,
-            is_signer: false,
-        });
-
-        (accounts, instruction)
-    }
-
-    fn signers(&self) -> Vec<&Keypair> {
-        vec![self.owner]
-    }
-}
-
-pub struct FlashLoan3BeginInstruction {
+pub struct FlashLoanBeginInstruction {
     pub group: Pubkey,
     pub mango_token_bank: Pubkey,
     pub mango_token_vault: Pubkey,
@@ -534,9 +332,9 @@ pub struct FlashLoan3BeginInstruction {
     pub withdraw_amount: u64,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for FlashLoan3BeginInstruction {
-    type Accounts = mango_v4::accounts::FlashLoan3Begin;
-    type Instruction = mango_v4::instruction::FlashLoan3Begin;
+impl ClientInstruction for FlashLoanBeginInstruction {
+    type Accounts = mango_v4::accounts::FlashLoanBegin;
+    type Instruction = mango_v4::instruction::FlashLoanBegin;
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
@@ -578,7 +376,7 @@ impl ClientInstruction for FlashLoan3BeginInstruction {
     }
 }
 
-pub struct FlashLoan3EndInstruction<'keypair> {
+pub struct FlashLoanEndInstruction<'keypair> {
     pub account: Pubkey,
     pub owner: &'keypair Keypair,
     pub mango_token_bank: Pubkey,
@@ -586,9 +384,9 @@ pub struct FlashLoan3EndInstruction<'keypair> {
     pub target_token_account: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for FlashLoan3EndInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::FlashLoan3End;
-    type Instruction = mango_v4::instruction::FlashLoan3End;
+impl<'keypair> ClientInstruction for FlashLoanEndInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::FlashLoanEnd;
+    type Instruction = mango_v4::instruction::FlashLoanEnd;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -596,7 +394,10 @@ impl<'keypair> ClientInstruction for FlashLoan3EndInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
 
-        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
 
         let health_check_metas = derive_health_check_remaining_account_metas(
             &account_loader,
@@ -659,10 +460,13 @@ impl<'keypair> ClientInstruction for TokenWithdrawInstruction<'keypair> {
 
         // load accounts, find PDAs, find remainingAccounts
         let token_account: TokenAccount = account_loader.load(&self.token_account).await.unwrap();
-        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
         let mint_info = Pubkey::find_program_address(
             &[
-                account.group.as_ref(),
+                account.fixed.group.as_ref(),
                 b"MintInfo".as_ref(),
                 token_account.mint.as_ref(),
             ],
@@ -681,7 +485,7 @@ impl<'keypair> ClientInstruction for TokenWithdrawInstruction<'keypair> {
         .await;
 
         let accounts = Self::Accounts {
-            group: account.group,
+            group: account.fixed.group,
             account: self.account,
             owner: self.owner.pubkey(),
             bank: mint_info.banks[self.bank_index],
@@ -724,10 +528,13 @@ impl ClientInstruction for TokenDepositInstruction {
 
         // load account so we know its mint
         let token_account: TokenAccount = account_loader.load(&self.token_account).await.unwrap();
-        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
         let mint_info = Pubkey::find_program_address(
             &[
-                account.group.as_ref(),
+                account.fixed.group.as_ref(),
                 b"MintInfo".as_ref(),
                 token_account.mint.as_ref(),
             ],
@@ -746,7 +553,7 @@ impl ClientInstruction for TokenDepositInstruction {
         .await;
 
         let accounts = Self::Accounts {
-            group: account.group,
+            group: account.fixed.group,
             account: self.account,
             bank: mint_info.banks[self.bank_index],
             vault: mint_info.vaults[self.bank_index],
@@ -786,7 +593,6 @@ pub struct TokenRegisterInstruction<'keypair> {
     pub group: Pubkey,
     pub admin: &'keypair Keypair,
     pub mint: Pubkey,
-    pub address_lookup_table: Pubkey,
     pub payer: &'keypair Keypair,
 }
 #[async_trait::async_trait(?Send)]
@@ -799,9 +605,12 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            name: "some_ticker".to_string(),
+            name: format!(
+                "{}{}",
+                "some_ticker".to_string(),
+                self.token_index.to_string()
+            ),
             token_index: self.token_index,
-            bank_num: 0,
             oracle_config: OracleConfig {
                 conf_filter: I80F48::from_num::<f32>(0.10),
             },
@@ -827,7 +636,7 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
                 self.group.as_ref(),
                 b"Bank".as_ref(),
                 &self.token_index.to_le_bytes(),
-                &0u64.to_le_bytes(),
+                &0u32.to_le_bytes(),
             ],
             &program_id,
         )
@@ -837,7 +646,7 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
                 self.group.as_ref(),
                 b"Vault".as_ref(),
                 &self.token_index.to_le_bytes(),
-                &0u64.to_le_bytes(),
+                &0u32.to_le_bytes(),
             ],
             &program_id,
         )
@@ -870,13 +679,9 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
             vault,
             mint_info,
             oracle,
-            // TODO: ALTs are unavailable
-            //address_lookup_table: self.address_lookup_table,
             payer: self.payer.pubkey(),
             token_program: Token::id(),
             system_program: System::id(),
-            // TODO: ALTs are unavailable
-            //address_lookup_table_program: mango_v4::address_lookup_table::id(),
             rent: sysvar::rent::Rent::id(),
         };
 
@@ -891,11 +696,10 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
 
 pub struct TokenAddBankInstruction<'keypair> {
     pub token_index: TokenIndex,
-    pub bank_num: u64,
+    pub bank_num: u32,
 
     pub group: Pubkey,
     pub admin: &'keypair Keypair,
-    pub address_lookup_table: Pubkey,
     pub payer: &'keypair Keypair,
 }
 #[async_trait::async_trait(?Send)]
@@ -917,7 +721,7 @@ impl<'keypair> ClientInstruction for TokenAddBankInstruction<'keypair> {
                 self.group.as_ref(),
                 b"Bank".as_ref(),
                 &self.token_index.to_le_bytes(),
-                &0u64.to_le_bytes(),
+                &0u32.to_le_bytes(),
             ],
             &program_id,
         )
@@ -955,18 +759,14 @@ impl<'keypair> ClientInstruction for TokenAddBankInstruction<'keypair> {
         let accounts = Self::Accounts {
             group: self.group,
             admin: self.admin.pubkey(),
-            mint: mint,
+            mint,
             existing_bank,
             bank,
             vault,
             mint_info,
-            // TODO: ALTs are unavailable
-            //address_lookup_table: self.address_lookup_table,
             payer: self.payer.pubkey(),
             token_program: Token::id(),
             system_program: System::id(),
-            // TODO: ALTs are unavailable
-            //address_lookup_table_program: mango_v4::address_lookup_table::id(),
             rent: sysvar::rent::Rent::id(),
         };
 
@@ -1187,7 +987,7 @@ impl<'keypair> ClientInstruction for StubOracleCloseInstruction<'keypair> {
 }
 
 pub struct GroupCreateInstruction<'keypair> {
-    pub admin: &'keypair Keypair,
+    pub creator: &'keypair Keypair,
     pub payer: &'keypair Keypair,
     pub insurance_mint: Pubkey,
 }
@@ -1203,12 +1003,13 @@ impl<'keypair> ClientInstruction for GroupCreateInstruction<'keypair> {
         let instruction = Self::Instruction {
             group_num: 0,
             testing: 1,
+            version: 0,
         };
 
         let group = Pubkey::find_program_address(
             &[
                 b"Group".as_ref(),
-                self.admin.pubkey().as_ref(),
+                self.creator.pubkey().as_ref(),
                 &instruction.group_num.to_le_bytes(),
             ],
             &program_id,
@@ -1223,7 +1024,7 @@ impl<'keypair> ClientInstruction for GroupCreateInstruction<'keypair> {
 
         let accounts = Self::Accounts {
             group,
-            admin: self.admin.pubkey(),
+            creator: self.creator.pubkey(),
             insurance_mint: self.insurance_mint,
             insurance_vault,
             payer: self.payer.pubkey(),
@@ -1237,7 +1038,7 @@ impl<'keypair> ClientInstruction for GroupCreateInstruction<'keypair> {
     }
 
     fn signers(&self) -> Vec<&Keypair> {
-        vec![self.admin, self.payer]
+        vec![self.creator, self.payer]
     }
 }
 
@@ -1257,9 +1058,16 @@ impl<'keypair> ClientInstruction for GroupCloseInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
 
+        let insurance_vault = Pubkey::find_program_address(
+            &[self.group.as_ref(), b"InsuranceVault".as_ref()],
+            &program_id,
+        )
+        .0;
+
         let accounts = Self::Accounts {
             group: self.group,
             admin: self.admin.pubkey(),
+            insurance_vault,
             sol_destination: self.sol_destination,
             token_program: Token::id(),
         };
@@ -1274,8 +1082,8 @@ impl<'keypair> ClientInstruction for GroupCloseInstruction<'keypair> {
 }
 
 pub struct AccountCreateInstruction<'keypair> {
-    pub account_num: u8,
-
+    pub account_num: u32,
+    pub account_size: AccountSize,
     pub group: Pubkey,
     pub owner: &'keypair Keypair,
     pub payer: &'keypair Keypair,
@@ -1291,6 +1099,7 @@ impl<'keypair> ClientInstruction for AccountCreateInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = mango_v4::instruction::AccountCreate {
             account_num: self.account_num,
+            account_size: self.account_size,
             name: "my_mango_account".to_string(),
         };
 
@@ -1322,8 +1131,53 @@ impl<'keypair> ClientInstruction for AccountCreateInstruction<'keypair> {
     }
 }
 
+pub struct AccountExpandInstruction<'keypair> {
+    pub account_num: u32,
+    pub group: Pubkey,
+    pub owner: &'keypair Keypair,
+    pub payer: &'keypair Keypair,
+}
+#[async_trait::async_trait(?Send)]
+impl<'keypair> ClientInstruction for AccountExpandInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::AccountExpand;
+    type Instruction = mango_v4::instruction::AccountExpand;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = mango_v4::instruction::AccountExpand {};
+
+        let account = Pubkey::find_program_address(
+            &[
+                self.group.as_ref(),
+                b"MangoAccount".as_ref(),
+                self.owner.pubkey().as_ref(),
+                &self.account_num.to_le_bytes(),
+            ],
+            &program_id,
+        )
+        .0;
+
+        let accounts = mango_v4::accounts::AccountExpand {
+            group: self.group,
+            account,
+            owner: self.owner.pubkey(),
+            payer: self.payer.pubkey(),
+            system_program: System::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![self.owner, self.payer]
+    }
+}
+
 pub struct AccountEditInstruction<'keypair> {
-    pub account_num: u8,
+    pub account_num: u32,
     pub group: Pubkey,
     pub owner: &'keypair Keypair,
     pub name: String,
@@ -1640,11 +1494,13 @@ impl<'keypair> ClientInstruction for Serum3PlaceOrderInstruction<'keypair> {
             limit: self.limit,
         };
 
-        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum3
-            .find(serum_market.market_index)
+            .serum3_find(serum_market.market_index)
             .unwrap()
             .open_orders;
         let quote_info =
@@ -1685,7 +1541,7 @@ impl<'keypair> ClientInstruction for Serum3PlaceOrderInstruction<'keypair> {
         .await;
 
         let accounts = Self::Accounts {
-            group: account.group,
+            group: account.fixed.group,
             account: self.account,
             open_orders,
             quote_bank: quote_info.first_bank(),
@@ -1740,11 +1596,13 @@ impl<'keypair> ClientInstruction for Serum3CancelOrderInstruction<'keypair> {
             order_id: self.order_id,
         };
 
-        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum3
-            .find(serum_market.market_index)
+            .serum3_find(serum_market.market_index)
             .unwrap()
             .open_orders;
 
@@ -1761,7 +1619,7 @@ impl<'keypair> ClientInstruction for Serum3CancelOrderInstruction<'keypair> {
         let event_q = market_external.event_q;
 
         let accounts = Self::Accounts {
-            group: account.group,
+            group: account.fixed.group,
             account: self.account,
             open_orders,
             serum_market: self.serum_market,
@@ -1799,11 +1657,13 @@ impl<'keypair> ClientInstruction for Serum3CancelAllOrdersInstruction<'keypair> 
         let program_id = mango_v4::id();
         let instruction = Self::Instruction { limit: self.limit };
 
-        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum3
-            .find(serum_market.market_index)
+            .serum3_find(serum_market.market_index)
             .unwrap()
             .open_orders;
 
@@ -1820,7 +1680,7 @@ impl<'keypair> ClientInstruction for Serum3CancelAllOrdersInstruction<'keypair> 
         let event_q = market_external.event_q;
 
         let accounts = Self::Accounts {
-            group: account.group,
+            group: account.fixed.group,
             account: self.account,
             open_orders,
             serum_market: self.serum_market,
@@ -1858,11 +1718,13 @@ impl<'keypair> ClientInstruction for Serum3SettleFundsInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
 
-        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum3
-            .find(serum_market.market_index)
+            .serum3_find(serum_market.market_index)
             .unwrap()
             .open_orders;
         let quote_info =
@@ -1890,7 +1752,7 @@ impl<'keypair> ClientInstruction for Serum3SettleFundsInstruction<'keypair> {
         .unwrap();
 
         let accounts = Self::Accounts {
-            group: account.group,
+            group: account.fixed.group,
             account: self.account,
             open_orders,
             quote_bank: quote_info.first_bank(),
@@ -1932,11 +1794,13 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction { limit: self.limit };
 
-        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum3
-            .find(serum_market.market_index)
+            .serum3_find(serum_market.market_index)
             .unwrap()
             .open_orders;
         let quote_info =
@@ -1976,7 +1840,7 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
         .await;
 
         let accounts = Self::Accounts {
-            group: account.group,
+            group: account.fixed.group,
             account: self.account,
             open_orders,
             quote_bank: quote_info.first_bank(),
@@ -2032,8 +1896,14 @@ impl<'keypair> ClientInstruction for LiqTokenWithTokenInstruction<'keypair> {
             max_liab_transfer: self.max_liab_transfer,
         };
 
-        let liqee: MangoAccount = account_loader.load(&self.liqee).await.unwrap();
-        let liqor: MangoAccount = account_loader.load(&self.liqor).await.unwrap();
+        let liqee = account_loader
+            .load_mango_account(&self.liqee)
+            .await
+            .unwrap();
+        let liqor = account_loader
+            .load_mango_account(&self.liqor)
+            .await
+            .unwrap();
         let health_check_metas = derive_liquidation_remaining_account_metas(
             &account_loader,
             &liqee,
@@ -2046,7 +1916,7 @@ impl<'keypair> ClientInstruction for LiqTokenWithTokenInstruction<'keypair> {
         .await;
 
         let accounts = Self::Accounts {
-            group: liqee.group,
+            group: liqee.fixed.group,
             liqee: self.liqee,
             liqor: self.liqor,
             liqor_owner: self.liqor_owner.pubkey(),
@@ -2087,8 +1957,14 @@ impl<'keypair> ClientInstruction for LiqTokenBankruptcyInstruction<'keypair> {
         };
 
         let liab_mint_info: MintInfo = account_loader.load(&self.liab_mint_info).await.unwrap();
-        let liqee: MangoAccount = account_loader.load(&self.liqee).await.unwrap();
-        let liqor: MangoAccount = account_loader.load(&self.liqor).await.unwrap();
+        let liqee = account_loader
+            .load_mango_account(&self.liqee)
+            .await
+            .unwrap();
+        let liqor = account_loader
+            .load_mango_account(&self.liqor)
+            .await
+            .unwrap();
         let health_check_metas = derive_liquidation_remaining_account_metas(
             &account_loader,
             &liqee,
@@ -2100,11 +1976,12 @@ impl<'keypair> ClientInstruction for LiqTokenBankruptcyInstruction<'keypair> {
         )
         .await;
 
-        let group: Group = account_loader.load(&liqee.group).await.unwrap();
+        let group_key = liqee.fixed.group;
+        let group: Group = account_loader.load(&group_key).await.unwrap();
 
         let quote_mint_info = Pubkey::find_program_address(
             &[
-                liqee.group.as_ref(),
+                liqee.fixed.group.as_ref(),
                 b"MintInfo".as_ref(),
                 group.insurance_mint.as_ref(),
             ],
@@ -2114,13 +1991,13 @@ impl<'keypair> ClientInstruction for LiqTokenBankruptcyInstruction<'keypair> {
         let quote_mint_info: MintInfo = account_loader.load(&quote_mint_info).await.unwrap();
 
         let insurance_vault = Pubkey::find_program_address(
-            &[liqee.group.as_ref(), b"InsuranceVault".as_ref()],
+            &[group_key.as_ref(), b"InsuranceVault".as_ref()],
             &program_id,
         )
         .0;
 
         let accounts = Self::Accounts {
-            group: liqee.group,
+            group: group_key,
             liqee: self.liqee,
             liqor: self.liqor,
             liqor_owner: self.liqor_owner.pubkey(),
@@ -2320,7 +2197,10 @@ impl<'keypair> ClientInstruction for PerpPlaceOrderInstruction<'keypair> {
         };
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
-        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
         let health_check_metas = derive_health_check_remaining_account_metas(
             &account_loader,
             &account,
@@ -2604,7 +2484,10 @@ impl ClientInstruction for ComputeAccountDataInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
 
-        let account: MangoAccount = account_loader.load(&self.account).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
 
         let health_check_metas = derive_health_check_remaining_account_metas(
             &account_loader,
@@ -2616,7 +2499,7 @@ impl ClientInstruction for ComputeAccountDataInstruction {
         .await;
 
         let accounts = Self::Accounts {
-            group: account.group,
+            group: account.fixed.group,
             account: self.account,
         };
 

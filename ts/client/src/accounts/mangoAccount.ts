@@ -23,6 +23,7 @@ export class MangoAccount {
       tokens: unknown;
       serum3: Object;
       perps: unknown;
+      perpOpenOrders: unknown;
       beingLiquidated: number;
       isBankrupt: number;
       accountNum: number;
@@ -36,9 +37,10 @@ export class MangoAccount {
       obj.group,
       obj.owner,
       obj.delegate,
-      obj.tokens as { values: TokenPositionDto[] },
-      obj.serum3 as { values: Serum3PositionDto[] },
-      obj.perps as { accounts: PerpPositionDto[] },
+      obj.tokens as TokenPositionDto[],
+      obj.serum3 as Serum3PositionDto[],
+      obj.perps as PerpPositionDto[],
+      obj.perpOpenOrders as any, // TODO
       obj.beingLiquidated,
       obj.isBankrupt,
       obj.accountNum,
@@ -54,9 +56,10 @@ export class MangoAccount {
     public group: PublicKey,
     public owner: PublicKey,
     public delegate: PublicKey,
-    tokens: { values: TokenPositionDto[] },
-    serum3: { values: Serum3PositionDto[] },
-    perps: { accounts: PerpPositionDto[] },
+    tokens: TokenPositionDto[],
+    serum3: Serum3PositionDto[],
+    perps: PerpPositionDto[],
+    perpOpenOrders: PerpPositionDto[],
     beingLiquidated: number,
     isBankrupt: number,
     accountNum: number,
@@ -65,9 +68,9 @@ export class MangoAccount {
     public accountData: {},
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
-    this.tokens = tokens.values.map((dto) => TokenPosition.from(dto));
-    this.serum3 = serum3.values.map((dto) => Serum3Orders.from(dto));
-    this.perps = perps.accounts.map((dto) => PerpPositions.from(dto));
+    this.tokens = tokens.map((dto) => TokenPosition.from(dto));
+    this.serum3 = serum3.map((dto) => Serum3Orders.from(dto));
+    this.perps = perps.map((dto) => PerpPositions.from(dto));
   }
 
   async reload(client: MangoClient, group: Group) {
@@ -97,10 +100,12 @@ export class MangoAccount {
     nativeTokenPosition: TokenPosition,
   ): I80F48 {
     return nativeTokenPosition
-      .native(sourceBank)
-      .mul(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
-      .div(I80F48.fromNumber(Math.pow(10, sourceBank.mintDecimals)))
-      .mul(sourceBank.price);
+      ? nativeTokenPosition
+          .native(sourceBank)
+          .mul(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
+          .div(I80F48.fromNumber(Math.pow(10, sourceBank.mintDecimals)))
+          .mul(sourceBank.price)
+      : ZERO_I80F48;
   }
 
   static getEquivalentNativeTokenPosition(
@@ -210,7 +215,7 @@ export class MangoAccount {
     const inUsdcUnits = MangoAccount.getEquivalentNativeUsdcPosition(
       bank,
       this.findToken(bank.tokenIndex),
-    );
+    ).max(ZERO_I80F48);
     const newInitHealth = initHealth.sub(inUsdcUnits.mul(bank.initAssetWeight));
     return MangoAccount.getEquivalentNativeTokenPosition(
       bank,
@@ -582,4 +587,9 @@ export class PerpEquity {
 export class EquityDto {
   tokens: { tokenIndex: number; value: I80F48Dto }[];
   perps: { perpMarketIndex: number; value: I80F48Dto }[];
+}
+
+export class AccountSize {
+  static small = { small: {} };
+  static large = { large: {} };
 }

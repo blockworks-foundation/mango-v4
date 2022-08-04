@@ -5,7 +5,7 @@ use crate::state::*;
 use crate::util::fill32_from_str;
 
 #[derive(Accounts)]
-#[instruction(account_num: u8)]
+#[instruction(account_num: u32, account_size: AccountSize)]
 pub struct AccountCreate<'info> {
     pub group: AccountLoader<'info, Group>,
 
@@ -14,9 +14,10 @@ pub struct AccountCreate<'info> {
         seeds = [group.key().as_ref(), b"MangoAccount".as_ref(), owner.key().as_ref(), &account_num.to_le_bytes()],
         bump,
         payer = payer,
-        space = 8 + std::mem::size_of::<MangoAccount>(),
+        space = MangoAccount::space(account_size),
     )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -25,20 +26,24 @@ pub struct AccountCreate<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn account_create(ctx: Context<AccountCreate>, account_num: u8, name: String) -> Result<()> {
+pub fn account_create(
+    ctx: Context<AccountCreate>,
+    account_num: u32,
+    account_size: AccountSize,
+    name: String,
+) -> Result<()> {
     let mut account = ctx.accounts.account.load_init()?;
 
-    account.name = fill32_from_str(name)?;
-    account.group = ctx.accounts.group.key();
-    account.owner = ctx.accounts.owner.key();
-    account.account_num = account_num;
-    account.bump = *ctx.bumps.get("account").ok_or(MangoError::SomeError)?;
-    account.delegate = Pubkey::default();
-    account.tokens = MangoAccountTokenPositions::default();
-    account.serum3 = MangoAccountSerum3Orders::default();
-    account.perps = MangoAccountPerpPositions::default();
-    account.set_being_liquidated(false);
-    account.set_bankrupt(false);
+    account.fixed.name = fill32_from_str(name)?;
+    account.fixed.group = ctx.accounts.group.key();
+    account.fixed.owner = ctx.accounts.owner.key();
+    account.fixed.account_num = account_num;
+    account.fixed.bump = *ctx.bumps.get("account").ok_or(MangoError::SomeError)?;
+    account.fixed.delegate = Pubkey::default();
+    account.fixed.set_being_liquidated(false);
+    account.fixed.set_bankrupt(false);
+
+    account.expand_dynamic_content(account_size)?;
 
     Ok(())
 }

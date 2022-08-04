@@ -10,10 +10,15 @@ pub const QUOTE_TOKEN_INDEX: TokenIndex = 0;
 #[derive(Debug)]
 pub struct Group {
     // ABI: Clients rely on this being at offset 8
-    pub admin: Pubkey,
+    pub creator: Pubkey,
 
     // ABI: Clients rely on this being at offset 40
     pub group_num: u32,
+
+    pub admin: Pubkey,
+
+    // TODO: unused, use case - listing shit tokens with conservative parameters (mostly defaults)
+    pub fast_listing_admin: Pubkey,
 
     pub padding: [u8; 4],
 
@@ -21,21 +26,43 @@ pub struct Group {
     pub insurance_mint: Pubkey,
 
     pub bump: u8,
-    // Only support closing/deregistering groups, stub oracles, tokens, and markets
-    // if testing == 1
+
     pub testing: u8,
-    pub padding2: [u8; 6],
-    pub reserved: [u8; 8],
+
+    pub version: u8,
+
+    pub padding2: [u8; 5],
+
+    pub reserved: [u8; 256],
 }
-const_assert_eq!(size_of::<Group>(), 32 * 3 + 4 + 4 + 1 * 2 + 6 + 8);
+const_assert_eq!(size_of::<Group>(), 32 * 5 + 4 + 4 + 1 + 1 + 6 + 256);
 const_assert_eq!(size_of::<Group>() % 8, 0);
 
+impl Group {
+    pub fn is_testing(&self) -> bool {
+        self.testing == 1
+    }
+
+    pub fn multiple_banks_supported(&self) -> bool {
+        self.is_testing() || self.version > 0
+    }
+
+    pub fn serum3_supported(&self) -> bool {
+        self.is_testing() || self.version > 0
+    }
+
+    pub fn perps_supported(&self) -> bool {
+        self.is_testing() || self.version > 0
+    }
+}
+
+// note: using creator instead of admin, since admin can be changed
 #[macro_export]
 macro_rules! group_seeds {
     ( $group:expr ) => {
         &[
             b"Group".as_ref(),
-            $group.admin.as_ref(),
+            $group.creator.as_ref(),
             &$group.group_num.to_le_bytes(),
             &[$group.bump],
         ]

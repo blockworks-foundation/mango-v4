@@ -1,14 +1,14 @@
 mod crank;
 mod taker;
 
-use std::env;
 use std::sync::Arc;
 
 use anchor_client::Cluster;
 
 use clap::{Parser, Subcommand};
-use client::MangoClient;
-use solana_sdk::{commitment_config::CommitmentConfig, signer::keypair};
+use client::{keypair_from_cli, Client, MangoClient};
+use solana_sdk::commitment_config::CommitmentConfig;
+use solana_sdk::pubkey::Pubkey;
 use tokio::time;
 
 // TODO
@@ -18,26 +18,33 @@ use tokio::time;
 // - I'm really annoyed about Keypair not being clonable. Seems everyone works around that manually. Should make a PR to solana to newtype it and provide that function.
 // keypair_from_arg_or_env could be a function
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
+#[clap()]
+struct CliDotenv {
+    // When --dotenv <file> is passed, read the specified dotenv file before parsing args
+    #[clap(long)]
+    dotenv: std::path::PathBuf,
+
+    remaining_args: Vec<std::ffi::OsString>,
+}
+
+#[derive(Parser, Debug, Clone)]
 #[clap()]
 struct Cli {
-    #[clap(short, long, env = "RPC_URL")]
-    rpc_url: Option<String>,
+    #[clap(short, long, env)]
+    rpc_url: String,
 
-    #[clap(short, long, env = "PAYER_KEYPAIR")]
-    payer: Option<std::path::PathBuf>,
+    #[clap(short, long, env)]
+    mango_account: Pubkey,
 
-    #[clap(short, long, env = "ADMIN_KEYPAIR")]
-    admin: Option<std::path::PathBuf>,
-
-    #[clap(short, long, env = "MANGO_ACCOUNT_NAME")]
-    mango_account_name: String,
+    #[clap(short, long, env)]
+    owner: String,
 
     #[clap(subcommand)]
     command: Command,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug, Clone)]
 enum Command {
     Crank {},
     Taker {},
@@ -47,49 +54,30 @@ fn main() -> Result<(), anyhow::Error> {
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
     );
 
-    dotenv::dotenv().ok();
-
-    let Cli {
-        rpc_url,
-        payer,
-        admin,
-        command,
-        mango_account_name,
-    } = Cli::parse();
-
-    let payer = match payer {
-        Some(p) => keypair::read_keypair_file(&p)
-            .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy())),
-        None => panic!("Payer keypair not provided..."),
+    let args = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
+        dotenv::from_path(cli_dotenv.dotenv)?;
+        cli_dotenv.remaining_args
+    } else {
+        dotenv::dotenv().ok();
+        std::env::args_os().collect()
     };
+    let cli = Cli::parse_from(args);
 
-    let admin = match admin {
-        Some(p) => keypair::read_keypair_file(&p)
-            .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy())),
-        None => panic!("Admin keypair not provided..."),
-    };
+    let owner = keypair_from_cli(&cli.owner);
 
-    let rpc_url = match rpc_url {
-        Some(rpc_url) => rpc_url,
-        None => match env::var("RPC_URL").ok() {
-            Some(rpc_url) => rpc_url,
-            None => panic!("Rpc URL not provided..."),
-        },
-    };
+    let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss");
 
     let cluster = Cluster::Custom(rpc_url, ws_url);
-    let commitment = match command {
+    let commitment = match cli.command {
         Command::Crank { .. } => CommitmentConfig::confirmed(),
         Command::Taker { .. } => CommitmentConfig::confirmed(),
     };
 
-    let mango_client = Arc::new(MangoClient::new(
-        cluster,
-        commitment,
-        payer,
-        admin,
-        &mango_account_name,
+    let mango_client = Arc::new(MangoClient::new_for_existing_account(
+        Client::new(cluster, commitment, &owner),
+        cli.mango_account,
+        owner,
     )?);
 
     let rt = tokio::runtime::Builder::new_multi_thread()
@@ -111,7 +99,7 @@ fn main() -> Result<(), anyhow::Error> {
         }
     };
 
-    match command {
+    match cli.command {
         Command::Crank { .. } => {
             let client = mango_client.clone();
             rt.block_on(crank::runner(client, debugging_handle))

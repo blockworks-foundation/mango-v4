@@ -1,11 +1,8 @@
 use anchor_lang::prelude::*;
-mod solana_address_lookup_table_instruction;
-pub use solana_address_lookup_table_instruction::*;
 use solana_program::pubkey::{Pubkey, PUBKEY_BYTES};
-use std::str::FromStr;
 
 pub fn id() -> Pubkey {
-    Pubkey::from_str("AddressLookupTab1e1111111111111111111111111").unwrap()
+    solana_address_lookup_table_program::ID
 }
 
 /// The maximum number of addresses that a lookup table can hold
@@ -32,10 +29,10 @@ pub fn extend<'info>(
     signer_seeds: &[&[&[u8]]],
     new_addresses: Vec<Pubkey>,
 ) -> std::result::Result<(), ProgramError> {
-    let instruction = extend_lookup_table(
+    let instruction = solana_address_lookup_table_program::instruction::extend_lookup_table(
         lookup_table_ai.key(),
         authority_ai.key(),
-        payer_ai.key(),
+        Some(payer_ai.key()),
         new_addresses,
     );
     let account_infos = [lookup_table_ai, authority_ai, payer_ai];

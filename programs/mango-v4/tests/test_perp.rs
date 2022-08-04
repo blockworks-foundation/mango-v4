@@ -36,6 +36,7 @@ async fn test_perp() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -49,6 +50,7 @@ async fn test_perp() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 1,
+            account_size: AccountSize::Large,
             group,
             owner,
             payer,
@@ -200,8 +202,8 @@ async fn test_perp() -> Result<(), TransportError> {
     let order_id_to_cancel = solana
         .get_account::<MangoAccount>(account_0)
         .await
-        .perps
-        .order_id[0];
+        .perp_open_orders[0]
+        .order_id;
     send_tx(
         solana,
         PerpCancelOrderInstruction {
@@ -398,12 +400,12 @@ async fn test_perp() -> Result<(), TransportError> {
     .unwrap();
 
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
-    assert_eq!(mango_account_0.perps.accounts[0].base_position_lots, 1);
-    assert!(mango_account_0.perps.accounts[0].quote_position_native < -100.019);
+    assert_eq!(mango_account_0.perps[0].base_position_lots, 1);
+    assert!(mango_account_0.perps[0].quote_position_native < -100.019);
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
-    assert_eq!(mango_account_1.perps.accounts[0].base_position_lots, -1);
-    assert_eq!(mango_account_1.perps.accounts[0].quote_position_native, 100);
+    assert_eq!(mango_account_1.perps[0].base_position_lots, -1);
+    assert_eq!(mango_account_1.perps[0].quote_position_native, 100);
 
     send_tx(
         solana,
@@ -426,10 +428,10 @@ async fn test_perp() -> Result<(), TransportError> {
 async fn assert_no_perp_orders(solana: &SolanaCookie, account_0: Pubkey) {
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
 
-    for i in 0..MAX_PERP_OPEN_ORDERS {
-        assert!(mango_account_0.perps.order_id[i] == 0);
-        assert!(mango_account_0.perps.order_side[i] == Side::Bid);
-        assert!(mango_account_0.perps.client_order_id[i] == 0);
-        assert!(mango_account_0.perps.order_market[i] == FREE_ORDER_SLOT);
+    for oo in mango_account_0.perp_open_orders.iter() {
+        assert!(oo.order_id == 0);
+        assert!(oo.order_side == Side::Bid);
+        assert!(oo.client_order_id == 0);
+        assert!(oo.order_market == FREE_ORDER_SLOT);
     }
 }
