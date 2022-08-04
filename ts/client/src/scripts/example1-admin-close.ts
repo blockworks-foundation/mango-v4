@@ -33,7 +33,7 @@ async function main() {
     MANGO_V4_ID['devnet'],
   );
 
-  const group = await client.getGroupForAdmin(admin.publicKey);
+  const group = await client.getGroupForCreator(admin.publicKey);
   console.log(`Group ${group.publicKey}`);
 
   let sig;

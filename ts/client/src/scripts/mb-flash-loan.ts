@@ -10,7 +10,7 @@ import {
 import BN from 'bn.js';
 import fs from 'fs';
 import { QUOTE_DECIMALS } from '../accounts/bank';
-import { MangoClient, AccountSize } from '../index';
+import { AccountSize, MangoClient } from '../index';
 import { getAssociatedTokenAddress } from '../utils';
 
 const CLUSTER_URL =
@@ -51,7 +51,7 @@ async function main() {
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
   // fetch group
-  const group = await client.getGroupForAdmin(admin.publicKey, 0);
+  const group = await client.getGroupForCreator(admin.publicKey, 0);
   console.log(`Found group ${group.publicKey.toBase58()}`);
   console.log(`start btc bank ${group.banksMap.get('BTC').toString()}`);
 

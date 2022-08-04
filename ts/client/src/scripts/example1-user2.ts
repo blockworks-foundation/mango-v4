@@ -35,7 +35,7 @@ async function main() {
       JSON.parse(fs.readFileSync(process.env.ADMIN_KEYPAIR!, 'utf-8')),
     ),
   );
-  const group = await client.getGroupForAdmin(admin.publicKey, GROUP_NUM);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(group.toString());
 
   // create + fetch account

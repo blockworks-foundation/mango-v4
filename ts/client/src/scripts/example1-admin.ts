@@ -63,7 +63,7 @@ async function main() {
   } catch (error) {
     console.log(error);
   }
-  const group = await client.getGroupForAdmin(admin.publicKey, GROUP_NUM);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(`...registered group ${group.publicKey}`);
 
   // stub oracle + register token 0
