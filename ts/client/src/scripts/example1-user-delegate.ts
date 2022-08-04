@@ -92,11 +92,11 @@ async function main() {
   if (true) {
     // deposit
     console.log(`...depositing 50 USDC`);
-    await client.tokenDeposit(group, mangoAccount, 'USDC', 50, user);
+    await client.tokenDeposit(group, mangoAccount, 'USDC', 50);
     await mangoAccount.reload(client, group);
 
     console.log(`...depositing 0.0005 BTC`);
-    await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005, user);
+    await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005);
     await mangoAccount.reload(client, group);
 
     // serum3
