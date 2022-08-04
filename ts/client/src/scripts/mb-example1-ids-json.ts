@@ -53,7 +53,7 @@ async function main() {
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString(group));
 
-  if (false) {
+  if (true) {
     console.log(`...depositing 10 USDC`);
     await client.tokenDeposit(group, mangoAccount, 'USDC', 10, user);
     await mangoAccount.reload(client, group);
