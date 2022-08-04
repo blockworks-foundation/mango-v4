@@ -1715,7 +1715,7 @@ export class MangoClient {
       }
     }
 
-    const mintInfos = [...new Set(tokenIndices)].map(
+    const mintInfos = [...new Set(tokenIndices.sort())].map(
       (tokenIndex) => group.mintInfosMap.get(tokenIndex)!,
     );
     healthRemainingAccounts.push(
