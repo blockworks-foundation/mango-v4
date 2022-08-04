@@ -171,12 +171,60 @@ export type MangoV4 = {
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Bank"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "const",
+                "type": "u32",
+                "value": 0
+              }
+            ]
+          }
         },
         {
           "name": "vault",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Vault"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "const",
+                "type": "u32",
+                "value": 0
+              }
+            ]
+          }
         },
         {
           "name": "mintInfo",
@@ -301,12 +349,60 @@ export type MangoV4 = {
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Bank"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "const",
+                "type": "u32",
+                "value": 0
+              }
+            ]
+          }
         },
         {
           "name": "vault",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Vault"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "const",
+                "type": "u32",
+                "value": 0
+              }
+            ]
+          }
         },
         {
           "name": "mintInfo",
@@ -5079,12 +5175,60 @@ export const IDL: MangoV4 = {
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Bank"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "const",
+                "type": "u32",
+                "value": 0
+              }
+            ]
+          }
         },
         {
           "name": "vault",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Vault"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "const",
+                "type": "u32",
+                "value": 0
+              }
+            ]
+          }
         },
         {
           "name": "mintInfo",
@@ -5209,12 +5353,60 @@ export const IDL: MangoV4 = {
         {
           "name": "bank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Bank"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "const",
+                "type": "u32",
+                "value": 0
+              }
+            ]
+          }
         },
         {
           "name": "vault",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Vault"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "const",
+                "type": "u32",
+                "value": 0
+              }
+            ]
+          }
         },
         {
           "name": "mintInfo",
