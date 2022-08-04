@@ -99,14 +99,14 @@ async fn main() -> anyhow::Result<()> {
     let rpc_timeout = Duration::from_secs(1);
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
     let commitment = CommitmentConfig::processed();
-    let client = Client::new(cluster.clone(), commitment, &liqor_owner);
+    let client = Client::new(cluster.clone(), commitment, &liqor_owner, Some(rpc_timeout));
 
     // The representation of current on-chain account data
     let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
     // Reading accounts from chain_data
     let account_fetcher = Arc::new(chain_data::AccountFetcher {
         chain_data: chain_data.clone(),
-        rpc: client.rpc_with_timeout(rpc_timeout),
+        rpc: client.rpc(),
     });
 
     let mango_account = account_fetcher.fetch_fresh_mango_account(&cli.liqor_mango_account)?;
