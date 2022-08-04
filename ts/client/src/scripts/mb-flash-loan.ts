@@ -59,7 +59,7 @@ async function main() {
   console.log(`Creating mangoaccount...`);
   const mangoAccount = await client.getOrCreateMangoAccount(
     group,
-    user.publicKey
+    user.publicKey,
   );
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(`start balance \n${mangoAccount.toString(group)}`);
