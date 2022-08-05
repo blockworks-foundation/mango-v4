@@ -1,0 +1,5 @@
+# Dockerfile for keeper service in Heroku
+# heroku container:push keeper -R -a HEROKU_APP_NAME
+# heroku container:release -a HEROKU_APP_NAME
+FROM gcr.io/mango-markets/mango-v4:latest
+ENTRYPOINT ["liquidator"] 
