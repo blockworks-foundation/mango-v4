@@ -10,6 +10,7 @@ use crate::state::{
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
+use anchor_lang::Discriminator;
 use anchor_spl::token::{self, Token, TokenAccount};
 use fixed::types::I80F48;
 
@@ -141,7 +142,7 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
 
                 // must be the FlashLoanEnd instruction
                 require!(
-                    ix.data[0..8] == [178, 170, 2, 78, 240, 23, 190, 178],
+                    ix.data[0..8] == crate::instruction::FlashLoanEnd::discriminator(),
                     MangoError::SomeError
                 );
 
