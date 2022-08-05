@@ -8,6 +8,7 @@ use client::{chain_data, keypair_from_cli, Client, MangoClient, MangoGroupContex
 use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 
+use anyhow::Context;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use std::collections::HashSet;
@@ -15,6 +16,7 @@ use std::collections::HashSet;
 pub mod account_shared_data;
 pub mod liquidate;
 pub mod metrics;
+pub mod rebalance;
 pub mod snapshot_source;
 pub mod util;
 pub mod websocket_source;
@@ -78,6 +80,9 @@ struct Cli {
     /// liquidator health ratio should not fall below this value
     #[clap(long, env, default_value = "50")]
     min_health_ratio: f64,
+
+    #[clap(long, env, default_value = "1")]
+    rebalance_slippage: f64,
 }
 
 pub fn encode_address(addr: &Pubkey) -> String {
@@ -210,6 +215,11 @@ async fn main() -> anyhow::Result<()> {
         min_health_ratio: cli.min_health_ratio,
     };
 
+    let mut rebalance_interval = tokio::time::interval(Duration::from_secs(5));
+    let rebalance_config = rebalance::Config {
+        slippage: cli.rebalance_slippage,
+    };
+
     info!("main loop");
     loop {
         tokio::select! {
@@ -237,14 +247,13 @@ async fn main() -> anyhow::Result<()> {
                             continue;
                         }
 
-                        if let Err(err) = liquidate::process_accounts(
+                        liquidate(
                             &mango_client,
                             &account_fetcher,
                             std::iter::once(&account_write.pubkey),
                             &liq_config,
-                        ) {
-                            warn!("could not process account {}: {:?}", account_write.pubkey, err);
-                        }
+                            &rebalance_config,
+                        )?;
                     }
 
                     if is_mango_bank(&account_write.account, &mango_program, &mango_group).is_some() || oracles.contains(&account_write.pubkey) {
@@ -260,22 +269,13 @@ async fn main() -> anyhow::Result<()> {
                             log::debug!("change to oracle {}", &account_write.pubkey);
                         }
 
-                        // check health of all accounts
-                        //
-                        // TODO: This could be done asynchronously by calling
-                        // let accounts = chain_data.accounts_snapshot();
-                        // and then working with the snapshot of the data
-                        //
-                        // However, this currently takes like 50ms for me in release builds,
-                        // so optimizing much seems unnecessary.
-                        if let Err(err) = liquidate::process_accounts(
+                        liquidate(
                             &mango_client,
                             &account_fetcher,
                             mango_accounts.iter(),
                             &liq_config,
-                        ) {
-                            warn!("could not process accounts: {:?}", err);
-                        }
+                            &rebalance_config,
+                        )?;
                     }
                 }
             },
@@ -302,18 +302,40 @@ async fn main() -> anyhow::Result<()> {
                 snapshot_source::update_chain_data(&mut chain_data.write().unwrap(), message);
                 one_snapshot_done = true;
 
-                // trigger a full health check
-                if let Err(err) = liquidate::process_accounts(
+                liquidate(
                     &mango_client,
                     &account_fetcher,
                     mango_accounts.iter(),
                     &liq_config,
-                ) {
-                    warn!("could not process accounts: {:?}", err);
-                }
+                    &rebalance_config,
+                )?;
             },
+
+            _ = rebalance_interval.tick() => {
+                rebalance::zero_all_non_quote(&mango_client, &account_fetcher, &cli.liqor_mango_account, &rebalance_config)
+                    .context("rebalancing liqor account")?;
+            }
         }
     }
+}
+
+fn liquidate<'a>(
+    mango_client: &MangoClient,
+    account_fetcher: &chain_data::AccountFetcher,
+    accounts: impl Iterator<Item = &'a Pubkey>,
+    config: &liquidate::Config,
+    rebalance_config: &rebalance::Config,
+) -> anyhow::Result<()> {
+    if !liquidate::maybe_liquidate_one(&mango_client, &account_fetcher, accounts, &config) {
+        return Ok(());
+    }
+
+    let liqor = &mango_client.mango_account_address;
+    account_fetcher.refresh_account_via_rpc(liqor)?;
+
+    rebalance::zero_all_non_quote(mango_client, account_fetcher, liqor, &rebalance_config)
+        .context("rebalancing liqor account after liquidation")?;
+    Ok(())
 }
 
 fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: &metrics::Metrics) {

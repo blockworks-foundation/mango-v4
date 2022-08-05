@@ -837,28 +837,31 @@ impl MangoClient {
         &self,
         input_mint: Pubkey,
         output_mint: Pubkey,
-        source_amount: u64,
+        amount: u64,
         slippage: f64,
+        swap_mode: JupiterSwapMode,
     ) -> anyhow::Result<Signature> {
-        self.invoke(self.jupiter_swap_async(input_mint, output_mint, source_amount, slippage))
+        self.invoke(self.jupiter_swap_async(input_mint, output_mint, amount, slippage, swap_mode))
     }
 
     pub fn jupiter_route(
         &self,
         input_mint: Pubkey,
         output_mint: Pubkey,
-        source_amount: u64,
+        amount: u64,
         slippage: f64,
+        swap_mode: JupiterSwapMode,
     ) -> anyhow::Result<jupiter::QueryRoute> {
-        self.invoke(self.jupiter_route_async(input_mint, output_mint, source_amount, slippage))
+        self.invoke(self.jupiter_route_async(input_mint, output_mint, amount, slippage, swap_mode))
     }
 
     pub async fn jupiter_route_async(
         &self,
         input_mint: Pubkey,
         output_mint: Pubkey,
-        source_amount: u64,
+        amount: u64,
         slippage: f64,
+        swap_mode: JupiterSwapMode,
     ) -> anyhow::Result<jupiter::QueryRoute> {
         let quote = self
             .http_client
@@ -866,10 +869,18 @@ impl MangoClient {
             .query(&[
                 ("inputMint", input_mint.to_string()),
                 ("outputMint", output_mint.to_string()),
-                ("amount", format!("{}", source_amount)),
+                ("amount", format!("{}", amount)),
                 ("onlyDirectRoutes", "true".into()),
                 ("filterTopNResult", "10".into()),
                 ("slippage", format!("{}", slippage)),
+                (
+                    "swapMode",
+                    match swap_mode {
+                        JupiterSwapMode::ExactIn => "ExactIn",
+                        JupiterSwapMode::ExactOut => "ExactOut",
+                    }
+                    .into(),
+                ),
             ])
             .send()
             .await
@@ -902,13 +913,14 @@ impl MangoClient {
         &self,
         input_mint: Pubkey,
         output_mint: Pubkey,
-        source_amount: u64,
+        amount: u64,
         slippage: f64,
+        swap_mode: JupiterSwapMode,
     ) -> anyhow::Result<Signature> {
         let source_token = self.context.token_by_mint(&input_mint)?;
         let target_token = self.context.token_by_mint(&output_mint)?;
         let route = self
-            .jupiter_route_async(input_mint, output_mint, source_amount, slippage)
+            .jupiter_route_async(input_mint, output_mint, amount, slippage, swap_mode)
             .await?;
 
         let swap = self
@@ -984,7 +996,7 @@ impl MangoClient {
             })
             .collect::<Vec<_>>();
 
-        let loan_amounts = vec![source_amount, 0u64];
+        let loan_amounts = vec![route.in_amount, 0u64];
 
         // This relies on the fact that health account banks will be identical to the first_bank above!
         let health_ams = self
@@ -1114,6 +1126,11 @@ pub fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
         _ => {}
     };
     err.into()
+}
+
+pub enum JupiterSwapMode {
+    ExactIn,
+    ExactOut,
 }
 
 pub fn keypair_from_cli(keypair: &str) -> Keypair {
