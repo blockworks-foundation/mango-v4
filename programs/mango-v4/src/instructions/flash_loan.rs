@@ -180,6 +180,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_mut()?;
+    let group = account.fixed.group;
 
     require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
@@ -335,6 +336,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         });
 
         emit!(TokenBalanceLog {
+            mango_group: group.key(),
             mango_account: ctx.accounts.account.key(),
             token_index: bank.token_index as u16,
             indexed_position: position.indexed_position.to_bits(),
@@ -345,6 +347,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     }
 
     emit!(FlashLoanLog {
+        mango_group: group.key(),
         mango_account: ctx.accounts.account.key(),
         token_loan_details
     });

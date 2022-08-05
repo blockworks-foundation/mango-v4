@@ -2374,6 +2374,7 @@ impl ClientInstruction for PerpConsumeEventsInstruction {
 }
 
 pub struct PerpUpdateFundingInstruction {
+    pub group: Pubkey,
     pub perp_market: Pubkey,
     pub bids: Pubkey,
     pub asks: Pubkey,
@@ -2391,6 +2392,7 @@ impl ClientInstruction for PerpUpdateFundingInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
         let accounts = Self::Accounts {
+            group: self.group,
             perp_market: self.perp_market,
             bids: self.bids,
             asks: self.asks,
@@ -2444,6 +2446,7 @@ impl ClientInstruction for TokenUpdateIndexAndRateInstruction {
         let mint_info: MintInfo = loader.load(&self.mint_info).await.unwrap();
 
         let accounts = Self::Accounts {
+            group: mint_info.group,
             mint_info: self.mint_info,
             oracle: mint_info.oracle,
             instructions: solana_program::sysvar::instructions::id(),

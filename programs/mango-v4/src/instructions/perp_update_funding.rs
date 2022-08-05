@@ -1,15 +1,18 @@
 use anchor_lang::prelude::*;
 
 use crate::accounts_zerocopy::*;
-use crate::state::{oracle_price, Book, BookSide, PerpMarket};
+use crate::state::{oracle_price, Book, BookSide, Group, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpUpdateFunding<'info> {
+    pub group: AccountLoader<'info, Group>, // Required for group metadata parsing
+
     #[account(
         mut,
         has_one = bids,
         has_one = asks,
         has_one = oracle,
+        constraint = perp_market.load()?.group.key() == group.key(),
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]

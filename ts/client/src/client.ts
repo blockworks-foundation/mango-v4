@@ -1559,6 +1559,27 @@ export class MangoClient {
     return this.program.provider.sendAndConfirm(tx);
   }
 
+  async updateIndexAndRate(group: Group, tokenName: string) {
+
+    let bank = group.banksMap.get(tokenName)!;
+    let mintInfo = group.mintInfosMap.get(bank.tokenIndex)!;
+  
+    await this.program.methods.tokenUpdateIndexAndRate().accounts({
+      'group': group.publicKey,
+      'mintInfo': mintInfo.publicKey,
+      'oracle': mintInfo.oracle,
+      'instructions': SYSVAR_INSTRUCTIONS_PUBKEY})
+      .remainingAccounts([
+        {
+          pubkey: bank.publicKey,
+          isWritable: true,
+          isSigner: false,
+        } as AccountMeta,
+      ])
+      .rpc()
+  }
+  
+
   /// liquidations
 
   async liqTokenWithToken(
@@ -1688,7 +1709,7 @@ export class MangoClient {
       }
     }
 
-    const mintInfos = [...new Set(tokenIndices.sort())].map(
+    const mintInfos = [...new Set(tokenIndices)].map(
       (tokenIndex) => group.mintInfosMap.get(tokenIndex)!,
     );
     healthRemainingAccounts.push(
