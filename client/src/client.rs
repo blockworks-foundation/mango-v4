@@ -843,17 +843,23 @@ impl MangoClient {
         self.invoke(self.jupiter_swap_async(input_mint, output_mint, source_amount, slippage))
     }
 
-    // Not actually fully async, since it uses the blocking RPC client to send the actual tx
-    pub async fn jupiter_swap_async(
+    pub fn jupiter_route(
         &self,
         input_mint: Pubkey,
         output_mint: Pubkey,
         source_amount: u64,
         slippage: f64,
-    ) -> anyhow::Result<Signature> {
-        let source_token = self.context.token_by_mint(&input_mint)?;
-        let target_token = self.context.token_by_mint(&output_mint)?;
+    ) -> anyhow::Result<jupiter::QueryRoute> {
+        self.invoke(self.jupiter_route_async(input_mint, output_mint, source_amount, slippage))
+    }
 
+    pub async fn jupiter_route_async(
+        &self,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        source_amount: u64,
+        slippage: f64,
+    ) -> anyhow::Result<jupiter::QueryRoute> {
         let quote = self
             .http_client
             .get("https://quote-api.jup.ag/v1/quote")
@@ -888,6 +894,22 @@ impl MangoClient {
                     quote.data.len()
                 )
             })?;
+
+        Ok(route.clone())
+    }
+
+    pub async fn jupiter_swap_async(
+        &self,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        source_amount: u64,
+        slippage: f64,
+    ) -> anyhow::Result<Signature> {
+        let source_token = self.context.token_by_mint(&input_mint)?;
+        let target_token = self.context.token_by_mint(&output_mint)?;
+        let route = self
+            .jupiter_route_async(input_mint, output_mint, source_amount, slippage)
+            .await?;
 
         let swap = self
             .http_client
