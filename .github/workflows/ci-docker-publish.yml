@@ -54,7 +54,7 @@ jobs:
           context: .
           push: true
           tags: |
-            us-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE }}:${{ github.sha }}
-            us-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE }}:latest
-          cache-from: type=registry,ref=us-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE }}:buildcache
-          cache-to: type=registry,ref=us-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE }}:buildcache,mode=max
+            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:${{ github.sha }}
+            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:latest
+          cache-from: type=registry,ref=us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:buildcache,mode=max
