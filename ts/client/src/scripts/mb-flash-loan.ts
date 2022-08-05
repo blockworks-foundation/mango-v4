@@ -1,5 +1,5 @@
 import { Jupiter } from '@jup-ag/core';
-import { AnchorProvider, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, Wallet } from '@frahman5/anchor';
 import {
   AccountMeta,
   Connection,

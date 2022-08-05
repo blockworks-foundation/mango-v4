@@ -1,7 +1,7 @@
 import {
   simulateTransaction,
   SuccessfulTxSimulationResponse,
-} from '@project-serum/anchor/dist/cjs/utils/rpc';
+} from '@frahman5/anchor/dist/cjs/utils/rpc';
 import {
   Signer,
   PublicKey,

@@ -1,4 +1,4 @@
-import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
+import { AnchorProvider, BN, Program, Provider } from '@frahman5/anchor';
 import { getFeeRates, getFeeTier } from '@project-serum/serum';
 import { Order } from '@project-serum/serum/lib/market';
 import {

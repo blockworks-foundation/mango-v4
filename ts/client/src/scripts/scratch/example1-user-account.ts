@@ -1,4 +1,4 @@
-import { AnchorProvider, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, Wallet } from '@frahman5/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { TokenPosition } from '../../accounts/mangoAccount';

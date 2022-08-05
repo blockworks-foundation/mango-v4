@@ -1,5 +1,5 @@
-import { BN } from '@project-serum/anchor';
-import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
+import { BN } from '@frahman5/anchor';
+import { utf8 } from '@frahman5/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { OracleConfig, QUOTE_DECIMALS } from './bank';
 import { I80F48, I80F48Dto } from './I80F48';

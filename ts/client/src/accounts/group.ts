@@ -1,4 +1,4 @@
-import { BorshAccountsCoder } from '@project-serum/anchor';
+import { BorshAccountsCoder } from '@frahman5/anchor';
 import { Market } from '@project-serum/serum';
 import { parsePriceData, PriceData } from '@pythnetwork/client';
 import { PublicKey } from '@solana/web3.js';

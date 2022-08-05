@@ -1,6 +1,6 @@
-import * as anchor from '@project-serum/anchor';
-import { AnchorProvider, Program } from '@project-serum/anchor';
-import NodeWallet from '@project-serum/anchor/dist/cjs/nodewallet';
+import * as anchor from '@frahman5/anchor';
+import { AnchorProvider, Program } from '@frahman5/anchor';
+import NodeWallet from '@frahman5/anchor/dist/cjs/nodewallet';
 import * as spl from '@solana/spl-token';
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { MangoV4 } from '../target/types/mango_v4';

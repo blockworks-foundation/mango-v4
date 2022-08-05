@@ -1,4 +1,4 @@
-import { BN } from '@project-serum/anchor';
+import { BN } from '@frahman5/anchor';
 
 export class FlashLoanWithdraw {
   static index: number;
