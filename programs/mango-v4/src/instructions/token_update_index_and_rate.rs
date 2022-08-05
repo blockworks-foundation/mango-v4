@@ -8,6 +8,7 @@ use crate::{
     state::{oracle_price, Bank, Group, MintInfo},
 };
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
+use anchor_lang::Discriminator;
 use checked_math as cm;
 use fixed::types::I80F48;
 
@@ -46,7 +47,8 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             // 2. we want to forbid cpi, since ix we would like to blacklist could just be called from cpi
             require!(
                 ix.program_id == crate::id()
-                    && ix.data[0..8] == [131, 136, 194, 39, 11, 50, 10, 198], // token_update_index_and_rate
+                    && ix.data[0..8]
+                        == crate::instruction::TokenUpdateIndexAndRate::discriminator(),
                 MangoError::SomeError
             );
 
