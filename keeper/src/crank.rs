@@ -3,6 +3,7 @@ use std::{sync::Arc, time::Duration};
 use crate::MangoClient;
 
 use anchor_lang::{__private::bytemuck::cast_ref, solana_program};
+use client::prettify_client_error;
 use futures::Future;
 use mango_v4::state::{EventQueue, EventType, FillEvent, OutEvent, PerpMarket, TokenIndex};
 use solana_sdk::{
@@ -11,31 +12,31 @@ use solana_sdk::{
 };
 use tokio::time;
 
+// TODO: move instructions into the client proper
+
 pub async fn runner(
     mango_client: Arc<MangoClient>,
     debugging_handle: impl Future,
 ) -> Result<(), anyhow::Error> {
     let handles1 = mango_client
-        .banks_cache
-        .values()
-        .map(|banks_for_a_token| {
-            loop_update_index_and_rate(
-                mango_client.clone(),
-                banks_for_a_token.get(0).unwrap().1.token_index,
-            )
-        })
+        .context
+        .tokens
+        .keys()
+        .map(|&token_index| loop_update_index_and_rate(mango_client.clone(), token_index))
         .collect::<Vec<_>>();
 
     let handles2 = mango_client
-        .perp_markets_cache
+        .context
+        .perp_markets
         .values()
-        .map(|(pk, perp_market)| loop_consume_events(mango_client.clone(), *pk, *perp_market))
+        .map(|perp| loop_consume_events(mango_client.clone(), perp.address, perp.market))
         .collect::<Vec<_>>();
 
     let handles3 = mango_client
-        .perp_markets_cache
+        .context
+        .perp_markets
         .values()
-        .map(|(pk, perp_market)| loop_update_funding(mango_client.clone(), *pk, *perp_market))
+        .map(|perp| loop_update_funding(mango_client.clone(), perp.address, perp.market))
         .collect::<Vec<_>>();
 
     futures::join!(
@@ -56,16 +57,10 @@ pub async fn loop_update_index_and_rate(mango_client: Arc<MangoClient>, token_in
         let client = mango_client.clone();
 
         let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-            let mint_info = client.get_mint_info(&token_index);
-            let banks_for_a_token = client.banks_cache_by_token_index.get(&token_index).unwrap();
-            let some_bank = banks_for_a_token.get(0).unwrap().1;
-            let token_name = some_bank.name();
-            let oracle = some_bank.oracle;
-
-            let bank_pubkeys_for_a_token = banks_for_a_token
-                .into_iter()
-                .map(|bank| bank.0)
-                .collect::<Vec<Pubkey>>();
+            let token = client.context.token(token_index);
+            let banks_for_a_token = token.mint_info.banks();
+            let token_name = &token.name;
+            let oracle = token.mint_info.oracle;
 
             let sig_result = client
                 .program()
@@ -75,7 +70,7 @@ pub async fn loop_update_index_and_rate(mango_client: Arc<MangoClient>, token_in
                         program_id: mango_v4::id(),
                         accounts: anchor_lang::ToAccountMetas::to_account_metas(
                             &mango_v4::accounts::TokenUpdateIndexAndRate {
-                                mint_info,
+                                mint_info: token.mint_info_address,
                                 oracle,
                                 instructions: solana_program::sysvar::instructions::id(),
                             },
@@ -85,7 +80,7 @@ pub async fn loop_update_index_and_rate(mango_client: Arc<MangoClient>, token_in
                             &mango_v4::instruction::TokenUpdateIndexAndRate {},
                         ),
                     };
-                    let mut banks = bank_pubkeys_for_a_token
+                    let mut banks = banks_for_a_token
                         .iter()
                         .map(|bank_pubkey| AccountMeta {
                             pubkey: *bank_pubkey,
@@ -96,7 +91,8 @@ pub async fn loop_update_index_and_rate(mango_client: Arc<MangoClient>, token_in
                     ix.accounts.append(&mut banks);
                     ix
                 })
-                .send();
+                .send()
+                .map_err(prettify_client_error);
 
             if let Err(e) = sig_result {
                 log::error!("{:?}", e)
@@ -196,7 +192,8 @@ pub async fn loop_consume_events(
                         &mango_v4::instruction::PerpConsumeEvents { limit: 10 },
                     ),
                 })
-                .send();
+                .send()
+                .map_err(prettify_client_error);
 
             if let Err(e) = sig_result {
                 log::error!("{:?}", e)
@@ -254,7 +251,8 @@ pub async fn loop_update_funding(
                         &mango_v4::instruction::PerpUpdateFunding {},
                     ),
                 })
-                .send();
+                .send()
+                .map_err(prettify_client_error);
             if let Err(e) = sig_result {
                 log::error!("{:?}", e)
             } else {

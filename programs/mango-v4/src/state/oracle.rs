@@ -10,7 +10,7 @@ use switchboard_v2::AggregatorAccountData;
 
 use crate::accounts_zerocopy::*;
 use crate::checked_math as cm;
-use crate::error::MangoError;
+use crate::error::*;
 
 const LOOKUP_START: i8 = -12;
 const LOOKUP: [I80F48; 25] = [
@@ -78,9 +78,9 @@ pub struct StubOracle {
     pub mint: Pubkey,
     pub price: I80F48,
     pub last_updated: i64,
-    pub reserved: [u8; 8],
+    pub reserved: [u8; 128],
 }
-const_assert_eq!(size_of::<StubOracle>(), 32 + 32 + 16 + 8 + 8);
+const_assert_eq!(size_of::<StubOracle>(), 32 + 32 + 16 + 8 + 128);
 const_assert_eq!(size_of::<StubOracle>() % 8, 0);
 
 pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<OracleType> {
@@ -144,14 +144,21 @@ pub fn oracle_price(
             cm!(price * decimal_adj)
         }
         OracleType::SwitchboardV2 => {
+            fn from_foreign_error(e: impl std::fmt::Display) -> Error {
+                error_msg!("{}", e)
+            }
+
             let feed = bytemuck::from_bytes::<AggregatorAccountData>(&data[8..]);
-            let feed_result = feed.get_result()?;
-            let price_decimal: f64 = feed_result.try_into()?;
+            let feed_result = feed.get_result().map_err(from_foreign_error)?;
+            let price_decimal: f64 = feed_result.try_into().map_err(from_foreign_error)?;
             let price = I80F48::from_num(price_decimal);
 
             // Filter out bad prices
-            let std_deviation_decimal: f64 =
-                feed.latest_confirmed_round.std_deviation.try_into()?;
+            let std_deviation_decimal: f64 = feed
+                .latest_confirmed_round
+                .std_deviation
+                .try_into()
+                .map_err(from_foreign_error)?;
             if I80F48::from_num(std_deviation_decimal) > oracle_conf_filter * price {
                 msg!(
                     "Switchboard v2 std deviation too high; pubkey {} price: {} latest_confirmed_round.std_deviation: {}",

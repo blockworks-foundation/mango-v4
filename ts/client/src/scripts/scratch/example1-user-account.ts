@@ -2,8 +2,8 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { TokenPosition } from '../../accounts/mangoAccount';
-import { MangoClient } from '../../client';
 import { MANGO_V4_ID } from '../../constants';
+import { AccountSize, MangoClient } from '../../index';
 
 //
 // An example for users based on high level api i.e. the client
@@ -38,7 +38,7 @@ async function main() {
       JSON.parse(fs.readFileSync(process.env.ADMIN_KEYPAIR!, 'utf-8')),
     ),
   );
-  const group = await client.getGroupForAdmin(admin.publicKey);
+  const group = await client.getGroupForCreator(admin.publicKey);
   console.log(`Found group ${group.publicKey.toBase58()}`);
 
   // create + fetch account
@@ -46,8 +46,6 @@ async function main() {
   const mangoAccount = await client.getOrCreateMangoAccount(
     group,
     user.publicKey,
-    0,
-    'my_mango_account',
   );
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
 

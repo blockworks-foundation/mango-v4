@@ -9,7 +9,7 @@ import { MangoClient } from '../client';
 //
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.CLUSTER_URL, options);
+  const connection = new Connection(process.env.CLUSTER_URL!, options);
 
   // user
   const user = Keypair.fromSecretKey(
@@ -38,12 +38,12 @@ async function main() {
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
   // fetch group
-  const group = await client.getGroupForAdmin(admin.publicKey);
+  const group = await client.getGroupForCreator(admin.publicKey);
   console.log(`Found group ${group.publicKey.toBase58()}`);
 
   // account
   const mangoAccount = (
-    await client.getMangoAccountForOwner(group, user.publicKey)
+    await client.getMangoAccountsForOwner(group, user.publicKey)
   )[0];
   console.log(`...found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString(group));
@@ -53,7 +53,7 @@ async function main() {
     for (const serum3Account of mangoAccount.serum3Active()) {
       let orders = await client.getSerum3Orders(
         group,
-        group.findSerum3Market(serum3Account.marketIndex).name,
+        group.findSerum3Market(serum3Account.marketIndex)!.name,
       );
       for (const order of orders) {
         console.log(
@@ -73,12 +73,12 @@ async function main() {
       await client.serum3SettleFunds(
         group,
         mangoAccount,
-        group.findSerum3Market(serum3Account.marketIndex).name,
+        group.findSerum3Market(serum3Account.marketIndex)!.name,
       );
       await client.serum3CloseOpenOrders(
         group,
         mangoAccount,
-        group.findSerum3Market(serum3Account.marketIndex).name,
+        group.findSerum3Market(serum3Account.marketIndex)!.name,
       );
     }
 
@@ -87,19 +87,19 @@ async function main() {
 
     // withdraw all tokens
     for (const token of mangoAccount.tokensActive()) {
-      const native = token.native(group.findBank(token.tokenIndex));
+      const native = token.native(group.findBank(token.tokenIndex)!);
       console.log(
-        `token native ${native} ${group.findBank(token.tokenIndex).name}`,
+        `token native ${native} ${group.findBank(token.tokenIndex)!.name}`,
       );
       if (native.toNumber() < 1) {
         continue;
       }
 
-      await client.tokenWithdraw2(
+      await client.tokenWithdrawNative(
         group,
         mangoAccount,
-        group.findBank(token.tokenIndex).name,
-        token.native(group.findBank(token.tokenIndex)).toNumber(),
+        group.findBank(token.tokenIndex)!.name,
+        token.native(group.findBank(token.tokenIndex)!).toNumber(),
         false,
       );
     }

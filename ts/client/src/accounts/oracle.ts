@@ -1,4 +1,4 @@
-import { PublicKey, TransactionSignature } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { I80F48, I80F48Dto } from './I80F48';
 
@@ -13,7 +13,6 @@ export class StubOracle {
       mint: PublicKey;
       price: I80F48Dto;
       lastUpdated: BN;
-      reserved: unknown;
     },
   ): StubOracle {
     return new StubOracle(

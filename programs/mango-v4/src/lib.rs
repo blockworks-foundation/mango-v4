@@ -15,23 +15,38 @@ pub mod error;
 pub mod events;
 pub mod instructions;
 pub mod logs;
-mod serum3_cpi;
+pub mod serum3_cpi;
 pub mod state;
 pub mod types;
 
-use state::{OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex};
+use state::{
+    AccountSize, OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex,
+};
 
 declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
 
 #[program]
 pub mod mango_v4 {
 
-    use crate::state::OracleConfig;
+    use crate::state::{AccountSize, OracleConfig};
 
     use super::*;
 
-    pub fn group_create(ctx: Context<GroupCreate>, group_num: u32, testing: u8) -> Result<()> {
-        instructions::group_create(ctx, group_num, testing)
+    pub fn group_create(
+        ctx: Context<GroupCreate>,
+        group_num: u32,
+        testing: u8,
+        version: u8,
+    ) -> Result<()> {
+        instructions::group_create(ctx, group_num, testing, version)
+    }
+
+    pub fn group_edit(
+        ctx: Context<GroupEdit>,
+        new_admin: Pubkey,
+        new_fast_listing_admin: Pubkey,
+    ) -> Result<()> {
+        instructions::group_edit(ctx, new_admin, new_fast_listing_admin)
     }
 
     pub fn group_close(ctx: Context<GroupClose>) -> Result<()> {
@@ -42,7 +57,6 @@ pub mod mango_v4 {
     pub fn token_register(
         ctx: Context<TokenRegister>,
         token_index: TokenIndex,
-        bank_num: u64,
         name: String,
         oracle_config: OracleConfig,
         interest_rate_params: InterestRateParams,
@@ -57,7 +71,6 @@ pub mod mango_v4 {
         instructions::token_register(
             ctx,
             token_index,
-            bank_num,
             name,
             oracle_config,
             interest_rate_params,
@@ -69,6 +82,14 @@ pub mod mango_v4 {
             init_liab_weight,
             liquidation_fee,
         )
+    }
+
+    pub fn token_register_trustless(
+        ctx: Context<TokenRegisterTrustless>,
+        token_index: TokenIndex,
+        name: String,
+    ) -> Result<()> {
+        instructions::token_register_trustless(ctx, token_index, name)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -106,7 +127,7 @@ pub mod mango_v4 {
     pub fn token_add_bank(
         ctx: Context<TokenAddBank>,
         token_index: TokenIndex,
-        bank_num: u64,
+        bank_num: u32,
     ) -> Result<()> {
         instructions::token_add_bank(ctx, token_index, bank_num)
     }
@@ -124,10 +145,15 @@ pub mod mango_v4 {
 
     pub fn account_create(
         ctx: Context<AccountCreate>,
-        account_num: u8,
+        account_num: u32,
+        account_size: AccountSize,
         name: String,
     ) -> Result<()> {
-        instructions::account_create(ctx, account_num, name)
+        instructions::account_create(ctx, account_num, account_size, name)
+    }
+
+    pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
+        instructions::account_expand(ctx)
     }
 
     pub fn account_edit(
@@ -173,39 +199,18 @@ pub mod mango_v4 {
         instructions::token_withdraw(ctx, amount, allow_borrow)
     }
 
-    pub fn flash_loan<'key, 'accounts, 'remaining, 'info>(
-        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan<'info>>,
-        withdraws: Vec<FlashLoanWithdraw>,
-        cpi_datas: Vec<CpiData>,
-    ) -> Result<()> {
-        instructions::flash_loan(ctx, withdraws, cpi_datas)
-    }
-
-    pub fn flash_loan2_begin<'key, 'accounts, 'remaining, 'info>(
-        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan2Begin<'info>>,
+    pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanBegin<'info>>,
         loan_amounts: Vec<u64>,
     ) -> Result<()> {
-        instructions::flash_loan2_begin(ctx, loan_amounts)
+        instructions::flash_loan_begin(ctx, loan_amounts)
     }
 
-    pub fn flash_loan2_end<'key, 'accounts, 'remaining, 'info>(
-        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan2End<'info>>,
+    // NOTE: keep disc synced in flash_loan.rs
+    pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
     ) -> Result<()> {
-        instructions::flash_loan2_end(ctx)
-    }
-
-    pub fn flash_loan3_begin<'key, 'accounts, 'remaining, 'info>(
-        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan3Begin<'info>>,
-        loan_amounts: Vec<u64>,
-    ) -> Result<()> {
-        instructions::flash_loan3_begin(ctx, loan_amounts)
-    }
-
-    // NOTE: keep disc synced in flash_loan3.rs
-    pub fn flash_loan3_end<'key, 'accounts, 'remaining, 'info>(
-        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoan3End<'info>>,
-    ) -> Result<()> {
-        instructions::flash_loan3_end(ctx)
+        instructions::flash_loan_end(ctx)
     }
 
     ///

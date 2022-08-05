@@ -6,7 +6,7 @@ import { I80F48, I80F48Dto, ZERO_I80F48 } from './I80F48';
 
 export const QUOTE_DECIMALS = 6;
 
-type OracleConfig = {
+export type OracleConfig = {
   confFilter: I80F48Dto;
 };
 
@@ -16,6 +16,8 @@ export class Bank {
   public borrowIndex: I80F48;
   public cachedIndexedTotalDeposits: I80F48;
   public cachedIndexedTotalBorrows: I80F48;
+  public avgUtilization: I80F48;
+  public adjustmentFactor: I80F48;
   public maxRate: I80F48;
   public rate0: I80F48;
   public rate1: I80F48;
@@ -31,8 +33,8 @@ export class Bank {
   static from(
     publicKey: PublicKey,
     obj: {
-      name: number[];
       group: PublicKey;
+      name: number[];
       mint: PublicKey;
       vault: PublicKey;
       oracle: PublicKey;
@@ -41,7 +43,12 @@ export class Bank {
       borrowIndex: I80F48Dto;
       cachedIndexedTotalDeposits: I80F48Dto;
       cachedIndexedTotalBorrows: I80F48Dto;
-      lastUpdated: BN;
+      indexedDeposits: I80F48Dto;
+      indexedBorrows: I80F48Dto;
+      indexLastUpdated: BN;
+      bankRateLastUpdated: BN;
+      avgUtilization: I80F48Dto;
+      adjustmentFactor: I80F48Dto;
       util0: I80F48Dto;
       rate0: I80F48Dto;
       util1: I80F48Dto;
@@ -55,9 +62,12 @@ export class Bank {
       maintLiabWeight: I80F48Dto;
       initLiabWeight: I80F48Dto;
       liquidationFee: I80F48Dto;
-      dust: Object;
+      dust: I80F48Dto;
+      flashLoanVaultInitial: BN;
+      flashLoanApprovedAmount: BN;
       tokenIndex: number;
       mintDecimals: number;
+      bankNum: number;
     },
   ) {
     return new Bank(
@@ -72,7 +82,12 @@ export class Bank {
       obj.borrowIndex,
       obj.cachedIndexedTotalDeposits,
       obj.cachedIndexedTotalBorrows,
-      obj.lastUpdated,
+      obj.indexedDeposits,
+      obj.indexedBorrows,
+      obj.indexLastUpdated,
+      obj.bankRateLastUpdated,
+      obj.avgUtilization,
+      obj.adjustmentFactor,
       obj.util0,
       obj.rate0,
       obj.util1,
@@ -87,8 +102,11 @@ export class Bank {
       obj.initLiabWeight,
       obj.liquidationFee,
       obj.dust,
+      obj.flashLoanVaultInitial,
+      obj.flashLoanApprovedAmount,
       obj.tokenIndex,
       obj.mintDecimals,
+      obj.bankNum,
     );
   }
 
@@ -104,7 +122,12 @@ export class Bank {
     borrowIndex: I80F48Dto,
     indexedTotalDeposits: I80F48Dto,
     indexedTotalBorrows: I80F48Dto,
-    lastUpdated: BN,
+    indexedDeposits: I80F48Dto,
+    indexedBorrows: I80F48Dto,
+    public indexLastUpdated: BN,
+    public bankRateLastUpdated: BN,
+    avgUtilization: I80F48Dto,
+    adjustmentFactor: I80F48Dto,
     util0: I80F48Dto,
     rate0: I80F48Dto,
     util1: I80F48Dto,
@@ -118,15 +141,20 @@ export class Bank {
     maintLiabWeight: I80F48Dto,
     initLiabWeight: I80F48Dto,
     liquidationFee: I80F48Dto,
-    dust: Object,
+    dust: I80F48Dto,
+    flashLoanVaultInitial: BN,
+    flashLoanApprovedAmount: BN,
     public tokenIndex: number,
     public mintDecimals: number,
+    public bankNum: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.depositIndex = I80F48.from(depositIndex);
     this.borrowIndex = I80F48.from(borrowIndex);
     this.cachedIndexedTotalDeposits = I80F48.from(indexedTotalDeposits);
     this.cachedIndexedTotalBorrows = I80F48.from(indexedTotalBorrows);
+    this.avgUtilization = I80F48.from(avgUtilization);
+    this.adjustmentFactor = I80F48.from(adjustmentFactor);
     this.maxRate = I80F48.from(maxRate);
     this.util0 = I80F48.from(util0);
     this.rate0 = I80F48.from(rate0);
@@ -155,6 +183,14 @@ export class Bank {
       this.cachedIndexedTotalDeposits.toNumber() +
       '\n cachedIndexedTotalBorrows - ' +
       this.cachedIndexedTotalBorrows.toNumber() +
+      '\n indexLastUpdated - ' +
+      new Date(this.indexLastUpdated.toNumber() * 1000) +
+      '\n bankRateLastUpdated - ' +
+      new Date(this.bankRateLastUpdated.toNumber() * 1000) +
+      '\n avgUtilization - ' +
+      this.avgUtilization.toNumber() +
+      '\n adjustmentFactor - ' +
+      this.adjustmentFactor.toNumber() +
       '\n maxRate - ' +
       this.maxRate.toNumber() +
       '\n util0 - ' +
@@ -174,7 +210,15 @@ export class Bank {
       '\n initLiabWeight - ' +
       this.initLiabWeight.toNumber() +
       '\n liquidationFee - ' +
-      this.liquidationFee.toNumber()
+      this.liquidationFee.toNumber() +
+      '\n uiDeposits() - ' +
+      this.uiDeposits() +
+      '\n uiBorrows() - ' +
+      this.uiBorrows() +
+      '\n getDepositRate() - ' +
+      this.getDepositRate().toNumber() +
+      '\n getBorrowRate() - ' +
+      this.getBorrowRate().toNumber()
     );
   }
 
@@ -250,34 +294,39 @@ export class MintInfo {
   static from(
     publicKey: PublicKey,
     obj: {
+      group: PublicKey;
+      tokenIndex: number;
       mint: PublicKey;
       banks: PublicKey[];
       vaults: PublicKey[];
       oracle: PublicKey;
-      addressLookupTable: PublicKey;
-      tokenIndex: number;
-      addressLookupTableBankIndex: Number;
-      addressLookupTableOracleIndex: Number;
-      reserved: unknown;
+      registrationTime: BN;
+      groupInsuranceFund: number;
     },
   ) {
     return new MintInfo(
       publicKey,
+      obj.group,
+      obj.tokenIndex,
       obj.mint,
       obj.banks,
       obj.vaults,
       obj.oracle,
-      obj.tokenIndex,
+      obj.registrationTime,
+      obj.groupInsuranceFund,
     );
   }
 
   constructor(
     public publicKey: PublicKey,
+    public group: PublicKey,
+    public tokenIndex: number,
     public mint: PublicKey,
     public banks: PublicKey[],
     public vaults: PublicKey[],
     public oracle: PublicKey,
-    public tokenIndex: number,
+    public registrationTime: BN,
+    public groupInsuranceFund: number,
   ) {}
 
   public firstBank(): PublicKey {
@@ -288,7 +337,7 @@ export class MintInfo {
   }
 
   toString(): string {
-    let res =
+    const res =
       'mint ' +
       this.mint.toBase58() +
       '\n oracle ' +

@@ -8,14 +8,8 @@ use crate::state::*;
 pub struct AccountClose<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        // note: should never be the delegate
-        has_one = owner,
-        has_one = group,
-        close = sol_destination
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut, has_one = group, has_one = owner, close = sol_destination)]
+    pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -28,23 +22,24 @@ pub struct AccountClose<'info> {
 pub fn account_close(ctx: Context<AccountClose>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
-    // don't perform checks if group is just testing
-    if group.testing == 1 {
-        return Ok(());
-    }
+    {
+        let account = ctx.accounts.account.load_mut()?;
 
-    let account = ctx.accounts.account.load()?;
-    require!(!account.being_liquidated(), MangoError::SomeError);
-    require!(!account.is_bankrupt(), MangoError::SomeError);
-    require_eq!(account.delegate, Pubkey::default());
-    for ele in account.tokens.values {
-        require_eq!(ele.is_active(), false);
-    }
-    for ele in account.serum3.values {
-        require_eq!(ele.is_active(), false);
-    }
-    for ele in account.perps.accounts {
-        require_eq!(ele.is_active(), false);
+        // don't perform checks if group is just testing
+        if group.testing == 0 {
+            require!(!account.fixed.being_liquidated(), MangoError::SomeError);
+            require!(!account.fixed.is_bankrupt(), MangoError::SomeError);
+            require_eq!(account.fixed.delegate, Pubkey::default());
+            for ele in account.token_iter() {
+                require_eq!(ele.is_active(), false);
+            }
+            for ele in account.serum3_iter() {
+                require_eq!(ele.is_active(), false);
+            }
+            for ele in account.perp_iter() {
+                require_eq!(ele.is_active(), false);
+            }
+        }
     }
 
     Ok(())

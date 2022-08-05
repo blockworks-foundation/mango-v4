@@ -17,3 +17,8 @@ programs/margin-trade/src/lib-expanded.rs
 programs/mango-v4/src/lib-expanded.rs
 
 keeper/.env
+
+ts/client/**/*.js
+ts/client/**/*.js.map
+migrations/*.js
+migrations/*.js.map

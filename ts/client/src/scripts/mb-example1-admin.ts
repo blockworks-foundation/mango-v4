@@ -42,11 +42,11 @@ async function main() {
   console.log(`Creating Group...`);
   try {
     const insuranceMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
-    await client.groupCreate(0, true, insuranceMint);
+    await client.groupCreate(0, true, 0, insuranceMint);
   } catch (error) {
     console.log(error);
   }
-  const group = await client.getGroupForAdmin(admin.publicKey);
+  const group = await client.getGroupForCreator(admin.publicKey);
   console.log(`...registered group ${group.publicKey}`);
 
   // register token 1

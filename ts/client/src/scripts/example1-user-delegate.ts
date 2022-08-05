@@ -79,7 +79,12 @@ async function main() {
   if (true) {
     // set delegate, and change name
     console.log(`...changing mango account name, and setting a delegate`);
-    await client.editMangoAccount(group, 'my_changed_name', delegate.publicKey);
+    await client.editMangoAccount(
+      group,
+      mangoAccount,
+      'my_changed_name',
+      delegate.publicKey,
+    );
     await mangoAccount.reload(client, group);
     console.log(mangoAccount.toString());
   }

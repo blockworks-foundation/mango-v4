@@ -19,7 +19,7 @@ export type MangoV4 = {
               {
                 "kind": "account",
                 "type": "publicKey",
-                "path": "admin"
+                "path": "creator"
               },
               {
                 "kind": "arg",
@@ -30,7 +30,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "admin",
+          "name": "creator",
           "isMut": false,
           "isSigner": true
         },
@@ -87,6 +87,35 @@ export type MangoV4 = {
         {
           "name": "testing",
           "type": "u8"
+        },
+        {
+          "name": "version",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "groupEdit",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "newAdmin",
+          "type": "publicKey"
+        },
+        {
+          "name": "newFastListingAdmin",
+          "type": "publicKey"
         }
       ]
     },
@@ -102,6 +131,11 @@ export type MangoV4 = {
           "name": "admin",
           "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
         },
         {
           "name": "solDestination",
@@ -156,9 +190,9 @@ export type MangoV4 = {
                 "path": "token_index"
               },
               {
-                "kind": "arg",
-                "type": "u64",
-                "path": "bank_num"
+                "kind": "const",
+                "type": "u32",
+                "value": 0
               }
             ]
           }
@@ -185,9 +219,9 @@ export type MangoV4 = {
                 "path": "token_index"
               },
               {
-                "kind": "arg",
-                "type": "u64",
-                "path": "bank_num"
+                "kind": "const",
+                "type": "u32",
+                "value": 0
               }
             ]
           }
@@ -249,10 +283,6 @@ export type MangoV4 = {
           "type": "u16"
         },
         {
-          "name": "bankNum",
-          "type": "u64"
-        },
-        {
           "name": "name",
           "type": "string"
         },
@@ -299,6 +329,144 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "tokenRegisterTrustless",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "fastListingAdmin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Bank"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "const",
+                "type": "u32",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Vault"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "const",
+                "type": "u32",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "name": "mintInfo",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "MintInfo"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "tokenEdit",
       "accounts": [
         {
@@ -313,7 +481,7 @@ export type MangoV4 = {
         },
         {
           "name": "mintInfo",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         }
       ],
@@ -434,7 +602,7 @@ export type MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u64",
+                "type": "u32",
                 "path": "bank_num"
               }
             ]
@@ -463,7 +631,7 @@ export type MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u64",
+                "type": "u32",
                 "path": "bank_num"
               }
             ]
@@ -522,7 +690,7 @@ export type MangoV4 = {
         },
         {
           "name": "bankNum",
-          "type": "u64"
+          "type": "u32"
         }
       ]
     },
@@ -619,7 +787,7 @@ export type MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u8",
+                "type": "u32",
                 "path": "account_num"
               }
             ]
@@ -644,13 +812,50 @@ export type MangoV4 = {
       "args": [
         {
           "name": "accountNum",
-          "type": "u8"
+          "type": "u32"
+        },
+        {
+          "name": "accountSize",
+          "type": {
+            "defined": "AccountSize"
+          }
         },
         {
           "name": "name",
           "type": "string"
         }
       ]
+    },
+    {
+      "name": "accountExpand",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
     },
     {
       "name": "accountEdit",
@@ -745,7 +950,7 @@ export type MangoV4 = {
                 "kind": "account",
                 "type": "publicKey",
                 "account": "Mint",
-                "path": "token_mint"
+                "path": "mint"
               }
             ]
           }
@@ -756,7 +961,7 @@ export type MangoV4 = {
           "isSigner": true
         },
         {
-          "name": "tokenMint",
+          "name": "mint",
           "isMut": false,
           "isSigner": false
         },
@@ -941,109 +1146,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "flashLoan",
-      "accounts": [
-        {
-          "name": "group",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "account",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "withdraws",
-          "type": {
-            "vec": {
-              "defined": "FlashLoanWithdraw"
-            }
-          }
-        },
-        {
-          "name": "cpiDatas",
-          "type": {
-            "vec": {
-              "defined": "CpiData"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "flashLoan2Begin",
-      "accounts": [
-        {
-          "name": "group",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "temporaryVaultAuthority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "instructions",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "loanAmounts",
-          "type": {
-            "vec": "u64"
-          }
-        }
-      ]
-    },
-    {
-      "name": "flashLoan2End",
-      "accounts": [
-        {
-          "name": "group",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "account",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "flashLoan3Begin",
+      "name": "flashLoanBegin",
       "accounts": [
         {
           "name": "group",
@@ -1058,7 +1161,10 @@ export type MangoV4 = {
         {
           "name": "instructions",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "Instructions Sysvar for instruction introspection"
+          ]
         }
       ],
       "args": [
@@ -1071,7 +1177,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "flashLoan3End",
+      "name": "flashLoanEnd",
       "accounts": [
         {
           "name": "account",
@@ -1093,6 +1199,11 @@ export type MangoV4 = {
     },
     {
       "name": "serum3RegisterMarket",
+      "docs": [
+        "",
+        "Serum",
+        ""
+      ],
       "accounts": [
         {
           "name": "group",
@@ -1393,7 +1504,10 @@ export type MangoV4 = {
         {
           "name": "marketVaultSigner",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "needed for the automatic settle_funds call"
+          ]
         },
         {
           "name": "quoteBank",
@@ -1539,7 +1653,7 @@ export type MangoV4 = {
         },
         {
           "name": "account",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -1641,7 +1755,10 @@ export type MangoV4 = {
         {
           "name": "marketVaultSigner",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "needed for the automatic settle_funds call"
+          ]
         },
         {
           "name": "quoteBank",
@@ -1867,6 +1984,11 @@ export type MangoV4 = {
     },
     {
       "name": "perpCreateMarket",
+      "docs": [
+        "",
+        "Perps",
+        ""
+      ],
       "accounts": [
         {
           "name": "group",
@@ -1910,7 +2032,11 @@ export type MangoV4 = {
         {
           "name": "bids",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "Accounts are initialised by client,",
+            "anchor discriminator is set first when ix exits,"
+          ]
         },
         {
           "name": "asks",
@@ -2487,6 +2613,11 @@ export type MangoV4 = {
     },
     {
       "name": "benchmark",
+      "docs": [
+        "",
+        "benchmark",
+        ""
+      ],
       "accounts": [],
       "args": []
     }
@@ -2530,6 +2661,10 @@ export type MangoV4 = {
           },
           {
             "name": "depositIndex",
+            "docs": [
+              "the index used to scale the value of an IndexedPosition",
+              "TODO: should always be >= 0, add checks?"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -2542,6 +2677,11 @@ export type MangoV4 = {
           },
           {
             "name": "cachedIndexedTotalDeposits",
+            "docs": [
+              "total deposits/borrows, only updated during UpdateIndexAndRate",
+              "TODO: These values could be dropped from the bank, they're written in UpdateIndexAndRate",
+              "and never read."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -2554,6 +2694,17 @@ export type MangoV4 = {
           },
           {
             "name": "indexedDeposits",
+            "docs": [
+              "deposits/borrows for this bank",
+              "",
+              "Note that these may become negative. It's perfectly fine for users to borrow one one bank",
+              "(increasing indexed_borrows there) and paying back on another (possibly decreasing indexed_borrows",
+              "below zero).",
+              "",
+              "The vault amount is not deducable from these values.",
+              "",
+              "These become meaningful when summed over all banks (like in update_index_and_rate)."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -2689,17 +2840,17 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "bankNum",
+            "type": "u32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                4
+                256
               ]
             }
-          },
-          {
-            "name": "bankNum",
-            "type": "u64"
           }
         ]
       }
@@ -2710,12 +2861,20 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
-            "name": "admin",
+            "name": "creator",
             "type": "publicKey"
           },
           {
             "name": "groupNum",
             "type": "u32"
+          },
+          {
+            "name": "admin",
+            "type": "publicKey"
+          },
+          {
+            "name": "fastListingAdmin",
+            "type": "publicKey"
           },
           {
             "name": "padding",
@@ -2743,11 +2902,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "version",
+            "type": "u8"
+          },
+          {
             "name": "padding2",
             "type": {
               "array": [
                 "u8",
-                6
+                5
               ]
             }
           },
@@ -2756,7 +2919,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                8
+                256
               ]
             }
           }
@@ -2790,29 +2953,17 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "tokens",
-            "type": {
-              "defined": "MangoAccountTokenPositions"
-            }
-          },
-          {
-            "name": "serum3",
-            "type": {
-              "defined": "MangoAccountSerum3Orders"
-            }
-          },
-          {
-            "name": "perps",
-            "type": {
-              "defined": "MangoAccountPerpPositions"
-            }
-          },
-          {
             "name": "beingLiquidated",
+            "docs": [
+              "This account cannot open new positions or borrow until `init_health >= 0`"
+            ],
             "type": "u8"
           },
           {
             "name": "isBankrupt",
+            "docs": [
+              "This account cannot do anything except go through `resolve_bankruptcy`"
+            ],
             "type": "u8"
           },
           {
@@ -2824,7 +2975,7 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "reserved",
+            "name": "padding",
             "type": {
               "array": [
                 "u8",
@@ -2839,6 +2990,76 @@ export type MangoV4 = {
           {
             "name": "netSettled",
             "type": "f32"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                256
+              ]
+            }
+          },
+          {
+            "name": "headerVersion",
+            "type": "u8"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "padding1",
+            "type": "u32"
+          },
+          {
+            "name": "tokens",
+            "type": {
+              "vec": {
+                "defined": "TokenPosition"
+              }
+            }
+          },
+          {
+            "name": "padding2",
+            "type": "u32"
+          },
+          {
+            "name": "serum3",
+            "type": {
+              "vec": {
+                "defined": "Serum3Orders"
+              }
+            }
+          },
+          {
+            "name": "padding3",
+            "type": "u32"
+          },
+          {
+            "name": "perps",
+            "type": {
+              "vec": {
+                "defined": "PerpPositions"
+              }
+            }
+          },
+          {
+            "name": "padding4",
+            "type": "u32"
+          },
+          {
+            "name": "perpOpenOrders",
+            "type": {
+              "vec": {
+                "defined": "PerpOpenOrders"
+              }
+            }
           }
         ]
       }
@@ -2857,7 +3078,7 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "padding",
+            "name": "padding1",
             "type": {
               "array": [
                 "u8",
@@ -2892,15 +3113,11 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "addressLookupTable",
-            "type": "publicKey"
+            "name": "registrationTime",
+            "type": "i64"
           },
           {
-            "name": "addressLookupTableBankIndex",
-            "type": "u8"
-          },
-          {
-            "name": "addressLookupTableOracleIndex",
+            "name": "groupInsuranceFund",
             "type": "u8"
           },
           {
@@ -2908,7 +3125,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                6
+                255
               ]
             }
           }
@@ -2943,7 +3160,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                8
+                128
               ]
             }
           }
@@ -2952,6 +3169,11 @@ export type MangoV4 = {
     },
     {
       "name": "bookSide",
+      "docs": [
+        "A binary tree on AnyNode::key()",
+        "",
+        "The key encodes the price in the top 64 bits."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -3000,6 +3222,15 @@ export type MangoV4 = {
                 1024
               ]
             }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                256
+              ]
+            }
           }
         ]
       }
@@ -3022,7 +3253,7 @@ export type MangoV4 = {
                 {
                   "defined": "AnyEvent"
                 },
-                512
+                488
               ]
             }
           }
@@ -3044,10 +3275,13 @@ export type MangoV4 = {
           },
           {
             "name": "perpMarketIndex",
+            "docs": [
+              "Lookup indices"
+            ],
             "type": "u16"
           },
           {
-            "name": "padding",
+            "name": "padding1",
             "type": {
               "array": [
                 "u8",
@@ -3088,10 +3322,18 @@ export type MangoV4 = {
           },
           {
             "name": "quoteLotSize",
+            "docs": [
+              "Number of quote native that reresents min tick"
+            ],
             "type": "i64"
           },
           {
             "name": "baseLotSize",
+            "docs": [
+              "Represents number of base native quantity",
+              "e.g. if base decimals for underlying asset are 6, base lot size is 100, and base position is 10000, then",
+              "UI position is 1"
+            ],
             "type": "i64"
           },
           {
@@ -3170,20 +3412,36 @@ export type MangoV4 = {
           },
           {
             "name": "openInterest",
+            "docs": [
+              ""
+            ],
             "type": "i64"
           },
           {
             "name": "seqNum",
+            "docs": [
+              "Total number of orders seen"
+            ],
             "type": "u64"
           },
           {
             "name": "feesAccrued",
+            "docs": [
+              "Fees accrued in native quote currency"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "bump",
+            "docs": [
+              "Liquidity mining metadata",
+              "pub liquidity_mining_info: LiquidityMiningInfo,",
+              "Token vault which holds mango tokens to be disbursed as liquidity incentives for this perp market",
+              "pub mngo_vault: Pubkey,",
+              "PDA bump"
+            ],
             "type": "u8"
           },
           {
@@ -3191,11 +3449,24 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "reserved",
+            "name": "padding2",
             "type": {
               "array": [
                 "u8",
                 6
+              ]
+            }
+          },
+          {
+            "name": "registrationTime",
+            "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                128
               ]
             }
           }
@@ -3220,7 +3491,7 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "padding",
+            "name": "padding1",
             "type": {
               "array": [
                 "u8",
@@ -3254,11 +3525,24 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "reserved",
+            "name": "padding2",
             "type": {
               "array": [
                 "u8",
                 5
+              ]
+            }
+          },
+          {
+            "name": "registrationTime",
+            "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                128
               ]
             }
           }
@@ -3323,38 +3607,6 @@ export type MangoV4 = {
             "type": {
               "defined": "I80F48"
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "FlashLoanWithdraw",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "index",
-            "type": "u8"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CpiData",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "accountStart",
-            "type": "u8"
-          },
-          {
-            "name": "data",
-            "type": "bytes"
           }
         ]
       }
@@ -3586,43 +3838,42 @@ export type MangoV4 = {
         "fields": [
           {
             "name": "indexedPosition",
+            "docs": [
+              "The deposit_index (if positive) or borrow_index (if negative) scaled position"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "tokenIndex",
+            "docs": [
+              "index into Group.tokens"
+            ],
             "type": "u16"
           },
           {
             "name": "inUseCount",
+            "docs": [
+              "incremented when a market requires this position to stay alive"
+            ],
             "type": "u8"
           },
           {
-            "name": "reserved",
+            "name": "padding",
             "type": {
               "array": [
                 "u8",
                 5
               ]
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "MangoAccountTokenPositions",
-      "type": {
-        "kind": "struct",
-        "fields": [
+          },
           {
-            "name": "values",
+            "name": "reserved",
             "type": {
               "array": [
-                {
-                  "defined": "TokenPosition"
-                },
-                16
+                "u8",
+                40
               ]
             }
           }
@@ -3652,6 +3903,11 @@ export type MangoV4 = {
           },
           {
             "name": "baseTokenIndex",
+            "docs": [
+              "Store the base/quote token index, so health computations don't need",
+              "to get passed the static SerumMarket to find which tokens a market",
+              "uses and look up the correct oracles."
+            ],
             "type": "u16"
           },
           {
@@ -3659,30 +3915,20 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "reserved",
+            "name": "padding",
             "type": {
               "array": [
                 "u8",
                 2
               ]
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "MangoAccountSerum3Orders",
-      "type": {
-        "kind": "struct",
-        "fields": [
+          },
           {
-            "name": "values",
+            "name": "reserved",
             "type": {
               "array": [
-                {
-                  "defined": "Serum3Orders"
-                },
-                8
+                "u8",
+                64
               ]
             }
           }
@@ -3699,7 +3945,7 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "reserved",
+            "name": "padding",
             "type": {
               "array": [
                 "u8",
@@ -3709,16 +3955,26 @@ export type MangoV4 = {
           },
           {
             "name": "basePositionLots",
+            "docs": [
+              "Active position size, measured in base lots"
+            ],
             "type": "i64"
           },
           {
             "name": "quotePositionNative",
+            "docs": [
+              "Active position in quote (conversation rate is that of the time the order was settled)",
+              "measured in native quote"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "longSettledFunding",
+            "docs": [
+              "Already settled funding"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -3731,74 +3987,89 @@ export type MangoV4 = {
           },
           {
             "name": "bidsBaseLots",
+            "docs": [
+              "Base lots in bids"
+            ],
             "type": "i64"
           },
           {
             "name": "asksBaseLots",
+            "docs": [
+              "Base lots in asks"
+            ],
             "type": "i64"
           },
           {
             "name": "takerBaseLots",
+            "docs": [
+              "Liquidity mining rewards",
+              "Amount that's on EventQueue waiting to be processed"
+            ],
             "type": "i64"
           },
           {
             "name": "takerQuoteLots",
             "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           }
         ]
       }
     },
     {
-      "name": "MangoAccountPerpPositions",
+      "name": "PerpOpenOrders",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "accounts",
+            "name": "orderSide",
+            "type": {
+              "defined": "Side"
+            }
+          },
+          {
+            "name": "padding1",
             "type": {
               "array": [
-                {
-                  "defined": "PerpPositions"
-                },
-                8
+                "u8",
+                1
               ]
             }
           },
           {
             "name": "orderMarket",
-            "type": {
-              "array": [
-                "u16",
-                8
-              ]
-            }
+            "type": "u16"
           },
           {
-            "name": "orderSide",
+            "name": "padding2",
             "type": {
               "array": [
-                {
-                  "defined": "Side"
-                },
-                8
-              ]
-            }
-          },
-          {
-            "name": "orderId",
-            "type": {
-              "array": [
-                "i128",
-                8
+                "u8",
+                4
               ]
             }
           },
           {
             "name": "clientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "orderId",
+            "type": "i128"
+          },
+          {
+            "name": "reserved",
             "type": {
               "array": [
-                "u64",
-                8
+                "u8",
+                64
               ]
             }
           }
@@ -3833,7 +4104,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                84
+                92
               ]
             }
           }
@@ -3874,7 +4145,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                199
+                207
               ]
             }
           }
@@ -3883,6 +4154,10 @@ export type MangoV4 = {
     },
     {
       "name": "TokenIndex",
+      "docs": [
+        "Nothing in Rust shall use these types. They only exist so that the Anchor IDL",
+        "knows about them and typescript can deserialize it."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -3930,50 +4205,10 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "ProgramInstruction",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "CreateLookupTable",
-            "fields": [
-              {
-                "name": "recent_slot",
-                "type": {
-                  "defined": "Slot"
-                }
-              },
-              {
-                "name": "bump_seed",
-                "type": "u8"
-              }
-            ]
-          },
-          {
-            "name": "FreezeLookupTable"
-          },
-          {
-            "name": "ExtendLookupTable",
-            "fields": [
-              {
-                "name": "new_addresses",
-                "type": {
-                  "vec": "publicKey"
-                }
-              }
-            ]
-          },
-          {
-            "name": "DeactivateLookupTable"
-          },
-          {
-            "name": "CloseLookupTable"
-          }
-        ]
-      }
-    },
-    {
       "name": "Serum3SelfTradeBehavior",
+      "docs": [
+        "Copy paste a bunch of enums so that we could AnchorSerialize & AnchorDeserialize them"
+      ],
       "type": {
         "kind": "enum",
         "variants": [
@@ -4022,6 +4257,14 @@ export type MangoV4 = {
     },
     {
       "name": "HealthType",
+      "docs": [
+        "There are two types of health, initial health used for opening new positions and maintenance",
+        "health used for liquidations. They are both calculated as a weighted sum of the assets",
+        "minus the liabilities but the maint. health uses slightly larger weights for assets and",
+        "slightly smaller weights for the liabilities. Zero is used as the bright line for both",
+        "i.e. if your init health falls below zero, you cannot open new positions and if your maint. health",
+        "falls below zero you will be liquidated."
+      ],
       "type": {
         "kind": "enum",
         "variants": [
@@ -4030,6 +4273,20 @@ export type MangoV4 = {
           },
           {
             "name": "Maint"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AccountSize",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Small"
+          },
+          {
+            "name": "Large"
           }
         ]
       }
@@ -4674,58 +4931,73 @@ export type MangoV4 = {
     },
     {
       "code": 6001,
+      "name": "NotImplementedError",
+      "msg": ""
+    },
+    {
+      "code": 6002,
       "name": "MathError",
       "msg": "checked math error"
     },
     {
-      "code": 6002,
+      "code": 6003,
       "name": "UnexpectedOracle",
       "msg": ""
     },
     {
-      "code": 6003,
+      "code": 6004,
       "name": "UnknownOracleType",
       "msg": "oracle type cannot be determined"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "InvalidFlashLoanTargetCpiProgram",
       "msg": ""
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "HealthMustBePositive",
       "msg": "health must be positive"
     },
     {
-      "code": 6006,
+      "code": 6007,
+      "name": "HealthMustBeNegative",
+      "msg": "health must be negative"
+    },
+    {
+      "code": 6008,
       "name": "IsBankrupt",
       "msg": "the account is bankrupt"
     },
     {
-      "code": 6007,
+      "code": 6009,
       "name": "IsNotBankrupt",
       "msg": "the account is not bankrupt"
     },
     {
-      "code": 6008,
+      "code": 6010,
       "name": "NoFreeTokenPositionIndex",
       "msg": "no free token position index"
     },
     {
-      "code": 6009,
+      "code": 6011,
       "name": "NoFreeSerum3OpenOrdersIndex",
       "msg": "no free serum3 open orders index"
     },
     {
-      "code": 6010,
+      "code": 6012,
       "name": "NoFreePerpPositionIndex",
       "msg": "no free perp position index"
     },
     {
-      "code": 6011,
+      "code": 6013,
       "name": "Serum3OpenOrdersExistAlready",
       "msg": "serum3 open orders exist already"
+    },
+    {
+      "code": 6014,
+      "name": "InsufficentBankVaultFunds",
+      "msg": "bank vault has insufficent funds"
     }
   ]
 };
@@ -4751,7 +5023,7 @@ export const IDL: MangoV4 = {
               {
                 "kind": "account",
                 "type": "publicKey",
-                "path": "admin"
+                "path": "creator"
               },
               {
                 "kind": "arg",
@@ -4762,7 +5034,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "admin",
+          "name": "creator",
           "isMut": false,
           "isSigner": true
         },
@@ -4819,6 +5091,35 @@ export const IDL: MangoV4 = {
         {
           "name": "testing",
           "type": "u8"
+        },
+        {
+          "name": "version",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "groupEdit",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "newAdmin",
+          "type": "publicKey"
+        },
+        {
+          "name": "newFastListingAdmin",
+          "type": "publicKey"
         }
       ]
     },
@@ -4834,6 +5135,11 @@ export const IDL: MangoV4 = {
           "name": "admin",
           "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
         },
         {
           "name": "solDestination",
@@ -4888,9 +5194,9 @@ export const IDL: MangoV4 = {
                 "path": "token_index"
               },
               {
-                "kind": "arg",
-                "type": "u64",
-                "path": "bank_num"
+                "kind": "const",
+                "type": "u32",
+                "value": 0
               }
             ]
           }
@@ -4917,9 +5223,9 @@ export const IDL: MangoV4 = {
                 "path": "token_index"
               },
               {
-                "kind": "arg",
-                "type": "u64",
-                "path": "bank_num"
+                "kind": "const",
+                "type": "u32",
+                "value": 0
               }
             ]
           }
@@ -4981,10 +5287,6 @@ export const IDL: MangoV4 = {
           "type": "u16"
         },
         {
-          "name": "bankNum",
-          "type": "u64"
-        },
-        {
           "name": "name",
           "type": "string"
         },
@@ -5031,6 +5333,144 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "tokenRegisterTrustless",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "fastListingAdmin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Bank"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "const",
+                "type": "u32",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Vault"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "token_index"
+              },
+              {
+                "kind": "const",
+                "type": "u32",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "name": "mintInfo",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "MintInfo"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "tokenEdit",
       "accounts": [
         {
@@ -5045,7 +5485,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "mintInfo",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         }
       ],
@@ -5166,7 +5606,7 @@ export const IDL: MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u64",
+                "type": "u32",
                 "path": "bank_num"
               }
             ]
@@ -5195,7 +5635,7 @@ export const IDL: MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u64",
+                "type": "u32",
                 "path": "bank_num"
               }
             ]
@@ -5254,7 +5694,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "bankNum",
-          "type": "u64"
+          "type": "u32"
         }
       ]
     },
@@ -5351,7 +5791,7 @@ export const IDL: MangoV4 = {
               },
               {
                 "kind": "arg",
-                "type": "u8",
+                "type": "u32",
                 "path": "account_num"
               }
             ]
@@ -5376,13 +5816,50 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "accountNum",
-          "type": "u8"
+          "type": "u32"
+        },
+        {
+          "name": "accountSize",
+          "type": {
+            "defined": "AccountSize"
+          }
         },
         {
           "name": "name",
           "type": "string"
         }
       ]
+    },
+    {
+      "name": "accountExpand",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
     },
     {
       "name": "accountEdit",
@@ -5477,7 +5954,7 @@ export const IDL: MangoV4 = {
                 "kind": "account",
                 "type": "publicKey",
                 "account": "Mint",
-                "path": "token_mint"
+                "path": "mint"
               }
             ]
           }
@@ -5488,7 +5965,7 @@ export const IDL: MangoV4 = {
           "isSigner": true
         },
         {
-          "name": "tokenMint",
+          "name": "mint",
           "isMut": false,
           "isSigner": false
         },
@@ -5673,109 +6150,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "flashLoan",
-      "accounts": [
-        {
-          "name": "group",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "account",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "withdraws",
-          "type": {
-            "vec": {
-              "defined": "FlashLoanWithdraw"
-            }
-          }
-        },
-        {
-          "name": "cpiDatas",
-          "type": {
-            "vec": {
-              "defined": "CpiData"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "flashLoan2Begin",
-      "accounts": [
-        {
-          "name": "group",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "temporaryVaultAuthority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "instructions",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "loanAmounts",
-          "type": {
-            "vec": "u64"
-          }
-        }
-      ]
-    },
-    {
-      "name": "flashLoan2End",
-      "accounts": [
-        {
-          "name": "group",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "account",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "flashLoan3Begin",
+      "name": "flashLoanBegin",
       "accounts": [
         {
           "name": "group",
@@ -5790,7 +6165,10 @@ export const IDL: MangoV4 = {
         {
           "name": "instructions",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "Instructions Sysvar for instruction introspection"
+          ]
         }
       ],
       "args": [
@@ -5803,7 +6181,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "flashLoan3End",
+      "name": "flashLoanEnd",
       "accounts": [
         {
           "name": "account",
@@ -5825,6 +6203,11 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "serum3RegisterMarket",
+      "docs": [
+        "",
+        "Serum",
+        ""
+      ],
       "accounts": [
         {
           "name": "group",
@@ -6125,7 +6508,10 @@ export const IDL: MangoV4 = {
         {
           "name": "marketVaultSigner",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "needed for the automatic settle_funds call"
+          ]
         },
         {
           "name": "quoteBank",
@@ -6271,7 +6657,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "account",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -6373,7 +6759,10 @@ export const IDL: MangoV4 = {
         {
           "name": "marketVaultSigner",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "needed for the automatic settle_funds call"
+          ]
         },
         {
           "name": "quoteBank",
@@ -6599,6 +6988,11 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "perpCreateMarket",
+      "docs": [
+        "",
+        "Perps",
+        ""
+      ],
       "accounts": [
         {
           "name": "group",
@@ -6642,7 +7036,11 @@ export const IDL: MangoV4 = {
         {
           "name": "bids",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "Accounts are initialised by client,",
+            "anchor discriminator is set first when ix exits,"
+          ]
         },
         {
           "name": "asks",
@@ -7219,6 +7617,11 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "benchmark",
+      "docs": [
+        "",
+        "benchmark",
+        ""
+      ],
       "accounts": [],
       "args": []
     }
@@ -7262,6 +7665,10 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "depositIndex",
+            "docs": [
+              "the index used to scale the value of an IndexedPosition",
+              "TODO: should always be >= 0, add checks?"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7274,6 +7681,11 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "cachedIndexedTotalDeposits",
+            "docs": [
+              "total deposits/borrows, only updated during UpdateIndexAndRate",
+              "TODO: These values could be dropped from the bank, they're written in UpdateIndexAndRate",
+              "and never read."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7286,6 +7698,17 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "indexedDeposits",
+            "docs": [
+              "deposits/borrows for this bank",
+              "",
+              "Note that these may become negative. It's perfectly fine for users to borrow one one bank",
+              "(increasing indexed_borrows there) and paying back on another (possibly decreasing indexed_borrows",
+              "below zero).",
+              "",
+              "The vault amount is not deducable from these values.",
+              "",
+              "These become meaningful when summed over all banks (like in update_index_and_rate)."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7421,17 +7844,17 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "bankNum",
+            "type": "u32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                4
+                256
               ]
             }
-          },
-          {
-            "name": "bankNum",
-            "type": "u64"
           }
         ]
       }
@@ -7442,12 +7865,20 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
-            "name": "admin",
+            "name": "creator",
             "type": "publicKey"
           },
           {
             "name": "groupNum",
             "type": "u32"
+          },
+          {
+            "name": "admin",
+            "type": "publicKey"
+          },
+          {
+            "name": "fastListingAdmin",
+            "type": "publicKey"
           },
           {
             "name": "padding",
@@ -7475,11 +7906,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "version",
+            "type": "u8"
+          },
+          {
             "name": "padding2",
             "type": {
               "array": [
                 "u8",
-                6
+                5
               ]
             }
           },
@@ -7488,7 +7923,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                8
+                256
               ]
             }
           }
@@ -7522,29 +7957,17 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "tokens",
-            "type": {
-              "defined": "MangoAccountTokenPositions"
-            }
-          },
-          {
-            "name": "serum3",
-            "type": {
-              "defined": "MangoAccountSerum3Orders"
-            }
-          },
-          {
-            "name": "perps",
-            "type": {
-              "defined": "MangoAccountPerpPositions"
-            }
-          },
-          {
             "name": "beingLiquidated",
+            "docs": [
+              "This account cannot open new positions or borrow until `init_health >= 0`"
+            ],
             "type": "u8"
           },
           {
             "name": "isBankrupt",
+            "docs": [
+              "This account cannot do anything except go through `resolve_bankruptcy`"
+            ],
             "type": "u8"
           },
           {
@@ -7556,7 +7979,7 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "reserved",
+            "name": "padding",
             "type": {
               "array": [
                 "u8",
@@ -7571,6 +7994,76 @@ export const IDL: MangoV4 = {
           {
             "name": "netSettled",
             "type": "f32"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                256
+              ]
+            }
+          },
+          {
+            "name": "headerVersion",
+            "type": "u8"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "padding1",
+            "type": "u32"
+          },
+          {
+            "name": "tokens",
+            "type": {
+              "vec": {
+                "defined": "TokenPosition"
+              }
+            }
+          },
+          {
+            "name": "padding2",
+            "type": "u32"
+          },
+          {
+            "name": "serum3",
+            "type": {
+              "vec": {
+                "defined": "Serum3Orders"
+              }
+            }
+          },
+          {
+            "name": "padding3",
+            "type": "u32"
+          },
+          {
+            "name": "perps",
+            "type": {
+              "vec": {
+                "defined": "PerpPositions"
+              }
+            }
+          },
+          {
+            "name": "padding4",
+            "type": "u32"
+          },
+          {
+            "name": "perpOpenOrders",
+            "type": {
+              "vec": {
+                "defined": "PerpOpenOrders"
+              }
+            }
           }
         ]
       }
@@ -7589,7 +8082,7 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "padding",
+            "name": "padding1",
             "type": {
               "array": [
                 "u8",
@@ -7624,15 +8117,11 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "addressLookupTable",
-            "type": "publicKey"
+            "name": "registrationTime",
+            "type": "i64"
           },
           {
-            "name": "addressLookupTableBankIndex",
-            "type": "u8"
-          },
-          {
-            "name": "addressLookupTableOracleIndex",
+            "name": "groupInsuranceFund",
             "type": "u8"
           },
           {
@@ -7640,7 +8129,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                6
+                255
               ]
             }
           }
@@ -7675,7 +8164,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                8
+                128
               ]
             }
           }
@@ -7684,6 +8173,11 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "bookSide",
+      "docs": [
+        "A binary tree on AnyNode::key()",
+        "",
+        "The key encodes the price in the top 64 bits."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -7732,6 +8226,15 @@ export const IDL: MangoV4 = {
                 1024
               ]
             }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                256
+              ]
+            }
           }
         ]
       }
@@ -7754,7 +8257,7 @@ export const IDL: MangoV4 = {
                 {
                   "defined": "AnyEvent"
                 },
-                512
+                488
               ]
             }
           }
@@ -7776,10 +8279,13 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "perpMarketIndex",
+            "docs": [
+              "Lookup indices"
+            ],
             "type": "u16"
           },
           {
-            "name": "padding",
+            "name": "padding1",
             "type": {
               "array": [
                 "u8",
@@ -7820,10 +8326,18 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "quoteLotSize",
+            "docs": [
+              "Number of quote native that reresents min tick"
+            ],
             "type": "i64"
           },
           {
             "name": "baseLotSize",
+            "docs": [
+              "Represents number of base native quantity",
+              "e.g. if base decimals for underlying asset are 6, base lot size is 100, and base position is 10000, then",
+              "UI position is 1"
+            ],
             "type": "i64"
           },
           {
@@ -7902,20 +8416,36 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "openInterest",
+            "docs": [
+              ""
+            ],
             "type": "i64"
           },
           {
             "name": "seqNum",
+            "docs": [
+              "Total number of orders seen"
+            ],
             "type": "u64"
           },
           {
             "name": "feesAccrued",
+            "docs": [
+              "Fees accrued in native quote currency"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "bump",
+            "docs": [
+              "Liquidity mining metadata",
+              "pub liquidity_mining_info: LiquidityMiningInfo,",
+              "Token vault which holds mango tokens to be disbursed as liquidity incentives for this perp market",
+              "pub mngo_vault: Pubkey,",
+              "PDA bump"
+            ],
             "type": "u8"
           },
           {
@@ -7923,11 +8453,24 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "reserved",
+            "name": "padding2",
             "type": {
               "array": [
                 "u8",
                 6
+              ]
+            }
+          },
+          {
+            "name": "registrationTime",
+            "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                128
               ]
             }
           }
@@ -7952,7 +8495,7 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "padding",
+            "name": "padding1",
             "type": {
               "array": [
                 "u8",
@@ -7986,11 +8529,24 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "reserved",
+            "name": "padding2",
             "type": {
               "array": [
                 "u8",
                 5
+              ]
+            }
+          },
+          {
+            "name": "registrationTime",
+            "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                128
               ]
             }
           }
@@ -8055,38 +8611,6 @@ export const IDL: MangoV4 = {
             "type": {
               "defined": "I80F48"
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "FlashLoanWithdraw",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "index",
-            "type": "u8"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CpiData",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "accountStart",
-            "type": "u8"
-          },
-          {
-            "name": "data",
-            "type": "bytes"
           }
         ]
       }
@@ -8318,43 +8842,42 @@ export const IDL: MangoV4 = {
         "fields": [
           {
             "name": "indexedPosition",
+            "docs": [
+              "The deposit_index (if positive) or borrow_index (if negative) scaled position"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "tokenIndex",
+            "docs": [
+              "index into Group.tokens"
+            ],
             "type": "u16"
           },
           {
             "name": "inUseCount",
+            "docs": [
+              "incremented when a market requires this position to stay alive"
+            ],
             "type": "u8"
           },
           {
-            "name": "reserved",
+            "name": "padding",
             "type": {
               "array": [
                 "u8",
                 5
               ]
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "MangoAccountTokenPositions",
-      "type": {
-        "kind": "struct",
-        "fields": [
+          },
           {
-            "name": "values",
+            "name": "reserved",
             "type": {
               "array": [
-                {
-                  "defined": "TokenPosition"
-                },
-                16
+                "u8",
+                40
               ]
             }
           }
@@ -8384,6 +8907,11 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "baseTokenIndex",
+            "docs": [
+              "Store the base/quote token index, so health computations don't need",
+              "to get passed the static SerumMarket to find which tokens a market",
+              "uses and look up the correct oracles."
+            ],
             "type": "u16"
           },
           {
@@ -8391,30 +8919,20 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "reserved",
+            "name": "padding",
             "type": {
               "array": [
                 "u8",
                 2
               ]
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "MangoAccountSerum3Orders",
-      "type": {
-        "kind": "struct",
-        "fields": [
+          },
           {
-            "name": "values",
+            "name": "reserved",
             "type": {
               "array": [
-                {
-                  "defined": "Serum3Orders"
-                },
-                8
+                "u8",
+                64
               ]
             }
           }
@@ -8431,7 +8949,7 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
-            "name": "reserved",
+            "name": "padding",
             "type": {
               "array": [
                 "u8",
@@ -8441,16 +8959,26 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "basePositionLots",
+            "docs": [
+              "Active position size, measured in base lots"
+            ],
             "type": "i64"
           },
           {
             "name": "quotePositionNative",
+            "docs": [
+              "Active position in quote (conversation rate is that of the time the order was settled)",
+              "measured in native quote"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "longSettledFunding",
+            "docs": [
+              "Already settled funding"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -8463,74 +8991,89 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "bidsBaseLots",
+            "docs": [
+              "Base lots in bids"
+            ],
             "type": "i64"
           },
           {
             "name": "asksBaseLots",
+            "docs": [
+              "Base lots in asks"
+            ],
             "type": "i64"
           },
           {
             "name": "takerBaseLots",
+            "docs": [
+              "Liquidity mining rewards",
+              "Amount that's on EventQueue waiting to be processed"
+            ],
             "type": "i64"
           },
           {
             "name": "takerQuoteLots",
             "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           }
         ]
       }
     },
     {
-      "name": "MangoAccountPerpPositions",
+      "name": "PerpOpenOrders",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "accounts",
+            "name": "orderSide",
+            "type": {
+              "defined": "Side"
+            }
+          },
+          {
+            "name": "padding1",
             "type": {
               "array": [
-                {
-                  "defined": "PerpPositions"
-                },
-                8
+                "u8",
+                1
               ]
             }
           },
           {
             "name": "orderMarket",
-            "type": {
-              "array": [
-                "u16",
-                8
-              ]
-            }
+            "type": "u16"
           },
           {
-            "name": "orderSide",
+            "name": "padding2",
             "type": {
               "array": [
-                {
-                  "defined": "Side"
-                },
-                8
-              ]
-            }
-          },
-          {
-            "name": "orderId",
-            "type": {
-              "array": [
-                "i128",
-                8
+                "u8",
+                4
               ]
             }
           },
           {
             "name": "clientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "orderId",
+            "type": "i128"
+          },
+          {
+            "name": "reserved",
             "type": {
               "array": [
-                "u64",
-                8
+                "u8",
+                64
               ]
             }
           }
@@ -8565,7 +9108,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                84
+                92
               ]
             }
           }
@@ -8606,7 +9149,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                199
+                207
               ]
             }
           }
@@ -8615,6 +9158,10 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "TokenIndex",
+      "docs": [
+        "Nothing in Rust shall use these types. They only exist so that the Anchor IDL",
+        "knows about them and typescript can deserialize it."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -8662,50 +9209,10 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "ProgramInstruction",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "CreateLookupTable",
-            "fields": [
-              {
-                "name": "recent_slot",
-                "type": {
-                  "defined": "Slot"
-                }
-              },
-              {
-                "name": "bump_seed",
-                "type": "u8"
-              }
-            ]
-          },
-          {
-            "name": "FreezeLookupTable"
-          },
-          {
-            "name": "ExtendLookupTable",
-            "fields": [
-              {
-                "name": "new_addresses",
-                "type": {
-                  "vec": "publicKey"
-                }
-              }
-            ]
-          },
-          {
-            "name": "DeactivateLookupTable"
-          },
-          {
-            "name": "CloseLookupTable"
-          }
-        ]
-      }
-    },
-    {
       "name": "Serum3SelfTradeBehavior",
+      "docs": [
+        "Copy paste a bunch of enums so that we could AnchorSerialize & AnchorDeserialize them"
+      ],
       "type": {
         "kind": "enum",
         "variants": [
@@ -8754,6 +9261,14 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "HealthType",
+      "docs": [
+        "There are two types of health, initial health used for opening new positions and maintenance",
+        "health used for liquidations. They are both calculated as a weighted sum of the assets",
+        "minus the liabilities but the maint. health uses slightly larger weights for assets and",
+        "slightly smaller weights for the liabilities. Zero is used as the bright line for both",
+        "i.e. if your init health falls below zero, you cannot open new positions and if your maint. health",
+        "falls below zero you will be liquidated."
+      ],
       "type": {
         "kind": "enum",
         "variants": [
@@ -8762,6 +9277,20 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Maint"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AccountSize",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Small"
+          },
+          {
+            "name": "Large"
           }
         ]
       }
@@ -9406,58 +9935,73 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6001,
+      "name": "NotImplementedError",
+      "msg": ""
+    },
+    {
+      "code": 6002,
       "name": "MathError",
       "msg": "checked math error"
     },
     {
-      "code": 6002,
+      "code": 6003,
       "name": "UnexpectedOracle",
       "msg": ""
     },
     {
-      "code": 6003,
+      "code": 6004,
       "name": "UnknownOracleType",
       "msg": "oracle type cannot be determined"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "InvalidFlashLoanTargetCpiProgram",
       "msg": ""
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "HealthMustBePositive",
       "msg": "health must be positive"
     },
     {
-      "code": 6006,
+      "code": 6007,
+      "name": "HealthMustBeNegative",
+      "msg": "health must be negative"
+    },
+    {
+      "code": 6008,
       "name": "IsBankrupt",
       "msg": "the account is bankrupt"
     },
     {
-      "code": 6007,
+      "code": 6009,
       "name": "IsNotBankrupt",
       "msg": "the account is not bankrupt"
     },
     {
-      "code": 6008,
+      "code": 6010,
       "name": "NoFreeTokenPositionIndex",
       "msg": "no free token position index"
     },
     {
-      "code": 6009,
+      "code": 6011,
       "name": "NoFreeSerum3OpenOrdersIndex",
       "msg": "no free serum3 open orders index"
     },
     {
-      "code": 6010,
+      "code": 6012,
       "name": "NoFreePerpPositionIndex",
       "msg": "no free perp position index"
     },
     {
-      "code": 6011,
+      "code": 6013,
       "name": "Serum3OpenOrdersExistAlready",
       "msg": "serum3 open orders exist already"
+    },
+    {
+      "code": 6014,
+      "name": "InsufficentBankVaultFunds",
+      "msg": "bank vault has insufficent funds"
     }
   ]
 };

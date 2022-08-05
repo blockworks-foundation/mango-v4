@@ -17,6 +17,7 @@ pub struct TokenEdit<'info> {
     pub admin: Signer<'info>,
 
     #[account(
+        mut,
         has_one = group
     )]
     pub mint_info: AccountLoader<'info, MintInfo>,
@@ -38,10 +39,8 @@ pub fn token_edit(
     init_liab_weight_opt: Option<f32>,
     liquidation_fee_opt: Option<f32>,
 ) -> Result<()> {
-    ctx.accounts
-        .mint_info
-        .load()?
-        .verify_banks_ais(ctx.remaining_accounts)?;
+    let mut mint_info = ctx.accounts.mint_info.load_mut()?;
+    mint_info.verify_banks_ais(ctx.remaining_accounts)?;
 
     for ai in ctx.remaining_accounts.iter() {
         let mut bank = ai.load_mut::<Bank>()?;
@@ -57,6 +56,7 @@ pub fn token_edit(
 
         if let Some(oracle) = oracle_opt {
             bank.oracle = oracle;
+            mint_info.oracle = oracle;
         }
         if let Some(oracle_config) = oracle_config_opt {
             bank.oracle_config = oracle_config;

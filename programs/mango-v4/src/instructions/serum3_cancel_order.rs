@@ -14,12 +14,8 @@ use checked_math as cm;
 pub struct Serum3CancelOrder<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        mut,
-        has_one = group,
-        constraint = account.load()?.is_owner_or_delegate(owner.key()),
-    )]
-    pub account: AccountLoader<'info, MangoAccount>,
+    #[account(mut, has_one = group)]
+    pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -63,13 +59,17 @@ pub fn serum3_cancel_order(
     //
     {
         let account = ctx.accounts.account.load()?;
-        require!(!account.is_bankrupt(), MangoError::IsBankrupt);
+        require!(
+            account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
+            MangoError::SomeError
+        );
+
+        require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
         // Validate open_orders
         require!(
             account
-                .serum3
-                .find(serum_market.market_index)
+                .serum3_find(serum_market.market_index)
                 .ok_or_else(|| error!(MangoError::SomeError))?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
@@ -96,7 +96,7 @@ pub fn serum3_cancel_order(
         let mut account = ctx.accounts.account.load_mut()?;
         decrease_maybe_loan(
             serum_market.market_index,
-            &mut account,
+            &mut account.borrow_mut(),
             &before_oo,
             &after_oo,
         );
@@ -109,11 +109,11 @@ pub fn serum3_cancel_order(
 // the cached
 pub fn decrease_maybe_loan(
     market_index: Serum3MarketIndex,
-    account: &mut MangoAccount,
+    account: &mut MangoAccountRefMut,
     before_oo: &OpenOrdersSlim,
     after_oo: &OpenOrdersSlim,
 ) {
-    let serum3_account = account.serum3.find_mut(market_index).unwrap();
+    let serum3_account = account.serum3_find_mut(market_index).unwrap();
 
     if after_oo.native_coin_free > before_oo.native_coin_free {
         let native_coin_free_increase = after_oo.native_coin_free - before_oo.native_coin_free;

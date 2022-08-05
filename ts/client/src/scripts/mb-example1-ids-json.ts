@@ -2,7 +2,7 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { HealthType } from '../accounts/mangoAccount';
-import { MangoClient } from '../client';
+import { AccountSize, MangoClient } from '../index';
 import { toUiDecimals } from '../utils';
 
 //
@@ -11,7 +11,7 @@ import { toUiDecimals } from '../utils';
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.CLUSTER_URL, options);
+  const connection = new Connection(process.env.CLUSTER_URL!, options);
 
   const user = Keypair.fromSecretKey(
     Buffer.from(
@@ -37,7 +37,7 @@ async function main() {
   );
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
-  const group = await client.getGroupForAdmin(admin.publicKey, 0);
+  const group = await client.getGroupForCreator(admin.publicKey, 0);
   console.log(`${group.toString()}`);
 
   // create + fetch account
@@ -45,8 +45,6 @@ async function main() {
   const mangoAccount = await client.getOrCreateMangoAccount(
     group,
     user.publicKey,
-    0,
-    'my_mango_account',
   );
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString(group));
