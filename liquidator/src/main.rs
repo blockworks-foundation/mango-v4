@@ -67,13 +67,17 @@ struct Cli {
     #[clap(long, env, default_value = "300")]
     snapshot_interval_secs: u64,
 
-    // how many getMultipleAccounts requests to send in parallel
+    /// how many getMultipleAccounts requests to send in parallel
     #[clap(long, env, default_value = "10")]
     parallel_rpc_requests: usize,
 
-    // typically 100 is the max number for getMultipleAccounts
+    /// typically 100 is the max number of accounts getMultipleAccounts will retrieve at once
     #[clap(long, env, default_value = "100")]
     get_multiple_accounts_count: usize,
+
+    /// liquidator health ratio should not fall below this value
+    #[clap(long, env, default_value = "50")]
+    min_health_ratio: f64,
 }
 
 pub fn encode_address(addr: &Pubkey) -> String {
@@ -114,8 +118,7 @@ async fn main() -> anyhow::Result<()> {
 
     let group_context = MangoGroupContext::new_from_rpc(mango_group, cluster.clone(), commitment)?;
 
-    // TODO: this is all oracles, not just pyth!
-    let mango_pyth_oracles = group_context
+    let mango_oracles = group_context
         .tokens
         .values()
         .map(|value| value.mint_info.oracle)
@@ -145,7 +148,7 @@ async fn main() -> anyhow::Result<()> {
             serum_program: cli.serum_program,
             open_orders_authority: mango_group,
         },
-        mango_pyth_oracles.clone(),
+        mango_oracles.clone(),
         websocket_sender,
     );
 
@@ -169,7 +172,7 @@ async fn main() -> anyhow::Result<()> {
             snapshot_interval: std::time::Duration::from_secs(cli.snapshot_interval_secs),
             min_slot: first_websocket_slot + 10,
         },
-        mango_pyth_oracles,
+        mango_oracles,
         snapshot_sender,
     );
 
@@ -182,14 +185,6 @@ async fn main() -> anyhow::Result<()> {
     let mut mint_infos = HashMap::<TokenIndex, Pubkey>::new();
     let mut oracles = HashSet::<Pubkey>::new();
     let mut perp_markets = HashMap::<PerpMarketIndex, Pubkey>::new();
-
-    // List of accounts that are potentially liquidatable.
-    //
-    // Used to send a different message for newly liqudatable accounts and
-    // accounts that are still liquidatable but not fresh anymore.
-    //
-    // This should actually be done per connected websocket client, and not globally.
-    let _current_candidates = HashSet::<Pubkey>::new();
 
     // Is the first snapshot done? Only start checking account health when it is.
     let mut one_snapshot_done = false;
@@ -209,6 +204,10 @@ async fn main() -> anyhow::Result<()> {
             group_context,
             account_fetcher.clone(),
         )?)
+    };
+
+    let liq_config = liquidate::Config {
+        min_health_ratio: cli.min_health_ratio,
     };
 
     info!("main loop");
@@ -239,10 +238,10 @@ async fn main() -> anyhow::Result<()> {
                         }
 
                         if let Err(err) = liquidate::process_accounts(
-                                &mango_client,
-                                &account_fetcher,
-                                std::iter::once(&account_write.pubkey),
-
+                            &mango_client,
+                            &account_fetcher,
+                            std::iter::once(&account_write.pubkey),
+                            &liq_config,
                         ) {
                             warn!("could not process account {}: {:?}", account_write.pubkey, err);
                         }
@@ -270,9 +269,10 @@ async fn main() -> anyhow::Result<()> {
                         // However, this currently takes like 50ms for me in release builds,
                         // so optimizing much seems unnecessary.
                         if let Err(err) = liquidate::process_accounts(
-                                &mango_client,
-                                &account_fetcher,
-                                mango_accounts.iter(),
+                            &mango_client,
+                            &account_fetcher,
+                            mango_accounts.iter(),
+                            &liq_config,
                         ) {
                             warn!("could not process accounts: {:?}", err);
                         }
@@ -304,9 +304,10 @@ async fn main() -> anyhow::Result<()> {
 
                 // trigger a full health check
                 if let Err(err) = liquidate::process_accounts(
-                        &mango_client,
-                        &account_fetcher,
-                        mango_accounts.iter(),
+                    &mango_client,
+                    &account_fetcher,
+                    mango_accounts.iter(),
+                    &liq_config,
                 ) {
                     warn!("could not process accounts: {:?}", err);
                 }

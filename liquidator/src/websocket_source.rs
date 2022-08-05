@@ -57,7 +57,7 @@ pub struct Config {
 
 async fn feed_data(
     config: &Config,
-    mango_pyth_oracles: Vec<Pubkey>,
+    mango_oracles: Vec<Pubkey>,
     sender: async_channel::Sender<Message>,
 ) -> anyhow::Result<()> {
     let connect = ws::try_connect::<RpcSolPubSubClient>(&config.rpc_ws_url).map_err_anyhow()?;
@@ -101,7 +101,7 @@ async fn feed_data(
         .map_err_anyhow()?;
     // TODO: mango_pyth_oracles should not contain stub mango_pyth_oracles, since they already sub'ed with mango_sub
     let mut mango_pyth_oracles_sub_map = StreamMap::new();
-    for oracle in mango_pyth_oracles.into_iter() {
+    for oracle in mango_oracles.into_iter() {
         mango_pyth_oracles_sub_map.insert(
             oracle,
             client
@@ -171,16 +171,12 @@ async fn feed_data(
     }
 }
 
-pub fn start(
-    config: Config,
-    mango_pyth_oracles: Vec<Pubkey>,
-    sender: async_channel::Sender<Message>,
-) {
+pub fn start(config: Config, mango_oracles: Vec<Pubkey>, sender: async_channel::Sender<Message>) {
     tokio::spawn(async move {
         // if the websocket disconnects, we get no data in a while etc, reconnect and try again
         loop {
             info!("connecting to solana websocket streams");
-            let out = feed_data(&config, mango_pyth_oracles.clone(), sender.clone());
+            let out = feed_data(&config, mango_oracles.clone(), sender.clone());
             let _ = out.await;
         }
     });

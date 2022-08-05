@@ -86,7 +86,7 @@ pub struct Config {
 
 async fn feed_snapshots(
     config: &Config,
-    mango_pyth_oracles: Vec<Pubkey>,
+    mango_oracles: Vec<Pubkey>,
     sender: &async_channel::Sender<AccountSnapshot>,
 ) -> anyhow::Result<()> {
     let rpc_client = http::connect_with_options::<AccountsDataClient>(&config.rpc_http_url, true)
@@ -128,7 +128,7 @@ async fn feed_snapshots(
     let results: Vec<(
         Vec<Pubkey>,
         Result<Response<Vec<Option<UiAccount>>>, jsonrpc_core_client::RpcError>,
-    )> = stream::iter(mango_pyth_oracles)
+    )> = stream::iter(mango_oracles)
         .chunks(config.get_multiple_accounts_count)
         .map(|keys| {
             let rpc_client = &rpc_client;
@@ -207,7 +207,7 @@ async fn feed_snapshots(
 
 pub fn start(
     config: Config,
-    mango_pyth_oracles: Vec<Pubkey>,
+    mango_oracles: Vec<Pubkey>,
     sender: async_channel::Sender<AccountSnapshot>,
 ) {
     let mut poll_wait_first_snapshot = time::interval(time::Duration::from_secs(2));
@@ -239,7 +239,7 @@ pub fn start(
 
         loop {
             interval_between_snapshots.tick().await;
-            if let Err(err) = feed_snapshots(&config, mango_pyth_oracles.clone(), &sender).await {
+            if let Err(err) = feed_snapshots(&config, mango_oracles.clone(), &sender).await {
                 warn!("snapshot error: {:?}", err);
             } else {
                 info!("snapshot success");

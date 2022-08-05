@@ -8,6 +8,10 @@ use mango_v4::state::{
 
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
+pub struct Config {
+    pub min_health_ratio: f64,
+}
+
 pub fn new_health_cache_(
     context: &MangoGroupContext,
     account_fetcher: &chain_data::AccountFetcher,
@@ -41,9 +45,9 @@ pub fn process_account(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     pubkey: &Pubkey,
+    config: &Config,
 ) -> anyhow::Result<()> {
-    // TODO: configurable
-    let min_health_ratio = I80F48::from_num(50.0f64);
+    let min_health_ratio = I80F48::from_num(config.min_health_ratio);
     let quote_token_index = 0;
 
     let account = account_fetcher.fetch_mango_account(pubkey)?;
@@ -166,9 +170,10 @@ pub fn process_accounts<'a>(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     accounts: impl Iterator<Item = &'a Pubkey>,
+    config: &Config,
 ) -> anyhow::Result<()> {
     for pubkey in accounts {
-        match process_account(mango_client, account_fetcher, pubkey) {
+        match process_account(mango_client, account_fetcher, pubkey, config) {
             Err(err) => {
                 // Not all errors need to be raised to the user's attention.
                 let mut log_level = log::Level::Error;
