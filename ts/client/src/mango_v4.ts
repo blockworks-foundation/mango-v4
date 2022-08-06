@@ -2830,7 +2830,7 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "flashLoanVaultInitial",
+            "name": "flashLoanTokenAccountInitial",
             "type": "u64"
           },
           {
@@ -7843,7 +7843,7 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "flashLoanVaultInitial",
+            "name": "flashLoanTokenAccountInitial",
             "type": "u64"
           },
           {

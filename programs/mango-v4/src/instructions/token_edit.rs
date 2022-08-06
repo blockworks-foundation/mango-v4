@@ -109,7 +109,7 @@ pub fn token_edit(
 
         // unchanged -
         // dust
-        // flash_loan_vault_initial
+        // flash_loan_token_account_initial
         // flash_loan_approved_amount
         // token_index
         // bump

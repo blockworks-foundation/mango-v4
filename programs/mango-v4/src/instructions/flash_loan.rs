@@ -77,19 +77,20 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
         require_keys_eq!(bank.group, ctx.accounts.group.key());
         require_keys_eq!(bank.vault, *vault_ai.key);
 
+        let vault = Account::<TokenAccount>::try_from(vault_ai)?;
         let token_account = Account::<TokenAccount>::try_from(token_account_ai)?;
 
         bank.flash_loan_approved_amount = *amount;
-        bank.flash_loan_vault_initial = token_account.amount;
+        bank.flash_loan_token_account_initial = token_account.amount;
 
         // Transfer the loaned funds
         if *amount > 0 {
             // Provide a readable error message in case the vault doesn't have enough tokens
-            if token_account.amount < *amount {
+            if vault.amount < *amount {
                 return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {
                     format!(
                         "bank vault {} does not have enough tokens, need {} but have {}",
-                        vault_ai.key, amount, token_account.amount
+                        vault_ai.key, amount, vault.amount
                     )
                 });
             }
@@ -235,7 +236,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         // The Begin instruction only checks that End ends with the same vault accounts -
         // but there could be an extra vault account in End, or a different bank could be
         // used for the same vault.
-        require_neq!(bank.flash_loan_vault_initial, u64::MAX);
+        require_neq!(bank.flash_loan_token_account_initial, u64::MAX);
 
         // Create the token position now, so we can compute the pre-health with fixed order health accounts
         let (_, raw_token_index, _) = account.token_get_mut_or_create(bank.token_index)?;
@@ -243,7 +244,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         // Transfer any excess over the inital balance of the token account back
         // into the vault. Compute the total change in the vault balance.
         let mut change = -I80F48::from(bank.flash_loan_approved_amount);
-        if token_account.amount > bank.flash_loan_vault_initial {
+        if token_account.amount > bank.flash_loan_token_account_initial {
             let transfer_ctx = CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
                 token::Transfer {
@@ -252,7 +253,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
                     authority: ctx.accounts.owner.to_account_info(),
                 },
             );
-            let repay = token_account.amount - bank.flash_loan_vault_initial;
+            let repay = token_account.amount - bank.flash_loan_token_account_initial;
             token::transfer(transfer_ctx, repay)?;
 
             let repay = I80F48::from(repay);
@@ -324,7 +325,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         }
 
         bank.flash_loan_approved_amount = 0;
-        bank.flash_loan_vault_initial = u64::MAX;
+        bank.flash_loan_token_account_initial = u64::MAX;
 
         token_loan_details.push(FlashLoanTokenDetail {
             token_index: position.token_index,
