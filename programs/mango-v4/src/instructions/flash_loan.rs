@@ -147,7 +147,7 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
                     MangoError::SomeError
                 );
 
-                // check that the same vaults are passed
+                // check that the same vaults and token accounts are passed
                 let begin_accounts = &ctx.remaining_accounts[num_loans..];
                 let end_accounts = &ix.accounts[ix.accounts.len() - 2 * num_loans..];
                 for (begin_account, end_account) in begin_accounts.iter().zip(end_accounts.iter()) {
