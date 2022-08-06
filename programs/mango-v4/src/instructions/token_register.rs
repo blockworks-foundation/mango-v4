@@ -131,7 +131,7 @@ pub fn token_register(
         init_liab_weight: I80F48::from_num(init_liab_weight),
         liquidation_fee: I80F48::from_num(liquidation_fee),
         dust: I80F48::ZERO,
-        flash_loan_vault_initial: u64::MAX,
+        flash_loan_token_account_initial: u64::MAX,
         flash_loan_approved_amount: 0,
         token_index,
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,

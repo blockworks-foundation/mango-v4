@@ -45,21 +45,17 @@ async function main() {
   const mangoAccount = await client.getOrCreateMangoAccount(
     group,
     user.publicKey,
-    user,
-    0,
-    AccountSize.small,
-    'my_mango_account',
   );
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString(group));
 
   if (false) {
     console.log(`...depositing 10 USDC`);
-    await client.tokenDeposit(group, mangoAccount, 'USDC', 10, user);
+    await client.tokenDeposit(group, mangoAccount, 'USDC', 10);
     await mangoAccount.reload(client, group);
 
     console.log(`...depositing 1 SOL`);
-    await client.tokenDeposit(group, mangoAccount, 'SOL', 1, user);
+    await client.tokenDeposit(group, mangoAccount, 'SOL', 1);
     await mangoAccount.reload(client, group);
   }
 

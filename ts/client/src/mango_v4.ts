@@ -739,6 +739,11 @@ export type MangoV4 = {
       "name": "tokenUpdateIndexAndRate",
       "accounts": [
         {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "mintInfo",
           "isMut": false,
           "isSigner": false
@@ -2573,6 +2578,11 @@ export type MangoV4 = {
       "name": "perpUpdateFunding",
       "accounts": [
         {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "perpMarket",
           "isMut": true,
           "isSigner": false
@@ -2820,7 +2830,7 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "flashLoanVaultInitial",
+            "name": "flashLoanTokenAccountInitial",
             "type": "u64"
           },
           {
@@ -4441,6 +4451,11 @@ export type MangoV4 = {
       "name": "PerpBalanceLog",
       "fields": [
         {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
           "name": "mangoAccount",
           "type": "publicKey",
           "index": false
@@ -4491,6 +4506,11 @@ export type MangoV4 = {
       "name": "TokenBalanceLog",
       "fields": [
         {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
           "name": "mangoAccount",
           "type": "publicKey",
           "index": false
@@ -4523,39 +4543,13 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "MarginTradeLog",
+      "name": "FlashLoanLog",
       "fields": [
         {
-          "name": "mangoAccount",
+          "name": "mangoGroup",
           "type": "publicKey",
           "index": false
         },
-        {
-          "name": "tokenIndexes",
-          "type": {
-            "vec": "u16"
-          },
-          "index": false
-        },
-        {
-          "name": "preIndexedPositions",
-          "type": {
-            "vec": "i128"
-          },
-          "index": false
-        },
-        {
-          "name": "postIndexedPositions",
-          "type": {
-            "vec": "i128"
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "FlashLoanLog",
-      "fields": [
         {
           "name": "mangoAccount",
           "type": "publicKey",
@@ -4575,6 +4569,11 @@ export type MangoV4 = {
     {
       "name": "WithdrawLog",
       "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
         {
           "name": "mangoAccount",
           "type": "publicKey",
@@ -4605,6 +4604,11 @@ export type MangoV4 = {
     {
       "name": "DepositLog",
       "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
         {
           "name": "mangoAccount",
           "type": "publicKey",
@@ -4830,6 +4834,11 @@ export type MangoV4 = {
     {
       "name": "LiquidateTokenAndTokenLog",
       "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
         {
           "name": "liqee",
           "type": "publicKey",
@@ -5743,6 +5752,11 @@ export const IDL: MangoV4 = {
       "name": "tokenUpdateIndexAndRate",
       "accounts": [
         {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "mintInfo",
           "isMut": false,
           "isSigner": false
@@ -7577,6 +7591,11 @@ export const IDL: MangoV4 = {
       "name": "perpUpdateFunding",
       "accounts": [
         {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "perpMarket",
           "isMut": true,
           "isSigner": false
@@ -7824,7 +7843,7 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "flashLoanVaultInitial",
+            "name": "flashLoanTokenAccountInitial",
             "type": "u64"
           },
           {
@@ -9445,6 +9464,11 @@ export const IDL: MangoV4 = {
       "name": "PerpBalanceLog",
       "fields": [
         {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
           "name": "mangoAccount",
           "type": "publicKey",
           "index": false
@@ -9495,6 +9519,11 @@ export const IDL: MangoV4 = {
       "name": "TokenBalanceLog",
       "fields": [
         {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
           "name": "mangoAccount",
           "type": "publicKey",
           "index": false
@@ -9527,39 +9556,13 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "MarginTradeLog",
+      "name": "FlashLoanLog",
       "fields": [
         {
-          "name": "mangoAccount",
+          "name": "mangoGroup",
           "type": "publicKey",
           "index": false
         },
-        {
-          "name": "tokenIndexes",
-          "type": {
-            "vec": "u16"
-          },
-          "index": false
-        },
-        {
-          "name": "preIndexedPositions",
-          "type": {
-            "vec": "i128"
-          },
-          "index": false
-        },
-        {
-          "name": "postIndexedPositions",
-          "type": {
-            "vec": "i128"
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "FlashLoanLog",
-      "fields": [
         {
           "name": "mangoAccount",
           "type": "publicKey",
@@ -9579,6 +9582,11 @@ export const IDL: MangoV4 = {
     {
       "name": "WithdrawLog",
       "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
         {
           "name": "mangoAccount",
           "type": "publicKey",
@@ -9609,6 +9617,11 @@ export const IDL: MangoV4 = {
     {
       "name": "DepositLog",
       "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
         {
           "name": "mangoAccount",
           "type": "publicKey",
@@ -9834,6 +9847,11 @@ export const IDL: MangoV4 = {
     {
       "name": "LiquidateTokenAndTokenLog",
       "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
         {
           "name": "liqee",
           "type": "publicKey",

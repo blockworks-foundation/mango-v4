@@ -207,7 +207,7 @@ export class Group {
             price.data.slice(0, 8),
           )
         ) {
-          let stubOracle = coder.decode('stubOracle', price.data);
+          const stubOracle = coder.decode('stubOracle', price.data);
           banks[index].price = new I80F48(stubOracle.price.val);
         } else {
           banks[index].price = I80F48.fromNumber(

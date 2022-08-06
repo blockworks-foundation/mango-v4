@@ -16,7 +16,7 @@ pub fn new_health_cache_(
     let active_token_len = account.token_iter_active().count();
     let active_perp_len = account.perp_iter_active_accounts().count();
 
-    let metas = context.derive_health_check_remaining_account_metas(account, None, false)?;
+    let metas = context.derive_health_check_remaining_account_metas(account, vec![], false)?;
     let accounts = metas
         .iter()
         .map(|meta| {

@@ -40,10 +40,6 @@ async function main() {
   const user1MangoAccount = await user1Client.getOrCreateMangoAccount(
     group,
     user1.publicKey,
-    user1,
-    0,
-    AccountSize.small,
-    'my_mango_account',
   );
 
   console.log(`...mangoAccount1 ${user1MangoAccount.publicKey}`);
@@ -52,7 +48,7 @@ async function main() {
   let amount = 0.001;
   let token = 'BTC';
   console.log(`Depositing...${amount} 'BTC'`);
-  await user1Client.tokenDeposit(group, user1MangoAccount, token, amount, user1);
+  await user1Client.tokenDeposit(group, user1MangoAccount, token, amount);
   await user1MangoAccount.reload(user1Client, group);
   console.log(`${user1MangoAccount.toString(group)}`);
 
@@ -74,10 +70,6 @@ async function main() {
   const user2MangoAccount = await user2Client.getOrCreateMangoAccount(
     group,
     user2.publicKey,
-    user2,
-    0,
-    AccountSize.small,
-    'my_mango_account',
   );
   console.log(`...mangoAccount2 ${user2MangoAccount.publicKey}`);
 
@@ -98,7 +90,7 @@ async function main() {
   /// user2 deposits some collateral and borrows BTC
   amount = 1;
   console.log(`Depositing...${amount} 'USDC'`);
-  await user2Client.tokenDeposit(group, user2MangoAccount, 'USDC', amount, user2);
+  await user2Client.tokenDeposit(group, user2MangoAccount, 'USDC', amount);
   await user2MangoAccount.reload(user2Client, group);
   console.log(`${user2MangoAccount.toString(group)}`);
 
@@ -113,7 +105,6 @@ async function main() {
     token,
     amount,
     true,
-    user2
   );
   await user2MangoAccount.reload(user2Client, group);
   console.log(`${user2MangoAccount.toString(group)}`);

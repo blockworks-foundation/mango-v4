@@ -23,13 +23,13 @@
     "example1-user": "ts-node ts/client/src/scripts/example1-user.ts",
     "example1-admin": "ts-node ts/client/src/scripts/example1-admin.ts",
     "scratch": "ts-node ts/client/src/scripts/scratch/scratch.ts",
-    "format": "prettier --check .",
-    "lint": "eslint . --ext ts --ext tsx --ext js --quiet",
+    "format": "prettier --check ./ts",
+    "lint": "eslint ./ts --ext ts --ext tsx --ext js --quiet",
     "typecheck": "tsc --noEmit --pretty",
     "prepare": "yarn build",
     "prebuild": "npm run clean",
     "prepublishOnly": "npm run validate && npm run build",
-    "validate": "npm run typecheck && npm run test && npm run lint && npm run format-check"
+    "validate": "npm run typecheck && npm run lint && npm run format"
   },
   "devDependencies": {
     "@jup-ag/core": "^1.0.0-beta.28",
@@ -38,8 +38,8 @@
     "@types/chai": "^4.3.0",
     "@types/mocha": "^9.1.0",
     "@types/node": "^14.14.37",
-    "@typescript-eslint/eslint-plugin": "^4.14.2",
-    "@typescript-eslint/parser": "^4.14.2",
+    "@typescript-eslint/eslint-plugin": "^5.32.0",
+    "@typescript-eslint/parser": "^5.32.0",
     "chai": "^4.3.4",
     "eslint": "^7.28.0",
     "eslint-config-prettier": "^7.2.0",

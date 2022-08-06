@@ -1,10 +1,4 @@
-import {
-  AnchorProvider,
-  BN,
-  Program,
-  Provider,
-  web3,
-} from '@project-serum/anchor';
+import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
 import { getFeeRates, getFeeTier } from '@project-serum/serum';
 import { Order } from '@project-serum/serum/lib/market';
 import {
@@ -472,20 +466,13 @@ export class MangoClient {
   public async getOrCreateMangoAccount(
     group: Group,
     ownerPk: PublicKey,
-    payer: web3.Keypair,
     accountNumber?: number,
     accountSize?: AccountSize,
     name?: string,
   ): Promise<MangoAccount> {
     let mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
     if (mangoAccounts.length === 0) {
-      await this.createMangoAccount(
-        group,
-        payer,
-        accountNumber ?? 0,
-        accountSize ?? AccountSize.small,
-        name ?? '',
-      );
+      await this.createMangoAccount(group, accountNumber, accountSize, name);
       mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
     }
     return mangoAccounts[0];
@@ -493,19 +480,21 @@ export class MangoClient {
 
   public async createMangoAccount(
     group: Group,
-    payer: web3.Keypair,
-    accountNumber: number,
-    accountSize: AccountSize,
+    accountNumber?: number,
+    accountSize?: AccountSize,
     name?: string,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .accountCreate(accountNumber, accountSize, name ?? '')
+      .accountCreate(
+        accountNumber ?? 0,
+        accountSize ?? AccountSize.small,
+        name ?? '',
+      )
       .accounts({
         group: group.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        payer: payer.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
-      .signers([payer])
       .rpc();
   }
 
@@ -631,7 +620,6 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     tokenName: string,
     amount: number,
-    signer: Signer,
   ) {
     const bank = group.banksMap.get(tokenName)!;
 
@@ -643,7 +631,7 @@ export class MangoClient {
     let wrappedSolAccount: Keypair | undefined;
     let preInstructions: TransactionInstruction[] = [];
     let postInstructions: TransactionInstruction[] = [];
-    let additionalSigners: Signer[] = [];
+    const additionalSigners: Signer[] = [];
     if (bank.mint.equals(WRAPPED_SOL_MINT)) {
       wrappedSolAccount = new Keypair();
       const lamports = Math.round(amount * LAMPORTS_PER_SOL) + 1e7;
@@ -698,7 +686,7 @@ export class MangoClient {
       )
       .preInstructions(preInstructions)
       .postInstructions(postInstructions)
-      .signers([signer].concat(additionalSigners))
+      .signers(additionalSigners)
       .rpc({ skipPreflight: true });
   }
 
@@ -708,7 +696,6 @@ export class MangoClient {
     tokenName: string,
     amount: number,
     allowBorrow: boolean,
-    signer: Signer,
   ) {
     const bank = group.banksMap.get(tokenName)!;
 
@@ -741,7 +728,6 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-      .signers([signer])
       .rpc({ skipPreflight: true });
   }
 
@@ -751,7 +737,6 @@ export class MangoClient {
     tokenName: string,
     nativeAmount: number,
     allowBorrow: boolean,
-    signer: Signer,
   ) {
     const bank = group.banksMap.get(tokenName)!;
 
@@ -784,7 +769,6 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-      .signers([signer])
       .rpc({ skipPreflight: true });
   }
 
@@ -901,7 +885,7 @@ export class MangoClient {
   ): Promise<TransactionSignature> {
     const serum3Market = group.serum3MarketsMap.get(serum3MarketName)!;
 
-    let openOrders = mangoAccount.serum3.find(
+    const openOrders = mangoAccount.serum3.find(
       (account) => account.marketIndex === serum3Market.marketIndex,
     )?.openOrders;
 
@@ -1358,7 +1342,7 @@ export class MangoClient {
         mangoAccount,
       ]);
 
-    let [nativePrice, nativeQuantity] = perpMarket.uiToNativePriceQuantity(
+    const [nativePrice, nativeQuantity] = perpMarket.uiToNativePriceQuantity(
       price,
       quantity,
     );
@@ -1437,7 +1421,7 @@ export class MangoClient {
     /*
      * Find or create associated token accounts
      */
-    let inputTokenAccountPk = await getAssociatedTokenAddress(
+    const inputTokenAccountPk = await getAssociatedTokenAddress(
       inputBank.mint,
       mangoAccount.owner,
     );
@@ -1445,7 +1429,7 @@ export class MangoClient {
       await this.program.provider.connection.getAccountInfo(
         inputTokenAccountPk,
       );
-    let preInstructions = [];
+    const preInstructions = [];
     if (!inputTokenAccExists) {
       preInstructions.push(
         Token.createAssociatedTokenAccountInstruction(
@@ -1459,7 +1443,7 @@ export class MangoClient {
       );
     }
 
-    let outputTokenAccountPk = await getAssociatedTokenAddress(
+    const outputTokenAccountPk = await getAssociatedTokenAddress(
       outputBank.mint,
       mangoAccount.owner,
     );
@@ -1575,19 +1559,39 @@ export class MangoClient {
     return this.program.provider.sendAndConfirm(tx);
   }
 
+  async updateIndexAndRate(group: Group, tokenName: string) {
+
+    let bank = group.banksMap.get(tokenName)!;
+    let mintInfo = group.mintInfosMap.get(bank.tokenIndex)!;
+  
+    await this.program.methods.tokenUpdateIndexAndRate().accounts({
+      'group': group.publicKey,
+      'mintInfo': mintInfo.publicKey,
+      'oracle': mintInfo.oracle,
+      'instructions': SYSVAR_INSTRUCTIONS_PUBKEY})
+      .remainingAccounts([
+        {
+          pubkey: bank.publicKey,
+          isWritable: true,
+          isSigner: false,
+        } as AccountMeta,
+      ])
+      .rpc()
+  }
+  
+
   /// liquidations
 
   async liqTokenWithToken(
     group: Group,
     liqor: MangoAccount,
     liqee: MangoAccount,
-    liqorOwner: Signer,
     assetTokenName: string,
     liabTokenName: string,
     maxLiabTransfer: number,
   ) {
-    let assetBank: Bank = group.banksMap.get(assetTokenName);
-    let liabBank: Bank = group.banksMap.get(liabTokenName);
+    const assetBank: Bank = group.banksMap.get(assetTokenName);
+    const liabBank: Bank = group.banksMap.get(liabTokenName);
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
@@ -1617,10 +1621,9 @@ export class MangoClient {
         group: group.publicKey,
         liqor: liqor.publicKey,
         liqee: liqee.publicKey,
-        liqorOwner: liqorOwner.publicKey,
+        liqorOwner: liqor.owner,
       })
       .remainingAccounts(parsedHealthAccounts)
-      .signers([liqorOwner])
       .rpc();
   }
 
@@ -1634,7 +1637,7 @@ export class MangoClient {
     // TODO: use IDL on chain or in repository? decide...
     // Alternatively we could fetch IDL from chain.
     // const idl = await Program.fetchIdl(MANGO_V4_ID, provider);
-    let idl = IDL;
+    const idl = IDL;
 
     return new MangoClient(
       new Program<MangoV4>(idl as MangoV4, programId, provider),
@@ -1650,7 +1653,7 @@ export class MangoClient {
     // TODO: use IDL on chain or in repository? decide...
     // Alternatively we could fetch IDL from chain.
     // const idl = await Program.fetchIdl(MANGO_V4_ID, provider);
-    let idl = IDL;
+    const idl = IDL;
 
     const id = Id.fromIds(groupName);
 
@@ -1706,7 +1709,7 @@ export class MangoClient {
       }
     }
 
-    const mintInfos = [...new Set(tokenIndices.sort())].map(
+    const mintInfos = [...new Set(tokenIndices)].map(
       (tokenIndex) => group.mintInfosMap.get(tokenIndex)!,
     );
     healthRemainingAccounts.push(
@@ -1742,7 +1745,7 @@ export class MangoClient {
     const healthRemainingAccounts: PublicKey[] = [];
 
     let tokenIndices = [];
-    for (let mangoAccount of mangoAccounts) {
+    for (const mangoAccount of mangoAccounts) {
       tokenIndices.push(
         ...mangoAccount.tokens
           .filter((token) => token.tokenIndex !== 65535)
@@ -1765,14 +1768,14 @@ export class MangoClient {
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.oracle),
     );
-    for (let mangoAccount of mangoAccounts) {
+    for (const mangoAccount of mangoAccounts) {
       healthRemainingAccounts.push(
         ...mangoAccount.serum3
           .filter((serum3Account) => serum3Account.marketIndex !== 65535)
           .map((serum3Account) => serum3Account.openOrders),
       );
     }
-    for (let mangoAccount of mangoAccounts) {
+    for (const mangoAccount of mangoAccounts) {
       healthRemainingAccounts.push(
         ...mangoAccount.perps
           .filter((perp) => perp.marketIndex !== 65535)

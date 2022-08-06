@@ -1,15 +1,10 @@
 import * as anchor from '@project-serum/anchor';
-import { Program, AnchorProvider } from '@project-serum/anchor';
-import { MangoV4 } from '../target/types/mango_v4';
-import * as spl from '@solana/spl-token';
+import { AnchorProvider, Program } from '@project-serum/anchor';
 import NodeWallet from '@project-serum/anchor/dist/cjs/nodewallet';
-import { PublicKey, LAMPORTS_PER_SOL, Connection } from '@solana/web3.js';
-import {
-  Group,
-  MangoClient,
-  StubOracle,
-  AccountSize,
-} from '../ts/client/src/index';
+import * as spl from '@solana/spl-token';
+import { Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
+import { MangoV4 } from '../target/types/mango_v4';
+import { Group, MangoClient, StubOracle } from '../ts/client/src/index';
 
 enum MINTS {
   USDC = 'USDC',
@@ -118,7 +113,7 @@ describe('mango-v4', () => {
     // I think this is only for getting the serum market though?
     envClient = await MangoClient.connect(envProvider, 'devnet', programId);
     await envClient.groupCreate(groupNum, false, 1, insuranceMintPk);
-    group = await envClient.getGroupForAdmin(adminPk, groupNum);
+    group = await envClient.getGroupForCreator(adminPk, groupNum);
 
     await envClient.stubOracleCreate(group, mintsMap['USDC']!.publicKey, 1.0);
     usdcOracle = (
@@ -215,49 +210,19 @@ describe('mango-v4', () => {
     const mangoAccount = await client.getOrCreateMangoAccount(
       group,
       users[0].keypair.publicKey,
-      users[0].keypair,
-      0,
-      AccountSize.small,
-      'my_mango_account',
     );
     await mangoAccount.reload(client, group);
 
-    await client.tokenDeposit(
-      group,
-      mangoAccount,
-      'USDC',
-      100.5,
-      users[0].keypair,
-    );
+    await client.tokenDeposit(group, mangoAccount, 'USDC', 100.5);
     await mangoAccount.reload(client, group);
 
-    await client.tokenDeposit(
-      group,
-      mangoAccount,
-      'BTC',
-      50.5,
-      users[0].keypair,
-    );
+    await client.tokenDeposit(group, mangoAccount, 'BTC', 50.5);
     await mangoAccount.reload(client, group);
 
-    await client.tokenWithdraw(
-      group,
-      mangoAccount,
-      'USDC',
-      100,
-      false,
-      users[0].keypair,
-    );
+    await client.tokenWithdraw(group, mangoAccount, 'USDC', 100, false);
     await mangoAccount.reload(client, group);
 
-    await client.tokenWithdraw(
-      group,
-      mangoAccount,
-      'BTC',
-      50,
-      false,
-      users[0].keypair,
-    );
+    await client.tokenWithdraw(group, mangoAccount, 'BTC', 50, false);
     await mangoAccount.reload(client, group);
   });
 
@@ -284,59 +249,26 @@ describe('mango-v4', () => {
     const mangoAccountA = await clientA.getOrCreateMangoAccount(
       group,
       users[0].keypair.publicKey,
-      users[0].keypair,
-      0,
-      AccountSize.small,
-      'my_mango_account',
     );
     await mangoAccountA.reload(clientA, group);
 
     const mangoAccountB = await clientB.getOrCreateMangoAccount(
       group,
       users[1].keypair.publicKey,
-      users[1].keypair,
-      0,
-      AccountSize.small,
-      'my_mango_account',
     );
     await mangoAccountB.reload(clientB, group);
 
     await envClient.stubOracleSet(group, btcOracle.publicKey, 100);
 
     // Initialize liquidator
-    await clientA.tokenDeposit(
-      group,
-      mangoAccountA,
-      'USDC',
-      1000,
-      users[0].keypair,
-    );
-    await clientA.tokenDeposit(
-      group,
-      mangoAccountA,
-      'BTC',
-      100,
-      users[0].keypair,
-    );
+    await clientA.tokenDeposit(group, mangoAccountA, 'USDC', 1000);
+    await clientA.tokenDeposit(group, mangoAccountA, 'BTC', 100);
 
     // Deposit collateral
-    await clientB.tokenDeposit(
-      group,
-      mangoAccountB,
-      'BTC',
-      100,
-      users[1].keypair,
-    );
+    await clientB.tokenDeposit(group, mangoAccountB, 'BTC', 100);
     await mangoAccountB.reload(clientB, group);
     // // Borrow
-    await clientB.tokenWithdraw(
-      group,
-      mangoAccountB,
-      'USDC',
-      200,
-      true,
-      users[1].keypair,
-    );
+    await clientB.tokenWithdraw(group, mangoAccountB, 'USDC', 200, true);
     // // Set price so health is below maintanence
     await envClient.stubOracleSet(group, btcOracle.publicKey, 1);
 
@@ -346,10 +278,13 @@ describe('mango-v4', () => {
       group,
       mangoAccountA,
       mangoAccountB,
-      users[0].keypair,
       'BTC',
       'USDC',
       1000,
     );
+  });
+
+  it('update index and rate', async () => {
+    envClient.updateIndexAndRate(group, 'USDC');
   });
 });

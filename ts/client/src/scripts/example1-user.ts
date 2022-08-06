@@ -1,7 +1,7 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
-import { AccountSize, HealthType } from '../accounts/mangoAccount';
+import { HealthType } from '../accounts/mangoAccount';
 import { OrderType, Side } from '../accounts/perp';
 import {
   Serum3OrderType,
@@ -50,7 +50,10 @@ async function main() {
       JSON.parse(fs.readFileSync(process.env.ADMIN_KEYPAIR!, 'utf-8')),
     ),
   );
-  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  // const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  const group = await client.getGroup(
+    new PublicKey('FdynL6q7CNJMMiTZpfnYVkqQRYaoiBWgWkFYvvpx9uA8'),
+  );
   console.log(group.toString());
 
   // create + fetch account
@@ -58,10 +61,6 @@ async function main() {
   const mangoAccount = await client.getOrCreateMangoAccount(
     group,
     user.publicKey,
-    user,
-    0,
-    AccountSize.small,
-    'my_mango_account',
   );
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString());
@@ -98,11 +97,15 @@ async function main() {
 
     try {
       console.log(`...depositing 50 USDC`);
-      await client.tokenDeposit(group, mangoAccount, 'USDC', 50, user);
+      await client.tokenDeposit(group, mangoAccount, 'USDC', 50);
+      await mangoAccount.reload(client, group);
+
+      console.log(`...withdrawing 1 USDC`);
+      await client.tokenWithdraw(group, mangoAccount, 'USDC', 1, true);
       await mangoAccount.reload(client, group);
 
       console.log(`...depositing 0.0005 BTC`);
-      await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005, user);
+      await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005);
       await mangoAccount.reload(client, group);
     } catch (error) {
       console.log(error);
