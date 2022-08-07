@@ -236,6 +236,7 @@ export class MangoClient {
     tokenName: string,
     oracle: PublicKey,
     oracleConfFilter: number,
+    groupInsuranceFund: boolean,
     adjustmentFactor: number,
     util0: number,
     rate0: number,
@@ -262,6 +263,7 @@ export class MangoClient {
             val: I80F48.fromNumber(oracleConfFilter).getData(),
           },
         } as any, // future: nested custom types dont typecheck, fix if possible?
+        groupInsuranceFund,
         { adjustmentFactor, util0, rate0, util1, rate1, maxRate },
         loanFeeRate,
         loanOriginationFeeRate,
@@ -620,7 +622,7 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     tokenName: string,
     amount: number,
-  ) {
+  ): Promise<TransactionSignature> {
     const bank = group.banksMap.get(tokenName)!;
 
     const tokenAccountPk = await getAssociatedTokenAddress(
@@ -696,7 +698,7 @@ export class MangoClient {
     tokenName: string,
     amount: number,
     allowBorrow: boolean,
-  ) {
+  ): Promise<TransactionSignature> {
     const bank = group.banksMap.get(tokenName)!;
 
     const tokenAccountPk = await getAssociatedTokenAddress(
@@ -737,7 +739,7 @@ export class MangoClient {
     tokenName: string,
     nativeAmount: number,
     allowBorrow: boolean,
-  ) {
+  ): Promise<TransactionSignature> {
     const bank = group.banksMap.get(tokenName)!;
 
     const tokenAccountPk = await getAssociatedTokenAddress(
@@ -1560,15 +1562,17 @@ export class MangoClient {
   }
 
   async updateIndexAndRate(group: Group, tokenName: string) {
-
     let bank = group.banksMap.get(tokenName)!;
     let mintInfo = group.mintInfosMap.get(bank.tokenIndex)!;
-  
-    await this.program.methods.tokenUpdateIndexAndRate().accounts({
-      'group': group.publicKey,
-      'mintInfo': mintInfo.publicKey,
-      'oracle': mintInfo.oracle,
-      'instructions': SYSVAR_INSTRUCTIONS_PUBKEY})
+
+    await this.program.methods
+      .tokenUpdateIndexAndRate()
+      .accounts({
+        group: group.publicKey,
+        mintInfo: mintInfo.publicKey,
+        oracle: mintInfo.oracle,
+        instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
+      })
       .remainingAccounts([
         {
           pubkey: bank.publicKey,
@@ -1576,9 +1580,8 @@ export class MangoClient {
           isSigner: false,
         } as AccountMeta,
       ])
-      .rpc()
+      .rpc();
   }
-  
 
   /// liquidations
 

@@ -30,6 +30,7 @@ pub fn token_edit(
     bank_num: u64,
     oracle_opt: Option<Pubkey>,
     oracle_config_opt: Option<OracleConfig>,
+    group_insurance_fund_opt: Option<bool>,
     interest_rate_params_opt: Option<InterestRateParams>,
     loan_fee_rate_opt: Option<f32>,
     loan_origination_fee_rate_opt: Option<f32>,
@@ -60,6 +61,10 @@ pub fn token_edit(
         }
         if let Some(oracle_config) = oracle_config_opt {
             bank.oracle_config = oracle_config;
+        };
+
+        if let Some(group_insurance_fund) = group_insurance_fund_opt {
+            mint_info.group_insurance_fund = if group_insurance_fund { 1 } else { 0 };
         };
 
         // unchanged -

@@ -505,6 +505,12 @@ export type MangoV4 = {
           }
         },
         {
+          "name": "groupInsuranceFundOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
           "name": "interestRateParamsOpt",
           "type": {
             "option": {
@@ -3979,6 +3985,21 @@ export type MangoV4 = {
             "type": {
               "defined": "I80F48"
             }
+          },
+          {
+            "name": "baseEntryLots",
+            "docs": [
+              "Tracks what the position is to calculate average entry  & break even price"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "quoteEntryNative",
+            "type": "i64"
+          },
+          {
+            "name": "quoteExitNative",
+            "type": "i64"
           },
           {
             "name": "longSettledFunding",
@@ -5518,6 +5539,12 @@ export const IDL: MangoV4 = {
           }
         },
         {
+          "name": "groupInsuranceFundOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
           "name": "interestRateParamsOpt",
           "type": {
             "option": {
@@ -8992,6 +9019,21 @@ export const IDL: MangoV4 = {
             "type": {
               "defined": "I80F48"
             }
+          },
+          {
+            "name": "baseEntryLots",
+            "docs": [
+              "Tracks what the position is to calculate average entry  & break even price"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "quoteEntryNative",
+            "type": "i64"
+          },
+          {
+            "name": "quoteExitNative",
+            "type": "i64"
           },
           {
             "name": "longSettledFunding",
