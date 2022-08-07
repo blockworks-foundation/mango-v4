@@ -107,9 +107,8 @@ async function main() {
         group,
         mangoAccount,
         group.findBank(token.tokenIndex)!.name,
-        nativeFlooredNumber,
+        nativeFlooredNumber - 1 /* see comment in token_withdraw in program */,
         false,
-        user,
       );
     }
 
