@@ -996,7 +996,14 @@ impl MangoClient {
             })
             .collect::<Vec<_>>();
 
-        let loan_amounts = vec![route.in_amount, 0u64];
+        let loan_amounts = vec![
+            match swap_mode {
+                JupiterSwapMode::ExactIn => amount,
+                // in amount + slippage
+                JupiterSwapMode::ExactOut => route.other_amount_threshold,
+            },
+            0u64,
+        ];
 
         // This relies on the fact that health account banks will be identical to the first_bank above!
         let health_ams = self
@@ -1128,6 +1135,7 @@ pub fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
     err.into()
 }
 
+#[derive(Clone, Copy)]
 pub enum JupiterSwapMode {
     ExactIn,
     ExactOut,
