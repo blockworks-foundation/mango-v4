@@ -5,12 +5,14 @@ use mango_v4::state::{oracle_price, Bank, TokenIndex, TokenPosition, QUOTE_TOKEN
 
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 pub struct Config {
     pub slippage: f64,
+    pub refresh_timeout: Duration,
 }
 
+#[derive(Debug)]
 struct TokenState {
     _price: I80F48,
     native_position: I80F48,
@@ -68,7 +70,9 @@ pub fn zero_all_non_quote(
             ))
         })
         .collect::<anyhow::Result<HashMap<TokenIndex, TokenState>>>()?;
+    log::trace!("account tokens: {:?}", tokens);
 
+    let mut txsigs = vec![];
     for (token_index, token_state) in tokens {
         let token = mango_client.context.token(token_index);
         if token_index == quote_token.token_index {
@@ -76,22 +80,51 @@ pub fn zero_all_non_quote(
         }
 
         if token_state.native_position > 0 {
-            mango_client.jupiter_swap(
+            let amount = token_state.native_position;
+            let txsig = mango_client.jupiter_swap(
                 token.mint_info.mint,
                 quote_token.mint_info.mint,
-                token_state.native_position.to_num::<u64>(),
+                amount.to_num::<u64>(),
                 config.slippage,
                 client::JupiterSwapMode::ExactIn,
             )?;
+            log::info!(
+                "sold {} {} for {} in tx {}",
+                token.native_to_ui(amount),
+                token.name,
+                quote_token.name,
+                txsig
+            );
+            txsigs.push(txsig);
         } else if token_state.native_position < 0 {
-            mango_client.jupiter_swap(
+            let amount = -token_state.native_position;
+            let txsig = mango_client.jupiter_swap(
                 quote_token.mint_info.mint,
                 token.mint_info.mint,
-                (-token_state.native_position).to_num::<u64>(),
+                amount.to_num::<u64>(),
                 config.slippage,
                 client::JupiterSwapMode::ExactOut,
             )?;
+            log::info!(
+                "bought {} {} for {} in tx {}",
+                token.native_to_ui(amount),
+                token.name,
+                quote_token.name,
+                txsig
+            );
+            txsigs.push(txsig);
         }
+    }
+
+    let max_slot = account_fetcher.transaction_max_slot(&txsigs)?;
+    if let Err(e) = account_fetcher.refresh_accounts_via_rpc_until_slot(
+        &[*mango_account_address],
+        max_slot,
+        config.refresh_timeout,
+    ) {
+        // If we don't get fresh data, maybe the tx landed on a fork?
+        // Rebalance is technically still ok.
+        log::info!("could not refresh account data: {}", e);
     }
 
     Ok(())

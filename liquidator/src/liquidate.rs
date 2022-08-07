@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::account_shared_data::KeyedAccountSharedData;
 
 use client::{chain_data, AccountFetcher, MangoClient, MangoClientError, MangoGroupContext};
@@ -10,6 +12,7 @@ use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 pub struct Config {
     pub min_health_ratio: f64,
+    pub refresh_timeout: Duration,
 }
 
 pub fn new_health_cache_(
@@ -169,7 +172,7 @@ pub fn maybe_liquidate_account(
     };
 
     // try liquidating
-    if account.is_bankrupt() {
+    let txsig = if account.is_bankrupt() {
         if tokens.is_empty() {
             anyhow::bail!("mango account {}, is bankrupt has no active tokens", pubkey);
         }
@@ -199,7 +202,7 @@ pub fn maybe_liquidate_account(
             maint_health,
             sig
         );
-        return Ok(true);
+        sig
     } else if maint_health.is_negative() {
         let asset_token_index = tokens
             .iter()
@@ -253,9 +256,21 @@ pub fn maybe_liquidate_account(
             maint_health,
             sig
         );
-        return Ok(true);
+        sig
+    } else {
+        return Ok(false);
+    };
+
+    let slot = account_fetcher.transaction_max_slot(&[txsig])?;
+    if let Err(e) = account_fetcher.refresh_accounts_via_rpc_until_slot(
+        &[*pubkey, mango_client.mango_account_address],
+        slot,
+        config.refresh_timeout,
+    ) {
+        log::info!("could not refresh after liquidation: {}", e);
     }
-    Ok(false)
+
+    Ok(true)
 }
 
 #[allow(clippy::too_many_arguments)]

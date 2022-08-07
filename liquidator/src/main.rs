@@ -8,7 +8,6 @@ use client::{chain_data, keypair_from_cli, Client, MangoClient, MangoGroupContex
 use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 
-use anyhow::Context;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use std::collections::HashSet;
@@ -213,11 +212,15 @@ async fn main() -> anyhow::Result<()> {
 
     let liq_config = liquidate::Config {
         min_health_ratio: cli.min_health_ratio,
+        // TODO: config
+        refresh_timeout: Duration::from_secs(30),
     };
 
     let mut rebalance_interval = tokio::time::interval(Duration::from_secs(5));
     let rebalance_config = rebalance::Config {
         slippage: cli.rebalance_slippage,
+        // TODO: config
+        refresh_timeout: Duration::from_secs(30),
     };
 
     info!("main loop");
@@ -312,8 +315,11 @@ async fn main() -> anyhow::Result<()> {
             },
 
             _ = rebalance_interval.tick() => {
-                rebalance::zero_all_non_quote(&mango_client, &account_fetcher, &cli.liqor_mango_account, &rebalance_config)
-                    .context("rebalancing liqor account")?;
+                if one_snapshot_done {
+                    if let Err(err) = rebalance::zero_all_non_quote(&mango_client, &account_fetcher, &cli.liqor_mango_account, &rebalance_config) {
+                        log::error!("failed to rebalance liqor: {:?}", err);
+                    }
+                }
             }
         }
     }
@@ -331,10 +337,11 @@ fn liquidate<'a>(
     }
 
     let liqor = &mango_client.mango_account_address;
-    account_fetcher.refresh_account_via_rpc(liqor)?;
-
-    rebalance::zero_all_non_quote(mango_client, account_fetcher, liqor, &rebalance_config)
-        .context("rebalancing liqor account after liquidation")?;
+    if let Err(err) =
+        rebalance::zero_all_non_quote(mango_client, account_fetcher, liqor, &rebalance_config)
+    {
+        log::error!("failed to rebalance liqor: {:?}", err);
+    }
     Ok(())
 }
 
