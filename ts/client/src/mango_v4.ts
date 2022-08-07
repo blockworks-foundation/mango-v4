@@ -820,10 +820,20 @@ export type MangoV4 = {
           "type": "u32"
         },
         {
-          "name": "accountSize",
-          "type": {
-            "defined": "AccountSize"
-          }
+          "name": "tokenCount",
+          "type": "u8"
+        },
+        {
+          "name": "serum3Count",
+          "type": "u8"
+        },
+        {
+          "name": "perpCount",
+          "type": "u8"
+        },
+        {
+          "name": "perpOoCount",
+          "type": "u8"
         },
         {
           "name": "name",
@@ -860,7 +870,24 @@ export type MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "tokenCount",
+          "type": "u8"
+        },
+        {
+          "name": "serum3Count",
+          "type": "u8"
+        },
+        {
+          "name": "perpCount",
+          "type": "u8"
+        },
+        {
+          "name": "perpOoCount",
+          "type": "u8"
+        }
+      ]
     },
     {
       "name": "accountEdit",
@@ -3981,6 +4008,21 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "baseEntryLots",
+            "docs": [
+              "Tracks what the position is to calculate average entry  & break even price"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "quoteEntryNative",
+            "type": "i64"
+          },
+          {
+            "name": "quoteExitNative",
+            "type": "i64"
+          },
+          {
             "name": "longSettledFunding",
             "docs": [
               "Already settled funding"
@@ -4283,20 +4325,6 @@ export type MangoV4 = {
           },
           {
             "name": "Maint"
-          }
-        ]
-      }
-    },
-    {
-      "name": "AccountSize",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Small"
-          },
-          {
-            "name": "Large"
           }
         ]
       }
@@ -5833,10 +5861,20 @@ export const IDL: MangoV4 = {
           "type": "u32"
         },
         {
-          "name": "accountSize",
-          "type": {
-            "defined": "AccountSize"
-          }
+          "name": "tokenCount",
+          "type": "u8"
+        },
+        {
+          "name": "serum3Count",
+          "type": "u8"
+        },
+        {
+          "name": "perpCount",
+          "type": "u8"
+        },
+        {
+          "name": "perpOoCount",
+          "type": "u8"
         },
         {
           "name": "name",
@@ -5873,7 +5911,24 @@ export const IDL: MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "tokenCount",
+          "type": "u8"
+        },
+        {
+          "name": "serum3Count",
+          "type": "u8"
+        },
+        {
+          "name": "perpCount",
+          "type": "u8"
+        },
+        {
+          "name": "perpOoCount",
+          "type": "u8"
+        }
+      ]
     },
     {
       "name": "accountEdit",
@@ -8994,6 +9049,21 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "baseEntryLots",
+            "docs": [
+              "Tracks what the position is to calculate average entry  & break even price"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "quoteEntryNative",
+            "type": "i64"
+          },
+          {
+            "name": "quoteExitNative",
+            "type": "i64"
+          },
+          {
             "name": "longSettledFunding",
             "docs": [
               "Already settled funding"
@@ -9296,20 +9366,6 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Maint"
-          }
-        ]
-      }
-    },
-    {
-      "name": "AccountSize",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Small"
-          },
-          {
-            "name": "Large"
           }
         ]
       }
