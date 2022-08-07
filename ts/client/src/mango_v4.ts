@@ -505,6 +505,12 @@ export type MangoV4 = {
           }
         },
         {
+          "name": "groupInsuranceFundOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
           "name": "interestRateParamsOpt",
           "type": {
             "option": {
@@ -5543,6 +5549,12 @@ export const IDL: MangoV4 = {
             "option": {
               "defined": "OracleConfig"
             }
+          }
+        },
+        {
+          "name": "groupInsuranceFundOpt",
+          "type": {
+            "option": "bool"
           }
         },
         {

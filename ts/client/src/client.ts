@@ -232,6 +232,7 @@ export class MangoClient {
     tokenName: string,
     oracle: PublicKey,
     oracleConfFilter: number,
+    groupInsuranceFund: boolean,
     adjustmentFactor: number,
     util0: number,
     rate0: number,
@@ -258,6 +259,7 @@ export class MangoClient {
             val: I80F48.fromNumber(oracleConfFilter).getData(),
           },
         } as any, // future: nested custom types dont typecheck, fix if possible?
+        groupInsuranceFund,
         { adjustmentFactor, util0, rate0, util1, rate1, maxRate },
         loanFeeRate,
         loanOriginationFeeRate,
@@ -614,7 +616,7 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     tokenName: string,
     amount: number,
-  ) {
+  ): Promise<TransactionSignature> {
     const bank = group.banksMap.get(tokenName)!;
 
     const tokenAccountPk = await getAssociatedTokenAddress(
@@ -690,7 +692,7 @@ export class MangoClient {
     tokenName: string,
     amount: number,
     allowBorrow: boolean,
-  ) {
+  ): Promise<TransactionSignature> {
     const bank = group.banksMap.get(tokenName)!;
 
     const tokenAccountPk = await getAssociatedTokenAddress(
@@ -731,7 +733,7 @@ export class MangoClient {
     tokenName: string,
     nativeAmount: number,
     allowBorrow: boolean,
-  ) {
+  ): Promise<TransactionSignature> {
     const bank = group.banksMap.get(tokenName)!;
 
     const tokenAccountPk = await getAssociatedTokenAddress(
