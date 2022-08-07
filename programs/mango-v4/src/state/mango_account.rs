@@ -1,13 +1,10 @@
-use std::fmt;
-
 use std::mem::size_of;
 
 use anchor_lang::prelude::*;
 use arrayref::array_ref;
 
 use fixed::types::I80F48;
-use num_enum::IntoPrimitive;
-use num_enum::TryFromPrimitive;
+
 use solana_program::program_memory::sol_memmove;
 use static_assertions::const_assert_eq;
 
