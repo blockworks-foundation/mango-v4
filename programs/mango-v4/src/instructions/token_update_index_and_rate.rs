@@ -12,6 +12,11 @@ use anchor_lang::Discriminator;
 use checked_math as cm;
 use fixed::types::I80F48;
 
+pub mod compute_budget {
+    use solana_program::declare_id;
+    declare_id!("ComputeBudget111111111111111111111111111111");
+}
+
 #[derive(Accounts)]
 pub struct TokenUpdateIndexAndRate<'info> {
     pub group: AccountLoader<'info, Group>, // Required for group metadata parsing
@@ -46,9 +51,10 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             // for now we just whitelist to other token_update_index_and_rate ix
             // 2. we want to forbid cpi, since ix we would like to blacklist could just be called from cpi
             require!(
-                ix.program_id == crate::id()
+                (ix.program_id == crate::id()
                     && ix.data[0..8]
-                        == crate::instruction::TokenUpdateIndexAndRate::discriminator(),
+                        == crate::instruction::TokenUpdateIndexAndRate::discriminator())
+                    || (ix.program_id == compute_budget::id()),
                 MangoError::SomeError
             );
 
