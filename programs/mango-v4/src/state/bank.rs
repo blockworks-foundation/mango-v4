@@ -94,11 +94,11 @@ pub struct Bank {
 
     pub bank_num: u32,
 
-    pub reserved: [u8; 256],
+    pub reserved: [u8; 2560],
 }
 const_assert_eq!(
     size_of::<Bank>(),
-    32 + 16 + 32 * 3 + 16 + 16 * 6 + 8 * 2 + 16 * 16 + 8 * 2 + 2 + 1 + 1 + 4 + 256
+    32 + 16 + 32 * 3 + 16 + 16 * 6 + 8 * 2 + 16 * 16 + 8 * 2 + 2 + 1 + 1 + 4 + 2560
 );
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
@@ -192,7 +192,7 @@ impl Bank {
             token_index: existing_bank.token_index,
             bump: existing_bank.bump,
             mint_decimals: existing_bank.mint_decimals,
-            reserved: [0; 256],
+            reserved: [0; 2560],
             bank_num,
         }
     }

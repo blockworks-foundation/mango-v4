@@ -21,20 +21,20 @@ pub struct MintInfo {
     // ABI: Clients rely on this being at offset 40
     pub token_index: TokenIndex,
 
-    pub padding1: [u8; 6],
+    pub group_insurance_fund: u8,
+    pub padding1: [u8; 5],
     pub mint: Pubkey,
     pub banks: [Pubkey; MAX_BANKS],
     pub vaults: [Pubkey; MAX_BANKS],
     pub oracle: Pubkey,
 
     pub registration_time: i64,
-    pub group_insurance_fund: u8,
 
-    pub reserved: [u8; 255],
+    pub reserved: [u8; 2560],
 }
 const_assert_eq!(
     size_of::<MintInfo>(),
-    MAX_BANKS * 2 * 32 + 3 * 32 + 2 + 8 + 6 + 1 + 255
+    MAX_BANKS * 2 * 32 + 3 * 32 + 2 + 8 + 6 + 2560
 );
 const_assert_eq!(size_of::<MintInfo>() % 8, 0);
 
