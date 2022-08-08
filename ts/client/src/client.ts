@@ -487,7 +487,7 @@ export class MangoClient {
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
-      .rpc();
+      .rpc({ skipPreflight: true });
   }
 
   public async expandMangoAccount(
@@ -1556,8 +1556,8 @@ export class MangoClient {
   }
 
   async updateIndexAndRate(group: Group, tokenName: string) {
-    let bank = group.banksMap.get(tokenName)!;
-    let mintInfo = group.mintInfosMap.get(bank.tokenIndex)!;
+    const bank = group.banksMap.get(tokenName)!;
+    const mintInfo = group.mintInfosMap.get(bank.tokenIndex)!;
 
     await this.program.methods
       .tokenUpdateIndexAndRate()
