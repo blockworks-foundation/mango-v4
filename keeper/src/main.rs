@@ -45,12 +45,6 @@ struct Cli {
     command: Command,
 }
 
-fn keypair_from_path(p: &std::path::PathBuf) -> Keypair {
-    let path = std::path::PathBuf::from_str(&*shellexpand::tilde(p.to_str().unwrap())).unwrap();
-    keypair::read_keypair_file(path)
-        .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy()))
-}
-
 #[derive(Subcommand, Debug, Clone)]
 enum Command {
     Crank {},

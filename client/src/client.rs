@@ -159,7 +159,6 @@ impl MangoClient {
                 Some(tuple) => tuple.1.fixed.account_num + 1,
                 None => 0u32,
             };
-
             Self::create_account(client, group, owner, payer, account_num, mango_account_name)
                 .context("Failed to create account...")?;
         }
