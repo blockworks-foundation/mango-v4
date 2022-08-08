@@ -192,7 +192,7 @@ impl Bank {
             token_index: existing_bank.token_index,
             bump: existing_bank.bump,
             mint_decimals: existing_bank.mint_decimals,
-            reserved: [0; 256],
+            reserved: [0; 2560],
             bank_num,
         }
     }

@@ -110,7 +110,7 @@ pub fn token_register_trustless(
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
-        reserved: [0; 256],
+        reserved: [0; 2560],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
@@ -118,14 +118,14 @@ pub fn token_register_trustless(
     *mint_info = MintInfo {
         group: ctx.accounts.group.key(),
         token_index,
+        group_insurance_fund: 0,
         padding1: Default::default(),
         mint: ctx.accounts.mint.key(),
         banks: Default::default(),
         vaults: Default::default(),
         oracle: ctx.accounts.oracle.key(),
         registration_time: Clock::get()?.unix_timestamp,
-        group_insurance_fund: 0,
-        reserved: [0; 255],
+        reserved: [0; 2560],
     };
 
     mint_info.banks[0] = ctx.accounts.bank.key();
