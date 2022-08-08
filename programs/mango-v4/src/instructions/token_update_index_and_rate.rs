@@ -5,16 +5,25 @@ use crate::logs::{UpdateIndexLog, UpdateRateLog};
 use crate::state::HOUR;
 use crate::{
     accounts_zerocopy::{AccountInfoRef, LoadMutZeroCopyRef, LoadZeroCopyRef},
-    state::{oracle_price, Bank, MintInfo},
+    state::{oracle_price, Bank, Group, MintInfo},
 };
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
+use anchor_lang::Discriminator;
 use checked_math as cm;
 use fixed::types::I80F48;
 
+pub mod compute_budget {
+    use solana_program::declare_id;
+    declare_id!("ComputeBudget111111111111111111111111111111");
+}
+
 #[derive(Accounts)]
 pub struct TokenUpdateIndexAndRate<'info> {
+    pub group: AccountLoader<'info, Group>, // Required for group metadata parsing
+
     #[account(
-        has_one = oracle
+        has_one = oracle,
+        constraint = mint_info.load()?.group.key() == group.key(),
     )]
     pub mint_info: AccountLoader<'info, MintInfo>,
 
@@ -42,8 +51,10 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             // for now we just whitelist to other token_update_index_and_rate ix
             // 2. we want to forbid cpi, since ix we would like to blacklist could just be called from cpi
             require!(
-                ix.program_id == crate::id()
-                    && ix.data[0..8] == [131, 136, 194, 39, 11, 50, 10, 198], // token_update_index_and_rate
+                (ix.program_id == crate::id()
+                    && ix.data[0..8]
+                        == crate::instruction::TokenUpdateIndexAndRate::discriminator())
+                    || (ix.program_id == compute_budget::id()),
                 MangoError::SomeError
             );
 

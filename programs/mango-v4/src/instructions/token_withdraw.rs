@@ -125,6 +125,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         cm!(amount_i80f48 * oracle_price * QUOTE_NATIVE_TO_UI).to_num::<f32>();
 
     emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         token_index,
         indexed_position: indexed_position.to_bits(),
@@ -151,6 +152,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     }
 
     emit!(WithdrawLog {
+        mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         signer: ctx.accounts.owner.key(),
         token_index,

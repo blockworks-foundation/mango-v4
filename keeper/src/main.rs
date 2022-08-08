@@ -76,7 +76,7 @@ fn main() -> Result<(), anyhow::Error> {
     };
 
     let mango_client = Arc::new(MangoClient::new_for_existing_account(
-        Client::new(cluster, commitment, &owner, Some(Duration::from_secs(1))),
+        Client::new(cluster, commitment, &owner, Some(Duration::from_secs(10))),
         cli.mango_account,
         owner,
     )?);

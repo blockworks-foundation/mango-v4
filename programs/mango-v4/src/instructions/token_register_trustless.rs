@@ -88,28 +88,29 @@ pub fn token_register_trustless(
         index_last_updated: Clock::get()?.unix_timestamp,
         bank_rate_last_updated: Clock::get()?.unix_timestamp,
         avg_utilization: I80F48::ZERO,
-        adjustment_factor: I80F48::from_num(0.02),
+        // 10% daily adjustment at 0% or 100% utilization
+        adjustment_factor: I80F48::from_num(0.004),
         util0: I80F48::from_num(0.7),
         rate0: I80F48::from_num(0.1),
-        util1: I80F48::from_num(0.8),
+        util1: I80F48::from_num(0.85),
         rate1: I80F48::from_num(0.2),
         max_rate: I80F48::from_num(2.0),
         collected_fees_native: I80F48::ZERO,
-        loan_origination_fee_rate: I80F48::from_num(0.001),
+        loan_origination_fee_rate: I80F48::from_num(0.0005),
         loan_fee_rate: I80F48::from_num(0.005),
         maint_asset_weight: I80F48::from_num(0),
         init_asset_weight: I80F48::from_num(0),
-        maint_liab_weight: I80F48::from_num(1.25),
-        init_liab_weight: I80F48::from_num(1.5),
-        liquidation_fee: I80F48::from_num(0.125),
+        maint_liab_weight: I80F48::from_num(1.4), // 2.5x
+        init_liab_weight: I80F48::from_num(1.8),  // 1.25x
+        liquidation_fee: I80F48::from_num(0.2),
         dust: I80F48::ZERO,
-        flash_loan_vault_initial: u64::MAX,
+        flash_loan_token_account_initial: u64::MAX,
         flash_loan_approved_amount: 0,
         token_index,
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
-        reserved: [0; 256],
+        reserved: [0; 2560],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
@@ -117,14 +118,14 @@ pub fn token_register_trustless(
     *mint_info = MintInfo {
         group: ctx.accounts.group.key(),
         token_index,
+        group_insurance_fund: 0,
         padding1: Default::default(),
         mint: ctx.accounts.mint.key(),
         banks: Default::default(),
         vaults: Default::default(),
         oracle: ctx.accounts.oracle.key(),
         registration_time: Clock::get()?.unix_timestamp,
-        group_insurance_fund: 0,
-        reserved: [0; 255],
+        reserved: [0; 2560],
     };
 
     mint_info.banks[0] = ctx.accounts.bank.key();

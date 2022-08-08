@@ -15,7 +15,7 @@ use bincode::Options;
 use fixed::types::I80F48;
 use itertools::Itertools;
 use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
-use mango_v4::state::{AccountSize, Bank, Group, MangoAccountValue, Serum3MarketIndex, TokenIndex};
+use mango_v4::state::{Bank, Group, MangoAccountValue, Serum3MarketIndex, TokenIndex};
 
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_client::rpc_client::RpcClient;
@@ -206,7 +206,10 @@ impl MangoClient {
                 data: anchor_lang::InstructionData::data(&mango_v4::instruction::AccountCreate {
                     account_num,
                     name: mango_account_name.to_owned(),
-                    account_size: AccountSize::Small,
+                    token_count: 8,
+                    serum3_count: 8,
+                    perp_count: 8,
+                    perp_oo_count: 8,
                 }),
             })
             .signer(owner)

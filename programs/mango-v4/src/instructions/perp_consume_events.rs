@@ -61,6 +61,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                 fill,
                             )?;
                             emit_perp_balances(
+                                ctx.accounts.group.key(),
                                 fill.maker,
                                 perp_market.perp_market_index as u64,
                                 fill.price,
@@ -101,6 +102,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                         fill,
                                     )?;
                                     emit_perp_balances(
+                                        ctx.accounts.group.key(),
                                         fill.maker,
                                         perp_market.perp_market_index as u64,
                                         fill.price,
@@ -110,6 +112,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                         &perp_market,
                                     );
                                     emit_perp_balances(
+                                        ctx.accounts.group.key(),
                                         fill.taker,
                                         perp_market.perp_market_index as u64,
                                         fill.price,

@@ -131,13 +131,13 @@ pub fn token_register(
         init_liab_weight: I80F48::from_num(init_liab_weight),
         liquidation_fee: I80F48::from_num(liquidation_fee),
         dust: I80F48::ZERO,
-        flash_loan_vault_initial: u64::MAX,
+        flash_loan_token_account_initial: u64::MAX,
         flash_loan_approved_amount: 0,
         token_index,
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
-        reserved: [0; 256],
+        reserved: [0; 2560],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
@@ -145,14 +145,14 @@ pub fn token_register(
     *mint_info = MintInfo {
         group: ctx.accounts.group.key(),
         token_index,
+        group_insurance_fund: 1,
         padding1: Default::default(),
         mint: ctx.accounts.mint.key(),
         banks: Default::default(),
         vaults: Default::default(),
         oracle: ctx.accounts.oracle.key(),
         registration_time: Clock::get()?.unix_timestamp,
-        group_insurance_fund: 1,
-        reserved: [0; 255],
+        reserved: [0; 2560],
     };
 
     mint_info.banks[0] = ctx.accounts.bank.key();
