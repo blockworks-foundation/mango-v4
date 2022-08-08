@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       imageName:
-        description: 'Image Name'
+        description: 'Docker Image Name'
         required: true
         type: string
 
