@@ -1,7 +1,7 @@
 name: Deploy Docker Image to Heroku
 
 on: 
-  workflow-dispatch:
+  workflow_dispatch:
     inputs:
       appName:
         description: 'Heroku App Name'
