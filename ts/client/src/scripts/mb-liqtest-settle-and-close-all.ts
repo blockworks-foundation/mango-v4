@@ -34,12 +34,43 @@ async function main() {
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(group.toString());
 
-  const accounts = await client.getMangoAccountsForOwner(
+  let accounts = await client.getMangoAccountsForOwner(
     group,
     admin.publicKey,
   );
   for (let account of accounts) {
-    console.log(`account: ${account}`);
+    console.log(`settling borrows on account: ${account}`);
+
+    // first, settle all borrows
+    for (let token of account.tokensActive()) {
+      const bank = group.findBank(token.tokenIndex);
+      const amount = token.native(bank).toNumber();
+      if (amount < 0) {
+        try {
+          await client.tokenDepositNative(
+            group,
+            account,
+            bank.name,
+            amount,
+          );
+          await account.reload(client, group);
+        } catch (error) {
+          console.log(
+            `failed to deposit ${bank.name} into ${account.publicKey}: ${error}`,
+          );
+        }
+      }
+    }
+  }
+
+  accounts = await client.getMangoAccountsForOwner(
+    group,
+    admin.publicKey,
+  );
+  for (let account of accounts) {
+    console.log(`withdrawing deposits of account: ${account}`);
+
+    // withdraw all funds
     for (let token of account.tokensActive()) {
       const bank = group.findBank(token.tokenIndex);
       const amount = token.native(bank).toNumber();
@@ -62,7 +93,9 @@ async function main() {
       }
     }
 
+    // close account
     try {
+      console.log(`closing account: ${account}`);
       await client.closeMangoAccount(group, account);
     } catch (error) {
       console.log(`failed to close ${account.publicKey}: ${error}`);
