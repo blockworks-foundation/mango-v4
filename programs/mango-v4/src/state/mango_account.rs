@@ -88,13 +88,14 @@ pub struct MangoAccount {
     // Alternative authority/signer of transactions for a mango account
     pub delegate: Pubkey,
 
+    pub account_num: u8,
+
     /// This account cannot open new positions or borrow until `init_health >= 0`
     being_liquidated: u8,
 
     /// This account cannot do anything except go through `resolve_bankruptcy`
     is_bankrupt: u8,
 
-    pub account_num: u8,
     pub bump: u8,
 
     pub padding: [u8; 4],
