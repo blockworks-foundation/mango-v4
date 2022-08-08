@@ -1,16 +1,8 @@
-use crate::FIRST_WEBSOCKET_SLOT;
-
 use {
-    log::*, solana_sdk::account::AccountSharedData, solana_sdk::pubkey::Pubkey,
-    std::collections::HashMap,
+    solana_sdk::account::AccountSharedData, solana_sdk::pubkey::Pubkey, std::collections::HashMap,
 };
 
-use {
-    // TODO: None of these should be here
-    crate::metrics,
-    crate::snapshot_source,
-    crate::websocket_source,
-};
+pub use crate::chain_data_fetcher::AccountFetcher;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SlotStatus {
@@ -28,7 +20,7 @@ pub struct SlotData {
 }
 
 #[derive(Clone, Debug)]
-pub struct AccountData {
+pub struct AccountAndSlot {
     pub slot: u64,
     pub account: AccountSharedData,
 }
@@ -41,33 +33,24 @@ pub struct ChainData {
     /// only slots >= newest_rooted_slot are retained
     slots: HashMap<u64, SlotData>,
     /// writes to accounts, only the latest rooted write an newer are retained
-    accounts: HashMap<Pubkey, Vec<AccountData>>,
+    accounts: HashMap<Pubkey, Vec<AccountAndSlot>>,
     newest_rooted_slot: u64,
     newest_processed_slot: u64,
     best_chain_slot: u64,
-
-    // storing global metrics here is not good style
-    metric_slots_count: metrics::MetricU64,
-    metric_accounts_count: metrics::MetricU64,
-    metric_account_write_count: metrics::MetricU64,
 }
 
 impl ChainData {
-    pub fn new(metrics: &metrics::Metrics) -> Self {
+    pub fn new() -> Self {
         Self {
             slots: HashMap::new(),
             accounts: HashMap::new(),
             newest_rooted_slot: 0,
             newest_processed_slot: 0,
             best_chain_slot: 0,
-            metric_slots_count: metrics.register_u64("chain_data_slots_count".into()),
-            metric_accounts_count: metrics.register_u64("chain_data_accounts_count".into()),
-            metric_account_write_count: metrics
-                .register_u64("chain_data_account_write_count".into()),
         }
     }
 
-    fn update_slot(&mut self, new_slot: SlotData) {
+    pub fn update_slot(&mut self, new_slot: SlotData) {
         let new_processed_head = new_slot.slot > self.newest_processed_slot;
         if new_processed_head {
             self.newest_processed_slot = new_slot.slot;
@@ -154,19 +137,10 @@ impl ChainData {
             // now it's fine to drop any slots before the new rooted head
             // as account writes for non-rooted slots before it have been dropped
             self.slots.retain(|s, _| *s >= self.newest_rooted_slot);
-
-            self.metric_slots_count.set(self.slots.len() as u64);
-            self.metric_accounts_count.set(self.accounts.len() as u64);
-            self.metric_account_write_count.set(
-                self.accounts
-                    .iter()
-                    .map(|(_key, writes)| writes.len() as u64)
-                    .sum(),
-            );
         }
     }
 
-    fn update_account(&mut self, pubkey: Pubkey, account: AccountData) {
+    pub fn update_account(&mut self, pubkey: Pubkey, account: AccountAndSlot) {
         use std::collections::hash_map::Entry;
         match self.accounts.entry(pubkey) {
             Entry::Vacant(v) => {
@@ -191,71 +165,7 @@ impl ChainData {
         };
     }
 
-    pub fn update_from_snapshot(&mut self, snapshot: snapshot_source::AccountSnapshot) {
-        for account_write in snapshot.accounts {
-            self.update_account(
-                account_write.pubkey,
-                AccountData {
-                    slot: account_write.slot,
-                    account: account_write.account,
-                },
-            );
-        }
-    }
-
-    pub fn update_from_websocket(&mut self, message: websocket_source::Message) {
-        match message {
-            websocket_source::Message::Account(account_write) => {
-                trace!("websocket account message");
-                self.update_account(
-                    account_write.pubkey,
-                    AccountData {
-                        slot: account_write.slot,
-                        account: account_write.account,
-                    },
-                );
-            }
-            websocket_source::Message::Slot(slot_update) => {
-                trace!("websocket slot message");
-                let slot_update = match *slot_update {
-                    solana_client::rpc_response::SlotUpdate::CreatedBank {
-                        slot, parent, ..
-                    } => Some(SlotData {
-                        slot,
-                        parent: Some(parent),
-                        status: SlotStatus::Processed,
-                        chain: 0,
-                    }),
-                    solana_client::rpc_response::SlotUpdate::OptimisticConfirmation {
-                        slot,
-                        ..
-                    } => Some(SlotData {
-                        slot,
-                        parent: None,
-                        status: SlotStatus::Confirmed,
-                        chain: 0,
-                    }),
-                    solana_client::rpc_response::SlotUpdate::Root { slot, .. } => Some(SlotData {
-                        slot,
-                        parent: None,
-                        status: SlotStatus::Rooted,
-                        chain: 0,
-                    }),
-                    _ => None,
-                };
-                if let Some(update) = slot_update {
-                    if FIRST_WEBSOCKET_SLOT.get().is_none() {
-                        FIRST_WEBSOCKET_SLOT.set(update.slot).expect("always Ok");
-                        log::debug!("first slot for websocket {}", update.slot);
-                    }
-
-                    self.update_slot(update);
-                }
-            }
-        }
-    }
-
-    pub fn update_from_rpc(&mut self, pubkey: &Pubkey, account: AccountData) {
+    pub fn update_from_rpc(&mut self, pubkey: &Pubkey, account: AccountAndSlot) {
         // Add a stub slot if the rpc has information about the future.
         // If it's in the past, either the slot already exists (and maybe we have
         // the data already), or it was a skipped slot and adding it now makes no difference.
@@ -271,7 +181,7 @@ impl ChainData {
         self.update_account(*pubkey, account)
     }
 
-    fn is_account_write_live(&self, write: &AccountData) -> bool {
+    fn is_account_write_live(&self, write: &AccountAndSlot) -> bool {
         self.slots
             .get(&write.slot)
             // either the slot is rooted, in the current chain or newer than the chain head
@@ -285,7 +195,7 @@ impl ChainData {
     }
 
     /// Cloned snapshot of all the most recent live writes per pubkey
-    pub fn accounts_snapshot(&self) -> HashMap<Pubkey, AccountData> {
+    pub fn accounts_snapshot(&self) -> HashMap<Pubkey, AccountAndSlot> {
         self.accounts
             .iter()
             .filter_map(|(pubkey, writes)| {
@@ -304,7 +214,7 @@ impl ChainData {
     }
 
     /// Ref to the most recent live write of the pubkey, along with the slot that it was for
-    pub fn account_and_slot<'a>(&'a self, pubkey: &Pubkey) -> anyhow::Result<&'a AccountData> {
+    pub fn account_and_slot<'a>(&'a self, pubkey: &Pubkey) -> anyhow::Result<&'a AccountAndSlot> {
         self.accounts
             .get(pubkey)
             .ok_or_else(|| anyhow::anyhow!("account {} not found", pubkey))?
@@ -312,5 +222,17 @@ impl ChainData {
             .rev()
             .find(|w| self.is_account_write_live(w))
             .ok_or_else(|| anyhow::anyhow!("account {} has no live data", pubkey))
+    }
+
+    pub fn slots_count(&self) -> usize {
+        self.slots.len()
+    }
+
+    pub fn accounts_count(&self) -> usize {
+        self.accounts.len()
+    }
+
+    pub fn account_writes_count(&self) -> usize {
+        self.accounts.values().map(|v| v.len()).sum()
     }
 }

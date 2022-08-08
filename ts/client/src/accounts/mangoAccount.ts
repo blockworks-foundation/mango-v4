@@ -16,56 +16,62 @@ export class MangoAccount {
   static from(
     publicKey: PublicKey,
     obj: {
-      name: number[];
       group: PublicKey;
       owner: PublicKey;
+      name: number[];
       delegate: PublicKey;
-      tokens: unknown;
-      serum3: Object;
-      perps: unknown;
-      perpOpenOrders: unknown;
       beingLiquidated: number;
       isBankrupt: number;
       accountNum: number;
       bump: number;
-      reserved: number[];
+      netDeposits: number;
+      netSettled: number;
+      headerVersion: number;
+      tokens: unknown;
+      serum3: unknown;
+      perps: unknown;
+      perpOpenOrders: unknown;
     },
   ) {
     return new MangoAccount(
       publicKey,
-      obj.name,
       obj.group,
       obj.owner,
+      obj.name,
       obj.delegate,
-      obj.tokens as TokenPositionDto[],
-      obj.serum3 as Serum3PositionDto[],
-      obj.perps as PerpPositionDto[],
-      obj.perpOpenOrders as any, // TODO
       obj.beingLiquidated,
       obj.isBankrupt,
       obj.accountNum,
       obj.bump,
-      obj.reserved,
-      {},
+      obj.netDeposits,
+      obj.netSettled,
+      obj.headerVersion,
+      obj.tokens as TokenPositionDto[],
+      obj.serum3 as Serum3PositionDto[],
+      obj.perps as PerpPositionDto[],
+      obj.perpOpenOrders as any,
+      {} as any,
     );
   }
 
   constructor(
     public publicKey: PublicKey,
-    name: number[],
     public group: PublicKey,
     public owner: PublicKey,
+    name: number[],
     public delegate: PublicKey,
+    beingLiquidated: number,
+    isBankrupt: number,
+    public accountNum: number,
+    bump: number,
+    netDeposits: number,
+    netSettled: number,
+    headerVersion: number,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
     perps: PerpPositionDto[],
     perpOpenOrders: PerpPositionDto[],
-    beingLiquidated: number,
-    isBankrupt: number,
-    accountNum: number,
-    bump: number,
-    reserved: number[],
-    public accountData: {},
+    public accountData: MangoAccountData,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.tokens = tokens.map((dto) => TokenPosition.from(dto));
@@ -166,7 +172,7 @@ export class MangoAccount {
    */
   getEquity(): I80F48 {
     const equity = (this.accountData as MangoAccountData).equity;
-    let total_equity = equity.tokens.reduce(
+    const total_equity = equity.tokens.reduce(
       (a, b) => a.add(b.value),
       ZERO_I80F48,
     );
@@ -185,7 +191,7 @@ export class MangoAccount {
    */
   getAssetsVal(): I80F48 {
     const equity = (this.accountData as MangoAccountData).equity;
-    let total_equity = equity.tokens.reduce(
+    const total_equity = equity.tokens.reduce(
       (a, b) => (b.value.gt(ZERO_I80F48) ? a.add(b.value) : a),
       ZERO_I80F48,
     );
@@ -197,7 +203,7 @@ export class MangoAccount {
    */
   getLiabsVal(): I80F48 {
     const equity = (this.accountData as MangoAccountData).equity;
-    let total_equity = equity.tokens.reduce(
+    const total_equity = equity.tokens.reduce(
       (a, b) => (b.value.lt(ZERO_I80F48) ? a.add(b.value) : a),
       ZERO_I80F48,
     );
@@ -207,7 +213,7 @@ export class MangoAccount {
   /**
    * The amount of given native token you can borrow, considering all existing assets as collateral except the deposits for this token.
    * Note 1: The existing native deposits need to be added to get the full amount that could be withdrawn.
-   * Note 2: The group might have less native deposits than what this returns.
+   * Note 2: The group might have less native deposits than what this returns. TODO: loan origination fees
    */
   getMaxWithdrawWithBorrowForToken(group: Group, tokenName: string): I80F48 {
     const bank = group.banksMap.get(tokenName);
@@ -226,7 +232,7 @@ export class MangoAccount {
   /**
    * The amount of given source native token you can swap to a target token considering all existing assets as collateral.
    * note: slippageAndFeesFactor is a normalized number, <1, e.g. a slippage of 5% and some fees which are 1%, then slippageAndFeesFactor = 0.94
-   * the factor is used to compute how much target can be obtained by swapping source
+   * the factor is used to compute how much target can be obtained by swapping source TODO: loan origination fees
    */
   getMaxSourceForTokenSwap(
     group: Group,
@@ -368,7 +374,7 @@ export class MangoAccount {
 }
 
 export class TokenPosition {
-  static TokenIndexUnset: number = 65535;
+  static TokenIndexUnset = 65535;
   static from(dto: TokenPositionDto) {
     return new TokenPosition(
       I80F48.from(dto.indexedPosition),
@@ -413,12 +419,12 @@ export class TokenPosition {
     ).toNumber();
   }
 
-  public toString(group?: Group): String {
-    let extra: string = '';
+  public toString(group?: Group): string {
+    let extra = '';
     if (group) {
-      let bank = group.findBank(this.tokenIndex);
+      const bank = group.findBank(this.tokenIndex);
       if (bank) {
-        let native = this.native(bank);
+        const native = this.native(bank);
         extra += ', native: ' + native.toNumber();
         extra += ', ui: ' + this.ui(bank);
         extra += ', tokenName: ' + bank.name;
@@ -587,9 +593,4 @@ export class PerpEquity {
 export class EquityDto {
   tokens: { tokenIndex: number; value: I80F48Dto }[];
   perps: { perpMarketIndex: number; value: I80F48Dto }[];
-}
-
-export class AccountSize {
-  static small = { small: {} };
-  static large = { large: {} };
 }

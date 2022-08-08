@@ -48,7 +48,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
 
                         Some(ai) => {
                             let mal: AccountLoaderDynamic<MangoAccount> =
-                                AccountLoaderDynamic::try_from(&ai)?;
+                                AccountLoaderDynamic::try_from(ai)?;
                             let mut ma = mal.load_mut()?;
                             ma.perp_execute_maker(
                                 perp_market.perp_market_index,
@@ -61,10 +61,11 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                 fill,
                             )?;
                             emit_perp_balances(
+                                ctx.accounts.group.key(),
                                 fill.maker,
                                 perp_market.perp_market_index as u64,
                                 fill.price,
-                                &ma.perp_find_account(perp_market.perp_market_index).unwrap(),
+                                ma.perp_find_account(perp_market.perp_market_index).unwrap(),
                                 &perp_market,
                             );
                         }
@@ -77,7 +78,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         }
                         Some(ai) => {
                             let mal: AccountLoaderDynamic<MangoAccount> =
-                                AccountLoaderDynamic::try_from(&ai)?;
+                                AccountLoaderDynamic::try_from(ai)?;
                             let mut maker = mal.load_mut()?;
 
                             match mango_account_ais.iter().find(|ai| ai.key == &fill.taker) {
@@ -87,7 +88,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                 }
                                 Some(ai) => {
                                     let mal: AccountLoaderDynamic<MangoAccount> =
-                                        AccountLoaderDynamic::try_from(&ai)?;
+                                        AccountLoaderDynamic::try_from(ai)?;
                                     let mut taker = mal.load_mut()?;
 
                                     maker.perp_execute_maker(
@@ -101,19 +102,21 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                         fill,
                                     )?;
                                     emit_perp_balances(
+                                        ctx.accounts.group.key(),
                                         fill.maker,
                                         perp_market.perp_market_index as u64,
                                         fill.price,
-                                        &maker
+                                        maker
                                             .perp_find_account(perp_market.perp_market_index)
                                             .unwrap(),
                                         &perp_market,
                                     );
                                     emit_perp_balances(
+                                        ctx.accounts.group.key(),
                                         fill.taker,
                                         perp_market.perp_market_index as u64,
                                         fill.price,
-                                        &taker
+                                        taker
                                             .perp_find_account(perp_market.perp_market_index)
                                             .unwrap(),
                                         &perp_market,
@@ -155,7 +158,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     }
                     Some(ai) => {
                         let mal: AccountLoaderDynamic<MangoAccount> =
-                            AccountLoaderDynamic::try_from(&ai)?;
+                            AccountLoaderDynamic::try_from(ai)?;
                         let mut ma = mal.load_mut()?;
 
                         ma.perp_remove_order(out.owner_slot as usize, out.quantity)?;

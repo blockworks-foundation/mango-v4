@@ -11,6 +11,7 @@ use crate::util::fill16_from_str;
 pub struct PerpCreateMarket<'info> {
     #[account(
         has_one = admin,
+        constraint = group.load()?.perps_supported()
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
@@ -95,8 +96,10 @@ pub fn perp_create_market(
         base_token_decimals,
         perp_market_index,
         base_token_index: base_token_index_opt.ok_or(TokenIndex::MAX).unwrap(),
-        padding: Default::default(),
-        reserved: Default::default(),
+        registration_time: Clock::get()?.unix_timestamp,
+        padding1: Default::default(),
+        padding2: Default::default(),
+        reserved: [0; 128],
     };
 
     let mut bids = ctx.accounts.bids.load_init()?;

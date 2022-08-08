@@ -73,8 +73,8 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
 
     Ok(FixedOrderAccountRetriever {
         ais: ais
-            .into_iter()
-            .map(|ai| AccountInfoRef::borrow(ai))
+            .iter()
+            .map(AccountInfoRef::borrow)
             .collect::<Result<Vec<_>>>()?,
         n_banks: active_token_len,
         begin_perp: cm!(active_token_len * 2),
@@ -93,11 +93,7 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
     fn oracle_price(&self, account_index: usize, bank: &Bank) -> Result<I80F48> {
         let oracle = &self.ais[cm!(self.n_banks + account_index)];
         require_keys_eq!(bank.oracle, *oracle.key());
-        Ok(oracle_price(
-            oracle,
-            bank.oracle_config.conf_filter,
-            bank.mint_decimals,
-        )?)
+        oracle_price(oracle, bank.oracle_config.conf_filter, bank.mint_decimals)
     }
 }
 
@@ -238,8 +234,8 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
 
         Ok(Self {
             ais: ais
-                .into_iter()
-                .map(|ai| AccountInfoRefMut::borrow(ai))
+                .iter()
+                .map(AccountInfoRefMut::borrow)
                 .collect::<Result<Vec<_>>>()?,
             token_index_map,
             perp_index_map,
@@ -270,6 +266,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
             .ok_or_else(|| error_msg!("perp market index {} not found", perp_market_index))?)
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn banks_mut_and_oracles(
         &mut self,
         token_index1: TokenIndex,
@@ -393,8 +390,8 @@ pub fn compute_health_from_fixed_accounts(
 
     let retriever = FixedOrderAccountRetriever {
         ais: ais
-            .into_iter()
-            .map(|ai| AccountInfoRef::borrow(ai))
+            .iter()
+            .map(AccountInfoRef::borrow)
             .collect::<Result<Vec<_>>>()?,
         n_banks: active_token_len,
         begin_perp: cm!(active_token_len * 2),
@@ -799,7 +796,7 @@ pub fn new_health_cache(
 
         // converts the token value to the basis token value for health computations
         // TODO: health basis token == USDC?
-        let native = position.native(&bank);
+        let native = position.native(bank);
 
         token_infos.push(TokenInfo {
             token_index: bank.token_index,

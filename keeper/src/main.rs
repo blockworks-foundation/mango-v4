@@ -1,20 +1,15 @@
 mod crank;
 mod taker;
 
-use std::path::PathBuf;
-use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anchor_client::Cluster;
 
 use clap::{Parser, Subcommand};
-use client::MangoClient;
+use client::{keypair_from_cli, Client, MangoClient};
+use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
-use solana_sdk::{
-    commitment_config::CommitmentConfig,
-    signature::Signer,
-    signer::{keypair, keypair::Keypair},
-};
 use tokio::time;
 
 // TODO
@@ -40,20 +35,11 @@ struct Cli {
     #[clap(short, long, env)]
     rpc_url: String,
 
-    #[clap(short, long, env = "PAYER_KEYPAIR")]
-    payer: String,
+    #[clap(short, long, env)]
+    mango_account: Pubkey,
 
     #[clap(short, long, env)]
-    group: Option<Pubkey>,
-
-    // These exist only as a shorthand to make testing easier. Normal users would provide the group.
-    #[clap(long, env)]
-    group_from_admin_keypair: Option<std::path::PathBuf>,
-    #[clap(long, env, default_value = "0")]
-    group_from_admin_num: u32,
-
-    #[clap(short, long, env)]
-    mango_account_name: String,
+    owner: String,
 
     #[clap(subcommand)]
     command: Command,
@@ -84,11 +70,7 @@ fn main() -> Result<(), anyhow::Error> {
     };
     let cli = Cli::parse_from(args);
 
-    let maybe_payer = keypair::read_keypair(&mut cli.payer.as_bytes());
-    let payer = match maybe_payer {
-        Ok(payer) => payer,
-        Err(_) => keypair_from_path(&PathBuf::from(&cli.payer)),
-    };
+    let owner = keypair_from_cli(&cli.owner);
 
     let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss");
@@ -99,21 +81,10 @@ fn main() -> Result<(), anyhow::Error> {
         Command::Taker { .. } => CommitmentConfig::confirmed(),
     };
 
-    let group = if let Some(group) = cli.group {
-        group
-    } else if let Some(p) = cli.group_from_admin_keypair {
-        let admin = keypair_from_path(&p);
-        MangoClient::group_for_admin(admin.pubkey(), cli.group_from_admin_num)
-    } else {
-        panic!("Must provide either group or group_from_admin_keypair");
-    };
-
-    let mango_client = Arc::new(MangoClient::new(
-        cluster,
-        commitment,
-        group,
-        payer,
-        &cli.mango_account_name,
+    let mango_client = Arc::new(MangoClient::new_for_existing_account(
+        Client::new(cluster, commitment, &owner, Some(Duration::from_secs(10))),
+        cli.mango_account,
+        owner,
     )?);
 
     let rt = tokio::runtime::Builder::new_multi_thread()

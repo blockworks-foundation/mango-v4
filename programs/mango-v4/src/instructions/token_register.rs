@@ -3,16 +3,16 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
-// TODO: ALTs are unavailable
-//use crate::address_lookup_table;
 use crate::error::*;
 use crate::state::*;
 use crate::util::fill16_from_str;
 
 pub const INDEX_START: I80F48 = I80F48!(1_000_000);
 
+const FIRST_BANK_NUM: u32 = 0;
+
 #[derive(Accounts)]
-#[instruction(token_index: TokenIndex, bank_num: u64)]
+#[instruction(token_index: TokenIndex)]
 pub struct TokenRegister<'info> {
     #[account(
         has_one = admin,
@@ -25,7 +25,7 @@ pub struct TokenRegister<'info> {
     #[account(
         init,
         // using the token_index in this seed guards against reusing it
-        seeds = [group.key().as_ref(), b"Bank".as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
+        seeds = [group.key().as_ref(), b"Bank".as_ref(), &token_index.to_le_bytes(), &FIRST_BANK_NUM.to_le_bytes()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<Bank>(),
@@ -34,7 +34,7 @@ pub struct TokenRegister<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"Vault".as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
+        seeds = [group.key().as_ref(), b"Vault".as_ref(), &token_index.to_le_bytes(), &FIRST_BANK_NUM.to_le_bytes()],
         bump,
         token::authority = group,
         token::mint = mint,
@@ -55,27 +55,15 @@ pub struct TokenRegister<'info> {
     /// CHECK: The oracle can be one of several different account types
     pub oracle: UncheckedAccount<'info>,
 
-    // Creating an address lookup table needs a recent valid slot as an
-    // input argument. That makes creating ALTs from governance instructions
-    // impossible. Hence the ALT that this instruction uses must be created
-    // externally and the admin is responsible for placing banks/oracles into
-    // sensible address lookup tables.
-    // constraint: must be created, have the admin authority and have free space
-    // TODO: ALTs are unavailable
-    //#[account(mut)]
-    //pub address_lookup_table: UncheckedAccount<'info>, // TODO: wrapper?
     #[account(mut)]
     pub payer: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
-
-    // TODO: ALTs are unavailable
-    //pub address_lookup_table_program: UncheckedAccount<'info>, // TODO: force address?
     pub rent: Sysvar<'info, Rent>,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Default)]
+#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct InterestRateParams {
     pub util0: f32,
     pub rate0: f32,
@@ -91,7 +79,6 @@ pub struct InterestRateParams {
 pub fn token_register(
     ctx: Context<TokenRegister>,
     token_index: TokenIndex,
-    bank_num: u64,
     name: String,
     oracle_config: OracleConfig,
     interest_rate_params: InterestRateParams,
@@ -103,10 +90,6 @@ pub fn token_register(
     init_liab_weight: f32,
     liquidation_fee: f32,
 ) -> Result<()> {
-    // TODO: Error if mint is already configured (technically, init of vault will fail)
-
-    require_eq!(bank_num, 0);
-
     // Require token 0 to be in the insurance token
     if token_index == QUOTE_TOKEN_INDEX {
         require_keys_eq!(
@@ -117,8 +100,8 @@ pub fn token_register(
 
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
-        name: fill16_from_str(name)?,
         group: ctx.accounts.group.key(),
+        name: fill16_from_str(name)?,
         mint: ctx.accounts.mint.key(),
         vault: ctx.accounts.vault.key(),
         oracle: ctx.accounts.oracle.key(),
@@ -148,50 +131,32 @@ pub fn token_register(
         init_liab_weight: I80F48::from_num(init_liab_weight),
         liquidation_fee: I80F48::from_num(liquidation_fee),
         dust: I80F48::ZERO,
-        flash_loan_vault_initial: u64::MAX,
+        flash_loan_token_account_initial: u64::MAX,
         flash_loan_approved_amount: 0,
         token_index,
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
-        reserved: Default::default(),
+        reserved: [0; 2560],
     };
+    require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
-    // TODO: ALTs are unavailable
-    // let alt_previous_size =
-    //     address_lookup_table::addresses(&ctx.accounts.address_lookup_table.try_borrow_data()?)
-    //         .len();
-    let address_lookup_table = Pubkey::default();
-    let alt_previous_size = 0;
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {
         group: ctx.accounts.group.key(),
+        token_index,
+        group_insurance_fund: 1,
+        padding1: Default::default(),
         mint: ctx.accounts.mint.key(),
         banks: Default::default(),
         vaults: Default::default(),
         oracle: ctx.accounts.oracle.key(),
-        address_lookup_table,
-        token_index,
-        address_lookup_table_bank_index: alt_previous_size as u8,
-        address_lookup_table_oracle_index: alt_previous_size as u8 + 1,
-        padding: Default::default(),
-        reserved: Default::default(),
+        registration_time: Clock::get()?.unix_timestamp,
+        reserved: [0; 2560],
     };
 
     mint_info.banks[0] = ctx.accounts.bank.key();
     mint_info.vaults[0] = ctx.accounts.vault.key();
-
-    // TODO: ALTs are unavailable
-    /*
-    address_lookup_table::extend(
-        ctx.accounts.address_lookup_table.to_account_info(),
-        // TODO: is using the admin as ALT authority a good idea?
-        ctx.accounts.admin.to_account_info(),
-        ctx.accounts.payer.to_account_info(),
-        &[],
-        vec![ctx.accounts.bank.key(), ctx.accounts.oracle.key()],
-    )?;
-    */
 
     Ok(())
 }

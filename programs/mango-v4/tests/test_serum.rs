@@ -40,7 +40,10 @@ async fn test_serum() -> Result<(), TransportError> {
         solana,
         AccountCreateInstruction {
             account_num: 0,
-            account_size: AccountSize::Large,
+            token_count: 16,
+            serum3_count: 8,
+            perp_count: 8,
+            perp_oo_count: 8,
             group,
             owner,
             payer,

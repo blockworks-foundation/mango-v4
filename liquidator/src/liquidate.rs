@@ -1,7 +1,6 @@
 use crate::account_shared_data::KeyedAccountSharedData;
-use crate::ChainDataAccountFetcher;
 
-use client::{AccountFetcher, MangoClient, MangoClientError, MangoGroupContext};
+use client::{chain_data, AccountFetcher, MangoClient, MangoClientError, MangoGroupContext};
 use mango_v4::state::{
     new_health_cache, oracle_price, Bank, FixedOrderAccountRetriever, HealthCache, HealthType,
     MangoAccountValue, TokenIndex,
@@ -11,13 +10,13 @@ use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 pub fn new_health_cache_(
     context: &MangoGroupContext,
-    account_fetcher: &ChainDataAccountFetcher,
+    account_fetcher: &chain_data::AccountFetcher,
     account: &MangoAccountValue,
 ) -> anyhow::Result<HealthCache> {
     let active_token_len = account.token_iter_active().count();
     let active_perp_len = account.perp_iter_active_accounts().count();
 
-    let metas = context.derive_health_check_remaining_account_metas(account, None, false)?;
+    let metas = context.derive_health_check_remaining_account_metas(account, vec![], false)?;
     let accounts = metas
         .iter()
         .map(|meta| {
@@ -40,7 +39,7 @@ pub fn new_health_cache_(
 #[allow(clippy::too_many_arguments)]
 pub fn process_account(
     mango_client: &MangoClient,
-    account_fetcher: &ChainDataAccountFetcher,
+    account_fetcher: &chain_data::AccountFetcher,
     pubkey: &Pubkey,
 ) -> anyhow::Result<()> {
     // TODO: configurable
@@ -96,8 +95,7 @@ pub fn process_account(
     let get_max_liab_transfer = |source, target| -> anyhow::Result<I80F48> {
         let mut liqor = account_fetcher
             .fetch_fresh_mango_account(&mango_client.mango_account_address)
-            .context("getting liquidator account")?
-            .clone();
+            .context("getting liquidator account")?;
 
         // Ensure the tokens are activated, so they appear in the health cache and
         // max_swap_source() will work.
@@ -166,7 +164,7 @@ pub fn process_account(
 #[allow(clippy::too_many_arguments)]
 pub fn process_accounts<'a>(
     mango_client: &MangoClient,
-    account_fetcher: &ChainDataAccountFetcher,
+    account_fetcher: &chain_data::AccountFetcher,
     accounts: impl Iterator<Item = &'a Pubkey>,
 ) -> anyhow::Result<()> {
     for pubkey in accounts {

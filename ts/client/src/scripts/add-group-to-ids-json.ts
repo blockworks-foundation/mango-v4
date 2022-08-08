@@ -46,7 +46,7 @@ async function main() {
       JSON.parse(fs.readFileSync(process.env.ADMIN_KEYPAIR!, 'utf-8')),
     ),
   );
-  const group = await client.getGroupForAdmin(admin.publicKey, 0);
+  const group = await client.getGroupForCreator(admin.publicKey, 0);
 
   // collect mappings &
   // collect pubkeys

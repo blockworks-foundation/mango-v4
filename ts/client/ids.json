@@ -70,16 +70,16 @@
       "mangoProgramId": "m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD",
       "banks": [
         {
-          "name": "SOL",
-          "publicKey": "6XDZbWax9imnCEaKokorQtwRY7dGj9HnZNk612ibZu4v"
+          "name": "BTC",
+          "publicKey": "G9uHVd7wahtZfFCjSy2yU9VjJnWSYwYSn4rh53F7ZBFd"
         },
         {
           "name": "USDC",
-          "publicKey": "9pJ3V2WvGWtWomiUsRLHvMguoZ9SUCWwZxfvaqdRDq44"
+          "publicKey": "CCaoxVy3vNZnbktSgdimwQcGZXhxA1tm5oP3WmNRDcm5"
         },
         {
-          "name": "BTC",
-          "publicKey": "41gvXTAYM4xckLYqxPXWwjpr6WM3GZEytM9QZSGKqfjX"
+          "name": "SOL",
+          "publicKey": "HFXYmN6uxBiE2A2TzcSNRUpaC3CbMp4xXBUKqJbQBmVh"
         }
       ],
       "stubOracles": [
@@ -90,12 +90,12 @@
       ],
       "mintInfos": [
         {
-          "name": "BTC",
-          "publicKey": "4KZkrJQRvrVy8BWmbUKk7YWezMAsSb97ZMHFLUtj6Q5u"
-        },
-        {
           "name": "SOL",
           "publicKey": "EvjoLBh7ej78C1yA7jaLcHQfoGx3KkDBnZbrztSZFGmC"
+        },
+        {
+          "name": "BTC",
+          "publicKey": "4KZkrJQRvrVy8BWmbUKk7YWezMAsSb97ZMHFLUtj6Q5u"
         },
         {
           "name": "USDC",

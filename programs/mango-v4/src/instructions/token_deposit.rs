@@ -83,6 +83,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
         cm!(amount_i80f48 * oracle_price * QUOTE_NATIVE_TO_UI).to_num::<f32>();
 
     emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         token_index,
         indexed_position: indexed_position.to_bits(),
@@ -111,9 +112,10 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     }
 
     emit!(DepositLog {
+        mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         signer: ctx.accounts.token_authority.key(),
-        token_index: token_index,
+        token_index,
         quantity: amount,
         price: oracle_price.to_bits(),
     });

@@ -184,11 +184,10 @@ pub fn charge_maybe_fees(
 
     if maybe_actualized_coin_loan > 0 {
         serum3_account.previous_native_coin_reserved = after_oo.native_coin_reserved();
-        drop(serum3_account);
 
         // loan origination fees
         let coin_token_account = account.token_get_mut(coin_bank.token_index)?.0;
-        let coin_token_native = coin_token_account.native(&coin_bank);
+        let coin_token_native = coin_token_account.native(coin_bank);
 
         if coin_token_native.is_negative() {
             let actualized_loan = coin_token_native.abs().min(maybe_actualized_coin_loan);
@@ -213,7 +212,7 @@ pub fn charge_maybe_fees(
 
         // loan origination fees
         let pc_token_account = account.token_get_mut(pc_bank.token_index)?.0;
-        let pc_token_native = pc_token_account.native(&pc_bank);
+        let pc_token_native = pc_token_account.native(pc_bank);
 
         if pc_token_native.is_negative() {
             let actualized_loan = pc_token_native.abs().min(maybe_actualized_pc_loan);

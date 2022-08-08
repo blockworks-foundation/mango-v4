@@ -26,7 +26,7 @@ pub struct PerpMarket {
     /// Lookup indices
     pub perp_market_index: PerpMarketIndex,
 
-    pub padding: [u8; 4],
+    pub padding1: [u8; 4],
 
     pub name: [u8; 16],
 
@@ -86,12 +86,16 @@ pub struct PerpMarket {
 
     pub base_token_decimals: u8,
 
-    pub reserved: [u8; 6],
+    pub padding2: [u8; 6],
+
+    pub registration_time: i64,
+
+    pub reserved: [u8; 128],
 }
 
 const_assert_eq!(
     size_of::<PerpMarket>(),
-    32 + 2 + 2 + 4 + 16 + 32 + 16 + 32 * 3 + 8 * 2 + 16 * 11 + 8 * 2 + 8 * 2 + 16 + 2 + 6
+    32 + 2 + 2 + 4 + 16 + 32 + 16 + 32 * 3 + 8 * 2 + 16 * 11 + 8 * 2 + 8 * 2 + 16 + 2 + 6 + 8 + 128
 );
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
 

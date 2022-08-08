@@ -1,3 +1,4 @@
+import { BorshAccountsCoder } from '@project-serum/anchor';
 import { Market } from '@project-serum/serum';
 import { parsePriceData, PriceData } from '@pythnetwork/client';
 import { PublicKey } from '@solana/web3.js';
@@ -12,12 +13,27 @@ import { Serum3Market } from './serum3';
 export class Group {
   static from(
     publicKey: PublicKey,
-    obj: { admin: PublicKey; groupNum: number },
+    obj: {
+      creator: PublicKey;
+      groupNum: number;
+      admin: PublicKey;
+      fastListingAdmin: PublicKey;
+      insuranceMint: PublicKey;
+      insuranceVault: PublicKey;
+      testing: number;
+      version: number;
+    },
   ): Group {
     return new Group(
       publicKey,
-      obj.admin,
+      obj.creator,
       obj.groupNum,
+      obj.admin,
+      obj.fastListingAdmin,
+      obj.insuranceMint,
+      obj.insuranceVault,
+      obj.testing,
+      obj.version,
       new Map(),
       new Map(),
       new Map(),
@@ -29,8 +45,14 @@ export class Group {
 
   constructor(
     public publicKey: PublicKey,
-    public admin: PublicKey,
+    public creator: PublicKey,
     public groupNum: number,
+    public admin: PublicKey,
+    public fastListingAdmin: PublicKey,
+    public insuranceMint: PublicKey,
+    public insuranceVault: PublicKey,
+    public testing: number,
+    public version: number,
     public banksMap: Map<string, Bank>,
     public serum3MarketsMap: Map<string, Serum3Market>,
     public serum3MarketExternalsMap: Map<string, Market>,
@@ -174,13 +196,24 @@ export class Group {
     const prices =
       await client.program.provider.connection.getMultipleAccountsInfo(oracles);
 
+    const coder = new BorshAccountsCoder(client.program.idl);
     for (const [index, price] of prices.entries()) {
       if (banks[index].name === 'USDC') {
         banks[index].price = ONE_I80F48;
       } else {
-        banks[index].price = I80F48.fromNumber(
-          parsePriceData(price.data).previousPrice,
-        );
+        // TODO: Implement switchboard oracle type
+        if (
+          !BorshAccountsCoder.accountDiscriminator('stubOracle').compare(
+            price.data.slice(0, 8),
+          )
+        ) {
+          const stubOracle = coder.decode('stubOracle', price.data);
+          banks[index].price = new I80F48(stubOracle.price.val);
+        } else {
+          banks[index].price = I80F48.fromNumber(
+            parsePriceData(price.data).previousPrice,
+          );
+        }
       }
     }
   }

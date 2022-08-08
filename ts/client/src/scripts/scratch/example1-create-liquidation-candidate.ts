@@ -1,6 +1,7 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
+import { AccountSize } from '../../accounts/mangoAccount';
 import { MangoClient } from '../../client';
 import { MANGO_V4_ID } from '../../constants';
 
@@ -39,9 +40,6 @@ async function main() {
   const user1MangoAccount = await user1Client.getOrCreateMangoAccount(
     group,
     user1.publicKey,
-    0,
-    AccountSize.small,
-    'my_mango_account',
   );
 
   console.log(`...mangoAccount1 ${user1MangoAccount.publicKey}`);
@@ -72,9 +70,6 @@ async function main() {
   const user2MangoAccount = await user2Client.getOrCreateMangoAccount(
     group,
     user2.publicKey,
-    0,
-    AccountSize.small,
-    'my_mango_account',
   );
   console.log(`...mangoAccount2 ${user2MangoAccount.publicKey}`);
 
@@ -104,7 +99,7 @@ async function main() {
   ).toNumber();
   amount = 0.9 * maxNative;
   console.log(`Withdrawing...${amount} native BTC'`);
-  await user2Client.tokenWithdraw2(
+  await user2Client.tokenWithdrawNative(
     group,
     user2MangoAccount,
     token,

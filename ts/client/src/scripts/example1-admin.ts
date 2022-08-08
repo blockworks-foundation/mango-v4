@@ -23,11 +23,13 @@ const DEVNET_MINTS = new Map([
   ['BTC', '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU'],
   ['SOL', 'So11111111111111111111111111111111111111112'],
   ['ORCA', 'orcarKHSqC5CDDsGbho8GKvwExejWHxTqGzXgcewB9L'],
+  ['MNGO', 'Bb9bsTQa1bGEtQ5KagGkvSHyuLqDWumFUcRqFusFNJWC'],
 ]);
 const DEVNET_ORACLES = new Map([
   ['BTC', 'HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J'],
   ['SOL', 'J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix'],
   ['ORCA', 'A1WttWF7X3Rg6ZRpB2YQUFHCRh1kiXV8sKKLV3S9neJV'],
+  ['MNGO', '8k7F9Xb36oFJsjpCKpsXvg4cgBRoZtwNTc3EzG5Ttd2o'],
 ]);
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
@@ -57,43 +59,12 @@ async function main() {
   console.log(`Creating Group...`);
   const insuranceMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
-    await client.groupCreate(GROUP_NUM, true, insuranceMint);
+    await client.groupCreate(GROUP_NUM, true, 0, insuranceMint);
   } catch (error) {
     console.log(error);
   }
-  const group = await client.getGroupForAdmin(admin.publicKey, GROUP_NUM);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(`...registered group ${group.publicKey}`);
-
-  // register token 1
-  console.log(`Registering BTC...`);
-  const btcDevnetMint = new PublicKey(DEVNET_MINTS.get('BTC')!);
-  const btcDevnetOracle = new PublicKey(DEVNET_ORACLES.get('BTC')!);
-  try {
-    await client.tokenRegister(
-      group,
-      btcDevnetMint,
-      btcDevnetOracle,
-      0.1,
-      1, // tokenIndex
-      'BTC',
-      0.01,
-      0.4,
-      0.07,
-      0.8,
-      0.9,
-      0.88,
-      0.0005,
-      0.0005,
-      0.8,
-      0.6,
-      1.2,
-      1.4,
-      0.02,
-    );
-    await group.reloadAll(client);
-  } catch (error) {
-    console.log(error);
-  }
 
   // stub oracle + register token 0
   console.log(`Registering USDC...`);
@@ -131,6 +102,37 @@ async function main() {
     );
     await group.reloadAll(client);
   } catch (error) {}
+
+  // register token 1
+  console.log(`Registering BTC...`);
+  const btcDevnetMint = new PublicKey(DEVNET_MINTS.get('BTC')!);
+  const btcDevnetOracle = new PublicKey(DEVNET_ORACLES.get('BTC')!);
+  try {
+    await client.tokenRegister(
+      group,
+      btcDevnetMint,
+      btcDevnetOracle,
+      0.1,
+      1, // tokenIndex
+      'BTC',
+      0.01,
+      0.4,
+      0.07,
+      0.8,
+      0.9,
+      0.88,
+      0.0005,
+      0.0005,
+      0.8,
+      0.6,
+      1.2,
+      1.4,
+      0.02,
+    );
+    await group.reloadAll(client);
+  } catch (error) {
+    console.log(error);
+  }
 
   // register token 2
   console.log(`Registering SOL...`);
@@ -194,11 +196,38 @@ async function main() {
     console.log(error);
   }
 
+  // register token 4
+  console.log(
+    `Editing group, setting existing admin as fastListingAdmin to be able to add MNGO truslessly...`,
+  );
+  let sig = await client.groupEdit(
+    group,
+    group.admin,
+    new PublicKey('Efhak3qj3MiyzgJr3cUUqXXz5wr3oYHt9sPzuqJf9eBN'),
+  );
+  console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+  console.log(`Registering MNGO...`);
+  const mngoDevnetMint = new PublicKey(DEVNET_MINTS.get('MNGO')!);
+  const mngoDevnetOracle = new PublicKey(DEVNET_ORACLES.get('MNGO')!);
+  try {
+    await client.tokenRegisterTrustless(
+      group,
+      mngoDevnetMint,
+      mngoDevnetOracle,
+      4,
+      'MNGO',
+    );
+    await group.reloadAll(client);
+  } catch (error) {
+    console.log(error);
+  }
+
   // log tokens/banks
   for (const bank of await group.banksMap.values()) {
     console.log(
       `...registered Bank ${bank.tokenIndex} ${bank.publicKey}, mint ${bank.mint}, oracle ${bank.oracle}`,
     );
+    console.log(bank.toString());
   }
 
   // register serum market
@@ -272,6 +301,7 @@ async function main() {
       'USDC',
       btcDevnetOracle,
       0.1,
+      undefined,
       0.01,
       0.3,
       0.08,
@@ -299,6 +329,7 @@ async function main() {
       'USDC',
       usdcDevnetOracle.publicKey,
       0.1,
+      undefined,
       0.01,
       0.4,
       0.07,

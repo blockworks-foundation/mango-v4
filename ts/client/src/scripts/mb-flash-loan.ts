@@ -10,7 +10,7 @@ import {
 import BN from 'bn.js';
 import fs from 'fs';
 import { QUOTE_DECIMALS } from '../accounts/bank';
-import { MangoClient } from '../client';
+import { AccountSize, MangoClient } from '../index';
 import { getAssociatedTokenAddress } from '../utils';
 
 const CLUSTER_URL =
@@ -21,7 +21,7 @@ const MANGO_MAINNET_PAYER_KEYPAIR =
   '/Users/tylershipe/.config/solana/deploy.json';
 
 //
-// example script which shows usage of flash loan 3 ix using a jupiter swap
+// example script which shows usage of flash loan ix using a jupiter swap
 //
 // NOTE: we assume that ATA for source and target already exist for wallet
 async function main() {
@@ -51,7 +51,7 @@ async function main() {
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
   // fetch group
-  const group = await client.getGroupForAdmin(admin.publicKey, 0);
+  const group = await client.getGroupForCreator(admin.publicKey, 0);
   console.log(`Found group ${group.publicKey.toBase58()}`);
   console.log(`start btc bank ${group.banksMap.get('BTC').toString()}`);
 
@@ -60,9 +60,6 @@ async function main() {
   const mangoAccount = await client.getOrCreateMangoAccount(
     group,
     user.publicKey,
-    0,
-    AccountSize.small,
-    'my_mango_account',
   );
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(`start balance \n${mangoAccount.toString(group)}`);
@@ -142,7 +139,7 @@ async function main() {
       );
       // 1. build flash loan end ix
       const flashLoadnEndIx = await client.program.methods
-        .flashLoan3End()
+        .flashLoanEnd()
         .accounts({
           account: mangoAccount.publicKey,
           owner: (client.program.provider as AnchorProvider).wallet.publicKey,
@@ -188,7 +185,7 @@ async function main() {
       // 2. build flash loan start ix, add end ix as a post ix
       try {
         res = await client.program.methods
-          .flashLoan3Begin([
+          .flashLoanBegin([
             new BN(sourceAmount),
             new BN(
               0,
@@ -198,7 +195,7 @@ async function main() {
             group: group.publicKey,
             // for observing ixs in the entire tx,
             // e.g. apart from flash loan start and end no other ix should target mango v4 program
-            // e.g. forbid FlashLoan3Begin been called from CPI
+            // e.g. forbid FlashLoanBegin been called from CPI
             instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
           })
           .remainingAccounts([

@@ -12,11 +12,17 @@ use crate::util::checked_math as cm;
 pub struct LiqTokenWithToken<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group
+    )]
     pub liqor: AccountLoaderDynamic<'info, MangoAccount>,
     pub liqor_owner: Signer<'info>,
 
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group
+    )]
     pub liqee: AccountLoaderDynamic<'info, MangoAccount>,
 }
 
@@ -79,11 +85,11 @@ pub fn liq_token_with_token(
         // The main complication here is that we can't keep the liqee_asset_position and liqee_liab_position
         // borrows alive at the same time. Possibly adding get_mut_pair() would be helpful.
         let (liqee_asset_position, liqee_asset_raw_index) = liqee.token_get(asset_token_index)?;
-        let liqee_assets_native = liqee_asset_position.native(&asset_bank);
+        let liqee_assets_native = liqee_asset_position.native(asset_bank);
         require!(liqee_assets_native.is_positive(), MangoError::SomeError);
 
         let (liqee_liab_position, liqee_liab_raw_index) = liqee.token_get(liab_token_index)?;
-        let liqee_liab_native = liqee_liab_position.native(&liab_bank);
+        let liqee_liab_native = liqee_liab_position.native(liab_bank);
         require!(liqee_liab_native.is_negative(), MangoError::SomeError);
 
         // TODO why sum of both tokens liquidation fees? Add comment
@@ -151,6 +157,7 @@ pub fn liq_token_with_token(
         );
 
         emit!(LiquidateTokenAndTokenLog {
+            mango_group: ctx.accounts.group.key(),
             liqee: ctx.accounts.liqee.key(),
             liqor: ctx.accounts.liqor.key(),
             asset_token_index,
@@ -164,6 +171,7 @@ pub fn liq_token_with_token(
 
         // liqee asset
         emit!(TokenBalanceLog {
+            mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.liqee.key(),
             token_index: asset_token_index,
             indexed_position: liqee_asset_position_indexed.to_bits(),
@@ -173,6 +181,7 @@ pub fn liq_token_with_token(
         });
         // liqee liab
         emit!(TokenBalanceLog {
+            mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.liqee.key(),
             token_index: liab_token_index,
             indexed_position: liqee_liab_position_indexed.to_bits(),
@@ -182,6 +191,7 @@ pub fn liq_token_with_token(
         });
         // liqor asset
         emit!(TokenBalanceLog {
+            mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.liqor.key(),
             token_index: asset_token_index,
             indexed_position: liqor_asset_position_indexed.to_bits(),
@@ -191,6 +201,7 @@ pub fn liq_token_with_token(
         });
         // liqor liab
         emit!(TokenBalanceLog {
+            mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.liqor.key(),
             token_index: liab_token_index,
             indexed_position: liqor_liab_position_indexed.to_bits(),

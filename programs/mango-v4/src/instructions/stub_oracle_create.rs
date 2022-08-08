@@ -13,7 +13,7 @@ pub struct StubOracleCreate<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"StubOracle".as_ref(), token_mint.key().as_ref()],
+        seeds = [group.key().as_ref(), b"StubOracle".as_ref(), mint.key().as_ref()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<StubOracle>(),
@@ -22,7 +22,7 @@ pub struct StubOracleCreate<'info> {
 
     pub admin: Signer<'info>,
 
-    pub token_mint: Account<'info, Mint>,
+    pub mint: Account<'info, Mint>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -33,7 +33,7 @@ pub struct StubOracleCreate<'info> {
 pub fn stub_oracle_create(ctx: Context<StubOracleCreate>, price: I80F48) -> Result<()> {
     let mut oracle = ctx.accounts.oracle.load_init()?;
     oracle.group = ctx.accounts.group.key();
-    oracle.mint = ctx.accounts.token_mint.key();
+    oracle.mint = ctx.accounts.mint.key();
     oracle.price = price;
     oracle.last_updated = Clock::get()?.unix_timestamp;
 

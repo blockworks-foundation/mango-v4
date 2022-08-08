@@ -4,42 +4,27 @@ use std::time::Duration;
 
 use anchor_client::Cluster;
 use clap::Parser;
-use client::{MangoClient, MangoGroupContext};
+use client::{chain_data, keypair_from_cli, Client, MangoClient, MangoGroupContext};
 use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 
-use once_cell::sync::OnceCell;
-
-use solana_client::rpc_client::RpcClient;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
-use solana_sdk::signer::{
-    keypair::{self, Keypair},
-    Signer,
-};
 use std::collections::HashSet;
-use std::str::FromStr;
 
 pub mod account_shared_data;
-pub mod chain_data;
-pub mod chain_data_fetcher;
 pub mod liquidate;
 pub mod metrics;
 pub mod snapshot_source;
 pub mod util;
 pub mod websocket_source;
 
-use crate::chain_data::*;
-use crate::chain_data_fetcher::*;
 use crate::util::{is_mango_account, is_mango_bank, is_mint_info, is_perp_market};
 
 // jemalloc seems to be better at keeping the memory footprint reasonable over
 // longer periods of time
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
-
-// first slot received from websocket feed
-static FIRST_WEBSOCKET_SLOT: OnceCell<u64> = OnceCell::new();
 
 trait AnyhowWrap {
     type Value;
@@ -69,28 +54,15 @@ struct Cli {
     #[clap(short, long, env)]
     rpc_url: String,
 
-    #[clap(long, env)]
-    group: Option<Pubkey>,
-
-    // These exist only as a shorthand to make testing easier. Normal users would provide the group.
-    #[clap(long, env)]
-    group_from_admin_keypair: Option<std::path::PathBuf>,
-    #[clap(long, env, default_value = "0")]
-    group_from_admin_num: u32,
-
-    // TODO: maybe store this in the group, so it's easy to start without providing it?
-    #[clap(long, env)]
-    pyth_program: Pubkey,
-
     // TODO: different serum markets could use different serum programs, should come from registered markets
     #[clap(long, env)]
     serum_program: Pubkey,
 
     #[clap(long, env)]
-    liqor_owner: std::path::PathBuf,
+    liqor_mango_account: Pubkey,
 
     #[clap(long, env)]
-    liqor_mango_account_name: String,
+    liqor_owner: String,
 
     #[clap(long, env, default_value = "300")]
     snapshot_interval_secs: u64,
@@ -102,12 +74,6 @@ struct Cli {
     // typically 100 is the max number for getMultipleAccounts
     #[clap(long, env, default_value = "100")]
     get_multiple_accounts_count: usize,
-}
-
-fn keypair_from_path(p: &std::path::PathBuf) -> Keypair {
-    let path = std::path::PathBuf::from_str(&*shellexpand::tilde(p.to_str().unwrap())).unwrap();
-    keypair::read_keypair_file(path)
-        .unwrap_or_else(|_| panic!("Failed to read keypair from {}", p.to_string_lossy()))
 }
 
 pub fn encode_address(addr: &Pubkey) -> String {
@@ -125,23 +91,27 @@ async fn main() -> anyhow::Result<()> {
     };
     let cli = Cli::parse_from(args);
 
-    let liqor_owner = keypair_from_path(&cli.liqor_owner);
-
-    let mango_group = if let Some(group) = cli.group {
-        group
-    } else if let Some(p) = cli.group_from_admin_keypair {
-        let admin = keypair_from_path(&p);
-        MangoClient::group_for_admin(admin.pubkey(), cli.group_from_admin_num)
-    } else {
-        panic!("Must provide either group or group_from_admin_keypair");
-    };
+    let liqor_owner = keypair_from_cli(&cli.liqor_owner);
 
     let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss");
 
-    let rpc_timeout = Duration::from_secs(1);
+    let rpc_timeout = Duration::from_secs(10);
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
     let commitment = CommitmentConfig::processed();
+    let client = Client::new(cluster.clone(), commitment, &liqor_owner, Some(rpc_timeout));
+
+    // The representation of current on-chain account data
+    let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
+    // Reading accounts from chain_data
+    let account_fetcher = Arc::new(chain_data::AccountFetcher {
+        chain_data: chain_data.clone(),
+        rpc: client.rpc(),
+    });
+
+    let mango_account = account_fetcher.fetch_fresh_mango_account(&cli.liqor_mango_account)?;
+    let mango_group = mango_account.fixed.group;
+
     let group_context = MangoGroupContext::new_from_rpc(mango_group, cluster.clone(), commitment)?;
 
     // TODO: this is all oracles, not just pyth!
@@ -179,6 +149,12 @@ async fn main() -> anyhow::Result<()> {
         websocket_sender,
     );
 
+    let first_websocket_slot = websocket_source::get_next_create_bank_slot(
+        websocket_receiver.clone(),
+        Duration::from_secs(10),
+    )
+    .await?;
+
     // Getting solana account snapshots via jsonrpc
     let (snapshot_sender, snapshot_receiver) =
         async_channel::unbounded::<snapshot_source::AccountSnapshot>();
@@ -191,22 +167,13 @@ async fn main() -> anyhow::Result<()> {
             get_multiple_accounts_count: cli.get_multiple_accounts_count,
             parallel_rpc_requests: cli.parallel_rpc_requests,
             snapshot_interval: std::time::Duration::from_secs(cli.snapshot_interval_secs),
+            min_slot: first_websocket_slot + 10,
         },
         mango_pyth_oracles,
         snapshot_sender,
     );
 
-    // The representation of current on-chain account data
-    let chain_data = Arc::new(RwLock::new(ChainData::new(&metrics)));
-    // Reading accounts from chain_data
-    let account_fetcher = Arc::new(ChainDataAccountFetcher {
-        chain_data: chain_data.clone(),
-        rpc: RpcClient::new_with_timeout_and_commitment(
-            cluster.url().to_string(),
-            rpc_timeout,
-            commitment,
-        ),
-    });
+    start_chain_data_metrics(chain_data.clone(), &metrics);
 
     // Addresses of the MangoAccounts belonging to the mango program.
     // Needed to check health of them all when the cache updates.
@@ -236,10 +203,9 @@ async fn main() -> anyhow::Result<()> {
     //
     let mango_client = {
         Arc::new(MangoClient::new_detail(
-            cluster,
-            commitment,
+            client,
+            cli.liqor_mango_account,
             liqor_owner,
-            &cli.liqor_mango_account_name,
             group_context,
             account_fetcher.clone(),
         )?)
@@ -254,8 +220,7 @@ async fn main() -> anyhow::Result<()> {
                 let message = message.expect("channel not closed");
 
                 // build a model of slots and accounts in `chain_data`
-                // this code should be generic so it can be reused in future projects
-                chain_data.write().unwrap().update_from_websocket(message.clone());
+                websocket_source::update_chain_data(&mut chain_data.write().unwrap(), message.clone());
 
                 // specific program logic using the mirrored data
                 if let websocket_source::Message::Account(account_write) = message {
@@ -334,7 +299,7 @@ async fn main() -> anyhow::Result<()> {
                 }
                 metric_mango_accounts.set(mango_accounts.len() as u64);
 
-                chain_data.write().unwrap().update_from_snapshot(message);
+                snapshot_source::update_chain_data(&mut chain_data.write().unwrap(), message);
                 one_snapshot_done = true;
 
                 // trigger a full health check
@@ -348,4 +313,23 @@ async fn main() -> anyhow::Result<()> {
             },
         }
     }
+}
+
+fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: &metrics::Metrics) {
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+
+    let mut metric_slots_count = metrics.register_u64("chain_data_slots_count".into());
+    let mut metric_accounts_count = metrics.register_u64("chain_data_accounts_count".into());
+    let mut metric_account_write_count =
+        metrics.register_u64("chain_data_account_write_count".into());
+
+    tokio::spawn(async move {
+        loop {
+            interval.tick().await;
+            let chain_lock = chain.read().unwrap();
+            metric_slots_count.set(chain_lock.slots_count() as u64);
+            metric_accounts_count.set(chain_lock.accounts_count() as u64);
+            metric_account_write_count.set(chain_lock.account_writes_count() as u64);
+        }
+    });
 }

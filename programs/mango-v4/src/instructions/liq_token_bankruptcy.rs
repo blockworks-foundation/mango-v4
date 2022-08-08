@@ -21,11 +21,17 @@ pub struct LiqTokenBankruptcy<'info> {
     )]
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group
+    )]
     pub liqor: AccountLoaderDynamic<'info, MangoAccount>,
     pub liqor_owner: Signer<'info>,
 
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group
+    )]
     pub liqee: AccountLoaderDynamic<'info, MangoAccount>,
 
     #[account(
@@ -37,6 +43,8 @@ pub struct LiqTokenBankruptcy<'info> {
     #[account(mut)]
     pub quote_vault: Account<'info, TokenAccount>,
 
+    // future: this would be an insurance fund vault specific to a
+    // trustless token, separate from the shared one on the group
     #[account(mut)]
     pub insurance_vault: Account<'info, TokenAccount>,
 
@@ -104,13 +112,21 @@ pub fn liq_token_bankruptcy(
     let liab_price_adjusted = cm!(liab_price * liab_fee_factor);
 
     let liab_transfer_unrounded = remaining_liab_loss.min(max_liab_transfer);
+
+    let insurance_vault_amount = if liab_mint_info.elligible_for_group_insurance_fund() {
+        ctx.accounts.insurance_vault.amount
+    } else {
+        0
+    };
+
     let insurance_transfer = cm!(liab_transfer_unrounded * liab_price_adjusted)
         .checked_ceil()
         .unwrap()
         .checked_to_num::<u64>()
         .unwrap()
-        .min(ctx.accounts.insurance_vault.amount);
-    let insurance_fund_exhausted = insurance_transfer == ctx.accounts.insurance_vault.amount;
+        .min(insurance_vault_amount);
+
+    let insurance_fund_exhausted = insurance_transfer == insurance_vault_amount;
 
     let insurance_transfer_i80f48 = I80F48::from(insurance_transfer);
 
@@ -123,7 +139,7 @@ pub fn liq_token_bankruptcy(
     if insurance_transfer > 0 {
         // in the end, the liqee gets liab assets
         liqee_liab_active = liab_bank.deposit(liqee_liab, liab_transfer)?;
-        remaining_liab_loss = -liqee_liab.native(&liab_bank);
+        remaining_liab_loss = -liqee_liab.native(liab_bank);
 
         // move insurance assets into quote bank
         let group_seeds = group_seeds!(group);
