@@ -85,7 +85,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         };
 
         require!(
-            allow_borrow || amount < native_position,
+            allow_borrow || amount <= native_position,
             MangoError::SomeError
         );
 
