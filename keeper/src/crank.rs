@@ -8,6 +8,7 @@ use client::prettify_client_error;
 use futures::Future;
 use mango_v4::state::{EventQueue, EventType, FillEvent, OutEvent, PerpMarket, TokenIndex};
 use solana_sdk::{
+    compute_budget::ComputeBudgetInstruction,
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
 };
@@ -79,6 +80,7 @@ pub async fn loop_update_index_and_rate(
 
             let program = client.program();
             let mut req = program.request();
+            req = req.instruction(ComputeBudgetInstruction::set_compute_unit_price(1));
             for token_index in token_indices_clone.iter() {
                 let token = client.context.token(*token_index);
                 let banks_for_a_token = token.mint_info.banks();
