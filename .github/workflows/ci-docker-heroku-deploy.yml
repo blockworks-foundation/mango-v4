@@ -1,6 +1,9 @@
 name: Deploy Docker Image to Heroku
 
-on: 
+on:
+  push:
+      branches:
+        - 'mc/docker'
   workflow_dispatch:
     inputs:
       appName:
