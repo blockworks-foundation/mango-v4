@@ -30,10 +30,12 @@ async function main() {
   );
 
   const groups = await (async () => {
-    if (GROUP_NUM === "all") {
+    if (GROUP_NUM === 'all') {
       return await client.getGroupsForCreator(admin.publicKey);
     } else {
-      return [await client.getGroupForCreator(admin.publicKey, Number(GROUP_NUM))];
+      return [
+        await client.getGroupForCreator(admin.publicKey, Number(GROUP_NUM)),
+      ];
     }
   })();
   for (const group of groups) {

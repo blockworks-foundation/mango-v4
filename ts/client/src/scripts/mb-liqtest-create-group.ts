@@ -65,9 +65,7 @@ async function main() {
     } catch (error) {
       console.log(error);
     }
-    const oracle = (
-      await client.getStubOracle(group, mintPk)
-    )[0];
+    const oracle = (await client.getStubOracle(group, mintPk))[0];
     console.log(`...created stub oracle ${oracle.publicKey}`);
     oracles.set(name, oracle.publicKey);
   }

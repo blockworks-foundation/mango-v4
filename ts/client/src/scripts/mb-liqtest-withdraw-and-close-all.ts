@@ -17,7 +17,9 @@ async function main() {
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(fs.readFileSync(process.env.MANGO_MAINNET_PAYER_KEYPAIR!, 'utf-8')),
+      JSON.parse(
+        fs.readFileSync(process.env.MANGO_MAINNET_PAYER_KEYPAIR!, 'utf-8'),
+      ),
     ),
   );
   const userWallet = new Wallet(admin);
@@ -32,19 +34,30 @@ async function main() {
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(group.toString());
 
-  const accounts = await client.getMangoAccountsForOwner(group, admin.publicKey);
+  const accounts = await client.getMangoAccountsForOwner(
+    group,
+    admin.publicKey,
+  );
   for (let account of accounts) {
-    console.log(`account: ${account.publicKey}`);
+    console.log(`account: ${account}`);
     for (let token of account.tokensActive()) {
       const bank = group.findBank(token.tokenIndex);
       const amount = token.native(bank).toNumber();
       if (amount > 0) {
         try {
           const allowBorrow = true; // TODO: set this to false once the withdraw amount ___<___ nativePosition bug is fixed
-          await client.tokenWithdrawNative(group, account, bank.name, amount, allowBorrow);
+          await client.tokenWithdrawNative(
+            group,
+            account,
+            bank.name,
+            amount,
+            allowBorrow,
+          );
           await account.reload(client, group);
-        } catch(error) {
-          console.log(`failed to withdraw ${bank.name} from ${account.publicKey}: ${error}`);
+        } catch (error) {
+          console.log(
+            `failed to withdraw ${bank.name} from ${account.publicKey}: ${error}`,
+          );
         }
       }
     }

@@ -17,7 +17,9 @@ async function main() {
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(fs.readFileSync(process.env.MANGO_MAINNET_PAYER_KEYPAIR!, 'utf-8')),
+      JSON.parse(
+        fs.readFileSync(process.env.MANGO_MAINNET_PAYER_KEYPAIR!, 'utf-8'),
+      ),
     ),
   );
   const userWallet = new Wallet(admin);
@@ -45,16 +47,16 @@ async function main() {
 
   // deposit
   try {
-    console.log(`...depositing 1 USDC`);
-    await client.tokenDeposit(group, mangoAccount, 'USDC', 1);
+    console.log(`...depositing 10 USDC`);
+    await client.tokenDeposit(group, mangoAccount, 'USDC', 10);
     await mangoAccount.reload(client, group);
 
-    console.log(`...depositing 0.00004 BTC`);
-    await client.tokenDeposit(group, mangoAccount, 'BTC', 0.00004);
+    console.log(`...depositing 0.0004 BTC`);
+    await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0004);
     await mangoAccount.reload(client, group);
 
-    console.log(`...depositing 0.025 SOL`);
-    await client.tokenDeposit(group, mangoAccount, 'SOL', 0.025);
+    console.log(`...depositing 0.25 SOL`);
+    await client.tokenDeposit(group, mangoAccount, 'SOL', 0.25);
     await mangoAccount.reload(client, group);
   } catch (error) {
     console.log(error);
