@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use crate::MangoClient;
+use itertools::Itertools;
 
 use anchor_lang::{__private::bytemuck::cast_ref, solana_program};
 use client::prettify_client_error;
@@ -22,7 +23,16 @@ pub async fn runner(
         .context
         .tokens
         .keys()
-        .map(|&token_index| loop_update_index_and_rate(mango_client.clone(), token_index))
+        // TokenUpdateIndexAndRate is known to take max 71k cu
+        // from cargo test-bpf local tests
+        .chunks(15)
+        .into_iter()
+        .map(|chunk| {
+            loop_update_index_and_rate(
+                mango_client.clone(),
+                chunk.copied().collect::<Vec<TokenIndex>>(),
+            )
+        })
         .collect::<Vec<_>>();
 
     let handles2 = mango_client
@@ -49,58 +59,65 @@ pub async fn runner(
     Ok(())
 }
 
-pub async fn loop_update_index_and_rate(mango_client: Arc<MangoClient>, token_index: TokenIndex) {
+pub async fn loop_update_index_and_rate(
+    mango_client: Arc<MangoClient>,
+    token_indices: Vec<TokenIndex>,
+) {
     let mut interval = time::interval(Duration::from_secs(5));
     loop {
         interval.tick().await;
 
         let client = mango_client.clone();
 
-        let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-            let token = client.context.token(token_index);
-            let banks_for_a_token = token.mint_info.banks();
-            let token_name = &token.name;
-            let oracle = token.mint_info.oracle;
+        let token_indices_clone = token_indices.clone();
 
-            let sig_result = client
-                .program()
-                .request()
-                .instruction({
-                    let mut ix = Instruction {
-                        program_id: mango_v4::id(),
-                        accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                            &mango_v4::accounts::TokenUpdateIndexAndRate {
-                                group: token.mint_info.group,
-                                mint_info: token.mint_info_address,
-                                oracle,
-                                instructions: solana_program::sysvar::instructions::id(),
-                            },
-                            None,
-                        ),
-                        data: anchor_lang::InstructionData::data(
-                            &mango_v4::instruction::TokenUpdateIndexAndRate {},
-                        ),
-                    };
-                    let mut banks = banks_for_a_token
-                        .iter()
-                        .map(|bank_pubkey| AccountMeta {
-                            pubkey: *bank_pubkey,
-                            is_signer: false,
-                            is_writable: true,
-                        })
-                        .collect::<Vec<_>>();
-                    ix.accounts.append(&mut banks);
-                    ix
-                })
-                .send()
-                .map_err(prettify_client_error);
+        let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+            let token_names = token_indices_clone
+                .iter()
+                .map(|token_index| client.context.token(*token_index).name.to_owned())
+                .join(", ");
+
+            let program = client.program();
+            let mut req = program.request();
+            for token_index in token_indices_clone.iter() {
+                let token = client.context.token(*token_index);
+                let banks_for_a_token = token.mint_info.banks();
+                let oracle = token.mint_info.oracle;
+
+                let mut ix = Instruction {
+                    program_id: mango_v4::id(),
+                    accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                        &mango_v4::accounts::TokenUpdateIndexAndRate {
+                            group: token.mint_info.group,
+                            mint_info: token.mint_info_address,
+                            oracle,
+                            instructions: solana_program::sysvar::instructions::id(),
+                        },
+                        None,
+                    ),
+                    data: anchor_lang::InstructionData::data(
+                        &mango_v4::instruction::TokenUpdateIndexAndRate {},
+                    ),
+                };
+                let mut banks = banks_for_a_token
+                    .iter()
+                    .map(|bank_pubkey| AccountMeta {
+                        pubkey: *bank_pubkey,
+                        is_signer: false,
+                        is_writable: true,
+                    })
+                    .collect::<Vec<_>>();
+                ix.accounts.append(&mut banks);
+                req = req.instruction(ix);
+            }
+            let sig_result = req.send().map_err(prettify_client_error);
 
             if let Err(e) = sig_result {
                 log::error!("{:?}", e)
             } else {
                 log::info!(
                     "update_index_and_rate {} {:?}",
-                    token_name,
+                    token_names,
                     sig_result.unwrap()
                 )
             }
