@@ -1,4 +1,4 @@
-name: Publish to Docker
+name: Publish Docker Image to GCR
 
 on:
   push:
@@ -15,7 +15,7 @@ env:
   IMAGE: mango-v4
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

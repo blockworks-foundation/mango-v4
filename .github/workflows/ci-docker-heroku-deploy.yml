@@ -1,0 +1,31 @@
+name: Deploy Docker Image to Heroku
+
+on: 
+  workflow-dispatch:
+    inputs:
+      appName:
+        description: 'Heroku App Name'
+        required: true
+        type: string
+      imageName:
+        description: 'Image Name'
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Login
+      env: 
+        HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      run: heroku container:login
+      - name: Push
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        run: heroku container:push ${{ inputs.imageName }} -a ${{ inputs.appName }} --recursive 
+      - name: Release
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        run: heroku container:release ${{ inputs.imageName }} -a ${{ inputs.appName }}
