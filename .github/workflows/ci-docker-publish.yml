@@ -15,7 +15,7 @@ env:
   IMAGE: mango-v4
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
