@@ -96,7 +96,7 @@ async fn main() -> anyhow::Result<()> {
     let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss");
 
-    let rpc_timeout = Duration::from_secs(1);
+    let rpc_timeout = Duration::from_secs(10);
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
     let commitment = CommitmentConfig::processed();
     let client = Client::new(cluster.clone(), commitment, &liqor_owner, Some(rpc_timeout));

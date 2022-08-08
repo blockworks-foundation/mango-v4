@@ -200,7 +200,12 @@ async function main() {
   console.log(
     `Editing group, setting existing admin as fastListingAdmin to be able to add MNGO truslessly...`,
   );
-  await client.groupEdit(group, group.admin, group.admin);
+  let sig = await client.groupEdit(
+    group,
+    group.admin,
+    new PublicKey('Efhak3qj3MiyzgJr3cUUqXXz5wr3oYHt9sPzuqJf9eBN'),
+  );
+  console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
   console.log(`Registering MNGO...`);
   const mngoDevnetMint = new PublicKey(DEVNET_MINTS.get('MNGO')!);
   const mngoDevnetOracle = new PublicKey(DEVNET_ORACLES.get('MNGO')!);
@@ -296,6 +301,7 @@ async function main() {
       'USDC',
       btcDevnetOracle,
       0.1,
+      undefined,
       0.01,
       0.3,
       0.08,
@@ -323,6 +329,7 @@ async function main() {
       'USDC',
       usdcDevnetOracle.publicKey,
       0.1,
+      undefined,
       0.01,
       0.4,
       0.07,
