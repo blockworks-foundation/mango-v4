@@ -2953,6 +2953,10 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "accountNum",
+            "type": "u8"
+          },
+          {
             "name": "beingLiquidated",
             "docs": [
               "This account cannot open new positions or borrow until `init_health >= 0`"
@@ -2964,10 +2968,6 @@ export type MangoV4 = {
             "docs": [
               "This account cannot do anything except go through `resolve_bankruptcy`"
             ],
-            "type": "u8"
-          },
-          {
-            "name": "accountNum",
             "type": "u8"
           },
           {
@@ -7957,6 +7957,10 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
+            "name": "accountNum",
+            "type": "u8"
+          },
+          {
             "name": "beingLiquidated",
             "docs": [
               "This account cannot open new positions or borrow until `init_health >= 0`"
@@ -7968,10 +7972,6 @@ export const IDL: MangoV4 = {
             "docs": [
               "This account cannot do anything except go through `resolve_bankruptcy`"
             ],
-            "type": "u8"
-          },
-          {
-            "name": "accountNum",
             "type": "u8"
           },
           {
