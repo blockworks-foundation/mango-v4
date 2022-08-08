@@ -283,4 +283,8 @@ describe('mango-v4', () => {
       1000,
     );
   });
+
+  it('update index and rate', async () => {
+    envClient.updateIndexAndRate(group, 'USDC');
+  });
 });

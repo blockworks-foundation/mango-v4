@@ -1,13 +1,10 @@
-use std::fmt;
-
 use std::mem::size_of;
 
 use anchor_lang::prelude::*;
 use arrayref::array_ref;
 
 use fixed::types::I80F48;
-use num_enum::IntoPrimitive;
-use num_enum::TryFromPrimitive;
+
 use solana_program::program_memory::sol_memmove;
 use static_assertions::const_assert_eq;
 
@@ -33,42 +30,6 @@ const BORSH_VEC_PADDING_BYTES: usize = 4;
 const BORSH_VEC_SIZE_BYTES: usize = 4;
 const DEFAULT_MANGO_ACCOUNT_VERSION: u8 = 1;
 
-#[derive(
-    Debug,
-    Eq,
-    PartialEq,
-    Clone,
-    Copy,
-    TryFromPrimitive,
-    IntoPrimitive,
-    AnchorSerialize,
-    AnchorDeserialize,
-)]
-#[repr(u8)]
-
-pub enum AccountSize {
-    Small = 0,
-    Large = 1,
-}
-
-impl fmt::Display for AccountSize {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            AccountSize::Small => write!(f, "Small"),
-            AccountSize::Large => write!(f, "Large"),
-        }
-    }
-}
-
-impl AccountSize {
-    pub fn space(&self) -> (u8, u8, u8, u8) {
-        match self {
-            AccountSize::Small => (8, 2, 2, 2),
-            AccountSize::Large => (16, 8, 8, 8),
-        }
-    }
-}
-
 // Mango Account
 // This struct definition is only for clients e.g. typescript, so that they can easily use out of the box
 // deserialization and not have to do custom deserialization
@@ -88,13 +49,14 @@ pub struct MangoAccount {
     // Alternative authority/signer of transactions for a mango account
     pub delegate: Pubkey,
 
+    pub account_num: u8,
+
     /// This account cannot open new positions or borrow until `init_health >= 0`
     being_liquidated: u8,
 
     /// This account cannot do anything except go through `resolve_bankruptcy`
     is_bankrupt: u8,
 
-    pub account_num: u8,
     pub bump: u8,
 
     pub padding: [u8; 4],
@@ -157,11 +119,19 @@ impl Default for MangoAccount {
 }
 
 impl MangoAccount {
-    pub fn space(account_size: AccountSize) -> usize {
-        let (token_count, serum3_count, perp_count, perp_oo_count) = account_size.space();
+    pub fn space(
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
+    ) -> Result<usize> {
+        require_gte!(16, token_count);
+        require_gte!(8, serum3_count);
+        require_gte!(8, perp_count);
+        require_gte!(64, perp_oo_count);
 
-        8 + size_of::<MangoAccountFixed>()
-            + Self::dynamic_size(token_count, serum3_count, perp_count, perp_oo_count)
+        Ok(8 + size_of::<MangoAccountFixed>()
+            + Self::dynamic_size(token_count, serum3_count, perp_count, perp_oo_count))
     }
 
     pub fn dynamic_token_vec_offset() -> usize {
@@ -201,7 +171,7 @@ impl MangoAccount {
 #[test]
 fn test_dynamic_offsets() {
     let mut account = MangoAccount::default();
-    account.tokens.resize(16, TokenPosition::default());
+    account.tokens.resize(8, TokenPosition::default());
     account.serum3.resize(8, Serum3Orders::default());
     account.perps.resize(8, PerpPositions::default());
     account
@@ -209,7 +179,7 @@ fn test_dynamic_offsets() {
         .resize(8, PerpOpenOrders::default());
     assert_eq!(
         8 + AnchorSerialize::try_to_vec(&account).unwrap().len(),
-        MangoAccount::space(AccountSize::Large)
+        MangoAccount::space(8, 8, 8, 8).unwrap()
     );
 }
 
@@ -563,13 +533,6 @@ impl<
             dynamic: self.dynamic(),
         }
     }
-
-    pub fn size(&self) -> AccountSize {
-        if self.header().perp_count() > 4 {
-            return AccountSize::Large;
-        }
-        AccountSize::Small
-    }
 }
 
 impl<
@@ -813,7 +776,7 @@ impl<
 
         let side = fill.taker_side.invert_side();
         let (base_change, quote_change) = fill.base_quote_change(side);
-        pa.change_base_position(perp_market, base_change);
+        pa.change_base_and_entry_positions(perp_market, base_change, quote_change);
         let quote = I80F48::from_num(
             perp_market
                 .quote_lot_size
@@ -855,7 +818,7 @@ impl<
 
         let (base_change, quote_change) = fill.base_quote_change(fill.taker_side);
         pa.remove_taker_trade(base_change, quote_change);
-        pa.change_base_position(perp_market, base_change);
+        pa.change_base_and_entry_positions(perp_market, base_change, quote_change);
         let quote = I80F48::from_num(perp_market.quote_lot_size * quote_change);
 
         // fees are assessed at time of trade; no need to assess fees here
@@ -914,14 +877,17 @@ impl<
         dst.copy_from_slice(&BorshVecLength::from(count).to_le_bytes());
     }
 
-    pub fn expand_dynamic_content(&mut self, account_size: AccountSize) -> Result<()> {
-        let (new_token_count, new_serum3_count, new_perp_count, new_perp_oo_count) =
-            account_size.space();
-
-        require_gt!(new_token_count, self.header().token_count);
-        require_gt!(new_serum3_count, self.header().serum3_count);
-        require_gt!(new_perp_count, self.header().perp_count);
-        require_gt!(new_perp_oo_count, self.header().perp_oo_count);
+    pub fn expand_dynamic_content(
+        &mut self,
+        new_token_count: u8,
+        new_serum3_count: u8,
+        new_perp_count: u8,
+        new_perp_oo_count: u8,
+    ) -> Result<()> {
+        require_gte!(new_token_count, self.header().token_count);
+        require_gte!(new_serum3_count, self.header().serum3_count);
+        require_gte!(new_perp_count, self.header().perp_count);
+        require_gte!(new_perp_oo_count, self.header().perp_oo_count);
 
         // create a temp copy to compute new starting offsets
         let new_header = MangoAccountDynamicHeader {
@@ -936,52 +902,63 @@ impl<
         // expand dynamic components by first moving existing positions, and then setting new ones to defaults
 
         // perp oo
-        unsafe {
-            sol_memmove(
-                &mut dynamic[new_header.perp_oo_offset(0)],
-                &mut dynamic[old_header.perp_oo_offset(0)],
-                size_of::<PerpOpenOrders>() * old_header.perp_oo_count(),
-            );
-        }
-        for i in old_header.perp_oo_count..new_perp_oo_count {
-            *get_helper_mut(dynamic, new_header.perp_oo_offset(i.into())) =
-                PerpOpenOrders::default();
+        if new_header.perp_oo_count() > old_header.perp_oo_count() {
+            unsafe {
+                sol_memmove(
+                    &mut dynamic[new_header.perp_oo_offset(0)],
+                    &mut dynamic[old_header.perp_oo_offset(0)],
+                    size_of::<PerpOpenOrders>() * old_header.perp_oo_count(),
+                );
+            }
+            for i in old_header.perp_oo_count..new_perp_oo_count {
+                *get_helper_mut(dynamic, new_header.perp_oo_offset(i.into())) =
+                    PerpOpenOrders::default();
+            }
         }
 
         // perp positions
-        unsafe {
-            sol_memmove(
-                &mut dynamic[new_header.perp_offset(0)],
-                &mut dynamic[old_header.perp_offset(0)],
-                size_of::<PerpPositions>() * old_header.perp_count(),
-            );
-        }
-        for i in old_header.perp_count..new_perp_count {
-            *get_helper_mut(dynamic, new_header.perp_offset(i.into())) = PerpPositions::default();
+        if new_header.perp_count() > old_header.perp_count() {
+            unsafe {
+                sol_memmove(
+                    &mut dynamic[new_header.perp_offset(0)],
+                    &mut dynamic[old_header.perp_offset(0)],
+                    size_of::<PerpPositions>() * old_header.perp_count(),
+                );
+            }
+            for i in old_header.perp_count..new_perp_count {
+                *get_helper_mut(dynamic, new_header.perp_offset(i.into())) =
+                    PerpPositions::default();
+            }
         }
 
         // serum3 positions
-        unsafe {
-            sol_memmove(
-                &mut dynamic[new_header.serum3_offset(0)],
-                &mut dynamic[old_header.serum3_offset(0)],
-                size_of::<Serum3Orders>() * old_header.serum3_count(),
-            );
-        }
-        for i in old_header.serum3_count..new_serum3_count {
-            *get_helper_mut(dynamic, new_header.serum3_offset(i.into())) = Serum3Orders::default();
+        if new_header.serum3_count() > old_header.serum3_count() {
+            unsafe {
+                sol_memmove(
+                    &mut dynamic[new_header.serum3_offset(0)],
+                    &mut dynamic[old_header.serum3_offset(0)],
+                    size_of::<Serum3Orders>() * old_header.serum3_count(),
+                );
+            }
+            for i in old_header.serum3_count..new_serum3_count {
+                *get_helper_mut(dynamic, new_header.serum3_offset(i.into())) =
+                    Serum3Orders::default();
+            }
         }
 
         // token positions
-        unsafe {
-            sol_memmove(
-                &mut dynamic[new_header.token_offset(0)],
-                &mut dynamic[old_header.token_offset(0)],
-                size_of::<TokenPosition>() * old_header.token_count(),
-            );
-        }
-        for i in old_header.token_count..new_token_count {
-            *get_helper_mut(dynamic, new_header.token_offset(i.into())) = TokenPosition::default();
+        if new_header.token_count() > old_header.token_count() {
+            unsafe {
+                sol_memmove(
+                    &mut dynamic[new_header.token_offset(0)],
+                    &mut dynamic[old_header.token_offset(0)],
+                    size_of::<TokenPosition>() * old_header.token_count(),
+                );
+            }
+            for i in old_header.token_count..new_token_count {
+                *get_helper_mut(dynamic, new_header.token_offset(i.into())) =
+                    TokenPosition::default();
+            }
         }
 
         // update header

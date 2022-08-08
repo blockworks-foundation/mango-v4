@@ -93,6 +93,14 @@ async function main() {
   }
 
   if (true) {
+    console.log(
+      `...expanding mango account to have serum3 and perp position slots`,
+    );
+    await client.expandMangoAccount(group, mangoAccount, 16, 8, 8, 8);
+    await mangoAccount.reload(client, group);
+  }
+
+  if (true) {
     // deposit and withdraw
 
     try {

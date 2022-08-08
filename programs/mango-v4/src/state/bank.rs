@@ -82,7 +82,7 @@ pub struct Bank {
     // Collection of all fractions-of-native-tokens that got rounded away
     pub dust: I80F48,
 
-    pub flash_loan_vault_initial: u64,
+    pub flash_loan_token_account_initial: u64,
     pub flash_loan_approved_amount: u64,
 
     // Index into TokenInfo on the group
@@ -94,11 +94,11 @@ pub struct Bank {
 
     pub bank_num: u32,
 
-    pub reserved: [u8; 256],
+    pub reserved: [u8; 2560],
 }
 const_assert_eq!(
     size_of::<Bank>(),
-    32 + 16 + 32 * 3 + 16 + 16 * 6 + 8 * 2 + 16 * 16 + 8 * 2 + 2 + 1 + 1 + 4 + 256
+    32 + 16 + 32 * 3 + 16 + 16 * 6 + 8 * 2 + 16 * 16 + 8 * 2 + 2 + 1 + 1 + 4 + 2560
 );
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
@@ -145,7 +145,10 @@ impl std::fmt::Debug for Bank {
                 "flash_loan_approved_amount",
                 &self.flash_loan_approved_amount,
             )
-            .field("flash_loan_vault_initial", &self.flash_loan_vault_initial)
+            .field(
+                "flash_loan_token_account_initial",
+                &self.flash_loan_token_account_initial,
+            )
             .field("reserved", &self.reserved)
             .finish()
     }
@@ -185,11 +188,11 @@ impl Bank {
             liquidation_fee: existing_bank.liquidation_fee,
             dust: I80F48::ZERO,
             flash_loan_approved_amount: 0,
-            flash_loan_vault_initial: u64::MAX,
+            flash_loan_token_account_initial: u64::MAX,
             token_index: existing_bank.token_index,
             bump: existing_bank.bump,
             mint_decimals: existing_bank.mint_decimals,
-            reserved: [0; 256],
+            reserved: [0; 2560],
             bank_num,
         }
     }
@@ -501,10 +504,16 @@ impl Bank {
         // interest rate legs 2 and 3 are seen as punitive legs, encouraging utilization to move towards optimal utilization
         // lets choose util0 as optimal utilization and 0 to utli0 as the leg where we want the utlization to preferably be
         let optimal_util = self.util0;
-        // use avg_utilization and not instantaneous_utilization so that rates cannot be manupulated easily
-        let util_diff = self.avg_utilization - optimal_util;
+        // use avg_utilization and not instantaneous_utilization so that rates cannot be manipulated easily
+        let avg_util = self.avg_utilization;
         // move rates up when utilization is above optimal utilization, and vice versa
-        let adjustment = I80F48::ONE + self.adjustment_factor * util_diff;
+        // util factor is between -1 (avg util = 0) and +1 (avg util = 100%)
+        let util_factor = if avg_util > optimal_util {
+            cm!((avg_util - optimal_util) / (I80F48::ONE - optimal_util))
+        } else {
+            cm!((avg_util - optimal_util) / optimal_util)
+        };
+        let adjustment = cm!(I80F48::ONE + self.adjustment_factor * util_factor);
 
         // 1. irrespective of which leg current utilization is in, update all rates
         // 2. only update rates as long as new adjusted rates are above MINIMUM_MAX_RATE,

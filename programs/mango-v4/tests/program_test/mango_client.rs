@@ -1083,7 +1083,10 @@ impl<'keypair> ClientInstruction for GroupCloseInstruction<'keypair> {
 
 pub struct AccountCreateInstruction<'keypair> {
     pub account_num: u32,
-    pub account_size: AccountSize,
+    pub token_count: u8,
+    pub serum3_count: u8,
+    pub perp_count: u8,
+    pub perp_oo_count: u8,
     pub group: Pubkey,
     pub owner: &'keypair Keypair,
     pub payer: &'keypair Keypair,
@@ -1099,7 +1102,10 @@ impl<'keypair> ClientInstruction for AccountCreateInstruction<'keypair> {
         let program_id = mango_v4::id();
         let instruction = mango_v4::instruction::AccountCreate {
             account_num: self.account_num,
-            account_size: self.account_size,
+            token_count: self.token_count,
+            serum3_count: self.serum3_count,
+            perp_count: self.perp_count,
+            perp_oo_count: self.perp_oo_count,
             name: "my_mango_account".to_string(),
         };
 
@@ -1136,6 +1142,10 @@ pub struct AccountExpandInstruction<'keypair> {
     pub group: Pubkey,
     pub owner: &'keypair Keypair,
     pub payer: &'keypair Keypair,
+    pub token_count: u8,
+    pub serum3_count: u8,
+    pub perp_count: u8,
+    pub perp_oo_count: u8,
 }
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for AccountExpandInstruction<'keypair> {
@@ -1146,7 +1156,12 @@ impl<'keypair> ClientInstruction for AccountExpandInstruction<'keypair> {
         _account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = mango_v4::instruction::AccountExpand {};
+        let instruction = mango_v4::instruction::AccountExpand {
+            token_count: self.token_count,
+            serum3_count: self.serum3_count,
+            perp_count: self.perp_count,
+            perp_oo_count: self.perp_oo_count,
+        };
 
         let account = Pubkey::find_program_address(
             &[
@@ -2374,6 +2389,7 @@ impl ClientInstruction for PerpConsumeEventsInstruction {
 }
 
 pub struct PerpUpdateFundingInstruction {
+    pub group: Pubkey,
     pub perp_market: Pubkey,
     pub bids: Pubkey,
     pub asks: Pubkey,
@@ -2391,6 +2407,7 @@ impl ClientInstruction for PerpUpdateFundingInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
         let accounts = Self::Accounts {
+            group: self.group,
             perp_market: self.perp_market,
             bids: self.bids,
             asks: self.asks,
@@ -2444,6 +2461,7 @@ impl ClientInstruction for TokenUpdateIndexAndRateInstruction {
         let mint_info: MintInfo = loader.load(&self.mint_info).await.unwrap();
 
         let accounts = Self::Accounts {
+            group: mint_info.group,
             mint_info: self.mint_info,
             oracle: mint_info.oracle,
             instructions: solana_program::sysvar::instructions::id(),

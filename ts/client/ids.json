@@ -70,12 +70,12 @@
       "mangoProgramId": "m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD",
       "banks": [
         {
-          "name": "USDC",
-          "publicKey": "CCaoxVy3vNZnbktSgdimwQcGZXhxA1tm5oP3WmNRDcm5"
-        },
-        {
           "name": "BTC",
           "publicKey": "G9uHVd7wahtZfFCjSy2yU9VjJnWSYwYSn4rh53F7ZBFd"
+        },
+        {
+          "name": "USDC",
+          "publicKey": "CCaoxVy3vNZnbktSgdimwQcGZXhxA1tm5oP3WmNRDcm5"
         },
         {
           "name": "SOL",
@@ -90,12 +90,12 @@
       ],
       "mintInfos": [
         {
-          "name": "BTC",
-          "publicKey": "4KZkrJQRvrVy8BWmbUKk7YWezMAsSb97ZMHFLUtj6Q5u"
-        },
-        {
           "name": "SOL",
           "publicKey": "EvjoLBh7ej78C1yA7jaLcHQfoGx3KkDBnZbrztSZFGmC"
+        },
+        {
+          "name": "BTC",
+          "publicKey": "4KZkrJQRvrVy8BWmbUKk7YWezMAsSb97ZMHFLUtj6Q5u"
         },
         {
           "name": "USDC",

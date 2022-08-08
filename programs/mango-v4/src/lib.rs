@@ -19,16 +19,14 @@ pub mod serum3_cpi;
 pub mod state;
 pub mod types;
 
-use state::{
-    AccountSize, OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex,
-};
+use state::{OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex};
 
 declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
 
 #[program]
 pub mod mango_v4 {
 
-    use crate::state::{AccountSize, OracleConfig};
+    use crate::state::OracleConfig;
 
     use super::*;
 
@@ -98,6 +96,7 @@ pub mod mango_v4 {
         bank_num: u64,
         oracle_opt: Option<Pubkey>,
         oracle_config_opt: Option<OracleConfig>,
+        group_insurance_fund_opt: Option<bool>,
         interest_rate_params_opt: Option<InterestRateParams>,
         loan_fee_rate_opt: Option<f32>,
         loan_origination_fee_rate_opt: Option<f32>,
@@ -112,6 +111,7 @@ pub mod mango_v4 {
             bank_num,
             oracle_opt,
             oracle_config_opt,
+            group_insurance_fund_opt,
             interest_rate_params_opt,
             loan_fee_rate_opt,
             loan_origination_fee_rate_opt,
@@ -146,14 +146,31 @@ pub mod mango_v4 {
     pub fn account_create(
         ctx: Context<AccountCreate>,
         account_num: u32,
-        account_size: AccountSize,
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
         name: String,
     ) -> Result<()> {
-        instructions::account_create(ctx, account_num, account_size, name)
+        instructions::account_create(
+            ctx,
+            account_num,
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+            name,
+        )
     }
 
-    pub fn account_expand(ctx: Context<AccountExpand>) -> Result<()> {
-        instructions::account_expand(ctx)
+    pub fn account_expand(
+        ctx: Context<AccountExpand>,
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
+    ) -> Result<()> {
+        instructions::account_expand(ctx, token_count, serum3_count, perp_count, perp_oo_count)
     }
 
     pub fn account_edit(

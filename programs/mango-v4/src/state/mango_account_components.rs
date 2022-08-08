@@ -148,6 +148,11 @@ pub struct PerpPositions {
     /// measured in native quote
     pub quote_position_native: I80F48,
 
+    /// Tracks what the position is to calculate average entry  & break even price
+    pub base_entry_lots: i64,
+    pub quote_entry_native: i64,
+    pub quote_exit_native: i64,
+
     /// Already settled funding
     pub long_settled_funding: I80F48,
     pub short_settled_funding: I80F48,
@@ -180,7 +185,7 @@ impl std::fmt::Debug for PerpPositions {
             .finish()
     }
 }
-const_assert_eq!(size_of::<PerpPositions>(), 8 + 8 * 5 + 3 * 16 + 64);
+const_assert_eq!(size_of::<PerpPositions>(), 8 + 8 * 8 + 3 * 16 + 64);
 const_assert_eq!(size_of::<PerpPositions>() % 8, 0);
 
 unsafe impl bytemuck::Pod for PerpPositions {}
@@ -192,6 +197,9 @@ impl Default for PerpPositions {
             market_index: PerpMarketIndex::MAX,
             base_position_lots: 0,
             quote_position_native: I80F48::ZERO,
+            base_entry_lots: 0,
+            quote_entry_native: 0,
+            quote_exit_native: 0,
             bids_base_lots: 0,
             asks_base_lots: 0,
             taker_base_lots: 0,
@@ -257,6 +265,67 @@ impl PerpPositions {
         self.long_settled_funding = perp_market.long_funding;
         self.short_settled_funding = perp_market.short_funding;
     }
+
+    /// Update the quote entry position
+    pub fn change_quote_entry(&mut self, base_change: i64, quote_change: i64) {
+        if base_change == 0 {
+            return;
+        }
+        let old_position = self.base_position_lots;
+        let is_increasing = old_position == 0 || old_position.signum() == base_change.signum();
+        match is_increasing {
+            true => {
+                self.quote_entry_native = cm!(self.quote_entry_native + quote_change);
+                self.base_entry_lots = cm!(self.base_entry_lots + base_change);
+            }
+            false => {
+                let new_position = cm!(old_position + base_change);
+                self.quote_exit_native = cm!(self.quote_exit_native + quote_change);
+                let is_overflow = old_position.signum() == -new_position.signum();
+                if new_position == 0 {
+                    self.quote_entry_native = 0;
+                    self.quote_exit_native = 0;
+                    self.base_entry_lots = 0;
+                }
+                if is_overflow {
+                    self.quote_entry_native = cm!(((new_position as f64) * (quote_change as f64)
+                        / (base_change as f64))
+                        .round()) as i64;
+                    self.quote_exit_native = 0;
+                    self.base_entry_lots = new_position;
+                }
+            }
+        }
+    }
+
+    /// Change the base and quote positions as the result of a trade
+    pub fn change_base_and_entry_positions(
+        &mut self,
+        perp_market: &mut PerpMarket,
+        base_change: i64,
+        quote_change: i64,
+    ) {
+        self.change_quote_entry(base_change, quote_change);
+        self.change_base_position(perp_market, base_change);
+    }
+
+    /// Calculate the average entry price of the position
+    pub fn get_avg_entry_price(&self) -> I80F48 {
+        if self.base_entry_lots == 0 {
+            return I80F48::ZERO; // TODO: What should this actually return? Error? NaN?
+        }
+        (I80F48::from(self.quote_entry_native) / I80F48::from(self.base_entry_lots)).abs()
+    }
+
+    /// Calculate the break even price of the position
+    pub fn get_break_even_price(&self) -> I80F48 {
+        if self.base_position_lots == 0 {
+            return I80F48::ZERO; // TODO: What should this actually return? Error? NaN?
+        }
+        (I80F48::from(self.quote_entry_native + self.quote_exit_native)
+            / I80F48::from(self.base_position_lots))
+        .abs()
+    }
 }
 
 #[zero_copy]
@@ -305,3 +374,227 @@ macro_rules! account_seeds {
 }
 
 pub use account_seeds;
+
+#[cfg(test)]
+mod tests {
+    use crate::state::{OracleConfig, PerpMarket};
+    use anchor_lang::prelude::Pubkey;
+    use fixed::types::I80F48;
+    use rand::Rng;
+
+    use super::PerpPositions;
+
+    fn create_perp_position(base_pos: i64, quote_pos: i64, entry_pos: i64) -> PerpPositions {
+        let mut pos = PerpPositions::default();
+        pos.base_position_lots = base_pos;
+        pos.quote_position_native = I80F48::from(quote_pos);
+        pos.quote_entry_native = entry_pos;
+        pos.quote_exit_native = 0;
+        pos.base_entry_lots = base_pos;
+        pos
+    }
+
+    fn create_perp_market() -> PerpMarket {
+        return PerpMarket {
+            group: Pubkey::new_unique(),
+            base_token_index: 0,
+            perp_market_index: 0,
+            name: Default::default(),
+            oracle: Pubkey::new_unique(),
+            oracle_config: OracleConfig {
+                conf_filter: I80F48::ZERO,
+            },
+            bids: Pubkey::new_unique(),
+            asks: Pubkey::new_unique(),
+            event_queue: Pubkey::new_unique(),
+            quote_lot_size: 1,
+            base_lot_size: 1,
+            maint_asset_weight: I80F48::from(1),
+            init_asset_weight: I80F48::from(1),
+            maint_liab_weight: I80F48::from(1),
+            init_liab_weight: I80F48::from(1),
+            liquidation_fee: I80F48::ZERO,
+            maker_fee: I80F48::ZERO,
+            taker_fee: I80F48::ZERO,
+            min_funding: I80F48::ZERO,
+            max_funding: I80F48::ZERO,
+            impact_quantity: 0,
+            long_funding: I80F48::ZERO,
+            short_funding: I80F48::ZERO,
+            funding_last_updated: 0,
+            open_interest: 0,
+            seq_num: 0,
+            fees_accrued: I80F48::ZERO,
+            bump: 0,
+            base_token_decimals: 0,
+            reserved: [0; 128],
+            padding1: Default::default(),
+            padding2: Default::default(),
+            registration_time: 0,
+        };
+    }
+
+    #[test]
+    fn test_quote_entry_long_increasing_from_zero() {
+        let mut market = create_perp_market();
+        let mut pos = create_perp_position(0, 0, 0);
+        // Go long 10 @ 10
+        pos.change_base_and_entry_positions(&mut market, 10, -100);
+        assert_eq!(pos.quote_entry_native, -100);
+        assert_eq!(pos.get_avg_entry_price(), I80F48::from(10));
+    }
+
+    #[test]
+    fn test_quote_entry_short_increasing_from_zero() {
+        let mut market = create_perp_market();
+        let mut pos = create_perp_position(0, 0, 0);
+        // Go short 10 @ 10
+        pos.change_base_and_entry_positions(&mut market, -10, 100);
+        assert_eq!(pos.quote_entry_native, 100);
+        assert_eq!(pos.get_avg_entry_price(), I80F48::from(10));
+    }
+
+    #[test]
+    fn test_quote_entry_long_increasing_from_long() {
+        let mut market = create_perp_market();
+        let mut pos = create_perp_position(10, -100, -100);
+        // Go long 10 @ 30
+        pos.change_base_and_entry_positions(&mut market, 10, -300);
+        assert_eq!(pos.quote_entry_native, -400);
+        assert_eq!(pos.get_avg_entry_price(), I80F48::from(20));
+    }
+
+    #[test]
+    fn test_quote_entry_short_increasing_from_short() {
+        let mut market = create_perp_market();
+        let mut pos = create_perp_position(-10, 100, 100);
+        // Go short 10 @ 10
+        pos.change_base_and_entry_positions(&mut market, -10, 300);
+        assert_eq!(pos.quote_entry_native, 400);
+        assert_eq!(pos.get_avg_entry_price(), I80F48::from(20));
+    }
+
+    #[test]
+    fn test_quote_entry_long_decreasing_from_short() {
+        let mut market = create_perp_market();
+        let mut pos = create_perp_position(-10, 100, 100);
+        // Go long 5 @ 50
+        pos.change_base_and_entry_positions(&mut market, 5, 250);
+        assert_eq!(pos.quote_entry_native, 100);
+        assert_eq!(pos.base_entry_lots, -10);
+        assert_eq!(pos.quote_exit_native, 250);
+        assert_eq!(pos.get_avg_entry_price(), I80F48::from(10)); // Entry price remains the same when decreasing
+    }
+
+    #[test]
+    fn test_quote_entry_short_decreasing_from_long() {
+        let mut market = create_perp_market();
+        let mut pos = create_perp_position(10, -100, -100);
+        // Go short 5 @ 50
+        pos.change_base_and_entry_positions(&mut market, -5, -250);
+        assert_eq!(pos.quote_entry_native, -100);
+        assert_eq!(pos.base_entry_lots, 10);
+        assert_eq!(pos.quote_exit_native, -250);
+        assert_eq!(pos.get_avg_entry_price(), I80F48::from(10)); // Entry price remains the same when decreasing
+    }
+
+    #[test]
+    fn test_quote_entry_long_close_with_short() {
+        let mut market = create_perp_market();
+        let mut pos = create_perp_position(10, -100, -100);
+        // Go short 10 @ 50
+        pos.change_base_and_entry_positions(&mut market, -10, 250);
+        assert_eq!(pos.quote_entry_native, 0);
+        assert_eq!(pos.quote_exit_native, 0);
+        assert_eq!(pos.base_entry_lots, 0);
+        assert_eq!(pos.get_avg_entry_price(), I80F48::from(0)); // Entry price zero when no position
+    }
+
+    #[test]
+    fn test_quote_entry_short_close_with_long() {
+        let mut market = create_perp_market();
+        let mut pos = create_perp_position(-10, 100, 100);
+        // Go long 10 @ 50
+        pos.change_base_and_entry_positions(&mut market, 10, -250);
+        assert_eq!(pos.quote_entry_native, 0);
+        assert_eq!(pos.quote_exit_native, 0);
+        assert_eq!(pos.base_entry_lots, 0);
+        assert_eq!(pos.get_avg_entry_price(), I80F48::from(0)); // Entry price zero when no position
+    }
+
+    #[test]
+    fn test_quote_entry_long_close_short_with_overflow() {
+        let mut market = create_perp_market();
+        let mut pos = create_perp_position(10, -100, -100);
+        // Go short 15 @ 20
+        pos.change_base_and_entry_positions(&mut market, -15, 300);
+        assert_eq!(pos.quote_entry_native, 100);
+        assert_eq!(pos.quote_exit_native, 0);
+        assert_eq!(pos.base_entry_lots, -5);
+        assert_eq!(pos.get_avg_entry_price(), I80F48::from(20)); // Entry price zero when no position
+    }
+
+    #[test]
+    fn test_quote_entry_short_close_long_with_overflow() {
+        let mut market = create_perp_market();
+        let mut pos = create_perp_position(-10, 100, 100);
+        // Go short 15 @ 20
+        pos.change_base_and_entry_positions(&mut market, 15, -300);
+        assert_eq!(pos.quote_entry_native, -100);
+        assert_eq!(pos.quote_exit_native, 0);
+        assert_eq!(pos.base_entry_lots, 5);
+        assert_eq!(pos.get_avg_entry_price(), I80F48::from(20)); // Entry price zero when no position
+    }
+
+    #[test]
+    fn test_quote_entry_break_even_price() {
+        let mut market = create_perp_market();
+        let mut pos = create_perp_position(0, 0, 0);
+        // Buy 11 @ 10,000
+        pos.change_base_and_entry_positions(&mut market, 11, -11 * 10_000);
+        // Sell 1 @ 12,000
+        pos.change_base_and_entry_positions(&mut market, -1, 12_000);
+        assert_eq!(pos.quote_entry_native, -11 * 10_000);
+        assert_eq!(pos.quote_exit_native, 12_000);
+        assert_eq!(pos.base_entry_lots, 11);
+        assert_eq!(pos.base_position_lots, 10);
+        assert_eq!(pos.get_break_even_price(), I80F48::from(9_800)); // We made 2k on the trade, so we can sell our contract up to a loss of 200 each
+    }
+
+    #[test]
+    fn test_quote_entry_multiple_and_reversed_changes_return_entry_to_zero() {
+        let mut market = create_perp_market();
+        let mut pos = create_perp_position(0, 0, 0);
+
+        // Generate array of random trades
+        let mut rng = rand::thread_rng();
+        let mut trades: Vec<[i64; 2]> = Vec::with_capacity(500);
+        for _ in 0..trades.capacity() {
+            let qty: i64 = rng.gen_range(-1000..=1000);
+            let px: f64 = rng.gen_range(0.1..=100.0);
+            let quote: i64 = (-qty as f64 * px).round() as i64;
+            trades.push([qty, quote]);
+        }
+        // Apply all of the trades going forward
+        trades.iter().for_each(|[qty, quote]| {
+            pos.change_base_and_entry_positions(&mut market, *qty, *quote);
+        });
+        // base_position should be sum of all base quantities
+        assert_eq!(
+            pos.base_position_lots,
+            trades.iter().map(|[qty, _]| qty).sum::<i64>()
+        );
+        // Reverse out all the trades
+        trades.iter().for_each(|[qty, quote]| {
+            pos.change_base_and_entry_positions(&mut market, -*qty, -*quote);
+        });
+        // base position should be 0
+        assert_eq!(pos.base_position_lots, 0);
+        // quote entry position should be 0
+        assert_eq!(pos.quote_entry_native, 0);
+        // quote exit should be 0
+        assert_eq!(pos.quote_exit_native, 0);
+        // base entry lots should be 0
+        assert_eq!(pos.base_entry_lots, 0);
+    }
+}
