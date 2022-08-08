@@ -29,12 +29,13 @@ pub struct MintInfo {
 
     pub registration_time: i64,
     pub group_insurance_fund: u8,
+    pub paddin2: [u8; 7],
 
-    pub reserved: [u8; 2559],
+    pub reserved: [u8; 2560],
 }
 const_assert_eq!(
     size_of::<MintInfo>(),
-    MAX_BANKS * 2 * 32 + 3 * 32 + 2 + 8 + 6 + 1 + 2559
+    MAX_BANKS * 2 * 32 + 3 * 32 + 2 + 8 + 6 + 1 + 7 + 2560
 );
 const_assert_eq!(size_of::<MintInfo>() % 8, 0);
 
