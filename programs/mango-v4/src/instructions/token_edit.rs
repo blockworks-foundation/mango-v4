@@ -8,7 +8,7 @@ use crate::accounts_zerocopy::LoadMutZeroCopyRef;
 use crate::state::*;
 
 #[derive(Accounts)]
-#[instruction(token_index: TokenIndex, bank_num: u64)]
+#[instruction(bank_num: u64)]
 pub struct TokenEdit<'info> {
     #[account(
         has_one = admin,
