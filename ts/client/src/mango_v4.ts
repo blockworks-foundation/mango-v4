@@ -2891,7 +2891,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                256
+                2560
               ]
             }
           }
@@ -2962,7 +2962,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                256
+                2560
               ]
             }
           }
@@ -3121,11 +3121,15 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "groupInsuranceFund",
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                6
+                5
               ]
             }
           },
@@ -3160,15 +3164,11 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "groupInsuranceFund",
-            "type": "u8"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                255
+                2560
               ]
             }
           }
@@ -7938,7 +7938,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                256
+                2560
               ]
             }
           }
@@ -8009,7 +8009,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                256
+                2560
               ]
             }
           }
@@ -8168,11 +8168,15 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "groupInsuranceFund",
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                6
+                5
               ]
             }
           },
@@ -8207,15 +8211,11 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "groupInsuranceFund",
-            "type": "u8"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                255
+                2560
               ]
             }
           }

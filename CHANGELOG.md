@@ -8,6 +8,12 @@ Update this for each mainnet deployment.
 
 ## mainnet
 
+Aug 8, 2022 at 18:56:04 Central European Summer Time
+https://explorer.solana.com/tx/yjZggRTrcDNquMkftNvBKLv77Dk4xp5yQPYXgN3qvBHTBWWJVhLPGHxqpGwosmEq3j8byHZMa13oxLLerBWUdgW
+
+- improved logging for off chain services
+- `AccountCreate` ix takes explicit input for sizes of various features
+
 Aug 4, 2022 at 09:30:00 Central European Summer Time
 
 ts/client changes
