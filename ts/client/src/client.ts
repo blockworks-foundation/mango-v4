@@ -128,10 +128,9 @@ export class MangoClient {
     return group;
   }
 
-  public async getGroupForCreator(
+  public async getGroupsForCreator(
     creatorPk: PublicKey,
-    groupNum?: number,
-  ): Promise<Group> {
+  ): Promise<Group[]> {
     const filters: MemcmpFilter[] = [
       {
         memcmp: {
@@ -141,20 +140,24 @@ export class MangoClient {
       },
     ];
 
-    if (groupNum !== undefined) {
-      const bbuf = Buffer.alloc(4);
-      bbuf.writeUInt32LE(groupNum);
-      filters.push({
-        memcmp: {
-          bytes: bs58.encode(bbuf),
-          offset: 40,
-        },
-      });
-    }
-
-    const groups = (await this.program.account.group.all(filters)).map(
+    return (await this.program.account.group.all(filters)).map(
       (tuple) => Group.from(tuple.publicKey, tuple.account),
     );
+  }
+
+  public async getGroupForCreator(
+    creatorPk: PublicKey,
+    groupNum?: number,
+  ): Promise<Group> {
+    const groups = (await this.getGroupsForCreator(creatorPk))
+      .filter((group) => {
+        if (groupNum !== undefined) {
+          return group.groupNum == groupNum;
+        } else {
+          return true;
+        }
+      });
+
     await groups[0].reloadAll(this);
     return groups[0];
   }
