@@ -33,7 +33,7 @@ pub struct QueryMarketInfo {
     pub lp_fee: QueryFee,
     pub platform_fee: QueryFee,
     pub not_enough_liquidity: bool,
-    pub price_impact_pct: f64,
+    pub price_impact_pct: Option<f64>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -41,7 +41,7 @@ pub struct QueryMarketInfo {
 pub struct QueryFee {
     pub amount: u64,
     pub mint: String,
-    pub pct: f64,
+    pub pct: Option<f64>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -49,6 +49,7 @@ pub struct QueryFee {
 pub struct SwapRequest {
     pub route: QueryRoute,
     pub user_public_key: String,
+    #[serde(rename = "wrapUnwrapSOL")]
     pub wrap_unwrap_sol: bool,
 }
 

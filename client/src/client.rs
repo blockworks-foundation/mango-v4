@@ -953,19 +953,12 @@ impl MangoClient {
                     .context("base64 decoding jupiter transaction")?,
             )
             .context("parsing jupiter transaction")?;
+        let ata_program = anchor_spl::associated_token::ID;
+        let token_program = anchor_spl::token::ID;
+        let is_setup_ix = |k: Pubkey| -> bool { k == ata_program || k == token_program };
         let jup_ixs = deserialize_instructions(&jup_tx.message)
             .into_iter()
-            // TODO: possibly creating associated token accounts if they don't exist yet is good?!
-            // we could squeeze the FlashLoan instructions in the middle:
-            //   - beginning AToken...
-            //   - FlashLoanBegin
-            //   - other JUP ix
-            //   - FlashLoanEnd
-            //   - ending AToken
-            .filter(|ix| {
-                ix.program_id
-                    != Pubkey::from_str("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL").unwrap()
-            })
+            .filter(|ix| !is_setup_ix(ix.program_id))
             .collect::<Vec<_>>();
 
         let bank_ams = [
@@ -1014,7 +1007,19 @@ impl MangoClient {
             .context("building health accounts")?;
 
         let program = self.program();
-        let mut builder = program.request().instruction(Instruction {
+        let mut builder = program.request();
+
+        builder = builder.instruction(create_associated_token_account_idempotent(
+            &self.owner.pubkey(),
+            &self.owner.pubkey(),
+            &source_token.mint_info.mint,
+        ));
+        builder = builder.instruction(create_associated_token_account_idempotent(
+            &self.owner.pubkey(),
+            &self.owner.pubkey(),
+            &target_token.mint_info.mint,
+        ));
+        builder = builder.instruction(Instruction {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
@@ -1035,7 +1040,7 @@ impl MangoClient {
             }),
         });
         for ix in jup_ixs {
-            builder = builder.instruction(ix);
+            builder = builder.instruction(ix.clone());
         }
         builder = builder.instruction(Instruction {
             program_id: mango_v4::id(),
@@ -1174,4 +1179,18 @@ fn to_writable_account_meta(pubkey: Pubkey) -> AccountMeta {
         is_writable: true,
         is_signer: false,
     }
+}
+
+// FUTURE: use spl_associated_token_account::instruction::create_associated_token_account_idempotent
+// Right now anchor depends on an earlier version of this package...
+fn create_associated_token_account_idempotent(
+    funder: &Pubkey,
+    owner: &Pubkey,
+    mint: &Pubkey,
+) -> Instruction {
+    let mut instr = spl_associated_token_account::instruction::create_associated_token_account(
+        funder, owner, mint,
+    );
+    instr.data = vec![0x1]; // CreateIdempotent
+    instr
 }
