@@ -2,7 +2,7 @@ name: Publish Docker Image to GCR
 
 on:
   push:
-    branches: [mc/docker]
+    branches: [dev]
   workflow_call:
     secrets:
       GCR_PROJECT:
