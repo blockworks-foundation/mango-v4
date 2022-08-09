@@ -2,7 +2,12 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
-import { AccountMeta, PublicKey } from '@solana/web3.js';
+import {
+  AccountMeta,
+  PublicKey,
+  TransactionInstruction,
+  SystemProgram,
+} from '@solana/web3.js';
 import BN from 'bn.js';
 import { QUOTE_DECIMALS } from './accounts/bank';
 import { I80F48 } from './accounts/I80F48';
@@ -67,6 +72,30 @@ export async function getAssociatedTokenAddress(
   );
 
   return address;
+}
+
+export async function createAssociatedTokenAccountIdempotentInstruction(
+  payer: PublicKey,
+  owner: PublicKey,
+  mint: PublicKey,
+): Promise<TransactionInstruction> {
+  const account = await getAssociatedTokenAddress(mint, owner);
+  return new TransactionInstruction({
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: account, isSigner: false, isWritable: true },
+      { pubkey: owner, isSigner: false, isWritable: false },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      {
+        pubkey: SystemProgram.programId,
+        isSigner: false,
+        isWritable: false,
+      },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+    data: Buffer.from([0x1]),
+  });
 }
 
 export function toNativeDecimals(amount: number, decimals: number): BN {

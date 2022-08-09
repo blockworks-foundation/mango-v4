@@ -43,6 +43,7 @@ import { SERUM3_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import {
+  createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
   I64_MAX_BN,
   toNativeDecimals,
@@ -1412,7 +1413,6 @@ export class MangoClient {
           isSigner: false,
         } as AccountMeta),
     );
-    console.log('1');
 
     /*
      * Find or create associated token accounts
@@ -1428,13 +1428,10 @@ export class MangoClient {
     const preInstructions = [];
     if (!inputTokenAccExists) {
       preInstructions.push(
-        Token.createAssociatedTokenAccountInstruction(
+        await createAssociatedTokenAccountIdempotentInstruction(
           mangoAccount.owner,
-          inputTokenAccountPk,
           mangoAccount.owner,
           inputBank.mint,
-          TOKEN_PROGRAM_ID,
-          ASSOCIATED_TOKEN_PROGRAM_ID,
         ),
       );
     }
@@ -1449,28 +1446,13 @@ export class MangoClient {
       );
     if (!outputTokenAccExists) {
       preInstructions.push(
-        Token.createAssociatedTokenAccountInstruction(
+        await createAssociatedTokenAccountIdempotentInstruction(
           mangoAccount.owner,
-          outputTokenAccountPk,
           mangoAccount.owner,
           outputBank.mint,
-          TOKEN_PROGRAM_ID,
-          ASSOCIATED_TOKEN_PROGRAM_ID,
         ),
       );
     }
-    console.log('2');
-
-    if (preInstructions.length) {
-      const tx = new Transaction();
-      for (const ix of preInstructions) {
-        tx.add(ix);
-      }
-      console.log('preInstructions', preInstructions);
-
-      await this.program.provider.sendAndConfirm(tx);
-    }
-    console.log('3');
 
     const inputBankAccount = {
       pubkey: inputBank.publicKey,
@@ -1521,9 +1503,6 @@ export class MangoClient {
         },
       ])
       .instruction();
-    console.log('4');
-
-    // userDefinedInstructions.push(flashLoanEndIx);
 
     const flashLoanBeginIx = await this.program.methods
       .flashLoanBegin([
@@ -1547,6 +1526,9 @@ export class MangoClient {
       .instruction();
 
     const tx = new Transaction();
+    for (const i of preInstructions) {
+      tx.add(i);
+    }
     tx.add(flashLoanBeginIx);
     for (const i of userDefinedInstructions) {
       tx.add(i);
