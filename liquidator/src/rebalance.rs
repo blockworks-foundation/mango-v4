@@ -97,7 +97,7 @@ pub fn zero_all_non_quote(
             );
             txsigs.push(txsig);
         } else if token_state.native_position < 0 {
-            let amount = -token_state.native_position;
+            let amount = (-token_state.native_position).ceil();
             let txsig = mango_client.jupiter_swap(
                 quote_token.mint_info.mint,
                 token.mint_info.mint,
