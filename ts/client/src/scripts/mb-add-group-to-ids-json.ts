@@ -25,7 +25,7 @@ async function main() {
 
   // build client and fetch group for admin
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.CLUSTER_URL, options);
+  const connection = new Connection(process.env.MB_CLUSTER_URL, options);
   const user = Keypair.fromSecretKey(
     Buffer.from(
       JSON.parse(fs.readFileSync(process.env.USER_KEYPAIR!, 'utf-8')),
@@ -40,9 +40,7 @@ async function main() {
   );
   const admin = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(
-        fs.readFileSync(process.env.MANGO_MAINNET_PAYER_KEYPAIR!, 'utf-8'),
-      ),
+      JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
     ),
   );
   console.log(`Admin ${admin.publicKey.toBase58()}`);

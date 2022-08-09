@@ -9,14 +9,12 @@ import { MangoClient } from '../client';
 //
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.CLUSTER_URL!, options);
+  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
 
   // user
   const user = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(
-        fs.readFileSync(process.env.MANGO_MAINNET_PAYER_KEYPAIR!, 'utf-8'),
-      ),
+      JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
     ),
   );
   const userWallet = new Wallet(user);
@@ -30,9 +28,7 @@ async function main() {
   // admin
   const admin = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(
-        fs.readFileSync(process.env.MANGO_MAINNET_PAYER_KEYPAIR!, 'utf-8'),
-      ),
+      JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
     ),
   );
   console.log(`Admin ${admin.publicKey.toBase58()}`);
