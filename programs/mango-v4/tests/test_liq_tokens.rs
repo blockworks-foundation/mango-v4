@@ -505,5 +505,73 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     assert!(!liqee.being_liquidated());
     assert!(!liqee.is_bankrupt());
 
+    //
+    // TEST: bankruptcy when collateral is dusted
+    //
+
+    // Setup: make collateral really valueable, remove nearly all of it
+    send_tx(
+        solana,
+        StubOracleSetInstruction {
+            group,
+            admin,
+            mint: collateral_token1.mint.pubkey,
+            payer,
+            price: "100000.0",
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        TokenWithdrawInstruction {
+            amount: (account_position(solana, account, collateral_token1.bank).await) as u64 - 1,
+            allow_borrow: false,
+            account,
+            owner,
+            token_account: payer_mint_accounts[2],
+            bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+    // Setup: reduce collateral value to trigger liquidatability
+    // We have -93 borrows, so -93*2*1.4 = -260.4 health from that
+    // And 1-2 collateral, so max 2*0.6*X health; say X=150 for max 180 health
+    send_tx(
+        solana,
+        StubOracleSetInstruction {
+            group,
+            admin,
+            mint: collateral_token1.mint.pubkey,
+            payer,
+            price: "150.0",
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        LiqTokenWithTokenInstruction {
+            liqee: account,
+            liqor: vault_account,
+            liqor_owner: owner,
+            asset_token_index: collateral_token1.index,
+            liab_token_index: borrow_token1.index,
+            max_liab_transfer: I80F48::from_num(10001.0),
+            asset_bank_index: 0,
+            liab_bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    // Liqee's remaining collateral got dusted, only borrows remain: bankrupt
+    let liqee = get_mango_account(solana, account).await;
+    assert_eq!(liqee.token_iter_active().count(), 1);
+    assert!(liqee.is_bankrupt());
+    assert!(liqee.being_liquidated());
+
     Ok(())
 }
