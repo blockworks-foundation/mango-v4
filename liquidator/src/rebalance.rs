@@ -72,14 +72,13 @@ pub fn zero_all_non_quote(
         .collect::<anyhow::Result<HashMap<TokenIndex, TokenState>>>()?;
     log::trace!("account tokens: {:?}", tokens);
 
-    let mut txsigs = vec![];
     for (token_index, token_state) in tokens {
         let token = mango_client.context.token(token_index);
         if token_index == quote_token.token_index {
             continue;
         }
 
-        if token_state.native_position > 0 {
+        let maybe_txsig = if token_state.native_position > 0 {
             let amount = token_state.native_position;
             let txsig = mango_client.jupiter_swap(
                 token.mint_info.mint,
@@ -95,7 +94,7 @@ pub fn zero_all_non_quote(
                 quote_token.name,
                 txsig
             );
-            txsigs.push(txsig);
+            Some(txsig)
         } else if token_state.native_position < 0 {
             let amount = (-token_state.native_position).ceil();
             let txsig = mango_client.jupiter_swap(
@@ -112,19 +111,26 @@ pub fn zero_all_non_quote(
                 quote_token.name,
                 txsig
             );
-            txsigs.push(txsig);
-        }
-    }
+            Some(txsig)
+        } else {
+            None
+        };
 
-    let max_slot = account_fetcher.transaction_max_slot(&txsigs)?;
-    if let Err(e) = account_fetcher.refresh_accounts_via_rpc_until_slot(
-        &[*mango_account_address],
-        max_slot,
-        config.refresh_timeout,
-    ) {
-        // If we don't get fresh data, maybe the tx landed on a fork?
-        // Rebalance is technically still ok.
-        log::info!("could not refresh account data: {}", e);
+        // The swaps aim to close token positions on the account. That means sending
+        // a second swap would fail due to including the wrong set of health accounts.
+        if let Some(txsig) = maybe_txsig {
+            let max_slot = account_fetcher.transaction_max_slot(&[txsig])?;
+            if let Err(e) = account_fetcher.refresh_accounts_via_rpc_until_slot(
+                &[*mango_account_address],
+                max_slot,
+                config.refresh_timeout,
+            ) {
+                // If we don't get fresh data, maybe the tx landed on a fork?
+                // Rebalance is technically still ok.
+                log::info!("could not refresh account data: {}", e);
+                return Ok(());
+            }
+        }
     }
 
     Ok(())
