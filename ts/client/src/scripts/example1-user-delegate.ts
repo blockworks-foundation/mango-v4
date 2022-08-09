@@ -43,7 +43,9 @@ async function main() {
 
   // delegate
   const delegate = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(process.env.DELEGATE!, 'utf-8'))),
+    Buffer.from(
+      JSON.parse(fs.readFileSync(process.env.USER3_KEYPAIR!, 'utf-8')),
+    ),
   );
   const delegateWallet = new Wallet(delegate);
   const delegateProvider = new AnchorProvider(
