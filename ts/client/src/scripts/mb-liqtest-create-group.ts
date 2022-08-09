@@ -61,7 +61,8 @@ async function main() {
     console.log(`Creating stub oracle for ${name}...`);
     const mintPk = new PublicKey(mint);
     try {
-      await client.stubOracleCreate(group, mintPk, STUB_PRICES[name]);
+      const price = STUB_PRICES.get(name);
+      await client.stubOracleCreate(group, mintPk, price);
     } catch (error) {
       console.log(error);
     }
@@ -89,7 +90,7 @@ async function main() {
       0.88,
       1.5,
       0.0,
-      0.0,
+      0.0001,
       0.9,
       0.8,
       1.1,
@@ -120,7 +121,7 @@ async function main() {
       0.9,
       1.5,
       0.0,
-      0.0,
+      0.0001,
       1,
       1,
       1,
@@ -151,7 +152,7 @@ async function main() {
       0.9,
       1.5,
       0.0,
-      0.0,
+      0.0001,
       0.9,
       0.8,
       1.1,

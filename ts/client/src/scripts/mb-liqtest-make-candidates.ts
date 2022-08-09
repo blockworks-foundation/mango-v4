@@ -24,9 +24,11 @@ const MAINNET_MINTS = new Map([
 ]);
 
 const SCENARIOS: [string, string, number, string, number][] = [
-  ['LIQTEST, A: USDC, L: SOL', 'USDC', 1000 * PRICES.SOL, 'SOL', 999],
-  //['LIQTEST, A: SOL, L: USDC', 'SOL', 1000, 'USDC', 999 * PRICES.SOL],
-  //['LIQTEST, A: BTC, L: SOL', 'BTC', 20, 'SOL', 19 * PRICES.BTC / PRICES.SOL],
+  ['LIQTEST, LIQOR', 'USDC', 1000000, 'USDC', 0],
+  ['LIQTEST, A: USDC, L: SOL', 'USDC', 1000 * PRICES.SOL, 'SOL', 920],
+  ['LIQTEST, A: SOL, L: USDC', 'SOL', 1000, 'USDC', 920 * PRICES.SOL],
+  // TODO: needs the fix on liq+dust to go live
+  //['LIQTEST, A: BTC, L: SOL', 'BTC', 20, 'SOL', 18 * PRICES.BTC / PRICES.SOL],
 ];
 
 async function main() {
@@ -58,7 +60,6 @@ async function main() {
     admin.publicKey,
   );
   let maxAccountNum = Math.max(...accounts.map((a) => a.accountNum));
-  console.log(maxAccountNum);
 
   for (const scenario of SCENARIOS) {
     const [name, assetName, assetAmount, liabName, liabAmount] = scenario;
@@ -83,20 +84,24 @@ async function main() {
     );
     await mangoAccount.reload(client, group);
 
-    // temporarily drop the borrowed token value, so the borrow goes through
-    const oracle = group.banksMap.get(liabName).oracle;
-    await client.stubOracleSet(group, oracle, PRICES[liabName] / 2);
+    if (liabAmount > 0) {
+      // temporarily drop the borrowed token value, so the borrow goes through
+      const oracle = group.banksMap.get(liabName).oracle;
+      try {
+        await client.stubOracleSet(group, oracle, PRICES[liabName] / 2);
 
-    await client.tokenWithdrawNative(
-      group,
-      mangoAccount,
-      liabName,
-      liabAmount,
-      true,
-    );
-
-    // restore the oracle
-    await client.stubOracleSet(group, oracle, PRICES[liabName]);
+        await client.tokenWithdrawNative(
+          group,
+          mangoAccount,
+          liabName,
+          liabAmount,
+          true,
+        );
+      } finally {
+        // restore the oracle
+        await client.stubOracleSet(group, oracle, PRICES[liabName]);
+      }
+    }
   }
 
   process.exit();

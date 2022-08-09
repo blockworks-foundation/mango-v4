@@ -34,10 +34,7 @@ async function main() {
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(group.toString());
 
-  let accounts = await client.getMangoAccountsForOwner(
-    group,
-    admin.publicKey,
-  );
+  let accounts = await client.getMangoAccountsForOwner(group, admin.publicKey);
   for (let account of accounts) {
     console.log(`settling borrows on account: ${account}`);
 
@@ -47,12 +44,7 @@ async function main() {
       const amount = token.native(bank).toNumber();
       if (amount < 0) {
         try {
-          await client.tokenDepositNative(
-            group,
-            account,
-            bank.name,
-            amount,
-          );
+          await client.tokenDepositNative(group, account, bank.name, amount);
           await account.reload(client, group);
         } catch (error) {
           console.log(
@@ -63,10 +55,7 @@ async function main() {
     }
   }
 
-  accounts = await client.getMangoAccountsForOwner(
-    group,
-    admin.publicKey,
-  );
+  accounts = await client.getMangoAccountsForOwner(group, admin.publicKey);
   for (let account of accounts) {
     console.log(`withdrawing deposits of account: ${account}`);
 
