@@ -14,6 +14,8 @@ export class Bank {
   public name: string;
   public depositIndex: I80F48;
   public borrowIndex: I80F48;
+  public indexedDeposits: I80F48;
+  public indexedBorrows: I80F48;
   public cachedIndexedTotalDeposits: I80F48;
   public cachedIndexedTotalBorrows: I80F48;
   public avgUtilization: I80F48;
@@ -24,6 +26,8 @@ export class Bank {
   public util0: I80F48;
   public util1: I80F48;
   public price: I80F48;
+  public loanFeeRate: I80F48;
+  public loanOriginationFeeRate: I80F48;
   public initAssetWeight: I80F48;
   public maintAssetWeight: I80F48;
   public initLiabWeight: I80F48;
@@ -55,8 +59,8 @@ export class Bank {
       rate1: I80F48Dto;
       maxRate: I80F48Dto;
       collectedFeesNative: I80F48Dto;
-      loanOriginationFeeRate: I80F48Dto;
       loanFeeRate: I80F48Dto;
+      loanOriginationFeeRate: I80F48Dto;
       maintAssetWeight: I80F48Dto;
       initAssetWeight: I80F48Dto;
       maintLiabWeight: I80F48Dto;
@@ -94,8 +98,8 @@ export class Bank {
       obj.rate1,
       obj.maxRate,
       obj.collectedFeesNative,
-      obj.loanOriginationFeeRate,
       obj.loanFeeRate,
+      obj.loanOriginationFeeRate,
       obj.maintAssetWeight,
       obj.initAssetWeight,
       obj.maintLiabWeight,
@@ -134,8 +138,8 @@ export class Bank {
     rate1: I80F48Dto,
     maxRate: I80F48Dto,
     collectedFeesNative: I80F48Dto,
-    loanOriginationFeeRate: I80F48Dto,
     loanFeeRate: I80F48Dto,
+    loanOriginationFeeRate: I80F48Dto,
     maintAssetWeight: I80F48Dto,
     initAssetWeight: I80F48Dto,
     maintLiabWeight: I80F48Dto,
@@ -162,6 +166,8 @@ export class Bank {
     this.rate0 = I80F48.from(rate0);
     this.util1 = I80F48.from(util1);
     this.rate1 = I80F48.from(rate1);
+    this.loanFeeRate = I80F48.from(loanFeeRate);
+    this.loanOriginationFeeRate = I80F48.from(loanOriginationFeeRate);
     this.maintAssetWeight = I80F48.from(maintAssetWeight);
     this.initAssetWeight = I80F48.from(initAssetWeight);
     this.maintLiabWeight = I80F48.from(maintLiabWeight);
@@ -211,6 +217,10 @@ export class Bank {
       this.util1.toNumber() +
       '\n rate1 - ' +
       this.rate1.toNumber() +
+      '\n loanFeeRate - ' +
+      this.loanFeeRate.toNumber() +
+      '\n loanOriginationFeeRate - ' +
+      this.loanOriginationFeeRate.toNumber() +
       '\n maintAssetWeight - ' +
       this.maintAssetWeight.toNumber() +
       '\n initAssetWeight - ' +
