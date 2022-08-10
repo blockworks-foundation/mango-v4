@@ -85,8 +85,8 @@ pub fn liq_token_with_token(
         // The main complication here is that we can't keep the liqee_asset_position and liqee_liab_position
         // borrows alive at the same time. Possibly adding get_mut_pair() would be helpful.
         let (liqee_asset_position, liqee_asset_raw_index) = liqee.token_get(asset_token_index)?;
-        let liqee_assets_native = liqee_asset_position.native(asset_bank);
-        require!(liqee_assets_native.is_positive(), MangoError::SomeError);
+        let liqee_asset_native = liqee_asset_position.native(asset_bank);
+        require!(liqee_asset_native.is_positive(), MangoError::SomeError);
 
         let (liqee_liab_position, liqee_liab_raw_index) = liqee.token_get(liab_token_index)?;
         let liqee_liab_native = liqee_liab_position.native(liab_bank);
@@ -115,7 +115,7 @@ pub fn liq_token_with_token(
             / (liab_price * init_liab_weight - init_asset_weight * liab_price_adjusted));
 
         // How much liab can we get at most for the asset balance?
-        let liab_possible = cm!(liqee_assets_native * asset_price / liab_price_adjusted);
+        let liab_possible = cm!(liqee_asset_native * asset_price / liab_price_adjusted);
 
         // The amount of liab native tokens we will transfer
         let liab_transfer = min(
@@ -135,6 +135,7 @@ pub fn liq_token_with_token(
             liqor.token_get_mut_or_create(liab_token_index)?;
         let liqor_liab_active = liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer)?;
         let liqor_liab_position_indexed = liqor_liab_position.indexed_position;
+        let liqee_liab_native_after = liqee_liab_position.native(&liab_bank);
 
         let (liqor_asset_position, liqor_asset_raw_index, _) =
             liqor.token_get_mut_or_create(asset_token_index)?;
@@ -145,10 +146,17 @@ pub fn liq_token_with_token(
         let liqee_asset_active =
             asset_bank.withdraw_without_fee(liqee_asset_position, asset_transfer)?;
         let liqee_asset_position_indexed = liqee_asset_position.indexed_position;
+        let liqee_assets_native_after = liqee_asset_position.native(&asset_bank);
 
         // Update the health cache
-        liqee_health_cache.adjust_token_balance(liab_token_index, liab_transfer)?;
-        liqee_health_cache.adjust_token_balance(asset_token_index, -asset_transfer)?;
+        liqee_health_cache.adjust_token_balance(
+            liab_token_index,
+            cm!(liqee_liab_native_after - liqee_liab_native),
+        )?;
+        liqee_health_cache.adjust_token_balance(
+            asset_token_index,
+            cm!(liqee_assets_native_after - liqee_asset_native),
+        )?;
 
         msg!(
             "liquidated {} liab for {} asset",

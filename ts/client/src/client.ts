@@ -128,10 +128,7 @@ export class MangoClient {
     return group;
   }
 
-  public async getGroupForCreator(
-    creatorPk: PublicKey,
-    groupNum?: number,
-  ): Promise<Group> {
+  public async getGroupsForCreator(creatorPk: PublicKey): Promise<Group[]> {
     const filters: MemcmpFilter[] = [
       {
         memcmp: {
@@ -141,20 +138,25 @@ export class MangoClient {
       },
     ];
 
-    if (groupNum !== undefined) {
-      const bbuf = Buffer.alloc(4);
-      bbuf.writeUInt32LE(groupNum);
-      filters.push({
-        memcmp: {
-          bytes: bs58.encode(bbuf),
-          offset: 40,
-        },
-      });
-    }
-
-    const groups = (await this.program.account.group.all(filters)).map(
-      (tuple) => Group.from(tuple.publicKey, tuple.account),
+    return (await this.program.account.group.all(filters)).map((tuple) =>
+      Group.from(tuple.publicKey, tuple.account),
     );
+  }
+
+  public async getGroupForCreator(
+    creatorPk: PublicKey,
+    groupNum?: number,
+  ): Promise<Group> {
+    const groups = (await this.getGroupsForCreator(creatorPk)).filter(
+      (group) => {
+        if (groupNum !== undefined) {
+          return group.groupNum == groupNum;
+        } else {
+          return true;
+        }
+      },
+    );
+
     await groups[0].reloadAll(this);
     return groups[0];
   }
@@ -472,12 +474,35 @@ export class MangoClient {
     accountNumber?: number,
     name?: string,
   ): Promise<MangoAccount> {
-    let mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
-    if (mangoAccounts.length === 0) {
-      await this.createMangoAccount(group, accountNumber, name);
-      mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
+    // TODO: this function discards accountSize and name when the account exists already!
+    // TODO: this function always creates accounts for this.program.owner, and not
+    //       ownerPk! It needs to get passed a keypair, and we need to add
+    //       createMangoAccountForOwner
+    if (accountNumber === undefined) {
+      // Get any MangoAccount
+      // TODO: should probably sort by accountNum for deterministic output!
+      let mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
+      if (mangoAccounts.length === 0) {
+        await this.createMangoAccount(group, accountNumber, name);
+        mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
+      }
+      return mangoAccounts[0];
+    } else {
+      let account = await this.getMangoAccountForOwner(
+        group,
+        ownerPk,
+        accountNumber,
+      );
+      if (account === undefined) {
+        await this.createMangoAccount(group, accountNumber, name);
+        account = await this.getMangoAccountForOwner(
+          group,
+          ownerPk,
+          accountNumber,
+        );
+      }
+      return account;
     }
-    return mangoAccounts[0];
   }
 
   public async createMangoAccount(
@@ -534,6 +559,16 @@ export class MangoClient {
     return MangoAccount.from(
       mangoAccount.publicKey,
       await this.program.account.mangoAccount.fetch(mangoAccount.publicKey),
+    );
+  }
+
+  public async getMangoAccountForOwner(
+    group: Group,
+    ownerPk: PublicKey,
+    accountNumber: number,
+  ): Promise<MangoAccount> {
+    return (await this.getMangoAccountsForOwner(group, ownerPk)).find(
+      (a) => a.accountNum == accountNumber,
     );
   }
 
@@ -623,6 +658,22 @@ export class MangoClient {
     amount: number,
   ): Promise<TransactionSignature> {
     const bank = group.banksMap.get(tokenName)!;
+    const nativeAmount = toNativeDecimals(amount, bank.mintDecimals).toNumber();
+    return await this.tokenDepositNative(
+      group,
+      mangoAccount,
+      tokenName,
+      nativeAmount,
+    );
+  }
+
+  public async tokenDepositNative(
+    group: Group,
+    mangoAccount: MangoAccount,
+    tokenName: string,
+    nativeAmount: number,
+  ) {
+    const bank = group.banksMap.get(tokenName)!;
 
     const tokenAccountPk = await getAssociatedTokenAddress(
       bank.mint,
@@ -635,7 +686,7 @@ export class MangoClient {
     const additionalSigners: Signer[] = [];
     if (bank.mint.equals(WRAPPED_SOL_MINT)) {
       wrappedSolAccount = new Keypair();
-      const lamports = Math.round(amount * LAMPORTS_PER_SOL) + 1e7;
+      const lamports = nativeAmount + 1e7;
 
       preInstructions = [
         SystemProgram.createAccount({
@@ -670,7 +721,7 @@ export class MangoClient {
       );
 
     return await this.program.methods
-      .tokenDeposit(toNativeDecimals(amount, bank.mintDecimals))
+      .tokenDeposit(new BN(nativeAmount))
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -699,45 +750,14 @@ export class MangoClient {
     allowBorrow: boolean,
   ): Promise<TransactionSignature> {
     const bank = group.banksMap.get(tokenName)!;
-
-    const tokenAccountPk = await getAssociatedTokenAddress(
-      bank.mint,
-      mangoAccount.owner,
+    const nativeAmount = toNativeDecimals(amount, bank.mintDecimals).toNumber();
+    return await this.tokenWithdrawNative(
+      group,
+      mangoAccount,
+      tokenName,
+      nativeAmount,
+      allowBorrow,
     );
-
-    const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
-        group,
-        [mangoAccount],
-        [bank],
-      );
-
-    return await this.program.methods
-      .tokenWithdraw(toNativeDecimals(amount, bank.mintDecimals), allowBorrow)
-      .accounts({
-        group: group.publicKey,
-        account: mangoAccount.publicKey,
-        bank: bank.publicKey,
-        vault: bank.vault,
-        tokenAccount: tokenAccountPk,
-        owner: mangoAccount.owner,
-      })
-      .remainingAccounts(
-        healthRemainingAccounts.map(
-          (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
-        ),
-      )
-      .preInstructions([
-        // ensure withdraws don't fail with missing ATAs
-        await createAssociatedTokenAccountIdempotentInstruction(
-          mangoAccount.owner,
-          mangoAccount.owner,
-          bank.mint,
-        ),
-      ])
-      .rpc({ skipPreflight: true });
   }
 
   public async tokenWithdrawNative(
@@ -778,6 +798,14 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
+      .preInstructions([
+        // ensure withdraws don't fail with missing ATAs
+        await createAssociatedTokenAccountIdempotentInstruction(
+          mangoAccount.owner,
+          mangoAccount.owner,
+          bank.mint,
+        ),
+      ])
       .rpc({ skipPreflight: true });
   }
 

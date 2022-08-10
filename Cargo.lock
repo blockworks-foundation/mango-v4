@@ -1276,6 +1276,7 @@ dependencies = [
  "solana-account-decoder",
  "solana-client",
  "solana-sdk",
+ "spl-associated-token-account",
  "thiserror",
  "tokio",
 ]

@@ -1,12 +1,19 @@
+use std::time::Duration;
+
 use crate::account_shared_data::KeyedAccountSharedData;
 
 use client::{chain_data, AccountFetcher, MangoClient, MangoClientError, MangoGroupContext};
 use mango_v4::state::{
     new_health_cache, oracle_price, Bank, FixedOrderAccountRetriever, HealthCache, HealthType,
-    MangoAccountValue, TokenIndex,
+    MangoAccountValue, TokenIndex, QUOTE_TOKEN_INDEX,
 };
 
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
+
+pub struct Config {
+    pub min_health_ratio: f64,
+    pub refresh_timeout: Duration,
+}
 
 pub fn new_health_cache_(
     context: &MangoGroupContext,
@@ -36,14 +43,68 @@ pub fn new_health_cache_(
     new_health_cache(&account.borrow(), &retriever).context("make health cache")
 }
 
+pub fn jupiter_market_can_buy(
+    mango_client: &MangoClient,
+    token: TokenIndex,
+    quote_token: TokenIndex,
+) -> bool {
+    if token == quote_token {
+        return true;
+    }
+    let token_mint = mango_client.context.token(token).mint_info.mint;
+    let quote_token_mint = mango_client.context.token(quote_token).mint_info.mint;
+
+    // Consider a market alive if we can swap $10 worth at 1% slippage
+    // TODO: configurable
+    // TODO: cache this, no need to recheck often
+    let quote_amount = 10_000_000u64;
+    let slippage = 1.0;
+    mango_client
+        .jupiter_route(
+            quote_token_mint,
+            token_mint,
+            quote_amount,
+            slippage,
+            client::JupiterSwapMode::ExactIn,
+        )
+        .is_ok()
+}
+
+pub fn jupiter_market_can_sell(
+    mango_client: &MangoClient,
+    token: TokenIndex,
+    quote_token: TokenIndex,
+) -> bool {
+    if token == quote_token {
+        return true;
+    }
+    let token_mint = mango_client.context.token(token).mint_info.mint;
+    let quote_token_mint = mango_client.context.token(quote_token).mint_info.mint;
+
+    // Consider a market alive if we can swap $10 worth at 1% slippage
+    // TODO: configurable
+    // TODO: cache this, no need to recheck often
+    let quote_amount = 10_000_000u64;
+    let slippage = 1.0;
+    mango_client
+        .jupiter_route(
+            token_mint,
+            quote_token_mint,
+            quote_amount,
+            slippage,
+            client::JupiterSwapMode::ExactOut,
+        )
+        .is_ok()
+}
+
 #[allow(clippy::too_many_arguments)]
-pub fn process_account(
+pub fn maybe_liquidate_account(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     pubkey: &Pubkey,
-) -> anyhow::Result<()> {
-    // TODO: configurable
-    let min_health_ratio = I80F48::from_num(50.0f64);
+    config: &Config,
+) -> anyhow::Result<bool> {
+    let min_health_ratio = I80F48::from_num(config.min_health_ratio);
     let quote_token_index = 0;
 
     let account = account_fetcher.fetch_mango_account(pubkey)?;
@@ -52,7 +113,7 @@ pub fn process_account(
         .health(HealthType::Maint);
 
     if maint_health >= 0 && !account.is_bankrupt() {
-        return Ok(());
+        return Ok(false);
     }
 
     log::trace!(
@@ -85,11 +146,11 @@ pub fn process_account(
             )?;
             Ok((
                 token_position.token_index,
-                bank,
+                price,
                 token_position.native(&bank) * price,
             ))
         })
-        .collect::<anyhow::Result<Vec<(TokenIndex, Bank, I80F48)>>>()?;
+        .collect::<anyhow::Result<Vec<(TokenIndex, I80F48, I80F48)>>>()?;
     tokens.sort_by(|a, b| a.2.cmp(&b.2));
 
     let get_max_liab_transfer = |source, target| -> anyhow::Result<I80F48> {
@@ -111,31 +172,69 @@ pub fn process_account(
     };
 
     // try liquidating
-    if account.is_bankrupt() {
+    let txsig = if account.is_bankrupt() {
         if tokens.is_empty() {
             anyhow::bail!("mango account {}, is bankrupt has no active tokens", pubkey);
         }
-        let (liab_token_index, _liab_bank, _liab_price) = tokens.first().unwrap();
+        let liab_token_index = tokens
+            .iter()
+            .find(|(liab_token_index, _liab_price, liab_usdc_equivalent)| {
+                liab_usdc_equivalent.is_negative()
+                    && jupiter_market_can_buy(mango_client, *liab_token_index, QUOTE_TOKEN_INDEX)
+            })
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "mango account {}, has no liab tokens that are purchasable for USDC: {:?}",
+                    pubkey,
+                    tokens
+                )
+            })?
+            .0;
 
-        let max_liab_transfer = get_max_liab_transfer(*liab_token_index, quote_token_index)?;
+        let max_liab_transfer = get_max_liab_transfer(liab_token_index, quote_token_index)?;
 
         let sig = mango_client
-            .liq_token_bankruptcy((pubkey, &account), *liab_token_index, max_liab_transfer)
+            .liq_token_bankruptcy((pubkey, &account), liab_token_index, max_liab_transfer)
             .context("sending liq_token_bankruptcy")?;
         log::info!(
-            "Liquidated bankruptcy for {}..., maint_health was {}, tx sig {:?}",
-            &pubkey.to_string()[..3],
+            "Liquidated bankruptcy for {}, maint_health was {}, tx sig {:?}",
+            pubkey,
             maint_health,
             sig
         );
+        sig
     } else if maint_health.is_negative() {
-        if tokens.len() < 2 {
-            anyhow::bail!("mango account {}, has less than 2 active tokens", pubkey);
-        }
-        let (asset_token_index, _asset_bank, _asset_price) = tokens.last().unwrap();
-        let (liab_token_index, _liab_bank, _liab_price) = tokens.first().unwrap();
+        let asset_token_index = tokens
+            .iter()
+            .rev()
+            .find(|(asset_token_index, _asset_price, asset_usdc_equivalent)| {
+                asset_usdc_equivalent.is_positive()
+                    && jupiter_market_can_sell(mango_client, *asset_token_index, QUOTE_TOKEN_INDEX)
+            })
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "mango account {}, has no asset tokens that are sellable for USDC: {:?}",
+                    pubkey,
+                    tokens
+                )
+            })?
+            .0;
+        let liab_token_index = tokens
+            .iter()
+            .find(|(liab_token_index, _liab_price, liab_usdc_equivalent)| {
+                liab_usdc_equivalent.is_negative()
+                    && jupiter_market_can_buy(mango_client, *liab_token_index, QUOTE_TOKEN_INDEX)
+            })
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "mango account {}, has no liab tokens that are purchasable for USDC: {:?}",
+                    pubkey,
+                    tokens
+                )
+            })?
+            .0;
 
-        let max_liab_transfer = get_max_liab_transfer(*liab_token_index, *asset_token_index)
+        let max_liab_transfer = get_max_liab_transfer(liab_token_index, asset_token_index)
             .context("getting max_liab_transfer")?;
 
         //
@@ -146,29 +245,43 @@ pub fn process_account(
         let sig = mango_client
             .liq_token_with_token(
                 (pubkey, &account),
-                *asset_token_index,
-                *liab_token_index,
+                asset_token_index,
+                liab_token_index,
                 max_liab_transfer,
             )
             .context("sending liq_token_with_token")?;
         log::info!(
-            "Liquidated token with token for {}..., maint_health was {}, tx sig {:?}",
-            &pubkey.to_string()[..3],
+            "Liquidated token with token for {}, maint_health was {}, tx sig {:?}",
+            pubkey,
             maint_health,
             sig
         );
+        sig
+    } else {
+        return Ok(false);
+    };
+
+    let slot = account_fetcher.transaction_max_slot(&[txsig])?;
+    if let Err(e) = account_fetcher.refresh_accounts_via_rpc_until_slot(
+        &[*pubkey, mango_client.mango_account_address],
+        slot,
+        config.refresh_timeout,
+    ) {
+        log::info!("could not refresh after liquidation: {}", e);
     }
-    Ok(())
+
+    Ok(true)
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn process_accounts<'a>(
+pub fn maybe_liquidate_one<'a>(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     accounts: impl Iterator<Item = &'a Pubkey>,
-) -> anyhow::Result<()> {
+    config: &Config,
+) -> bool {
     for pubkey in accounts {
-        match process_account(mango_client, account_fetcher, pubkey) {
+        match maybe_liquidate_account(mango_client, account_fetcher, pubkey, config) {
             Err(err) => {
                 // Not all errors need to be raised to the user's attention.
                 let mut log_level = log::Level::Error;
@@ -185,9 +298,10 @@ pub fn process_accounts<'a>(
                 };
                 log::log!(log_level, "liquidating account {}: {:?}", pubkey, err);
             }
+            Ok(true) => return true,
             _ => {}
         };
     }
 
-    Ok(())
+    false
 }

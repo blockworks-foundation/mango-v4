@@ -1,4 +1,6 @@
 use std::sync::{Arc, RwLock};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use crate::chain_data::*;
 
@@ -11,7 +13,9 @@ use anyhow::Context;
 
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
+use solana_sdk::clock::Slot;
 use solana_sdk::pubkey::Pubkey;
+use solana_sdk::signature::Signature;
 
 pub struct AccountFetcher {
     pub chain_data: Arc<RwLock<ChainData>>,
@@ -66,11 +70,12 @@ impl AccountFetcher {
             .clone())
     }
 
-    pub fn refresh_account_via_rpc(&self, address: &Pubkey) -> anyhow::Result<()> {
+    pub fn refresh_account_via_rpc(&self, address: &Pubkey) -> anyhow::Result<Slot> {
         let response = self
             .rpc
             .get_account_with_commitment(&address, self.rpc.commitment())
             .with_context(|| format!("refresh account {} via rpc", address))?;
+        let slot = response.context.slot;
         let account = response
             .value
             .ok_or(anchor_client::ClientError::AccountNotFound)
@@ -85,6 +90,43 @@ impl AccountFetcher {
             },
         );
 
+        Ok(slot)
+    }
+
+    /// Return the maximum slot reported for the processing of the signatures
+    pub fn transaction_max_slot(&self, signatures: &[Signature]) -> anyhow::Result<Slot> {
+        let statuses = self.rpc.get_signature_statuses(signatures)?.value;
+        Ok(statuses
+            .iter()
+            .map(|status_opt| status_opt.as_ref().map(|status| status.slot).unwrap_or(0))
+            .max()
+            .unwrap_or(0))
+    }
+
+    /// Return success once all addresses have data >= min_slot
+    pub fn refresh_accounts_via_rpc_until_slot(
+        &self,
+        addresses: &[Pubkey],
+        min_slot: Slot,
+        timeout: Duration,
+    ) -> anyhow::Result<()> {
+        let start = Instant::now();
+        for address in addresses {
+            loop {
+                if start.elapsed() > timeout {
+                    anyhow::bail!(
+                        "timeout while waiting for data for {} that's newer than slot {}",
+                        address,
+                        min_slot
+                    );
+                }
+                let data_slot = self.refresh_account_via_rpc(address)?;
+                if data_slot >= min_slot {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(500));
+            }
+        }
         Ok(())
     }
 }
