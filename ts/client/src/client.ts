@@ -725,6 +725,14 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
+      .preInstructions([
+        // ensure withdraws don't fail with missing ATAs
+        await createAssociatedTokenAccountIdempotentInstruction(
+          mangoAccount.owner,
+          mangoAccount.owner,
+          bank.mint,
+        ),
+      ])
       .rpc({ skipPreflight: true });
   }
 
