@@ -395,6 +395,57 @@ impl MangoClient {
             .map_err(prettify_client_error)
     }
 
+    pub fn token_withdraw(
+        &self,
+        mint: Pubkey,
+        amount: u64,
+        allow_borrow: bool,
+    ) -> anyhow::Result<Signature> {
+        let token = self.context.token_by_mint(&mint)?;
+        let token_index = token.token_index;
+        let mint_info = token.mint_info;
+
+        let health_check_metas =
+            self.derive_health_check_remaining_account_metas(vec![token_index], false)?;
+
+        self.program()
+            .request()
+            .instruction(create_associated_token_account_idempotent(
+                &self.owner(),
+                &self.owner(),
+                &mint,
+            ))
+            .instruction(Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        &mango_v4::accounts::TokenWithdraw {
+                            group: self.group(),
+                            account: self.mango_account_address,
+                            owner: self.owner(),
+                            bank: mint_info.first_bank(),
+                            vault: mint_info.first_vault(),
+                            token_account: get_associated_token_address(
+                                &self.owner(),
+                                &mint_info.mint,
+                            ),
+                            token_program: Token::id(),
+                        },
+                        None,
+                    );
+                    ams.extend(health_check_metas.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(&mango_v4::instruction::TokenWithdraw {
+                    amount,
+                    allow_borrow,
+                }),
+            })
+            .signer(&self.owner)
+            .send()
+            .map_err(prettify_client_error)
+    }
+
     pub fn get_oracle_price(
         &self,
         token_name: &str,
