@@ -2,12 +2,8 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { HealthType } from '../accounts/mangoAccount';
-import { MangoClient } from '../index';
+import { MangoClient, MANGO_V4_ID } from '../index';
 import { toUiDecimals } from '../utils';
-
-//
-// example script shows usage of ids json (saves havint to do gpa)
-//
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
@@ -20,9 +16,10 @@ async function main() {
   );
   const userWallet = new Wallet(user);
   const userProvider = new AnchorProvider(connection, userWallet, options);
-  const client = await MangoClient.connectForGroupName(
+  const client = await MangoClient.connect(
     userProvider,
-    'mainnet-beta.microwavedcola' /* Use ids json instead of getProgramAccounts */,
+    'mainnet-beta',
+    MANGO_V4_ID['mainnet-beta'],
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
@@ -45,7 +42,7 @@ async function main() {
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString(group));
 
-  if (false) {
+  if (true) {
     console.log(`...depositing 10 USDC`);
     await client.tokenDeposit(group, mangoAccount, 'USDC', 10);
     await mangoAccount.reload(client, group);
@@ -89,14 +86,6 @@ async function main() {
         ).toNumber(),
       ),
   );
-  // let withdraw = mangoAccount
-  //   .getNative(group.banksMap.get('SOL')!)
-  //   .add(mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL'))
-  //   .toNumber();
-  // console.log(` Withdrawing ${toUiDecimals(withdraw)} SOL`);
-  // await client.tokenWithdraw2(group, mangoAccount, 'SOL', withdraw, true);
-  // console.log(` Depositing ${toUiDecimals(withdraw)} SOL`);
-  // await client.tokenDeposit(group, mangoAccount, 'SOL', withdraw);
 
   console.log(
     "mangoAccount.getMaxSourceForTokenSwap(group, 'USDC', 'BTC') " +
