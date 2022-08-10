@@ -136,7 +136,7 @@ export class MangoClient {
       },
     ];
 
-    if (groupNum) {
+    if (groupNum !== undefined) {
       const bbuf = Buffer.alloc(4);
       bbuf.writeUInt32LE(groupNum);
       filters.push({

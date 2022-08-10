@@ -151,6 +151,8 @@ export class Bank {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.depositIndex = I80F48.from(depositIndex);
     this.borrowIndex = I80F48.from(borrowIndex);
+    this.indexedDeposits = I80F48.from(indexedDeposits);
+    this.indexedBorrows = I80F48.from(indexedBorrows);
     this.cachedIndexedTotalDeposits = I80F48.from(indexedTotalDeposits);
     this.cachedIndexedTotalBorrows = I80F48.from(indexedTotalBorrows);
     this.avgUtilization = I80F48.from(avgUtilization);
@@ -171,14 +173,22 @@ export class Bank {
   toString(): string {
     return (
       'Bank ' +
+      '\n public key - ' +
+      this.publicKey.toBase58() +
       '\n token index - ' +
       this.tokenIndex +
       '\n token name - ' +
       this.name +
+      '\n vault - ' +
+      this.vault.toBase58() +
       '\n deposit index - ' +
       this.depositIndex.toNumber() +
       '\n borrow index - ' +
       this.borrowIndex.toNumber() +
+      '\n indexedDeposits - ' +
+      this.indexedDeposits.toNumber() +
+      '\n indexedBorrows - ' +
+      this.indexedBorrows.toNumber() +
       '\n cachedIndexedTotalDeposits - ' +
       this.cachedIndexedTotalDeposits.toNumber() +
       '\n cachedIndexedTotalBorrows - ' +
