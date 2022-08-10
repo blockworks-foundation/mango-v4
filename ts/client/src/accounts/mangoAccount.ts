@@ -390,7 +390,7 @@ export class TokenPosition {
   ) {}
 
   public isActive(): boolean {
-    return this.tokenIndex !== 65535;
+    return this.tokenIndex !== TokenPosition.TokenIndexUnset;
   }
 
   public native(bank: Bank): I80F48 {
@@ -454,7 +454,7 @@ export class TokenPositionDto {
 
 export class Serum3Orders {
   static Serum3MarketIndexUnset = 65535;
-  static from(dto: Serum3PositionDto) {
+  static from(dto: Serum3PositionDto): Serum3Orders {
     return new Serum3Orders(
       dto.openOrders,
       dto.marketIndex,

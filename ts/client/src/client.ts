@@ -30,7 +30,11 @@ import bs58 from 'bs58';
 import { Bank, MintInfo } from './accounts/bank';
 import { Group } from './accounts/group';
 import { I80F48 } from './accounts/I80F48';
-import { MangoAccount, MangoAccountData } from './accounts/mangoAccount';
+import {
+  MangoAccount,
+  MangoAccountData,
+  TokenPosition,
+} from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
 import { OrderType, PerpMarket, Side } from './accounts/perp';
 import {
@@ -1663,7 +1667,7 @@ export class MangoClient {
     group: Group,
     mangoAccounts: MangoAccount[],
     banks?: Bank[] /** TODO for serum3PlaceOrder we are just ingoring this atm */,
-  ) {
+  ): PublicKey[] {
     if (retriever === AccountRetriever.Fixed) {
       return this.buildFixedAccountRetrieverHealthAccounts(
         group,
@@ -1683,22 +1687,29 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     banks?: Bank[] /** TODO for serum3PlaceOrder we are just ingoring this atm */,
-  ) {
+  ): PublicKey[] {
     const healthRemainingAccounts: PublicKey[] = [];
 
-    const tokenIndices = mangoAccount.tokens
-      .filter((token) => token.tokenIndex !== 65535)
-      .map((token) => token.tokenIndex);
-
-    if (banks?.length) {
+    const allTokenIndices = mangoAccount.tokens.map(
+      (token) => token.tokenIndex,
+    );
+    if (banks) {
       for (const bank of banks) {
-        tokenIndices.push(bank.tokenIndex);
+        if (allTokenIndices.indexOf(bank.tokenIndex) < 0) {
+          allTokenIndices[
+            mangoAccount.tokens.findIndex(
+              (token, index) =>
+                !token.isActive() &&
+                allTokenIndices[index] == TokenPosition.TokenIndexUnset,
+            )
+          ] = bank.tokenIndex;
+        }
       }
     }
+    const mintInfos = allTokenIndices
+      .filter((index) => index != TokenPosition.TokenIndexUnset)
+      .map((tokenIndex) => group.mintInfosMap.get(tokenIndex)!);
 
-    const mintInfos = [...new Set(tokenIndices)].map(
-      (tokenIndex) => group.mintInfosMap.get(tokenIndex)!,
-    );
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.firstBank()),
     );
@@ -1728,7 +1739,7 @@ export class MangoClient {
     group: Group,
     mangoAccounts: MangoAccount[],
     banks?: Bank[] /** TODO for serum3PlaceOrder we are just ingoring this atm */,
-  ) {
+  ): PublicKey[] {
     const healthRemainingAccounts: PublicKey[] = [];
 
     let tokenIndices = [];
