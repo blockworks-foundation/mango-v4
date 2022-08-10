@@ -353,7 +353,11 @@ export class MangoAccount {
         ? res +
           '\n tokens:' +
           JSON.stringify(
-            this.tokensActive().map((token) => token.toString(group)),
+            this.tokens.map((token, i) =>
+              token.isActive()
+                ? token.toString(group, i)
+                : `index: ${i} - empty slot`,
+            ),
             null,
             4,
           )
@@ -419,7 +423,7 @@ export class TokenPosition {
     ).toNumber();
   }
 
-  public toString(group?: Group): string {
+  public toString(group?: Group, index?: number): string {
     let extra = '';
     if (group) {
       const bank = group.findBank(this.tokenIndex);
@@ -432,7 +436,8 @@ export class TokenPosition {
     }
 
     return (
-      'tokenIndex: ' +
+      (index !== undefined ? 'index: ' + index : '') +
+      ', tokenIndex: ' +
       this.tokenIndex +
       ', inUseCount: ' +
       this.inUseCount +

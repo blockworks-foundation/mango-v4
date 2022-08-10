@@ -9,7 +9,16 @@ import { toUiDecimals } from '../utils';
 async function debugUser(client, group, mangoAccount) {
   console.log(mangoAccount.toString(group));
   await mangoAccount.reload(client, group);
-
+  console.log(
+    'buildFixedAccountRetrieverHealthAccounts ' +
+      client
+        .buildFixedAccountRetrieverHealthAccounts(group, mangoAccount, [
+          group.banksMap.get('BTC'),
+          group.banksMap.get('USDC'),
+        ])
+        .map((pk) => pk.toBase58())
+        .join(', '),
+  );
   console.log(
     'mangoAccount.getEquity() ' +
       toUiDecimals(mangoAccount.getEquity().toNumber()),
