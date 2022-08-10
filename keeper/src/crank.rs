@@ -64,7 +64,7 @@ pub async fn loop_update_index_and_rate(
     mango_client: Arc<MangoClient>,
     token_indices: Vec<TokenIndex>,
 ) {
-    let mut interval = time::interval(Duration::from_secs(5));
+    let mut interval = time::interval(Duration::from_secs(60));
     loop {
         interval.tick().await;
 
