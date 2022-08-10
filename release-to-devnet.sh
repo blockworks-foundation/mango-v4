@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e pipefail
+set -ex pipefail
 
 WALLET_WITH_FUNDS=~/.config/solana/mango-devnet.json
 PROGRAM_ID=m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD

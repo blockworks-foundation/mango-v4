@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e pipefail
+set -ex pipefail
 
 WALLET_WITH_FUNDS=~/.config/solana/mango-mainnet.json
 PROGRAM_ID=m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD
@@ -19,11 +19,11 @@ cp -v ./target/types/mango_v4.ts ./ts/client/src/mango_v4.ts
 
 if [[ -z "${NO_DEPLOY}" ]]; then
     # publish program
-    solana --url $CLUSTER_URL program deploy --program-id $PROGRAM_ID  \
+    solana --url $MB_CLUSTER_URL program deploy --program-id $PROGRAM_ID  \
         -k $WALLET_WITH_FUNDS target/deploy/mango_v4.so
 
     # publish idl
-    cargo run -p anchor-cli -- idl upgrade --provider.cluster $CLUSTER_URL --provider.wallet $WALLET_WITH_FUNDS \
+    cargo run -p anchor-cli -- idl upgrade --provider.cluster $MB_CLUSTER_URL --provider.wallet $WALLET_WITH_FUNDS \
         --filepath target/idl/mango_v4.json $PROGRAM_ID
 else
     echo "Skipping deployment..."
