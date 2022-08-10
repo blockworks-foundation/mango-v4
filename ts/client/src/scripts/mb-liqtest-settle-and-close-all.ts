@@ -44,7 +44,12 @@ async function main() {
       const amount = token.native(bank).toNumber();
       if (amount < 0) {
         try {
-          await client.tokenDepositNative(group, account, bank.name, Math.ceil(-amount));
+          await client.tokenDepositNative(
+            group,
+            account,
+            bank.name,
+            Math.ceil(-amount),
+          );
           await account.reload(client, group);
         } catch (error) {
           console.log(
