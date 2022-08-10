@@ -395,6 +395,57 @@ impl MangoClient {
             .map_err(prettify_client_error)
     }
 
+    pub fn token_withdraw(
+        &self,
+        mint: Pubkey,
+        amount: u64,
+        allow_borrow: bool,
+    ) -> anyhow::Result<Signature> {
+        let token = self.context.token_by_mint(&mint)?;
+        let token_index = token.token_index;
+        let mint_info = token.mint_info;
+
+        let health_check_metas =
+            self.derive_health_check_remaining_account_metas(vec![token_index], false)?;
+
+        self.program()
+            .request()
+            .instruction(create_associated_token_account_idempotent(
+                &self.owner(),
+                &self.owner(),
+                &mint,
+            ))
+            .instruction(Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        &mango_v4::accounts::TokenWithdraw {
+                            group: self.group(),
+                            account: self.mango_account_address,
+                            owner: self.owner(),
+                            bank: mint_info.first_bank(),
+                            vault: mint_info.first_vault(),
+                            token_account: get_associated_token_address(
+                                &self.owner(),
+                                &mint_info.mint,
+                            ),
+                            token_program: Token::id(),
+                        },
+                        None,
+                    );
+                    ams.extend(health_check_metas.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(&mango_v4::instruction::TokenWithdraw {
+                    amount,
+                    allow_borrow,
+                }),
+            })
+            .signer(&self.owner)
+            .send()
+            .map_err(prettify_client_error)
+    }
+
     pub fn get_oracle_price(
         &self,
         token_name: &str,
@@ -837,33 +888,50 @@ impl MangoClient {
         &self,
         input_mint: Pubkey,
         output_mint: Pubkey,
-        source_amount: u64,
+        amount: u64,
         slippage: f64,
+        swap_mode: JupiterSwapMode,
     ) -> anyhow::Result<Signature> {
-        self.invoke(self.jupiter_swap_async(input_mint, output_mint, source_amount, slippage))
+        self.invoke(self.jupiter_swap_async(input_mint, output_mint, amount, slippage, swap_mode))
     }
 
-    // Not actually fully async, since it uses the blocking RPC client to send the actual tx
-    pub async fn jupiter_swap_async(
+    pub fn jupiter_route(
         &self,
         input_mint: Pubkey,
         output_mint: Pubkey,
-        source_amount: u64,
+        amount: u64,
         slippage: f64,
-    ) -> anyhow::Result<Signature> {
-        let source_token = self.context.token_by_mint(&input_mint)?;
-        let target_token = self.context.token_by_mint(&output_mint)?;
+        swap_mode: JupiterSwapMode,
+    ) -> anyhow::Result<jupiter::QueryRoute> {
+        self.invoke(self.jupiter_route_async(input_mint, output_mint, amount, slippage, swap_mode))
+    }
 
+    pub async fn jupiter_route_async(
+        &self,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        amount: u64,
+        slippage: f64,
+        swap_mode: JupiterSwapMode,
+    ) -> anyhow::Result<jupiter::QueryRoute> {
         let quote = self
             .http_client
             .get("https://quote-api.jup.ag/v1/quote")
             .query(&[
                 ("inputMint", input_mint.to_string()),
                 ("outputMint", output_mint.to_string()),
-                ("amount", format!("{}", source_amount)),
+                ("amount", format!("{}", amount)),
                 ("onlyDirectRoutes", "true".into()),
                 ("filterTopNResult", "10".into()),
                 ("slippage", format!("{}", slippage)),
+                (
+                    "swapMode",
+                    match swap_mode {
+                        JupiterSwapMode::ExactIn => "ExactIn",
+                        JupiterSwapMode::ExactOut => "ExactOut",
+                    }
+                    .into(),
+                ),
             ])
             .send()
             .await
@@ -888,6 +956,23 @@ impl MangoClient {
                     quote.data.len()
                 )
             })?;
+
+        Ok(route.clone())
+    }
+
+    pub async fn jupiter_swap_async(
+        &self,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        amount: u64,
+        slippage: f64,
+        swap_mode: JupiterSwapMode,
+    ) -> anyhow::Result<Signature> {
+        let source_token = self.context.token_by_mint(&input_mint)?;
+        let target_token = self.context.token_by_mint(&output_mint)?;
+        let route = self
+            .jupiter_route_async(input_mint, output_mint, amount, slippage, swap_mode)
+            .await?;
 
         let swap = self
             .http_client
@@ -919,19 +1004,12 @@ impl MangoClient {
                     .context("base64 decoding jupiter transaction")?,
             )
             .context("parsing jupiter transaction")?;
+        let ata_program = anchor_spl::associated_token::ID;
+        let token_program = anchor_spl::token::ID;
+        let is_setup_ix = |k: Pubkey| -> bool { k == ata_program || k == token_program };
         let jup_ixs = deserialize_instructions(&jup_tx.message)
             .into_iter()
-            // TODO: possibly creating associated token accounts if they don't exist yet is good?!
-            // we could squeeze the FlashLoan instructions in the middle:
-            //   - beginning AToken...
-            //   - FlashLoanBegin
-            //   - other JUP ix
-            //   - FlashLoanEnd
-            //   - ending AToken
-            .filter(|ix| {
-                ix.program_id
-                    != Pubkey::from_str("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL").unwrap()
-            })
+            .filter(|ix| !is_setup_ix(ix.program_id))
             .collect::<Vec<_>>();
 
         let bank_ams = [
@@ -962,7 +1040,14 @@ impl MangoClient {
             })
             .collect::<Vec<_>>();
 
-        let loan_amounts = vec![source_amount, 0u64];
+        let loan_amounts = vec![
+            match swap_mode {
+                JupiterSwapMode::ExactIn => amount,
+                // in amount + slippage
+                JupiterSwapMode::ExactOut => route.other_amount_threshold,
+            },
+            0u64,
+        ];
 
         // This relies on the fact that health account banks will be identical to the first_bank above!
         let health_ams = self
@@ -973,7 +1058,19 @@ impl MangoClient {
             .context("building health accounts")?;
 
         let program = self.program();
-        let mut builder = program.request().instruction(Instruction {
+        let mut builder = program.request();
+
+        builder = builder.instruction(create_associated_token_account_idempotent(
+            &self.owner.pubkey(),
+            &self.owner.pubkey(),
+            &source_token.mint_info.mint,
+        ));
+        builder = builder.instruction(create_associated_token_account_idempotent(
+            &self.owner.pubkey(),
+            &self.owner.pubkey(),
+            &target_token.mint_info.mint,
+        ));
+        builder = builder.instruction(Instruction {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
@@ -994,7 +1091,7 @@ impl MangoClient {
             }),
         });
         for ix in jup_ixs {
-            builder = builder.instruction(ix);
+            builder = builder.instruction(ix.clone());
         }
         builder = builder.instruction(Instruction {
             program_id: mango_v4::id(),
@@ -1094,6 +1191,12 @@ pub fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
     err.into()
 }
 
+#[derive(Clone, Copy)]
+pub enum JupiterSwapMode {
+    ExactIn,
+    ExactOut,
+}
+
 pub fn keypair_from_cli(keypair: &str) -> Keypair {
     let maybe_keypair = keypair::read_keypair(&mut keypair.as_bytes());
     match maybe_keypair {
@@ -1127,4 +1230,18 @@ fn to_writable_account_meta(pubkey: Pubkey) -> AccountMeta {
         is_writable: true,
         is_signer: false,
     }
+}
+
+// FUTURE: use spl_associated_token_account::instruction::create_associated_token_account_idempotent
+// Right now anchor depends on an earlier version of this package...
+fn create_associated_token_account_idempotent(
+    funder: &Pubkey,
+    owner: &Pubkey,
+    mint: &Pubkey,
+) -> Instruction {
+    let mut instr = spl_associated_token_account::instruction::create_associated_token_account(
+        funder, owner, mint,
+    );
+    instr.data = vec![0x1]; // CreateIdempotent
+    instr
 }

@@ -176,7 +176,13 @@ fn main() -> Result<(), anyhow::Error> {
             let input_mint = client::pubkey_from_cli(&cmd.input_mint);
             let output_mint = client::pubkey_from_cli(&cmd.output_mint);
             let client = MangoClient::new_for_existing_account(client, account, owner)?;
-            let txsig = client.jupiter_swap(input_mint, output_mint, cmd.amount, cmd.slippage)?;
+            let txsig = client.jupiter_swap(
+                input_mint,
+                output_mint,
+                cmd.amount,
+                cmd.slippage,
+                client::JupiterSwapMode::ExactIn,
+            )?;
             println!("{}", txsig);
         }
         Command::GroupAddress { creator, num } => {

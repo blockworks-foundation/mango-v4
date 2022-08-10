@@ -57,7 +57,7 @@ pub struct Config {
 
 async fn feed_data(
     config: &Config,
-    mango_pyth_oracles: Vec<Pubkey>,
+    mango_oracles: Vec<Pubkey>,
     sender: async_channel::Sender<Message>,
 ) -> anyhow::Result<()> {
     let connect = ws::try_connect::<RpcSolPubSubClient>(&config.rpc_ws_url).map_err_anyhow()?;
@@ -99,10 +99,9 @@ async fn feed_data(
             Some(all_accounts_config.clone()),
         )
         .map_err_anyhow()?;
-    // TODO: mango_pyth_oracles should not contain stub mango_pyth_oracles, since they already sub'ed with mango_sub
-    let mut mango_pyth_oracles_sub_map = StreamMap::new();
-    for oracle in mango_pyth_oracles.into_iter() {
-        mango_pyth_oracles_sub_map.insert(
+    let mut mango_oracles_sub_map = StreamMap::new();
+    for oracle in mango_oracles.into_iter() {
+        mango_oracles_sub_map.insert(
             oracle,
             client
                 .account_subscribe(
@@ -136,13 +135,13 @@ async fn feed_data(
                     return Ok(());
                 }
             },
-            message = mango_pyth_oracles_sub_map.next() => {
+            message = mango_oracles_sub_map.next() => {
                 if let Some(data) = message {
                     let response = data.1.map_err_anyhow()?;
                     let response = solana_client::rpc_response::Response{ context: RpcResponseContext{ slot: response.context.slot, api_version: None }, value: RpcKeyedAccount{ pubkey: data.0.to_string(), account:  response.value} } ;
                     sender.send(Message::Account(AccountUpdate::from_rpc(response)?)).await.expect("sending must succeed");
                 } else {
-                    warn!("pyth stream closed");
+                    warn!("oracle stream closed");
                     return Ok(());
                 }
             },
@@ -171,16 +170,12 @@ async fn feed_data(
     }
 }
 
-pub fn start(
-    config: Config,
-    mango_pyth_oracles: Vec<Pubkey>,
-    sender: async_channel::Sender<Message>,
-) {
+pub fn start(config: Config, mango_oracles: Vec<Pubkey>, sender: async_channel::Sender<Message>) {
     tokio::spawn(async move {
         // if the websocket disconnects, we get no data in a while etc, reconnect and try again
         loop {
             info!("connecting to solana websocket streams");
-            let out = feed_data(&config, mango_pyth_oracles.clone(), sender.clone());
+            let out = feed_data(&config, mango_oracles.clone(), sender.clone());
             let _ = out.await;
         }
     });
