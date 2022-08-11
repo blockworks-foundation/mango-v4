@@ -324,7 +324,7 @@ pub async fn account_position_f64(solana: &SolanaCookie, account: Pubkey, bank: 
 // ClientInstruction impl
 //
 
-pub struct FlashLoanBeginInstruction {
+pub struct MarginBeginInstruction {
     pub group: Pubkey,
     pub mango_token_bank: Pubkey,
     pub mango_token_vault: Pubkey,
@@ -332,9 +332,9 @@ pub struct FlashLoanBeginInstruction {
     pub withdraw_amount: u64,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for FlashLoanBeginInstruction {
-    type Accounts = mango_v4::accounts::FlashLoanBegin;
-    type Instruction = mango_v4::instruction::FlashLoanBegin;
+impl ClientInstruction for MarginBeginInstruction {
+    type Accounts = mango_v4::accounts::MarginBegin;
+    type Instruction = mango_v4::instruction::MarginBegin;
     async fn to_instruction(
         &self,
         _account_loader: impl ClientAccountLoader + 'async_trait,
@@ -376,7 +376,7 @@ impl ClientInstruction for FlashLoanBeginInstruction {
     }
 }
 
-pub struct FlashLoanEndInstruction<'keypair> {
+pub struct MarginEndInstruction<'keypair> {
     pub account: Pubkey,
     pub owner: &'keypair Keypair,
     pub mango_token_bank: Pubkey,
@@ -384,9 +384,9 @@ pub struct FlashLoanEndInstruction<'keypair> {
     pub target_token_account: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for FlashLoanEndInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::FlashLoanEnd;
-    type Instruction = mango_v4::instruction::FlashLoanEnd;
+impl<'keypair> ClientInstruction for MarginEndInstruction<'keypair> {
+    type Accounts = mango_v4::accounts::MarginEnd;
+    type Instruction = mango_v4::instruction::MarginEnd;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,

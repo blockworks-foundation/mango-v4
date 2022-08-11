@@ -1,7 +1,7 @@
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::group_seeds;
-use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
+use crate::logs::{MarginLog, MarginTokenDetail, TokenBalanceLog};
 use crate::state::MangoAccount;
 use crate::state::{
     compute_health, compute_health_from_fixed_accounts, new_fixed_order_account_retriever,
@@ -14,7 +14,7 @@ use anchor_lang::Discriminator;
 use anchor_spl::token::{self, Token, TokenAccount};
 use fixed::types::I80F48;
 
-/// Sets up mango vaults for flash loan
+/// Sets up mango vaults for margin
 ///
 /// In addition to these accounts, there must be remaining_accounts:
 /// 1. N banks (writable)
@@ -22,7 +22,7 @@ use fixed::types::I80F48;
 /// 3. N token accounts (writable), in the same order as the vaults,
 ///    the loaned funds are transfered into these
 #[derive(Accounts)]
-pub struct FlashLoanBegin<'info> {
+pub struct MarginBegin<'info> {
     pub group: AccountLoader<'info, Group>,
     pub token_program: Program<'info, Token>,
 
@@ -31,15 +31,15 @@ pub struct FlashLoanBegin<'info> {
     pub instructions: UncheckedAccount<'info>,
 }
 
-/// Finalizes a flash loan
+/// Finalizes margin
 ///
 /// In addition to these accounts, there must be remaining_accounts:
-/// 1. health accounts, and every bank that also appeared in FlashLoanBegin must be writable
-/// 2. N vaults (writable), matching what was in FlashLoanBegin
-/// 3. N token accounts (writable), matching what was in FlashLoanBegin;
+/// 1. health accounts, and every bank that also appeared in MarginBegin must be writable
+/// 2. N vaults (writable), matching what was in MarginBegin
+/// 3. N token accounts (writable), matching what was in MarginBegin;
 ///    the `owner` must have authority to transfer tokens out of them
 #[derive(Accounts)]
-pub struct FlashLoanEnd<'info> {
+pub struct MarginEnd<'info> {
     #[account(
         mut,
         has_one = owner
@@ -52,8 +52,8 @@ pub struct FlashLoanEnd<'info> {
 
 /// The `loan_amounts` argument lists the amount to be loaned from each bank/vault and
 /// the order matches the order of bank accounts.
-pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
-    ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanBegin<'info>>,
+pub fn margin_begin<'key, 'accounts, 'remaining, 'info>(
+    ctx: Context<'key, 'accounts, 'remaining, 'info, MarginBegin<'info>>,
     loan_amounts: Vec<u64>,
 ) -> Result<()> {
     let num_loans = loan_amounts.len();
@@ -80,8 +80,8 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
         let vault = Account::<TokenAccount>::try_from(vault_ai)?;
         let token_account = Account::<TokenAccount>::try_from(token_account_ai)?;
 
-        bank.flash_loan_approved_amount = *amount;
-        bank.flash_loan_token_account_initial = token_account.amount;
+        bank.margin_approved_amount = *amount;
+        bank.margin_token_account_initial = token_account.amount;
 
         // Transfer the loaned funds
         if *amount > 0 {
@@ -113,15 +113,15 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
         let ixs = ctx.accounts.instructions.as_ref();
         let current_index = tx_instructions::load_current_index_checked(ixs)? as usize;
 
-        // Forbid FlashLoanBegin to be called from CPI (it does not have to be the first instruction)
+        // Forbid MarginBegin to be called from CPI (it does not have to be the first instruction)
         let current_ix = tx_instructions::load_instruction_at_checked(current_index, ixs)?;
         require_msg!(
             current_ix.program_id == *ctx.program_id,
-            "FlashLoanBegin must be a top-level instruction"
+            "MarginBegin must be a top-level instruction"
         );
 
         // The only other mango instruction that must appear before the end of the tx is
-        // the FlashLoanEnd instruction. No other mango instructions are allowed.
+        // the MarginEnd instruction. No other mango instructions are allowed.
         let mut index = current_index + 1;
         let mut found_end = false;
         loop {
@@ -134,16 +134,16 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
             // Check that the mango program key is not used
             if ix.program_id == crate::id() {
                 // must be the last mango ix -- this could possibly be relaxed, but right now
-                // we need to guard against multiple FlashLoanEnds
+                // we need to guard against multiple MarginEnds
                 require_msg!(
                     !found_end,
-                    "the transaction must not contain a Mango instruction after FlashLoanEnd"
+                    "the transaction must not contain a Mango instruction after MarginEnd"
                 );
                 found_end = true;
 
-                // must be the FlashLoanEnd instruction
+                // must be the MarginEnd instruction
                 require!(
-                    ix.data[0..8] == crate::instruction::FlashLoanEnd::discriminator(),
+                    ix.data[0..8] == crate::instruction::MarginEnd::discriminator(),
                     MangoError::SomeError
                 );
 
@@ -151,21 +151,18 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
                 let begin_accounts = &ctx.remaining_accounts[num_loans..];
                 let end_accounts = &ix.accounts[ix.accounts.len() - 2 * num_loans..];
                 for (begin_account, end_account) in begin_accounts.iter().zip(end_accounts.iter()) {
-                    require_msg!(*begin_account.key == end_account.pubkey, "the trailing accounts passed to FlashLoanBegin and End must match, found {} on begin and {} on end", begin_account.key, end_account.pubkey);
+                    require_msg!(*begin_account.key == end_account.pubkey, "the trailing accounts passed to MarginBegin and End must match, found {} on begin and {} on end", begin_account.key, end_account.pubkey);
                 }
             } else {
                 // ensure no one can cpi into mango either
                 for meta in ix.accounts.iter() {
-                    require_msg!(meta.pubkey != crate::id(), "instructions between FlashLoanBegin and End may not use the Mango program account");
+                    require_msg!(meta.pubkey != crate::id(), "instructions between MarginBegin and End may not use the Mango program account");
                 }
             }
 
             index += 1;
         }
-        require_msg!(
-            found_end,
-            "found no FlashLoanEnd instruction in transaction"
-        );
+        require_msg!(found_end, "found no MarginEnd instruction in transaction");
     }
 
     Ok(())
@@ -178,8 +175,8 @@ struct TokenVaultChange {
     amount: I80F48,
 }
 
-pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
-    ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
+pub fn margin_end<'key, 'accounts, 'remaining, 'info>(
+    ctx: Context<'key, 'accounts, 'remaining, 'info, MarginEnd<'info>>,
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_mut()?;
     let group = account.fixed.group;
@@ -236,15 +233,15 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         // The Begin instruction only checks that End ends with the same vault accounts -
         // but there could be an extra vault account in End, or a different bank could be
         // used for the same vault.
-        require_neq!(bank.flash_loan_token_account_initial, u64::MAX);
+        require_neq!(bank.margin_token_account_initial, u64::MAX);
 
         // Create the token position now, so we can compute the pre-health with fixed order health accounts
         let (_, raw_token_index, _) = account.token_get_mut_or_create(bank.token_index)?;
 
         // Transfer any excess over the inital balance of the token account back
         // into the vault. Compute the total change in the vault balance.
-        let mut change = -I80F48::from(bank.flash_loan_approved_amount);
-        if token_account.amount > bank.flash_loan_token_account_initial {
+        let mut change = -I80F48::from(bank.margin_approved_amount);
+        if token_account.amount > bank.margin_token_account_initial {
             let transfer_ctx = CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
                 token::Transfer {
@@ -253,7 +250,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
                     authority: ctx.accounts.owner.to_account_info(),
                 },
             );
-            let repay = token_account.amount - bank.flash_loan_token_account_initial;
+            let repay = token_account.amount - bank.margin_token_account_initial;
             token::transfer(transfer_ctx, repay)?;
 
             let repay = I80F48::from(repay);
@@ -307,7 +304,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         let mut bank = health_ais[change.bank_index].load_mut::<Bank>()?;
         let position = account.token_get_mut_raw(change.raw_token_index);
         let native = position.native(&bank);
-        let approved_amount = I80F48::from(bank.flash_loan_approved_amount);
+        let approved_amount = I80F48::from(bank.margin_approved_amount);
 
         let loan = if native.is_positive() {
             cm!(approved_amount - native).max(I80F48::ZERO)
@@ -324,10 +321,10 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             deactivated_token_positions.push(change.raw_token_index);
         }
 
-        bank.flash_loan_approved_amount = 0;
-        bank.flash_loan_token_account_initial = u64::MAX;
+        bank.margin_approved_amount = 0;
+        bank.margin_token_account_initial = u64::MAX;
 
-        token_loan_details.push(FlashLoanTokenDetail {
+        token_loan_details.push(MarginTokenDetail {
             token_index: position.token_index,
             change_amount: change.amount.to_bits(),
             loan: loan.to_bits(),
@@ -348,7 +345,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         });
     }
 
-    emit!(FlashLoanLog {
+    emit!(MarginLog {
         mango_group: group.key(),
         mango_account: ctx.accounts.account.key(),
         token_loan_details

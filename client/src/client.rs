@@ -1074,7 +1074,7 @@ impl MangoClient {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::FlashLoanBegin {
+                    &mango_v4::accounts::MarginBegin {
                         group: self.group(),
                         token_program: Token::id(),
                         instructions: solana_sdk::sysvar::instructions::id(),
@@ -1086,7 +1086,7 @@ impl MangoClient {
                 ams.extend(token_ams.clone());
                 ams
             },
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanBegin {
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::MarginBegin {
                 loan_amounts,
             }),
         });
@@ -1097,7 +1097,7 @@ impl MangoClient {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::FlashLoanEnd {
+                    &mango_v4::accounts::MNarginEnd {
                         account: self.mango_account_address,
                         owner: self.owner(),
                         token_program: Token::id(),
@@ -1109,7 +1109,7 @@ impl MangoClient {
                 ams.extend(token_ams);
                 ams
             },
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanEnd {}),
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::MarginEnd {}),
         });
 
         let rpc = self.client.rpc_async();

@@ -114,8 +114,8 @@ pub fn token_edit(
 
         // unchanged -
         // dust
-        // flash_loan_token_account_initial
-        // flash_loan_approved_amount
+        // margin_token_account_initial
+        // margin_approved_amount
         // token_index
         // bump
         // mint_decimals

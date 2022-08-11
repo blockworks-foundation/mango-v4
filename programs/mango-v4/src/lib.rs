@@ -216,18 +216,18 @@ pub mod mango_v4 {
         instructions::token_withdraw(ctx, amount, allow_borrow)
     }
 
-    pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
-        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanBegin<'info>>,
+    pub fn margin_begin<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, MarginBegin<'info>>,
         loan_amounts: Vec<u64>,
     ) -> Result<()> {
-        instructions::flash_loan_begin(ctx, loan_amounts)
+        instructions::margin_begin(ctx, loan_amounts)
     }
 
-    // NOTE: keep disc synced in flash_loan.rs
-    pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
-        ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
+    // NOTE: keep disc synced in margin.rs
+    pub fn margin_end<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, MarginEnd<'info>>,
     ) -> Result<()> {
-        instructions::flash_loan_end(ctx)
+        instructions::margin_end(ctx)
     }
 
     ///

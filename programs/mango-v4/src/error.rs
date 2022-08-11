@@ -16,7 +16,7 @@ pub enum MangoError {
     #[msg("oracle type cannot be determined")]
     UnknownOracleType,
     #[msg("")]
-    InvalidFlashLoanTargetCpiProgram,
+    InvalidMarginTargetCpiProgram,
     #[msg("health must be positive")]
     HealthMustBePositive,
     #[msg("health must be negative")]

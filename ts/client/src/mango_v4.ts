@@ -1184,7 +1184,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "flashLoanBegin",
+      "name": "marginBegin",
       "accounts": [
         {
           "name": "group",
@@ -1215,7 +1215,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "flashLoanEnd",
+      "name": "marginEnd",
       "accounts": [
         {
           "name": "account",
@@ -2863,11 +2863,11 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "flashLoanTokenAccountInitial",
+            "name": "marginTokenAccountInitial",
             "type": "u64"
           },
           {
-            "name": "flashLoanApprovedAmount",
+            "name": "marginApprovedAmount",
             "type": "u64"
           },
           {
@@ -3687,7 +3687,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "FlashLoanTokenDetail",
+      "name": "MarginTokenDetail",
       "type": {
         "kind": "struct",
         "fields": [
@@ -4014,18 +4014,14 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "baseEntryLots",
+            "name": "quoteEntryNative",
             "docs": [
-              "Tracks what the position is to calculate average entry  & break even price"
+              "Tracks what the position is to calculate average entry & break even price"
             ],
             "type": "i64"
           },
           {
-            "name": "quoteEntryNative",
-            "type": "i64"
-          },
-          {
-            "name": "quoteExitNative",
+            "name": "quoteRunningNative",
             "type": "i64"
           },
           {
@@ -4577,7 +4573,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "FlashLoanLog",
+      "name": "MarginLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -4593,7 +4589,7 @@ export type MangoV4 = {
           "name": "tokenLoanDetails",
           "type": {
             "vec": {
-              "defined": "FlashLoanTokenDetail"
+              "defined": "MarginTokenDetail"
             }
           },
           "index": false
@@ -4994,7 +4990,7 @@ export type MangoV4 = {
     },
     {
       "code": 6005,
-      "name": "InvalidFlashLoanTargetCpiProgram",
+      "name": "InvalidMarginTargetCpiProgram",
       "msg": ""
     },
     {
@@ -6231,7 +6227,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "flashLoanBegin",
+      "name": "marginBegin",
       "accounts": [
         {
           "name": "group",
@@ -6262,7 +6258,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "flashLoanEnd",
+      "name": "marginEnd",
       "accounts": [
         {
           "name": "account",
@@ -7910,11 +7906,11 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "flashLoanTokenAccountInitial",
+            "name": "marginTokenAccountInitial",
             "type": "u64"
           },
           {
-            "name": "flashLoanApprovedAmount",
+            "name": "marginApprovedAmount",
             "type": "u64"
           },
           {
@@ -8734,7 +8730,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "FlashLoanTokenDetail",
+      "name": "MarginTokenDetail",
       "type": {
         "kind": "struct",
         "fields": [
@@ -9061,18 +9057,14 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "baseEntryLots",
+            "name": "quoteEntryNative",
             "docs": [
-              "Tracks what the position is to calculate average entry  & break even price"
+              "Tracks what the position is to calculate average entry & break even price"
             ],
             "type": "i64"
           },
           {
-            "name": "quoteEntryNative",
-            "type": "i64"
-          },
-          {
-            "name": "quoteExitNative",
+            "name": "quoteRunningNative",
             "type": "i64"
           },
           {
@@ -9624,7 +9616,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "FlashLoanLog",
+      "name": "MarginLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -9640,7 +9632,7 @@ export const IDL: MangoV4 = {
           "name": "tokenLoanDetails",
           "type": {
             "vec": {
-              "defined": "FlashLoanTokenDetail"
+              "defined": "MarginTokenDetail"
             }
           },
           "index": false
@@ -10041,7 +10033,7 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6005,
-      "name": "InvalidFlashLoanTargetCpiProgram",
+      "name": "InvalidMarginTargetCpiProgram",
       "msg": ""
     },
     {

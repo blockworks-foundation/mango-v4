@@ -152,9 +152,9 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     let target_token_account = context.users[0].token_accounts[0];
     let withdraw_amount = 2;
     let deposit_amount = 1;
-    let send_flash_loan_tx = |solana, withdraw_amount, deposit_amount| async move {
+    let send_margin_tx = |solana, withdraw_amount, deposit_amount| async move {
         let mut tx = ClientTransaction::new(solana);
-        tx.add_instruction(FlashLoanBeginInstruction {
+        tx.add_instruction(MarginBeginInstruction {
             group,
             mango_token_bank: bank,
             mango_token_vault: vault,
@@ -189,7 +189,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
             );
             tx.add_signer(&payer);
         }
-        tx.add_instruction(FlashLoanEndInstruction {
+        tx.add_instruction(MarginEndInstruction {
             account,
             owner,
             mango_token_bank: bank,
@@ -199,7 +199,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
         .await;
         tx.send().await.unwrap();
     };
-    send_flash_loan_tx(solana, withdraw_amount, deposit_amount).await;
+    send_margin_tx(solana, withdraw_amount, deposit_amount).await;
 
     assert_eq!(
         solana.token_account_balance(vault).await,
@@ -222,7 +222,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     let margin_account_initial = solana.token_account_balance(margin_account).await;
     let withdraw_amount = deposit_amount_initial as u64;
     let deposit_amount = 0;
-    send_flash_loan_tx(solana, withdraw_amount, deposit_amount).await;
+    send_margin_tx(solana, withdraw_amount, deposit_amount).await;
     assert_eq!(solana.token_account_balance(vault).await, provided_amount);
     assert_eq!(
         solana.token_account_balance(margin_account).await,
@@ -238,7 +238,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     let margin_account_initial = solana.token_account_balance(margin_account).await;
     let withdraw_amount = 0;
     let deposit_amount = 100;
-    send_flash_loan_tx(solana, withdraw_amount, deposit_amount).await;
+    send_margin_tx(solana, withdraw_amount, deposit_amount).await;
     assert_eq!(
         solana.token_account_balance(vault).await,
         provided_amount + deposit_amount
@@ -260,7 +260,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     let withdraw_amount = 500;
     let deposit_amount = 450;
     println!("{}", deposit_amount_initial);
-    send_flash_loan_tx(solana, withdraw_amount, deposit_amount).await;
+    send_margin_tx(solana, withdraw_amount, deposit_amount).await;
     assert_eq!(
         solana.token_account_balance(vault).await,
         provided_amount + deposit_amount_initial + deposit_amount - withdraw_amount

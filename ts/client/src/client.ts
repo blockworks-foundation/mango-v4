@@ -1525,8 +1525,8 @@ export class MangoClient {
       isSigner: false,
     };
 
-    const flashLoanEndIx = await this.program.methods
-      .flashLoanEnd()
+    const marginEndIx = await this.program.methods
+      .marginEnd()
       .accounts({
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -1544,8 +1544,8 @@ export class MangoClient {
       ])
       .instruction();
 
-    const flashLoanBeginIx = await this.program.methods
-      .flashLoanBegin([
+    const marginBeginIx = await this.program.methods
+      .marginBegin([
         toNativeDecimals(amountIn, inputBank.mintDecimals),
         new BN(
           0,
@@ -1569,11 +1569,11 @@ export class MangoClient {
     for (const i of preInstructions) {
       tx.add(i);
     }
-    tx.add(flashLoanBeginIx);
+    tx.add(marginBeginIx);
     for (const i of userDefinedInstructions) {
       tx.add(i);
     }
-    tx.add(flashLoanEndIx);
+    tx.add(marginEndIx);
     return this.program.provider.sendAndConfirm(tx);
   }
 

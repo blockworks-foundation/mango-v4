@@ -5,7 +5,7 @@ import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 
 //
-// (unfinished?) script which shows how to use the flash loan 1 ix
+// (unfinished?) script which shows how to use the margin 1 ix
 //
 
 async function main() {

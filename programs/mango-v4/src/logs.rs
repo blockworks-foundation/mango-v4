@@ -51,7 +51,7 @@ pub struct TokenBalanceLog {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct FlashLoanTokenDetail {
+pub struct MarginTokenDetail {
     pub token_index: u16,
     pub change_amount: i128,
     pub loan: i128,
@@ -62,10 +62,10 @@ pub struct FlashLoanTokenDetail {
 }
 
 #[event]
-pub struct FlashLoanLog {
+pub struct MarginLog {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
-    pub token_loan_details: Vec<FlashLoanTokenDetail>,
+    pub token_loan_details: Vec<MarginTokenDetail>,
 }
 
 #[event]

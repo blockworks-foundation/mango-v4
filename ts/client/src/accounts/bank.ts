@@ -67,8 +67,8 @@ export class Bank {
       initLiabWeight: I80F48Dto;
       liquidationFee: I80F48Dto;
       dust: I80F48Dto;
-      flashLoanTokenAccountInitial: BN;
-      flashLoanApprovedAmount: BN;
+      marginTokenAccountInitial: BN;
+      marginApprovedAmount: BN;
       tokenIndex: number;
       mintDecimals: number;
       bankNum: number;
@@ -106,8 +106,8 @@ export class Bank {
       obj.initLiabWeight,
       obj.liquidationFee,
       obj.dust,
-      obj.flashLoanTokenAccountInitial,
-      obj.flashLoanApprovedAmount,
+      obj.marginTokenAccountInitial,
+      obj.marginApprovedAmount,
       obj.tokenIndex,
       obj.mintDecimals,
       obj.bankNum,
@@ -146,8 +146,8 @@ export class Bank {
     initLiabWeight: I80F48Dto,
     liquidationFee: I80F48Dto,
     dust: I80F48Dto,
-    flashLoanTokenAccountInitial: BN,
-    flashLoanApprovedAmount: BN,
+    marginTokenAccountInitial: BN,
+    marginApprovedAmount: BN,
     public tokenIndex: number,
     public mintDecimals: number,
     public bankNum: number,

@@ -104,8 +104,8 @@ pub fn token_register_trustless(
         init_liab_weight: I80F48::from_num(1.8),  // 1.25x
         liquidation_fee: I80F48::from_num(0.2),
         dust: I80F48::ZERO,
-        flash_loan_token_account_initial: u64::MAX,
-        flash_loan_approved_amount: 0,
+        margin_token_account_initial: u64::MAX,
+        margin_approved_amount: 0,
         token_index,
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
