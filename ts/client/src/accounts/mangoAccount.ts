@@ -185,27 +185,17 @@ export class MangoAccount {
   }
 
   /**
-   * Similar to getEquity, but only the sum of all positive assets.
+   * Sum of all positive assets.
    */
-  getAssetsVal(): I80F48 {
-    const equity = (this.accountData as MangoAccountData).equity;
-    const total_equity = equity.tokens.reduce(
-      (a, b) => (b.value.gt(ZERO_I80F48) ? a.add(b.value) : a),
-      ZERO_I80F48,
-    );
-    return total_equity;
+  getAssetsVal(healthType: HealthType): I80F48 {
+    return this.accountData.healthCache.assets(healthType);
   }
 
   /**
-   * Similar to getEquity, but only the sum of all negative assets. Note: return value would be negative.
+   * Sum of all negative assets.
    */
-  getLiabsVal(): I80F48 {
-    const equity = (this.accountData as MangoAccountData).equity;
-    const total_equity = equity.tokens.reduce(
-      (a, b) => (b.value.lt(ZERO_I80F48) ? a.add(b.value) : a),
-      ZERO_I80F48,
-    );
-    return total_equity;
+  getLiabsVal(healthType: HealthType): I80F48 {
+    return this.accountData.healthCache.liabs(healthType);
   }
 
   /**

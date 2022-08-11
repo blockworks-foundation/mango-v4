@@ -64,39 +64,88 @@ export class HealthCache {
     return health;
   }
 
-  public healthRatio(healthType: HealthType): I80F48 {
+  public assets(healthType: HealthType): I80F48 {
     let assets = ZERO_I80F48;
-    let liabs = ZERO_I80F48;
-
-    function sum(assets: I80F48, liabs: I80F48, contrib: I80F48) {
-      if (contrib.isPos()) {
-        assets = assets.add(contrib);
-      } else {
-        liabs = liabs.sub(contrib);
-      }
-      return [assets, liabs];
-    }
-
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
-      const res = sum(assets, liabs, contrib);
-      assets = res[0];
-      liabs = res[1];
+      if (contrib.isPos()) {
+        assets = assets.add(contrib);
+      }
     }
     for (const serum3Info of this.serum3Infos) {
       const contrib = serum3Info.healthContribution(
         healthType,
         this.tokenInfos,
       );
-      const res = sum(assets, liabs, contrib);
-      assets = res[0];
-      liabs = res[1];
+      if (contrib.isPos()) {
+        assets = assets.add(contrib);
+      }
     }
     for (const perpInfo of this.perpInfos) {
       const contrib = perpInfo.healthContribution(healthType);
-      const res = sum(assets, liabs, contrib);
-      assets = res[0];
-      liabs = res[1];
+      if (contrib.isPos()) {
+        assets = assets.add(contrib);
+      }
+    }
+    return assets;
+  }
+
+  public liabs(healthType: HealthType): I80F48 {
+    let liabs = ZERO_I80F48;
+    for (const tokenInfo of this.tokenInfos) {
+      const contrib = tokenInfo.healthContribution(healthType);
+      if (contrib.isNeg()) {
+        liabs = liabs.sub(contrib);
+      }
+    }
+    for (const serum3Info of this.serum3Infos) {
+      const contrib = serum3Info.healthContribution(
+        healthType,
+        this.tokenInfos,
+      );
+      if (contrib.isNeg()) {
+        liabs = liabs.sub(contrib);
+      }
+    }
+    for (const perpInfo of this.perpInfos) {
+      const contrib = perpInfo.healthContribution(healthType);
+      if (contrib.isNeg()) {
+        liabs = liabs.sub(contrib);
+      }
+    }
+    return liabs;
+  }
+
+  public healthRatio(healthType: HealthType): I80F48 {
+    let assets = ZERO_I80F48;
+    let liabs = ZERO_I80F48;
+
+    for (const tokenInfo of this.tokenInfos) {
+      const contrib = tokenInfo.healthContribution(healthType);
+      if (contrib.isPos()) {
+        assets = assets.add(contrib);
+      } else {
+        liabs = liabs.sub(contrib);
+      }
+    }
+    for (const serum3Info of this.serum3Infos) {
+      const contrib = serum3Info.healthContribution(
+        healthType,
+        this.tokenInfos,
+      );
+      if (contrib.isPos()) {
+        assets = assets.add(contrib);
+      } else {
+        liabs = liabs.sub(contrib);
+      }
+    }
+    for (const perpInfo of this.perpInfos) {
+      const contrib = perpInfo.healthContribution(healthType);
+      if (contrib.isPos()) {
+        assets = assets.add(contrib);
+      } else {
+        liabs = liabs.sub(contrib);
+      }
     }
 
     if (liabs.isPos()) {

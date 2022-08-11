@@ -39,11 +39,15 @@ async function debugUser(client, group, mangoAccount) {
   );
   console.log(
     'mangoAccount.getAssetsVal() ' +
-      toUiDecimalsForQuote(mangoAccount.getAssetsVal().toNumber()),
+      toUiDecimalsForQuote(
+        mangoAccount.getAssetsVal(HealthType.init).toNumber(),
+      ),
   );
   console.log(
     'mangoAccount.getLiabsVal() ' +
-      toUiDecimalsForQuote(mangoAccount.getLiabsVal().toNumber()),
+      toUiDecimalsForQuote(
+        mangoAccount.getLiabsVal(HealthType.init).toNumber(),
+      ),
   );
 
   console.log(
@@ -51,20 +55,6 @@ async function debugUser(client, group, mangoAccount) {
       toUiDecimalsForQuote(
         (
           await mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL')
-        ).toNumber(),
-      ),
-  );
-
-  console.log(
-    "mangoAccount.getMaxSourceForTokenSwap(group, 'USDC', 'BTC') " +
-      toUiDecimalsForQuote(
-        (
-          await mangoAccount.getMaxSourceForTokenSwap(
-            group,
-            'USDC',
-            'BTC',
-            0.94,
-          )
         ).toNumber(),
       ),
   );
@@ -134,7 +124,7 @@ async function main() {
   }
 
   for (const keypair of [
-    process.env.MB_PAYER_KEYPAIR,
+    // process.env.MB_PAYER_KEYPAIR,
     process.env.MB_USER2_KEYPAIR,
   ]) {
     console.log();
