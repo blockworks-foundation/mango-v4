@@ -1097,7 +1097,7 @@ impl MangoClient {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                    &mango_v4::accounts::MNarginEnd {
+                    &mango_v4::accounts::MarginEnd {
                         account: self.mango_account_address,
                         owner: self.owner(),
                         token_program: Token::id(),
