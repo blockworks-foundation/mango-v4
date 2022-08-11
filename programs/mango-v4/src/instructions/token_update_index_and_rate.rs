@@ -23,7 +23,7 @@ pub struct TokenUpdateIndexAndRate<'info> {
 
     #[account(
         has_one = oracle,
-        constraint = mint_info.load()?.group.key() == group.key(),
+        has_one = group,
     )]
     pub mint_info: AccountLoader<'info, MintInfo>,
 

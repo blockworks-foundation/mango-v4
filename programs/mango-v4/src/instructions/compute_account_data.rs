@@ -5,6 +5,7 @@ use anchor_lang::prelude::*;
 pub struct ComputeAccountData<'info> {
     pub group: AccountLoader<'info, Group>,
 
+    #[account(has_one = group)]
     pub account: AccountLoaderDynamic<'info, MangoAccount>,
 }
 
