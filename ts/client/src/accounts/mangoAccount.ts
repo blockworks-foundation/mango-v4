@@ -6,7 +6,13 @@ import { nativeI80F48ToUi } from '../utils';
 import { Bank, QUOTE_DECIMALS } from './bank';
 import { Group } from './group';
 import { HealthCache, HealthCacheDto } from './healthCache';
-import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from './I80F48';
+import {
+  HUNDRED_I80F48,
+  I80F48,
+  I80F48Dto,
+  ONE_I80F48,
+  ZERO_I80F48,
+} from './I80F48';
 export class MangoAccount {
   public tokens: TokenPosition[];
   public serum3: Serum3Orders[];
@@ -155,16 +161,8 @@ export class MangoAccount {
       : (this.accountData as MangoAccountData).maintHealth;
   }
 
-  /**
-   * TODO: this is incorrect, getAssetsVal and getLiabsVal are in equity, and not in given health type.
-   * Wait for dev to be deployed to mainnet, and then we can adapt this.
-   */
   getHealthRatio(healthType: HealthType): I80F48 {
-    const assets = this.getAssetsVal();
-    const liabs = this.getLiabsVal();
-    return liabs.gt(ZERO_I80F48)
-      ? assets.div(liabs).sub(ONE_I80F48).mul(I80F48.fromNumber(100))
-      : I80F48.fromNumber(100);
+    return this.accountData.healthCache.healthRatio(healthType);
   }
 
   /**
@@ -240,31 +238,14 @@ export class MangoAccount {
     targetTokenName: string,
     slippageAndFeesFactor: number,
   ): I80F48 {
-    const initHealth = (this.accountData as MangoAccountData).initHealth;
-
-    const sourceBank = group.banksMap.get(sourceTokenName);
-    const targetBank = group.banksMap.get(targetTokenName);
-
-    // This is a conservative approximation of the easy case, where
-    // mango account has no token positions for source and target tokens, or
-    // borrows for source and deposits for target tokens before the swap.
-    // Tighter estimates can be obtained by adding cases where deposits can exist for source,
-    // and borrows for target. TODO: solve this by searching over a blackbox like health formula.
-    // Lets solve below for s,
-    // h - s * slw + t * taw = 0
-    // where h is init_health, s is source amount in usdc native units, and t is target amount in usdc native units
-    // where t = s * slip ( s < 1), where slip is factor for slippage and fees which is normalised e.g. for 5% slippage, slip = 0.95
-    // h - s * (slw - slip * taw) = 0
-    // s = h / ( slw - slip * taw )
-    return initHealth
-      .div(
-        sourceBank.initLiabWeight.sub(
-          I80F48.fromNumber(slippageAndFeesFactor).mul(
-            targetBank.initAssetWeight,
-          ),
-        ),
+    return this.accountData.healthCache
+      .getMaxSourceForTokenSwap(
+        group,
+        sourceTokenName,
+        targetTokenName,
+        HUNDRED_I80F48,
       )
-      .div(sourceBank.price);
+      .mul(I80F48.fromNumber(slippageAndFeesFactor));
   }
 
   /**

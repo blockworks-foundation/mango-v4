@@ -1,14 +1,16 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
+import { I80F48 } from '../accounts/I80F48';
 import { HealthType } from '../accounts/mangoAccount';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
-import { toUiDecimals } from '../utils';
+import { toUiDecimalsForQuote } from '../utils';
 
 async function debugUser(client, group, mangoAccount) {
   console.log(mangoAccount.toString(group));
   await mangoAccount.reload(client, group);
+
   console.log(
     'buildFixedAccountRetrieverHealthAccounts ' +
       client
@@ -21,11 +23,11 @@ async function debugUser(client, group, mangoAccount) {
   );
   console.log(
     'mangoAccount.getEquity() ' +
-      toUiDecimals(mangoAccount.getEquity().toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getEquity().toNumber()),
   );
   console.log(
     'mangoAccount.getHealth(HealthType.init) ' +
-      toUiDecimals(mangoAccount.getHealth(HealthType.init).toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getHealth(HealthType.init).toNumber()),
   );
   console.log(
     'mangoAccount.getHealthRatio(HealthType.init) ' +
@@ -33,20 +35,20 @@ async function debugUser(client, group, mangoAccount) {
   );
   console.log(
     'mangoAccount.getCollateralValue() ' +
-      toUiDecimals(mangoAccount.getCollateralValue().toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getCollateralValue().toNumber()),
   );
   console.log(
     'mangoAccount.getAssetsVal() ' +
-      toUiDecimals(mangoAccount.getAssetsVal().toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getAssetsVal().toNumber()),
   );
   console.log(
     'mangoAccount.getLiabsVal() ' +
-      toUiDecimals(mangoAccount.getLiabsVal().toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getLiabsVal().toNumber()),
   );
 
   console.log(
     "mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL') " +
-      toUiDecimals(
+      toUiDecimalsForQuote(
         (
           await mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL')
         ).toNumber(),
@@ -55,7 +57,7 @@ async function debugUser(client, group, mangoAccount) {
 
   console.log(
     "mangoAccount.getMaxSourceForTokenSwap(group, 'USDC', 'BTC') " +
-      toUiDecimals(
+      toUiDecimalsForQuote(
         (
           await mangoAccount.getMaxSourceForTokenSwap(
             group,
@@ -69,7 +71,7 @@ async function debugUser(client, group, mangoAccount) {
 
   console.log(
     'mangoAccount.simHealthWithTokenPositionChanges ' +
-      toUiDecimals(
+      toUiDecimalsForQuote(
         (
           await mangoAccount.simHealthWithTokenPositionChanges(group, [
             {
@@ -87,6 +89,22 @@ async function debugUser(client, group, mangoAccount) {
         ).toNumber(),
       ),
   );
+
+  function getMaxSourceForTokenSwapWrapper(src, tgt) {
+    console.log(group.banksMap.get(src).mintDecimals);
+    console.log(
+      `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
+        mangoAccount
+          .getMaxSourceForTokenSwap(group, src, tgt, 0.9)
+          .div(
+            I80F48.fromNumber(
+              Math.pow(10, group.banksMap.get(src).mintDecimals),
+            ),
+          )
+          .toNumber(),
+    );
+  }
+  getMaxSourceForTokenSwapWrapper('SOL', 'BTC');
 }
 
 async function main() {

@@ -4,7 +4,6 @@ import fs from 'fs';
 import { HealthType } from '../accounts/mangoAccount';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
-import { toUiDecimals } from '../utils';
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 
@@ -71,15 +70,15 @@ async function main() {
     await mangoAccount.reload(client, group);
     console.log(
       '...mangoAccount.getEquity() ' +
-        toUiDecimals(mangoAccount.getEquity().toNumber()),
+        toUiDecimalsForQuote(mangoAccount.getEquity().toNumber()),
     );
     console.log(
       '...mangoAccount.getCollateralValue() ' +
-        toUiDecimals(mangoAccount.getCollateralValue().toNumber()),
+        toUiDecimalsForQuote(mangoAccount.getCollateralValue().toNumber()),
     );
     console.log(
       '...mangoAccount.accountData["healthCache"].health(HealthType.init) ' +
-        toUiDecimals(
+        toUiDecimalsForQuote(
           mangoAccount.accountData['healthCache']
             .health(HealthType.init)
             .toNumber(),
@@ -87,15 +86,15 @@ async function main() {
     );
     console.log(
       '...mangoAccount.getAssetsVal() ' +
-        toUiDecimals(mangoAccount.getAssetsVal().toNumber()),
+        toUiDecimalsForQuote(mangoAccount.getAssetsVal().toNumber()),
     );
     console.log(
       '...mangoAccount.getLiabsVal() ' +
-        toUiDecimals(mangoAccount.getLiabsVal().toNumber()),
+        toUiDecimalsForQuote(mangoAccount.getLiabsVal().toNumber()),
     );
     console.log(
       '...mangoAccount.getMaxWithdrawWithBorrowForToken(group, "SOL") ' +
-        toUiDecimals(
+        toUiDecimalsForQuote(
           (
             await mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL')
           ).toNumber(),
@@ -103,7 +102,7 @@ async function main() {
     );
     console.log(
       "...mangoAccount.getSerum3MarketMarginAvailable(group, 'BTC/USDC') " +
-        toUiDecimals(
+        toUiDecimalsForQuote(
           mangoAccount
             .getSerum3MarketMarginAvailable(group, 'BTC/USDC')
             .toNumber(),
@@ -111,7 +110,7 @@ async function main() {
     );
     console.log(
       "...mangoAccount.getPerpMarketMarginAvailable(group, 'BTC-PERP') " +
-        toUiDecimals(
+        toUiDecimalsForQuote(
           mangoAccount
             .getPerpMarketMarginAvailable(group, 'BTC-PERP')
             .toNumber(),

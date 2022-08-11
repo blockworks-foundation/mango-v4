@@ -3,7 +3,6 @@ import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { HealthType } from '../accounts/mangoAccount';
 import { MangoClient, MANGO_V4_ID } from '../index';
-import { toUiDecimals } from '../utils';
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
@@ -55,11 +54,11 @@ async function main() {
   await mangoAccount.reload(client, group);
   console.log(
     'mangoAccount.getEquity() ' +
-      toUiDecimals(mangoAccount.getEquity().toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getEquity().toNumber()),
   );
   console.log(
     'mangoAccount.getHealth(HealthType.init) ' +
-      toUiDecimals(mangoAccount.getHealth(HealthType.init).toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getHealth(HealthType.init).toNumber()),
   );
   console.log(
     'mangoAccount.getHealthRatio(HealthType.init) ' +
@@ -67,20 +66,20 @@ async function main() {
   );
   console.log(
     'mangoAccount.getCollateralValue() ' +
-      toUiDecimals(mangoAccount.getCollateralValue().toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getCollateralValue().toNumber()),
   );
   console.log(
     'mangoAccount.getAssetsVal() ' +
-      toUiDecimals(mangoAccount.getAssetsVal().toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getAssetsVal().toNumber()),
   );
   console.log(
     'mangoAccount.getLiabsVal() ' +
-      toUiDecimals(mangoAccount.getLiabsVal().toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getLiabsVal().toNumber()),
   );
 
   console.log(
     "mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL') " +
-      toUiDecimals(
+      toUiDecimalsForQuote(
         (
           await mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL')
         ).toNumber(),
@@ -89,7 +88,7 @@ async function main() {
 
   console.log(
     "mangoAccount.getMaxSourceForTokenSwap(group, 'USDC', 'BTC') " +
-      toUiDecimals(
+      toUiDecimalsForQuote(
         (
           await mangoAccount.getMaxSourceForTokenSwap(
             group,
@@ -103,7 +102,7 @@ async function main() {
 
   console.log(
     'mangoAccount.simHealthWithTokenPositionChanges ' +
-      toUiDecimals(
+      toUiDecimalsForQuote(
         (
           await mangoAccount.simHealthWithTokenPositionChanges(group, [
             {
