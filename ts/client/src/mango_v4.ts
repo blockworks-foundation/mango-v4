@@ -3007,10 +3007,7 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "isBankrupt",
-            "docs": [
-              "This account cannot do anything except go through `resolve_bankruptcy`"
-            ],
+            "name": "padding5",
             "type": "u8"
           },
           {
@@ -8054,10 +8051,7 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "isBankrupt",
-            "docs": [
-              "This account cannot do anything except go through `resolve_bankruptcy`"
-            ],
+            "name": "padding5",
             "type": "u8"
           },
           {

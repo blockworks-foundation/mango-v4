@@ -58,7 +58,6 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
 
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;
-    require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
     let (position, raw_token_index, active_token_index) =
         account.token_get_mut_or_create(token_index)?;
@@ -94,12 +93,11 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
 
     //
     // Health computation
-    // TODO: This will be used to disable is_bankrupt or being_liquidated
-    //       when health recovers sufficiently
     //
     let health = compute_health(&account.borrow(), HealthType::Init, &retriever)
         .context("post-deposit init health")?;
     msg!("health: {}", health);
+    account.fixed.maybe_recover_from_being_liquidated(health);
 
     //
     // Deactivate the position only after the health check because the user passed in

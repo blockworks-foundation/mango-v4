@@ -48,7 +48,6 @@ pub fn account_create(
     account.fixed.bump = *ctx.bumps.get("account").ok_or(MangoError::SomeError)?;
     account.fixed.delegate = Pubkey::default();
     account.fixed.set_being_liquidated(false);
-    account.fixed.set_bankrupt(false);
 
     account.expand_dynamic_content(token_count, serum3_count, perp_count, perp_oo_count)?;
 

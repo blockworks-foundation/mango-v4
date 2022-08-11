@@ -78,8 +78,6 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
             MangoError::SomeError
         );
 
-        require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
-
         // Validate open_orders
         require!(
             account
