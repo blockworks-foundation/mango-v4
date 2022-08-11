@@ -165,6 +165,14 @@ export class MangoAccount {
     return this.accountData.healthCache.healthRatio(healthType);
   }
 
+  getHealthRatioUi(healthType: HealthType): number {
+    const ratio = this.accountData.healthCache
+      .healthRatio(healthType)
+      .toNumber();
+
+    return ratio > 100 ? 100 : Math.trunc(ratio);
+  }
+
   /**
    * Sum of all the assets i.e. token deposits, borrows, total assets in spot open orders, (perps positions is todo) in terms of quote value.
    */
