@@ -15,6 +15,7 @@ pub struct LiqTokenWithToken<'info> {
     #[account(
         mut,
         has_one = group
+        // liqor_owner is checked at #1
     )]
     pub liqor: AccountLoaderDynamic<'info, MangoAccount>,
     pub liqor_owner: Signer<'info>,
@@ -39,6 +40,7 @@ pub fn liq_token_with_token(
         .context("create account retriever")?;
 
     let mut liqor = ctx.accounts.liqor.load_mut()?;
+    // account constraint #1
     require!(
         liqor
             .fixed

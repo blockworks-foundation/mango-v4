@@ -24,6 +24,7 @@ pub struct LiqTokenBankruptcy<'info> {
     #[account(
         mut,
         has_one = group
+        // liqor_owner is checked at #1
     )]
     pub liqor: AccountLoaderDynamic<'info, MangoAccount>,
     pub liqor_owner: Signer<'info>,
@@ -41,6 +42,7 @@ pub struct LiqTokenBankruptcy<'info> {
     pub liab_mint_info: AccountLoader<'info, MintInfo>,
 
     #[account(mut)]
+    // address is checked at #2 a) and b)
     pub quote_vault: Account<'info, TokenAccount>,
 
     // future: this would be an insurance fund vault specific to a
@@ -81,6 +83,7 @@ pub fn liq_token_bankruptcy(
     );
 
     let mut liqor = ctx.accounts.liqor.load_mut()?;
+    // account constraint #1
     require!(
         liqor
             .fixed
@@ -150,6 +153,7 @@ pub fn liq_token_bankruptcy(
 
         // move quote assets into liqor and withdraw liab assets
         if let Some((quote_bank, _)) = opt_quote_bank_and_price {
+            // account constraint #2 a)
             require_keys_eq!(quote_bank.vault, ctx.accounts.quote_vault.key());
             require_keys_eq!(quote_bank.mint, ctx.accounts.insurance_vault.mint);
 
@@ -177,6 +181,8 @@ pub fn liq_token_bankruptcy(
         } else {
             // For liab_token_index == QUOTE_TOKEN_INDEX: the insurance fund deposits directly into liqee,
             // without a fee or the liqor being involved
+            // account constraint #2 b)
+            require_keys_eq!(liab_bank.vault, ctx.accounts.quote_vault.key());
             require_eq!(liab_token_index, QUOTE_TOKEN_INDEX);
             require_eq!(liab_price_adjusted, I80F48::ONE);
             require_eq!(insurance_transfer_i80f48, liab_transfer);
