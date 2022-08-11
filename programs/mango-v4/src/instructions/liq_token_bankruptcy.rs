@@ -90,23 +90,27 @@ pub fn liq_token_bankruptcy(
             .is_owner_or_delegate(ctx.accounts.liqor_owner.key()),
         MangoError::SomeError
     );
-    require!(!liqor.fixed.is_bankrupt(), MangoError::IsBankrupt);
-
-    let mut liqee = ctx.accounts.liqee.load_mut()?;
-    require!(liqee.fixed.is_bankrupt(), MangoError::IsBankrupt);
-
-    let liab_bank = bank_ais[0].load::<Bank>()?;
-    let liab_deposit_index = liab_bank.deposit_index;
-    let (liqee_liab, liqee_raw_token_index) = liqee.token_get_mut(liab_token_index)?;
-    let mut remaining_liab_loss = -liqee_liab.native(&liab_bank);
-    require_gt!(remaining_liab_loss, I80F48::ZERO);
-    drop(liab_bank);
 
     let mut account_retriever = ScanningAccountRetriever::new(health_ais, group_pk)?;
 
-    // find insurance transfer amount
+    let mut liqee = ctx.accounts.liqee.load_mut()?;
+    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
+        .context("create liqee health cache")?;
+    require!(
+        !liqee_health_cache.has_liquidatable_assets(),
+        MangoError::IsNotBankrupt
+    );
+    liqee.fixed.set_being_liquidated(true);
+
     let (liab_bank, liab_price, opt_quote_bank_and_price) =
         account_retriever.banks_mut_and_oracles(liab_token_index, QUOTE_TOKEN_INDEX)?;
+    let liab_deposit_index = liab_bank.deposit_index;
+    let (liqee_liab, liqee_raw_token_index) = liqee.token_get_mut(liab_token_index)?;
+    let initial_liab_native = liqee_liab.native(&liab_bank);
+    let mut remaining_liab_loss = -initial_liab_native;
+    require_gt!(remaining_liab_loss, I80F48::ZERO);
+
+    // find insurance transfer amount
     let liab_fee_factor = if liab_token_index == QUOTE_TOKEN_INDEX {
         I80F48::ONE
     } else {
@@ -226,14 +230,16 @@ pub fn liq_token_bankruptcy(
         liqee_liab_active = false;
     }
 
-    // If the account has no more borrows then it's no longer bankrupt
-    // and should (always?) no longer be liquidated.
-    let account_retriever = ScanningAccountRetriever::new(health_ais, group_pk)?;
-    let liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)?;
-    liqee.fixed.set_bankrupt(liqee_health_cache.has_borrows());
-    if !liqee.is_bankrupt() && liqee_health_cache.health(HealthType::Init) >= 0 {
-        liqee.fixed.set_being_liquidated(false);
-    }
+    let liab_bank = bank_ais[0].load::<Bank>()?;
+    let end_liab_native = liqee_liab.native(&liab_bank);
+    liqee_health_cache
+        .adjust_token_balance(liab_token_index, cm!(end_liab_native - initial_liab_native))?;
+
+    // Check liqee health again
+    let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+    liqee
+        .fixed
+        .maybe_recover_from_being_liquidated(liqee_init_health);
 
     if !liqee_liab_active {
         liqee.token_deactivate(liqee_raw_token_index);

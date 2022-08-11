@@ -54,8 +54,7 @@ pub struct MangoAccount {
     /// This account cannot open new positions or borrow until `init_health >= 0`
     being_liquidated: u8,
 
-    /// This account cannot do anything except go through `resolve_bankruptcy`
-    is_bankrupt: u8,
+    padding5: u8,
 
     pub bump: u8,
 
@@ -97,7 +96,7 @@ impl Default for MangoAccount {
             owner: Pubkey::default(),
             delegate: Pubkey::default(),
             being_liquidated: 0,
-            is_bankrupt: 0,
+            padding5: 0,
             account_num: 0,
             bump: 0,
             padding: Default::default(),
@@ -193,7 +192,7 @@ pub struct MangoAccountFixed {
     pub delegate: Pubkey,
     pub account_num: u32,
     being_liquidated: u8,
-    is_bankrupt: u8,
+    padding2: u8,
     pub bump: u8,
     pub padding: [u8; 1],
     pub net_deposits: f32,
@@ -214,20 +213,20 @@ impl MangoAccountFixed {
         self.owner == ix_signer || self.delegate == ix_signer
     }
 
-    pub fn is_bankrupt(&self) -> bool {
-        self.is_bankrupt != 0
-    }
-
-    pub fn set_bankrupt(&mut self, b: bool) {
-        self.is_bankrupt = if b { 1 } else { 0 };
-    }
-
     pub fn being_liquidated(&self) -> bool {
         self.being_liquidated != 0
     }
 
     pub fn set_being_liquidated(&mut self, b: bool) {
         self.being_liquidated = if b { 1 } else { 0 };
+    }
+
+    pub fn maybe_recover_from_being_liquidated(&mut self, init_health: I80F48) {
+        // This is used as threshold to flip flag instead of 0 because of dust issues
+        let one_native_usdc = I80F48::ONE;
+        if self.being_liquidated() && init_health > -one_native_usdc {
+            self.set_being_liquidated(false);
+        }
     }
 }
 
@@ -520,10 +519,6 @@ impl<
 
     pub fn being_liquidated(&self) -> bool {
         self.fixed().being_liquidated()
-    }
-
-    pub fn is_bankrupt(&self) -> bool {
-        self.fixed().is_bankrupt()
     }
 
     pub fn borrow(&self) -> DynamicAccountRef<MangoAccount> {

@@ -21,7 +21,6 @@ export class MangoAccount {
       name: number[];
       delegate: PublicKey;
       beingLiquidated: number;
-      isBankrupt: number;
       accountNum: number;
       bump: number;
       netDeposits: number;
@@ -40,7 +39,6 @@ export class MangoAccount {
       obj.name,
       obj.delegate,
       obj.beingLiquidated,
-      obj.isBankrupt,
       obj.accountNum,
       obj.bump,
       obj.netDeposits,
@@ -61,7 +59,6 @@ export class MangoAccount {
     name: number[],
     public delegate: PublicKey,
     beingLiquidated: number,
-    isBankrupt: number,
     public accountNum: number,
     bump: number,
     netDeposits: number,

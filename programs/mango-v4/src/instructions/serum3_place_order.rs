@@ -168,7 +168,6 @@ pub fn serum3_place_order(
             account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
             MangoError::SomeError
         );
-        require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
         // Validate open_orders
         require!(
