@@ -81,7 +81,6 @@ async function debugUser(client, group, mangoAccount) {
   );
 
   function getMaxSourceForTokenSwapWrapper(src, tgt) {
-    console.log(group.banksMap.get(src).mintDecimals);
     console.log(
       `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
         mangoAccount
