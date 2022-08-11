@@ -258,17 +258,17 @@ export class MangoAccount {
     // mango account has no token positions for tokens in changes list, or
     // the change is in direction e.g. deposits for deposits, borrows for borrows, of existing token position.
     // TODO: recompute entire health using components.
-    const initHealth = (this.accountData as MangoAccountData).initHealth;
+    let initHealth = (this.accountData as MangoAccountData).initHealth;
     for (const change of tokenChanges) {
       const bank = group.banksMap.get(change.tokenName);
       if (change.tokenAmount >= 0) {
-        initHealth.add(
+        initHealth = initHealth.add(
           bank.initAssetWeight
             .mul(I80F48.fromNumber(change.tokenAmount))
             .mul(bank.price),
         );
       } else {
-        initHealth.sub(
+        initHealth = initHealth.sub(
           bank.initLiabWeight
             .mul(I80F48.fromNumber(change.tokenAmount))
             .mul(bank.price),
