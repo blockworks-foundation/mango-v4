@@ -5,8 +5,8 @@ import {
 import {
   AccountMeta,
   PublicKey,
-  TransactionInstruction,
   SystemProgram,
+  TransactionInstruction,
 } from '@solana/web3.js';
 import BN from 'bn.js';
 import { QUOTE_DECIMALS } from './accounts/bank';
@@ -104,13 +104,18 @@ export function toNativeDecimals(amount: number, decimals: number): BN {
 
 export function toUiDecimals(
   amount: I80F48 | number,
-  decimals = QUOTE_DECIMALS,
+  decimals: number,
 ): number {
   amount = amount instanceof I80F48 ? amount.toNumber() : amount;
   return amount / Math.pow(10, decimals);
 }
 
-export function toU64(amount: number, decimals): BN {
+export function toUiDecimalsForQuote(amount: I80F48 | number): number {
+  amount = amount instanceof I80F48 ? amount.toNumber() : amount;
+  return amount / Math.pow(10, QUOTE_DECIMALS);
+}
+
+export function toU64(amount: number, decimals: number): BN {
   const bn = toNativeDecimals(amount, decimals).toString();
   console.log('bn', bn);
 

@@ -229,3 +229,5 @@ export const ONE_I80F48 = I80F48.fromString('1');
 export const ZERO_I80F48 = I80F48.fromString('0');
 /** @internal */
 export const NEG_ONE_I80F48 = I80F48.fromString('-1');
+export const HUNDRED_I80F48 = I80F48.fromString('100');
+export const MAX_I80F48 = new I80F48(I80F48.MAX_BN);
