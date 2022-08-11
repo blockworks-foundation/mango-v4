@@ -218,9 +218,10 @@ export class MangoAccount {
   }
 
   /**
-   * The amount of given source native token you can swap to a target token considering all existing assets as collateral.
-   * note: slippageAndFeesFactor is a normalized number, <1, e.g. a slippage of 5% and some fees which are 1%, then slippageAndFeesFactor = 0.94
-   * the factor is used to compute how much target can be obtained by swapping source TODO: loan origination fees
+   * The max amount of given source native token you can swap to a target token.
+   * note: slippageAndFeesFactor is a normalized number, <1,
+   *  e.g. a slippage of 5% and some fees which are 1%, then slippageAndFeesFactor = 0.94
+   *  the factor is used to compute how much target can be obtained by swapping source
    */
   getMaxSourceForTokenSwap(
     group: Group,

@@ -5,6 +5,7 @@ import {
   I80F48,
   I80F48Dto,
   MAX_I80F48,
+  ONE_I80F48,
   ZERO_I80F48,
 } from './I80F48';
 import { HealthType } from './mangoAccount';
@@ -312,7 +313,13 @@ export class HealthCache {
       );
     }
 
-    return amount.div(source.oraclePrice);
+    return amount
+      .div(source.oraclePrice)
+      .mul(
+        ONE_I80F48.sub(
+          group.banksMap.get(sourceTokenName).loanOriginationFeeRate,
+        ),
+      );
   }
 }
 
