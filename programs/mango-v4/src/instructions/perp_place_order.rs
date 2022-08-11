@@ -81,7 +81,6 @@ pub fn perp_place_order(
         MangoError::SomeError
     );
 
-    require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
     let account_pk = ctx.accounts.account.key();
 
     {

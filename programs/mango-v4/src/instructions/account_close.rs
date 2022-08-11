@@ -33,7 +33,6 @@ pub fn account_close(ctx: Context<AccountClose>) -> Result<()> {
         // don't perform checks if group is just testing
         if group.testing == 0 {
             require!(!account.fixed.being_liquidated(), MangoError::SomeError);
-            require!(!account.fixed.is_bankrupt(), MangoError::SomeError);
             require_eq!(account.fixed.delegate, Pubkey::default());
             for ele in account.token_iter() {
                 require_eq!(ele.is_active(), false);

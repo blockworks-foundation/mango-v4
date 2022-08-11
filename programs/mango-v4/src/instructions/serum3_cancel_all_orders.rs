@@ -51,8 +51,6 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
             MangoError::SomeError
         );
 
-        require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
-
         let serum_market = ctx.accounts.serum_market.load()?;
 
         // Validate open_orders

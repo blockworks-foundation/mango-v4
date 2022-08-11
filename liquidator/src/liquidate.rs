@@ -108,11 +108,12 @@ pub fn maybe_liquidate_account(
     let quote_token_index = 0;
 
     let account = account_fetcher.fetch_mango_account(pubkey)?;
-    let maint_health = new_health_cache_(&mango_client.context, account_fetcher, &account)
-        .expect("always ok")
-        .health(HealthType::Maint);
+    let health_cache =
+        new_health_cache_(&mango_client.context, account_fetcher, &account).expect("always ok");
+    let maint_health = health_cache.health(HealthType::Maint);
+    let is_bankrupt = !health_cache.has_liquidatable_assets();
 
-    if maint_health >= 0 && !account.is_bankrupt() {
+    if maint_health >= 0 && !is_bankrupt {
         return Ok(false);
     }
 
@@ -121,16 +122,17 @@ pub fn maybe_liquidate_account(
         pubkey,
         account.fixed.owner,
         maint_health,
-        account.is_bankrupt(),
+        is_bankrupt,
     );
 
     // Fetch a fresh account and re-compute
     // This is -- unfortunately -- needed because the websocket streams seem to not
     // be great at providing timely updates to the account data.
     let account = account_fetcher.fetch_fresh_mango_account(pubkey)?;
-    let maint_health = new_health_cache_(&mango_client.context, account_fetcher, &account)
-        .expect("always ok")
-        .health(HealthType::Maint);
+    let health_cache =
+        new_health_cache_(&mango_client.context, account_fetcher, &account).expect("always ok");
+    let maint_health = health_cache.health(HealthType::Maint);
+    let is_bankrupt = !health_cache.has_liquidatable_assets();
 
     // find asset and liab tokens
     let mut tokens = account
@@ -172,7 +174,7 @@ pub fn maybe_liquidate_account(
     };
 
     // try liquidating
-    let txsig = if account.is_bankrupt() {
+    let txsig = if is_bankrupt {
         if tokens.is_empty() {
             anyhow::bail!("mango account {}, is bankrupt has no active tokens", pubkey);
         }
