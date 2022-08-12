@@ -7,6 +7,10 @@ use crate::accounts_zerocopy::LoadMutZeroCopyRef;
 
 use crate::state::*;
 
+/// Changes a token's parameters.
+///
+/// In addition to these accounts, all banks must be passed as remaining_accounts
+/// in MintInfo order.
 #[derive(Accounts)]
 #[instruction(bank_num: u64)]
 pub struct TokenEdit<'info> {
