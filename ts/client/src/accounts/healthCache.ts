@@ -1,4 +1,5 @@
 import _ from 'lodash';
+import { Bank } from './bank';
 import { Group } from './group';
 import {
   HUNDRED_I80F48,
@@ -40,7 +41,7 @@ export class HealthCache {
   perpInfos: PerpInfo[];
 
   constructor(dto: HealthCacheDto) {
-    this.tokenInfos = dto.tokenInfos.map((dto) => new TokenInfo(dto));
+    this.tokenInfos = dto.tokenInfos.map((dto) => TokenInfo.fromDto(dto));
     this.serum3Infos = dto.serum3Infos.map((dto) => new Serum3Info(dto));
     this.perpInfos = dto.perpInfos.map((dto) => new PerpInfo(dto));
   }
@@ -162,6 +163,14 @@ export class HealthCache {
     );
   }
 
+  getOrCreateTokenInfoIndex(bank: Bank): number {
+    const index = this.findTokenInfoIndex(bank.tokenIndex);
+    if (index == -1) {
+      this.tokenInfos.push(TokenInfo.emptyFromBank(bank));
+    }
+    return this.findTokenInfoIndex(bank.tokenIndex);
+  }
+
   simHealthRatioWithTokenPositionChanges(
     group: Group,
     tokenChanges: { tokenName: string; tokenAmount: number }[],
@@ -170,10 +179,10 @@ export class HealthCache {
     const adjustedCache: HealthCache = _.cloneDeep(this);
     for (const change of tokenChanges) {
       const bank = group.banksMap.get(change.tokenName);
-      adjustedCache.tokenInfos[bank.tokenIndex].balance =
-        adjustedCache.tokenInfos[bank.tokenIndex].balance.add(
-          I80F48.fromNumber(change.tokenAmount).mul(bank.price),
-        );
+      const changeIndex = adjustedCache.getOrCreateTokenInfoIndex(bank);
+      adjustedCache.tokenInfos[changeIndex].balance = adjustedCache.tokenInfos[
+        changeIndex
+      ].balance.add(I80F48.fromNumber(change.tokenAmount).mul(bank.price));
     }
     return adjustedCache.healthRatio(healthType);
   }
@@ -184,8 +193,8 @@ export class HealthCache {
     targetTokenName: string,
     minRatio: I80F48,
   ): I80F48 {
-    const sourceTokenIndex = group.banksMap.get(sourceTokenName).tokenIndex;
-    const targetTokenIndex = group.banksMap.get(targetTokenName).tokenIndex;
+    const sourceBank = group.banksMap.get(sourceTokenName);
+    const targetBank = group.banksMap.get(targetTokenName);
 
     // The health_ratio is a nonlinear based on swap amount.
     // For large swap amounts the slope is guaranteed to be negative, but small amounts
@@ -200,20 +209,21 @@ export class HealthCache {
       return ZERO_I80F48;
     }
 
-    const sourceIndex = this.findTokenInfoIndex(sourceTokenIndex);
-    const targetIndex = this.findTokenInfoIndex(targetTokenIndex);
+    const healthCacheClone: HealthCache = _.cloneDeep(this);
+    const sourceIndex = healthCacheClone.getOrCreateTokenInfoIndex(sourceBank);
+    const targetIndex = healthCacheClone.getOrCreateTokenInfoIndex(targetBank);
 
-    const source = this.tokenInfos[sourceIndex];
-    const target = this.tokenInfos[targetIndex];
+    const source = healthCacheClone.tokenInfos[sourceIndex];
+    const target = healthCacheClone.tokenInfos[targetIndex];
 
     // There are two key slope changes: Assume source.balance > 0 and target.balance < 0. Then
     // initially health ratio goes up. When one of balances flips sign, the health ratio slope
     // may be positive or negative for a bit, until both balances have flipped and the slope is
     // negative.
     // The maximum will be at one of these points (ignoring serum3 effects).
-    const originalHealthCache: HealthCache = _.cloneDeep(this);
+
     function cacheAfterSwap(amount: I80F48) {
-      const adjustedCache: HealthCache = _.cloneDeep(originalHealthCache);
+      const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
       adjustedCache.tokenInfos[sourceIndex].balance =
         adjustedCache.tokenInfos[sourceIndex].balance.sub(amount);
       adjustedCache.tokenInfos[targetIndex].balance =
@@ -340,27 +350,45 @@ export class HealthCache {
 }
 
 export class TokenInfo {
-  constructor(dto: TokenInfoDto) {
-    this.tokenIndex = dto.tokenIndex;
-    this.maintAssetWeight = I80F48.from(dto.maintAssetWeight);
-    this.initAssetWeight = I80F48.from(dto.initAssetWeight);
-    this.maintLiabWeight = I80F48.from(dto.maintLiabWeight);
-    this.initLiabWeight = I80F48.from(dto.initLiabWeight);
-    this.oraclePrice = I80F48.from(dto.oraclePrice);
-    this.balance = I80F48.from(dto.balance);
-    this.serum3MaxReserved = I80F48.from(dto.serum3MaxReserved);
+  constructor(
+    public tokenIndex: number,
+    public maintAssetWeight: I80F48,
+    public initAssetWeight: I80F48,
+    public maintLiabWeight: I80F48,
+    public initLiabWeight: I80F48,
+    // native/native
+    public oraclePrice: I80F48,
+    // in health-reference-token native units
+    public balance: I80F48,
+    // in health-reference-token native units
+    public serum3MaxReserved: I80F48,
+  ) {}
+
+  static fromDto(dto: TokenInfoDto): TokenInfo {
+    return new TokenInfo(
+      dto.tokenIndex,
+      I80F48.from(dto.maintAssetWeight),
+      I80F48.from(dto.initAssetWeight),
+      I80F48.from(dto.maintLiabWeight),
+      I80F48.from(dto.initLiabWeight),
+      I80F48.from(dto.oraclePrice),
+      I80F48.from(dto.balance),
+      I80F48.from(dto.serum3MaxReserved),
+    );
   }
 
-  tokenIndex: number;
-  maintAssetWeight: I80F48;
-  initAssetWeight: I80F48;
-  maintLiabWeight: I80F48;
-  initLiabWeight: I80F48;
-  oraclePrice: I80F48; // native/native
-  // in health-reference-token native units
-  balance: I80F48;
-  // in health-reference-token native units
-  serum3MaxReserved: I80F48;
+  static emptyFromBank(bank: Bank): TokenInfo {
+    return new TokenInfo(
+      bank.tokenIndex,
+      bank.maintAssetWeight,
+      bank.initAssetWeight,
+      bank.maintLiabWeight,
+      bank.initLiabWeight,
+      bank.price,
+      ZERO_I80F48,
+      ZERO_I80F48,
+    );
+  }
 
   assetWeight(healthType: HealthType): I80F48 {
     return healthType == HealthType.init
