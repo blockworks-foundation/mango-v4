@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::error::*;
 use crate::state::*;
-use crate::util::fill32_from_str;
+use crate::util::fill_from_str;
 
 #[derive(Accounts)]
 #[instruction(account_num: u32, token_count: u8, serum3_count: u8, perp_count: u8, perp_oo_count: u8)]
@@ -41,7 +41,7 @@ pub fn account_create(
         account.header_version()
     );
 
-    account.fixed.name = fill32_from_str(name)?;
+    account.fixed.name = fill_from_str(&name)?;
     account.fixed.group = ctx.accounts.group.key();
     account.fixed.owner = ctx.accounts.owner.key();
     account.fixed.account_num = account_num;

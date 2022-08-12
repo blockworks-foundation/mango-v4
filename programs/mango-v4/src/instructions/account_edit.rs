@@ -1,8 +1,8 @@
-use crate::error::MangoError;
 use anchor_lang::prelude::*;
 
+use crate::error::MangoError;
 use crate::state::*;
-use crate::util::fill32_from_str;
+use crate::util::fill_from_str;
 
 #[derive(Accounts)]
 pub struct AccountEdit<'info> {
@@ -34,7 +34,7 @@ pub fn account_edit(
     // please maintain, and don't remove, makes it easy to reason about which support modification by owner
 
     if let Some(name) = name_opt {
-        account.fixed.name = fill32_from_str(name)?;
+        account.fixed.name = fill_from_str(&name)?;
     }
 
     // unchanged -

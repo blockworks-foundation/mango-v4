@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use checked_math as cm;
+use derivative::Derivative;
 use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
 use std::cmp::Ordering;
@@ -10,7 +11,8 @@ use crate::state::*;
 pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
+#[derivative(Debug)]
 pub struct TokenPosition {
     // TODO: Why did we have deposits and borrows as two different values
     //       if only one of them was allowed to be != 0 at a time?
@@ -26,8 +28,10 @@ pub struct TokenPosition {
     /// incremented when a market requires this position to stay alive
     pub in_use_count: u8,
 
+    #[derivative(Debug = "ignore")]
     pub padding: [u8; 5],
 
+    #[derivative(Debug = "ignore")]
     pub reserved: [u8; 40],
 }
 
@@ -82,7 +86,8 @@ impl TokenPosition {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Debug)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
+#[derivative(Debug)]
 pub struct Serum3Orders {
     pub open_orders: Pubkey,
 
@@ -101,8 +106,10 @@ pub struct Serum3Orders {
     pub base_token_index: TokenIndex,
     pub quote_token_index: TokenIndex,
 
+    #[derivative(Debug = "ignore")]
     pub padding: [u8; 2],
 
+    #[derivative(Debug = "ignore")]
     pub reserved: [u8; 64],
 }
 const_assert_eq!(size_of::<Serum3Orders>(), 32 + 8 * 2 + 2 * 3 + 2 + 64);
@@ -137,9 +144,11 @@ impl Default for Serum3Orders {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
+#[derivative(Debug)]
 pub struct PerpPositions {
     pub market_index: PerpMarketIndex,
+    #[derivative(Debug = "ignore")]
     pub padding: [u8; 6],
 
     /// Active position size, measured in base lots
@@ -168,21 +177,8 @@ pub struct PerpPositions {
     pub taker_base_lots: i64,
     pub taker_quote_lots: i64,
 
+    #[derivative(Debug = "ignore")]
     pub reserved: [u8; 64],
-}
-
-impl std::fmt::Debug for PerpPositions {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("PerpAccount")
-            .field("market_index", &self.market_index)
-            .field("base_position_lots", &self.base_position_lots)
-            .field("quote_position_native", &self.quote_position_native)
-            .field("bids_base_lots", &self.bids_base_lots)
-            .field("asks_base_lots", &self.asks_base_lots)
-            .field("taker_base_lots", &self.taker_base_lots)
-            .field("taker_quote_lots", &self.taker_quote_lots)
-            .finish()
-    }
 }
 const_assert_eq!(size_of::<PerpPositions>(), 8 + 7 * 8 + 3 * 16 + 64);
 const_assert_eq!(size_of::<PerpPositions>() % 8, 0);

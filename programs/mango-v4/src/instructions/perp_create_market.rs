@@ -4,7 +4,7 @@ use fixed::types::I80F48;
 use crate::error::MangoError;
 
 use crate::state::*;
-use crate::util::fill16_from_str;
+use crate::util::fill_from_str;
 
 #[derive(Accounts)]
 #[instruction(perp_market_index: PerpMarketIndex)]
@@ -66,7 +66,7 @@ pub fn perp_create_market(
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_init()?;
     *perp_market = PerpMarket {
-        name: fill16_from_str(name)?,
+        name: fill_from_str(&name)?,
         group: ctx.accounts.group.key(),
         oracle: ctx.accounts.oracle.key(),
         oracle_config,
