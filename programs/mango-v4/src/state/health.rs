@@ -695,7 +695,7 @@ impl HealthCache {
              mut right_ratio: I80F48,
              target_ratio: I80F48| {
                 let max_iterations = 20;
-                let target_error = I80F48::ONE;
+                let target_error = I80F48!(0.01);
                 require_msg!(
                     (left_ratio - target_ratio).signum() * (right_ratio - target_ratio).signum()
                         != I80F48::ONE,

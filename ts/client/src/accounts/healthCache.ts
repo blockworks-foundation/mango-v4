@@ -254,7 +254,8 @@ export class HealthCache {
       targetRatio: I80F48,
     ) {
       const maxIterations = 20;
-      const targetError = I80F48.fromString('0.000001'); // ONE_I80F48;
+      // TODO: make relative to health ratio decimals? Might be over engineering
+      const targetError = I80F48.fromString('0.001'); // ONE_I80F48;
 
       if (
         (leftRatio.sub(targetRatio).isPos() &&
@@ -267,8 +268,9 @@ export class HealthCache {
         );
       }
 
+      let newAmount;
       for (const key of Array(maxIterations).fill(0).keys()) {
-        const newAmount = left.add(right).mul(I80F48.fromString('0.5'));
+        newAmount = left.add(right).mul(I80F48.fromString('0.5'));
         const newAmountRatio = healthRatioAfterSwap(newAmount);
         const error = newAmountRatio.sub(targetRatio);
         if (error.isPos() && error.lt(targetError)) {
@@ -281,9 +283,10 @@ export class HealthCache {
           rightRatio = newAmountRatio;
         }
       }
-      throw new Error(
+      console.error(
         `Unable to get targetRatio within ${maxIterations} iterations`,
       );
+      return newAmount;
     }
 
     let amount: I80F48;
