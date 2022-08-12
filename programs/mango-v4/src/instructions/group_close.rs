@@ -26,9 +26,7 @@ pub struct GroupClose<'info> {
 }
 
 pub fn group_close(ctx: Context<GroupClose>) -> Result<()> {
-    // TODO: checks
-
-    // close insurance vault
+    // close insurance vault (must be empty)
     let group = ctx.accounts.group.load()?;
     let group_seeds = group_seeds!(group);
     let cpi_accounts = CloseAccount {

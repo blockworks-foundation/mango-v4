@@ -94,11 +94,11 @@ export class MangoClient {
 
   public async groupEdit(
     group: Group,
-    newAdmin: PublicKey,
-    newFastListingAdmin: PublicKey,
+    admin: PublicKey,
+    fastListingAdmin: PublicKey,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .groupEdit(newAdmin, newFastListingAdmin)
+      .groupEdit(admin, fastListingAdmin)
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,

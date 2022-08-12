@@ -110,12 +110,16 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "newAdmin",
-          "type": "publicKey"
+          "name": "admin",
+          "type": {
+            "option": "publicKey"
+          }
         },
         {
-          "name": "newFastListingAdmin",
-          "type": "publicKey"
+          "name": "fastListingAdmin",
+          "type": {
+            "option": "publicKey"
+          }
         }
       ]
     },
@@ -5150,12 +5154,16 @@ export const IDL: MangoV4 = {
       ],
       "args": [
         {
-          "name": "newAdmin",
-          "type": "publicKey"
+          "name": "admin",
+          "type": {
+            "option": "publicKey"
+          }
         },
         {
-          "name": "newFastListingAdmin",
-          "type": "publicKey"
+          "name": "fastListingAdmin",
+          "type": {
+            "option": "publicKey"
+          }
         }
       ]
     },
