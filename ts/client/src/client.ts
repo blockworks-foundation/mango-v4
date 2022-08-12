@@ -1476,6 +1476,9 @@ export class MangoClient {
     amountIn,
     outputToken,
     userDefinedInstructions,
+    // margin trade is a general function
+    // set swapIndicator to true if you desire the transaction to be recorded as a swap 
+    swapIndicator 
   }: {
     group: Group;
     mangoAccount: MangoAccount;
@@ -1483,6 +1486,7 @@ export class MangoClient {
     amountIn: number;
     outputToken: string;
     userDefinedInstructions: TransactionInstruction[];
+    swapIndicator: boolean;
   }): Promise<TransactionSignature> {
     const inputBank = group.banksMap.get(inputToken);
     const outputBank = group.banksMap.get(outputToken);
@@ -1582,7 +1586,7 @@ export class MangoClient {
     };
 
     const flashLoanEndIx = await this.program.methods
-      .flashLoanEnd()
+      .flashLoanEnd(swapIndicator)
       .accounts({
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,

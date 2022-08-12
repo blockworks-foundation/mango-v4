@@ -1224,7 +1224,12 @@ export type MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "swapIndicator",
+          "type": "bool"
+        }
+      ]
     },
     {
       "name": "serum3RegisterMarket",
@@ -4580,6 +4585,11 @@ export type MangoV4 = {
               "defined": "FlashLoanTokenDetail"
             }
           },
+          "index": false
+        },
+        {
+          "name": "swapIndicator",
+          "type": "bool",
           "index": false
         }
       ]
@@ -6255,7 +6265,12 @@ export const IDL: MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "swapIndicator",
+          "type": "bool"
+        }
+      ]
     },
     {
       "name": "serum3RegisterMarket",
@@ -9611,6 +9626,11 @@ export const IDL: MangoV4 = {
               "defined": "FlashLoanTokenDetail"
             }
           },
+          "index": false
+        },
+        {
+          "name": "swapIndicator",
+          "type": "bool",
           "index": false
         }
       ]

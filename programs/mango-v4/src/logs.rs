@@ -66,6 +66,7 @@ pub struct FlashLoanLog {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
     pub token_loan_details: Vec<FlashLoanTokenDetail>,
+    pub swap_indicator: bool,
 }
 
 #[event]

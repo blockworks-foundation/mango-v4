@@ -136,7 +136,7 @@ async function main() {
         );
       // 1. build flash loan end ix
       const flashLoadnEndIx = await client.program.methods
-        .flashLoanEnd()
+        .flashLoanEnd(true)
         .accounts({
           account: mangoAccount.publicKey,
           owner: (client.program.provider as AnchorProvider).wallet.publicKey,

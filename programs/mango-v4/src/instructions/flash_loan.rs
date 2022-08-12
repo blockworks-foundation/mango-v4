@@ -198,6 +198,7 @@ struct TokenVaultChange {
 
 pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
+    swap_indicator: bool,
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_mut()?;
     let group = account.fixed.group;
@@ -285,6 +286,13 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         });
     }
 
+    if swap_indicator {
+        require_msg!(
+            changes.len() == 2,
+            "when swap_indicator is true there must be exactly 2 token vault changes"
+        )
+    }
+
     // all vaults must have had matching banks
     for (i, has_bank) in vaults_with_banks.iter().enumerate() {
         require_msg!(
@@ -368,6 +376,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     emit!(FlashLoanLog {
         mango_group: group.key(),
         mango_account: ctx.accounts.account.key(),
+        swap_indicator: swap_indicator,
         token_loan_details
     });
 

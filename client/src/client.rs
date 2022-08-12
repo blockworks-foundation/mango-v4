@@ -1107,7 +1107,9 @@ impl MangoClient {
                 ams.push(to_readonly_account_meta(self.group()));
                 ams
             },
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanEnd {}),
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanEnd {
+                swap_indicator: true,
+            }),
         });
 
         let rpc = self.client.rpc_async();

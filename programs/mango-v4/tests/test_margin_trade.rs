@@ -194,6 +194,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
             mango_token_bank: bank,
             mango_token_vault: vault,
             target_token_account,
+            swap_indicator: false,
         })
         .await;
         tx.send().await.unwrap();
