@@ -120,7 +120,7 @@ async function main() {
   }
 
   for (const keypair of [
-    // process.env.MB_PAYER_KEYPAIR,
+    process.env.MB_PAYER_KEYPAIR,
     process.env.MB_USER2_KEYPAIR,
   ]) {
     console.log();
