@@ -28,6 +28,7 @@ bincode = "1.3.3"
 borsh = { version = "0.9.3", features = ["const-generics"] }
 bytemuck = "^1.7.2"
 checked_math = { path = "../../lib/checked_math" }
+derivative = "2.2.0"
 fixed = { version = "=1.11.0", features = ["serde", "borsh"] } # todo: higher versions don't work
 fixed-macro = "^1.1.1"
 mango-macro = { path = "../../mango-macro" }

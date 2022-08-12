@@ -5,7 +5,7 @@ use fixed::types::I80F48;
 use crate::error::*;
 use crate::instructions::INDEX_START;
 use crate::state::*;
-use crate::util::fill16_from_str;
+use crate::util::fill_from_str;
 
 const FIRST_BANK_NUM: u32 = 0;
 
@@ -72,7 +72,7 @@ pub fn token_register_trustless(
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
         group: ctx.accounts.group.key(),
-        name: fill16_from_str(name)?,
+        name: fill_from_str(&name)?,
         mint: ctx.accounts.mint.key(),
         vault: ctx.accounts.vault.key(),
         oracle: ctx.accounts.oracle.key(),
