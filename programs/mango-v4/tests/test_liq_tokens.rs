@@ -406,7 +406,6 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     assert!(account_position_closed(solana, account, collateral_token2.bank).await,);
     let liqee = get_mango_account(solana, account).await;
     assert!(liqee.being_liquidated());
-    assert!(!liqee.is_bankrupt());
 
     //
     // TEST: liquidate the remaining borrow2 against collateral1,
@@ -436,7 +435,6 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     );
     let liqee = get_mango_account(solana, account).await;
     assert!(liqee.being_liquidated());
-    assert!(!liqee.is_bankrupt());
 
     //
     // TEST: liquidate borrow1 with collateral1, but place a limit
@@ -468,7 +466,6 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     );
     let liqee = get_mango_account(solana, account).await;
     assert!(liqee.being_liquidated());
-    assert!(!liqee.is_bankrupt());
 
     //
     // TEST: liquidate borrow1 with collateral1, making the account healthy again
@@ -503,7 +500,6 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     );
     let liqee = get_mango_account(solana, account).await;
     assert!(!liqee.being_liquidated());
-    assert!(!liqee.is_bankrupt());
 
     //
     // TEST: bankruptcy when collateral is dusted
@@ -567,11 +563,12 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    // Liqee's remaining collateral got dusted, only borrows remain: bankrupt
+    // Liqee's remaining collateral got dusted, only borrows remain
+    // but the borrow amount is so tiny, that being_liquidated is already switched off
     let liqee = get_mango_account(solana, account).await;
     assert_eq!(liqee.token_iter_active().count(), 1);
-    assert!(liqee.is_bankrupt());
-    assert!(liqee.being_liquidated());
+    assert!(account_position_f64(solana, account, borrow_token1.bank).await > -1.0);
+    assert!(!liqee.being_liquidated());
 
     Ok(())
 }

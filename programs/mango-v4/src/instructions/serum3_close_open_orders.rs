@@ -41,8 +41,6 @@ pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<(
         MangoError::SomeError
     );
 
-    require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
-
     let serum_market = ctx.accounts.serum_market.load()?;
 
     // Validate open_orders

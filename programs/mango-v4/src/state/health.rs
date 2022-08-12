@@ -16,7 +16,7 @@ use crate::util::checked_math as cm;
 
 use super::MangoAccountRef;
 
-const BANKRUPTCY_DUST_THRESHOLD: I80F48 = I80F48!(0.000001);
+const ONE_NATIVE_USDC_IN_USD: I80F48 = I80F48!(0.000001);
 
 /// This trait abstracts how to find accounts needed for the health computation.
 ///
@@ -565,13 +565,14 @@ impl HealthCache {
     }
 
     pub fn has_liquidatable_assets(&self) -> bool {
-        let spot_liquidatable = self.token_infos.iter().any(|ti| {
-            ti.balance > BANKRUPTCY_DUST_THRESHOLD || ti.serum3_max_reserved.is_positive()
-        });
+        let spot_liquidatable = self
+            .token_infos
+            .iter()
+            .any(|ti| ti.balance.is_positive() || ti.serum3_max_reserved.is_positive());
         let perp_liquidatable = self
             .perp_infos
             .iter()
-            .any(|p| p.base != 0 || p.quote > BANKRUPTCY_DUST_THRESHOLD);
+            .any(|p| p.base != 0 || p.quote > ONE_NATIVE_USDC_IN_USD);
         spot_liquidatable || perp_liquidatable
     }
 

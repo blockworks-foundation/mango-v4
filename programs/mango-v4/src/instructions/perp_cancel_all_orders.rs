@@ -31,8 +31,6 @@ pub fn perp_cancel_all_orders(ctx: Context<PerpCancelAllOrders>, limit: u8) -> R
         MangoError::SomeError
     );
 
-    require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
-
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
     let bids = ctx.accounts.bids.load_mut()?;
     let asks = ctx.accounts.asks.load_mut()?;

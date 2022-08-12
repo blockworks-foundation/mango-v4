@@ -47,10 +47,8 @@ pub fn liq_token_with_token(
             .is_owner_or_delegate(ctx.accounts.liqor_owner.key()),
         MangoError::SomeError
     );
-    require!(!liqor.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
     let mut liqee = ctx.accounts.liqee.load_mut()?;
-    require!(!liqee.fixed.is_bankrupt(), MangoError::IsBankrupt);
 
     // Initial liqee health check
     let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
@@ -236,18 +234,10 @@ pub fn liq_token_with_token(
     }
 
     // Check liqee health again
-    let maint_health = liqee_health_cache.health(HealthType::Maint);
-    if maint_health < I80F48::ZERO {
-        liqee
-            .fixed
-            .set_bankrupt(!liqee_health_cache.has_liquidatable_assets());
-    } else {
-        let init_health = liqee_health_cache.health(HealthType::Init);
-
-        // this is equivalent to one native USDC or 1e-6 USDC
-        // This is used as threshold to flip flag instead of 0 because of dust issues
-        liqee.fixed.set_being_liquidated(init_health < -I80F48::ONE);
-    }
+    let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+    liqee
+        .fixed
+        .maybe_recover_from_being_liquidated(liqee_init_health);
 
     // Check liqor's health
     let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)

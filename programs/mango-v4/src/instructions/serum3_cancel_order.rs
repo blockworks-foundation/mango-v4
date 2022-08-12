@@ -64,8 +64,6 @@ pub fn serum3_cancel_order(
             MangoError::SomeError
         );
 
-        require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
-
         // Validate open_orders
         require!(
             account

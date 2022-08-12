@@ -70,7 +70,6 @@ pub fn serum3_liq_force_cancel_orders(
     //
     {
         let account = ctx.accounts.account.load()?;
-        require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
         let serum_market = ctx.accounts.serum_market.load()?;
 
         // Validate open_orders

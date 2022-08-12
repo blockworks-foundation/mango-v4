@@ -60,24 +60,21 @@ async function debugUser(client, group, mangoAccount) {
   );
 
   console.log(
-    'mangoAccount.simHealthWithTokenPositionChanges ' +
-      toUiDecimalsForQuote(
-        (
-          await mangoAccount.simHealthWithTokenPositionChanges(group, [
-            {
-              tokenName: 'USDC',
-              tokenAmount:
-                -20_000 *
-                Math.pow(10, group.banksMap.get('BTC')!.mintDecimals!),
-            },
-            {
-              tokenName: 'BTC',
-              tokenAmount:
-                1 * Math.pow(10, group.banksMap.get('BTC')!.mintDecimals!),
-            },
-          ])
-        ).toNumber(),
-      ),
+    'mangoAccount.simHealthRatioWithTokenPositionChanges ' +
+      (
+        await mangoAccount.simHealthRatioWithTokenPositionChanges(group, [
+          {
+            tokenName: 'USDC',
+            tokenAmount:
+              -95_000 * Math.pow(10, group.banksMap.get('USDC')!.mintDecimals!),
+          },
+          {
+            tokenName: 'BTC',
+            tokenAmount:
+              4 * Math.pow(10, group.banksMap.get('BTC')!.mintDecimals!),
+          },
+        ])
+      ).toNumber(),
   );
 
   function getMaxSourceForTokenSwapWrapper(src, tgt) {

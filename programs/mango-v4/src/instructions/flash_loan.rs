@@ -184,8 +184,6 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     let mut account = ctx.accounts.account.load_mut()?;
     let group = account.fixed.group;
 
-    require!(!account.fixed.is_bankrupt(), MangoError::IsBankrupt);
-
     // Find index at which vaults start
     let vaults_index = ctx
         .remaining_accounts
