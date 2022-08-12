@@ -237,34 +237,19 @@ export class MangoAccount {
   }
 
   /**
-   * Simulates new health after applying tokenChanges to the token positions. Useful to simulate health after a potential swap.
+   * Simulates new health ratio after applying tokenChanges to the token positions.
+   * e.g. useful to simulate health after a potential swap.
    */
-  simHealthWithTokenPositionChanges(
+  simHealthRatioWithTokenPositionChanges(
     group: Group,
     tokenChanges: { tokenName: string; tokenAmount: number }[],
+    healthType: HealthType = HealthType.init,
   ): I80F48 {
-    // This is a approximation of the easy case, where
-    // mango account has no token positions for tokens in changes list, or
-    // the change is in direction e.g. deposits for deposits, borrows for borrows, of existing token position.
-    // TODO: recompute entire health using components.
-    const initHealth = (this.accountData as MangoAccountData).initHealth;
-    for (const change of tokenChanges) {
-      const bank = group.banksMap.get(change.tokenName);
-      if (change.tokenAmount >= 0) {
-        initHealth.add(
-          bank.initAssetWeight
-            .mul(I80F48.fromNumber(change.tokenAmount))
-            .mul(bank.price),
-        );
-      } else {
-        initHealth.sub(
-          bank.initLiabWeight
-            .mul(I80F48.fromNumber(change.tokenAmount))
-            .mul(bank.price),
-        );
-      }
-    }
-    return initHealth;
+    return this.accountData.healthCache.simHealthRatioWithTokenPositionChanges(
+      group,
+      tokenChanges,
+      healthType,
+    );
   }
 
   /**

@@ -162,6 +162,22 @@ export class HealthCache {
     );
   }
 
+  simHealthRatioWithTokenPositionChanges(
+    group: Group,
+    tokenChanges: { tokenName: string; tokenAmount: number }[],
+    healthType: HealthType = HealthType.init,
+  ): I80F48 {
+    const adjustedCache: HealthCache = _.cloneDeep(this);
+    for (const change of tokenChanges) {
+      const bank = group.banksMap.get(change.tokenName);
+      adjustedCache.tokenInfos[bank.tokenIndex].balance =
+        adjustedCache.tokenInfos[bank.tokenIndex].balance.add(
+          I80F48.fromNumber(change.tokenAmount).mul(bank.price),
+        );
+    }
+    return adjustedCache.healthRatio(healthType);
+  }
+
   getMaxSourceForTokenSwap(
     group: Group,
     sourceTokenName: string,
