@@ -36,7 +36,7 @@ async function main() {
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
   // fetch group
-  const group = await client.getGroupForCreator(admin.publicKey, 0);
+  const group = await client.getGroupForCreator(admin.publicKey, 2);
   console.log(`Found group ${group.publicKey.toBase58()}`);
 
   // account

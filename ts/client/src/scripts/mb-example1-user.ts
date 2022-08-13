@@ -29,7 +29,7 @@ async function main() {
   );
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
-  const group = await client.getGroupForCreator(admin.publicKey, 0);
+  const group = await client.getGroupForCreator(admin.publicKey, 2);
   console.log(`${group.toString()}`);
 
   // create + fetch account
