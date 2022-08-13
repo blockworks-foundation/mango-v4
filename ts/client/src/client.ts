@@ -15,7 +15,6 @@ import {
   AccountMeta,
   Cluster,
   Keypair,
-  LAMPORTS_PER_SOL,
   MemcmpFilter,
   PublicKey,
   Signer,
@@ -53,6 +52,7 @@ import {
   toNativeDecimals,
 } from './utils';
 import { simulate } from './utils/anchor';
+import { sendTransaction } from './utils/rpc';
 
 enum AccountRetriever {
   Scanning,
@@ -62,12 +62,21 @@ enum AccountRetriever {
 // TODO: replace ui values with native as input wherever possible
 // TODO: replace token/market names with token or market indices
 export class MangoClient {
+  private postSendTxCallback?: ({ txid: string }) => void;
+  private prioritizationFee: number;
+
   constructor(
     public program: Program<MangoV4>,
     public programId: PublicKey,
     public cluster: Cluster,
     public groupName?: string,
+    public opts: {
+      postSendTxCallback?: ({ txid }: { txid: string }) => void;
+      prioritizationFee?: number;
+    } = {},
   ) {
+    this.prioritizationFee = opts?.prioritizationFee || 0;
+    this.postSendTxCallback = opts?.postSendTxCallback;
     // TODO: evil side effect, but limited backtraces are a nightmare
     Error.stackTraceLimit = 1000;
   }
@@ -782,7 +791,7 @@ export class MangoClient {
         [bank],
       );
 
-    return await this.program.methods
+    const transaction = await this.program.methods
       .tokenWithdraw(new BN(nativeAmount), allowBorrow)
       .accounts({
         group: group.publicKey,
@@ -806,7 +815,16 @@ export class MangoClient {
           bank.mint,
         ),
       ])
-      .rpc({ skipPreflight: true });
+      .transaction();
+    // .rpc({ skipPreflight: true });
+
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      transaction,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
   }
 
   // Serum
@@ -1574,7 +1592,10 @@ export class MangoClient {
       tx.add(i);
     }
     tx.add(flashLoanEndIx);
-    return this.program.provider.sendAndConfirm(tx);
+
+    return await sendTransaction(this.program.provider as AnchorProvider, tx, {
+      postSendTxCallback: this.postSendTxCallback,
+    });
   }
 
   async updateIndexAndRate(group: Group, tokenName: string) {
@@ -1652,6 +1673,7 @@ export class MangoClient {
     provider: Provider,
     cluster: Cluster,
     programId: PublicKey,
+    opts: any = {},
   ): MangoClient {
     // TODO: use IDL on chain or in repository? decide...
     // Alternatively we could fetch IDL from chain.
@@ -1662,6 +1684,8 @@ export class MangoClient {
       new Program<MangoV4>(idl as MangoV4, programId, provider),
       programId,
       cluster,
+      null,
+      opts,
     );
   }
 
