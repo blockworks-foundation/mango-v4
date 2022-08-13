@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 
+use crate::error::*;
 use crate::state::*;
 
 #[derive(Accounts)]
@@ -25,7 +26,7 @@ pub struct TokenAddBank<'info> {
     #[account(
         init,
         // using the token_index in this seed guards against reusing it
-        seeds = [group.key().as_ref(), b"Bank".as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
+        seeds = [b"Bank".as_ref(), group.key().as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<Bank>(),
@@ -34,7 +35,7 @@ pub struct TokenAddBank<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"Vault".as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
+        seeds = [b"Vault".as_ref(), group.key().as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
         bump,
         token::authority = group,
         token::mint = mint,
@@ -44,10 +45,12 @@ pub struct TokenAddBank<'info> {
 
     #[account(
         mut,
-        seeds = [group.key().as_ref(), b"MintInfo".as_ref(), mint.key().as_ref()],
-        bump
+        constraint = mint_info.load()?.token_index == token_index,
+        has_one = group,
+        has_one = mint,
     )]
     pub mint_info: AccountLoader<'info, MintInfo>,
+
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -56,8 +59,6 @@ pub struct TokenAddBank<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-// TODO: should this be "configure_mint", we pass an explicit index, and allow
-// overwriting config as long as the mint account stays the same?
 #[allow(clippy::too_many_arguments)]
 #[allow(unused_variables)]
 pub fn token_add_bank(
@@ -65,11 +66,10 @@ pub fn token_add_bank(
     token_index: TokenIndex,
     bank_num: u32,
 ) -> Result<()> {
-    // TODO: Error if mint is already configured (technically, init of vault will fail)
-
     let existing_bank = ctx.accounts.existing_bank.load()?;
     let mut bank = ctx.accounts.bank.load_init()?;
-    *bank = Bank::from_existing_bank(&existing_bank, ctx.accounts.vault.key(), bank_num);
+    let bump = *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?;
+    *bank = Bank::from_existing_bank(&existing_bank, ctx.accounts.vault.key(), bank_num, bump);
 
     let mut mint_info = ctx.accounts.mint_info.load_mut()?;
     let free_slot = mint_info

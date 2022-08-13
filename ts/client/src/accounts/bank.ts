@@ -26,6 +26,7 @@ export class Bank {
   public util0: I80F48;
   public util1: I80F48;
   public price: I80F48;
+  public collectedFeesNative: I80F48;
   public loanFeeRate: I80F48;
   public loanOriginationFeeRate: I80F48;
   public initAssetWeight: I80F48;
@@ -166,6 +167,7 @@ export class Bank {
     this.rate0 = I80F48.from(rate0);
     this.util1 = I80F48.from(util1);
     this.rate1 = I80F48.from(rate1);
+    this.collectedFeesNative = I80F48.from(collectedFeesNative);
     this.loanFeeRate = I80F48.from(loanFeeRate);
     this.loanOriginationFeeRate = I80F48.from(loanOriginationFeeRate);
     this.maintAssetWeight = I80F48.from(maintAssetWeight);

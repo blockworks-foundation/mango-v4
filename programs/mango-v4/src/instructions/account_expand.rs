@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::state::*;
+use crate::util::checked_math as cm;
 
 #[derive(Accounts)]
 pub struct AccountExpand<'info> {
@@ -32,6 +33,7 @@ pub fn account_expand(
 
     let realloc_account = ctx.accounts.account.as_ref();
     let old_space = realloc_account.data_len();
+    let old_lamports = realloc_account.lamports();
 
     require_gt!(new_space, old_space);
 
@@ -44,13 +46,11 @@ pub fn account_expand(
                 to: realloc_account.clone(),
             },
         ),
-        new_rent_minimum
-            .checked_sub(realloc_account.lamports())
-            .unwrap(),
+        cm!(new_rent_minimum - old_lamports),
     )?;
 
-    // realloc
-    realloc_account.realloc(new_space, true)?;
+    // realloc: it's safe to not re-zero-init since we never shrink accounts
+    realloc_account.realloc(new_space, false)?;
 
     // expand dynamic content, e.g. to grow token positions, we need to slide serum3orders further later, and so on....
     let mut account = ctx.accounts.account.load_mut()?;

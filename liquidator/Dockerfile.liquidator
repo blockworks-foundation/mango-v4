@@ -2,4 +2,4 @@
 # heroku container:push keeper -R -a HEROKU_APP_NAME
 # heroku container:release -a HEROKU_APP_NAME
 FROM us-docker.pkg.dev/mango-markets/gcr.io/mango-v4:latest
-ENTRYPOINT ["liquidator"] 
+CMD ["liquidator"] 

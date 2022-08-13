@@ -10,6 +10,7 @@ import {
 } from '../accounts/serum3';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
+import { toUiDecimalsForQuote } from '../utils';
 
 //
 // An example for users based on high level api i.e. the client
@@ -240,11 +241,15 @@ async function main() {
     );
     console.log(
       '...mangoAccount.getAssetsVal() ' +
-        toUiDecimalsForQuote(mangoAccount.getAssetsVal().toNumber()),
+        toUiDecimalsForQuote(
+          mangoAccount.getAssetsVal(HealthType.init).toNumber(),
+        ),
     );
     console.log(
       '...mangoAccount.getLiabsVal() ' +
-        toUiDecimalsForQuote(mangoAccount.getLiabsVal().toNumber()),
+        toUiDecimalsForQuote(
+          mangoAccount.getLiabsVal(HealthType.init).toNumber(),
+        ),
     );
     console.log(
       '...mangoAccount.getMaxWithdrawWithBorrowForToken(group, "SOL") ' +

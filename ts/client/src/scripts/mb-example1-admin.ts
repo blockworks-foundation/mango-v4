@@ -209,7 +209,7 @@ async function main() {
   );
 
   console.log(`Registering MNGO...`);
-  await client.groupEdit(group, group.admin, group.admin);
+  await client.groupEdit(group, group.admin, group.admin, undefined, undefined);
   const mngoMainnetMint = new PublicKey(MAINNET_MINTS.get('MNGO')!);
   const mngoMainnetOracle = new PublicKey(MAINNET_ORACLES.get('MNGO')!);
   await client.tokenRegisterTrustless(

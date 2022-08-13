@@ -48,9 +48,6 @@ impl<'info> TokenDeposit<'info> {
     }
 }
 
-// TODO: It may make sense to have the token_index passed in from the outside.
-//       That would save a lot of computation that needs to go into finding the
-//       right index for the mint.
 pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     require_msg!(amount > 0, "deposit amount must be positive");
 

@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::error::MangoError;
 use crate::serum3_cpi::{load_market_state, pubkey_from_u64_array};
 use crate::state::*;
-use crate::util::fill16_from_str;
+use crate::util::fill_from_str;
 
 #[derive(Accounts)]
 pub struct Serum3RegisterMarket<'info> {
@@ -24,7 +24,7 @@ pub struct Serum3RegisterMarket<'info> {
     #[account(
         init,
         // using the serum_market_external in the seed guards against registering the same market twice
-        seeds = [group.key().as_ref(), b"Serum3Market".as_ref(), serum_market_external.key().as_ref()],
+        seeds = [b"Serum3Market".as_ref(), group.key().as_ref(), serum_market_external.key().as_ref()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<Serum3Market>(),
@@ -67,7 +67,7 @@ pub fn serum3_register_market(
 
     let mut serum_market = ctx.accounts.serum_market.load_init()?;
     *serum_market = Serum3Market {
-        name: fill16_from_str(name)?,
+        name: fill_from_str(&name)?,
         group: ctx.accounts.group.key(),
         serum_program: ctx.accounts.serum_program.key(),
         serum_market_external: ctx.accounts.serum_market_external.key(),

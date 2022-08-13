@@ -956,14 +956,10 @@ impl<
             }
         }
 
-        // update header
-        let header_mut = self.header_mut();
-        header_mut.token_count = new_token_count;
-        header_mut.serum3_count = new_serum3_count;
-        header_mut.perp_count = new_perp_count;
-        header_mut.perp_oo_count = new_perp_oo_count;
+        // update the already-parsed header
+        *self.header_mut() = new_header;
 
-        // write new lengths (uses header)
+        // write new lengths to the dynamic data (uses header)
         self.write_token_length();
         self.write_serum3_length();
         self.write_perp_length();

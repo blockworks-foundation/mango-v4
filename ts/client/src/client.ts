@@ -104,11 +104,18 @@ export class MangoClient {
 
   public async groupEdit(
     group: Group,
-    newAdmin: PublicKey,
-    newFastListingAdmin: PublicKey,
+    admin: PublicKey | undefined,
+    fastListingAdmin: PublicKey | undefined,
+    testing: number | undefined,
+    version: number | undefined,
   ): Promise<TransactionSignature> {
     return await this.program.methods
-      .groupEdit(newAdmin, newFastListingAdmin)
+      .groupEdit(
+        admin ?? null,
+        fastListingAdmin ?? null,
+        testing ?? null,
+        version ?? null,
+      )
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -597,6 +604,21 @@ export class MangoClient {
           memcmp: {
             bytes: ownerPk.toBase58(),
             offset: 40,
+          },
+        },
+      ])
+    ).map((pa) => {
+      return MangoAccount.from(pa.publicKey, pa.account);
+    });
+  }
+
+  public async getAllMangoAccounts(group: Group): Promise<MangoAccount[]> {
+    return (
+      await this.program.account.mangoAccount.all([
+        {
+          memcmp: {
+            bytes: group.publicKey.toBase58(),
+            offset: 8,
           },
         },
       ])

@@ -1,6 +1,8 @@
 use super::{OracleConfig, TokenIndex, TokenPosition};
+use crate::util;
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
+use derivative::Derivative;
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 use static_assertions::const_assert_eq;
@@ -13,11 +15,14 @@ pub const DAY_I80F48: I80F48 = I80F48!(86400);
 pub const YEAR_I80F48: I80F48 = I80F48!(31536000);
 pub const MINIMUM_MAX_RATE: I80F48 = I80F48!(0.5);
 
+#[derive(Derivative)]
+#[derivative(Debug)]
 #[account(zero_copy)]
 pub struct Bank {
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
 
+    #[derivative(Debug(format_with = "util::format_zero_terminated_utf8_bytes"))]
     pub name: [u8; 16],
 
     pub mint: Pubkey,
@@ -94,6 +99,7 @@ pub struct Bank {
 
     pub bank_num: u32,
 
+    #[derivative(Debug = "ignore")]
     pub reserved: [u8; 2560],
 }
 const_assert_eq!(
@@ -102,73 +108,37 @@ const_assert_eq!(
 );
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
-impl std::fmt::Debug for Bank {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Bank")
-            .field("name", &self.name())
-            .field("group", &self.group)
-            .field("mint", &self.mint)
-            .field("vault", &self.vault)
-            .field("oracle", &self.oracle)
-            .field("oracle_config", &self.oracle_config)
-            .field("deposit_index", &self.deposit_index)
-            .field("borrow_index", &self.borrow_index)
-            .field(
-                "cached_indexed_total_deposits",
-                &self.cached_indexed_total_deposits,
-            )
-            .field(
-                "cached_indexed_total_borrows",
-                &self.cached_indexed_total_borrows,
-            )
-            .field("indexed_deposits", &self.indexed_deposits)
-            .field("indexed_borrows", &self.indexed_borrows)
-            .field("index_last_updated", &self.index_last_updated)
-            .field("bank_rate_last_updated", &self.bank_rate_last_updated)
-            .field("avg_utilization", &self.avg_utilization)
-            .field("util0", &self.util0)
-            .field("rate0", &self.rate0)
-            .field("util1", &self.util1)
-            .field("rate1", &self.rate1)
-            .field("max_rate", &self.max_rate)
-            .field("collected_fees_native", &self.collected_fees_native)
-            .field("loan_origination_fee_rate", &self.loan_origination_fee_rate)
-            .field("loan_fee_rate", &self.loan_fee_rate)
-            .field("maint_asset_weight", &self.maint_asset_weight)
-            .field("init_asset_weight", &self.init_asset_weight)
-            .field("maint_liab_weight", &self.maint_liab_weight)
-            .field("init_liab_weight", &self.init_liab_weight)
-            .field("liquidation_fee", &self.liquidation_fee)
-            .field("dust", &self.dust)
-            .field("token_index", &self.token_index)
-            .field(
-                "flash_loan_approved_amount",
-                &self.flash_loan_approved_amount,
-            )
-            .field(
-                "flash_loan_token_account_initial",
-                &self.flash_loan_token_account_initial,
-            )
-            .field("reserved", &self.reserved)
-            .finish()
-    }
-}
-
 impl Bank {
-    pub fn from_existing_bank(existing_bank: &Bank, vault: Pubkey, bank_num: u32) -> Self {
+    pub fn from_existing_bank(
+        existing_bank: &Bank,
+        vault: Pubkey,
+        bank_num: u32,
+        bump: u8,
+    ) -> Self {
         Self {
+            // values that must be reset/changed
+            vault,
+            indexed_deposits: I80F48::ZERO,
+            indexed_borrows: I80F48::ZERO,
+            collected_fees_native: I80F48::ZERO,
+            dust: I80F48::ZERO,
+            flash_loan_approved_amount: 0,
+            flash_loan_token_account_initial: u64::MAX,
+            bump,
+            bank_num,
+
+            // values that can be copied
+            // these are listed explicitly, so someone must make the decision when a
+            // new field is added!
             name: existing_bank.name,
             group: existing_bank.group,
             mint: existing_bank.mint,
-            vault,
             oracle: existing_bank.oracle,
             oracle_config: existing_bank.oracle_config,
             deposit_index: existing_bank.deposit_index,
             borrow_index: existing_bank.borrow_index,
             cached_indexed_total_deposits: existing_bank.cached_indexed_total_deposits,
             cached_indexed_total_borrows: existing_bank.cached_indexed_total_borrows,
-            indexed_deposits: I80F48::ZERO,
-            indexed_borrows: I80F48::ZERO,
             index_last_updated: existing_bank.index_last_updated,
             bank_rate_last_updated: existing_bank.bank_rate_last_updated,
             avg_utilization: existing_bank.avg_utilization,
@@ -178,7 +148,6 @@ impl Bank {
             util1: existing_bank.util1,
             rate1: existing_bank.rate1,
             max_rate: existing_bank.max_rate,
-            collected_fees_native: existing_bank.collected_fees_native,
             loan_origination_fee_rate: existing_bank.loan_origination_fee_rate,
             loan_fee_rate: existing_bank.loan_fee_rate,
             maint_asset_weight: existing_bank.maint_asset_weight,
@@ -186,14 +155,9 @@ impl Bank {
             maint_liab_weight: existing_bank.maint_liab_weight,
             init_liab_weight: existing_bank.init_liab_weight,
             liquidation_fee: existing_bank.liquidation_fee,
-            dust: I80F48::ZERO,
-            flash_loan_approved_amount: 0,
-            flash_loan_token_account_initial: u64::MAX,
             token_index: existing_bank.token_index,
-            bump: existing_bank.bump,
             mint_decimals: existing_bank.mint_decimals,
             reserved: [0; 2560],
-            bank_num,
         }
     }
 
@@ -535,8 +499,8 @@ impl Bank {
 macro_rules! bank_seeds {
     ( $bank:expr ) => {
         &[
-            $bank.group.as_ref(),
             b"Bank".as_ref(),
+            $bank.group.as_ref(),
             $bank.token_index.to_le_bytes(),
             &bank.bank_num.to_le_bytes(),
             &[$bank.bump],

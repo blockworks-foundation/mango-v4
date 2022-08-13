@@ -48,8 +48,8 @@ impl Serum3Market {
 macro_rules! serum_market_seeds {
     ( $acc:expr ) => {
         &[
-            $acc.group.as_ref(),
             b"Serum3Market".as_ref(),
+            $acc.group.as_ref(),
             $acc.serum_market_external.as_ref(),
             &[$acc.bump],
         ]

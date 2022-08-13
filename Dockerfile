@@ -16,6 +16,6 @@ RUN --mount=type=cache,target=/usr/local/cargo,from=rust,source=/usr/local/cargo
 # Copy bins out of cache
 RUN --mount=type=cache,target=target mkdir .bin && cp target/release/keeper target/release/liquidator .bin/
 
-FROM debian:buster-slim as run
-RUN apt-get update && apt-get -y install ca-certificates
+FROM debian:bullseye-slim as run
+RUN apt-get update && apt-get -y install ca-certificates libc6
 COPY --from=build /app/.bin/* /usr/local/bin/
