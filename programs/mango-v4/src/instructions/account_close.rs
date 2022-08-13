@@ -27,22 +27,19 @@ pub struct AccountClose<'info> {
 pub fn account_close(ctx: Context<AccountClose>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
-    {
-        let account = ctx.accounts.account.load_mut()?;
+    let account = ctx.accounts.account.load_mut()?;
 
-        // don't perform checks if group is just testing
-        if group.testing == 0 {
-            require!(!account.fixed.being_liquidated(), MangoError::SomeError);
-            require_eq!(account.fixed.delegate, Pubkey::default());
-            for ele in account.token_iter() {
-                require_eq!(ele.is_active(), false);
-            }
-            for ele in account.serum3_iter() {
-                require_eq!(ele.is_active(), false);
-            }
-            for ele in account.perp_iter() {
-                require_eq!(ele.is_active(), false);
-            }
+    // don't perform checks if group is just testing
+    if !group.is_testing() {
+        require!(!account.fixed.being_liquidated(), MangoError::SomeError);
+        for ele in account.token_iter() {
+            require_eq!(ele.is_active(), false);
+        }
+        for ele in account.serum3_iter() {
+            require_eq!(ele.is_active(), false);
+        }
+        for ele in account.perp_iter() {
+            require_eq!(ele.is_active(), false);
         }
     }
 

@@ -109,20 +109,36 @@ const_assert_eq!(
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
 impl Bank {
-    pub fn from_existing_bank(existing_bank: &Bank, vault: Pubkey, bank_num: u32) -> Self {
+    pub fn from_existing_bank(
+        existing_bank: &Bank,
+        vault: Pubkey,
+        bank_num: u32,
+        bump: u8,
+    ) -> Self {
         Self {
+            // values that must be reset/changed
+            vault,
+            indexed_deposits: I80F48::ZERO,
+            indexed_borrows: I80F48::ZERO,
+            collected_fees_native: I80F48::ZERO,
+            dust: I80F48::ZERO,
+            flash_loan_approved_amount: 0,
+            flash_loan_token_account_initial: u64::MAX,
+            bump,
+            bank_num,
+
+            // values that can be copied
+            // these are listed explicitly, so someone must make the decision when a
+            // new field is added!
             name: existing_bank.name,
             group: existing_bank.group,
             mint: existing_bank.mint,
-            vault,
             oracle: existing_bank.oracle,
             oracle_config: existing_bank.oracle_config,
             deposit_index: existing_bank.deposit_index,
             borrow_index: existing_bank.borrow_index,
             cached_indexed_total_deposits: existing_bank.cached_indexed_total_deposits,
             cached_indexed_total_borrows: existing_bank.cached_indexed_total_borrows,
-            indexed_deposits: I80F48::ZERO,
-            indexed_borrows: I80F48::ZERO,
             index_last_updated: existing_bank.index_last_updated,
             bank_rate_last_updated: existing_bank.bank_rate_last_updated,
             avg_utilization: existing_bank.avg_utilization,
@@ -132,7 +148,6 @@ impl Bank {
             util1: existing_bank.util1,
             rate1: existing_bank.rate1,
             max_rate: existing_bank.max_rate,
-            collected_fees_native: existing_bank.collected_fees_native,
             loan_origination_fee_rate: existing_bank.loan_origination_fee_rate,
             loan_fee_rate: existing_bank.loan_fee_rate,
             maint_asset_weight: existing_bank.maint_asset_weight,
@@ -140,14 +155,9 @@ impl Bank {
             maint_liab_weight: existing_bank.maint_liab_weight,
             init_liab_weight: existing_bank.init_liab_weight,
             liquidation_fee: existing_bank.liquidation_fee,
-            dust: I80F48::ZERO,
-            flash_loan_approved_amount: 0,
-            flash_loan_token_account_initial: u64::MAX,
             token_index: existing_bank.token_index,
-            bump: existing_bank.bump,
             mint_decimals: existing_bank.mint_decimals,
             reserved: [0; 2560],
-            bank_num,
         }
     }
 

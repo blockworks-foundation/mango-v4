@@ -17,6 +17,13 @@ pub mod compute_budget {
     declare_id!("ComputeBudget111111111111111111111111111111");
 }
 
+/// Updates token interest and interest rates.
+///
+/// In addition to these accounts, all banks must be passed as remaining_accounts
+/// in MintInfo order.
+///
+/// This instruction may only be used alongside other instructions of the same kind
+/// or ComputeBudget instructions.
 #[derive(Accounts)]
 pub struct TokenUpdateIndexAndRate<'info> {
     pub group: AccountLoader<'info, Group>, // Required for group metadata parsing

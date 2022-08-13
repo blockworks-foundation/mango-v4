@@ -204,6 +204,8 @@ async function main() {
     group,
     group.admin,
     new PublicKey('Efhak3qj3MiyzgJr3cUUqXXz5wr3oYHt9sPzuqJf9eBN'),
+    undefined,
+    undefined,
   );
   console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
   console.log(`Registering MNGO...`);

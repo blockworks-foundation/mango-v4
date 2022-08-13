@@ -73,8 +73,6 @@ pub struct InterestRateParams {
     pub adjustment_factor: f32,
 }
 
-// TODO: should this be "configure_mint", we pass an explicit index, and allow
-// overwriting config as long as the mint account stays the same?
 #[allow(clippy::too_many_arguments)]
 pub fn token_register(
     ctx: Context<TokenRegister>,

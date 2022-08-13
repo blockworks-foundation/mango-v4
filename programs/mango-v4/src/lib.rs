@@ -41,10 +41,18 @@ pub mod mango_v4 {
 
     pub fn group_edit(
         ctx: Context<GroupEdit>,
-        new_admin: Pubkey,
-        new_fast_listing_admin: Pubkey,
+        admin_opt: Option<Pubkey>,
+        fast_listing_admin_opt: Option<Pubkey>,
+        testing_opt: Option<u8>,
+        version_opt: Option<u8>,
     ) -> Result<()> {
-        instructions::group_edit(ctx, new_admin, new_fast_listing_admin)
+        instructions::group_edit(
+            ctx,
+            admin_opt,
+            fast_listing_admin_opt,
+            testing_opt,
+            version_opt,
+        )
     }
 
     pub fn group_close(ctx: Context<GroupClose>) -> Result<()> {
