@@ -15,7 +15,6 @@ import {
   AccountMeta,
   Cluster,
   Keypair,
-  LAMPORTS_PER_SOL,
   MemcmpFilter,
   PublicKey,
   Signer,
@@ -588,6 +587,21 @@ export class MangoClient {
           memcmp: {
             bytes: ownerPk.toBase58(),
             offset: 40,
+          },
+        },
+      ])
+    ).map((pa) => {
+      return MangoAccount.from(pa.publicKey, pa.account);
+    });
+  }
+
+  public async getAllMangoAccounts(group: Group): Promise<MangoAccount[]> {
+    return (
+      await this.program.account.mangoAccount.all([
+        {
+          memcmp: {
+            bytes: group.publicKey.toBase58(),
+            offset: 8,
           },
         },
       ])

@@ -3,6 +3,7 @@ import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { Serum3Side } from '../accounts/serum3';
 import { MangoClient } from '../client';
+import { MANGO_V4_ID } from '../constants';
 
 //
 // (untested?) script which closes a mango account cleanly, first closes all positions, withdraws all tokens and then closes it
@@ -14,14 +15,15 @@ async function main() {
   // user
   const user = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
+      JSON.parse(fs.readFileSync(process.env.USER_KEYPAIR!, 'utf-8')),
     ),
   );
   const userWallet = new Wallet(user);
   const userProvider = new AnchorProvider(connection, userWallet, options);
-  const client = await MangoClient.connectForGroupName(
+  const client = await MangoClient.connect(
     userProvider,
-    'mainnet-beta.microwavedcola' /* Use ids json instead of getProgramAccounts */,
+    'mainnet-beta',
+    MANGO_V4_ID['mainnet-beta'],
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
@@ -34,7 +36,7 @@ async function main() {
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
   // fetch group
-  const group = await client.getGroupForCreator(admin.publicKey);
+  const group = await client.getGroupForCreator(admin.publicKey, 0);
   console.log(`Found group ${group.publicKey.toBase58()}`);
 
   // account
