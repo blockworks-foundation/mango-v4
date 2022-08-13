@@ -25,7 +25,7 @@ pub struct TokenAddBank<'info> {
     #[account(
         init,
         // using the token_index in this seed guards against reusing it
-        seeds = [group.key().as_ref(), b"Bank".as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
+        seeds = [b"Bank".as_ref(), group.key().as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<Bank>(),
@@ -34,7 +34,7 @@ pub struct TokenAddBank<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"Vault".as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
+        seeds = [b"Vault".as_ref(), group.key().as_ref(), &token_index.to_le_bytes(), &bank_num.to_le_bytes()],
         bump,
         token::authority = group,
         token::mint = mint,
@@ -44,7 +44,7 @@ pub struct TokenAddBank<'info> {
 
     #[account(
         mut,
-        seeds = [group.key().as_ref(), b"MintInfo".as_ref(), mint.key().as_ref()],
+        seeds = [b"MintInfo".as_ref(), group.key().as_ref(), mint.key().as_ref()],
         bump
     )]
     pub mint_info: AccountLoader<'info, MintInfo>,

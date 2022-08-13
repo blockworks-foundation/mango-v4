@@ -354,8 +354,8 @@ const_assert_eq!(size_of::<PerpOpenOrders>() % 8, 0);
 macro_rules! account_seeds {
     ( $account:expr ) => {
         &[
-            $account.group.as_ref(),
             b"MangoAccount".as_ref(),
+            $account.group.as_ref(),
             $account.owner.as_ref(),
             &$account.account_num.to_le_bytes(),
             &[$account.bump],

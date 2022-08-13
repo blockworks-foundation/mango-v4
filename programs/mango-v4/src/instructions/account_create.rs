@@ -11,7 +11,7 @@ pub struct AccountCreate<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"MangoAccount".as_ref(), owner.key().as_ref(), &account_num.to_le_bytes()],
+        seeds = [b"MangoAccount".as_ref(), group.key().as_ref(), owner.key().as_ref(), &account_num.to_le_bytes()],
         bump,
         payer = payer,
         space = MangoAccount::space(token_count, serum3_count, perp_count, perp_oo_count)?,
