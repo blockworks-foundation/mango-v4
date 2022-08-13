@@ -128,8 +128,8 @@ async fn get_mint_info_by_mint(
 ) -> MintInfo {
     let mint_info_pk = Pubkey::find_program_address(
         &[
-            account.fixed.group.as_ref(),
             b"MintInfo".as_ref(),
+            account.fixed.group.as_ref(),
             mint.as_ref(),
         ],
         &mango_v4::id(),
@@ -145,8 +145,8 @@ async fn get_mint_info_by_token_index(
 ) -> MintInfo {
     let bank_pk = Pubkey::find_program_address(
         &[
-            account.fixed.group.as_ref(),
             b"Bank".as_ref(),
+            account.fixed.group.as_ref(),
             &token_index.to_le_bytes(),
             &0u32.to_le_bytes(),
         ],
@@ -160,8 +160,8 @@ async fn get_mint_info_by_token_index(
 fn get_perp_market_address_by_index(group: Pubkey, perp_market_index: PerpMarketIndex) -> Pubkey {
     Pubkey::find_program_address(
         &[
-            group.as_ref(),
             b"PerpMarket".as_ref(),
+            group.as_ref(),
             &perp_market_index.to_le_bytes(),
         ],
         &mango_v4::id(),
@@ -466,8 +466,8 @@ impl<'keypair> ClientInstruction for TokenWithdrawInstruction<'keypair> {
             .unwrap();
         let mint_info = Pubkey::find_program_address(
             &[
-                account.fixed.group.as_ref(),
                 b"MintInfo".as_ref(),
+                account.fixed.group.as_ref(),
                 token_account.mint.as_ref(),
             ],
             &program_id,
@@ -534,8 +534,8 @@ impl ClientInstruction for TokenDepositInstruction {
             .unwrap();
         let mint_info = Pubkey::find_program_address(
             &[
-                account.fixed.group.as_ref(),
                 b"MintInfo".as_ref(),
+                account.fixed.group.as_ref(),
                 token_account.mint.as_ref(),
             ],
             &program_id,
@@ -633,8 +633,8 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
 
         let bank = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"Bank".as_ref(),
+                self.group.as_ref(),
                 &self.token_index.to_le_bytes(),
                 &0u32.to_le_bytes(),
             ],
@@ -643,8 +643,8 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
         .0;
         let vault = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"Vault".as_ref(),
+                self.group.as_ref(),
                 &self.token_index.to_le_bytes(),
                 &0u32.to_le_bytes(),
             ],
@@ -653,8 +653,8 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
         .0;
         let mint_info = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"MintInfo".as_ref(),
+                self.group.as_ref(),
                 self.mint.as_ref(),
             ],
             &program_id,
@@ -663,8 +663,8 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
         // TODO: remove copy pasta of pda derivation, use reference
         let oracle = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"StubOracle".as_ref(),
+                self.group.as_ref(),
                 self.mint.as_ref(),
             ],
             &program_id,
@@ -718,8 +718,8 @@ impl<'keypair> ClientInstruction for TokenAddBankInstruction<'keypair> {
 
         let existing_bank = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"Bank".as_ref(),
+                self.group.as_ref(),
                 &self.token_index.to_le_bytes(),
                 &0u32.to_le_bytes(),
             ],
@@ -728,8 +728,8 @@ impl<'keypair> ClientInstruction for TokenAddBankInstruction<'keypair> {
         .0;
         let bank = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"Bank".as_ref(),
+                self.group.as_ref(),
                 &self.token_index.to_le_bytes(),
                 &self.bank_num.to_le_bytes(),
             ],
@@ -738,8 +738,8 @@ impl<'keypair> ClientInstruction for TokenAddBankInstruction<'keypair> {
         .0;
         let vault = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"Vault".as_ref(),
+                self.group.as_ref(),
                 &self.token_index.to_le_bytes(),
                 &self.bank_num.to_le_bytes(),
             ],
@@ -751,7 +751,7 @@ impl<'keypair> ClientInstruction for TokenAddBankInstruction<'keypair> {
         let mint = existing_bank_data.mint;
 
         let mint_info = Pubkey::find_program_address(
-            &[self.group.as_ref(), b"MintInfo".as_ref(), mint.as_ref()],
+            &[b"MintInfo".as_ref(), self.group.as_ref(), mint.as_ref()],
             &program_id,
         )
         .0;
@@ -869,8 +869,8 @@ impl<'keypair> ClientInstruction for StubOracleSetInstruction<'keypair> {
         // TODO: remove copy pasta of pda derivation, use reference
         let oracle = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"StubOracle".as_ref(),
+                self.group.as_ref(),
                 self.mint.as_ref(),
             ],
             &program_id,
@@ -915,8 +915,8 @@ impl<'keypair> ClientInstruction for StubOracleCreate<'keypair> {
 
         let oracle = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"StubOracle".as_ref(),
+                self.group.as_ref(),
                 self.mint.as_ref(),
             ],
             &program_id,
@@ -961,8 +961,8 @@ impl<'keypair> ClientInstruction for StubOracleCloseInstruction<'keypair> {
 
         let oracle = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"StubOracle".as_ref(),
+                self.group.as_ref(),
                 self.mint.as_ref(),
             ],
             &program_id,
@@ -1017,7 +1017,7 @@ impl<'keypair> ClientInstruction for GroupCreateInstruction<'keypair> {
         .0;
 
         let insurance_vault = Pubkey::find_program_address(
-            &[group.as_ref(), b"InsuranceVault".as_ref()],
+            &[b"InsuranceVault".as_ref(), group.as_ref()],
             &program_id,
         )
         .0;
@@ -1059,7 +1059,7 @@ impl<'keypair> ClientInstruction for GroupCloseInstruction<'keypair> {
         let instruction = Self::Instruction {};
 
         let insurance_vault = Pubkey::find_program_address(
-            &[self.group.as_ref(), b"InsuranceVault".as_ref()],
+            &[b"InsuranceVault".as_ref(), self.group.as_ref()],
             &program_id,
         )
         .0;
@@ -1111,8 +1111,8 @@ impl<'keypair> ClientInstruction for AccountCreateInstruction<'keypair> {
 
         let account = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"MangoAccount".as_ref(),
+                self.group.as_ref(),
                 self.owner.pubkey().as_ref(),
                 &self.account_num.to_le_bytes(),
             ],
@@ -1165,8 +1165,8 @@ impl<'keypair> ClientInstruction for AccountExpandInstruction<'keypair> {
 
         let account = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"MangoAccount".as_ref(),
+                self.group.as_ref(),
                 self.owner.pubkey().as_ref(),
                 &self.account_num.to_le_bytes(),
             ],
@@ -1214,8 +1214,8 @@ impl<'keypair> ClientInstruction for AccountEditInstruction<'keypair> {
 
         let account = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"MangoAccount".as_ref(),
+                self.group.as_ref(),
                 self.owner.pubkey().as_ref(),
                 &self.account_num.to_le_bytes(),
             ],
@@ -1301,8 +1301,8 @@ impl<'keypair> ClientInstruction for Serum3RegisterMarketInstruction<'keypair> {
 
         let serum_market = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"Serum3Market".as_ref(),
+                self.group.as_ref(),
                 self.serum_market_external.as_ref(),
             ],
             &program_id,
@@ -1349,8 +1349,8 @@ impl<'keypair> ClientInstruction for Serum3DeregisterMarketInstruction<'keypair>
 
         let serum_market = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"Serum3Market".as_ref(),
+                self.group.as_ref(),
                 self.serum_market_external.as_ref(),
             ],
             &program_id,
@@ -1395,8 +1395,8 @@ impl<'keypair> ClientInstruction for Serum3CreateOpenOrdersInstruction<'keypair>
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = Pubkey::find_program_address(
             &[
-                self.account.as_ref(),
                 b"Serum3OO".as_ref(),
+                self.account.as_ref(),
                 self.serum_market.as_ref(),
             ],
             &program_id,
@@ -1446,8 +1446,8 @@ impl<'keypair> ClientInstruction for Serum3CloseOpenOrdersInstruction<'keypair> 
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = Pubkey::find_program_address(
             &[
-                self.account.as_ref(),
                 b"Serum3OO".as_ref(),
+                self.account.as_ref(),
                 self.serum_market.as_ref(),
             ],
             &program_id,
@@ -1996,8 +1996,8 @@ impl<'keypair> ClientInstruction for LiqTokenBankruptcyInstruction<'keypair> {
 
         let quote_mint_info = Pubkey::find_program_address(
             &[
-                liqee.fixed.group.as_ref(),
                 b"MintInfo".as_ref(),
+                liqee.fixed.group.as_ref(),
                 group.insurance_mint.as_ref(),
             ],
             &program_id,
@@ -2006,7 +2006,7 @@ impl<'keypair> ClientInstruction for LiqTokenBankruptcyInstruction<'keypair> {
         let quote_mint_info: MintInfo = account_loader.load(&quote_mint_info).await.unwrap();
 
         let insurance_vault = Pubkey::find_program_address(
-            &[group_key.as_ref(), b"InsuranceVault".as_ref()],
+            &[b"InsuranceVault".as_ref(), group_key.as_ref()],
             &program_id,
         )
         .0;
@@ -2097,8 +2097,8 @@ impl<'keypair> ClientInstruction for PerpCreateMarketInstruction<'keypair> {
 
         let perp_market = Pubkey::find_program_address(
             &[
-                self.group.as_ref(),
                 b"PerpMarket".as_ref(),
+                self.group.as_ref(),
                 self.perp_market_index.to_le_bytes().as_ref(),
             ],
             &program_id,

@@ -21,7 +21,7 @@ pub struct PerpCreateMarket<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"PerpMarket".as_ref(), perp_market_index.to_le_bytes().as_ref()],
+        seeds = [b"PerpMarket".as_ref(), group.key().as_ref(), perp_market_index.to_le_bytes().as_ref()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<PerpMarket>(),

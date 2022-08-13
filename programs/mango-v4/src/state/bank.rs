@@ -489,8 +489,8 @@ impl Bank {
 macro_rules! bank_seeds {
     ( $bank:expr ) => {
         &[
-            $bank.group.as_ref(),
             b"Bank".as_ref(),
+            $bank.group.as_ref(),
             $bank.token_index.to_le_bytes(),
             &bank.bank_num.to_le_bytes(),
             &[$bank.bump],

@@ -22,7 +22,7 @@ pub struct GroupCreate<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"InsuranceVault".as_ref()],
+        seeds = [b"InsuranceVault".as_ref(), group.key().as_ref()],
         bump,
         token::authority = group,
         token::mint = insurance_mint,

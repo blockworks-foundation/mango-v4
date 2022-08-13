@@ -13,7 +13,7 @@ pub struct StubOracleCreate<'info> {
 
     #[account(
         init,
-        seeds = [group.key().as_ref(), b"StubOracle".as_ref(), mint.key().as_ref()],
+        seeds = [b"StubOracle".as_ref(), group.key().as_ref(), mint.key().as_ref()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<StubOracle>(),

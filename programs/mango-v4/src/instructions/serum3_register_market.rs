@@ -24,7 +24,7 @@ pub struct Serum3RegisterMarket<'info> {
     #[account(
         init,
         // using the serum_market_external in the seed guards against registering the same market twice
-        seeds = [group.key().as_ref(), b"Serum3Market".as_ref(), serum_market_external.key().as_ref()],
+        seeds = [b"Serum3Market".as_ref(), group.key().as_ref(), serum_market_external.key().as_ref()],
         bump,
         payer = payer,
         space = 8 + std::mem::size_of::<Serum3Market>(),
