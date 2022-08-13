@@ -154,26 +154,37 @@ export class MangoClient {
       },
     ];
 
-    return (await this.program.account.group.all(filters)).map((tuple) =>
-      Group.from(tuple.publicKey, tuple.account),
+    const groups = (await this.program.account.group.all(filters)).map(
+      (tuple) => Group.from(tuple.publicKey, tuple.account),
     );
+    groups.forEach((group) => group.reloadAll(this));
+    return groups;
   }
 
   public async getGroupForCreator(
     creatorPk: PublicKey,
-    groupNum?: number,
+    groupNum: number,
   ): Promise<Group> {
-    const groups = (await this.getGroupsForCreator(creatorPk)).filter(
-      (group) => {
-        if (groupNum !== undefined) {
-          return group.groupNum == groupNum;
-        } else {
-          return true;
-        }
+    const bbuf = Buffer.alloc(4);
+    bbuf.writeUInt32LE(groupNum);
+    const filters: MemcmpFilter[] = [
+      {
+        memcmp: {
+          bytes: creatorPk.toBase58(),
+          offset: 8,
+        },
       },
+      {
+        memcmp: {
+          bytes: bs58.encode(bbuf),
+          offset: 40,
+        },
+      },
+    ];
+    const groups = (await this.program.account.group.all(filters)).map(
+      (tuple) => Group.from(tuple.publicKey, tuple.account),
     );
-
-    await groups[0].reloadAll(this);
+    groups.forEach((group) => group.reloadAll(this));
     return groups[0];
   }
 

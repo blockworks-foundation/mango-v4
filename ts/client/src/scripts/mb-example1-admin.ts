@@ -261,7 +261,7 @@ async function registerTokens() {
 
 async function createUser() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.CLUSTER_URL!, options);
+  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
 
   const user = Keypair.fromSecretKey(
     Buffer.from(
@@ -282,7 +282,9 @@ async function createUser() {
       JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
     ),
   );
+  console.log(`Admin ${admin.publicKey.toBase58()}`);
   const group = await client.getGroupForCreator(admin.publicKey, 2);
+  console.log(group);
   console.log(`${group.toString()}`);
 
   console.log(`Creating MangoAccount...`);
@@ -303,9 +305,21 @@ async function createUser() {
 }
 
 async function main() {
-  await createGroup();
-  await registerTokens();
-  // createUser();
+  try {
+    await createGroup();
+  } catch (error) {
+    console.log(error);
+  }
+  try {
+    await registerTokens();
+  } catch (error) {
+    console.log(error);
+  }
+  try {
+    await createUser();
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 try {
