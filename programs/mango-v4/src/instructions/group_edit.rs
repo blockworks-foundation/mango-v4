@@ -18,6 +18,8 @@ pub fn group_edit(
     ctx: Context<GroupEdit>,
     admin_opt: Option<Pubkey>,
     fast_listing_admin_opt: Option<Pubkey>,
+    testing_opt: Option<u8>,
+    version_opt: Option<u8>,
 ) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
 
@@ -27,6 +29,14 @@ pub fn group_edit(
 
     if let Some(fast_listing_admin) = fast_listing_admin_opt {
         group.fast_listing_admin = fast_listing_admin;
+    }
+
+    if let Some(testing) = testing_opt {
+        group.testing = testing;
+    }
+
+    if let Some(version) = version_opt {
+        group.version = version;
     }
 
     Ok(())

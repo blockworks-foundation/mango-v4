@@ -110,15 +110,27 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "admin",
+          "name": "adminOpt",
           "type": {
             "option": "publicKey"
           }
         },
         {
-          "name": "fastListingAdmin",
+          "name": "fastListingAdminOpt",
           "type": {
             "option": "publicKey"
+          }
+        },
+        {
+          "name": "testingOpt",
+          "type": {
+            "option": "u8"
+          }
+        },
+        {
+          "name": "versionOpt",
+          "type": {
+            "option": "u8"
           }
         }
       ]
@@ -650,27 +662,7 @@ export type MangoV4 = {
         {
           "name": "mintInfo",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "MintInfo"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
-                "path": "mint"
-              }
-            ]
-          }
+          "isSigner": false
         },
         {
           "name": "payer",
@@ -5154,15 +5146,27 @@ export const IDL: MangoV4 = {
       ],
       "args": [
         {
-          "name": "admin",
+          "name": "adminOpt",
           "type": {
             "option": "publicKey"
           }
         },
         {
-          "name": "fastListingAdmin",
+          "name": "fastListingAdminOpt",
           "type": {
             "option": "publicKey"
+          }
+        },
+        {
+          "name": "testingOpt",
+          "type": {
+            "option": "u8"
+          }
+        },
+        {
+          "name": "versionOpt",
+          "type": {
+            "option": "u8"
           }
         }
       ]
@@ -5694,27 +5698,7 @@ export const IDL: MangoV4 = {
         {
           "name": "mintInfo",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "MintInfo"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
-                "path": "mint"
-              }
-            ]
-          }
+          "isSigner": false
         },
         {
           "name": "payer",
