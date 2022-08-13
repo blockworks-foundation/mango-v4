@@ -210,7 +210,7 @@ impl Bank {
             if new_indexed_value.is_negative() {
                 // pay back borrows only, leaving a negative position
                 self.indexed_borrows = cm!(self.indexed_borrows - indexed_change);
-                position.indexed_position = cm!(position.indexed_position + indexed_change);
+                position.indexed_position = new_indexed_value;
                 return Ok(true);
             } else if new_native_position < I80F48::ONE && !position.is_in_use() {
                 // if there's less than one token deposited, zero the position
@@ -224,7 +224,8 @@ impl Bank {
             self.indexed_borrows = cm!(self.indexed_borrows + position.indexed_position); // position.value is negative
             position.indexed_position = I80F48::ZERO;
             // deposit the rest
-            native_amount = cm!(native_amount + native_position);
+            // note: .max(0) because there's a scenario where new_indexed_value == 0 and new_native_position < 0
+            native_amount = new_native_position.max(I80F48::ZERO);
         }
 
         // add to deposits
@@ -369,6 +370,7 @@ impl Bank {
         let native_total_deposits = cm!(self.deposit_index * indexed_total_deposits);
         let native_total_borrows = cm!(self.borrow_index * indexed_total_borrows);
 
+        // This will be >= 0, but can also be > 1
         let instantaneous_utilization = if native_total_deposits == I80F48::ZERO {
             I80F48::ZERO
         } else {
@@ -377,13 +379,8 @@ impl Bank {
 
         let borrow_interest_rate = self.compute_interest_rate(instantaneous_utilization);
 
-        let borrow_interest: I80F48 = cm!(borrow_interest_rate * diff_ts);
+        let borrow_interest = cm!(borrow_interest_rate * diff_ts);
         let deposit_interest = cm!(borrow_interest * instantaneous_utilization);
-
-        // msg!("utilization {}", utilization);
-        // msg!("interest_rate {}", interest_rate);
-        // msg!("borrow_interest {}", borrow_interest);
-        // msg!("deposit_interest {}", deposit_interest);
 
         if borrow_interest <= I80F48::ZERO || deposit_interest <= I80F48::ZERO {
             return Ok((self.deposit_index, self.borrow_index));
@@ -446,8 +443,8 @@ impl Bank {
             return I80F48::ZERO;
         }
 
-        let native_total_deposits = self.deposit_index * indexed_total_deposits;
-        let native_total_borrows = self.borrow_index * indexed_total_borrows;
+        let native_total_deposits = cm!(self.deposit_index * indexed_total_deposits);
+        let native_total_borrows = cm!(self.borrow_index * indexed_total_borrows);
         let instantaneous_utilization = if native_total_deposits == I80F48::ZERO {
             I80F48::ZERO
         } else {
@@ -458,9 +455,9 @@ impl Bank {
         // scaling factor for previous avg_utilization is old_ts/new_ts
         // scaling factor for instantaneous utilization is (new_ts - old_ts) / new_ts
         let bank_rate_last_updated_i80f48 = I80F48::from_num(self.bank_rate_last_updated);
-        (self.avg_utilization * bank_rate_last_updated_i80f48
+        cm!((self.avg_utilization * bank_rate_last_updated_i80f48
             + instantaneous_utilization * (now_ts - bank_rate_last_updated_i80f48))
-            / now_ts
+            / now_ts)
     }
 
     // computes new optimal rates and max rate
