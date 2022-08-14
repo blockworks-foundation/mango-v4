@@ -4,7 +4,6 @@ use anchor_lang::prelude::*;
 use solana_program_test::*;
 use solana_sdk::signature::Keypair;
 
-use mango_v4::state::*;
 use program_test::*;
 
 mod program_test;

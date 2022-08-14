@@ -4,7 +4,6 @@ use solana_program_test::*;
 use solana_sdk::signature::Keypair;
 use solana_sdk::signature::Signer;
 
-use mango_v4::state::*;
 use program_test::*;
 
 mod program_test;

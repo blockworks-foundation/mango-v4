@@ -3,10 +3,7 @@
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, signer::Signer, transport::TransportError};
 
-use mango_v4::{
-    instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side},
-    state::*,
-};
+use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use program_test::*;
 
 mod program_test;
