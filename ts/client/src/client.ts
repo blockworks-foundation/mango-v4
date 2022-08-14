@@ -184,7 +184,7 @@ export class MangoClient {
     const groups = (await this.program.account.group.all(filters)).map(
       (tuple) => Group.from(tuple.publicKey, tuple.account),
     );
-    groups.forEach((group) => group.reloadAll(this));
+    await groups[0].reloadAll(this);
     return groups[0];
   }
 

@@ -112,7 +112,7 @@ async function main() {
     MANGO_V4_ID['mainnet-beta'],
   );
 
-  const group = await client.getGroupForCreator(admin.publicKey, 0);
+  const group = await client.getGroupForCreator(admin.publicKey, 2);
   console.log(`${group.toString()}`);
 
   for (const bank of await group.banksMap.values()) {
