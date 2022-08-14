@@ -12,8 +12,8 @@ use crate::accounts_zerocopy::*;
 use crate::checked_math as cm;
 use crate::error::*;
 
-const LOOKUP_START: i8 = -12;
-const LOOKUP: [I80F48; 25] = [
+const DECIMAL_CONSTANT_ZERO_INDEX: i8 = 12;
+const DECIMAL_CONSTANTS: [I80F48; 25] = [
     I80F48::from_bits((1 << 48) / 10i128.pow(12u32)),
     I80F48::from_bits((1 << 48) / 10i128.pow(11u32) + 1),
     I80F48::from_bits((1 << 48) / 10i128.pow(10u32)),
@@ -26,7 +26,7 @@ const LOOKUP: [I80F48; 25] = [
     I80F48::from_bits((1 << 48) / 10i128.pow(3u32) + 1), // 0.001
     I80F48::from_bits((1 << 48) / 10i128.pow(2u32) + 1), // 0.01
     I80F48::from_bits((1 << 48) / 10i128.pow(1u32) + 1), // 0.1
-    I80F48::from_bits((1 << 48) * 10i128.pow(0u32)),     // 1
+    I80F48::from_bits((1 << 48) * 10i128.pow(0u32)),     // 1, index 12
     I80F48::from_bits((1 << 48) * 10i128.pow(1u32)),     // 10
     I80F48::from_bits((1 << 48) * 10i128.pow(2u32)),     // 100
     I80F48::from_bits((1 << 48) * 10i128.pow(3u32)),     // 1000
@@ -40,10 +40,12 @@ const LOOKUP: [I80F48; 25] = [
     I80F48::from_bits((1 << 48) * 10i128.pow(11u32)),
     I80F48::from_bits((1 << 48) * 10i128.pow(12u32)),
 ];
-const LOOKUP_FN: fn(i8) -> usize = |decimals: i8| (decimals - LOOKUP_START) as usize;
+pub const fn power_of_ten(decimals: i8) -> I80F48 {
+    DECIMAL_CONSTANTS[(decimals + DECIMAL_CONSTANT_ZERO_INDEX) as usize]
+}
 
 pub const QUOTE_DECIMALS: i8 = 6;
-pub const QUOTE_NATIVE_TO_UI: I80F48 = LOOKUP[(-QUOTE_DECIMALS - LOOKUP_START) as usize];
+pub const QUOTE_NATIVE_TO_UI: I80F48 = power_of_ten(-QUOTE_DECIMALS);
 
 pub mod switchboard_v1_devnet_oracle {
     use solana_program::declare_id;
@@ -121,7 +123,7 @@ pub fn oracle_price(
             let price = I80F48::from_num(price_account.price);
 
             // Filter out bad prices
-            if I80F48::from_num(price_account.conf) > oracle_conf_filter * price {
+            if I80F48::from_num(price_account.conf) > cm!(oracle_conf_filter * price) {
                 msg!(
                     "Pyth conf interval too high; pubkey {} price: {} price_account.conf: {}",
                     acc_info.key(),
@@ -140,7 +142,7 @@ pub fn oracle_price(
                 .unwrap()
                 .checked_sub(base_token_decimals as i8)
                 .unwrap();
-            let decimal_adj = LOOKUP[LOOKUP_FN(decimals)];
+            let decimal_adj = power_of_ten(decimals);
             cm!(price * decimal_adj)
         }
         OracleType::SwitchboardV2 => {
@@ -159,7 +161,7 @@ pub fn oracle_price(
                 .std_deviation
                 .try_into()
                 .map_err(from_foreign_error)?;
-            if I80F48::from_num(std_deviation_decimal) > oracle_conf_filter * price {
+            if I80F48::from_num(std_deviation_decimal) > cm!(oracle_conf_filter * price) {
                 msg!(
                     "Switchboard v2 std deviation too high; pubkey {} price: {} latest_confirmed_round.std_deviation: {}",
                     acc_info.key(),
@@ -172,7 +174,7 @@ pub fn oracle_price(
             let decimals = QUOTE_DECIMALS
                 .checked_sub(base_token_decimals as i8)
                 .unwrap();
-            let decimal_adj = LOOKUP[LOOKUP_FN(decimals)];
+            let decimal_adj = power_of_ten(decimals);
             cm!(price * decimal_adj)
         }
         OracleType::SwitchboardV1 => {
@@ -182,7 +184,7 @@ pub fn oracle_price(
             // Filter out bad prices
             let min_response = I80F48::from_num(result.result.min_response);
             let max_response = I80F48::from_num(result.result.max_response);
-            if cm!(max_response - min_response) > oracle_conf_filter * price {
+            if cm!(max_response - min_response) > cm!(oracle_conf_filter * price) {
                 msg!(
                     "Switchboard v1 min-max response gap too wide; pubkey {} price: {} min_response: {} max_response {}",
                     acc_info.key(),
@@ -196,7 +198,7 @@ pub fn oracle_price(
             let decimals = QUOTE_DECIMALS
                 .checked_sub(base_token_decimals as i8)
                 .unwrap();
-            let decimal_adj = LOOKUP[LOOKUP_FN(decimals)];
+            let decimal_adj = power_of_ten(decimals);
             cm!(price * decimal_adj)
         }
     })
@@ -251,7 +253,7 @@ mod tests {
     pub fn lookup_test() {
         for idx in -12..0 {
             assert_eq!(
-                LOOKUP[LOOKUP_FN(idx)],
+                power_of_ten(idx),
                 I80F48::from_str(&format!(
                     "0.{}1",
                     str::repeat("0", (idx.abs() as usize) - 1)
@@ -260,11 +262,11 @@ mod tests {
             )
         }
 
-        assert_eq!(LOOKUP[LOOKUP_FN(0)], I80F48::ONE);
+        assert_eq!(power_of_ten(0), I80F48::ONE);
 
         for idx in 1..=12 {
             assert_eq!(
-                LOOKUP[LOOKUP_FN(idx)],
+                power_of_ten(idx),
                 I80F48::from_str(&format!("1{}", str::repeat("0", idx.abs() as usize))).unwrap()
             )
         }
