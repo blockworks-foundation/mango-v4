@@ -380,23 +380,7 @@ pub fn compute_health_from_fixed_accounts(
     health_type: HealthType,
     ais: &[AccountInfo],
 ) -> Result<I80F48> {
-    let active_token_len = account.token_iter_active().count();
-    let active_serum3_len = account.serum3_iter_active().count();
-    let active_perp_len = account.perp_iter_active_accounts().count();
-    let expected_ais = cm!(active_token_len * 2 // banks + oracles
-        + active_perp_len // PerpMarkets
-        + active_serum3_len); // open_orders
-    require_eq!(ais.len(), expected_ais);
-
-    let retriever = FixedOrderAccountRetriever {
-        ais: ais
-            .iter()
-            .map(AccountInfoRef::borrow)
-            .collect::<Result<Vec<_>>>()?,
-        n_banks: active_token_len,
-        begin_perp: cm!(active_token_len * 2),
-        begin_serum3: cm!(active_token_len * 2 + active_perp_len),
-    };
+    let retriever = new_fixed_order_account_retriever(ais, account)?;
     Ok(new_health_cache(account, &retriever)?.health(health_type))
 }
 
