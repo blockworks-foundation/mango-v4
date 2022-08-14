@@ -70,6 +70,7 @@ impl TokenPosition {
         }
     }
 
+    #[cfg(feature = "client")]
     pub fn ui(&self, bank: &Bank) -> I80F48 {
         if self.indexed_position.is_positive() {
             (self.indexed_position * bank.deposit_index)

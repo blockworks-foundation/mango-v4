@@ -609,6 +609,7 @@ impl HealthCache {
     /// - MAX if liabs = 0
     ///
     /// Maybe talking about the collateralization ratio assets/liabs is more intuitive?
+    #[cfg(feature = "client")]
     pub fn health_ratio(&self, health_type: HealthType) -> I80F48 {
         let (assets, liabs) = self.health_assets_and_liabs(health_type);
         let hundred = I80F48::from(100);
@@ -623,6 +624,7 @@ impl HealthCache {
     /// above the min_ratio health ratio.
     ///
     /// TODO: Add slippage/fees.
+    #[cfg(feature = "client")]
     pub fn max_swap_source_for_health_ratio(
         &self,
         source: TokenIndex,

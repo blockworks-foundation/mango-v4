@@ -15,7 +15,7 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
-test-bpf = []
+test-bpf = ["client"]
 client = ["solana-sdk"]
 
 [dependencies]
