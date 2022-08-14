@@ -19,11 +19,25 @@ pub fn transform_expr(mut expr: Expr) -> proc_macro2::TokenStream {
                 abort!(mc, "method calls with arguments are not supported");
             }
         }
-        Expr::Call(ref mut c) => {
+        Expr::Call(c) => {
+            let f = c.func.clone();
+            let name = quote!(#f).to_string();
             if c.args.is_empty() {
                 quote! { Some(#c) }
+            } else if (name == "I80F48 :: from" || name == "I80F48 :: from_num")
+                && c.args.len() == 1
+            {
+                let expr = transform_expr(c.args[0].clone());
+                quote! { (#expr).map(|v| #f(v)) }
             } else {
                 abort!(c, "calls with arguments are not supported");
+            }
+        }
+        Expr::Cast(c) => {
+            let ty = *c.ty;
+            let expr = transform_expr(*c.expr);
+            quote! {
+                #expr.map(|v| v as #ty)
             }
         }
         Expr::Paren(p) => {
