@@ -137,11 +137,8 @@ pub fn oracle_price(
                 return Err(MangoError::SomeError.into());
             }
 
-            let decimals = (price_account.expo as i8)
-                .checked_add(QUOTE_DECIMALS)
-                .unwrap()
-                .checked_sub(base_token_decimals as i8)
-                .unwrap();
+            let decimals =
+                cm!((price_account.expo as i8) + QUOTE_DECIMALS - (base_token_decimals as i8));
             let decimal_adj = power_of_ten(decimals);
             cm!(price * decimal_adj)
         }
@@ -171,9 +168,7 @@ pub fn oracle_price(
                 return Err(MangoError::SomeError.into());
             }
 
-            let decimals = QUOTE_DECIMALS
-                .checked_sub(base_token_decimals as i8)
-                .unwrap();
+            let decimals = cm!(QUOTE_DECIMALS - (base_token_decimals as i8));
             let decimal_adj = power_of_ten(decimals);
             cm!(price * decimal_adj)
         }
@@ -195,9 +190,7 @@ pub fn oracle_price(
                 return Err(MangoError::SomeError.into());
             }
 
-            let decimals = QUOTE_DECIMALS
-                .checked_sub(base_token_decimals as i8)
-                .unwrap();
+            let decimals = cm!(QUOTE_DECIMALS - (base_token_decimals as i8));
             let decimal_adj = power_of_ten(decimals);
             cm!(price * decimal_adj)
         }
