@@ -27,6 +27,7 @@ pub struct FlashLoanBegin<'info> {
     pub token_program: Program<'info, Token>,
 
     /// Instructions Sysvar for instruction introspection
+    /// CHECK: fixed instructions sysvar account
     #[account(address = tx_instructions::ID)]
     pub instructions: UncheckedAccount<'info>,
 }

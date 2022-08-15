@@ -2,9 +2,8 @@
 
 set -e pipefail
 
-# TODO fix need for --skip-lint
 # build program, 
-cargo run -p anchor-cli -- build --skip-lint
+cargo run -p anchor-cli -- build
 
 # patch types, which we want in rust, but anchor client doesn't support
 ./idl-fixup.sh

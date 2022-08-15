@@ -5,9 +5,8 @@ set -ex pipefail
 WALLET_WITH_FUNDS=~/.config/solana/mango-devnet.json
 PROGRAM_ID=m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD
 
-# TODO fix need for --skip-lint
 # build program, 
-cargo run -p anchor-cli -- build --skip-lint
+cargo run -p anchor-cli -- build
 
 # patch types, which we want in rust, but anchor client doesn't support
 ./idl-fixup.sh
