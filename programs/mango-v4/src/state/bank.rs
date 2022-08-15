@@ -175,14 +175,36 @@ impl Bank {
         self.deposit_index * self.indexed_deposits
     }
 
-    /// Returns whether the position is active
+    /// Deposits `native_amount`.
+    ///
+    /// If the token position ends up positive but below one native token and this token
+    /// position isn't marked as in-use, the token balance will be dusted, the position
+    /// will be set to zero and this function returns Ok(false).
     ///
     /// native_amount must be >= 0
     /// fractional deposits can be relevant during liquidation, for example
-    pub fn deposit(
+    pub fn deposit(&mut self, position: &mut TokenPosition, native_amount: I80F48) -> Result<bool> {
+        self.deposit_internal(position, native_amount, !position.is_in_use())
+    }
+
+    /// Like `deposit()`, but allows dusting of in-use accounts.
+    ///
+    /// Returns Ok(false) if the position was dusted and was not in-use.
+    pub fn deposit_with_dusting(
+        &mut self,
+        position: &mut TokenPosition,
+        native_amount: I80F48,
+    ) -> Result<bool> {
+        self.deposit_internal(position, native_amount, true)
+            .map(|not_dusted| not_dusted || position.is_in_use())
+    }
+
+    /// Internal function to deposit funds
+    pub fn deposit_internal(
         &mut self,
         position: &mut TokenPosition,
         mut native_amount: I80F48,
+        allow_dusting: bool,
     ) -> Result<bool> {
         require_gte!(native_amount, 0);
         let native_position = position.native(self);
@@ -212,7 +234,7 @@ impl Bank {
                 self.indexed_borrows = cm!(self.indexed_borrows - indexed_change);
                 position.indexed_position = new_indexed_value;
                 return Ok(true);
-            } else if new_native_position < I80F48::ONE && !position.is_in_use() {
+            } else if new_native_position < I80F48::ONE && allow_dusting {
                 // if there's less than one token deposited, zero the position
                 self.dust = cm!(self.dust + new_native_position);
                 self.indexed_borrows = cm!(self.indexed_borrows + position.indexed_position);
@@ -236,8 +258,11 @@ impl Bank {
         Ok(true)
     }
 
-    /// Returns whether the position is active after withdrawing from a position
-    /// without applying the loan origination fee.
+    /// Withdraws `native_amount` without applying the loan origination fee.
+    ///
+    /// If the token position ends up positive but below one native token and this token
+    /// position isn't marked as in-use, the token balance will be dusted, the position
+    /// will be set to zero and this function returns Ok(false).
     ///
     /// native_amount must be >= 0
     /// fractional withdraws can be relevant during liquidation, for example
@@ -246,11 +271,26 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
     ) -> Result<bool> {
-        self.withdraw_internal(position, native_amount, false)
+        self.withdraw_internal(position, native_amount, false, !position.is_in_use())
     }
 
-    /// Returns whether the position is active after withdrawing from a position
-    /// while applying the loan origination fee if a borrow is created.
+    /// Like `withdraw_without_fee()` but allows dusting of in-use token accounts.
+    ///
+    /// Returns Ok(false) on dusted positions that weren't in-use.
+    pub fn withdraw_without_fee_with_dusting(
+        &mut self,
+        position: &mut TokenPosition,
+        native_amount: I80F48,
+    ) -> Result<bool> {
+        self.withdraw_internal(position, native_amount, false, true)
+            .map(|not_dusted| not_dusted || position.is_in_use())
+    }
+
+    /// Withdraws `native_amount` while applying the loan origination fee if a borrow is created.
+    ///
+    /// If the token position ends up positive but below one native token and this token
+    /// position isn't marked as in-use, the token balance will be dusted, the position
+    /// will be set to zero and this function returns Ok(false).
     ///
     /// native_amount must be >= 0
     /// fractional withdraws can be relevant during liquidation, for example
@@ -259,14 +299,16 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
     ) -> Result<bool> {
-        self.withdraw_internal(position, native_amount, true)
+        self.withdraw_internal(position, native_amount, true, !position.is_in_use())
     }
 
+    /// Internal function to withdraw funds
     fn withdraw_internal(
         &mut self,
         position: &mut TokenPosition,
         mut native_amount: I80F48,
         with_loan_origination_fee: bool,
+        allow_dusting: bool,
     ) -> Result<bool> {
         require_gte!(native_amount, 0);
         let native_position = position.native(self);
@@ -275,7 +317,7 @@ impl Bank {
             let new_native_position = cm!(native_position - native_amount);
             if !new_native_position.is_negative() {
                 // withdraw deposits only
-                if new_native_position < I80F48::ONE && !position.is_in_use() {
+                if new_native_position < I80F48::ONE && allow_dusting {
                     // zero the account collecting the leftovers in `dust`
                     self.dust = cm!(self.dust + new_native_position);
                     self.indexed_deposits = cm!(self.indexed_deposits - position.indexed_position);
@@ -321,7 +363,7 @@ impl Bank {
             cm!(self.loan_origination_fee_rate * already_borrowed_native_amount);
         self.collected_fees_native = cm!(self.collected_fees_native + loan_origination_fee);
 
-        self.withdraw_internal(position, loan_origination_fee, false)
+        self.withdraw_internal(position, loan_origination_fee, false, !position.is_in_use())
     }
 
     /// Change a position without applying the loan origination fee

@@ -144,8 +144,9 @@ pub fn liq_token_bankruptcy(
 
     let mut liqee_liab_active = true;
     if insurance_transfer > 0 {
-        // in the end, the liqee gets liab assets
-        liqee_liab_active = liab_bank.deposit(liqee_liab, liab_transfer)?;
+        // in the end, the liqee gets liab assets (enable dusting to prevent a case where the
+        // position is brought to +I80F48::DELTA)
+        liqee_liab_active = liab_bank.deposit_with_dusting(liqee_liab, liab_transfer)?;
         remaining_liab_loss = -liqee_liab.native(liab_bank);
 
         // move insurance assets into quote bank
