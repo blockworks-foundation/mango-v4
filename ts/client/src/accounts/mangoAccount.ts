@@ -29,8 +29,8 @@ export class MangoAccount {
       beingLiquidated: number;
       accountNum: number;
       bump: number;
-      netDeposits: number;
-      netSettled: number;
+      netDeposits: BN;
+      netSettled: BN;
       headerVersion: number;
       tokens: unknown;
       serum3: unknown;
@@ -67,8 +67,8 @@ export class MangoAccount {
     beingLiquidated: number,
     public accountNum: number,
     bump: number,
-    netDeposits: number,
-    netSettled: number,
+    netDeposits: BN,
+    netSettled: BN,
     headerVersion: number,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
