@@ -38,6 +38,10 @@ impl<'a, 'info: 'a> AccountInfoRef<'a, 'info> {
             //data: account_info.try_borrow_data()?,
         })
     }
+
+    pub fn borrow_slice(ais: &'a [AccountInfo<'info>]) -> Result<Vec<Self>> {
+        ais.iter().map(Self::borrow).collect()
+    }
 }
 
 pub struct AccountInfoRefMut<'a, 'info: 'a> {
@@ -56,6 +60,10 @@ impl<'a, 'info: 'a> AccountInfoRefMut<'a, 'info> {
                 .try_borrow_mut()
                 .map_err(|_| ProgramError::AccountBorrowFailed)?,
         })
+    }
+
+    pub fn borrow_slice(ais: &'a [AccountInfo<'info>]) -> Result<Vec<Self>> {
+        ais.iter().map(Self::borrow).collect()
     }
 }
 

@@ -72,10 +72,7 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
     require_eq!(ais.len(), expected_ais);
 
     Ok(FixedOrderAccountRetriever {
-        ais: ais
-            .iter()
-            .map(AccountInfoRef::borrow)
-            .collect::<Result<Vec<_>>>()?,
+        ais: AccountInfoRef::borrow_slice(ais)?,
         n_banks: active_token_len,
         begin_perp: cm!(active_token_len * 2),
         begin_serum3: cm!(active_token_len * 2 + active_perp_len),
@@ -174,7 +171,10 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
 /// and retrieves accounts needed for the health computation by doing a linear
 /// scan for each request.
 pub struct ScanningAccountRetriever<'a, 'info> {
-    ais: Vec<AccountInfoRefMut<'a, 'info>>,
+    banks: Vec<AccountInfoRefMut<'a, 'info>>,
+    oracles: Vec<AccountInfoRef<'a, 'info>>,
+    perp_markets: Vec<AccountInfoRef<'a, 'info>>,
+    serum3_oos: Vec<AccountInfoRef<'a, 'info>>,
     token_index_map: HashMap<TokenIndex, usize>,
     perp_index_map: HashMap<PerpMarketIndex, usize>,
 }
@@ -212,11 +212,12 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
                 })()
                 .with_context(|| format!("scanning banks, health account index {}", i))
             })?;
+        let n_banks = token_index_map.len();
 
         // skip all banks and oracles, then find number of PerpMarket accounts
-        let skip = token_index_map.len() * 2;
-        let mut perp_index_map = HashMap::with_capacity(ais.len() - skip);
-        ais[skip..]
+        let perps_start = n_banks * 2;
+        let mut perp_index_map = HashMap::with_capacity(ais.len() - perps_start);
+        ais[perps_start..]
             .iter()
             .enumerate()
             .map_while(can_load_as::<PerpMarket>)
@@ -224,30 +225,28 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
                 (|| {
                     let perp_market = loaded?;
                     require_keys_eq!(perp_market.group, *group);
-                    perp_index_map.insert(perp_market.perp_market_index, cm!(skip + i));
+                    perp_index_map.insert(perp_market.perp_market_index, i);
                     Ok(())
                 })()
                 .with_context(|| {
-                    format!("scanning perp markets, health account index {}", i + skip)
+                    format!(
+                        "scanning perp markets, health account index {}",
+                        i + perps_start
+                    )
                 })
             })?;
+        let n_perps = perp_index_map.len();
+
+        let serum3_start = perps_start + n_perps;
 
         Ok(Self {
-            ais: ais
-                .iter()
-                .map(AccountInfoRefMut::borrow)
-                .collect::<Result<Vec<_>>>()?,
+            banks: AccountInfoRefMut::borrow_slice(&ais[..n_banks])?,
+            oracles: AccountInfoRef::borrow_slice(&ais[n_banks..2 * n_banks])?,
+            perp_markets: AccountInfoRef::borrow_slice(&ais[perps_start..perps_start + n_perps])?,
+            serum3_oos: AccountInfoRef::borrow_slice(&ais[serum3_start..])?,
             token_index_map,
             perp_index_map,
         })
-    }
-
-    fn n_banks(&self) -> usize {
-        self.token_index_map.len()
-    }
-
-    fn begin_serum3(&self) -> usize {
-        2 * self.token_index_map.len() + self.perp_index_map.len()
     }
 
     #[inline]
@@ -272,12 +271,10 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         token_index1: TokenIndex,
         token_index2: TokenIndex,
     ) -> Result<(&mut Bank, I80F48, Option<(&mut Bank, I80F48)>)> {
-        let n_banks = self.n_banks();
         if token_index1 == token_index2 {
             let index = self.bank_index(token_index1)?;
-            let (bank_part, oracle_part) = self.ais.split_at_mut(index + 1);
-            let bank = bank_part[index].load_mut_fully_unchecked::<Bank>()?;
-            let oracle = &oracle_part[n_banks - 1];
+            let bank = self.banks[index].load_mut_fully_unchecked::<Bank>()?;
+            let oracle = &self.oracles[index];
             require_keys_eq!(bank.oracle, *oracle.key);
             let price = oracle_price(oracle, bank.oracle_config.conf_filter, bank.mint_decimals)?;
             return Ok((bank, price, None));
@@ -291,13 +288,12 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         };
 
         // split_at_mut after the first bank and after the second bank
-        let (first_bank_part, second_part) = self.ais.split_at_mut(first + 1);
-        let (second_bank_part, oracles_part) = second_part.split_at_mut(second - first);
+        let (first_bank_part, second_bank_part) = self.banks.split_at_mut(first + 1);
 
         let bank1 = first_bank_part[first].load_mut_fully_unchecked::<Bank>()?;
         let bank2 = second_bank_part[second - (first + 1)].load_mut_fully_unchecked::<Bank>()?;
-        let oracle1 = &oracles_part[cm!(n_banks + first - (second + 1))];
-        let oracle2 = &oracles_part[cm!(n_banks + second - (second + 1))];
+        let oracle1 = &self.oracles[first];
+        let oracle2 = &self.oracles[second];
         require_keys_eq!(bank1.oracle, *oracle1.key);
         require_keys_eq!(bank2.oracle, *oracle2.key);
         let mint_decimals1 = bank1.mint_decimals;
@@ -313,8 +309,8 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
 
     pub fn scanned_bank_and_oracle(&self, token_index: TokenIndex) -> Result<(&Bank, I80F48)> {
         let index = self.bank_index(token_index)?;
-        let bank = self.ais[index].load_fully_unchecked::<Bank>()?;
-        let oracle = &self.ais[cm!(self.n_banks() + index)];
+        let bank = self.banks[index].load_fully_unchecked::<Bank>()?;
+        let oracle = &self.oracles[index];
         require_keys_eq!(bank.oracle, *oracle.key);
         Ok((
             bank,
@@ -324,11 +320,12 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
 
     pub fn scanned_perp_market(&self, perp_market_index: PerpMarketIndex) -> Result<&PerpMarket> {
         let index = self.perp_market_index(perp_market_index)?;
-        self.ais[index].load_fully_unchecked::<PerpMarket>()
+        self.perp_markets[index].load_fully_unchecked::<PerpMarket>()
     }
 
     pub fn scanned_serum_oo(&self, key: &Pubkey) -> Result<&OpenOrders> {
-        let oo = self.ais[self.begin_serum3()..]
+        let oo = self
+            .serum3_oos
             .iter()
             .find(|ai| ai.key == key)
             .ok_or_else(|| error_msg!("no serum3 open orders for key {}", key))?;
@@ -1143,6 +1140,10 @@ mod tests {
 
         let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
         let (mut bank2, mut oracle2) = mock_bank_and_oracle(group, 4, 5.0, 0.5, 0.3);
+        let (mut bank3, _) = mock_bank_and_oracle(group, 5, 1.0, 0.5, 0.3);
+
+        // bank3 reuses the bank2 oracle, to ensure the ScanningAccountRetriever doesn't choke on that
+        bank3.data().oracle = oracle2.pubkey;
 
         let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
         let oo1key = oo1.pubkey;
@@ -1152,20 +1153,26 @@ mod tests {
         perp1.data().group = group;
         perp1.data().perp_market_index = 9;
 
+        let oracle2_account_info = oracle2.as_account_info();
         let ais = vec![
             bank1.as_account_info(),
             bank2.as_account_info(),
+            bank3.as_account_info(),
             oracle1.as_account_info(),
-            oracle2.as_account_info(),
+            oracle2_account_info.clone(),
+            oracle2_account_info,
             perp1.as_account_info(),
             oo1.as_account_info(),
         ];
 
         let mut retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
 
-        assert_eq!(retriever.n_banks(), 2);
-        assert_eq!(retriever.begin_serum3(), 5);
+        assert_eq!(retriever.banks.len(), 3);
+        assert_eq!(retriever.token_index_map.len(), 3);
+        assert_eq!(retriever.oracles.len(), 3);
+        assert_eq!(retriever.perp_markets.len(), 1);
         assert_eq!(retriever.perp_index_map.len(), 1);
+        assert_eq!(retriever.serum3_oos.len(), 1);
 
         {
             let (b1, o1, opt_b2o2) = retriever.banks_mut_and_oracles(1, 4).unwrap();
@@ -1193,6 +1200,12 @@ mod tests {
         }
 
         retriever.banks_mut_and_oracles(4, 2).unwrap_err();
+
+        {
+            let (b, o) = retriever.scanned_bank_and_oracle(5).unwrap();
+            assert_eq!(b.token_index, 5);
+            assert_eq!(o, 5 * I80F48::ONE);
+        }
 
         let oo = retriever.serum_oo(0, &oo1key).unwrap();
         assert_eq!(identity(oo.native_pc_total), 20);
