@@ -196,6 +196,14 @@ export class HealthCache {
     const sourceBank = group.banksMap.get(sourceTokenName);
     const targetBank = group.banksMap.get(targetTokenName);
 
+    if (sourceTokenName === targetTokenName) {
+      return ZERO_I80F48;
+    }
+
+    if (!sourceBank.price || sourceBank.price.lte(ZERO_I80F48)) {
+      return ZERO_I80F48;
+    }
+
     // The health_ratio is a nonlinear based on swap amount.
     // For large swap amounts the slope is guaranteed to be negative, but small amounts
     // can have positive slope (e.g. using source deposits to pay back target borrows).

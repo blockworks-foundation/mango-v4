@@ -234,10 +234,6 @@ export class MangoAccount {
     targetTokenName: string,
     slippageAndFeesFactor: number,
   ): I80F48 {
-    if (sourceTokenName === targetTokenName) {
-      return ZERO_I80F48;
-    }
-
     return this.accountData.healthCache
       .getMaxSourceForTokenSwap(
         group,
