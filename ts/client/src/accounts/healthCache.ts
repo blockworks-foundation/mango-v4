@@ -151,7 +151,7 @@ export class HealthCache {
     }
 
     if (liabs.isPos()) {
-      return HUNDRED_I80F48.add(assets.sub(liabs).div(liabs));
+      return HUNDRED_I80F48.mul(assets.sub(liabs).div(liabs));
     } else {
       return MAX_I80F48;
     }
