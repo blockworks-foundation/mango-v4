@@ -259,14 +259,12 @@ async function registerTokens() {
   }
 }
 
-async function createUser() {
+async function createUser(userKeypair: string) {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
 
   const user = Keypair.fromSecretKey(
-    Buffer.from(
-      JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
-    ),
+    Buffer.from(JSON.parse(fs.readFileSync(userKeypair, 'utf-8'))),
   );
   const userWallet = new Wallet(user);
   const userProvider = new AnchorProvider(connection, userWallet, options);
@@ -316,7 +314,8 @@ async function main() {
     console.log(error);
   }
   try {
-    await createUser();
+    await createUser(process.env.MB_USER_KEYPAIR!);
+    // await createUser(process.env.MB_USER2_KEYPAIR!);
   } catch (error) {
     console.log(error);
   }

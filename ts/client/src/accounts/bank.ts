@@ -34,6 +34,7 @@ export class Bank {
   public initLiabWeight: I80F48;
   public maintLiabWeight: I80F48;
   public liquidationFee: I80F48;
+  public dust: I80F48;
 
   static from(
     publicKey: PublicKey,
@@ -175,6 +176,7 @@ export class Bank {
     this.maintLiabWeight = I80F48.from(maintLiabWeight);
     this.initLiabWeight = I80F48.from(initLiabWeight);
     this.liquidationFee = I80F48.from(liquidationFee);
+    this.dust = I80F48.from(dust);
     this.price = undefined;
   }
 

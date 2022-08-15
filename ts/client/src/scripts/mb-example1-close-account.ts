@@ -8,15 +8,13 @@ import { MANGO_V4_ID } from '../constants';
 //
 // (untested?) script which closes a mango account cleanly, first closes all positions, withdraws all tokens and then closes it
 //
-async function main() {
+async function closeUserAccount(userKeypairFile: string) {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
 
   // user
   const user = Keypair.fromSecretKey(
-    Buffer.from(
-      JSON.parse(fs.readFileSync(process.env.USER_KEYPAIR!, 'utf-8')),
-    ),
+    Buffer.from(JSON.parse(fs.readFileSync(userKeypairFile, 'utf-8'))),
   );
   const userWallet = new Wallet(user);
   const userProvider = new AnchorProvider(connection, userWallet, options);
@@ -113,6 +111,11 @@ async function main() {
   const res = await client.closeMangoAccount(group, mangoAccount);
 
   process.exit();
+}
+
+async function main() {
+  // await closeUserAccount(process.env.MB_USER_KEYPAIR!);
+  await closeUserAccount(process.env.MB_USER2_KEYPAIR!);
 }
 
 main();

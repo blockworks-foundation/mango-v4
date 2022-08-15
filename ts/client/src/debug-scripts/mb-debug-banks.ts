@@ -73,6 +73,7 @@ async function main() {
     res =
       res +
       `\n ${'collectedFeesNative'.padEnd(40)} ${bank.collectedFeesNative}` +
+      `\n ${'dust'.padEnd(40)} ${bank.dust}` +
       `\n ${'deposits'.padEnd(40)} ${bank.indexedDeposits.mul(
         bank.depositIndex,
       )}` +
