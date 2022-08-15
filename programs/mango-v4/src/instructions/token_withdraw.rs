@@ -48,10 +48,6 @@ impl<'info> TokenWithdraw<'info> {
     }
 }
 
-// TODO: It may make sense to have the token_index passed in from the outside.
-//       That would save a lot of computation that needs to go into finding the
-//       right index for the mint.
-// TODO: https://github.com/blockworks-foundation/mango-v4/commit/15961ec81c7e9324b37d79d0e2a1650ce6bd981d comments
 pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
     require_msg!(amount > 0, "withdraw amount must be positive");
 
@@ -120,8 +116,8 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
 
     // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
-    account.fixed.net_deposits -=
-        cm!(amount_i80f48 * oracle_price * QUOTE_NATIVE_TO_UI).to_num::<f32>();
+    let amount_usd = cm!(amount_i80f48 * oracle_price).to_num::<i64>();
+    account.fixed.net_deposits = cm!(account.fixed.net_deposits - amount_usd);
 
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),

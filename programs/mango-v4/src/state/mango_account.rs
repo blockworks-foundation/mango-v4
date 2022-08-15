@@ -62,13 +62,13 @@ pub struct MangoAccount {
 
     // Cumulative (deposits - withdraws)
     // using USD prices at the time of the deposit/withdraw
-    // in UI USD units
-    pub net_deposits: f32,
+    // in USD units with 6 decimals
+    pub net_deposits: i64,
     // Cumulative settles on perp positions
     // TODO: unimplemented
-    pub net_settled: f32,
+    pub net_settled: i64,
 
-    pub reserved: [u8; 256],
+    pub reserved: [u8; 248],
 
     // dynamic
     pub header_version: u8,
@@ -100,9 +100,9 @@ impl Default for MangoAccount {
             account_num: 0,
             bump: 0,
             padding: Default::default(),
-            net_deposits: 0.0,
-            net_settled: 0.0,
-            reserved: [0; 256],
+            net_deposits: 0,
+            net_settled: 0,
+            reserved: [0; 248],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding0: Default::default(),
             padding1: Default::default(),
@@ -183,7 +183,7 @@ fn test_dynamic_offsets() {
 }
 
 // Mango Account fixed part for easy zero copy deserialization
-#[derive(Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
+#[derive(Copy, Clone)]
 #[repr(C)]
 pub struct MangoAccountFixed {
     pub group: Pubkey,
@@ -195,12 +195,15 @@ pub struct MangoAccountFixed {
     padding2: u8,
     pub bump: u8,
     pub padding: [u8; 1],
-    pub net_deposits: f32,
-    pub net_settled: f32,
-    pub reserved: [u8; 256],
+    pub net_deposits: i64,
+    pub net_settled: i64,
+    pub reserved: [u8; 248],
 }
-const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 2 * 4 + 256);
+const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 2 * 8 + 248);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
+
+unsafe impl bytemuck::Pod for MangoAccountFixed {}
+unsafe impl bytemuck::Zeroable for MangoAccountFixed {}
 
 impl MangoAccountFixed {
     pub fn name(&self) -> &str {

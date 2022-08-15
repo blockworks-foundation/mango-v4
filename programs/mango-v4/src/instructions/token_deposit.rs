@@ -75,8 +75,8 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
         retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
 
     // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
-    account.fixed.net_deposits +=
-        cm!(amount_i80f48 * oracle_price * QUOTE_NATIVE_TO_UI).to_num::<f32>();
+    let amount_usd = cm!(amount_i80f48 * oracle_price).to_num::<i64>();
+    account.fixed.net_deposits = cm!(account.fixed.net_deposits + amount_usd);
 
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
