@@ -34,8 +34,10 @@ pub struct TokenUpdateIndexAndRate<'info> {
     )]
     pub mint_info: AccountLoader<'info, MintInfo>,
 
+    /// CHECK: oracle can be one of multiple account types
     pub oracle: UncheckedAccount<'info>,
 
+    /// CHECK: fixed instructions sysvar account
     #[account(address = tx_instructions::ID)]
     pub instructions: UncheckedAccount<'info>,
 }
