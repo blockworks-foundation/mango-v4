@@ -3021,18 +3021,18 @@ export type MangoV4 = {
           },
           {
             "name": "netDeposits",
-            "type": "f32"
+            "type": "i64"
           },
           {
             "name": "netSettled",
-            "type": "f32"
+            "type": "i64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                256
+                248
               ]
             }
           },
@@ -8057,18 +8057,18 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "netDeposits",
-            "type": "f32"
+            "type": "i64"
           },
           {
             "name": "netSettled",
-            "type": "f32"
+            "type": "i64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                256
+                248
               ]
             }
           },
