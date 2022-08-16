@@ -12,6 +12,9 @@ export async function sendTransaction(
     await connection.getLatestBlockhash(opts.preflightCommitment)
   ).blockhash;
   transaction.feePayer = payer.publicKey;
+  if (opts.additionalSigners.length > 0) {
+    transaction.partialSign(...opts.additionalSigners);
+  }
 
   await payer.signTransaction(transaction);
   const rawTransaction = transaction.serialize();

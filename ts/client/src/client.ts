@@ -803,6 +803,7 @@ export class MangoClient {
       this.program.provider as AnchorProvider,
       transaction,
       {
+        additionalSigners,
         postSendTxCallback: this.postSendTxCallback,
       },
     );
