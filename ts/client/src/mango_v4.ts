@@ -3854,6 +3854,10 @@ export type MangoV4 = {
                 "defined": "PerpInfo"
               }
             }
+          },
+          {
+            "name": "beingLiquidated",
+            "type": "bool"
           }
         ]
       }
@@ -8881,6 +8885,10 @@ export const IDL: MangoV4 = {
                 "defined": "PerpInfo"
               }
             }
+          },
+          {
+            "name": "beingLiquidated",
+            "type": "bool"
           }
         ]
       }

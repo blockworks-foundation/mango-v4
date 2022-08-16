@@ -523,6 +523,7 @@ pub struct HealthCache {
     token_infos: Vec<TokenInfo>,
     serum3_infos: Vec<Serum3Info>,
     perp_infos: Vec<PerpInfo>,
+    being_liquidated: bool,
 }
 
 impl HealthCache {
@@ -564,6 +565,20 @@ impl HealthCache {
             .iter()
             .any(|p| p.quote.is_negative() || p.base != 0);
         spot_borrows || perp_borrows
+    }
+
+    #[cfg(feature = "client")]
+    pub fn is_bankrupt(&self) -> bool {
+        !self.has_liquidatable_assets() && self.has_borrows()
+    }
+
+    #[cfg(feature = "client")]
+    pub fn is_liquidatable(&self) -> bool {
+        if self.being_liquidated {
+            self.health(HealthType::Init).is_negative()
+        } else {
+            self.health(HealthType::Maint).is_negative()
+        }
     }
 
     fn health_sum(&self, health_type: HealthType, mut action: impl FnMut(I80F48)) {
@@ -922,6 +937,7 @@ pub fn new_health_cache(
         token_infos,
         serum3_infos,
         perp_infos,
+        being_liquidated: account.fixed.being_liquidated(),
     })
 }
 
@@ -1478,6 +1494,7 @@ mod tests {
             ],
             serum3_infos: vec![],
             perp_infos: vec![],
+            being_liquidated: false,
         };
 
         assert_eq!(health_cache.health(HealthType::Init), I80F48::ZERO);
