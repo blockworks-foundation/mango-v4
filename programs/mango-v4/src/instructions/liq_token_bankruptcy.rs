@@ -11,10 +11,9 @@ use crate::state::*;
 use crate::util::checked_math as cm;
 
 // Remaining accounts:
-// - all banks for liab_token_index (writable)
+// - all banks for liab_mint_info (writable)
 // - merged health accounts for liqor+liqee
 #[derive(Accounts)]
-#[instruction(liab_token_index: TokenIndex)]
 pub struct LiqTokenBankruptcy<'info> {
     #[account(
         has_one = insurance_vault,
@@ -37,7 +36,6 @@ pub struct LiqTokenBankruptcy<'info> {
 
     #[account(
         has_one = group,
-        constraint = liab_mint_info.load()?.token_index == liab_token_index,
     )]
     pub liab_mint_info: AccountLoader<'info, MintInfo>,
 
@@ -67,7 +65,6 @@ impl<'info> LiqTokenBankruptcy<'info> {
 
 pub fn liq_token_bankruptcy(
     ctx: Context<LiqTokenBankruptcy>,
-    liab_token_index: TokenIndex,
     max_liab_transfer: I80F48,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
@@ -75,12 +72,9 @@ pub fn liq_token_bankruptcy(
 
     // split remaining accounts into banks and health
     let liab_mint_info = ctx.accounts.liab_mint_info.load()?;
-    let bank_pks = liab_mint_info.banks();
-    let (bank_ais, health_ais) = &ctx.remaining_accounts.split_at(bank_pks.len());
-    require!(
-        bank_ais.iter().map(|ai| ai.key).eq(bank_pks.iter()),
-        MangoError::SomeError
-    );
+    let liab_token_index = liab_mint_info.token_index;
+    let (bank_ais, health_ais) = &ctx.remaining_accounts.split_at(liab_mint_info.num_banks());
+    liab_mint_info.verify_banks_ais(bank_ais)?;
 
     let mut liqor = ctx.accounts.liqor.load_mut()?;
     // account constraint #1

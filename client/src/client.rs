@@ -873,10 +873,7 @@ impl MangoClient {
                     ams
                 },
                 data: anchor_lang::InstructionData::data(
-                    &mango_v4::instruction::LiqTokenBankruptcy {
-                        liab_token_index,
-                        max_liab_transfer,
-                    },
+                    &mango_v4::instruction::LiqTokenBankruptcy { max_liab_transfer },
                 ),
             })
             .signer(&self.owner)

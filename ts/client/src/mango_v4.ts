@@ -2005,10 +2005,6 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "liabTokenIndex",
-          "type": "u16"
-        },
-        {
           "name": "maxLiabTransfer",
           "type": {
             "defined": "I80F48"
@@ -7040,10 +7036,6 @@ export const IDL: MangoV4 = {
         }
       ],
       "args": [
-        {
-          "name": "liabTokenIndex",
-          "type": "u16"
-        },
         {
           "name": "maxLiabTransfer",
           "type": {

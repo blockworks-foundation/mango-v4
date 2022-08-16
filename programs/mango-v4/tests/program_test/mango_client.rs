@@ -1953,7 +1953,6 @@ pub struct LiqTokenBankruptcyInstruction<'keypair> {
     pub liqor: Pubkey,
     pub liqor_owner: &'keypair Keypair,
 
-    pub liab_token_index: TokenIndex,
     pub max_liab_transfer: I80F48,
     pub liab_mint_info: Pubkey,
 }
@@ -1967,7 +1966,6 @@ impl<'keypair> ClientInstruction for LiqTokenBankruptcyInstruction<'keypair> {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            liab_token_index: self.liab_token_index,
             max_liab_transfer: self.max_liab_transfer,
         };
 
@@ -1986,7 +1984,7 @@ impl<'keypair> ClientInstruction for LiqTokenBankruptcyInstruction<'keypair> {
             &liqor,
             QUOTE_TOKEN_INDEX,
             0,
-            self.liab_token_index,
+            liab_mint_info.token_index,
             0,
         )
         .await;

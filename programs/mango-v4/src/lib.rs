@@ -337,10 +337,9 @@ pub mod mango_v4 {
 
     pub fn liq_token_bankruptcy(
         ctx: Context<LiqTokenBankruptcy>,
-        liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -> Result<()> {
-        instructions::liq_token_bankruptcy(ctx, liab_token_index, max_liab_transfer)
+        instructions::liq_token_bankruptcy(ctx, max_liab_transfer)
     }
 
     ///
