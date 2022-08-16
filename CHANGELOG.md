@@ -4,7 +4,7 @@ Update this for each mainnet deployment.
 
 ## not on mainnet
 
--
+- liq_token_bankruptcy: removed liab_token_index argument
 
 ## mainnet
 
