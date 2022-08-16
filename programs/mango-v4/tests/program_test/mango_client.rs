@@ -342,7 +342,6 @@ impl ClientInstruction for FlashLoanBeginInstruction {
         let program_id = mango_v4::id();
 
         let accounts = Self::Accounts {
-            group: self.group,
             token_program: Token::id(),
             instructions: solana_program::sysvar::instructions::id(),
         };
@@ -365,6 +364,11 @@ impl ClientInstruction for FlashLoanBeginInstruction {
         instruction.accounts.push(AccountMeta {
             pubkey: self.target_token_account,
             is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.group,
+            is_writable: false,
             is_signer: false,
         });
 
@@ -424,6 +428,11 @@ impl<'keypair> ClientInstruction for FlashLoanEndInstruction<'keypair> {
         instruction.accounts.push(AccountMeta {
             pubkey: self.target_token_account,
             is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: account.fixed.group,
+            is_writable: false,
             is_signer: false,
         });
 
