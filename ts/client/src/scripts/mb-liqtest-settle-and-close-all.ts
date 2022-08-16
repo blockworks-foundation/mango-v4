@@ -70,7 +70,7 @@ async function main() {
       const amount = token.native(bank).toNumber();
       if (amount > 0) {
         try {
-          const allowBorrow = true; // TODO: set this to false once the withdraw amount ___<___ nativePosition bug is fixed
+          const allowBorrow = false;
           await client.tokenWithdrawNative(
             group,
             account,

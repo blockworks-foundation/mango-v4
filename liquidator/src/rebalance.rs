@@ -175,8 +175,7 @@ pub fn zero_all_non_quote(
         // Any remainder that could not be sold just gets withdrawn to ensure the
         // TokenPosition is freed up
         if amount > 0 && amount <= dust_threshold {
-            // TODO: fix to false once program updated to fix allow_borrow bug
-            let allow_borrow = true;
+            let allow_borrow = false;
             let txsig =
                 mango_client.token_withdraw(token_mint, amount.to_num::<u64>(), allow_borrow)?;
             log::info!(
