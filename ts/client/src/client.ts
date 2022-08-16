@@ -1575,6 +1575,11 @@ export class MangoClient {
       isWritable: false,
       isSigner: false,
     };
+    const groupAM = {
+      pubkey: group.publicKey,
+      isWritable: false,
+      isSigner: false,
+    };
 
     const flashLoanEndIx = await this.program.methods
       .flashLoanEnd()
@@ -1592,6 +1597,7 @@ export class MangoClient {
           pubkey: outputTokenAccountPk,
           isSigner: false,
         },
+        groupAM,
       ])
       .instruction();
 
@@ -1603,7 +1609,6 @@ export class MangoClient {
         ) /* we don't care about borrowing the target amount, this is just a dummy */,
       ])
       .accounts({
-        group: group.publicKey,
         instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       })
       .remainingAccounts([
@@ -1613,6 +1618,7 @@ export class MangoClient {
         outputBankVault,
         inputATA,
         outputATA,
+        groupAM,
       ])
       .instruction();
 

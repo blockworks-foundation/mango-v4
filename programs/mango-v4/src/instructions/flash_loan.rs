@@ -21,9 +21,9 @@ use fixed::types::I80F48;
 /// 2. N vaults (writable), matching the banks
 /// 3. N token accounts (writable), in the same order as the vaults,
 ///    the loaned funds are transfered into these
+/// 4. the mango group
 #[derive(Accounts)]
 pub struct FlashLoanBegin<'info> {
-    pub group: AccountLoader<'info, Group>,
     pub token_program: Program<'info, Token>,
 
     /// Instructions Sysvar for instruction introspection
@@ -39,6 +39,7 @@ pub struct FlashLoanBegin<'info> {
 /// 2. N vaults (writable), matching what was in FlashLoanBegin
 /// 3. N token accounts (writable), matching what was in FlashLoanBegin;
 ///    the `owner` must have authority to transfer tokens out of them
+/// 4. the mango group
 #[derive(Accounts)]
 pub struct FlashLoanEnd<'info> {
     #[account(
@@ -58,14 +59,22 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
     loan_amounts: Vec<u64>,
 ) -> Result<()> {
     let num_loans = loan_amounts.len();
-    require_eq!(ctx.remaining_accounts.len(), 3 * num_loans);
+    require_eq!(ctx.remaining_accounts.len(), 3 * num_loans + 1);
     let banks = &ctx.remaining_accounts[..num_loans];
     let vaults = &ctx.remaining_accounts[num_loans..2 * num_loans];
-    let token_accounts = &ctx.remaining_accounts[2 * num_loans..];
+    let token_accounts = &ctx.remaining_accounts[2 * num_loans..3 * num_loans];
+    let group_ai = &ctx.remaining_accounts[3 * num_loans];
 
-    let group = ctx.accounts.group.load()?;
+    let group_al = AccountLoader::<Group>::try_from(&group_ai)?;
+    let group = group_al.load()?;
     let group_seeds = group_seeds!(group);
     let seeds = [&group_seeds[..]];
+
+    // This instruction does not currently deal with:
+    // - borrowing twice from the same bank
+    // - borrowing from two different banks for the same token
+    // Hence we collect all token_indexes and ensure each appears only once.
+    let mut seen_token_indexes = Vec::with_capacity(num_loans);
 
     // Check that the banks and vaults correspond
     for (((bank_ai, vault_ai), token_account_ai), amount) in banks
@@ -75,11 +84,19 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
         .zip(loan_amounts.iter())
     {
         let mut bank = bank_ai.load_mut::<Bank>()?;
-        require_keys_eq!(bank.group, ctx.accounts.group.key());
+        require_keys_eq!(bank.group, group_ai.key());
         require_keys_eq!(bank.vault, *vault_ai.key);
+
+        require_msg!(
+            !seen_token_indexes.contains(&bank.token_index),
+            "each loan must be for a unique token_index"
+        );
+        seen_token_indexes.push(bank.token_index);
 
         let vault = Account::<TokenAccount>::try_from(vault_ai)?;
         let token_account = Account::<TokenAccount>::try_from(token_account_ai)?;
+
+        require_keys_neq!(token_account.owner, group_ai.key());
 
         bank.flash_loan_approved_amount = *amount;
         bank.flash_loan_token_account_initial = token_account.amount;
@@ -101,7 +118,7 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
                 token::Transfer {
                     from: vault_ai.clone(),
                     to: token_account_ai.clone(),
-                    authority: ctx.accounts.group.to_account_info(),
+                    authority: group_ai.clone(),
                 },
             )
             .with_signer(&seeds);
@@ -150,9 +167,9 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
 
                 // check that the same vaults and token accounts are passed
                 let begin_accounts = &ctx.remaining_accounts[num_loans..];
-                let end_accounts = &ix.accounts[ix.accounts.len() - 2 * num_loans..];
+                let end_accounts = &ix.accounts[ix.accounts.len() - begin_accounts.len()..];
                 for (begin_account, end_account) in begin_accounts.iter().zip(end_accounts.iter()) {
-                    require_msg!(*begin_account.key == end_account.pubkey, "the trailing accounts passed to FlashLoanBegin and End must match, found {} on begin and {} on end", begin_account.key, end_account.pubkey);
+                    require_msg!(*begin_account.key == end_account.pubkey, "the trailing vault, token and group accounts passed to FlashLoanBegin and End must match, found {} on begin and {} on end", begin_account.key, end_account.pubkey);
                 }
             } else {
                 // ensure no one can cpi into mango either
@@ -185,26 +202,26 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     let mut account = ctx.accounts.account.load_mut()?;
     let group = account.fixed.group;
 
-    // Find index at which vaults start
-    let vaults_index = ctx
-        .remaining_accounts
-        .iter()
-        .position(|ai| {
-            let maybe_token_account = Account::<TokenAccount>::try_from(ai);
-            if maybe_token_account.is_err() {
-                return false;
-            }
+    let remaining_len = ctx.remaining_accounts.len();
+    let group_ai = &ctx.remaining_accounts[remaining_len - 1];
+    require_keys_eq!(group, group_ai.key());
 
-            maybe_token_account.unwrap().owner == account.fixed.group
-        })
-        .ok_or_else(|| error_msg!("expected at least one vault token account to be passed"))?;
-    let vaults_len = (ctx.remaining_accounts.len() - vaults_index) / 2;
-    require_eq!(ctx.remaining_accounts.len(), vaults_index + 2 * vaults_len);
+    // Find index at which vaults start
+    let vaults_len = ctx.remaining_accounts[..remaining_len - 1]
+        .iter()
+        .rev()
+        .map_while(|ai| Account::<TokenAccount>::try_from(ai).ok())
+        .position(|token_account| token_account.owner == group)
+        .ok_or_else(|| {
+            error_msg!("expected at least one group-owned vault token account to be passed")
+        })?;
+    let vaults_index = remaining_len - 2 * vaults_len - 1;
 
     // First initialize to the remaining delegated amount
     let health_ais = &ctx.remaining_accounts[..vaults_index];
     let vaults = &ctx.remaining_accounts[vaults_index..vaults_index + vaults_len];
-    let token_accounts = &ctx.remaining_accounts[vaults_index + vaults_len..];
+    let token_accounts =
+        &ctx.remaining_accounts[vaults_index + vaults_len..vaults_index + 2 * vaults_len];
     let mut vaults_with_banks = vec![false; vaults.len()];
 
     // Loop over the banks, finding matching vaults
@@ -216,6 +233,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             Ok(b) => b,
             Err(_) => break,
         };
+        require_keys_eq!(bank.group, group);
 
         // find a vault -- if there's none, skip
         let (vault_index, vault_ai) = match vaults
