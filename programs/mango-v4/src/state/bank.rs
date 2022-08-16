@@ -392,22 +392,12 @@ impl Bank {
         }
     }
 
-    // Borrows continously expose insurance fund to risk, collect fees from borrowers
-    pub fn charge_loan_fee(&mut self, diff_ts: I80F48) {
-        let native_borrows_old = self.native_borrows();
-        self.indexed_borrows =
-            cm!((self.indexed_borrows
-                * (I80F48::ONE + self.loan_fee_rate * (diff_ts / YEAR_I80F48))));
-        self.collected_fees_native =
-            cm!(self.collected_fees_native + self.native_borrows() - native_borrows_old);
-    }
-
     pub fn compute_index(
         &self,
         indexed_total_deposits: I80F48,
         indexed_total_borrows: I80F48,
         diff_ts: I80F48,
-    ) -> Result<(I80F48, I80F48)> {
+    ) -> Result<(I80F48, I80F48, I80F48)> {
         // compute index based on utilization
         let native_total_deposits = cm!(self.deposit_index * indexed_total_deposits);
         let native_total_borrows = cm!(self.borrow_index * indexed_total_borrows);
@@ -419,21 +409,31 @@ impl Bank {
             cm!(native_total_borrows / native_total_deposits)
         };
 
-        let borrow_interest_rate = self.compute_interest_rate(instantaneous_utilization);
+        let borrow_rate = self.compute_interest_rate(instantaneous_utilization);
 
-        let borrow_interest = cm!(borrow_interest_rate * diff_ts);
-        let deposit_interest = cm!(borrow_interest * instantaneous_utilization);
+        // We want to grant depositors a rate that exactly matches the amount that is
+        // taken from borrowers. That means:
+        //   (new_deposit_index - old_deposit_index) * indexed_deposits
+        //      = (new_borrow_index - old_borrow_index) * indexed_borrows
+        // with
+        //   new_deposit_index = old_deposit_index * (1 + deposit_rate) and
+        //   new_borrow_index = old_borrow_index * (1 * borrow_rate)
+        // we have
+        //   deposit_rate = borrow_rate * (old_borrow_index * indexed_borrows) / (old_deposit_index * indexed_deposits)
+        // and the latter factor is exactly instantaneous_utilization.
+        let deposit_rate = cm!(borrow_rate * instantaneous_utilization);
 
-        if borrow_interest <= I80F48::ZERO || deposit_interest <= I80F48::ZERO {
-            return Ok((self.deposit_index, self.borrow_index));
-        }
+        // The loan fee rate is not distributed to depositors.
+        let borrow_rate_with_fees = cm!(borrow_rate + self.loan_fee_rate);
+        let borrow_fees = native_total_borrows * self.loan_fee_rate * diff_ts / YEAR_I80F48;
 
-        let borrow_index =
-            cm!((self.borrow_index * borrow_interest) / YEAR_I80F48 + self.borrow_index);
+        let borrow_index = cm!(
+            (self.borrow_index * borrow_rate_with_fees * diff_ts) / YEAR_I80F48 + self.borrow_index
+        );
         let deposit_index =
-            cm!((self.deposit_index * deposit_interest) / YEAR_I80F48 + self.deposit_index);
+            cm!((self.deposit_index * deposit_rate * diff_ts) / YEAR_I80F48 + self.deposit_index);
 
-        Ok((deposit_index, borrow_index))
+        Ok((deposit_index, borrow_index, borrow_fees))
     }
 
     /// returns the current interest rate in APR

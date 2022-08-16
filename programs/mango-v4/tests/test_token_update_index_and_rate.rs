@@ -107,9 +107,11 @@ async fn test_token_update_index_and_rate() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    let bank_before_update_index_and_rate = solana.get_account::<Bank>(tokens[0].bank).await;
+    let bank_before = solana.get_account::<Bank>(tokens[0].bank).await;
 
+    let time_before = solana.get_clock().await.unix_timestamp;
     solana.advance_clock().await;
+    let time_after = solana.get_clock().await.unix_timestamp;
 
     send_tx(
         solana,
@@ -120,16 +122,38 @@ async fn test_token_update_index_and_rate() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    let bank_after_update_index_and_rate = solana.get_account::<Bank>(tokens[0].bank).await;
-    dbg!(bank_after_update_index_and_rate);
-    dbg!(bank_after_update_index_and_rate);
+    let bank_after = solana.get_account::<Bank>(tokens[0].bank).await;
+    dbg!(bank_after);
+    dbg!(bank_after);
+
+    let utilization = 0.5; // 10000 deposits / 5000 borrows
+    let diff_ts = (time_after - time_before) as f64;
+    let year = 31536000.0;
+    let loan_fee_rate = 0.0005;
+    let dynamic_rate = 0.07 + 0.9 * (utilization - 0.4) / (0.8 - 0.4);
+    let interest_change = 5000.0 * (dynamic_rate + loan_fee_rate) * diff_ts / year;
+    let fee_change = 5000.0 * loan_fee_rate * diff_ts / year;
+
     assert!(
-        bank_before_update_index_and_rate.deposit_index
-            < bank_after_update_index_and_rate.deposit_index
+        (bank_after.native_borrows().to_num::<f64>()
+            - bank_before.native_borrows().to_num::<f64>()
+            - interest_change)
+            .abs()
+            < 0.1
     );
     assert!(
-        bank_before_update_index_and_rate.borrow_index
-            < bank_after_update_index_and_rate.borrow_index
+        (bank_after.native_deposits().to_num::<f64>()
+            - bank_before.native_deposits().to_num::<f64>()
+            - interest_change)
+            .abs()
+            < 0.1
+    );
+    assert!(
+        (bank_after.collected_fees_native.to_num::<f64>()
+            - bank_before.collected_fees_native.to_num::<f64>()
+            - fee_change)
+            .abs()
+            < 0.1
     );
 
     Ok(())
