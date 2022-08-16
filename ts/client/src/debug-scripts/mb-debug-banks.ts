@@ -102,7 +102,7 @@ async function main() {
       `\n ${'cachedIndexedTotalDeposits'.padEnd(40)} ${(
         bank as any
       ).cachedIndexedTotalDeposits.mul(bank.depositIndex)}` +
-      `\n ${'indexedBorrows'.padEnd(40)} ${bank.indexedBorrows.mul(
+      `\n ${'borrows'.padEnd(40)} ${bank.indexedBorrows.mul(
         bank.borrowIndex,
       )}` +
       `\n ${'borrows (sum over all mango accounts)'.padEnd(40)} ${
