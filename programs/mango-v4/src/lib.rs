@@ -231,8 +231,9 @@ pub mod mango_v4 {
 
     pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
+        flash_loan_type: FlashLoanType,
     ) -> Result<()> {
-        instructions::flash_loan_end(ctx)
+        instructions::flash_loan_end(ctx, flash_loan_type)
     }
 
     ///

@@ -1224,7 +1224,14 @@ export type MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
+          }
+        }
+      ]
     },
     {
       "name": "serum3RegisterMarket",
@@ -4247,6 +4254,20 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "FlashLoanType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Unknown"
+          },
+          {
+            "name": "Swap"
+          }
+        ]
+      }
+    },
+    {
       "name": "Serum3SelfTradeBehavior",
       "docs": [
         "Copy paste a bunch of enums so that we could AnchorSerialize & AnchorDeserialize them"
@@ -4579,6 +4600,13 @@ export type MangoV4 = {
             "vec": {
               "defined": "FlashLoanTokenDetail"
             }
+          },
+          "index": false
+        },
+        {
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
           },
           "index": false
         }
@@ -6255,7 +6283,14 @@ export const IDL: MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
+          }
+        }
+      ]
     },
     {
       "name": "serum3RegisterMarket",
@@ -9278,6 +9313,20 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "FlashLoanType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Unknown"
+          },
+          {
+            "name": "Swap"
+          }
+        ]
+      }
+    },
+    {
       "name": "Serum3SelfTradeBehavior",
       "docs": [
         "Copy paste a bunch of enums so that we could AnchorSerialize & AnchorDeserialize them"
@@ -9610,6 +9659,13 @@ export const IDL: MangoV4 = {
             "vec": {
               "defined": "FlashLoanTokenDetail"
             }
+          },
+          "index": false
+        },
+        {
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
           },
           "index": false
         }

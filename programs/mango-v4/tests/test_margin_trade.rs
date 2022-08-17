@@ -194,6 +194,8 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
             mango_token_bank: bank,
             mango_token_vault: vault,
             target_token_account,
+            // the test only accesses a single token: not a swap
+            flash_loan_type: mango_v4::instructions::FlashLoanType::Unknown,
         })
         .await;
         tx.send().await.unwrap();
