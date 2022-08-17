@@ -155,6 +155,7 @@ async fn test_token_update_index_and_rate() -> Result<(), TransportError> {
             .abs()
             < 0.1
     );
+    assert!((bank_after.avg_utilization.to_num::<f64>() - utilization).abs() < 0.01);
 
     Ok(())
 }
