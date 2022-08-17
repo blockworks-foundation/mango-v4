@@ -4,3 +4,8 @@ export class FlashLoanWithdraw {
   static index: number;
   static amount: BN;
 }
+
+export class FlashLoanType {
+  static unknown = { unknown: {} };
+  static swap = { swap: {} };
+}

@@ -1108,7 +1108,7 @@ impl MangoClient {
                 ams
             },
             data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanEnd {
-                swap_indicator: true,
+                flash_loan_type: mango_v4::instructions::FlashLoanType::Swap,
             }),
         });
 

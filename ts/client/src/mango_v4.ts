@@ -1226,8 +1226,10 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "swapIndicator",
-          "type": "bool"
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
+          }
         }
       ]
     },
@@ -4252,6 +4254,20 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "FlashLoanType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Unknown"
+          },
+          {
+            "name": "Swap"
+          }
+        ]
+      }
+    },
+    {
       "name": "Serum3SelfTradeBehavior",
       "docs": [
         "Copy paste a bunch of enums so that we could AnchorSerialize & AnchorDeserialize them"
@@ -4588,8 +4604,10 @@ export type MangoV4 = {
           "index": false
         },
         {
-          "name": "swapIndicator",
-          "type": "bool",
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
+          },
           "index": false
         }
       ]
@@ -6267,8 +6285,10 @@ export const IDL: MangoV4 = {
       ],
       "args": [
         {
-          "name": "swapIndicator",
-          "type": "bool"
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
+          }
         }
       ]
     },
@@ -9293,6 +9313,20 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "FlashLoanType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Unknown"
+          },
+          {
+            "name": "Swap"
+          }
+        ]
+      }
+    },
+    {
       "name": "Serum3SelfTradeBehavior",
       "docs": [
         "Copy paste a bunch of enums so that we could AnchorSerialize & AnchorDeserialize them"
@@ -9629,8 +9663,10 @@ export const IDL: MangoV4 = {
           "index": false
         },
         {
-          "name": "swapIndicator",
-          "type": "bool",
+          "name": "flashLoanType",
+          "type": {
+            "defined": "FlashLoanType"
+          },
           "index": false
         }
       ]

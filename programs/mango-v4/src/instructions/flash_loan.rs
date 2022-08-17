@@ -52,6 +52,13 @@ pub struct FlashLoanEnd<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+#[derive(PartialEq, Copy, Clone, Debug, AnchorSerialize, AnchorDeserialize)]
+#[repr(u8)]
+pub enum FlashLoanType {
+    Unknown,
+    Swap,
+}
+
 /// The `loan_amounts` argument lists the amount to be loaned from each bank/vault and
 /// the order matches the order of bank accounts.
 pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
@@ -198,7 +205,7 @@ struct TokenVaultChange {
 
 pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
-    swap_indicator: bool,
+    flash_loan_type: FlashLoanType,
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_mut()?;
     let group = account.fixed.group;
@@ -286,11 +293,14 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         });
     }
 
-    if swap_indicator {
-        require_msg!(
-            changes.len() == 2,
-            "when swap_indicator is true there must be exactly 2 token vault changes"
-        )
+    match flash_loan_type {
+        FlashLoanType::Unknown => {}
+        FlashLoanType::Swap => {
+            require_msg!(
+                changes.len() == 2,
+                "when flash_loan_type is Swap there must be exactly 2 token vault changes"
+            )
+        }
     }
 
     // all vaults must have had matching banks
@@ -376,7 +386,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     emit!(FlashLoanLog {
         mango_group: group.key(),
         mango_account: ctx.accounts.account.key(),
-        swap_indicator: swap_indicator,
+        flash_loan_type,
         token_loan_details
     });
 

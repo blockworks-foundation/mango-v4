@@ -45,6 +45,7 @@ import {
 import { SERUM3_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
+import { FlashLoanType } from './types';
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
@@ -1477,8 +1478,8 @@ export class MangoClient {
     outputToken,
     userDefinedInstructions,
     // margin trade is a general function
-    // set swapIndicator to true if you desire the transaction to be recorded as a swap 
-    swapIndicator 
+    // set flash_loan_type to FlashLoanType.swap if you desire the transaction to be recorded as a swap
+    flashLoanType,
   }: {
     group: Group;
     mangoAccount: MangoAccount;
@@ -1486,7 +1487,7 @@ export class MangoClient {
     amountIn: number;
     outputToken: string;
     userDefinedInstructions: TransactionInstruction[];
-    swapIndicator: boolean;
+    flashLoanType: FlashLoanType;
   }): Promise<TransactionSignature> {
     const inputBank = group.banksMap.get(inputToken);
     const outputBank = group.banksMap.get(outputToken);
@@ -1586,7 +1587,7 @@ export class MangoClient {
     };
 
     const flashLoanEndIx = await this.program.methods
-      .flashLoanEnd(swapIndicator)
+      .flashLoanEnd(flashLoanType)
       .accounts({
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
