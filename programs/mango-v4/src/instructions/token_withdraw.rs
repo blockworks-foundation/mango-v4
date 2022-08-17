@@ -136,6 +136,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         .context("post-withdraw init health")?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
+    account.fixed.maybe_recover_from_being_liquidated(health);
 
     //
     // Deactivate the position only after the health check because the user passed in

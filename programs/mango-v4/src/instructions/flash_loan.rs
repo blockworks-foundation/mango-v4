@@ -225,11 +225,12 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         })?;
     let vaults_index = remaining_len - 2 * vaults_len - 1;
 
-    // First initialize to the remaining delegated amount
     let health_ais = &ctx.remaining_accounts[..vaults_index];
     let vaults = &ctx.remaining_accounts[vaults_index..vaults_index + vaults_len];
     let token_accounts =
         &ctx.remaining_accounts[vaults_index + vaults_len..vaults_index + 2 * vaults_len];
+
+    // Verify that each mentioned vault has a bank in the health accounts
     let mut vaults_with_banks = vec![false; vaults.len()];
 
     // Loop over the banks, finding matching vaults
@@ -313,13 +314,9 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         );
     }
 
-    // Check pre-cpi health
-    // NOTE: This health check isn't strictly necessary. It will be, later, when
-    // we want to have reduce_only or be able to move an account out of bankruptcy.
+    // Check health before balance adjustments
     let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
-    let pre_cpi_health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
-    require!(pre_cpi_health >= 0, MangoError::HealthMustBePositive);
-    msg!("pre_cpi_health {:?}", pre_cpi_health);
+    let _pre_health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
 
     // Prices for logging
     let mut prices = vec![];
@@ -390,11 +387,14 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         token_loan_details
     });
 
-    // Check post-cpi health
-    let post_cpi_health =
+    // Check health after account position changes
+    let post_health =
         compute_health_from_fixed_accounts(&account.borrow(), HealthType::Init, health_ais)?;
-    require!(post_cpi_health >= 0, MangoError::HealthMustBePositive);
-    msg!("post_cpi_health {:?}", post_cpi_health);
+    msg!("post_cpi_health {:?}", post_health);
+    require!(post_health >= 0, MangoError::HealthMustBePositive);
+    account
+        .fixed
+        .maybe_recover_from_being_liquidated(post_health);
 
     // Deactivate inactive token accounts after health check
     for raw_token_index in deactivated_token_positions {
