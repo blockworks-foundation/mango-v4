@@ -294,6 +294,7 @@ pub fn serum3_place_order(
     let health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
+    account.fixed.maybe_recover_from_being_liquidated(health);
 
     vault_difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
 
