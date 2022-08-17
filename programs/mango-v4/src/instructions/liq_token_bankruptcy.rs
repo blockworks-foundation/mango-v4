@@ -181,13 +181,14 @@ pub fn liq_token_bankruptcy(
                 liqor.token_deactivate(liqor_liab_raw_token_index);
             }
 
-            emit!(WithdrawLoanOriginationFeeLog {
-                mango_group: ctx.accounts.group.key(),
-                mango_account: ctx.accounts.liqor.key(),
-                token_index: liab_token_index,
-                loan_origination_fee: loan_origination_fee.to_bits(),
-                price: liab_price.to_bits(),
-            });
+            if loan_origination_fee.is_positive() {
+                emit!(WithdrawLoanOriginationFeeLog {
+                    mango_group: ctx.accounts.group.key(),
+                    mango_account: ctx.accounts.liqor.key(),
+                    token_index: liab_token_index,
+                    loan_origination_fee: loan_origination_fee.to_bits(),
+                });
+            }
         } else {
             // For liab_token_index == QUOTE_TOKEN_INDEX: the insurance fund deposits directly into liqee,
             // without a fee or the liqor being involved

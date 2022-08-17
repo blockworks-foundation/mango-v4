@@ -180,5 +180,4 @@ pub struct WithdrawLoanOriginationFeeLog {
     pub mango_account: Pubkey,
     pub token_index: u16,
     pub loan_origination_fee: i128, // I80F48
-    pub price: i128,                // I80F48
 }

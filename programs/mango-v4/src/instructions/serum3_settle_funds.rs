@@ -10,6 +10,7 @@ use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
 
 use super::{apply_vault_difference, OpenOrdersReserved, OpenOrdersSlim};
+use crate::logs::WithdrawLoanOriginationFeeLog;
 
 #[derive(Accounts)]
 pub struct Serum3SettleFunds<'info> {
@@ -149,16 +150,34 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         let mut account = ctx.accounts.account.load_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-        let (vault_difference_result, _, _) = apply_vault_difference(
-            &mut account.borrow_mut(),
-            &mut base_bank,
-            after_base_vault,
-            before_base_vault,
-            &mut quote_bank,
-            after_quote_vault,
-            before_quote_vault,
-        )?;
+        let (vault_difference_result, base_loan_origination_fee, quote_loan_origination_fee) =
+            apply_vault_difference(
+                &mut account.borrow_mut(),
+                &mut base_bank,
+                after_base_vault,
+                before_base_vault,
+                &mut quote_bank,
+                after_quote_vault,
+                before_quote_vault,
+            )?;
         vault_difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
+
+        if base_loan_origination_fee.is_positive() {
+            emit!(WithdrawLoanOriginationFeeLog {
+                mango_group: ctx.accounts.group.key(),
+                mango_account: ctx.accounts.account.key(),
+                token_index: serum_market.base_token_index,
+                loan_origination_fee: base_loan_origination_fee.to_bits(),
+            });
+        }
+        if quote_loan_origination_fee.is_positive() {
+            emit!(WithdrawLoanOriginationFeeLog {
+                mango_group: ctx.accounts.group.key(),
+                mango_account: ctx.accounts.account.key(),
+                token_index: serum_market.quote_token_index,
+                loan_origination_fee: quote_loan_origination_fee.to_bits(),
+            });
+        }
     }
 
     Ok(())

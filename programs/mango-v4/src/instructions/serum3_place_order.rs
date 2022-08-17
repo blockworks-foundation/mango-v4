@@ -300,33 +300,22 @@ pub fn serum3_place_order(
 
     vault_difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
 
-    let (_, base_oracle_price) = retriever.bank_and_oracle(
-        &ctx.accounts.group.key(),
-        vault_difference_result.base_raw_index,
-        serum_market.base_token_index,
-    )?;
-
-    emit!(WithdrawLoanOriginationFeeLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.account.key(),
-        token_index: serum_market.base_token_index,
-        loan_origination_fee: base_loan_origination_fee.to_bits(),
-        price: base_oracle_price.to_bits(),
-    });
-
-    let (_, quote_oracle_price) = retriever.bank_and_oracle(
-        &ctx.accounts.group.key(),
-        vault_difference_result.quote_raw_index,
-        serum_market.quote_token_index,
-    )?;
-
-    emit!(WithdrawLoanOriginationFeeLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.account.key(),
-        token_index: serum_market.quote_token_index,
-        loan_origination_fee: quote_loan_origination_fee.to_bits(),
-        price: quote_oracle_price.to_bits(),
-    });
+    if base_loan_origination_fee.is_positive() {
+        emit!(WithdrawLoanOriginationFeeLog {
+            mango_group: ctx.accounts.group.key(),
+            mango_account: ctx.accounts.account.key(),
+            token_index: serum_market.base_token_index,
+            loan_origination_fee: base_loan_origination_fee.to_bits(),
+        });
+    }
+    if quote_loan_origination_fee.is_positive() {
+        emit!(WithdrawLoanOriginationFeeLog {
+            mango_group: ctx.accounts.group.key(),
+            mango_account: ctx.accounts.account.key(),
+            token_index: serum_market.quote_token_index,
+            loan_origination_fee: quote_loan_origination_fee.to_bits(),
+        });
+    }
 
     Ok(())
 }
