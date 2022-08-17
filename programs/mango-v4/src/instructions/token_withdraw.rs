@@ -156,15 +156,13 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         price: oracle_price.to_bits(),
     });
 
-    if loan_origination_fee.is_positive() {
-        emit!(WithdrawLoanOriginationFeeLog {
-            mango_group: ctx.accounts.group.key(),
-            mango_account: ctx.accounts.account.key(),
-            token_index,
-            loan_origination_fee: loan_origination_fee.to_bits(),
-            price: oracle_price.to_bits(),
-        });
-    }
+    emit!(WithdrawLoanOriginationFeeLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account.key(),
+        token_index,
+        loan_origination_fee: loan_origination_fee.to_bits(),
+        price: oracle_price.to_bits(),
+    });
 
     Ok(())
 }

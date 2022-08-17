@@ -4816,6 +4816,16 @@ export type MangoV4 = {
           "name": "price",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "collectedFees",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "loanFeeRate",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -4940,6 +4950,36 @@ export type MangoV4 = {
         {
           "name": "referrerRebatesAccrued",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "WithdrawLoanOriginationFeeLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "loanOriginationFee",
+          "type": "i128",
           "index": false
         },
         {
@@ -9847,6 +9887,16 @@ export const IDL: MangoV4 = {
           "name": "price",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "collectedFees",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "loanFeeRate",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -9971,6 +10021,36 @@ export const IDL: MangoV4 = {
         {
           "name": "referrerRebatesAccrued",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "WithdrawLoanOriginationFeeLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "loanOriginationFee",
+          "type": "i128",
           "index": false
         },
         {

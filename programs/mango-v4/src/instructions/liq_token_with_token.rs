@@ -8,6 +8,8 @@ use crate::state::ScanningAccountRetriever;
 use crate::state::*;
 use crate::util::checked_math as cm;
 
+use crate::logs::WithdrawLoanOriginationFeeLog;
+
 #[derive(Accounts)]
 pub struct LiqTokenWithToken<'info> {
     pub group: AccountLoader<'info, Group>,
@@ -142,7 +144,8 @@ pub fn liq_token_with_token(
 
         let (liqor_liab_position, liqor_liab_raw_index, _) =
             liqor.token_get_mut_or_create(liab_token_index)?;
-        let liqor_liab_active = liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer)?;
+        let (liqor_liab_active, loan_origination_fee) =
+            liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer)?;
         let liqor_liab_position_indexed = liqor_liab_position.indexed_position;
         let liqee_liab_native_after = liqee_liab_position.native(&liab_bank);
 
@@ -224,6 +227,14 @@ pub fn liq_token_with_token(
             indexed_position: liqor_liab_position_indexed.to_bits(),
             deposit_index: liab_bank.deposit_index.to_bits(),
             borrow_index: liab_bank.borrow_index.to_bits(),
+            price: liab_price.to_bits(),
+        });
+
+        emit!(WithdrawLoanOriginationFeeLog {
+            mango_group: ctx.accounts.group.key(),
+            mango_account: ctx.accounts.liqor.key(),
+            token_index: liab_token_index,
+            loan_origination_fee: loan_origination_fee.to_bits(),
             price: liab_price.to_bits(),
         });
 

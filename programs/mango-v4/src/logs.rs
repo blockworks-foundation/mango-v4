@@ -133,6 +133,8 @@ pub struct UpdateIndexLog {
     pub borrow_index: i128,    // I80F48
     pub avg_utilization: i128, // I80F48
     pub price: i128,           // I80F48
+    pub collected_fees: i128,  // I80F48
+    pub loan_fee_rate: i128,   // I80F48
 }
 
 #[event]

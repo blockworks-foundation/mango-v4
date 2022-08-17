@@ -10,6 +10,8 @@ use crate::state::ScanningAccountRetriever;
 use crate::state::*;
 use crate::util::checked_math as cm;
 
+use crate::logs::WithdrawLoanOriginationFeeLog;
+
 // Remaining accounts:
 // - all banks for liab_mint_info (writable)
 // - merged health accounts for liqor+liqee
@@ -164,7 +166,8 @@ pub fn liq_token_bankruptcy(
             // transfer liab from liqee to liqor
             let (liqor_liab, liqor_liab_raw_token_index, _) =
                 liqor.token_get_mut_or_create(liab_token_index)?;
-            let liqor_liab_active = liab_bank.withdraw_with_fee(liqor_liab, liab_transfer)?;
+            let (liqor_liab_active, loan_origination_fee) =
+                liab_bank.withdraw_with_fee(liqor_liab, liab_transfer)?;
 
             // Check liqor's health
             let liqor_health =
@@ -177,6 +180,14 @@ pub fn liq_token_bankruptcy(
             if !liqor_liab_active {
                 liqor.token_deactivate(liqor_liab_raw_token_index);
             }
+
+            emit!(WithdrawLoanOriginationFeeLog {
+                mango_group: ctx.accounts.group.key(),
+                mango_account: ctx.accounts.liqor.key(),
+                token_index: liab_token_index,
+                loan_origination_fee: loan_origination_fee.to_bits(),
+                price: liab_price.to_bits(),
+            });
         } else {
             // For liab_token_index == QUOTE_TOKEN_INDEX: the insurance fund deposits directly into liqee,
             // without a fee or the liqor being involved
