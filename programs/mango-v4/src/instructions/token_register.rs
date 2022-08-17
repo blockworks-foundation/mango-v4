@@ -150,7 +150,9 @@ pub fn token_register(
         vaults: Default::default(),
         oracle: ctx.accounts.oracle.key(),
         registration_time: Clock::get()?.unix_timestamp,
-        reserved: [0; 2560],
+        address_lookup_table_bank_index: u8::MAX,
+        address_lookup_table_oracle_index: u8::MAX,
+        reserved: [0; 2558],
     };
 
     mint_info.banks[0] = ctx.accounts.bank.key();

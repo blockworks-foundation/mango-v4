@@ -98,6 +98,10 @@ pub mod mango_v4 {
         instructions::token_register_trustless(ctx, token_index, name)
     }
 
+    pub fn alt_extend(ctx: Context<AltExtend>) -> Result<()> {
+        instructions::alt_extend(ctx)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn token_edit(
         ctx: Context<TokenEdit>,

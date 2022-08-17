@@ -30,11 +30,14 @@ pub struct MintInfo {
 
     pub registration_time: i64,
 
-    pub reserved: [u8; 2560],
+    pub address_lookup_table_bank_index: u8,
+    pub address_lookup_table_oracle_index: u8,
+
+    pub reserved: [u8; 2558],
 }
 const_assert_eq!(
     size_of::<MintInfo>(),
-    MAX_BANKS * 2 * 32 + 3 * 32 + 2 + 8 + 6 + 2560
+    MAX_BANKS * 2 * 32 + 3 * 32 + 2 + 8 + 6 + 1 + 1 + 2558
 );
 const_assert_eq!(size_of::<MintInfo>() % 8, 0);
 

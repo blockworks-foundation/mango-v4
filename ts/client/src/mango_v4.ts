@@ -483,6 +483,48 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "altExtend",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "mintInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "addressLookupTable",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "addressLookupTableProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "tokenEdit",
       "accounts": [
         {
@@ -3148,11 +3190,19 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "addressLookupTableBankIndex",
+            "type": "u8"
+          },
+          {
+            "name": "addressLookupTableOracleIndex",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                2558
               ]
             }
           }
@@ -5514,6 +5564,48 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "altExtend",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "mintInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "addressLookupTable",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "addressLookupTableProgram",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "CHECK"
+          ]
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "tokenEdit",
       "accounts": [
         {
@@ -8179,11 +8271,19 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "addressLookupTableBankIndex",
+            "type": "u8"
+          },
+          {
+            "name": "addressLookupTableOracleIndex",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                2558
               ]
             }
           }

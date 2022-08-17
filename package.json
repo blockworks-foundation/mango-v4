@@ -62,6 +62,7 @@
     "@project-serum/serum": "^0.13.65",
     "@pythnetwork/client": "^2.7.0",
     "@solana/spl-token": "^0.1.8",
+    "@solana/web3.js": "^1.53.0",
     "big.js": "^6.1.1",
     "bs58": "^5.0.0"
   },
