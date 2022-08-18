@@ -33,7 +33,7 @@ async function main() {
     MANGO_V4_ID['devnet'],
   );
 
-  const group = await client.getGroupForCreator(admin.publicKey);
+  const group = await client.getGroupForCreator(admin.publicKey, 0);
   console.log(`Group ${group.publicKey}`);
 
   let sig;
@@ -50,11 +50,13 @@ async function main() {
   );
 
   // close all bank
-  for (const bank of group.banksMap.values()) {
-    sig = await client.tokenDeregister(group, bank.name);
-    console.log(
-      `Removed token ${bank.name}, sig https://explorer.solana.com/tx/${sig}?cluster=devnet`,
-    );
+  for (const tokenBanks of group.banksMapByMint.values()) {
+    for (const bank of tokenBanks) {
+      sig = await client.tokenDeregister(group, bank.mint);
+      console.log(
+        `Removed token ${bank.name}, sig https://explorer.solana.com/tx/${sig}?cluster=devnet`,
+      );
+    }
   }
 
   // deregister all serum markets

@@ -225,11 +225,13 @@ async function main() {
   }
 
   // log tokens/banks
-  for (const bank of await group.banksMap.values()) {
-    console.log(
-      `...registered Bank ${bank.tokenIndex} ${bank.publicKey}, mint ${bank.mint}, oracle ${bank.oracle}`,
-    );
-    console.log(bank.toString());
+  for (const mintBanks of await group.banksMapByMint.values()) {
+    for (const bank of mintBanks) {
+      console.log(
+        `...registered Bank ${bank.tokenIndex} ${bank.publicKey}, mint ${bank.mint}, oracle ${bank.oracle}`,
+      );
+      console.log(bank.toString());
+    }
   }
 
   // register serum market
@@ -240,10 +242,9 @@ async function main() {
   try {
     await client.serum3RegisterMarket(
       group,
-
       serumMarketExternalPk,
-      group.banksMap.get('BTC')!,
-      group.banksMap.get('USDC')!,
+      group.banksMapByMint.get(btcDevnetMint.toString())![0],
+      group.banksMapByMint.get(usdcDevnetMint.toString())![0],
       0,
       'BTC/USDC',
     );
@@ -252,8 +253,8 @@ async function main() {
   }
   const markets = await client.serum3GetMarkets(
     group,
-    group.banksMap.get('BTC')?.tokenIndex,
-    group.banksMap.get('USDC')?.tokenIndex,
+    group.banksMapByMint.get(btcDevnetMint.toString())![0].tokenIndex,
+    group.banksMapByMint.get(usdcDevnetMint.toString())![0].tokenIndex
   );
   console.log(`...registerd serum3 market ${markets[0].publicKey}`);
 
@@ -288,7 +289,7 @@ async function main() {
   }
   const perpMarkets = await client.perpGetMarkets(
     group,
-    group.banksMap.get('BTC')?.tokenIndex,
+    group.banksMapByMint.get(btcDevnetMint.toString())![0].tokenIndex
   );
   console.log(`...created perp market ${perpMarkets[0].publicKey}`);
 
@@ -300,7 +301,7 @@ async function main() {
   try {
     let sig = await client.tokenEdit(
       group,
-      'USDC',
+      usdcDevnetMint,
       btcDevnetOracle,
       0.1,
       undefined,
@@ -320,7 +321,7 @@ async function main() {
     );
     console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
     await group.reloadAll(client);
-    console.log(group.banksMap.get('USDC')!.toString());
+    console.log(group.banksMapByMint.get(usdcDevnetMint.toString())![0].toString());
   } catch (error) {
     throw error;
   }
@@ -328,7 +329,7 @@ async function main() {
   try {
     let sig = await client.tokenEdit(
       group,
-      'USDC',
+      usdcDevnetMint,
       usdcDevnetOracle.publicKey,
       0.1,
       undefined,
@@ -348,7 +349,7 @@ async function main() {
     );
     console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
     await group.reloadAll(client);
-    console.log(group.banksMap.get('USDC').toString());
+    console.log(group.banksMapByMint.get(usdcDevnetMint.toString())![0].toString());
   } catch (error) {
     throw error;
   }
@@ -375,7 +376,7 @@ async function main() {
     );
     console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
     await group.reloadAll(client);
-    console.log(group.perpMarketsMap.get('BTC-PERP').toString());
+    console.log(group.perpMarketsMap.get('BTC-PERP')!.toString());
   } catch (error) {
     console.log(error);
   }
@@ -401,7 +402,7 @@ async function main() {
     );
     console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
     await group.reloadAll(client);
-    console.log(group.perpMarketsMap.get('BTC-PERP').toString());
+    console.log(group.perpMarketsMap.get('BTC-PERP')!.toString());
   } catch (error) {
     console.log(error);
   }

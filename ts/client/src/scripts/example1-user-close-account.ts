@@ -90,7 +90,7 @@ async function main() {
 
     // withdraw all tokens
     for (const token of mangoAccount.tokensActive()) {
-      let native = token.native(group.findBank(token.tokenIndex)!);
+      let native = token.native(group.banksMapByTokenIndex.get(token.tokenIndex)![0]);
 
       // to avoid rounding issues
       if (native.toNumber() < 1) {
@@ -99,14 +99,14 @@ async function main() {
       let nativeFlooredNumber = Math.floor(native.toNumber());
       console.log(
         `withdrawing token ${
-          group.findBank(token.tokenIndex)!.name
+          group.banksMapByTokenIndex.get(token.tokenIndex)![0].name
         } native amount ${nativeFlooredNumber} `,
       );
 
       await client.tokenWithdrawNative(
         group,
         mangoAccount,
-        group.findBank(token.tokenIndex)!.name,
+        group.banksMapByTokenIndex.get(token.tokenIndex)![0].mint,
         nativeFlooredNumber - 1 /* see comment in token_withdraw in program */,
         false,
       );

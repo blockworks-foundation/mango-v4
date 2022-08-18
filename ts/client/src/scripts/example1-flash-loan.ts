@@ -1,5 +1,5 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
@@ -7,6 +7,14 @@ import { MANGO_V4_ID } from '../constants';
 //
 // (unfinished?) script which shows how to use the flash loan 1 ix
 //
+
+const DEVNET_MINTS = new Map([
+  ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'], // use devnet usdc
+  ['BTC', '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU'],
+  ['SOL', 'So11111111111111111111111111111111111111112'],
+  ['ORCA', 'orcarKHSqC5CDDsGbho8GKvwExejWHxTqGzXgcewB9L'],
+  ['MNGO', 'Bb9bsTQa1bGEtQ5KagGkvSHyuLqDWumFUcRqFusFNJWC'],
+]);
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
@@ -61,9 +69,9 @@ async function main() {
     const sig = await client.marginTrade({
       group: group,
       mangoAccount: mangoAccount,
-      inputToken: 'USDC',
+      inputMintPk: new PublicKey(DEVNET_MINTS['USDC']),
       amountIn: 0.001,
-      outputToken: 'SOL',
+      outputMintPk: new PublicKey(DEVNET_MINTS['SOL']),
       slippage: 1,
     });
     console.log(

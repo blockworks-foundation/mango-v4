@@ -115,10 +115,6 @@ async function main() {
   const group = await client.getGroupForCreator(admin.publicKey, 2);
   console.log(`${group.toString()}`);
 
-  for (const bank of await group.banksMap.values()) {
-    console.log(`${bank.toString()}`);
-  }
-
   for (const keypair of [
     process.env.MB_PAYER_KEYPAIR,
     process.env.MB_USER2_KEYPAIR,

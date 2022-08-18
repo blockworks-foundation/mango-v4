@@ -21,6 +21,14 @@ import { toUiDecimalsForQuote } from '../utils';
 // This script deposits some tokens, places some serum orders, cancels them, places some perp orders
 //
 
+const DEVNET_MINTS = new Map([
+  ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'], // use devnet usdc
+  ['BTC', '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU'],
+  ['SOL', 'So11111111111111111111111111111111111111112'],
+  ['ORCA', 'orcarKHSqC5CDDsGbho8GKvwExejWHxTqGzXgcewB9L'],
+  ['MNGO', 'Bb9bsTQa1bGEtQ5KagGkvSHyuLqDWumFUcRqFusFNJWC'],
+]);
+
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 
 async function main() {
@@ -105,15 +113,15 @@ async function main() {
 
     try {
       console.log(`...depositing 50 USDC`);
-      await client.tokenDeposit(group, mangoAccount, 'USDC', 50);
+      await client.tokenDeposit(group, mangoAccount, new PublicKey(DEVNET_MINTS['USDC']), 50);
       await mangoAccount.reload(client, group);
 
       console.log(`...withdrawing 1 USDC`);
-      await client.tokenWithdraw(group, mangoAccount, 'USDC', 1, true);
+      await client.tokenWithdraw(group, mangoAccount, new PublicKey(DEVNET_MINTS['USDC']), 1, true);
       await mangoAccount.reload(client, group);
 
       console.log(`...depositing 0.0005 BTC`);
-      await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005);
+      await client.tokenDeposit(group, mangoAccount, new PublicKey(DEVNET_MINTS['BTC']), 0.0005);
       await mangoAccount.reload(client, group);
     } catch (error) {
       console.log(error);
@@ -255,7 +263,7 @@ async function main() {
       '...mangoAccount.getMaxWithdrawWithBorrowForToken(group, "SOL") ' +
         toUiDecimalsForQuote(
           (
-            await mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL')
+            await mangoAccount.getMaxWithdrawWithBorrowForToken(group, new PublicKey(DEVNET_MINTS['SOL']))
           ).toNumber(),
         ),
     );
