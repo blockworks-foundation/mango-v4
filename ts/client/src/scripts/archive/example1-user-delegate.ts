@@ -1,14 +1,14 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
-import { OrderType, Side } from '../accounts/perp';
+import { OrderType, Side } from '../../accounts/perp';
 import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
   Serum3Side,
-} from '../accounts/serum3';
-import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
+} from '../../accounts/serum3';
+import { MangoClient } from '../../client';
+import { MANGO_V4_ID } from '../../constants';
 
 //
 // An example for users based on high level api i.e. the client

@@ -8,6 +8,8 @@ import { MANGO_V4_ID } from '../constants';
 // example script to close accounts - banks, markets, group etc. which require admin to be the signer
 //
 
+const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
+
 export const DEVNET_MINTS = new Map([
   ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'], // use devnet usdc
 ]);
@@ -31,9 +33,11 @@ async function main() {
     adminProvider,
     'devnet',
     MANGO_V4_ID['devnet'],
+    {},
+    'get-program-accounts',
   );
 
-  const group = await client.getGroupForCreator(admin.publicKey, 0);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(`Group ${group.publicKey}`);
 
   let sig;
@@ -50,14 +54,7 @@ async function main() {
   );
 
   // close all bank
-  for (const tokenBanks of group.banksMapByMint.values()) {
-    for (const bank of tokenBanks) {
-      sig = await client.tokenDeregister(group, bank.mint);
-      console.log(
-        `Removed token ${bank.name}, sig https://explorer.solana.com/tx/${sig}?cluster=devnet`,
-      );
-    }
-  }
+  group.consoleLogBanks();
 
   // deregister all serum markets
   for (const market of group.serum3MarketsMap.values()) {

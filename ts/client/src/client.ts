@@ -60,7 +60,7 @@ enum AccountRetriever {
   Fixed,
 }
 
-export type idsSource = 'api' | 'static' | 'get-program-accounts';
+export type IdsSource = 'api' | 'static' | 'get-program-accounts';
 
 // TODO: replace ui values with native as input wherever possible
 // TODO: replace token/market names with token or market indices
@@ -76,7 +76,7 @@ export class MangoClient {
       postSendTxCallback?: ({ txid }: { txid: string }) => void;
       prioritizationFee?: number;
     } = {},
-    public idsSource: idsSource = 'api',
+    public idsSource: IdsSource = 'api',
   ) {
     this.prioritizationFee = opts?.prioritizationFee || 0;
     this.postSendTxCallback = opts?.postSendTxCallback;
@@ -1734,7 +1734,7 @@ export class MangoClient {
     cluster: Cluster,
     programId: PublicKey,
     opts: any = {},
-    getIdsFromApi: idsSource = 'api',
+    getIdsFromApi: IdsSource = 'api',
   ): MangoClient {
     // TODO: use IDL on chain or in repository? decide...
     // Alternatively we could fetch IDL from chain.

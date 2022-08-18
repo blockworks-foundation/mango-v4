@@ -1,8 +1,8 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
-import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
+import { MangoClient } from '../../client';
+import { MANGO_V4_ID } from '../../constants';
 
 //
 // (unfinished?) script which shows how to use the flash loan 1 ix

@@ -9,9 +9,9 @@ import {
 } from '@solana/web3.js';
 import BN from 'bn.js';
 import fs from 'fs';
-import { QUOTE_DECIMALS } from '../accounts/bank';
-import { MangoClient } from '../index';
-import { getAssociatedTokenAddress } from '../utils';
+import { QUOTE_DECIMALS } from '../../accounts/bank';
+import { MangoClient } from '../../index';
+import { getAssociatedTokenAddress } from '../../utils';
 
 const MB_CLUSTER_URL =
   process.env.MB_CLUSTER_URL ||

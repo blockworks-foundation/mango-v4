@@ -1,10 +1,10 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
-import { HealthType } from '../accounts/mangoAccount';
-import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
-import { toUiDecimalsForQuote } from '../utils';
+import { HealthType } from '../../accounts/mangoAccount';
+import { MangoClient } from '../../client';
+import { MANGO_V4_ID } from '../../constants';
+import { toUiDecimalsForQuote } from '../../utils';
 
 const DEVNET_MINTS = new Map([
   ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'], // use devnet usdc

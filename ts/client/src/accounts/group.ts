@@ -256,6 +256,14 @@ export class Group {
     return this.banksMapByTokenIndex.get(tokenIndex)[0];
   }
 
+  public consoleLogBanks() {
+    for (const mintBanks of this.banksMapByMint.values()) {
+      for (const bank of mintBanks) {
+        console.log(bank.toString());
+      }
+    }
+  }
+
   toString(): string {
     let res = 'Group\n';
     res = res + ' pk: ' + this.publicKey.toString();

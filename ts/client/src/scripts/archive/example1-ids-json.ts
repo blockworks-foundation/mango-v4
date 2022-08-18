@@ -1,7 +1,7 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
-import { MangoClient } from '../client';
+import { MangoClient } from '../../client';
 
 //
 // script which shows example usage of ids json (saves having to do gpa)

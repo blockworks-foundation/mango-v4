@@ -53,6 +53,8 @@ async function main() {
     adminProvider,
     'devnet',
     MANGO_V4_ID['devnet'],
+    {},
+    'get-program-accounts',
   );
 
   // group
@@ -225,14 +227,7 @@ async function main() {
   }
 
   // log tokens/banks
-  for (const mintBanks of await group.banksMapByMint.values()) {
-    for (const bank of mintBanks) {
-      console.log(
-        `...registered Bank ${bank.tokenIndex} ${bank.publicKey}, mint ${bank.mint}, oracle ${bank.oracle}`,
-      );
-      console.log(bank.toString());
-    }
-  }
+  group.consoleLogBanks();
 
   // register serum market
   console.log(`Registering serum3 market...`);
@@ -243,8 +238,8 @@ async function main() {
     await client.serum3RegisterMarket(
       group,
       serumMarketExternalPk,
-      group.banksMapByMint.get(btcDevnetMint.toString())![0],
-      group.banksMapByMint.get(usdcDevnetMint.toString())![0],
+      group.getFirstBankByMint(btcDevnetMint),
+      group.getFirstBankByMint(usdcDevnetMint),
       0,
       'BTC/USDC',
     );
@@ -253,8 +248,8 @@ async function main() {
   }
   const markets = await client.serum3GetMarkets(
     group,
-    group.banksMapByMint.get(btcDevnetMint.toString())![0].tokenIndex,
-    group.banksMapByMint.get(usdcDevnetMint.toString())![0].tokenIndex,
+    group.getFirstBankByMint(btcDevnetMint).tokenIndex,
+    group.getFirstBankByMint(usdcDevnetMint).tokenIndex,
   );
   console.log(`...registerd serum3 market ${markets[0].publicKey}`);
 
@@ -289,7 +284,7 @@ async function main() {
   }
   const perpMarkets = await client.perpGetMarkets(
     group,
-    group.banksMapByMint.get(btcDevnetMint.toString())![0].tokenIndex,
+    group.getFirstBankByMint(btcDevnetMint).tokenIndex,
   );
   console.log(`...created perp market ${perpMarkets[0].publicKey}`);
 
@@ -321,9 +316,7 @@ async function main() {
     );
     console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
     await group.reloadAll(client);
-    console.log(
-      group.banksMapByMint.get(usdcDevnetMint.toString())![0].toString(),
-    );
+    console.log(group.getFirstBankByMint(btcDevnetMint).toString());
   } catch (error) {
     throw error;
   }
@@ -351,9 +344,7 @@ async function main() {
     );
     console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
     await group.reloadAll(client);
-    console.log(
-      group.banksMapByMint.get(usdcDevnetMint.toString())![0].toString(),
-    );
+    console.log(group.getFirstBankByMint(usdcDevnetMint).toString());
   } catch (error) {
     throw error;
   }

@@ -2,10 +2,10 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
-import idsJson from '../../ids.json';
-import { MangoClient } from '../client';
-import { MANGO_V4_ID, SERUM3_PROGRAM_ID } from '../constants';
-import { Id } from '../ids';
+import idsJson from '../../../ids.json';
+import { MangoClient } from '../../client';
+import { MANGO_V4_ID, SERUM3_PROGRAM_ID } from '../../constants';
+import { Id } from '../../ids';
 
 //
 // script to add a group to ids json
