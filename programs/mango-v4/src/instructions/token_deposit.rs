@@ -57,7 +57,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     let mut account = ctx.accounts.account.load_mut()?;
 
     let (position, raw_token_index, active_token_index) =
-        account.token_get_mut_or_create(token_index)?;
+        account.ensure_token_position(token_index)?;
 
     let amount_i80f48 = I80F48::from(amount);
     let position_is_active = {
@@ -103,7 +103,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     // Deposits can deactivate a position if they cancel out a previous borrow.
     //
     if !position_is_active {
-        account.token_deactivate(raw_token_index);
+        account.deactivate_token_position(raw_token_index);
     }
 
     emit!(DepositLog {

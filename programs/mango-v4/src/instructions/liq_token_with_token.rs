@@ -88,11 +88,13 @@ pub fn liq_token_with_token(
 
         // The main complication here is that we can't keep the liqee_asset_position and liqee_liab_position
         // borrows alive at the same time. Possibly adding get_mut_pair() would be helpful.
-        let (liqee_asset_position, liqee_asset_raw_index) = liqee.token_get(asset_token_index)?;
+        let (liqee_asset_position, liqee_asset_raw_index) =
+            liqee.token_position_and_raw_index(asset_token_index)?;
         let liqee_asset_native = liqee_asset_position.native(asset_bank);
         require!(liqee_asset_native.is_positive(), MangoError::SomeError);
 
-        let (liqee_liab_position, liqee_liab_raw_index) = liqee.token_get(liab_token_index)?;
+        let (liqee_liab_position, liqee_liab_raw_index) =
+            liqee.token_position_and_raw_index(liab_token_index)?;
         let liqee_liab_native = liqee_liab_position.native(liab_bank);
         require!(liqee_liab_native.is_negative(), MangoError::SomeError);
 
@@ -135,23 +137,23 @@ pub fn liq_token_with_token(
         // is nominally in-use.
 
         // Apply the balance changes to the liqor and liqee accounts
-        let liqee_liab_position = liqee.token_get_mut_raw(liqee_liab_raw_index);
+        let liqee_liab_position = liqee.token_position_mut_by_raw_index(liqee_liab_raw_index);
         let liqee_liab_active =
             liab_bank.deposit_with_dusting(liqee_liab_position, liab_transfer)?;
         let liqee_liab_position_indexed = liqee_liab_position.indexed_position;
 
         let (liqor_liab_position, liqor_liab_raw_index, _) =
-            liqor.token_get_mut_or_create(liab_token_index)?;
+            liqor.ensure_token_position(liab_token_index)?;
         let liqor_liab_active = liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer)?;
         let liqor_liab_position_indexed = liqor_liab_position.indexed_position;
         let liqee_liab_native_after = liqee_liab_position.native(&liab_bank);
 
         let (liqor_asset_position, liqor_asset_raw_index, _) =
-            liqor.token_get_mut_or_create(asset_token_index)?;
+            liqor.ensure_token_position(asset_token_index)?;
         let liqor_asset_active = asset_bank.deposit(liqor_asset_position, asset_transfer)?;
         let liqor_asset_position_indexed = liqor_asset_position.indexed_position;
 
-        let liqee_asset_position = liqee.token_get_mut_raw(liqee_asset_raw_index);
+        let liqee_asset_position = liqee.token_position_mut_by_raw_index(liqee_asset_raw_index);
         let liqee_asset_active =
             asset_bank.withdraw_without_fee_with_dusting(liqee_asset_position, asset_transfer)?;
         let liqee_asset_position_indexed = liqee_asset_position.indexed_position;
@@ -229,16 +231,16 @@ pub fn liq_token_with_token(
 
         // Since we use a scanning account retriever, it's safe to deactivate inactive token positions
         if !liqee_asset_active {
-            liqee.token_deactivate(liqee_asset_raw_index);
+            liqee.deactivate_token_position(liqee_asset_raw_index);
         }
         if !liqee_liab_active {
-            liqee.token_deactivate(liqee_liab_raw_index);
+            liqee.deactivate_token_position(liqee_liab_raw_index);
         }
         if !liqor_asset_active {
-            liqor.token_deactivate(liqor_asset_raw_index);
+            liqor.deactivate_token_position(liqor_asset_raw_index);
         }
         if !liqor_liab_active {
-            liqor.token_deactivate(liqor_liab_raw_index)
+            liqor.deactivate_token_position(liqor_liab_raw_index)
         }
     }
 

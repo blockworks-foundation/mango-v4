@@ -99,7 +99,7 @@ pub fn liq_token_bankruptcy(
     let (liab_bank, liab_price, opt_quote_bank_and_price) =
         account_retriever.banks_mut_and_oracles(liab_token_index, QUOTE_TOKEN_INDEX)?;
     let liab_deposit_index = liab_bank.deposit_index;
-    let (liqee_liab, liqee_raw_token_index) = liqee.token_get_mut(liab_token_index)?;
+    let (liqee_liab, liqee_raw_token_index) = liqee.token_position_mut(liab_token_index)?;
     let initial_liab_native = liqee_liab.native(&liab_bank);
     let mut remaining_liab_loss = -initial_liab_native;
     require_gt!(remaining_liab_loss, I80F48::ZERO);
@@ -158,12 +158,12 @@ pub fn liq_token_bankruptcy(
 
             // credit the liqor
             let (liqor_quote, liqor_quote_raw_token_index, _) =
-                liqor.token_get_mut_or_create(QUOTE_TOKEN_INDEX)?;
+                liqor.ensure_token_position(QUOTE_TOKEN_INDEX)?;
             let liqor_quote_active = quote_bank.deposit(liqor_quote, insurance_transfer_i80f48)?;
 
             // transfer liab from liqee to liqor
             let (liqor_liab, liqor_liab_raw_token_index, _) =
-                liqor.token_get_mut_or_create(liab_token_index)?;
+                liqor.ensure_token_position(liab_token_index)?;
             let liqor_liab_active = liab_bank.withdraw_with_fee(liqor_liab, liab_transfer)?;
 
             // Check liqor's health
@@ -172,10 +172,10 @@ pub fn liq_token_bankruptcy(
             require!(liqor_health >= 0, MangoError::HealthMustBePositive);
 
             if !liqor_quote_active {
-                liqor.token_deactivate(liqor_quote_raw_token_index);
+                liqor.deactivate_token_position(liqor_quote_raw_token_index);
             }
             if !liqor_liab_active {
-                liqor.token_deactivate(liqor_liab_raw_token_index);
+                liqor.deactivate_token_position(liqor_liab_raw_token_index);
             }
         } else {
             // For liab_token_index == QUOTE_TOKEN_INDEX: the insurance fund deposits directly into liqee,
@@ -240,7 +240,7 @@ pub fn liq_token_bankruptcy(
         .maybe_recover_from_being_liquidated(liqee_init_health);
 
     if !liqee_liab_active {
-        liqee.token_deactivate(liqee_raw_token_index);
+        liqee.deactivate_token_position(liqee_raw_token_index);
     }
 
     Ok(())

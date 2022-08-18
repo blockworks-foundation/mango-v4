@@ -265,7 +265,7 @@ impl<'a> Book<'a> {
             // Record the taker trade in the account already, even though it will only be
             // realized when the fill event gets executed
             let perp_account = mango_account
-                .perp_get_account_mut_or_create(market.perp_market_index)?
+                .ensure_perp_position(market.perp_market_index)?
                 .0;
             perp_account.add_taker_trade(side, match_base_lots, match_quote_lots);
 
@@ -373,7 +373,7 @@ impl<'a> Book<'a> {
                 price_lots
             );
 
-            mango_account.perp_add_order(market.perp_market_index, side, &new_order)?;
+            mango_account.add_perp_order(market.perp_market_index, side, &new_order)?;
         }
 
         // if there were matched taker quote apply ref fees
@@ -393,7 +393,7 @@ impl<'a> Book<'a> {
         side_to_cancel_option: Option<Side>,
     ) -> Result<()> {
         for i in 0..mango_account.header.perp_oo_count() {
-            let oo = mango_account.perp_oo_get_raw(i);
+            let oo = mango_account.perp_orders_by_raw_index(i);
             if oo.order_market == FREE_ORDER_SLOT
                 || oo.order_market != perp_market.perp_market_index
             {
@@ -411,7 +411,7 @@ impl<'a> Book<'a> {
 
             if let Ok(leaf_node) = self.cancel_order(order_id, order_side) {
                 mango_account
-                    .perp_remove_order(leaf_node.owner_slot as usize, leaf_node.quantity)?
+                    .remove_perp_order(leaf_node.owner_slot as usize, leaf_node.quantity)?
             };
 
             limit -= 1;
@@ -459,7 +459,7 @@ fn apply_fees(
 
     let taker_fees = taker_quote_native * market.taker_fee;
     let perp_account = mango_account
-        .perp_get_account_mut_or_create(market.perp_market_index)?
+        .ensure_perp_position(market.perp_market_index)?
         .0;
     perp_account.quote_position_native -= taker_fees;
     market.fees_accrued += taker_fees + maker_fees;

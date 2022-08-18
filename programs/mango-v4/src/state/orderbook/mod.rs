@@ -124,7 +124,7 @@ mod tests {
                     u8::MAX,
                 )
                 .unwrap();
-                account.perp_oo_get_raw(0).order_id
+                account.perp_orders_by_raw_index(0).order_id
             };
 
         // insert bids until book side is full
@@ -225,25 +225,34 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            maker.perp_oo_get_mut_raw(0).order_market,
+            maker.perp_orders_mut_by_raw_index(0).order_market,
             market.perp_market_index
         );
-        assert_eq!(maker.perp_oo_get_mut_raw(1).order_market, FREE_ORDER_SLOT);
-        assert_ne!(maker.perp_oo_get_mut_raw(0).order_id, 0);
-        assert_eq!(maker.perp_oo_get_mut_raw(0).client_order_id, 42);
-        assert_eq!(maker.perp_oo_get_mut_raw(0).order_side, Side::Bid);
+        assert_eq!(
+            maker.perp_orders_mut_by_raw_index(1).order_market,
+            FREE_ORDER_SLOT
+        );
+        assert_ne!(maker.perp_orders_mut_by_raw_index(0).order_id, 0);
+        assert_eq!(maker.perp_orders_mut_by_raw_index(0).client_order_id, 42);
+        assert_eq!(maker.perp_orders_mut_by_raw_index(0).order_side, Side::Bid);
         assert!(bookside_contains_key(
             &book.bids,
-            maker.perp_oo_get_mut_raw(0).order_id
+            maker.perp_orders_mut_by_raw_index(0).order_id
         ));
         assert!(bookside_contains_price(&book.bids, price));
-        assert_eq!(maker.perp_get_raw(0).bids_base_lots, bid_quantity);
-        assert_eq!(maker.perp_get_raw(0).asks_base_lots, 0);
-        assert_eq!(maker.perp_get_raw(0).taker_base_lots, 0);
-        assert_eq!(maker.perp_get_raw(0).taker_quote_lots, 0);
-        assert_eq!(maker.perp_get_raw(0).base_position_lots, 0);
         assert_eq!(
-            maker.perp_get_raw(0).quote_position_native.to_num::<u32>(),
+            maker.perp_position_by_raw_index(0).bids_base_lots,
+            bid_quantity
+        );
+        assert_eq!(maker.perp_position_by_raw_index(0).asks_base_lots, 0);
+        assert_eq!(maker.perp_position_by_raw_index(0).taker_base_lots, 0);
+        assert_eq!(maker.perp_position_by_raw_index(0).taker_quote_lots, 0);
+        assert_eq!(maker.perp_position_by_raw_index(0).base_position_lots, 0);
+        assert_eq!(
+            maker
+                .perp_position_by_raw_index(0)
+                .quote_position_native
+                .to_num::<u32>(),
             0
         );
         assert_eq!(event_queue.len(), 0);
@@ -269,7 +278,8 @@ mod tests {
         .unwrap();
         // the remainder of the maker order is still on the book
         // (the maker account is unchanged: it was not even passed in)
-        let order = bookside_leaf_by_key(&book.bids, maker.perp_oo_get_raw(0).order_id).unwrap();
+        let order =
+            bookside_leaf_by_key(&book.bids, maker.perp_orders_by_raw_index(0).order_id).unwrap();
         assert_eq!(order.price(), price);
         assert_eq!(order.quantity, bid_quantity - match_quantity);
 
@@ -281,17 +291,23 @@ mod tests {
         );
 
         // the taker account is updated
-        assert_eq!(taker.perp_oo_get_raw(0).order_market, FREE_ORDER_SLOT);
-        assert_eq!(taker.perp_get_raw(0).bids_base_lots, 0);
-        assert_eq!(taker.perp_get_raw(0).asks_base_lots, 0);
-        assert_eq!(taker.perp_get_raw(0).taker_base_lots, -match_quantity);
         assert_eq!(
-            taker.perp_get_raw(0).taker_quote_lots,
+            taker.perp_orders_by_raw_index(0).order_market,
+            FREE_ORDER_SLOT
+        );
+        assert_eq!(taker.perp_position_by_raw_index(0).bids_base_lots, 0);
+        assert_eq!(taker.perp_position_by_raw_index(0).asks_base_lots, 0);
+        assert_eq!(
+            taker.perp_position_by_raw_index(0).taker_base_lots,
+            -match_quantity
+        );
+        assert_eq!(
+            taker.perp_position_by_raw_index(0).taker_quote_lots,
             match_quantity * price
         );
-        assert_eq!(taker.perp_get_raw(0).base_position_lots, 0);
+        assert_eq!(taker.perp_position_by_raw_index(0).base_position_lots, 0);
         assert_eq!(
-            taker.perp_get_raw(0).quote_position_native,
+            taker.perp_position_by_raw_index(0).quote_position_native,
             -match_quote * market.taker_fee
         );
 
@@ -311,34 +327,40 @@ mod tests {
 
         // simulate event queue processing
         maker
-            .perp_execute_maker(market.perp_market_index, &mut market, &fill)
+            .execute_perp_maker(market.perp_market_index, &mut market, &fill)
             .unwrap();
         taker
-            .perp_execute_taker(market.perp_market_index, &mut market, &fill)
+            .execute_perp_taker(market.perp_market_index, &mut market, &fill)
             .unwrap();
         assert_eq!(market.open_interest, 2 * match_quantity);
 
-        assert_eq!(maker.perp_oo_get_raw(0).order_market, 0);
+        assert_eq!(maker.perp_orders_by_raw_index(0).order_market, 0);
         assert_eq!(
-            maker.perp_get_raw(0).bids_base_lots,
+            maker.perp_position_by_raw_index(0).bids_base_lots,
             bid_quantity - match_quantity
         );
-        assert_eq!(maker.perp_get_raw(0).asks_base_lots, 0);
-        assert_eq!(maker.perp_get_raw(0).taker_base_lots, 0);
-        assert_eq!(maker.perp_get_raw(0).taker_quote_lots, 0);
-        assert_eq!(maker.perp_get_raw(0).base_position_lots, match_quantity);
+        assert_eq!(maker.perp_position_by_raw_index(0).asks_base_lots, 0);
+        assert_eq!(maker.perp_position_by_raw_index(0).taker_base_lots, 0);
+        assert_eq!(maker.perp_position_by_raw_index(0).taker_quote_lots, 0);
         assert_eq!(
-            maker.perp_get_raw(0).quote_position_native,
+            maker.perp_position_by_raw_index(0).base_position_lots,
+            match_quantity
+        );
+        assert_eq!(
+            maker.perp_position_by_raw_index(0).quote_position_native,
             -match_quote - match_quote * market.maker_fee
         );
 
-        assert_eq!(taker.perp_get_raw(0).bids_base_lots, 0);
-        assert_eq!(taker.perp_get_raw(0).asks_base_lots, 0);
-        assert_eq!(taker.perp_get_raw(0).taker_base_lots, 0);
-        assert_eq!(taker.perp_get_raw(0).taker_quote_lots, 0);
-        assert_eq!(taker.perp_get_raw(0).base_position_lots, -match_quantity);
+        assert_eq!(taker.perp_position_by_raw_index(0).bids_base_lots, 0);
+        assert_eq!(taker.perp_position_by_raw_index(0).asks_base_lots, 0);
+        assert_eq!(taker.perp_position_by_raw_index(0).taker_base_lots, 0);
+        assert_eq!(taker.perp_position_by_raw_index(0).taker_quote_lots, 0);
         assert_eq!(
-            taker.perp_get_raw(0).quote_position_native,
+            taker.perp_position_by_raw_index(0).base_position_lots,
+            -match_quantity
+        );
+        assert_eq!(
+            taker.perp_position_by_raw_index(0).quote_position_native,
             match_quote - match_quote * market.taker_fee
         );
     }

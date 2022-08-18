@@ -164,7 +164,7 @@ async fn feed_snapshots(
         })
         .flat_map(|mango_account| {
             mango_account
-                .serum3_iter_active()
+                .active_serum3_orders()
                 .map(|serum3account| serum3account.open_orders)
                 .collect::<Vec<_>>()
         })

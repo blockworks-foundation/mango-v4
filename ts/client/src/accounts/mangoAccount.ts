@@ -16,7 +16,7 @@ import {
 export class MangoAccount {
   public tokens: TokenPosition[];
   public serum3: Serum3Orders[];
-  public perps: PerpPositions[];
+  public perps: PerpPosition[];
   public name: string;
 
   static from(
@@ -79,7 +79,7 @@ export class MangoAccount {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.tokens = tokens.map((dto) => TokenPosition.from(dto));
     this.serum3 = serum3.map((dto) => Serum3Orders.from(dto));
-    this.perps = perps.map((dto) => PerpPositions.from(dto));
+    this.perps = perps.map((dto) => PerpPosition.from(dto));
   }
 
   async reload(client: MangoClient, group: Group) {
@@ -360,7 +360,7 @@ export class MangoAccount {
     return this.serum3.filter((serum3) => serum3.isActive());
   }
 
-  perpActive(): PerpPositions[] {
+  perpActive(): PerpPosition[] {
     return this.perps.filter((perp) => perp.isActive());
   }
 
@@ -532,10 +532,10 @@ export class Serum3PositionDto {
   ) {}
 }
 
-export class PerpPositions {
+export class PerpPosition {
   static PerpMarketIndexUnset = 65535;
   static from(dto: PerpPositionDto) {
-    return new PerpPositions(
+    return new PerpPosition(
       dto.marketIndex,
       dto.basePositionLots.toNumber(),
       dto.quotePositionNative.val.toNumber(),
@@ -557,7 +557,7 @@ export class PerpPositions {
   ) {}
 
   isActive(): boolean {
-    return this.marketIndex != PerpPositions.PerpMarketIndexUnset;
+    return this.marketIndex != PerpPosition.PerpMarketIndexUnset;
   }
 }
 

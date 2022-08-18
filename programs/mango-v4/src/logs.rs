@@ -1,6 +1,6 @@
 use crate::{
     instructions::FlashLoanType,
-    state::{PerpMarket, PerpPositions},
+    state::{PerpMarket, PerpPosition},
 };
 use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
@@ -11,7 +11,7 @@ pub fn emit_perp_balances(
     mango_account: Pubkey,
     market_index: u64,
     price: i64,
-    pp: &PerpPositions,
+    pp: &PerpPosition,
     pm: &PerpMarket,
 ) {
     emit!(PerpBalanceLog {

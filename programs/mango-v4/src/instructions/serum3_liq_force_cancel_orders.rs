@@ -75,7 +75,7 @@ pub fn serum3_liq_force_cancel_orders(
         // Validate open_orders
         require!(
             account
-                .serum3_find(serum_market.market_index)
+                .serum3_orders(serum_market.market_index)
                 .ok_or_else(|| error!(MangoError::SomeError))?
                 .open_orders
                 == ctx.accounts.open_orders.key(),

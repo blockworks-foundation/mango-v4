@@ -231,7 +231,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     );
     // Check that position is fully deactivated
     let account_data = get_mango_account(solana, account).await;
-    assert_eq!(account_data.token_iter_active().count(), 0);
+    assert_eq!(account_data.active_token_positions().count(), 0);
 
     //
     // TEST: Activating a token via margin trade

@@ -68,7 +68,7 @@ pub fn zero_all_non_quote(
     let account = account_fetcher.fetch_mango_account(mango_account_address)?;
 
     let tokens = account
-        .token_iter_active()
+        .active_token_positions()
         .map(|token_position| {
             let token = mango_client.context.token(token_position.token_index);
             Ok((
@@ -140,7 +140,7 @@ pub fn zero_all_non_quote(
             let bank = TokenState::bank(token, account_fetcher)?;
             amount = mango_client
                 .mango_account()?
-                .token_get(token_index)
+                .token_position_and_raw_index(token_index)
                 .map(|(position, _)| position.native(&bank))
                 .unwrap_or(I80F48::ZERO);
         } else if token_state.native_position < 0 {
@@ -167,7 +167,7 @@ pub fn zero_all_non_quote(
             let bank = TokenState::bank(token, account_fetcher)?;
             amount = mango_client
                 .mango_account()?
-                .token_get(token_index)
+                .token_position_and_raw_index(token_index)
                 .map(|(position, _)| position.native(&bank))
                 .unwrap_or(I80F48::ZERO);
         }

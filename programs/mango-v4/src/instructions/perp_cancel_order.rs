@@ -46,5 +46,5 @@ pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: i128) -> Resul
         MangoError::SomeError // InvalidOwner
     );
 
-    account.perp_remove_order(order.owner_slot as usize, order.quantity)
+    account.remove_perp_order(order.owner_slot as usize, order.quantity)
 }

@@ -130,7 +130,7 @@ async fn test_serum() -> Result<(), TransportError> {
     let account_data = get_mango_account(solana, account).await;
     assert_eq!(
         account_data
-            .serum3_iter_active()
+            .active_serum3_orders()
             .map(|v| (v.open_orders, v.market_index))
             .collect::<Vec<_>>(),
         [(open_orders, 0)]
