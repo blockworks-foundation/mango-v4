@@ -2996,7 +2996,11 @@ export type MangoV4 = {
           {
             "name": "beingLiquidated",
             "docs": [
-              "This account cannot open new positions or borrow until `init_health >= 0`"
+              "Tracks that this account should be liquidated until init_health >= 0.",
+              "",
+              "Normally accounts can not be liquidated while maint_health >= 0. But when an account",
+              "reaches maint_health < 0, liquidators will call a liquidation instruction and thereby",
+              "set this flag. Now the account may be liquidated until init_health >= 0."
             ],
             "type": "u8"
           },
@@ -8055,7 +8059,11 @@ export const IDL: MangoV4 = {
           {
             "name": "beingLiquidated",
             "docs": [
-              "This account cannot open new positions or borrow until `init_health >= 0`"
+              "Tracks that this account should be liquidated until init_health >= 0.",
+              "",
+              "Normally accounts can not be liquidated while maint_health >= 0. But when an account",
+              "reaches maint_health < 0, liquidators will call a liquidation instruction and thereby",
+              "set this flag. Now the account may be liquidated until init_health >= 0."
             ],
             "type": "u8"
           },
