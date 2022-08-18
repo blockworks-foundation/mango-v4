@@ -77,7 +77,7 @@ export class Group {
     let ids: Id | undefined = undefined;
 
     if (client.idsSource === 'api') {
-      await Id.fromApi(this.publicKey);
+      ids = await Id.fromApi(this.publicKey);
     } else if (client.idsSource === 'static') {
       ids = Id.fromIdsByPk(this.publicKey);
     } else {

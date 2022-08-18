@@ -1,6 +1,6 @@
 import { Cluster, PublicKey } from '@solana/web3.js';
-import ids from '../ids.json';
 import fetch from 'cross-fetch';
+import ids from '../ids.json';
 export class Id {
   constructor(
     public cluster: Cluster,
@@ -99,7 +99,7 @@ export class Id {
       groupConfig.publicKey,
       groupConfig.serum3ProgramId,
       groupConfig.mangoProgramId,
-      groupConfig.tokens.map((t) =>
+      groupConfig.tokens.flatMap((t) =>
         t.banks.map((b) => ({
           name: t.symbol,
           mint: t.mint,
