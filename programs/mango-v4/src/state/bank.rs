@@ -437,7 +437,7 @@ impl Bank {
 
         // The loan fee rate is not distributed to depositors.
         let borrow_rate_with_fees = cm!(borrow_rate + self.loan_fee_rate);
-        let borrow_fees = native_total_borrows * self.loan_fee_rate * diff_ts / YEAR_I80F48;
+        let borrow_fees = cm!(native_total_borrows * self.loan_fee_rate * diff_ts / YEAR_I80F48);
 
         let borrow_index = cm!(
             (self.borrow_index * borrow_rate_with_fees * diff_ts) / YEAR_I80F48 + self.borrow_index
@@ -491,9 +491,9 @@ impl Bank {
         &self,
         indexed_total_deposits: I80F48,
         indexed_total_borrows: I80F48,
-        now_ts: I80F48,
+        now_ts: i64,
     ) -> I80F48 {
-        if now_ts == I80F48::ZERO {
+        if now_ts <= 0 {
             return I80F48::ZERO;
         }
 
@@ -505,13 +505,18 @@ impl Bank {
             cm!(native_total_borrows / native_total_deposits)
         };
 
-        // combine old and new with relevant factors to form new avg_utilization
-        // scaling factor for previous avg_utilization is old_ts/new_ts
-        // scaling factor for instantaneous utilization is (new_ts - old_ts) / new_ts
-        let bank_rate_last_updated_i80f48 = I80F48::from_num(self.bank_rate_last_updated);
-        cm!((self.avg_utilization * bank_rate_last_updated_i80f48
-            + instantaneous_utilization * (now_ts - bank_rate_last_updated_i80f48))
-            / now_ts)
+        // Compute a time-weighted average since bank_rate_last_updated.
+        let previous_avg_time =
+            I80F48::from_num(cm!(self.index_last_updated - self.bank_rate_last_updated));
+        let diff_ts = I80F48::from_num(cm!(now_ts - self.index_last_updated));
+        let new_avg_time = I80F48::from_num(cm!(now_ts - self.bank_rate_last_updated));
+        if new_avg_time <= 0 {
+            return instantaneous_utilization;
+        }
+        cm!(
+            (self.avg_utilization * previous_avg_time + instantaneous_utilization * diff_ts)
+                / new_avg_time
+        )
     }
 
     // computes new optimal rates and max rate
@@ -679,28 +684,30 @@ mod tests {
         let mut bank = Bank::zeroed();
         bank.deposit_index = I80F48::from_num(1.0);
         bank.borrow_index = I80F48::from_num(1.0);
-        bank.bank_rate_last_updated = 0;
+        bank.bank_rate_last_updated = 1000;
+        bank.index_last_updated = 1000;
 
         let compute_new_avg_utilization_runner =
             |bank: &mut Bank, utilization: I80F48, now_ts: i64| {
-                bank.avg_utilization = bank.compute_new_avg_utilization(
-                    I80F48::ONE,
-                    utilization,
-                    I80F48::from_num(now_ts),
-                );
-                bank.bank_rate_last_updated = now_ts;
+                bank.avg_utilization =
+                    bank.compute_new_avg_utilization(I80F48::ONE, utilization, now_ts);
+                bank.index_last_updated = now_ts;
             };
 
-        compute_new_avg_utilization_runner(&mut bank, I80F48::ZERO, 0);
+        compute_new_avg_utilization_runner(&mut bank, I80F48::ZERO, 1000);
         assert_eq!(bank.avg_utilization, I80F48::ZERO);
 
-        compute_new_avg_utilization_runner(&mut bank, I80F48::from_num(0.5), 10);
+        compute_new_avg_utilization_runner(&mut bank, I80F48::from_num(0.5), 1010);
         assert!((bank.avg_utilization - I80F48::from_num(0.5)).abs() < 0.0001);
 
-        compute_new_avg_utilization_runner(&mut bank, I80F48::from_num(0.8), 15);
+        compute_new_avg_utilization_runner(&mut bank, I80F48::from_num(0.8), 1015);
         assert!((bank.avg_utilization - I80F48::from_num(0.6)).abs() < 0.0001);
 
-        compute_new_avg_utilization_runner(&mut bank, I80F48::ONE, 20);
+        compute_new_avg_utilization_runner(&mut bank, I80F48::ONE, 1020);
         assert!((bank.avg_utilization - I80F48::from_num(0.7)).abs() < 0.0001);
+
+        bank.bank_rate_last_updated = 1020;
+        compute_new_avg_utilization_runner(&mut bank, I80F48::ONE, 1040);
+        assert_eq!(bank.avg_utilization, I80F48::ONE);
     }
 }

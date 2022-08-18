@@ -386,6 +386,7 @@ pub struct FlashLoanEndInstruction<'keypair> {
     pub mango_token_bank: Pubkey,
     pub mango_token_vault: Pubkey,
     pub target_token_account: Pubkey,
+    pub flash_loan_type: mango_v4::instructions::FlashLoanType,
 }
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for FlashLoanEndInstruction<'keypair> {
@@ -396,7 +397,9 @@ impl<'keypair> ClientInstruction for FlashLoanEndInstruction<'keypair> {
         account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction {};
+        let instruction = Self::Instruction {
+            flash_loan_type: self.flash_loan_type,
+        };
 
         let account = account_loader
             .load_mango_account(&self.account)

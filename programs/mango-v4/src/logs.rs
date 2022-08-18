@@ -1,4 +1,7 @@
-use crate::state::{PerpMarket, PerpPositions};
+use crate::{
+    instructions::FlashLoanType,
+    state::{PerpMarket, PerpPositions},
+};
 use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 
@@ -66,6 +69,7 @@ pub struct FlashLoanLog {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
     pub token_loan_details: Vec<FlashLoanTokenDetail>,
+    pub flash_loan_type: FlashLoanType,
 }
 
 #[event]
