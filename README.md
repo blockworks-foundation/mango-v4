@@ -8,10 +8,10 @@
 
 Devnet deployment - m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD
 
-I have cleand up and renamed the scripts, for testing latest program changes while developing,
-just run below form any branch,
+For testing latest program changes while developing,
+just run below scripts in given order form any branch,
 these set of scripts should more or less always work,
-bump up GROUP_NUM if you unsure if previous GROUP_NUM is not cleanly closed or setup with older program code
+bump up GROUP_NUM if you unsure if previous GROUP_NUM has not been cleanly closed or setup with older program code
 
 ```
 ./release-to-devnet.sh
