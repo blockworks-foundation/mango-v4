@@ -4,11 +4,53 @@ Update this for each mainnet deployment.
 
 ## not on mainnet
 
+## mainnet
+
+Aug 18, 2022 at 17:17:40 Central European Summer Time
+https://explorer.solana.com/tx/4Xnyswcwx98y6khw8ptNVmdhQZwJjuNy2BvmQg2pJayoThFiw8kmS2ecRAg5cg2DncvW3NQgn2vtP8mCUtv6Q1yB
+
 - liq_token_bankruptcy: removed liab_token_index argument
 - flash_loan: both begin and end instructions now require the group to be passed as the final trailing remaining account
 - flash_loan: the end instruction now requires passing a FlashLoanType, so logging can distinguish swaps from other uses
+- ts client changes
+  Class Group
+  banksMap is now private
+  there are now getFirstBankByMint, getMintDecimals, getFirstBankByTokenIndex
 
-## mainnet
+  Class MangoAccount
+  How to navigate
+
+  - if a function is returning a I80F48, then usually the return value is in native quote or native token, unless specified
+  - if a function is returning a number, then usually the return value is in ui token, unless specified
+  - functions try to be explicit by having native or ui in the name to better reflect the value
+  - some values might appear unexpected large or small, usually the doc contains a "note"
+
+  getMaxSourceForTokenSwap takes sourceMintPk and targetMintPk instead of sourceTokenName and targetTokenName
+  simHealthRatioWithTokenPositionChanges takes mintPk instead of tokenName
+  getEquivalentNativeUsdcPosition -> getEquivalentUsdcPosition
+  getEquivalentNativeTokenPosition -> getEquivalentTokenPosition
+  getNative -> getTokenBalance
+  getNativeDeposits -> getTokenDeposits
+  getNativeBorrows -> getTokenBorrows
+  getUi -> getTokenBalanceUi
+  deposits -> getTokenDepositsUi
+  borrows -> getTokenBorrowsUi
+  getAssetsVal -> getAssetsValue
+  getLiabsVal-> getLiabsValue
+
+  Class TokenPosition
+  ui -> balanceUi
+  uiDeposits -> depositsUi
+  uiBorrows -> borrowsUi
+
+  Class MangoClient
+  Constructor doesnt take groupName anymore, it optionally takes idsSource with the correct default already set
+  tokenDeposit now takes mintPk instead of tokenName
+  tokenDepositNative now takes mintPk instead of tokenName
+  tokenWithdraw -- same as above --
+  tokenWithdrawNative -- same as above --
+  marginTrade takes inputMintPk and outputMintPk instead of inputToken and outputToken
+  marginTrade takes flashLoanType as an argument
 
 Aug 8, 2022 at 18:56:04 Central European Summer Time
 https://explorer.solana.com/tx/yjZggRTrcDNquMkftNvBKLv77Dk4xp5yQPYXgN3qvBHTBWWJVhLPGHxqpGwosmEq3j8byHZMa13oxLLerBWUdgW
