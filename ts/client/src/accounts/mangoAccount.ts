@@ -133,7 +133,7 @@ export class MangoAccount {
    * @param bank
    * @returns native balance for a token
    */
-  getNative(bank: Bank): I80F48 {
+  getTokenBalance(bank: Bank): I80F48 {
     const ta = this.findToken(bank.tokenIndex);
     return ta ? ta.native(bank) : ZERO_I80F48;
   }
@@ -143,8 +143,8 @@ export class MangoAccount {
    * @param bank
    * @returns native balance for a token, 0 or more
    */
-  getNativeDeposits(bank: Bank): I80F48 {
-    const native = this.getNative(bank);
+  getTokenDeposits(bank: Bank): I80F48 {
+    const native = this.getTokenBalance(bank);
     return native.gte(ZERO_I80F48) ? native : ZERO_I80F48;
   }
 
@@ -153,8 +153,8 @@ export class MangoAccount {
    * @param bank
    * @returns native balance for a token, 0 or less
    */
-  getNativeBorrows(bank: Bank): I80F48 {
-    const native = this.getNative(bank);
+  getTokenBorrows(bank: Bank): I80F48 {
+    const native = this.getTokenBalance(bank);
     return native.lte(ZERO_I80F48) ? native : ZERO_I80F48;
   }
 
@@ -427,13 +427,21 @@ export class TokenPosition {
     }
   }
 
+  /**
+   * @param bank
+   * @returns position in UI decimals, is signed
+   */
   public ui(bank: Bank): number {
     return nativeI80F48ToUi(this.native(bank), bank.mintDecimals).toNumber();
   }
 
+  /**
+   * @param bank
+   * @returns position in UI decimals, 0 if position has borrows
+   */
   public uiDeposits(bank: Bank): number {
     if (this.indexedPosition && this.indexedPosition.lt(ZERO_I80F48)) {
-      throw new Error(`There are no deposits, rather borrows for ${bank.name}`);
+      return 0;
     }
 
     return nativeI80F48ToUi(
@@ -442,9 +450,13 @@ export class TokenPosition {
     ).toNumber();
   }
 
+  /**
+   * @param bank
+   * @returns position in UI decimals, can be 0 or negative, 0 if position has deposits
+   */
   public uiBorrows(bank: Bank): number {
     if (this.indexedPosition && this.indexedPosition.gt(ZERO_I80F48)) {
-      throw new Error(`There are no borrows, rather deposits for ${bank.name}`);
+      return 0;
     }
 
     return nativeI80F48ToUi(
