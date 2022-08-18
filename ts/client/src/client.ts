@@ -541,14 +541,22 @@ export class MangoClient {
     accountNumber?: number,
     name?: string,
   ): Promise<TransactionSignature> {
-    return await this.program.methods
+    const transaction = await this.program.methods
       .accountCreate(accountNumber ?? 0, 8, 0, 0, 0, name ?? '')
       .accounts({
         group: group.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
-      .rpc({ skipPreflight: true });
+      .transaction();
+
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      transaction,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
   }
 
   public async expandMangoAccount(
@@ -576,14 +584,22 @@ export class MangoClient {
     name?: string,
     delegate?: PublicKey,
   ): Promise<TransactionSignature> {
-    return await this.program.methods
+    const transaction = await this.program.methods
       .accountEdit(name ?? null, delegate ?? null)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
-      .rpc({ skipPreflight: true });
+      .transaction();
+
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      transaction,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
   }
 
   public async getMangoAccount(mangoAccount: MangoAccount) {
@@ -768,7 +784,7 @@ export class MangoClient {
         [bank],
       );
 
-    return await this.program.methods
+    const transaction = await this.program.methods
       .tokenDeposit(new BN(nativeAmount))
       .accounts({
         group: group.publicKey,
@@ -787,7 +803,16 @@ export class MangoClient {
       .preInstructions(preInstructions)
       .postInstructions(postInstructions)
       .signers(additionalSigners)
-      .rpc({ skipPreflight: true });
+      .transaction();
+
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      transaction,
+      {
+        additionalSigners,
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
   }
 
   public async tokenWithdraw(

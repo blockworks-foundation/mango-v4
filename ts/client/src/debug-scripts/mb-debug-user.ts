@@ -91,6 +91,7 @@ async function debugUser(client, group, mangoAccount) {
     );
   }
   getMaxSourceForTokenSwapWrapper('SOL', 'BTC');
+  getMaxSourceForTokenSwapWrapper('USDC', 'USDC');
 }
 
 async function main() {
