@@ -251,7 +251,6 @@ export class MangoAccount {
   simHealthRatioWithTokenPositionChanges(
     group: Group,
     tokenChanges: {
-      tokenName: string;
       tokenAmount: number;
       mintPk: PublicKey;
     }[],

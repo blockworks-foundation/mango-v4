@@ -72,8 +72,6 @@ export class MangoClient {
     public program: Program<MangoV4>,
     public programId: PublicKey,
     public cluster: Cluster,
-    // public groupName?: string,
-    // public groupPk?: PublicKey,
     public opts: {
       postSendTxCallback?: ({ txid }: { txid: string }) => void;
       prioritizationFee?: number;

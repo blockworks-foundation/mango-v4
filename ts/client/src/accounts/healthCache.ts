@@ -1,3 +1,4 @@
+import { PublicKey } from '@solana/web3.js';
 import _ from 'lodash';
 import { Bank } from './bank';
 import { Group } from './group';
@@ -10,7 +11,6 @@ import {
   ZERO_I80F48,
 } from './I80F48';
 import { HealthType } from './mangoAccount';
-import { PublicKey } from '@solana/web3.js';
 
 //               ░░░░
 //
@@ -175,7 +175,6 @@ export class HealthCache {
   simHealthRatioWithTokenPositionChanges(
     group: Group,
     tokenChanges: {
-      tokenName: string;
       tokenAmount: number;
       mintPk: PublicKey;
     }[],
