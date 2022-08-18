@@ -122,6 +122,12 @@ export class MangoAccount {
       .mul(I80F48.fromNumber(Math.pow(10, targetBank.mintDecimals)));
   }
 
+  // How to navigate
+  // * if a function is returning a I80F48, then usually the return value is in native quote or native token, unless specified
+  // * if a function is returning a number, then usually the return value is in native tokens, unless specified
+  // * functions try to be explicit by having native or ui in the name to better reflect the value
+  // * some values might appear unexpected large or small, usually the doc contains a "note"
+
   /**
    *
    * @param bank
