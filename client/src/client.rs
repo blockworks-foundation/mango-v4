@@ -321,8 +321,8 @@ impl MangoClient {
         let account = self.mango_account()?;
 
         let token_indexes = liqee
-            .token_iter_active()
-            .chain(account.token_iter_active())
+            .active_token_positions()
+            .chain(account.active_token_positions())
             .map(|ta| ta.token_index)
             .unique();
 
@@ -334,12 +334,12 @@ impl MangoClient {
         }
 
         let serum_oos = liqee
-            .serum3_iter_active()
-            .chain(account.serum3_iter_active())
+            .active_serum3_orders()
+            .chain(account.active_serum3_orders())
             .map(|&s| s.open_orders);
         let perp_markets = liqee
-            .perp_iter_active_accounts()
-            .chain(account.perp_iter_active_accounts())
+            .active_perp_positions()
+            .chain(account.active_perp_positions())
             .map(|&pa| self.context.perp_market_address(pa.market_index));
 
         Ok(banks
@@ -543,7 +543,7 @@ impl MangoClient {
         let s3 = self.serum3_data(name)?;
 
         let account = self.mango_account()?;
-        let open_orders = account.serum3_find(s3.market_index).unwrap().open_orders;
+        let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
 
         let health_check_metas = self.derive_health_check_remaining_account_metas(vec![], false)?;
 
@@ -658,7 +658,7 @@ impl MangoClient {
         let s3 = self.serum3_data(name)?;
 
         let account = self.mango_account()?;
-        let open_orders = account.serum3_find(s3.market_index).unwrap().open_orders;
+        let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
 
         self.program()
             .request()
@@ -700,7 +700,7 @@ impl MangoClient {
             .get(market_name)
             .unwrap();
         let account = self.mango_account()?;
-        let open_orders = account.serum3_find(market_index).unwrap().open_orders;
+        let open_orders = account.serum3_orders(market_index).unwrap().open_orders;
 
         let open_orders_bytes = self.account_fetcher.fetch_raw_account(open_orders)?.data;
         let open_orders_data: &serum_dex::state::OpenOrders = bytemuck::from_bytes(
@@ -732,7 +732,7 @@ impl MangoClient {
         let s3 = self.serum3_data(market_name)?;
 
         let account = self.mango_account()?;
-        let open_orders = account.serum3_find(s3.market_index).unwrap().open_orders;
+        let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
 
         self.program()
             .request()

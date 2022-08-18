@@ -32,13 +32,13 @@ pub fn account_close(ctx: Context<AccountClose>) -> Result<()> {
     // don't perform checks if group is just testing
     if !group.is_testing() {
         require!(!account.fixed.being_liquidated(), MangoError::SomeError);
-        for ele in account.token_iter() {
+        for ele in account.all_token_positions() {
             require_eq!(ele.is_active(), false);
         }
-        for ele in account.serum3_iter() {
+        for ele in account.all_serum3_orders() {
             require_eq!(ele.is_active(), false);
         }
-        for ele in account.perp_iter() {
+        for ele in account.all_perp_positions() {
             require_eq!(ele.is_active(), false);
         }
     }

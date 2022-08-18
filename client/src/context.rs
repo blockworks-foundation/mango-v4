@@ -211,29 +211,32 @@ impl MangoGroupContext {
         // figure out all the banks/oracles that need to be passed for the health check
         let mut banks = vec![];
         let mut oracles = vec![];
-        for position in account.token_iter_active() {
+        for position in account.active_token_positions() {
             let mint_info = self.mint_info(position.token_index);
             banks.push(mint_info.first_bank());
             oracles.push(mint_info.oracle);
         }
         for affected_token_index in affected_tokens {
             if account
-                .token_iter_active()
+                .active_token_positions()
                 .find(|p| p.token_index == affected_token_index)
                 .is_none()
             {
                 // If there is not yet an active position for the token, we need to pass
                 // the bank/oracle for health check anyway.
-                let new_position = account.token_iter().position(|p| !p.is_active()).unwrap();
+                let new_position = account
+                    .all_token_positions()
+                    .position(|p| !p.is_active())
+                    .unwrap();
                 let mint_info = self.mint_info(affected_token_index);
                 banks.insert(new_position, mint_info.first_bank());
                 oracles.insert(new_position, mint_info.oracle);
             }
         }
 
-        let serum_oos = account.serum3_iter_active().map(|&s| s.open_orders);
+        let serum_oos = account.active_serum3_orders().map(|&s| s.open_orders);
         let perp_markets = account
-            .perp_iter_active_accounts()
+            .active_perp_positions()
             .map(|&pa| self.perp_market_address(pa.market_index));
 
         Ok(banks

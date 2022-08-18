@@ -50,12 +50,12 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                             let mal: AccountLoaderDynamic<MangoAccount> =
                                 AccountLoaderDynamic::try_from(ai)?;
                             let mut ma = mal.load_mut()?;
-                            ma.perp_execute_maker(
+                            ma.execute_perp_maker(
                                 perp_market.perp_market_index,
                                 &mut perp_market,
                                 fill,
                             )?;
-                            ma.perp_execute_taker(
+                            ma.execute_perp_taker(
                                 perp_market.perp_market_index,
                                 &mut perp_market,
                                 fill,
@@ -65,7 +65,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                 fill.maker,
                                 perp_market.perp_market_index as u64,
                                 fill.price,
-                                ma.perp_find_account(perp_market.perp_market_index).unwrap(),
+                                ma.perp_position(perp_market.perp_market_index).unwrap(),
                                 &perp_market,
                             );
                         }
@@ -91,12 +91,12 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                         AccountLoaderDynamic::try_from(ai)?;
                                     let mut taker = mal.load_mut()?;
 
-                                    maker.perp_execute_maker(
+                                    maker.execute_perp_maker(
                                         perp_market.perp_market_index,
                                         &mut perp_market,
                                         fill,
                                     )?;
-                                    taker.perp_execute_taker(
+                                    taker.execute_perp_taker(
                                         perp_market.perp_market_index,
                                         &mut perp_market,
                                         fill,
@@ -106,9 +106,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                         fill.maker,
                                         perp_market.perp_market_index as u64,
                                         fill.price,
-                                        maker
-                                            .perp_find_account(perp_market.perp_market_index)
-                                            .unwrap(),
+                                        maker.perp_position(perp_market.perp_market_index).unwrap(),
                                         &perp_market,
                                     );
                                     emit_perp_balances(
@@ -116,9 +114,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                         fill.taker,
                                         perp_market.perp_market_index as u64,
                                         fill.price,
-                                        taker
-                                            .perp_find_account(perp_market.perp_market_index)
-                                            .unwrap(),
+                                        taker.perp_position(perp_market.perp_market_index).unwrap(),
                                         &perp_market,
                                     );
                                 }
@@ -161,7 +157,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                             AccountLoaderDynamic::try_from(ai)?;
                         let mut ma = mal.load_mut()?;
 
-                        ma.perp_remove_order(out.owner_slot as usize, out.quantity)?;
+                        ma.remove_perp_order(out.owner_slot as usize, out.quantity)?;
                     }
                 };
             }

@@ -20,8 +20,8 @@ pub fn new_health_cache_(
     account_fetcher: &chain_data::AccountFetcher,
     account: &MangoAccountValue,
 ) -> anyhow::Result<HealthCache> {
-    let active_token_len = account.token_iter_active().count();
-    let active_perp_len = account.perp_iter_active_accounts().count();
+    let active_token_len = account.active_token_positions().count();
+    let active_perp_len = account.active_perp_positions().count();
 
     let metas = context.derive_health_check_remaining_account_metas(account, vec![], false)?;
     let accounts = metas
@@ -138,7 +138,7 @@ pub fn maybe_liquidate_account(
 
     // find asset and liab tokens
     let mut tokens = account
-        .token_iter_active()
+        .active_token_positions()
         .map(|token_position| {
             let token = mango_client.context.token(token_position.token_index);
             let bank = account_fetcher.fetch::<Bank>(&token.mint_info.first_bank())?;
@@ -164,8 +164,8 @@ pub fn maybe_liquidate_account(
 
         // Ensure the tokens are activated, so they appear in the health cache and
         // max_swap_source() will work.
-        liqor.token_get_mut_or_create(source)?;
-        liqor.token_get_mut_or_create(target)?;
+        liqor.ensure_token_position(source)?;
+        liqor.ensure_token_position(target)?;
 
         let health_cache =
             new_health_cache_(&mango_client.context, account_fetcher, &liqor).expect("always ok");

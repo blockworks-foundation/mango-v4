@@ -147,7 +147,7 @@ impl Default for Serum3Orders {
 #[zero_copy]
 #[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
 #[derivative(Debug)]
-pub struct PerpPositions {
+pub struct PerpPosition {
     pub market_index: PerpMarketIndex,
     #[derivative(Debug = "ignore")]
     pub padding: [u8; 6],
@@ -181,13 +181,13 @@ pub struct PerpPositions {
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 64],
 }
-const_assert_eq!(size_of::<PerpPositions>(), 8 + 7 * 8 + 3 * 16 + 64);
-const_assert_eq!(size_of::<PerpPositions>() % 8, 0);
+const_assert_eq!(size_of::<PerpPosition>(), 8 + 7 * 8 + 3 * 16 + 64);
+const_assert_eq!(size_of::<PerpPosition>() % 8, 0);
 
-unsafe impl bytemuck::Pod for PerpPositions {}
-unsafe impl bytemuck::Zeroable for PerpPositions {}
+unsafe impl bytemuck::Pod for PerpPosition {}
+unsafe impl bytemuck::Zeroable for PerpPosition {}
 
-impl Default for PerpPositions {
+impl Default for PerpPosition {
     fn default() -> Self {
         Self {
             market_index: PerpMarketIndex::MAX,
@@ -207,7 +207,7 @@ impl Default for PerpPositions {
     }
 }
 
-impl PerpPositions {
+impl PerpPosition {
     /// Add taker trade after it has been matched but before it has been process on EventQueue
     pub fn add_taker_trade(&mut self, side: Side, base_lots: i64, quote_lots: i64) {
         match side {
@@ -373,10 +373,10 @@ mod tests {
     use fixed::types::I80F48;
     use rand::Rng;
 
-    use super::PerpPositions;
+    use super::PerpPosition;
 
-    fn create_perp_position(base_pos: i64, quote_pos: i64, entry_pos: i64) -> PerpPositions {
-        let mut pos = PerpPositions::default();
+    fn create_perp_position(base_pos: i64, quote_pos: i64, entry_pos: i64) -> PerpPosition {
+        let mut pos = PerpPosition::default();
         pos.base_position_lots = base_pos;
         pos.quote_position_native = I80F48::from(quote_pos);
         pos.quote_entry_native = entry_pos;

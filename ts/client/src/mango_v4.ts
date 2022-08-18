@@ -3083,7 +3083,7 @@ export type MangoV4 = {
             "name": "perps",
             "type": {
               "vec": {
-                "defined": "PerpPositions"
+                "defined": "PerpPosition"
               }
             }
           },
@@ -3978,7 +3978,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "PerpPositions",
+      "name": "PerpPosition",
       "type": {
         "kind": "struct",
         "fields": [
@@ -8146,7 +8146,7 @@ export const IDL: MangoV4 = {
             "name": "perps",
             "type": {
               "vec": {
-                "defined": "PerpPositions"
+                "defined": "PerpPosition"
               }
             }
           },
@@ -9041,7 +9041,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "PerpPositions",
+      "name": "PerpPosition",
       "type": {
         "kind": "struct",
         "fields": [

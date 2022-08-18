@@ -81,7 +81,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         // Validate open_orders
         require!(
             account
-                .serum3_find(serum_market.market_index)
+                .serum3_orders(serum_market.market_index)
                 .ok_or_else(|| error!(MangoError::SomeError))?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
@@ -172,7 +172,7 @@ pub fn charge_maybe_fees(
     account: &mut MangoAccountRefMut,
     after_oo: &OpenOrdersSlim,
 ) -> Result<()> {
-    let serum3_account = account.serum3_find_mut(market_index).unwrap();
+    let serum3_account = account.serum3_orders_mut(market_index).unwrap();
 
     let maybe_actualized_coin_loan = I80F48::from_num::<u64>(
         serum3_account
@@ -184,7 +184,7 @@ pub fn charge_maybe_fees(
         serum3_account.previous_native_coin_reserved = after_oo.native_coin_reserved();
 
         // loan origination fees
-        let coin_token_account = account.token_get_mut(coin_bank.token_index)?.0;
+        let coin_token_account = account.token_position_mut(coin_bank.token_index)?.0;
         let coin_token_native = coin_token_account.native(coin_bank);
 
         if coin_token_native.is_negative() {
@@ -198,7 +198,7 @@ pub fn charge_maybe_fees(
         }
     }
 
-    let serum3_account = account.serum3_find_mut(market_index).unwrap();
+    let serum3_account = account.serum3_orders_mut(market_index).unwrap();
     let maybe_actualized_pc_loan = I80F48::from_num::<u64>(
         serum3_account
             .previous_native_pc_reserved
@@ -209,7 +209,7 @@ pub fn charge_maybe_fees(
         serum3_account.previous_native_pc_reserved = after_oo.native_pc_reserved();
 
         // loan origination fees
-        let pc_token_account = account.token_get_mut(pc_bank.token_index)?.0;
+        let pc_token_account = account.token_position_mut(pc_bank.token_index)?.0;
         let pc_token_native = pc_token_account.native(pc_bank);
 
         if pc_token_native.is_negative() {

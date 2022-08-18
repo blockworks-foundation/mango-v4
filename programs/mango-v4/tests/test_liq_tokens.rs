@@ -563,7 +563,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     // Liqee's remaining collateral got dusted, only borrows remain
     // but the borrow amount is so tiny, that being_liquidated is already switched off
     let liqee = get_mango_account(solana, account).await;
-    assert_eq!(liqee.token_iter_active().count(), 1);
+    assert_eq!(liqee.active_token_positions().count(), 1);
     assert!(account_position_f64(solana, account, borrow_token1.bank).await > -1.0);
     assert!(!liqee.being_liquidated());
 
