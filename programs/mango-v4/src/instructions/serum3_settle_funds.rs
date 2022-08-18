@@ -10,7 +10,7 @@ use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
 
 use super::{apply_vault_difference, OpenOrdersReserved, OpenOrdersSlim};
-use crate::logs::WithdrawLoanOriginationFeeLog;
+use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
 
 #[derive(Accounts)]
 pub struct Serum3SettleFunds<'info> {
@@ -168,6 +168,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
                 mango_account: ctx.accounts.account.key(),
                 token_index: serum_market.base_token_index,
                 loan_origination_fee: base_loan_origination_fee.to_bits(),
+                instruction: LoanOriginationFeeInstruction::Serum3SettleFunds
             });
         }
         if quote_loan_origination_fee.is_positive() {
@@ -176,6 +177,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
                 mango_account: ctx.accounts.account.key(),
                 token_index: serum_market.quote_token_index,
                 loan_origination_fee: quote_loan_origination_fee.to_bits(),
+                instruction: LoanOriginationFeeInstruction::Serum3SettleFunds
             });
         }
     }

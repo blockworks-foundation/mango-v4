@@ -12,7 +12,7 @@ use serum_dex::instruction::NewOrderInstructionV3;
 use serum_dex::matching::Side;
 use serum_dex::state::OpenOrders;
 
-use crate::logs::WithdrawLoanOriginationFeeLog;
+use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
 
 /// For loan origination fees bookkeeping purposes
 pub struct OpenOrdersSlim {
@@ -306,6 +306,7 @@ pub fn serum3_place_order(
             mango_account: ctx.accounts.account.key(),
             token_index: serum_market.base_token_index,
             loan_origination_fee: base_loan_origination_fee.to_bits(),
+            instruction: LoanOriginationFeeInstruction::Serum3PlaceOrder
         });
     }
     if quote_loan_origination_fee.is_positive() {
@@ -314,6 +315,7 @@ pub fn serum3_place_order(
             mango_account: ctx.accounts.account.key(),
             token_index: serum_market.quote_token_index,
             loan_origination_fee: quote_loan_origination_fee.to_bits(),
+            instruction: LoanOriginationFeeInstruction::Serum3PlaceOrder
         });
     }
 

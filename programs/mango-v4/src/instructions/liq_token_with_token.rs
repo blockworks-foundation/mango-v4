@@ -3,12 +3,13 @@ use fixed::types::I80F48;
 use std::cmp::min;
 
 use crate::error::*;
-use crate::logs::{LiquidateTokenAndTokenLog, TokenBalanceLog};
+use crate::logs::{
+    LiquidateTokenAndTokenLog, LoanOriginationFeeInstruction, TokenBalanceLog,
+    WithdrawLoanOriginationFeeLog,
+};
 use crate::state::ScanningAccountRetriever;
 use crate::state::*;
 use crate::util::checked_math as cm;
-
-use crate::logs::WithdrawLoanOriginationFeeLog;
 
 #[derive(Accounts)]
 pub struct LiqTokenWithToken<'info> {
@@ -186,7 +187,7 @@ pub fn liq_token_with_token(
             liab_transfer: liab_transfer.to_bits(),
             asset_price: asset_price.to_bits(),
             liab_price: liab_price.to_bits(),
-            // bankruptcy:
+            bankruptcy: !liqee_health_cache.has_liquidatable_assets()
         });
 
         // liqee asset
@@ -236,6 +237,7 @@ pub fn liq_token_with_token(
                 mango_account: ctx.accounts.liqor.key(),
                 token_index: liab_token_index,
                 loan_origination_fee: loan_origination_fee.to_bits(),
+                instruction: LoanOriginationFeeInstruction::LiqTokenWithToken
             });
         }
 

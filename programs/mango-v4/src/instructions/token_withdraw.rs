@@ -6,7 +6,9 @@ use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 use fixed::types::I80F48;
 
-use crate::logs::{TokenBalanceLog, WithdrawLoanOriginationFeeLog, WithdrawLog};
+use crate::logs::{
+    LoanOriginationFeeInstruction, TokenBalanceLog, WithdrawLoanOriginationFeeLog, WithdrawLog,
+};
 use crate::state::new_fixed_order_account_retriever;
 use crate::util::checked_math as cm;
 
@@ -162,6 +164,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             mango_account: ctx.accounts.account.key(),
             token_index,
             loan_origination_fee: loan_origination_fee.to_bits(),
+            instruction: LoanOriginationFeeInstruction::TokenWithdraw,
         });
     }
 

@@ -5,7 +5,7 @@ use crate::error::*;
 use crate::instructions::apply_vault_difference;
 use crate::state::*;
 
-use crate::logs::WithdrawLoanOriginationFeeLog;
+use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
 
 #[derive(Accounts)]
 pub struct Serum3LiqForceCancelOrders<'info> {
@@ -158,6 +158,7 @@ pub fn serum3_liq_force_cancel_orders(
             mango_account: ctx.accounts.account.key(),
             token_index: serum_market.base_token_index,
             loan_origination_fee: base_loan_origination_fee.to_bits(),
+            instruction: LoanOriginationFeeInstruction::Serum3LiqForceCancelOrders
         });
     }
     if quote_loan_origination_fee.is_positive() {
@@ -166,6 +167,7 @@ pub fn serum3_liq_force_cancel_orders(
             mango_account: ctx.accounts.account.key(),
             token_index: serum_market.quote_token_index,
             loan_origination_fee: quote_loan_origination_fee.to_bits(),
+            instruction: LoanOriginationFeeInstruction::Serum3LiqForceCancelOrders
         });
     }
 
