@@ -1769,7 +1769,6 @@ export class MangoClient {
       ),
       new PublicKey(id.mangoProgramId),
       id.cluster,
-      // groupName,
     );
   }
 
