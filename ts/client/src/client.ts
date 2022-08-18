@@ -682,11 +682,11 @@ export class MangoClient {
         .remainingAccounts(
           healthRemainingAccounts.map(
             (pk) =>
-            ({
-              pubkey: pk,
-              isWritable: false,
-              isSigner: false,
-            } as AccountMeta),
+              ({
+                pubkey: pk,
+                isWritable: false,
+                isSigner: false,
+              } as AccountMeta),
           ),
         )
         .simulate();
@@ -1048,7 +1048,7 @@ export class MangoClient {
     const rates = getFeeRates(feeTier);
     const maxQuoteQuantity = new BN(
       serum3MarketExternal.decoded.quoteLotSize.toNumber() *
-      (1 + rates.taker) /** TODO: fix taker/maker */,
+        (1 + rates.taker) /** TODO: fix taker/maker */,
     ).mul(
       serum3MarketExternal
         .baseSizeNumberToLots(size)
@@ -1082,10 +1082,14 @@ export class MangoClient {
         marketBaseVault: serum3MarketExternal.decoded.baseVault,
         marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
         marketVaultSigner: serum3MarketExternalVaultSigner,
-        quoteBank: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex).publicKey,
-        quoteVault: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex).vault,
-        baseBank: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex).publicKey,
-        baseVault: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex).vault,
+        quoteBank: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
+          .publicKey,
+        quoteVault: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
+          .vault,
+        baseBank: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
+          .publicKey,
+        baseVault: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
+          .vault,
       })
       .remainingAccounts(
         healthRemainingAccounts.map(
@@ -1163,10 +1167,14 @@ export class MangoClient {
         marketBaseVault: serum3MarketExternal.decoded.baseVault,
         marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
         marketVaultSigner: serum3MarketExternalVaultSigner,
-        quoteBank: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex).publicKey,
-        quoteVault: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex).vault,
-        baseBank: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex).publicKey,
-        baseVault: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex).vault,
+        quoteBank: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
+          .publicKey,
+        quoteVault: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
+          .vault,
+        baseBank: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
+          .publicKey,
+        baseVault: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
+          .vault,
       })
       .rpc();
   }
@@ -1499,7 +1507,7 @@ export class MangoClient {
     flashLoanType: FlashLoanType;
   }): Promise<TransactionSignature> {
     const inputBank: Bank = group.getFirstBankByMint(inputMintPk);
-    const outputBank: Bank = group.getFirstBankByMint(outputMintPk)
+    const outputBank: Bank = group.getFirstBankByMint(outputMintPk);
 
     if (!inputBank || !outputBank) throw new Error('Invalid token');
 
@@ -1512,11 +1520,11 @@ export class MangoClient {
       );
     const parsedHealthAccounts = healthRemainingAccounts.map(
       (pk) =>
-      ({
-        pubkey: pk,
-        isWritable: false,
-        isSigner: false,
-      } as AccountMeta),
+        ({
+          pubkey: pk,
+          isWritable: false,
+          isSigner: false,
+        } as AccountMeta),
     );
 
     /*
@@ -1697,14 +1705,14 @@ export class MangoClient {
 
     const parsedHealthAccounts = healthRemainingAccounts.map(
       (pk) =>
-      ({
-        pubkey: pk,
-        isWritable:
-          pk.equals(assetBank.publicKey) || pk.equals(liabBank.publicKey)
-            ? true
-            : false,
-        isSigner: false,
-      } as AccountMeta),
+        ({
+          pubkey: pk,
+          isWritable:
+            pk.equals(assetBank.publicKey) || pk.equals(liabBank.publicKey)
+              ? true
+              : false,
+          isSigner: false,
+        } as AccountMeta),
     );
 
     await this.program.methods

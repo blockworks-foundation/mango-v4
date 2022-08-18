@@ -110,10 +110,10 @@ export class MangoAccount {
   ): I80F48 {
     return nativeTokenPosition
       ? nativeTokenPosition
-        .native(sourceBank)
-        .mul(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
-        .div(I80F48.fromNumber(Math.pow(10, sourceBank.mintDecimals)))
-        .mul(sourceBank.price)
+          .native(sourceBank)
+          .mul(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
+          .div(I80F48.fromNumber(Math.pow(10, sourceBank.mintDecimals)))
+          .mul(sourceBank.price)
       : ZERO_I80F48;
   }
 
@@ -317,16 +317,16 @@ export class MangoAccount {
     res =
       this.tokensActive().length > 0
         ? res +
-        '\n tokens:' +
-        JSON.stringify(
-          this.tokens.map((token, i) =>
-            token.isActive()
-              ? token.toString(group, i)
-              : `index: ${i} - empty slot`,
-          ),
-          null,
-          4,
-        )
+          '\n tokens:' +
+          JSON.stringify(
+            this.tokens.map((token, i) =>
+              token.isActive()
+                ? token.toString(group, i)
+                : `index: ${i} - empty slot`,
+            ),
+            null,
+            4,
+          )
         : res + '';
 
     res =
@@ -357,7 +357,7 @@ export class TokenPosition {
     public indexedPosition: I80F48,
     public tokenIndex: number,
     public inUseCount: number,
-  ) { }
+  ) {}
 
   public isActive(): boolean {
     return this.tokenIndex !== TokenPosition.TokenIndexUnset;
@@ -420,7 +420,7 @@ export class TokenPositionDto {
     public tokenIndex: number,
     public inUseCount: number,
     public reserved: number[],
-  ) { }
+  ) {}
 }
 
 export class Serum3Orders {
@@ -439,7 +439,7 @@ export class Serum3Orders {
     public marketIndex: number,
     public baseTokenIndex: number,
     public quoteTokenIndex: number,
-  ) { }
+  ) {}
 
   public isActive(): boolean {
     return this.marketIndex !== Serum3Orders.Serum3MarketIndexUnset;
@@ -453,7 +453,7 @@ export class Serum3PositionDto {
     public baseTokenIndex: number,
     public quoteTokenIndex: number,
     public reserved: number[],
-  ) { }
+  ) {}
 }
 
 export class PerpPositions {
@@ -478,7 +478,7 @@ export class PerpPositions {
     public asksBaseLots: number,
     public takerBaseLots: number,
     public takerQuoteLots: number,
-  ) { }
+  ) {}
 
   isActive(): boolean {
     return this.marketIndex != PerpPositions.PerpMarketIndexUnset;
@@ -495,7 +495,7 @@ export class PerpPositionDto {
     public asksBaseLots: BN,
     public takerBaseLots: BN,
     public takerQuoteLots: BN,
-  ) { }
+  ) {}
 }
 
 export class HealthType {
@@ -509,7 +509,7 @@ export class MangoAccountData {
     public initHealth: I80F48,
     public maintHealth: I80F48,
     public equity: Equity,
-  ) { }
+  ) {}
 
   static from(event: {
     healthCache: HealthCacheDto;
@@ -535,7 +535,7 @@ export class Equity {
   public constructor(
     public tokens: TokenEquity[],
     public perps: PerpEquity[],
-  ) { }
+  ) {}
 
   static from(dto: EquityDto): Equity {
     return new Equity(
@@ -554,11 +554,11 @@ export class Equity {
 }
 
 export class TokenEquity {
-  public constructor(public tokenIndex: number, public value: I80F48) { }
+  public constructor(public tokenIndex: number, public value: I80F48) {}
 }
 
 export class PerpEquity {
-  public constructor(public perpMarketIndex: number, public value: I80F48) { }
+  public constructor(public perpMarketIndex: number, public value: I80F48) {}
 }
 
 export class EquityDto {

@@ -17,7 +17,7 @@ export class Id {
       marketExternal: string;
     }[],
     public perpMarkets: { name: string; publicKey: string }[],
-  ) { }
+  ) {}
 
   public getBanks(): PublicKey[] {
     return Array.from(this.banks.map((bank) => new PublicKey(bank.publicKey)));

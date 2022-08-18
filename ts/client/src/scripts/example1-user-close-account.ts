@@ -90,7 +90,9 @@ async function main() {
 
     // withdraw all tokens
     for (const token of mangoAccount.tokensActive()) {
-      let native = token.native(group.banksMapByTokenIndex.get(token.tokenIndex)![0]);
+      let native = token.native(
+        group.banksMapByTokenIndex.get(token.tokenIndex)![0],
+      );
 
       // to avoid rounding issues
       if (native.toNumber() < 1) {

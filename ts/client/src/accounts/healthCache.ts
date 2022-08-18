@@ -198,12 +198,8 @@ export class HealthCache {
     targetMintPk: PublicKey,
     minRatio: I80F48,
   ): I80F48 {
-    const sourceBank: Bank = group.getFirstBankByMint(
-      sourceMintPk,
-    );
-    const targetBank: Bank = group.getFirstBankByMint(
-      targetMintPk
-    );
+    const sourceBank: Bank = group.getFirstBankByMint(sourceMintPk);
+    const targetBank: Bank = group.getFirstBankByMint(targetMintPk);
 
     // The health_ratio is a nonlinear based on swap amount.
     // For large swap amounts the slope is guaranteed to be negative, but small amounts
@@ -374,7 +370,7 @@ export class TokenInfo {
     public balance: I80F48,
     // in health-reference-token native units
     public serum3MaxReserved: I80F48,
-  ) { }
+  ) {}
 
   static fromDto(dto: TokenInfoDto): TokenInfo {
     return new TokenInfo(

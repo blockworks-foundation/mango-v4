@@ -65,7 +65,7 @@ export class Group {
     public mintInfosMapByTokenIndex: Map<number, MintInfo>,
     public mintInfosMapByMint: Map<string, MintInfo>,
     public oraclesMap: Map<string, PriceData>,
-  ) { }
+  ) {}
 
   public findSerum3Market(marketIndex: number): Serum3Market | undefined {
     return Array.from(this.serum3MarketsMap.values()).find(
@@ -253,11 +253,8 @@ export class Group {
   }
 
   public getFirstBankByTokenIndex(tokenIndex: number) {
-    return this.banksMapByTokenIndex.get(
-      tokenIndex)[0]
+    return this.banksMapByTokenIndex.get(tokenIndex)[0];
   }
-
-
 
   toString(): string {
     let res = 'Group\n';
@@ -273,11 +270,10 @@ export class Group {
         )
         .join(', ');
 
-
-    let banks = []
+    let banks = [];
     for (const tokenBanks of this.banksMapByMint.values()) {
       for (const bank of tokenBanks) {
-        banks.push(bank)
+        banks.push(bank);
       }
     }
 
@@ -285,10 +281,7 @@ export class Group {
       res +
       '\n banks:' +
       Array.from(banks)
-        .map(
-          (bank) =>
-            '  \n' + bank.name + ') ' + bank.toString(),
-        )
+        .map((bank) => '  \n' + bank.name + ') ' + bank.toString())
         .join(', ');
 
     return res;
