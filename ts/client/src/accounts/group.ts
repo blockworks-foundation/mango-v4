@@ -34,12 +34,15 @@ export class Group {
       obj.insuranceVault,
       obj.testing,
       obj.version,
-      new Map(),
-      new Map(),
-      new Map(),
-      new Map(),
-      new Map(),
-      new Map(),
+      new Map(), // banksMapByName
+      new Map(), // banksMapByMint
+      new Map(), // banksMapByTokenIndex
+      new Map(), // serum3MarketsMap
+      new Map(), // serum3MarketExternalsMap
+      new Map(), // perpMarketsMap
+      new Map(), // mintInfosMapByTokenIndex
+      new Map(), // mintInfosMapByMint
+      new Map(), // oraclesMap
     );
   }
 
@@ -53,19 +56,16 @@ export class Group {
     public insuranceVault: PublicKey,
     public testing: number,
     public version: number,
-    public banksMap: Map<string, Bank>,
+    private banksMapByName: Map<string, Bank[]>,
+    private banksMapByMint: Map<string, Bank[]>,
+    private banksMapByTokenIndex: Map<number, Bank[]>,
     public serum3MarketsMap: Map<string, Serum3Market>,
     public serum3MarketExternalsMap: Map<string, Market>,
     public perpMarketsMap: Map<string, PerpMarket>,
-    public mintInfosMap: Map<number, MintInfo>,
+    public mintInfosMapByTokenIndex: Map<number, MintInfo>,
+    public mintInfosMapByMint: Map<string, MintInfo>,
     public oraclesMap: Map<string, PriceData>,
   ) {}
-
-  public findBank(tokenIndex: number): Bank | undefined {
-    return Array.from(this.banksMap.values()).find(
-      (bank) => bank.tokenIndex === tokenIndex,
-    );
-  }
 
   public findSerum3Market(marketIndex: number): Serum3Market | undefined {
     return Array.from(this.serum3MarketsMap.values()).find(
@@ -76,8 +76,12 @@ export class Group {
   public async reloadAll(client: MangoClient) {
     let ids: Id | undefined = undefined;
 
-    if (client.groupName) {
-      ids = Id.fromIds(client.groupName);
+    if (client.idsSource === 'api') {
+      ids = await Id.fromApi(this.publicKey);
+    } else if (client.idsSource === 'static') {
+      ids = Id.fromIdsByPk(this.publicKey);
+    } else {
+      ids = null;
     }
 
     // console.time('group.reload');
@@ -110,7 +114,21 @@ export class Group {
       banks = await client.getBanksForGroup(this);
     }
 
-    this.banksMap = new Map(banks.map((bank) => [bank.name, bank]));
+    this.banksMapByName = new Map();
+    this.banksMapByMint = new Map();
+    this.banksMapByTokenIndex = new Map();
+    for (const bank of banks) {
+      const mintId = bank.mint.toString();
+      if (this.banksMapByMint.has(mintId)) {
+        this.banksMapByMint.get(mintId).push(bank);
+        this.banksMapByName.get(bank.name).push(bank);
+        this.banksMapByTokenIndex.get(bank.tokenIndex).push(bank);
+      } else {
+        this.banksMapByMint.set(mintId, [bank]);
+        this.banksMapByName.set(bank.name, [bank]);
+        this.banksMapByTokenIndex.set(bank.tokenIndex, [bank]);
+      }
+    }
   }
 
   public async reloadMintInfos(client: MangoClient, ids?: Id) {
@@ -125,9 +143,15 @@ export class Group {
       mintInfos = await client.getMintInfosForGroup(this);
     }
 
-    this.mintInfosMap = new Map(
+    this.mintInfosMapByTokenIndex = new Map(
       mintInfos.map((mintInfo) => {
         return [mintInfo.tokenIndex, mintInfo];
+      }),
+    );
+
+    this.mintInfosMapByMint = new Map(
+      mintInfos.map((mintInfo) => {
+        return [mintInfo.mint.toString(), mintInfo];
       }),
     );
   }
@@ -191,29 +215,51 @@ export class Group {
   }
 
   public async reloadBankPrices(client: MangoClient, ids?: Id): Promise<void> {
-    const banks = Array.from(this?.banksMap, ([, value]) => value);
-    const oracles = banks.map((b) => b.oracle);
+    const banks = Array.from(this?.banksMapByMint, ([, value]) => value);
+    const oracles = banks.map((b) => b[0].oracle);
     const prices =
       await client.program.provider.connection.getMultipleAccountsInfo(oracles);
 
     const coder = new BorshAccountsCoder(client.program.idl);
     for (const [index, price] of prices.entries()) {
-      if (banks[index].name === 'USDC') {
-        banks[index].price = ONE_I80F48;
-      } else {
-        // TODO: Implement switchboard oracle type
-        if (
-          !BorshAccountsCoder.accountDiscriminator('stubOracle').compare(
-            price.data.slice(0, 8),
-          )
-        ) {
-          const stubOracle = coder.decode('stubOracle', price.data);
-          banks[index].price = new I80F48(stubOracle.price.val);
+      for (const bank of banks[index]) {
+        if (bank.name === 'USDC') {
+          bank.price = ONE_I80F48;
         } else {
-          banks[index].price = I80F48.fromNumber(
-            parsePriceData(price.data).previousPrice,
-          );
+          // TODO: Implement switchboard oracle type
+          if (
+            !BorshAccountsCoder.accountDiscriminator('stubOracle').compare(
+              price.data.slice(0, 8),
+            )
+          ) {
+            const stubOracle = coder.decode('stubOracle', price.data);
+            bank.price = new I80F48(stubOracle.price.val);
+          } else {
+            bank.price = I80F48.fromNumber(
+              parsePriceData(price.data).previousPrice,
+            );
+          }
         }
+      }
+    }
+  }
+
+  public getMintDecimals(mintPk: PublicKey) {
+    return this.banksMapByMint.get(mintPk.toString())[0].mintDecimals;
+  }
+
+  public getFirstBankByMint(mintPk: PublicKey) {
+    return this.banksMapByMint.get(mintPk.toString())![0];
+  }
+
+  public getFirstBankByTokenIndex(tokenIndex: number) {
+    return this.banksMapByTokenIndex.get(tokenIndex)[0];
+  }
+
+  public consoleLogBanks() {
+    for (const mintBanks of this.banksMapByMint.values()) {
+      for (const bank of mintBanks) {
+        console.log(bank.toString());
       }
     }
   }
@@ -225,11 +271,25 @@ export class Group {
     res =
       res +
       '\n mintInfos:' +
-      Array.from(this.mintInfosMap.entries())
+      Array.from(this.mintInfosMapByTokenIndex.entries())
         .map(
           (mintInfoTuple) =>
             '  \n' + mintInfoTuple[0] + ') ' + mintInfoTuple[1].toString(),
         )
+        .join(', ');
+
+    const banks = [];
+    for (const tokenBanks of this.banksMapByMint.values()) {
+      for (const bank of tokenBanks) {
+        banks.push(bank);
+      }
+    }
+
+    res =
+      res +
+      '\n banks:' +
+      Array.from(banks)
+        .map((bank) => '  \n' + bank.name + ') ' + bank.toString())
         .join(', ');
 
     return res;

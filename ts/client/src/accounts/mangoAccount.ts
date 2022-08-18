@@ -208,8 +208,8 @@ export class MangoAccount {
    * Note 1: The existing native deposits need to be added to get the full amount that could be withdrawn.
    * Note 2: The group might have less native deposits than what this returns. TODO: loan origination fees
    */
-  getMaxWithdrawWithBorrowForToken(group: Group, tokenName: string): I80F48 {
-    const bank = group.banksMap.get(tokenName);
+  getMaxWithdrawWithBorrowForToken(group: Group, mintPk: PublicKey): I80F48 {
+    const bank: Bank = group.getFirstBankByMint(mintPk);
     const initHealth = (this.accountData as MangoAccountData).initHealth;
     const inUsdcUnits = MangoAccount.getEquivalentNativeUsdcPosition(
       bank,
@@ -230,15 +230,15 @@ export class MangoAccount {
    */
   getMaxSourceForTokenSwap(
     group: Group,
-    sourceTokenName: string,
-    targetTokenName: string,
+    sourceMintPk: PublicKey,
+    targetMintPk: PublicKey,
     slippageAndFeesFactor: number,
   ): I80F48 {
     return this.accountData.healthCache
       .getMaxSourceForTokenSwap(
         group,
-        sourceTokenName,
-        targetTokenName,
+        sourceMintPk,
+        targetMintPk,
         HUNDRED_I80F48,
       )
       .mul(I80F48.fromNumber(slippageAndFeesFactor));
@@ -250,7 +250,10 @@ export class MangoAccount {
    */
   simHealthRatioWithTokenPositionChanges(
     group: Group,
-    tokenChanges: { tokenName: string; tokenAmount: number }[],
+    tokenChanges: {
+      tokenAmount: number;
+      mintPk: PublicKey;
+    }[],
     healthType: HealthType = HealthType.init,
   ): I80F48 {
     return this.accountData.healthCache.simHealthRatioWithTokenPositionChanges(
@@ -271,7 +274,7 @@ export class MangoAccount {
   getSerum3MarketMarginAvailable(group: Group, marketName: string): I80F48 {
     const initHealth = (this.accountData as MangoAccountData).initHealth;
     const serum3Market = group.serum3MarketsMap.get(marketName)!;
-    const marketAssetWeight = group.findBank(
+    const marketAssetWeight = group.getFirstBankByTokenIndex(
       serum3Market.baseTokenIndex,
     ).initAssetWeight;
     return initHealth.div(ONE_I80F48.sub(marketAssetWeight));
@@ -388,7 +391,7 @@ export class TokenPosition {
   public toString(group?: Group, index?: number): string {
     let extra = '';
     if (group) {
-      const bank = group.findBank(this.tokenIndex);
+      const bank: Bank = group.getFirstBankByTokenIndex(this.tokenIndex);
       if (bank) {
         const native = this.native(bank);
         extra += ', native: ' + native.toNumber();

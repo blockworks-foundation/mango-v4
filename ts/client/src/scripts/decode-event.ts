@@ -1,8 +1,4 @@
-import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { BN, BorshCoder } from '@project-serum/anchor';
-import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
 import { IDL } from '../mango_v4';
 
 async function main() {
