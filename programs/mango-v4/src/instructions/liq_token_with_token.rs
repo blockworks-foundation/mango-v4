@@ -130,9 +130,14 @@ pub fn liq_token_with_token(
         // The amount of asset native tokens we will give up for them
         let asset_transfer = cm!(liab_transfer * liab_price_adjusted / asset_price);
 
+        // During liquidation, we mustn't leave small positive balances in the liqee. Those
+        // could break bankruptcy-detection. Thus we dust them even if the token position
+        // is nominally in-use.
+
         // Apply the balance changes to the liqor and liqee accounts
         let liqee_liab_position = liqee.token_get_mut_raw(liqee_liab_raw_index);
-        let liqee_liab_active = liab_bank.deposit(liqee_liab_position, liab_transfer)?;
+        let liqee_liab_active =
+            liab_bank.deposit_with_dusting(liqee_liab_position, liab_transfer)?;
         let liqee_liab_position_indexed = liqee_liab_position.indexed_position;
 
         let (liqor_liab_position, liqor_liab_raw_index, _) =
@@ -148,7 +153,7 @@ pub fn liq_token_with_token(
 
         let liqee_asset_position = liqee.token_get_mut_raw(liqee_asset_raw_index);
         let liqee_asset_active =
-            asset_bank.withdraw_without_fee(liqee_asset_position, asset_transfer)?;
+            asset_bank.withdraw_without_fee_with_dusting(liqee_asset_position, asset_transfer)?;
         let liqee_asset_position_indexed = liqee_asset_position.indexed_position;
         let liqee_assets_native_after = liqee_asset_position.native(&asset_bank);
 

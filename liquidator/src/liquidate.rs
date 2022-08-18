@@ -111,9 +111,10 @@ pub fn maybe_liquidate_account(
     let health_cache =
         new_health_cache_(&mango_client.context, account_fetcher, &account).expect("always ok");
     let maint_health = health_cache.health(HealthType::Maint);
-    let is_bankrupt = !health_cache.has_liquidatable_assets();
+    let is_bankrupt = health_cache.is_bankrupt();
+    let is_liquidatable = health_cache.is_liquidatable();
 
-    if maint_health >= 0 && !is_bankrupt {
+    if !is_liquidatable && !is_bankrupt {
         return Ok(false);
     }
 
@@ -132,7 +133,8 @@ pub fn maybe_liquidate_account(
     let health_cache =
         new_health_cache_(&mango_client.context, account_fetcher, &account).expect("always ok");
     let maint_health = health_cache.health(HealthType::Maint);
-    let is_bankrupt = !health_cache.has_liquidatable_assets();
+    let is_bankrupt = health_cache.is_bankrupt();
+    let is_liquidatable = health_cache.is_liquidatable();
 
     // find asset and liab tokens
     let mut tokens = account
@@ -205,7 +207,7 @@ pub fn maybe_liquidate_account(
             sig
         );
         sig
-    } else if maint_health.is_negative() {
+    } else if is_liquidatable {
         let asset_token_index = tokens
             .iter()
             .rev()

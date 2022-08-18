@@ -175,14 +175,36 @@ impl Bank {
         self.deposit_index * self.indexed_deposits
     }
 
-    /// Returns whether the position is active
+    /// Deposits `native_amount`.
+    ///
+    /// If the token position ends up positive but below one native token and this token
+    /// position isn't marked as in-use, the token balance will be dusted, the position
+    /// will be set to zero and this function returns Ok(false).
     ///
     /// native_amount must be >= 0
     /// fractional deposits can be relevant during liquidation, for example
-    pub fn deposit(
+    pub fn deposit(&mut self, position: &mut TokenPosition, native_amount: I80F48) -> Result<bool> {
+        self.deposit_internal(position, native_amount, !position.is_in_use())
+    }
+
+    /// Like `deposit()`, but allows dusting of in-use accounts.
+    ///
+    /// Returns Ok(false) if the position was dusted and was not in-use.
+    pub fn deposit_with_dusting(
+        &mut self,
+        position: &mut TokenPosition,
+        native_amount: I80F48,
+    ) -> Result<bool> {
+        self.deposit_internal(position, native_amount, true)
+            .map(|not_dusted| not_dusted || position.is_in_use())
+    }
+
+    /// Internal function to deposit funds
+    pub fn deposit_internal(
         &mut self,
         position: &mut TokenPosition,
         mut native_amount: I80F48,
+        allow_dusting: bool,
     ) -> Result<bool> {
         require_gte!(native_amount, 0);
         let native_position = position.native(self);
@@ -212,7 +234,7 @@ impl Bank {
                 self.indexed_borrows = cm!(self.indexed_borrows - indexed_change);
                 position.indexed_position = new_indexed_value;
                 return Ok(true);
-            } else if new_native_position < I80F48::ONE && !position.is_in_use() {
+            } else if new_native_position < I80F48::ONE && allow_dusting {
                 // if there's less than one token deposited, zero the position
                 self.dust = cm!(self.dust + new_native_position);
                 self.indexed_borrows = cm!(self.indexed_borrows + position.indexed_position);
@@ -236,8 +258,11 @@ impl Bank {
         Ok(true)
     }
 
-    /// Returns whether the position is active after withdrawing from a position
-    /// without applying the loan origination fee.
+    /// Withdraws `native_amount` without applying the loan origination fee.
+    ///
+    /// If the token position ends up positive but below one native token and this token
+    /// position isn't marked as in-use, the token balance will be dusted, the position
+    /// will be set to zero and this function returns Ok(false).
     ///
     /// native_amount must be >= 0
     /// fractional withdraws can be relevant during liquidation, for example
@@ -246,11 +271,26 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
     ) -> Result<bool> {
-        self.withdraw_internal(position, native_amount, false)
+        self.withdraw_internal(position, native_amount, false, !position.is_in_use())
     }
 
-    /// Returns whether the position is active after withdrawing from a position
-    /// while applying the loan origination fee if a borrow is created.
+    /// Like `withdraw_without_fee()` but allows dusting of in-use token accounts.
+    ///
+    /// Returns Ok(false) on dusted positions that weren't in-use.
+    pub fn withdraw_without_fee_with_dusting(
+        &mut self,
+        position: &mut TokenPosition,
+        native_amount: I80F48,
+    ) -> Result<bool> {
+        self.withdraw_internal(position, native_amount, false, true)
+            .map(|not_dusted| not_dusted || position.is_in_use())
+    }
+
+    /// Withdraws `native_amount` while applying the loan origination fee if a borrow is created.
+    ///
+    /// If the token position ends up positive but below one native token and this token
+    /// position isn't marked as in-use, the token balance will be dusted, the position
+    /// will be set to zero and this function returns Ok(false).
     ///
     /// native_amount must be >= 0
     /// fractional withdraws can be relevant during liquidation, for example
@@ -259,14 +299,16 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
     ) -> Result<bool> {
-        self.withdraw_internal(position, native_amount, true)
+        self.withdraw_internal(position, native_amount, true, !position.is_in_use())
     }
 
+    /// Internal function to withdraw funds
     fn withdraw_internal(
         &mut self,
         position: &mut TokenPosition,
         mut native_amount: I80F48,
         with_loan_origination_fee: bool,
+        allow_dusting: bool,
     ) -> Result<bool> {
         require_gte!(native_amount, 0);
         let native_position = position.native(self);
@@ -275,7 +317,7 @@ impl Bank {
             let new_native_position = cm!(native_position - native_amount);
             if !new_native_position.is_negative() {
                 // withdraw deposits only
-                if new_native_position < I80F48::ONE && !position.is_in_use() {
+                if new_native_position < I80F48::ONE && allow_dusting {
                     // zero the account collecting the leftovers in `dust`
                     self.dust = cm!(self.dust + new_native_position);
                     self.indexed_deposits = cm!(self.indexed_deposits - position.indexed_position);
@@ -321,7 +363,7 @@ impl Bank {
             cm!(self.loan_origination_fee_rate * already_borrowed_native_amount);
         self.collected_fees_native = cm!(self.collected_fees_native + loan_origination_fee);
 
-        self.withdraw_internal(position, loan_origination_fee, false)
+        self.withdraw_internal(position, loan_origination_fee, false, !position.is_in_use())
     }
 
     /// Change a position without applying the loan origination fee
@@ -350,22 +392,12 @@ impl Bank {
         }
     }
 
-    // Borrows continously expose insurance fund to risk, collect fees from borrowers
-    pub fn charge_loan_fee(&mut self, diff_ts: I80F48) {
-        let native_borrows_old = self.native_borrows();
-        self.indexed_borrows =
-            cm!((self.indexed_borrows
-                * (I80F48::ONE + self.loan_fee_rate * (diff_ts / YEAR_I80F48))));
-        self.collected_fees_native =
-            cm!(self.collected_fees_native + self.native_borrows() - native_borrows_old);
-    }
-
     pub fn compute_index(
         &self,
         indexed_total_deposits: I80F48,
         indexed_total_borrows: I80F48,
         diff_ts: I80F48,
-    ) -> Result<(I80F48, I80F48)> {
+    ) -> Result<(I80F48, I80F48, I80F48)> {
         // compute index based on utilization
         let native_total_deposits = cm!(self.deposit_index * indexed_total_deposits);
         let native_total_borrows = cm!(self.borrow_index * indexed_total_borrows);
@@ -377,21 +409,31 @@ impl Bank {
             cm!(native_total_borrows / native_total_deposits)
         };
 
-        let borrow_interest_rate = self.compute_interest_rate(instantaneous_utilization);
+        let borrow_rate = self.compute_interest_rate(instantaneous_utilization);
 
-        let borrow_interest = cm!(borrow_interest_rate * diff_ts);
-        let deposit_interest = cm!(borrow_interest * instantaneous_utilization);
+        // We want to grant depositors a rate that exactly matches the amount that is
+        // taken from borrowers. That means:
+        //   (new_deposit_index - old_deposit_index) * indexed_deposits
+        //      = (new_borrow_index - old_borrow_index) * indexed_borrows
+        // with
+        //   new_deposit_index = old_deposit_index * (1 + deposit_rate) and
+        //   new_borrow_index = old_borrow_index * (1 * borrow_rate)
+        // we have
+        //   deposit_rate = borrow_rate * (old_borrow_index * indexed_borrows) / (old_deposit_index * indexed_deposits)
+        // and the latter factor is exactly instantaneous_utilization.
+        let deposit_rate = cm!(borrow_rate * instantaneous_utilization);
 
-        if borrow_interest <= I80F48::ZERO || deposit_interest <= I80F48::ZERO {
-            return Ok((self.deposit_index, self.borrow_index));
-        }
+        // The loan fee rate is not distributed to depositors.
+        let borrow_rate_with_fees = cm!(borrow_rate + self.loan_fee_rate);
+        let borrow_fees = cm!(native_total_borrows * self.loan_fee_rate * diff_ts / YEAR_I80F48);
 
-        let borrow_index =
-            cm!((self.borrow_index * borrow_interest) / YEAR_I80F48 + self.borrow_index);
+        let borrow_index = cm!(
+            (self.borrow_index * borrow_rate_with_fees * diff_ts) / YEAR_I80F48 + self.borrow_index
+        );
         let deposit_index =
-            cm!((self.deposit_index * deposit_interest) / YEAR_I80F48 + self.deposit_index);
+            cm!((self.deposit_index * deposit_rate * diff_ts) / YEAR_I80F48 + self.deposit_index);
 
-        Ok((deposit_index, borrow_index))
+        Ok((deposit_index, borrow_index, borrow_fees))
     }
 
     /// returns the current interest rate in APR
@@ -437,9 +479,9 @@ impl Bank {
         &self,
         indexed_total_deposits: I80F48,
         indexed_total_borrows: I80F48,
-        now_ts: I80F48,
+        now_ts: i64,
     ) -> I80F48 {
-        if now_ts == I80F48::ZERO {
+        if now_ts <= 0 {
             return I80F48::ZERO;
         }
 
@@ -451,13 +493,18 @@ impl Bank {
             cm!(native_total_borrows / native_total_deposits)
         };
 
-        // combine old and new with relevant factors to form new avg_utilization
-        // scaling factor for previous avg_utilization is old_ts/new_ts
-        // scaling factor for instantaneous utilization is (new_ts - old_ts) / new_ts
-        let bank_rate_last_updated_i80f48 = I80F48::from_num(self.bank_rate_last_updated);
-        cm!((self.avg_utilization * bank_rate_last_updated_i80f48
-            + instantaneous_utilization * (now_ts - bank_rate_last_updated_i80f48))
-            / now_ts)
+        // Compute a time-weighted average since bank_rate_last_updated.
+        let previous_avg_time =
+            I80F48::from_num(cm!(self.index_last_updated - self.bank_rate_last_updated));
+        let diff_ts = I80F48::from_num(cm!(now_ts - self.index_last_updated));
+        let new_avg_time = I80F48::from_num(cm!(now_ts - self.bank_rate_last_updated));
+        if new_avg_time <= 0 {
+            return instantaneous_utilization;
+        }
+        cm!(
+            (self.avg_utilization * previous_avg_time + instantaneous_utilization * diff_ts)
+                / new_avg_time
+        )
     }
 
     // computes new optimal rates and max rate
@@ -625,28 +672,30 @@ mod tests {
         let mut bank = Bank::zeroed();
         bank.deposit_index = I80F48::from_num(1.0);
         bank.borrow_index = I80F48::from_num(1.0);
-        bank.bank_rate_last_updated = 0;
+        bank.bank_rate_last_updated = 1000;
+        bank.index_last_updated = 1000;
 
         let compute_new_avg_utilization_runner =
             |bank: &mut Bank, utilization: I80F48, now_ts: i64| {
-                bank.avg_utilization = bank.compute_new_avg_utilization(
-                    I80F48::ONE,
-                    utilization,
-                    I80F48::from_num(now_ts),
-                );
-                bank.bank_rate_last_updated = now_ts;
+                bank.avg_utilization =
+                    bank.compute_new_avg_utilization(I80F48::ONE, utilization, now_ts);
+                bank.index_last_updated = now_ts;
             };
 
-        compute_new_avg_utilization_runner(&mut bank, I80F48::ZERO, 0);
+        compute_new_avg_utilization_runner(&mut bank, I80F48::ZERO, 1000);
         assert_eq!(bank.avg_utilization, I80F48::ZERO);
 
-        compute_new_avg_utilization_runner(&mut bank, I80F48::from_num(0.5), 10);
+        compute_new_avg_utilization_runner(&mut bank, I80F48::from_num(0.5), 1010);
         assert!((bank.avg_utilization - I80F48::from_num(0.5)).abs() < 0.0001);
 
-        compute_new_avg_utilization_runner(&mut bank, I80F48::from_num(0.8), 15);
+        compute_new_avg_utilization_runner(&mut bank, I80F48::from_num(0.8), 1015);
         assert!((bank.avg_utilization - I80F48::from_num(0.6)).abs() < 0.0001);
 
-        compute_new_avg_utilization_runner(&mut bank, I80F48::ONE, 20);
+        compute_new_avg_utilization_runner(&mut bank, I80F48::ONE, 1020);
         assert!((bank.avg_utilization - I80F48::from_num(0.7)).abs() < 0.0001);
+
+        bank.bank_rate_last_updated = 1020;
+        compute_new_avg_utilization_runner(&mut bank, I80F48::ONE, 1040);
+        assert_eq!(bank.avg_utilization, I80F48::ONE);
     }
 }

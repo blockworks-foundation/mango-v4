@@ -342,7 +342,6 @@ impl ClientInstruction for FlashLoanBeginInstruction {
         let program_id = mango_v4::id();
 
         let accounts = Self::Accounts {
-            group: self.group,
             token_program: Token::id(),
             instructions: solana_program::sysvar::instructions::id(),
         };
@@ -367,6 +366,11 @@ impl ClientInstruction for FlashLoanBeginInstruction {
             is_writable: true,
             is_signer: false,
         });
+        instruction.accounts.push(AccountMeta {
+            pubkey: self.group,
+            is_writable: false,
+            is_signer: false,
+        });
 
         (accounts, instruction)
     }
@@ -382,6 +386,7 @@ pub struct FlashLoanEndInstruction<'keypair> {
     pub mango_token_bank: Pubkey,
     pub mango_token_vault: Pubkey,
     pub target_token_account: Pubkey,
+    pub flash_loan_type: mango_v4::instructions::FlashLoanType,
 }
 #[async_trait::async_trait(?Send)]
 impl<'keypair> ClientInstruction for FlashLoanEndInstruction<'keypair> {
@@ -392,7 +397,9 @@ impl<'keypair> ClientInstruction for FlashLoanEndInstruction<'keypair> {
         account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction {};
+        let instruction = Self::Instruction {
+            flash_loan_type: self.flash_loan_type,
+        };
 
         let account = account_loader
             .load_mango_account(&self.account)
@@ -424,6 +431,11 @@ impl<'keypair> ClientInstruction for FlashLoanEndInstruction<'keypair> {
         instruction.accounts.push(AccountMeta {
             pubkey: self.target_token_account,
             is_writable: true,
+            is_signer: false,
+        });
+        instruction.accounts.push(AccountMeta {
+            pubkey: account.fixed.group,
+            is_writable: false,
             is_signer: false,
         });
 
@@ -1953,7 +1965,6 @@ pub struct LiqTokenBankruptcyInstruction<'keypair> {
     pub liqor: Pubkey,
     pub liqor_owner: &'keypair Keypair,
 
-    pub liab_token_index: TokenIndex,
     pub max_liab_transfer: I80F48,
     pub liab_mint_info: Pubkey,
 }
@@ -1967,7 +1978,6 @@ impl<'keypair> ClientInstruction for LiqTokenBankruptcyInstruction<'keypair> {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            liab_token_index: self.liab_token_index,
             max_liab_transfer: self.max_liab_transfer,
         };
 
@@ -1986,7 +1996,7 @@ impl<'keypair> ClientInstruction for LiqTokenBankruptcyInstruction<'keypair> {
             &liqor,
             QUOTE_TOKEN_INDEX,
             0,
-            self.liab_token_index,
+            liab_mint_info.token_index,
             0,
         )
         .await;

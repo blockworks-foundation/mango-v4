@@ -210,12 +210,10 @@ pub mod mango_v4 {
         instructions::stub_oracle_set(ctx, price)
     }
 
-    // NOTE: keep disc synced in token_update_index_and_rate ix
     pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
         instructions::token_deposit(ctx, amount)
     }
 
-    // NOTE: keep disc synced in token_update_index_and_rate ix
     pub fn token_withdraw(
         ctx: Context<TokenWithdraw>,
         amount: u64,
@@ -231,11 +229,11 @@ pub mod mango_v4 {
         instructions::flash_loan_begin(ctx, loan_amounts)
     }
 
-    // NOTE: keep disc synced in flash_loan.rs
     pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
+        flash_loan_type: FlashLoanType,
     ) -> Result<()> {
-        instructions::flash_loan_end(ctx)
+        instructions::flash_loan_end(ctx, flash_loan_type)
     }
 
     ///
@@ -337,10 +335,9 @@ pub mod mango_v4 {
 
     pub fn liq_token_bankruptcy(
         ctx: Context<LiqTokenBankruptcy>,
-        liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -> Result<()> {
-        instructions::liq_token_bankruptcy(ctx, liab_token_index, max_liab_transfer)
+        instructions::liq_token_bankruptcy(ctx, max_liab_transfer)
     }
 
     ///

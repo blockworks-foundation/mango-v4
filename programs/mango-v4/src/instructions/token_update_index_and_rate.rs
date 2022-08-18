@@ -91,18 +91,19 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
 
     // compute and set latest index and average utilization on each bank
     {
-        let some_bank = ctx.remaining_accounts[0].load::<Bank>()?;
+        let mut some_bank = ctx.remaining_accounts[0].load_mut::<Bank>()?;
 
-        let now_ts_i80f48 = I80F48::from_num(now_ts);
-        let diff_ts = I80F48::from_num(now_ts - some_bank.index_last_updated);
+        let diff_ts = I80F48::from_num(cm!(now_ts - some_bank.index_last_updated));
 
-        let (deposit_index, borrow_index) =
+        let (deposit_index, borrow_index, borrow_fees) =
             some_bank.compute_index(indexed_total_deposits, indexed_total_borrows, diff_ts)?;
+
+        some_bank.collected_fees_native = cm!(some_bank.collected_fees_native + borrow_fees);
 
         let new_avg_utilization = some_bank.compute_new_avg_utilization(
             indexed_total_deposits,
             indexed_total_borrows,
-            now_ts_i80f48,
+            now_ts,
         );
 
         let price = oracle_price(
@@ -135,7 +136,6 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             bank.cached_indexed_total_borrows = indexed_total_borrows;
 
             bank.index_last_updated = now_ts;
-            bank.charge_loan_fee(diff_ts);
 
             bank.deposit_index = deposit_index;
             bank.borrow_index = borrow_index;

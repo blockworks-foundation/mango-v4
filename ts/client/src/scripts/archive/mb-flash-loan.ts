@@ -9,9 +9,9 @@ import {
 } from '@solana/web3.js';
 import BN from 'bn.js';
 import fs from 'fs';
-import { QUOTE_DECIMALS } from '../accounts/bank';
-import { MangoClient } from '../index';
-import { getAssociatedTokenAddress } from '../utils';
+import { QUOTE_DECIMALS } from '../../accounts/bank';
+import { MangoClient } from '../../index';
+import { getAssociatedTokenAddress } from '../../utils';
 
 const MB_CLUSTER_URL =
   process.env.MB_CLUSTER_URL ||
@@ -128,14 +128,15 @@ async function main() {
 
       // flash loan start ix - takes a loan for source token,
       // flash loan end ix - returns increase in all token account's amounts to respective vaults,
-      const healthRemainingAccounts = client.buildHealthRemainingAccounts(
-        group,
-        mangoAccount,
-        [sourceBank, targetBank], // we would be taking a sol loan potentially
-      );
+      const healthRemainingAccounts =
+        client.buildFixedAccountRetrieverHealthAccounts(
+          group,
+          mangoAccount,
+          [sourceBank, targetBank], // we would be taking a sol loan potentially
+        );
       // 1. build flash loan end ix
       const flashLoadnEndIx = await client.program.methods
-        .flashLoanEnd()
+        .flashLoanEnd(true)
         .accounts({
           account: mangoAccount.publicKey,
           owner: (client.program.provider as AnchorProvider).wallet.publicKey,
@@ -175,6 +176,11 @@ async function main() {
             isWritable: true, // increase in this address amount is transferred back to the targetBank.vault above in this case whatever is result of swap
             isSigner: false,
           } as AccountMeta,
+          {
+            pubkey: group.publicKey,
+            isWritable: false,
+            isSigner: false,
+          } as AccountMeta,
         ])
         .instruction();
       instructions.push(flashLoadnEndIx);
@@ -188,7 +194,6 @@ async function main() {
             ) /* we don't care about borrowing the target amount, this is just a dummy */,
           ])
           .accounts({
-            group: group.publicKey,
             // for observing ixs in the entire tx,
             // e.g. apart from flash loan start and end no other ix should target mango v4 program
             // e.g. forbid FlashLoanBegin been called from CPI
@@ -229,6 +234,11 @@ async function main() {
                 mangoAccount.owner,
               ),
               isWritable: false, // this is a dummy, its just done so that we match flash loan start and end ix
+              isSigner: false,
+            } as AccountMeta,
+            {
+              pubkey: group.publicKey,
+              isWritable: false,
               isSigner: false,
             } as AccountMeta,
           ])

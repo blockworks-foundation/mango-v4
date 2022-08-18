@@ -873,10 +873,7 @@ impl MangoClient {
                     ams
                 },
                 data: anchor_lang::InstructionData::data(
-                    &mango_v4::instruction::LiqTokenBankruptcy {
-                        liab_token_index,
-                        max_liab_transfer,
-                    },
+                    &mango_v4::instruction::LiqTokenBankruptcy { max_liab_transfer },
                 ),
             })
             .signer(&self.owner)
@@ -1075,7 +1072,6 @@ impl MangoClient {
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
                     &mango_v4::accounts::FlashLoanBegin {
-                        group: self.group(),
                         token_program: Token::id(),
                         instructions: solana_sdk::sysvar::instructions::id(),
                     },
@@ -1084,6 +1080,7 @@ impl MangoClient {
                 ams.extend(bank_ams);
                 ams.extend(vault_ams.clone());
                 ams.extend(token_ams.clone());
+                ams.push(to_readonly_account_meta(self.group()));
                 ams
             },
             data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanBegin {
@@ -1107,9 +1104,12 @@ impl MangoClient {
                 ams.extend(health_ams);
                 ams.extend(vault_ams);
                 ams.extend(token_ams);
+                ams.push(to_readonly_account_meta(self.group()));
                 ams
             },
-            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanEnd {}),
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::FlashLoanEnd {
+                flash_loan_type: mango_v4::instructions::FlashLoanType::Swap,
+            }),
         });
 
         let rpc = self.client.rpc_async();

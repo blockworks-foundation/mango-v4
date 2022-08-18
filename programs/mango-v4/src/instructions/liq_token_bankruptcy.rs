@@ -11,10 +11,9 @@ use crate::state::*;
 use crate::util::checked_math as cm;
 
 // Remaining accounts:
-// - all banks for liab_token_index (writable)
+// - all banks for liab_mint_info (writable)
 // - merged health accounts for liqor+liqee
 #[derive(Accounts)]
-#[instruction(liab_token_index: TokenIndex)]
 pub struct LiqTokenBankruptcy<'info> {
     #[account(
         has_one = insurance_vault,
@@ -37,7 +36,6 @@ pub struct LiqTokenBankruptcy<'info> {
 
     #[account(
         has_one = group,
-        constraint = liab_mint_info.load()?.token_index == liab_token_index,
     )]
     pub liab_mint_info: AccountLoader<'info, MintInfo>,
 
@@ -67,7 +65,6 @@ impl<'info> LiqTokenBankruptcy<'info> {
 
 pub fn liq_token_bankruptcy(
     ctx: Context<LiqTokenBankruptcy>,
-    liab_token_index: TokenIndex,
     max_liab_transfer: I80F48,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
@@ -75,12 +72,9 @@ pub fn liq_token_bankruptcy(
 
     // split remaining accounts into banks and health
     let liab_mint_info = ctx.accounts.liab_mint_info.load()?;
-    let bank_pks = liab_mint_info.banks();
-    let (bank_ais, health_ais) = &ctx.remaining_accounts.split_at(bank_pks.len());
-    require!(
-        bank_ais.iter().map(|ai| ai.key).eq(bank_pks.iter()),
-        MangoError::SomeError
-    );
+    let liab_token_index = liab_mint_info.token_index;
+    let (bank_ais, health_ais) = &ctx.remaining_accounts.split_at(liab_mint_info.num_banks());
+    liab_mint_info.verify_banks_ais(bank_ais)?;
 
     let mut liqor = ctx.accounts.liqor.load_mut()?;
     // account constraint #1
@@ -144,8 +138,9 @@ pub fn liq_token_bankruptcy(
 
     let mut liqee_liab_active = true;
     if insurance_transfer > 0 {
-        // in the end, the liqee gets liab assets
-        liqee_liab_active = liab_bank.deposit(liqee_liab, liab_transfer)?;
+        // liqee gets liab assets (enable dusting to prevent a case where the position is brought
+        // to +I80F48::DELTA)
+        liqee_liab_active = liab_bank.deposit_with_dusting(liqee_liab, liab_transfer)?;
         remaining_liab_loss = -liqee_liab.native(liab_bank);
 
         // move insurance assets into quote bank
@@ -194,7 +189,8 @@ pub fn liq_token_bankruptcy(
     }
     drop(account_retriever);
 
-    // Socialize loss
+    // Socialize loss if there's more loss and noone else could use the
+    // insurance fund to cover it.
     if insurance_fund_exhausted && remaining_liab_loss.is_positive() {
         // find the total deposits
         let mut indexed_total_deposits = I80F48::ZERO;
@@ -211,7 +207,6 @@ pub fn liq_token_bankruptcy(
             cm!(liab_deposit_index - remaining_liab_loss / indexed_total_deposits);
 
         let mut amount_to_credit = remaining_liab_loss;
-        let mut position_active = true;
         for bank_ai in bank_ais.iter() {
             let mut bank = bank_ai.load_mut::<Bank>()?;
             bank.deposit_index = new_deposit_index;
@@ -219,15 +214,18 @@ pub fn liq_token_bankruptcy(
             // credit liqee on each bank where we can offset borrows
             let amount_for_bank = amount_to_credit.min(bank.native_borrows());
             if amount_for_bank.is_positive() {
-                position_active = bank.deposit(liqee_liab, amount_for_bank)?;
+                // enable dusting, because each deposit() is allowed to round up. thus multiple deposit
+                // could bring the total position slightly above zero otherwise
+                liqee_liab_active = bank.deposit_with_dusting(liqee_liab, amount_for_bank)?;
                 amount_to_credit = cm!(amount_to_credit - amount_for_bank);
-                if amount_to_credit.is_zero() {
+                if amount_to_credit <= 0 {
                     break;
                 }
             }
         }
-        require!(!position_active, MangoError::SomeError);
-        liqee_liab_active = false;
+
+        // socialized loss always brings the position to zero
+        require_eq!(liqee_liab.indexed_position, I80F48::ZERO);
     }
 
     let liab_bank = bank_ais[0].load::<Bank>()?;

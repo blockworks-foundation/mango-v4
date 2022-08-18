@@ -1,14 +1,14 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
-import { OrderType, Side } from '../accounts/perp';
+import { OrderType, Side } from '../../accounts/perp';
 import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
   Serum3Side,
-} from '../accounts/serum3';
-import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
+} from '../../accounts/serum3';
+import { MangoClient } from '../../client';
+import { MANGO_V4_ID } from '../../constants';
 
 //
 // An example for users based on high level api i.e. the client
@@ -18,6 +18,14 @@ import { MANGO_V4_ID } from '../constants';
 //
 // This script deposits some tokens, places some serum orders, cancels them, places some perp orders
 //
+
+const DEVNET_MINTS = new Map([
+  ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'], // use devnet usdc
+  ['BTC', '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU'],
+  ['SOL', 'So11111111111111111111111111111111111111112'],
+  ['ORCA', 'orcarKHSqC5CDDsGbho8GKvwExejWHxTqGzXgcewB9L'],
+  ['MNGO', 'Bb9bsTQa1bGEtQ5KagGkvSHyuLqDWumFUcRqFusFNJWC'],
+]);
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
@@ -94,11 +102,21 @@ async function main() {
   if (true) {
     // deposit
     console.log(`...depositing 50 USDC`);
-    await client.tokenDeposit(group, mangoAccount, 'USDC', 50);
+    await client.tokenDeposit(
+      group,
+      mangoAccount,
+      new PublicKey(DEVNET_MINTS['USDC']),
+      50,
+    );
     await mangoAccount.reload(client, group);
 
     console.log(`...depositing 0.0005 BTC`);
-    await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0005);
+    await client.tokenDeposit(
+      group,
+      mangoAccount,
+      new PublicKey(DEVNET_MINTS['BTC']),
+      0.0005,
+    );
     await mangoAccount.reload(client, group);
 
     // serum3

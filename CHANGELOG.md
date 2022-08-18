@@ -4,7 +4,9 @@ Update this for each mainnet deployment.
 
 ## not on mainnet
 
--
+- liq_token_bankruptcy: removed liab_token_index argument
+- flash_loan: both begin and end instructions now require the group to be passed as the final trailing remaining account
+- flash_loan: the end instruction now requires passing a FlashLoanType, so logging can distinguish swaps from other uses
 
 ## mainnet
 

@@ -90,6 +90,10 @@ async function main() {
     let res = `${bank.name}`;
     res =
       res +
+      `\n ${'tokenIndex'.padEnd(40)} ${bank.tokenIndex}` +
+      `\n ${'bank'.padEnd(40)} ${bank.publicKey}` +
+      `\n ${'vault'.padEnd(40)} ${bank.vault}` +
+      `\n ${'mint'.padEnd(40)} ${bank.mint}` +
       `\n ${'error'.padEnd(40)} ${error}` +
       `\n ${'collectedFeesNative'.padEnd(40)} ${bank.collectedFeesNative}` +
       `\n ${'dust'.padEnd(40)} ${bank.dust}` +
@@ -99,7 +103,7 @@ async function main() {
       `\n ${'deposits (sum over all mango accounts)'.padEnd(40)} ${
         (bank as any).indexedDepositsByMangoAccounts
       }` +
-      `\n ${'cachedIndexedTotalDeposits'.padEnd(40)} ${(
+      `\n ${'cachedTotalDeposits'.padEnd(40)} ${(
         bank as any
       ).cachedIndexedTotalDeposits.mul(bank.depositIndex)}` +
       `\n ${'borrows'.padEnd(40)} ${bank.indexedBorrows.mul(
@@ -108,13 +112,33 @@ async function main() {
       `\n ${'borrows (sum over all mango accounts)'.padEnd(40)} ${
         (bank as any).indexedBorrowsByMangoAccounts
       }` +
-      `\n ${'cachedIndexedTotalBorrows'.padEnd(40)} ${(
+      `\n ${'cachedTotalBorrows'.padEnd(40)} ${(
         bank as any
       ).cachedIndexedTotalBorrows.mul(bank.borrowIndex)}` +
-      `\n ${'avgUtilization'.padEnd(40)} ${bank.avgUtilization}` +
-      `\n ${'depositRate'.padEnd(40)} ${bank.getDepositRate()}` +
-      `\n ${'borrowRate'.padEnd(40)} ${bank.getBorrowRate()}` +
-      `\n ${'vault'.padEnd(40)} ${vault}`;
+      `\n ${'avgUtilization'.padEnd(40)} ${(
+        100 * bank.avgUtilization.toNumber()
+      ).toFixed(1)}%` +
+      `\n ${'rate parameters'.padEnd(40)} ${(
+        100 * bank.rate0.toNumber()
+      ).toFixed()}% @ ${(100 * bank.util0.toNumber()).toFixed()}% util, ${(
+        100 * bank.rate1.toNumber()
+      ).toFixed()}% @${(100 * bank.util1.toNumber()).toFixed()}% util, ${(
+        100 * bank.maxRate.toNumber()
+      ).toFixed()}% @ 100% util` +
+      `\n ${'depositRate'.padEnd(40)} ${(
+        100 * bank.getDepositRate().toNumber()
+      ).toFixed(2)}%` +
+      `\n ${'borrowRate'.padEnd(40)} ${(
+        100 * bank.getBorrowRate().toNumber()
+      ).toFixed(2)}%` +
+      `\n ${'vault balance'.padEnd(40)} ${coder()
+        .accounts.decode(
+          'token',
+          await (
+            await client.program.provider.connection.getAccountInfo(bank.vault)
+          ).data,
+        )
+        .amount.toNumber()}`;
 
     console.log(`${res}`);
   }

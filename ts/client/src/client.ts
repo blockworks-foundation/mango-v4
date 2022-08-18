@@ -45,6 +45,7 @@ import {
 import { SERUM3_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
+import { FlashLoanType } from './types';
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
@@ -59,6 +60,8 @@ enum AccountRetriever {
   Fixed,
 }
 
+export type IdsSource = 'api' | 'static' | 'get-program-accounts';
+
 // TODO: replace ui values with native as input wherever possible
 // TODO: replace token/market names with token or market indices
 export class MangoClient {
@@ -69,11 +72,11 @@ export class MangoClient {
     public program: Program<MangoV4>,
     public programId: PublicKey,
     public cluster: Cluster,
-    public groupName?: string,
     public opts: {
       postSendTxCallback?: ({ txid }: { txid: string }) => void;
       prioritizationFee?: number;
     } = {},
+    public idsSource: IdsSource = 'api',
   ) {
     this.prioritizationFee = opts?.prioritizationFee || 0;
     this.postSendTxCallback = opts?.postSendTxCallback;
@@ -263,7 +266,7 @@ export class MangoClient {
 
   public async tokenEdit(
     group: Group,
-    tokenName: string,
+    mintPk: PublicKey,
     oracle: PublicKey,
     oracleConfFilter: number,
     groupInsuranceFund: boolean | undefined,
@@ -281,8 +284,8 @@ export class MangoClient {
     initLiabWeight: number,
     liquidationFee: number,
   ): Promise<TransactionSignature> {
-    const bank = group.banksMap.get(tokenName)!;
-    const mintInfo = group.mintInfosMap.get(bank.tokenIndex)!;
+    const bank = group.getFirstBankByMint(mintPk);
+    const mintInfo = group.mintInfosMapByTokenIndex.get(bank.tokenIndex)!;
 
     return await this.program.methods
       .tokenEdit(
@@ -320,9 +323,9 @@ export class MangoClient {
 
   public async tokenDeregister(
     group: Group,
-    tokenName: string,
+    mintPk: PublicKey,
   ): Promise<TransactionSignature> {
-    const bank = group.banksMap.get(tokenName)!;
+    const bank = group.getFirstBankByMint(mintPk);
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
 
     const dustVaultPk = await getAssociatedTokenAddress(bank.mint, adminPk);
@@ -349,7 +352,8 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         admin: adminPk,
-        mintInfo: group.mintInfosMap.get(bank.tokenIndex)?.publicKey,
+        mintInfo: group.mintInfosMapByTokenIndex.get(bank.tokenIndex)
+          ?.publicKey,
         dustVault: dustVaultPk,
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
@@ -712,15 +716,17 @@ export class MangoClient {
   public async tokenDeposit(
     group: Group,
     mangoAccount: MangoAccount,
-    tokenName: string,
+    mintPk: PublicKey,
     amount: number,
   ): Promise<TransactionSignature> {
-    const bank = group.banksMap.get(tokenName)!;
-    const nativeAmount = toNativeDecimals(amount, bank.mintDecimals).toNumber();
+    const nativeAmount = toNativeDecimals(
+      amount,
+      group.getMintDecimals(mintPk),
+    ).toNumber();
     return await this.tokenDepositNative(
       group,
       mangoAccount,
-      tokenName,
+      mintPk,
       nativeAmount,
     );
   }
@@ -728,13 +734,13 @@ export class MangoClient {
   public async tokenDepositNative(
     group: Group,
     mangoAccount: MangoAccount,
-    tokenName: string,
+    mintPk: PublicKey,
     nativeAmount: number,
   ) {
-    const bank = group.banksMap.get(tokenName)!;
+    const bank = group.getFirstBankByMint(mintPk);
 
     const tokenAccountPk = await getAssociatedTokenAddress(
-      bank.mint,
+      mintPk,
       mangoAccount.owner,
     );
 
@@ -742,7 +748,7 @@ export class MangoClient {
     let preInstructions: TransactionInstruction[] = [];
     let postInstructions: TransactionInstruction[] = [];
     const additionalSigners: Signer[] = [];
-    if (bank.mint.equals(WRAPPED_SOL_MINT)) {
+    if (mintPk.equals(WRAPPED_SOL_MINT)) {
       wrappedSolAccount = new Keypair();
       const lamports = nativeAmount + 1e7;
 
@@ -812,16 +818,18 @@ export class MangoClient {
   public async tokenWithdraw(
     group: Group,
     mangoAccount: MangoAccount,
-    tokenName: string,
+    mintPk: PublicKey,
     amount: number,
     allowBorrow: boolean,
   ): Promise<TransactionSignature> {
-    const bank = group.banksMap.get(tokenName)!;
-    const nativeAmount = toNativeDecimals(amount, bank.mintDecimals).toNumber();
+    const nativeAmount = toNativeDecimals(
+      amount,
+      group.getMintDecimals(mintPk),
+    ).toNumber();
     return await this.tokenWithdrawNative(
       group,
       mangoAccount,
-      tokenName,
+      mintPk,
       nativeAmount,
       allowBorrow,
     );
@@ -830,11 +838,11 @@ export class MangoClient {
   public async tokenWithdrawNative(
     group: Group,
     mangoAccount: MangoAccount,
-    tokenName: string,
+    mintPk: PublicKey,
     nativeAmount: number,
     allowBorrow: boolean,
   ): Promise<TransactionSignature> {
-    const bank = group.banksMap.get(tokenName)!;
+    const bank = group.getFirstBankByMint(mintPk);
 
     const tokenAccountPk = await getAssociatedTokenAddress(
       bank.mint,
@@ -1097,10 +1105,14 @@ export class MangoClient {
         marketBaseVault: serum3MarketExternal.decoded.baseVault,
         marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
         marketVaultSigner: serum3MarketExternalVaultSigner,
-        quoteBank: group.findBank(serum3Market.quoteTokenIndex)?.publicKey,
-        quoteVault: group.findBank(serum3Market.quoteTokenIndex)?.vault,
-        baseBank: group.findBank(serum3Market.baseTokenIndex)?.publicKey,
-        baseVault: group.findBank(serum3Market.baseTokenIndex)?.vault,
+        quoteBank: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
+          .publicKey,
+        quoteVault: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
+          .vault,
+        baseBank: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
+          .publicKey,
+        baseVault: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
+          .vault,
       })
       .remainingAccounts(
         healthRemainingAccounts.map(
@@ -1178,10 +1190,14 @@ export class MangoClient {
         marketBaseVault: serum3MarketExternal.decoded.baseVault,
         marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
         marketVaultSigner: serum3MarketExternalVaultSigner,
-        quoteBank: group.findBank(serum3Market.quoteTokenIndex)?.publicKey,
-        quoteVault: group.findBank(serum3Market.quoteTokenIndex)?.vault,
-        baseBank: group.findBank(serum3Market.baseTokenIndex)?.publicKey,
-        baseVault: group.findBank(serum3Market.baseTokenIndex)?.vault,
+        quoteBank: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
+          .publicKey,
+        quoteVault: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
+          .vault,
+        baseBank: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
+          .publicKey,
+        baseVault: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
+          .vault,
       })
       .rpc();
   }
@@ -1497,20 +1513,24 @@ export class MangoClient {
   public async marginTrade({
     group,
     mangoAccount,
-    inputToken,
+    inputMintPk,
     amountIn,
-    outputToken,
+    outputMintPk,
     userDefinedInstructions,
+    // margin trade is a general function
+    // set flash_loan_type to FlashLoanType.swap if you desire the transaction to be recorded as a swap
+    flashLoanType,
   }: {
     group: Group;
     mangoAccount: MangoAccount;
-    inputToken: string;
+    inputMintPk: PublicKey;
     amountIn: number;
-    outputToken: string;
+    outputMintPk: PublicKey;
     userDefinedInstructions: TransactionInstruction[];
+    flashLoanType: FlashLoanType;
   }): Promise<TransactionSignature> {
-    const inputBank = group.banksMap.get(inputToken);
-    const outputBank = group.banksMap.get(outputToken);
+    const inputBank: Bank = group.getFirstBankByMint(inputMintPk);
+    const outputBank: Bank = group.getFirstBankByMint(outputMintPk);
 
     if (!inputBank || !outputBank) throw new Error('Invalid token');
 
@@ -1600,9 +1620,14 @@ export class MangoClient {
       isWritable: false,
       isSigner: false,
     };
+    const groupAM = {
+      pubkey: group.publicKey,
+      isWritable: false,
+      isSigner: false,
+    };
 
     const flashLoanEndIx = await this.program.methods
-      .flashLoanEnd()
+      .flashLoanEnd(flashLoanType)
       .accounts({
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -1617,6 +1642,7 @@ export class MangoClient {
           pubkey: outputTokenAccountPk,
           isSigner: false,
         },
+        groupAM,
       ])
       .instruction();
 
@@ -1628,7 +1654,6 @@ export class MangoClient {
         ) /* we don't care about borrowing the target amount, this is just a dummy */,
       ])
       .accounts({
-        group: group.publicKey,
         instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       })
       .remainingAccounts([
@@ -1638,6 +1663,7 @@ export class MangoClient {
         outputBankVault,
         inputATA,
         outputATA,
+        groupAM,
       ])
       .instruction();
 
@@ -1656,9 +1682,10 @@ export class MangoClient {
     });
   }
 
-  async updateIndexAndRate(group: Group, tokenName: string) {
-    const bank = group.banksMap.get(tokenName)!;
-    const mintInfo = group.mintInfosMap.get(bank.tokenIndex)!;
+  async updateIndexAndRate(group: Group, mintPk: PublicKey) {
+    // TODO: handle updating multiple banks
+    const bank = group.getFirstBankByMint(mintPk);
+    const mintInfo = group.mintInfosMapByMint.get(mintPk.toString())!;
 
     await this.program.methods
       .tokenUpdateIndexAndRate()
@@ -1684,12 +1711,12 @@ export class MangoClient {
     group: Group,
     liqor: MangoAccount,
     liqee: MangoAccount,
-    assetTokenName: string,
-    liabTokenName: string,
+    assetMintPk: PublicKey,
+    liabMintPk: PublicKey,
     maxLiabTransfer: number,
   ) {
-    const assetBank: Bank = group.banksMap.get(assetTokenName);
-    const liabBank: Bank = group.banksMap.get(liabTokenName);
+    const assetBank: Bank = group.getFirstBankByMint(assetMintPk);
+    const liabBank: Bank = group.getFirstBankByMint(liabMintPk);
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
@@ -1732,6 +1759,7 @@ export class MangoClient {
     cluster: Cluster,
     programId: PublicKey,
     opts: any = {},
+    getIdsFromApi: IdsSource = 'api',
   ): MangoClient {
     // TODO: use IDL on chain or in repository? decide...
     // Alternatively we could fetch IDL from chain.
@@ -1742,8 +1770,8 @@ export class MangoClient {
       new Program<MangoV4>(idl as MangoV4, programId, provider),
       programId,
       cluster,
-      null,
       opts,
+      getIdsFromApi,
     );
   }
 
@@ -1756,7 +1784,7 @@ export class MangoClient {
     // const idl = await Program.fetchIdl(MANGO_V4_ID, provider);
     const idl = IDL;
 
-    const id = Id.fromIds(groupName);
+    const id = Id.fromIdsByName(groupName);
 
     return new MangoClient(
       new Program<MangoV4>(
@@ -1766,7 +1794,6 @@ export class MangoClient {
       ),
       new PublicKey(id.mangoProgramId),
       id.cluster,
-      groupName,
     );
   }
 
@@ -1818,7 +1845,7 @@ export class MangoClient {
     }
     const mintInfos = allTokenIndices
       .filter((index) => index != TokenPosition.TokenIndexUnset)
-      .map((tokenIndex) => group.mintInfosMap.get(tokenIndex)!);
+      .map((tokenIndex) => group.mintInfosMapByTokenIndex.get(tokenIndex)!);
 
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.firstBank()),
@@ -1868,7 +1895,7 @@ export class MangoClient {
       }
     }
     const mintInfos = [...new Set(tokenIndices)].map(
-      (tokenIndex) => group.mintInfosMap.get(tokenIndex)!,
+      (tokenIndex) => group.mintInfosMapByTokenIndex.get(tokenIndex)!,
     );
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.firstBank()),
