@@ -165,7 +165,7 @@ export class MangoAccount {
    */
   getUi(bank: Bank): number {
     const ta = this.findToken(bank.tokenIndex);
-    return ta ? ta.ui(bank) : 0;
+    return ta ? ta.tokenBalanceUi(bank) : 0;
   }
 
   /**
@@ -175,7 +175,7 @@ export class MangoAccount {
    */
   getDepositsUi(bank: Bank): number {
     const ta = this.findToken(bank.tokenIndex);
-    return ta ? ta.uiDeposits(bank) : 0;
+    return ta ? ta.tokenDepositsUi(bank) : 0;
   }
 
   /**
@@ -185,7 +185,7 @@ export class MangoAccount {
    */
   getBorrowsUi(bank: Bank): number {
     const ta = this.findToken(bank.tokenIndex);
-    return ta ? ta.uiBorrows(bank) : 0;
+    return ta ? ta.tokenBorrowsUi(bank) : 0;
   }
 
   /**
@@ -431,7 +431,7 @@ export class TokenPosition {
    * @param bank
    * @returns position in UI decimals, is signed
    */
-  public ui(bank: Bank): number {
+  public tokenBalanceUi(bank: Bank): number {
     return nativeI80F48ToUi(this.native(bank), bank.mintDecimals).toNumber();
   }
 
@@ -439,7 +439,7 @@ export class TokenPosition {
    * @param bank
    * @returns position in UI decimals, 0 if position has borrows
    */
-  public uiDeposits(bank: Bank): number {
+  public tokenDepositsUi(bank: Bank): number {
     if (this.indexedPosition && this.indexedPosition.lt(ZERO_I80F48)) {
       return 0;
     }
@@ -454,7 +454,7 @@ export class TokenPosition {
    * @param bank
    * @returns position in UI decimals, can be 0 or negative, 0 if position has deposits
    */
-  public uiBorrows(bank: Bank): number {
+  public tokenBorrowsUi(bank: Bank): number {
     if (this.indexedPosition && this.indexedPosition.gt(ZERO_I80F48)) {
       return 0;
     }
@@ -472,7 +472,7 @@ export class TokenPosition {
       if (bank) {
         const native = this.native(bank);
         extra += ', native: ' + native.toNumber();
-        extra += ', ui: ' + this.ui(bank);
+        extra += ', ui: ' + this.tokenBalanceUi(bank);
         extra += ', tokenName: ' + bank.name;
       }
     }
