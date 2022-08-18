@@ -117,8 +117,8 @@ export class Group {
     this.banksMapByName = new Map();
     this.banksMapByMint = new Map();
     this.banksMapByTokenIndex = new Map();
-    for (let bank of banks) {
-      let mintId = bank.mint.toString();
+    for (const bank of banks) {
+      const mintId = bank.mint.toString();
       if (this.banksMapByMint.has(mintId)) {
         this.banksMapByMint.get(mintId).push(bank);
         this.banksMapByName.get(bank.name).push(bank);
@@ -270,7 +270,7 @@ export class Group {
         )
         .join(', ');
 
-    let banks = [];
+    const banks = [];
     for (const tokenBanks of this.banksMapByMint.values()) {
       for (const bank of tokenBanks) {
         banks.push(bank);

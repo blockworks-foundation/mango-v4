@@ -84,12 +84,12 @@ export class Id {
   }
 
   static async fromApi(groupPk: PublicKey): Promise<Id> {
-    let groupMetadataApiUrl =
+    const groupMetadataApiUrl =
       'https://mango-transaction-log.herokuapp.com/v4/group-metadata';
     const response = await fetch(groupMetadataApiUrl);
-    let jsonData = await response.json();
+    const jsonData = await response.json();
 
-    let groupConfig = jsonData.groups.find(
+    const groupConfig = jsonData.groups.find(
       (group) => group.publicKey === groupPk.toString(),
     );
 
