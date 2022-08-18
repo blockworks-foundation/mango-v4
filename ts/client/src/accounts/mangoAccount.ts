@@ -99,11 +99,6 @@ export class MangoAccount {
     return this.serum3.find((sa) => sa.marketIndex == marketIndex);
   }
 
-  getNative(bank: Bank): I80F48 {
-    const ta = this.findToken(bank.tokenIndex);
-    return ta ? ta.native(bank) : ZERO_I80F48;
-  }
-
   static getEquivalentNativeUsdcPosition(
     sourceBank: Bank,
     nativeTokenPosition: TokenPosition,
@@ -127,51 +122,100 @@ export class MangoAccount {
       .mul(I80F48.fromNumber(Math.pow(10, targetBank.mintDecimals)));
   }
 
+  /**
+   *
+   * @param bank
+   * @returns native balance for a token
+   */
+  getNative(bank: Bank): I80F48 {
+    const ta = this.findToken(bank.tokenIndex);
+    return ta ? ta.native(bank) : ZERO_I80F48;
+  }
+
+  /**
+   *
+   * @param bank
+   * @returns native balance for a token, 0 or more
+   */
   getNativeDeposits(bank: Bank): I80F48 {
     const native = this.getNative(bank);
     return native.gte(ZERO_I80F48) ? native : ZERO_I80F48;
   }
 
+  /**
+   *
+   * @param bank
+   * @returns native balance for a token, 0 or less
+   */
   getNativeBorrows(bank: Bank): I80F48 {
     const native = this.getNative(bank);
     return native.lte(ZERO_I80F48) ? native : ZERO_I80F48;
   }
 
+  /**
+   *
+   * @param bank
+   * @returns UI balance for a token
+   */
   getUi(bank: Bank): number {
     const ta = this.findToken(bank.tokenIndex);
     return ta ? ta.ui(bank) : 0;
   }
 
-  deposits(bank: Bank): number {
+  /**
+   *
+   * @param bank
+   * @returns UI balance for a token, 0 or more
+   */
+  getDepositsUi(bank: Bank): number {
     const ta = this.findToken(bank.tokenIndex);
     return ta ? ta.uiDeposits(bank) : 0;
   }
 
-  borrows(bank: Bank): number {
+  /**
+   *
+   * @param bank
+   * @returns UI balance for a token, 0 or less
+   */
+  getBorrowsUi(bank: Bank): number {
     const ta = this.findToken(bank.tokenIndex);
     return ta ? ta.uiBorrows(bank) : 0;
   }
 
+  /**
+   * Health, see health.rs or https://docs.mango.markets/mango-markets/health-overview
+   * @param healthType
+   * @returns raw health number, in native quote
+   */
   getHealth(healthType: HealthType): I80F48 {
     return healthType == HealthType.init
       ? (this.accountData as MangoAccountData).initHealth
       : (this.accountData as MangoAccountData).maintHealth;
   }
 
+  /**
+   * Health ratio, which is computed so `100 * (assets-liabs)/liabs`
+   * Note: health ratio is technically ∞ if liabs are 0
+   * @param healthType
+   * @returns health ratio, in percentage form
+   */
   getHealthRatio(healthType: HealthType): I80F48 {
     return this.accountData.healthCache.healthRatio(healthType);
   }
 
+  /**
+   * Health ratio
+   * @param healthType
+   * @returns health ratio, in percentage form, capped to 100
+   */
   getHealthRatioUi(healthType: HealthType): number {
-    const ratio = this.accountData.healthCache
-      .healthRatio(healthType)
-      .toNumber();
-
+    const ratio = this.getHealthRatio(healthType).toNumber();
     return ratio > 100 ? 100 : Math.trunc(ratio);
   }
 
   /**
    * Sum of all the assets i.e. token deposits, borrows, total assets in spot open orders, (perps positions is todo) in terms of quote value.
+   * @returns equity, in native quote
    */
   getEquity(): I80F48 {
     const equity = (this.accountData as MangoAccountData).equity;
@@ -184,6 +228,7 @@ export class MangoAccount {
 
   /**
    * The amount of native quote you could withdraw against your existing assets.
+   * @returns collateral value, in native quote
    */
   getCollateralValue(): I80F48 {
     return this.getHealth(HealthType.init);
@@ -191,6 +236,7 @@ export class MangoAccount {
 
   /**
    * Sum of all positive assets.
+   * @returns assets, in native quote
    */
   getAssetsVal(healthType: HealthType): I80F48 {
     return this.accountData.healthCache.assets(healthType);
@@ -198,6 +244,7 @@ export class MangoAccount {
 
   /**
    * Sum of all negative assets.
+   * @returns liabs, in native quote
    */
   getLiabsVal(healthType: HealthType): I80F48 {
     return this.accountData.healthCache.liabs(healthType);
@@ -207,6 +254,7 @@ export class MangoAccount {
    * The amount of given native token you can borrow, considering all existing assets as collateral except the deposits for this token.
    * Note 1: The existing native deposits need to be added to get the full amount that could be withdrawn.
    * Note 2: The group might have less native deposits than what this returns. TODO: loan origination fees
+   * @returns amount of given native token you can borrow, considering all existing assets as collateral except the deposits for this token, in native token
    */
   getMaxWithdrawWithBorrowForToken(group: Group, mintPk: PublicKey): I80F48 {
     const bank: Bank = group.getFirstBankByMint(mintPk);
@@ -227,6 +275,7 @@ export class MangoAccount {
    * note: slippageAndFeesFactor is a normalized number, <1,
    *  e.g. a slippage of 5% and some fees which are 1%, then slippageAndFeesFactor = 0.94
    *  the factor is used to compute how much target can be obtained by swapping source
+   * @returns max amount of given source native token you can swap to a target token, in native token
    */
   getMaxSourceForTokenSwap(
     group: Group,
@@ -247,6 +296,8 @@ export class MangoAccount {
   /**
    * Simulates new health ratio after applying tokenChanges to the token positions.
    * e.g. useful to simulate health after a potential swap.
+   * Note: health ratio is technically ∞ if liabs are 0
+   * @returns health ratio, in percentage form
    */
   simHealthRatioWithTokenPositionChanges(
     group: Group,
@@ -267,7 +318,7 @@ export class MangoAccount {
    * The remaining native quote margin available for given market.
    *
    * TODO: this is a very bad estimation atm.
-   * It assumes quote asset is always USDC,
+   * It assumes quote asset is always quote,
    * it assumes that there are no interaction effects,
    * it assumes that there are no existing borrows for either of the tokens in the market.
    */
@@ -284,7 +335,7 @@ export class MangoAccount {
    * The remaining native quote margin available for given market.
    *
    * TODO: this is a very bad estimation atm.
-   * It assumes quote asset is always USDC,
+   * It assumes quote asset is always quote,
    * it assumes that there are no interaction effects,
    * it assumes that there are no existing borrows for either of the tokens in the market.
    */
@@ -375,6 +426,10 @@ export class TokenPosition {
   }
 
   public uiDeposits(bank: Bank): number {
+    if (this.indexedPosition && this.indexedPosition.lt(ZERO_I80F48)) {
+      throw new Error(`There are no deposits, rather borrows for ${bank.name}`);
+    }
+
     return nativeI80F48ToUi(
       bank.depositIndex.mul(this.indexedPosition),
       bank.mintDecimals,
@@ -382,6 +437,10 @@ export class TokenPosition {
   }
 
   public uiBorrows(bank: Bank): number {
+    if (this.indexedPosition && this.indexedPosition.gt(ZERO_I80F48)) {
+      throw new Error(`There are no borrows, rather deposits for ${bank.name}`);
+    }
+
     return nativeI80F48ToUi(
       bank.borrowIndex.mul(this.indexedPosition),
       bank.mintDecimals,
