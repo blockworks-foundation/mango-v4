@@ -99,7 +99,13 @@ export class MangoAccount {
     return this.serum3.find((sa) => sa.marketIndex == marketIndex);
   }
 
-  static getEquivalentNativeUsdcPosition(
+  // How to navigate
+  // * if a function is returning a I80F48, then usually the return value is in native quote or native token, unless specified
+  // * if a function is returning a number, then usually the return value is in native tokens, unless specified
+  // * functions try to be explicit by having native or ui in the name to better reflect the value
+  // * some values might appear unexpected large or small, usually the doc contains a "note"
+
+  static getEquivalentUsdcPosition(
     sourceBank: Bank,
     nativeTokenPosition: TokenPosition,
   ): I80F48 {
@@ -112,7 +118,7 @@ export class MangoAccount {
       : ZERO_I80F48;
   }
 
-  static getEquivalentNativeTokenPosition(
+  static getEquivalentTokenPosition(
     targetBank: Bank,
     nativeUsdcPosition: I80F48,
   ): I80F48 {
@@ -121,12 +127,6 @@ export class MangoAccount {
       .div(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
       .mul(I80F48.fromNumber(Math.pow(10, targetBank.mintDecimals)));
   }
-
-  // How to navigate
-  // * if a function is returning a I80F48, then usually the return value is in native quote or native token, unless specified
-  // * if a function is returning a number, then usually the return value is in native tokens, unless specified
-  // * functions try to be explicit by having native or ui in the name to better reflect the value
-  // * some values might appear unexpected large or small, usually the doc contains a "note"
 
   /**
    *
@@ -163,9 +163,9 @@ export class MangoAccount {
    * @param bank
    * @returns UI balance for a token
    */
-  getUi(bank: Bank): number {
+  getTokenBalanceUi(bank: Bank): number {
     const ta = this.findToken(bank.tokenIndex);
-    return ta ? ta.tokenBalanceUi(bank) : 0;
+    return ta ? ta.balanceUi(bank) : 0;
   }
 
   /**
@@ -173,9 +173,9 @@ export class MangoAccount {
    * @param bank
    * @returns UI balance for a token, 0 or more
    */
-  getDepositsUi(bank: Bank): number {
+  getTokenDepositsUi(bank: Bank): number {
     const ta = this.findToken(bank.tokenIndex);
-    return ta ? ta.tokenDepositsUi(bank) : 0;
+    return ta ? ta.depositsUi(bank) : 0;
   }
 
   /**
@@ -183,9 +183,9 @@ export class MangoAccount {
    * @param bank
    * @returns UI balance for a token, 0 or less
    */
-  getBorrowsUi(bank: Bank): number {
+  getTokenBorrowsUi(bank: Bank): number {
     const ta = this.findToken(bank.tokenIndex);
-    return ta ? ta.tokenBorrowsUi(bank) : 0;
+    return ta ? ta.borrowsUi(bank) : 0;
   }
 
   /**
@@ -244,7 +244,7 @@ export class MangoAccount {
    * Sum of all positive assets.
    * @returns assets, in native quote
    */
-  getAssetsVal(healthType: HealthType): I80F48 {
+  getAssetsValue(healthType: HealthType): I80F48 {
     return this.accountData.healthCache.assets(healthType);
   }
 
@@ -252,7 +252,7 @@ export class MangoAccount {
    * Sum of all negative assets.
    * @returns liabs, in native quote
    */
-  getLiabsVal(healthType: HealthType): I80F48 {
+  getLiabsValue(healthType: HealthType): I80F48 {
     return this.accountData.healthCache.liabs(healthType);
   }
 
@@ -265,12 +265,12 @@ export class MangoAccount {
   getMaxWithdrawWithBorrowForToken(group: Group, mintPk: PublicKey): I80F48 {
     const bank: Bank = group.getFirstBankByMint(mintPk);
     const initHealth = (this.accountData as MangoAccountData).initHealth;
-    const inUsdcUnits = MangoAccount.getEquivalentNativeUsdcPosition(
+    const inUsdcUnits = MangoAccount.getEquivalentUsdcPosition(
       bank,
       this.findToken(bank.tokenIndex),
     ).max(ZERO_I80F48);
     const newInitHealth = initHealth.sub(inUsdcUnits.mul(bank.initAssetWeight));
-    return MangoAccount.getEquivalentNativeTokenPosition(
+    return MangoAccount.getEquivalentTokenPosition(
       bank,
       newInitHealth.div(bank.initLiabWeight),
     );
@@ -431,7 +431,7 @@ export class TokenPosition {
    * @param bank
    * @returns position in UI decimals, is signed
    */
-  public tokenBalanceUi(bank: Bank): number {
+  public balanceUi(bank: Bank): number {
     return nativeI80F48ToUi(this.native(bank), bank.mintDecimals).toNumber();
   }
 
@@ -439,7 +439,7 @@ export class TokenPosition {
    * @param bank
    * @returns position in UI decimals, 0 if position has borrows
    */
-  public tokenDepositsUi(bank: Bank): number {
+  public depositsUi(bank: Bank): number {
     if (this.indexedPosition && this.indexedPosition.lt(ZERO_I80F48)) {
       return 0;
     }
@@ -454,7 +454,7 @@ export class TokenPosition {
    * @param bank
    * @returns position in UI decimals, can be 0 or negative, 0 if position has deposits
    */
-  public tokenBorrowsUi(bank: Bank): number {
+  public borrowsUi(bank: Bank): number {
     if (this.indexedPosition && this.indexedPosition.gt(ZERO_I80F48)) {
       return 0;
     }
@@ -472,7 +472,7 @@ export class TokenPosition {
       if (bank) {
         const native = this.native(bank);
         extra += ', native: ' + native.toNumber();
-        extra += ', ui: ' + this.tokenBalanceUi(bank);
+        extra += ', ui: ' + this.balanceUi(bank);
         extra += ', tokenName: ' + bank.name;
       }
     }
