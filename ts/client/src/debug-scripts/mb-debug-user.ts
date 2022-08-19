@@ -34,6 +34,18 @@ async function debugUser(client, group, mangoAccount) {
       mangoAccount.getHealthRatio(HealthType.init).toNumber(),
   );
   console.log(
+    'mangoAccount.getHealthRatioUi(HealthType.init) ' +
+      mangoAccount.getHealthRatioUi(HealthType.init),
+  );
+  console.log(
+    'mangoAccount.getHealthRatio(HealthType.maint) ' +
+      mangoAccount.getHealthRatio(HealthType.maint).toNumber(),
+  );
+  console.log(
+    'mangoAccount.getHealthRatioUi(HealthType.maint) ' +
+      mangoAccount.getHealthRatioUi(HealthType.maint),
+  );
+  console.log(
     'mangoAccount.getCollateralValue() ' +
       toUiDecimalsForQuote(mangoAccount.getCollateralValue().toNumber()),
   );
