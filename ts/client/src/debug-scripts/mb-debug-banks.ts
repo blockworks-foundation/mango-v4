@@ -115,7 +115,7 @@ async function main() {
       `\n ${'cachedTotalBorrows'.padEnd(40)} ${(
         bank as any
       ).cachedIndexedTotalBorrows.mul(bank.borrowIndex)}` +
-      `\n ${'avgUtilization'.padEnd(40)} ${(
+      `\n ${'avgUtilization since last rate update'.padEnd(40)} ${(
         100 * bank.avgUtilization.toNumber()
       ).toFixed(1)}%` +
       `\n ${'rate parameters'.padEnd(40)} ${(
@@ -138,7 +138,13 @@ async function main() {
             await client.program.provider.connection.getAccountInfo(bank.vault)
           ).data,
         )
-        .amount.toNumber()}`;
+        .amount.toNumber()}` +
+      `\n ${'last index update'.padEnd(40)} ${new Date(
+        1000 * bank.indexLastUpdated.toNumber(),
+      )}` +
+      `\n ${'last rates update'.padEnd(40)} ${new Date(
+        1000 * bank.bankRateLastUpdated.toNumber(),
+      )}`;
 
     console.log(`${res}`);
   }
