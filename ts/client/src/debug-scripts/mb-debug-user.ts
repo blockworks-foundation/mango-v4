@@ -15,8 +15,8 @@ async function debugUser(client, group, mangoAccount) {
     'buildFixedAccountRetrieverHealthAccounts ' +
       client
         .buildFixedAccountRetrieverHealthAccounts(group, mangoAccount, [
-          group.banksMap.get('BTC'),
-          group.banksMap.get('USDC'),
+          group.banksMapByName.get('BTC')[0],
+          group.banksMapByName.get('USDC')[0],
         ])
         .map((pk) => pk.toBase58())
         .join(', '),
@@ -38,23 +38,28 @@ async function debugUser(client, group, mangoAccount) {
       toUiDecimalsForQuote(mangoAccount.getCollateralValue().toNumber()),
   );
   console.log(
-    'mangoAccount.getAssetsVal() ' +
+    'mangoAccount.getAssetsValue() ' +
       toUiDecimalsForQuote(
-        mangoAccount.getAssetsVal(HealthType.init).toNumber(),
+        mangoAccount.getAssetsValue(HealthType.init).toNumber(),
       ),
   );
   console.log(
-    'mangoAccount.getLiabsVal() ' +
+    'mangoAccount.getLiabsValue() ' +
       toUiDecimalsForQuote(
-        mangoAccount.getLiabsVal(HealthType.init).toNumber(),
+        mangoAccount.getLiabsValue(HealthType.init).toNumber(),
       ),
   );
+
+  console.log(group.banksMapByName.get('SOL')[0].mint.toBase58());
 
   console.log(
     "mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL') " +
       toUiDecimalsForQuote(
         (
-          await mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL')
+          await mangoAccount.getMaxWithdrawWithBorrowForToken(
+            group,
+            group.banksMapByName.get('SOL')[0].mint,
+          )
         ).toNumber(),
       ),
   );
@@ -64,14 +69,16 @@ async function debugUser(client, group, mangoAccount) {
       (
         await mangoAccount.simHealthRatioWithTokenPositionChanges(group, [
           {
-            tokenName: 'USDC',
+            mintPk: group.banksMapByName.get('USDC')[0].mint,
             tokenAmount:
-              -95_000 * Math.pow(10, group.banksMap.get('USDC')!.mintDecimals!),
+              -95_000 *
+              Math.pow(10, group.banksMapByName.get('USDC')[0]!.mintDecimals!),
           },
           {
-            tokenName: 'BTC',
+            mintPk: group.banksMapByName.get('BTC')[0].mint,
             tokenAmount:
-              4 * Math.pow(10, group.banksMap.get('BTC')!.mintDecimals!),
+              4 *
+              Math.pow(10, group.banksMapByName.get('BTC')[0]!.mintDecimals!),
           },
         ])
       ).toNumber(),
@@ -81,10 +88,15 @@ async function debugUser(client, group, mangoAccount) {
     console.log(
       `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
         mangoAccount
-          .getMaxSourceForTokenSwap(group, src, tgt, 0.9)
+          .getMaxSourceForTokenSwap(
+            group,
+            group.banksMapByName.get(src)[0].mint,
+            group.banksMapByName.get(tgt)[0].mint,
+            0.9,
+          )
           .div(
             I80F48.fromNumber(
-              Math.pow(10, group.banksMap.get(src).mintDecimals),
+              Math.pow(10, group.banksMapByName.get(src)[0].mintDecimals),
             ),
           )
           .toNumber(),
