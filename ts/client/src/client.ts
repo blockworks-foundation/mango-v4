@@ -1830,6 +1830,7 @@ export class MangoClient {
     const allTokenIndices = mangoAccount.tokens.map(
       (token) => token.tokenIndex,
     );
+
     if (banks) {
       for (const bank of banks) {
         if (allTokenIndices.indexOf(bank.tokenIndex) < 0) {
