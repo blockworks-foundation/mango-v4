@@ -49,7 +49,7 @@ pub struct MangoAccount {
     // Alternative authority/signer of transactions for a mango account
     pub delegate: Pubkey,
 
-    pub account_num: u8,
+    pub account_num: u32,
 
     /// Tracks that this account should be liquidated until init_health >= 0.
     ///
@@ -58,11 +58,11 @@ pub struct MangoAccount {
     /// set this flag. Now the account may be liquidated until init_health >= 0.
     being_liquidated: u8,
 
-    padding5: u8,
+    padding2: u8,
 
     pub bump: u8,
 
-    pub padding: [u8; 4],
+    pub padding: [u8; 1],
 
     // Cumulative (deposits - withdraws)
     // using USD prices at the time of the deposit/withdraw
@@ -76,19 +76,19 @@ pub struct MangoAccount {
 
     // dynamic
     pub header_version: u8,
-    pub padding0: [u8; 7],
+    pub padding3: [u8; 7],
     // note: padding is required for TokenPosition, etc. to be aligned
-    pub padding1: u32,
+    pub padding4: u32,
     // Maps token_index -> deposit/borrow account for each token
     // that is active on this MangoAccount.
     pub tokens: Vec<TokenPosition>,
-    pub padding2: u32,
+    pub padding5: u32,
     // Maps serum_market_index -> open orders for each serum market
     // that is active on this MangoAccount.
     pub serum3: Vec<Serum3Orders>,
-    pub padding3: u32,
+    pub padding6: u32,
     pub perps: Vec<PerpPositions>,
-    pub padding4: u32,
+    pub padding7: u32,
     pub perp_open_orders: Vec<PerpOpenOrders>,
 }
 
@@ -100,7 +100,7 @@ impl Default for MangoAccount {
             owner: Pubkey::default(),
             delegate: Pubkey::default(),
             being_liquidated: 0,
-            padding5: 0,
+            padding2: 0,
             account_num: 0,
             bump: 0,
             padding: Default::default(),
@@ -108,14 +108,14 @@ impl Default for MangoAccount {
             net_settled: 0,
             reserved: [0; 248],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
-            padding0: Default::default(),
-            padding1: Default::default(),
-            tokens: vec![TokenPosition::default(); 3],
-            padding2: Default::default(),
-            serum3: vec![Serum3Orders::default(); 5],
             padding3: Default::default(),
-            perps: vec![PerpPositions::default(); 2],
             padding4: Default::default(),
+            tokens: vec![TokenPosition::default(); 3],
+            padding5: Default::default(),
+            serum3: vec![Serum3Orders::default(); 5],
+            padding6: Default::default(),
+            perps: vec![PerpPositions::default(); 2],
+            padding7: Default::default(),
             perp_open_orders: vec![PerpOpenOrders::default(); 2],
         }
     }
@@ -172,17 +172,52 @@ impl MangoAccount {
 }
 
 #[test]
-fn test_dynamic_offsets() {
+fn test_serialization_match() {
     let mut account = MangoAccount::default();
+    account.group = Pubkey::new_unique();
+    account.owner = Pubkey::new_unique();
+    account.name = crate::util::fill_from_str("abcdef").unwrap();
+    account.delegate = Pubkey::new_unique();
+    account.account_num = 1;
+    account.bump = 2;
+    account.net_deposits = 3;
+    account.net_settled = 4;
     account.tokens.resize(8, TokenPosition::default());
+    account.tokens[0].token_index = 5;
     account.serum3.resize(8, Serum3Orders::default());
+    account.serum3[0].open_orders = Pubkey::new_unique();
     account.perps.resize(8, PerpPositions::default());
+    account.perps[0].market_index = 6;
     account
         .perp_open_orders
         .resize(8, PerpOpenOrders::default());
+
+    let account_bytes = AnchorSerialize::try_to_vec(&account).unwrap();
     assert_eq!(
-        8 + AnchorSerialize::try_to_vec(&account).unwrap().len(),
+        8 + account_bytes.len(),
         MangoAccount::space(8, 8, 8, 8).unwrap()
+    );
+
+    let account2 = MangoAccountValue::from_bytes(&account_bytes).unwrap();
+    assert_eq!(account.group, account2.fixed.group);
+    assert_eq!(account.owner, account2.fixed.owner);
+    assert_eq!(account.name, account2.fixed.name);
+    assert_eq!(account.delegate, account2.fixed.delegate);
+    assert_eq!(account.account_num, account2.fixed.account_num);
+    assert_eq!(account.bump, account2.fixed.bump);
+    assert_eq!(account.net_deposits, account2.fixed.net_deposits);
+    assert_eq!(account.net_settled, account2.fixed.net_settled);
+    assert_eq!(
+        account.tokens[0].token_index,
+        account2.token_get_raw(0).token_index
+    );
+    assert_eq!(
+        account.serum3[0].open_orders,
+        account2.serum3_get_raw(0).open_orders
+    );
+    assert_eq!(
+        account.perps[0].market_index,
+        account2.perp_get_raw(0).market_index
     );
 }
 
