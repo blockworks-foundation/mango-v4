@@ -8,7 +8,15 @@
 
 Devnet deployment - m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD
 
-TS client based examples
+For testing latest program changes while developing,
+just run below scripts in given order form any branch,
+these set of scripts should more or less always work,
+bump up GROUP_NUM if you unsure if previous GROUP_NUM has not been cleanly closed or setup with older program code
 
-- ts/client/src/scripts/example1-admin.ts
-- ts/client/src/scripts/example1-user.ts
+```
+./release-to-devnet.sh
+GROUP_NUM=4 yarn ts-node ts/client/src/scripts/devnet-admin.ts
+GROUP_NUM=4 yarn ts-node ts/client/src/scripts/devnet-user.ts
+GROUP_NUM=4 yarn ts-node ts/client/src/scripts/devnet-user-close-account.ts
+GROUP_NUM=4 yarn ts-node ts/client/src/scripts/devnet-admin-close.ts
+```

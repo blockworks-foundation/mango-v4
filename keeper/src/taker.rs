@@ -77,7 +77,7 @@ fn ensure_oo(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> {
     let account = mango_client.mango_account()?;
 
     for (market_index, serum3_market) in mango_client.context.serum3_markets.iter() {
-        if account.serum3_find(*market_index).is_none() {
+        if account.serum3_orders(*market_index).is_none() {
             mango_client.serum3_create_open_orders(serum3_market.market.name())?;
         }
     }
@@ -92,7 +92,7 @@ fn ensure_deposit(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> 
         let bank = mango_client.first_bank(token_index)?;
         let desired_balance = I80F48::from_num(10_000 * 10u64.pow(bank.mint_decimals as u32));
 
-        let token_account_opt = mango_account.token_find(token_index);
+        let token_account_opt = mango_account.token_position(token_index).ok();
 
         let deposit_native = match token_account_opt {
             Some(token_account) => {

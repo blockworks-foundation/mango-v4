@@ -2991,17 +2991,21 @@ export type MangoV4 = {
           },
           {
             "name": "accountNum",
-            "type": "u8"
+            "type": "u32"
           },
           {
             "name": "beingLiquidated",
             "docs": [
-              "This account cannot open new positions or borrow until `init_health >= 0`"
+              "Tracks that this account should be liquidated until init_health >= 0.",
+              "",
+              "Normally accounts can not be liquidated while maint_health >= 0. But when an account",
+              "reaches maint_health < 0, liquidators will call a liquidation instruction and thereby",
+              "set this flag. Now the account may be liquidated until init_health >= 0."
             ],
             "type": "u8"
           },
           {
-            "name": "padding5",
+            "name": "padding2",
             "type": "u8"
           },
           {
@@ -3013,7 +3017,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                4
+                1
               ]
             }
           },
@@ -3039,7 +3043,7 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding0",
+            "name": "padding3",
             "type": {
               "array": [
                 "u8",
@@ -3048,7 +3052,7 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "padding1",
+            "name": "padding4",
             "type": "u32"
           },
           {
@@ -3060,7 +3064,7 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "padding2",
+            "name": "padding5",
             "type": "u32"
           },
           {
@@ -3072,19 +3076,19 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "padding3",
+            "name": "padding6",
             "type": "u32"
           },
           {
             "name": "perps",
             "type": {
               "vec": {
-                "defined": "PerpPositions"
+                "defined": "PerpPosition"
               }
             }
           },
           {
-            "name": "padding4",
+            "name": "padding7",
             "type": "u32"
           },
           {
@@ -3974,7 +3978,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "PerpPositions",
+      "name": "PerpPosition",
       "type": {
         "kind": "struct",
         "fields": [
@@ -8176,17 +8180,21 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "accountNum",
-            "type": "u8"
+            "type": "u32"
           },
           {
             "name": "beingLiquidated",
             "docs": [
-              "This account cannot open new positions or borrow until `init_health >= 0`"
+              "Tracks that this account should be liquidated until init_health >= 0.",
+              "",
+              "Normally accounts can not be liquidated while maint_health >= 0. But when an account",
+              "reaches maint_health < 0, liquidators will call a liquidation instruction and thereby",
+              "set this flag. Now the account may be liquidated until init_health >= 0."
             ],
             "type": "u8"
           },
           {
-            "name": "padding5",
+            "name": "padding2",
             "type": "u8"
           },
           {
@@ -8198,7 +8206,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                4
+                1
               ]
             }
           },
@@ -8224,7 +8232,7 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding0",
+            "name": "padding3",
             "type": {
               "array": [
                 "u8",
@@ -8233,7 +8241,7 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "padding1",
+            "name": "padding4",
             "type": "u32"
           },
           {
@@ -8245,7 +8253,7 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "padding2",
+            "name": "padding5",
             "type": "u32"
           },
           {
@@ -8257,19 +8265,19 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "padding3",
+            "name": "padding6",
             "type": "u32"
           },
           {
             "name": "perps",
             "type": {
               "vec": {
-                "defined": "PerpPositions"
+                "defined": "PerpPosition"
               }
             }
           },
           {
-            "name": "padding4",
+            "name": "padding7",
             "type": "u32"
           },
           {
@@ -9159,7 +9167,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "PerpPositions",
+      "name": "PerpPosition",
       "type": {
         "kind": "struct",
         "fields": [

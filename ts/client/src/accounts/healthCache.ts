@@ -1,3 +1,4 @@
+import { PublicKey } from '@solana/web3.js';
 import _ from 'lodash';
 import { Bank } from './bank';
 import { Group } from './group';
@@ -173,12 +174,15 @@ export class HealthCache {
 
   simHealthRatioWithTokenPositionChanges(
     group: Group,
-    tokenChanges: { tokenName: string; tokenAmount: number }[],
+    tokenChanges: {
+      tokenAmount: number;
+      mintPk: PublicKey;
+    }[],
     healthType: HealthType = HealthType.init,
   ): I80F48 {
     const adjustedCache: HealthCache = _.cloneDeep(this);
     for (const change of tokenChanges) {
-      const bank = group.banksMap.get(change.tokenName);
+      const bank: Bank = group.getFirstBankByMint(change.mintPk);
       const changeIndex = adjustedCache.getOrCreateTokenInfoIndex(bank);
       adjustedCache.tokenInfos[changeIndex].balance = adjustedCache.tokenInfos[
         changeIndex
@@ -189,12 +193,29 @@ export class HealthCache {
 
   getMaxSourceForTokenSwap(
     group: Group,
-    sourceTokenName: string,
-    targetTokenName: string,
+    sourceMintPk: PublicKey,
+    targetMintPk: PublicKey,
     minRatio: I80F48,
   ): I80F48 {
-    const sourceBank = group.banksMap.get(sourceTokenName);
-    const targetBank = group.banksMap.get(targetTokenName);
+    const sourceBank: Bank = group.getFirstBankByMint(sourceMintPk);
+    const targetBank: Bank = group.getFirstBankByMint(targetMintPk);
+
+    if (sourceMintPk.equals(targetMintPk)) {
+      return ZERO_I80F48;
+    }
+
+    if (!sourceBank.price || sourceBank.price.lte(ZERO_I80F48)) {
+      return ZERO_I80F48;
+    }
+
+    if (
+      sourceBank.initLiabWeight
+        .sub(targetBank.initAssetWeight)
+        .abs()
+        .lte(ZERO_I80F48)
+    ) {
+      return ZERO_I80F48;
+    }
 
     // The health_ratio is a nonlinear based on swap amount.
     // For large swap amounts the slope is guaranteed to be negative, but small amounts
@@ -346,7 +367,7 @@ export class HealthCache {
       .div(source.oraclePrice)
       .mul(
         ONE_I80F48.sub(
-          group.banksMap.get(sourceTokenName).loanOriginationFeeRate,
+          group.getFirstBankByMint(sourceMintPk).loanOriginationFeeRate,
         ),
       );
   }

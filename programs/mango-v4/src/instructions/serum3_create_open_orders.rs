@@ -53,7 +53,7 @@ pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result
         MangoError::SomeError
     );
 
-    let serum_account = account.serum3_create(serum_market.market_index)?;
+    let serum_account = account.create_serum3_orders(serum_market.market_index)?;
     serum_account.open_orders = ctx.accounts.open_orders.key();
     serum_account.base_token_index = serum_market.base_token_index;
     serum_account.quote_token_index = serum_market.quote_token_index;
@@ -61,9 +61,9 @@ pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result
     // Make it so that the token_account_map for the base and quote currency
     // stay permanently blocked. Otherwise users may end up in situations where
     // they can't settle a market because they don't have free token_account_map!
-    let (quote_position, _, _) = account.token_get_mut_or_create(serum_market.quote_token_index)?;
+    let (quote_position, _, _) = account.ensure_token_position(serum_market.quote_token_index)?;
     quote_position.in_use_count += 1;
-    let (base_position, _, _) = account.token_get_mut_or_create(serum_market.base_token_index)?;
+    let (base_position, _, _) = account.ensure_token_position(serum_market.base_token_index)?;
     base_position.in_use_count += 1;
 
     Ok(())

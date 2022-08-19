@@ -46,7 +46,7 @@ pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<(
     // Validate open_orders
     require!(
         account
-            .serum3_find(serum_market.market_index)
+            .serum3_orders(serum_market.market_index)
             .ok_or_else(|| error!(MangoError::SomeError))?
             .open_orders
             == ctx.accounts.open_orders.key(),
@@ -59,7 +59,7 @@ pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<(
     cpi_close_open_orders(ctx.accounts)?;
 
     // TODO: decrement in_use_count on the base token and quote token
-    account.serum3_deactivate(serum_market.market_index)?;
+    account.deactivate_serum3_orders(serum_market.market_index)?;
 
     Ok(())
 }

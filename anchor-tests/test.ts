@@ -101,6 +101,7 @@ describe('mango-v4', () => {
 
   it('Initialize group and users', async () => {
     console.log(`provider ${envProviderWallet.publicKey.toString()}`);
+    console.log(`program id ${programId.toString()}`);
 
     mintsMap = await createMints(program, envProviderPayer, envProviderWallet);
     users = await createUsers(mintsMap, envProviderPayer, envProvider);
@@ -111,7 +112,13 @@ describe('mango-v4', () => {
 
     // Passing devnet as the cluster here - client cannot accept localnet
     // I think this is only for getting the serum market though?
-    envClient = await MangoClient.connect(envProvider, 'devnet', programId);
+    envClient = await MangoClient.connect(
+      envProvider,
+      'devnet',
+      programId,
+      {},
+      'get-program-accounts',
+    );
     await envClient.groupCreate(groupNum, false, 1, insuranceMintPk);
     group = await envClient.getGroupForCreator(adminPk, groupNum);
 
@@ -205,6 +212,8 @@ describe('mango-v4', () => {
       ),
       'devnet',
       programId,
+      {},
+      'get-program-accounts',
     );
 
     const mangoAccount = await client.getOrCreateMangoAccount(
@@ -213,16 +222,38 @@ describe('mango-v4', () => {
     );
     await mangoAccount.reload(client, group);
 
-    await client.tokenDeposit(group, mangoAccount, 'USDC', 100.5);
+    await client.tokenDeposit(
+      group,
+      mangoAccount,
+      mintsMap.USDC!.publicKey,
+      100.5,
+    );
     await mangoAccount.reload(client, group);
 
-    await client.tokenDeposit(group, mangoAccount, 'BTC', 50.5);
+    await client.tokenDeposit(
+      group,
+      mangoAccount,
+      mintsMap.BTC!.publicKey,
+      50.5,
+    );
     await mangoAccount.reload(client, group);
 
-    await client.tokenWithdraw(group, mangoAccount, 'USDC', 100, false);
+    await client.tokenWithdraw(
+      group,
+      mangoAccount,
+      mintsMap.USDC!.publicKey,
+      100,
+      false,
+    );
     await mangoAccount.reload(client, group);
 
-    await client.tokenWithdraw(group, mangoAccount, 'BTC', 50, false);
+    await client.tokenWithdraw(
+      group,
+      mangoAccount,
+      mintsMap.BTC!.publicKey,
+      50,
+      false,
+    );
     await mangoAccount.reload(client, group);
   });
 
@@ -235,6 +266,8 @@ describe('mango-v4', () => {
       ),
       'devnet',
       programId,
+      {},
+      'get-program-accounts',
     );
     const clientB = await MangoClient.connect(
       new anchor.AnchorProvider(
@@ -244,6 +277,8 @@ describe('mango-v4', () => {
       ),
       'devnet',
       programId,
+      {},
+      'get-program-accounts',
     );
 
     const mangoAccountA = await clientA.getOrCreateMangoAccount(
@@ -261,14 +296,35 @@ describe('mango-v4', () => {
     await envClient.stubOracleSet(group, btcOracle.publicKey, 100);
 
     // Initialize liquidator
-    await clientA.tokenDeposit(group, mangoAccountA, 'USDC', 1000);
-    await clientA.tokenDeposit(group, mangoAccountA, 'BTC', 100);
+    await clientA.tokenDeposit(
+      group,
+      mangoAccountA,
+      mintsMap.USDC!.publicKey,
+      1000,
+    );
+    await clientA.tokenDeposit(
+      group,
+      mangoAccountA,
+      mintsMap.BTC!.publicKey,
+      100,
+    );
 
     // Deposit collateral
-    await clientB.tokenDeposit(group, mangoAccountB, 'BTC', 100);
+    await clientB.tokenDeposit(
+      group,
+      mangoAccountB,
+      mintsMap.BTC!.publicKey,
+      100,
+    );
     await mangoAccountB.reload(clientB, group);
     // // Borrow
-    await clientB.tokenWithdraw(group, mangoAccountB, 'USDC', 200, true);
+    await clientB.tokenWithdraw(
+      group,
+      mangoAccountB,
+      mintsMap.USDC!.publicKey,
+      200,
+      true,
+    );
     // // Set price so health is below maintanence
     await envClient.stubOracleSet(group, btcOracle.publicKey, 1);
 
@@ -278,13 +334,13 @@ describe('mango-v4', () => {
       group,
       mangoAccountA,
       mangoAccountB,
-      'BTC',
-      'USDC',
+      mintsMap.BTC!.publicKey,
+      mintsMap.USDC!.publicKey,
       1000,
     );
   });
 
   it('update index and rate', async () => {
-    envClient.updateIndexAndRate(group, 'USDC');
+    envClient.updateIndexAndRate(group, mintsMap.USDC!.publicKey);
   });
 });

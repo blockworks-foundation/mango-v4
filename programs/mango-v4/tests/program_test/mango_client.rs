@@ -181,19 +181,19 @@ async fn derive_health_check_remaining_account_metas(
     if let Some(affected_bank) = affected_bank {
         let bank: Bank = account_loader.load(&affected_bank).await.unwrap();
         adjusted_account
-            .token_get_mut_or_create(bank.token_index)
+            .ensure_token_position(bank.token_index)
             .unwrap();
     }
     if let Some(affected_perp_market_index) = affected_perp_market_index {
         adjusted_account
-            .perp_get_account_mut_or_create(affected_perp_market_index)
+            .ensure_perp_position(affected_perp_market_index)
             .unwrap();
     }
 
     // figure out all the banks/oracles that need to be passed for the health check
     let mut banks = vec![];
     let mut oracles = vec![];
-    for position in adjusted_account.token_iter_active() {
+    for position in adjusted_account.active_token_positions() {
         let mint_info =
             get_mint_info_by_token_index(account_loader, account, position.token_index).await;
         banks.push(mint_info.first_bank());
@@ -201,10 +201,10 @@ async fn derive_health_check_remaining_account_metas(
     }
 
     let perp_markets = adjusted_account
-        .perp_iter_active_accounts()
+        .active_perp_positions()
         .map(|perp| get_perp_market_address_by_index(account.fixed.group, perp.market_index));
 
-    let serum_oos = account.serum3_iter_active().map(|&s| s.open_orders);
+    let serum_oos = account.active_serum3_orders().map(|&s| s.open_orders);
 
     let to_account_meta = |pubkey| AccountMeta {
         pubkey,
@@ -237,8 +237,8 @@ async fn derive_liquidation_remaining_account_metas(
     let mut banks = vec![];
     let mut oracles = vec![];
     let token_indexes = liqee
-        .token_iter_active()
-        .chain(liqor.token_iter_active())
+        .active_token_positions()
+        .chain(liqor.active_token_positions())
         .map(|ta| ta.token_index)
         .unique();
     for token_index in token_indexes {
@@ -255,14 +255,14 @@ async fn derive_liquidation_remaining_account_metas(
     }
 
     let perp_markets = liqee
-        .perp_iter_active_accounts()
-        .chain(liqee.perp_iter_active_accounts())
+        .active_perp_positions()
+        .chain(liqee.active_perp_positions())
         .map(|perp| get_perp_market_address_by_index(liqee.fixed.group, perp.market_index))
         .unique();
 
     let serum_oos = liqee
-        .serum3_iter_active()
-        .chain(liqor.serum3_iter_active())
+        .active_serum3_orders()
+        .chain(liqor.active_serum3_orders())
         .map(|&s| s.open_orders);
 
     let to_account_meta = |pubkey| AccountMeta {
@@ -297,7 +297,7 @@ pub async fn account_position(solana: &SolanaCookie, account: Pubkey, bank: Pubk
     let account_data = get_mango_account(solana, account).await;
     let bank_data: Bank = solana.get_account(bank).await;
     let native = account_data
-        .token_find(bank_data.token_index)
+        .token_position(bank_data.token_index)
         .unwrap()
         .native(&bank_data);
     native.round().to_num::<i64>()
@@ -306,14 +306,14 @@ pub async fn account_position(solana: &SolanaCookie, account: Pubkey, bank: Pubk
 pub async fn account_position_closed(solana: &SolanaCookie, account: Pubkey, bank: Pubkey) -> bool {
     let account_data = get_mango_account(solana, account).await;
     let bank_data: Bank = solana.get_account(bank).await;
-    account_data.token_find(bank_data.token_index).is_none()
+    account_data.token_position(bank_data.token_index).is_err()
 }
 
 pub async fn account_position_f64(solana: &SolanaCookie, account: Pubkey, bank: Pubkey) -> f64 {
     let account_data = get_mango_account(solana, account).await;
     let bank_data: Bank = solana.get_account(bank).await;
     let native = account_data
-        .token_find(bank_data.token_index)
+        .token_position(bank_data.token_index)
         .unwrap()
         .native(&bank_data);
     native.to_num::<f64>()
@@ -1527,7 +1527,7 @@ impl<'keypair> ClientInstruction for Serum3PlaceOrderInstruction<'keypair> {
             .unwrap();
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum3_find(serum_market.market_index)
+            .serum3_orders(serum_market.market_index)
             .unwrap()
             .open_orders;
         let quote_info =
@@ -1629,7 +1629,7 @@ impl<'keypair> ClientInstruction for Serum3CancelOrderInstruction<'keypair> {
             .unwrap();
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum3_find(serum_market.market_index)
+            .serum3_orders(serum_market.market_index)
             .unwrap()
             .open_orders;
 
@@ -1690,7 +1690,7 @@ impl<'keypair> ClientInstruction for Serum3CancelAllOrdersInstruction<'keypair> 
             .unwrap();
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum3_find(serum_market.market_index)
+            .serum3_orders(serum_market.market_index)
             .unwrap()
             .open_orders;
 
@@ -1751,7 +1751,7 @@ impl<'keypair> ClientInstruction for Serum3SettleFundsInstruction<'keypair> {
             .unwrap();
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum3_find(serum_market.market_index)
+            .serum3_orders(serum_market.market_index)
             .unwrap()
             .open_orders;
         let quote_info =
@@ -1827,7 +1827,7 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
             .unwrap();
         let serum_market: Serum3Market = account_loader.load(&self.serum_market).await.unwrap();
         let open_orders = account
-            .serum3_find(serum_market.market_index)
+            .serum3_orders(serum_market.market_index)
             .unwrap()
             .open_orders;
         let quote_info =

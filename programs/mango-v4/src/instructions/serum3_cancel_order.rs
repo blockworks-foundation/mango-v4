@@ -67,7 +67,7 @@ pub fn serum3_cancel_order(
         // Validate open_orders
         require!(
             account
-                .serum3_find(serum_market.market_index)
+                .serum3_orders(serum_market.market_index)
                 .ok_or_else(|| error!(MangoError::SomeError))?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
@@ -111,7 +111,7 @@ pub fn decrease_maybe_loan(
     before_oo: &OpenOrdersSlim,
     after_oo: &OpenOrdersSlim,
 ) {
-    let serum3_account = account.serum3_find_mut(market_index).unwrap();
+    let serum3_account = account.serum3_orders_mut(market_index).unwrap();
 
     if after_oo.native_coin_free > before_oo.native_coin_free {
         let native_coin_free_increase = after_oo.native_coin_free - before_oo.native_coin_free;

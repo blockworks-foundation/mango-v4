@@ -63,9 +63,9 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
     ais: &'a [AccountInfo<'info>],
     account: &MangoAccountRef,
 ) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
-    let active_token_len = account.token_iter_active().count();
-    let active_serum3_len = account.serum3_iter_active().count();
-    let active_perp_len = account.perp_iter_active_accounts().count();
+    let active_token_len = account.active_token_positions().count();
+    let active_serum3_len = account.active_serum3_orders().count();
+    let active_perp_len = account.active_perp_positions().count();
     let expected_ais = cm!(active_token_len * 2 // banks + oracles
         + active_perp_len // PerpMarkets
         + active_serum3_len); // open_orders
@@ -787,7 +787,7 @@ pub fn new_health_cache(
     // token contribution from token accounts
     let mut token_infos = vec![];
 
-    for (i, position) in account.token_iter_active().enumerate() {
+    for (i, position) in account.active_token_positions().enumerate() {
         let (bank, oracle_price) =
             retriever.bank_and_oracle(&account.fixed.group, i, position.token_index)?;
 
@@ -810,7 +810,7 @@ pub fn new_health_cache(
     // Fill the TokenInfo balance with free funds in serum3 oo accounts, and fill
     // the serum3_max_reserved with their reserved funds. Also build Serum3Infos.
     let mut serum3_infos = vec![];
-    for (i, serum_account) in account.serum3_iter_active().enumerate() {
+    for (i, serum_account) in account.active_serum3_orders().enumerate() {
         let oo = retriever.serum_oo(i, &serum_account.open_orders)?;
 
         // find the TokenInfos for the market's base and quote tokens
@@ -847,8 +847,8 @@ pub fn new_health_cache(
 
     // TODO: also account for perp funding in health
     // health contribution from perp accounts
-    let mut perp_infos = Vec::with_capacity(account.perp_iter_active_accounts().count());
-    for (i, perp_account) in account.perp_iter_active_accounts().enumerate() {
+    let mut perp_infos = Vec::with_capacity(account.active_perp_positions().count());
+    for (i, perp_account) in account.active_perp_positions().enumerate() {
         let perp_market =
             retriever.perp_market(&account.fixed.group, i, perp_account.market_index)?;
 
@@ -1074,20 +1074,20 @@ mod tests {
         bank1
             .data()
             .deposit(
-                account.token_get_mut_or_create(1).unwrap().0,
+                account.ensure_token_position(1).unwrap().0,
                 I80F48::from(100),
             )
             .unwrap();
         bank2
             .data()
             .withdraw_without_fee(
-                account.token_get_mut_or_create(4).unwrap().0,
+                account.ensure_token_position(4).unwrap().0,
                 I80F48::from(10),
             )
             .unwrap();
 
         let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
-        let serum3account = account.serum3_create(2).unwrap();
+        let serum3account = account.create_serum3_orders(2).unwrap();
         serum3account.open_orders = oo1.pubkey;
         serum3account.base_token_index = 4;
         serum3account.quote_token_index = 1;
@@ -1107,7 +1107,7 @@ mod tests {
         perp1.data().maint_liab_weight = I80F48::from_num(1.0 + 0.1f64);
         perp1.data().quote_lot_size = 100;
         perp1.data().base_lot_size = 10;
-        let perpaccount = account.perp_get_account_mut_or_create(9).unwrap().0;
+        let perpaccount = account.ensure_perp_position(9).unwrap().0;
         perpaccount.base_position_lots = 3;
         perpaccount.quote_position_native = -I80F48::from(310u16);
         perpaccount.bids_base_lots = 7;
@@ -1254,27 +1254,27 @@ mod tests {
         bank1
             .data()
             .change_without_fee(
-                account.token_get_mut_or_create(1).unwrap().0,
+                account.ensure_token_position(1).unwrap().0,
                 I80F48::from(testcase.token1),
             )
             .unwrap();
         bank2
             .data()
             .change_without_fee(
-                account.token_get_mut_or_create(4).unwrap().0,
+                account.ensure_token_position(4).unwrap().0,
                 I80F48::from(testcase.token2),
             )
             .unwrap();
         bank3
             .data()
             .change_without_fee(
-                account.token_get_mut_or_create(5).unwrap().0,
+                account.ensure_token_position(5).unwrap().0,
                 I80F48::from(testcase.token3),
             )
             .unwrap();
 
         let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
-        let serum3account1 = account.serum3_create(2).unwrap();
+        let serum3account1 = account.create_serum3_orders(2).unwrap();
         serum3account1.open_orders = oo1.pubkey;
         serum3account1.base_token_index = 4;
         serum3account1.quote_token_index = 1;
@@ -1282,7 +1282,7 @@ mod tests {
         oo1.data().native_coin_total = testcase.oo_1_2.1;
 
         let mut oo2 = TestAccount::<OpenOrders>::new_zeroed();
-        let serum3account2 = account.serum3_create(3).unwrap();
+        let serum3account2 = account.create_serum3_orders(3).unwrap();
         serum3account2.open_orders = oo2.pubkey;
         serum3account2.base_token_index = 5;
         serum3account2.quote_token_index = 1;
@@ -1299,7 +1299,7 @@ mod tests {
         perp1.data().maint_liab_weight = I80F48::from_num(1.0 + 0.1f64);
         perp1.data().quote_lot_size = 100;
         perp1.data().base_lot_size = 10;
-        let perpaccount = account.perp_get_account_mut_or_create(9).unwrap().0;
+        let perpaccount = account.ensure_perp_position(9).unwrap().0;
         perpaccount.base_position_lots = testcase.perp1.0;
         perpaccount.quote_position_native = I80F48::from(testcase.perp1.1);
         perpaccount.bids_base_lots = testcase.perp1.2;

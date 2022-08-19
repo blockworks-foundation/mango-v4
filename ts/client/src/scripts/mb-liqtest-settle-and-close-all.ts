@@ -9,17 +9,20 @@ import { MANGO_V4_ID } from '../constants';
 // by MANGO_MAINNET_PAYER_KEYPAIR in the group.
 //
 
-const GROUP_NUM = Number(process.env.GROUP_NUM || 1);
+const GROUP_NUM = Number(process.env.GROUP_NUM || 2);
+const CLUSTER_URL =
+  process.env.CLUSTER_URL ||
+  'https://mango.rpcpool.com/946ef7337da3f5b8d3e4a34e7f88';
+const MANGO_MAINNET_PAYER_KEYPAIR =
+  process.env.MANGO_MAINNET_PAYER_KEYPAIR || '';
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.CLUSTER_URL, options);
+  const connection = new Connection(CLUSTER_URL, options);
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(
-        fs.readFileSync(process.env.MANGO_MAINNET_PAYER_KEYPAIR!, 'utf-8'),
-      ),
+      JSON.parse(fs.readFileSync(MANGO_MAINNET_PAYER_KEYPAIR, 'utf-8')),
     ),
   );
   const userWallet = new Wallet(admin);
@@ -31,6 +34,12 @@ async function main() {
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
+  // const groups = await client.getGroupsForCreator(admin.publicKey);
+  // console.log(
+  //   'groups: ',
+  //   groups.map((g) => g.publicKey.toString() + '  ' + g.groupNum.toString()),
+  // );
+
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(group.toString());
 
@@ -40,14 +49,14 @@ async function main() {
 
     // first, settle all borrows
     for (let token of account.tokensActive()) {
-      const bank = group.findBank(token.tokenIndex);
+      const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
       const amount = token.native(bank).toNumber();
       if (amount < 0) {
         try {
           await client.tokenDepositNative(
             group,
             account,
-            bank.name,
+            bank.mint,
             Math.ceil(-amount),
           );
           await account.reload(client, group);
@@ -66,7 +75,7 @@ async function main() {
 
     // withdraw all funds
     for (let token of account.tokensActive()) {
-      const bank = group.findBank(token.tokenIndex);
+      const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
       const amount = token.native(bank).toNumber();
       if (amount > 0) {
         try {
@@ -74,7 +83,7 @@ async function main() {
           await client.tokenWithdrawNative(
             group,
             account,
-            bank.name,
+            bank.mint,
             amount,
             allowBorrow,
           );

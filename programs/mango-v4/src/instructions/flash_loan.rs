@@ -225,11 +225,12 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         })?;
     let vaults_index = remaining_len - 2 * vaults_len - 1;
 
-    // First initialize to the remaining delegated amount
     let health_ais = &ctx.remaining_accounts[..vaults_index];
     let vaults = &ctx.remaining_accounts[vaults_index..vaults_index + vaults_len];
     let token_accounts =
         &ctx.remaining_accounts[vaults_index + vaults_len..vaults_index + 2 * vaults_len];
+
+    // Verify that each mentioned vault has a bank in the health accounts
     let mut vaults_with_banks = vec![false; vaults.len()];
 
     // Loop over the banks, finding matching vaults
@@ -264,7 +265,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         require_neq!(bank.flash_loan_token_account_initial, u64::MAX);
 
         // Create the token position now, so we can compute the pre-health with fixed order health accounts
-        let (_, raw_token_index, _) = account.token_get_mut_or_create(bank.token_index)?;
+        let (_, raw_token_index, _) = account.ensure_token_position(bank.token_index)?;
 
         // Transfer any excess over the inital balance of the token account back
         // into the vault. Compute the total change in the vault balance.
@@ -313,13 +314,9 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         );
     }
 
-    // Check pre-cpi health
-    // NOTE: This health check isn't strictly necessary. It will be, later, when
-    // we want to have reduce_only or be able to move an account out of bankruptcy.
+    // Check health before balance adjustments
     let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
-    let pre_cpi_health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
-    require!(pre_cpi_health >= 0, MangoError::HealthMustBePositive);
-    msg!("pre_cpi_health {:?}", pre_cpi_health);
+    let _pre_health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
 
     // Prices for logging
     let mut prices = vec![];
@@ -340,7 +337,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     let mut token_loan_details = Vec::with_capacity(changes.len());
     for (change, price) in changes.iter().zip(prices.iter()) {
         let mut bank = health_ais[change.bank_index].load_mut::<Bank>()?;
-        let position = account.token_get_mut_raw(change.raw_token_index);
+        let position = account.token_position_mut_by_raw_index(change.raw_token_index);
         let native = position.native(&bank);
         let approved_amount = I80F48::from(bank.flash_loan_approved_amount);
 
@@ -390,15 +387,18 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         token_loan_details
     });
 
-    // Check post-cpi health
-    let post_cpi_health =
+    // Check health after account position changes
+    let post_health =
         compute_health_from_fixed_accounts(&account.borrow(), HealthType::Init, health_ais)?;
-    require!(post_cpi_health >= 0, MangoError::HealthMustBePositive);
-    msg!("post_cpi_health {:?}", post_cpi_health);
+    msg!("post_cpi_health {:?}", post_health);
+    require!(post_health >= 0, MangoError::HealthMustBePositive);
+    account
+        .fixed
+        .maybe_recover_from_being_liquidated(post_health);
 
     // Deactivate inactive token accounts after health check
     for raw_token_index in deactivated_token_positions {
-        account.token_deactivate(raw_token_index);
+        account.deactivate_token_position(raw_token_index);
     }
 
     Ok(())

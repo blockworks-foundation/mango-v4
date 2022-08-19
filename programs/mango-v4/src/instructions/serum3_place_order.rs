@@ -174,7 +174,7 @@ pub fn serum3_place_order(
         // Validate open_orders
         require!(
             account
-                .serum3_find(serum_market.market_index)
+                .serum3_orders(serum_market.market_index)
                 .ok_or_else(|| error!(MangoError::SomeError))?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
@@ -297,6 +297,7 @@ pub fn serum3_place_order(
     let health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
+    account.fixed.maybe_recover_from_being_liquidated(health);
 
     vault_difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
 
@@ -329,7 +330,7 @@ pub fn inc_maybe_loan(
     before_oo: &OpenOrdersSlim,
     after_oo: &OpenOrdersSlim,
 ) {
-    let serum3_account = account.serum3_find_mut(market_index).unwrap();
+    let serum3_account = account.serum3_orders_mut(market_index).unwrap();
 
     if after_oo.native_coin_reserved() > before_oo.native_coin_reserved() {
         let native_coin_reserved_increase =
@@ -355,10 +356,10 @@ pub struct VaultDifferenceResult {
 impl VaultDifferenceResult {
     pub fn deactivate_inactive_token_accounts(&self, account: &mut MangoAccountRefMut) {
         if !self.base_active {
-            account.token_deactivate(self.base_raw_index);
+            account.deactivate_token_position(self.base_raw_index);
         }
         if !self.quote_active {
-            account.token_deactivate(self.quote_raw_index);
+            account.deactivate_token_position(self.quote_raw_index);
         }
     }
 }
@@ -376,12 +377,12 @@ pub fn apply_vault_difference(
     // charged if an order executes and the loan materializes? Otherwise MMs that place
     // an order without having the funds will be charged for each place_order!
 
-    let (base_position, base_raw_index) = account.token_get_mut(base_bank.token_index)?;
+    let (base_position, base_raw_index) = account.token_position_mut(base_bank.token_index)?;
     let base_change = I80F48::from(after_base_vault) - I80F48::from(before_base_vault);
     let (base_active, base_loan_origination_fee) =
         base_bank.change_with_fee(base_position, base_change)?;
 
-    let (quote_position, quote_raw_index) = account.token_get_mut(quote_bank.token_index)?;
+    let (quote_position, quote_raw_index) = account.token_position_mut(quote_bank.token_index)?;
     let quote_change = I80F48::from(after_quote_vault) - I80F48::from(before_quote_vault);
     let (quote_active, quote_loan_origination_fee) =
         quote_bank.change_with_fee(quote_position, quote_change)?;

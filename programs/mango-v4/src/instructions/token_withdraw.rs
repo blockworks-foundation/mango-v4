@@ -60,7 +60,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     let mut account = ctx.accounts.account.load_mut()?;
 
     let (position, raw_token_index, active_token_index) =
-        account.token_get_mut_or_create(token_index)?;
+        account.ensure_token_position(token_index)?;
 
     // The bank will also be passed in remainingAccounts. Use an explicit scope
     // to drop the &mut before we borrow it immutably again later.
@@ -139,6 +139,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         .context("post-withdraw init health")?;
     msg!("health: {}", health);
     require!(health >= 0, MangoError::HealthMustBePositive);
+    account.fixed.maybe_recover_from_being_liquidated(health);
 
     //
     // Deactivate the position only after the health check because the user passed in
@@ -146,7 +147,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     // deactivated.
     //
     if !position_is_active {
-        account.token_deactivate(raw_token_index);
+        account.deactivate_token_position(raw_token_index);
     }
 
     emit!(WithdrawLog {

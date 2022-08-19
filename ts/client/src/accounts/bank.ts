@@ -247,27 +247,31 @@ export class Bank {
   }
 
   nativeDeposits(): I80F48 {
-    return this.cachedIndexedTotalDeposits.mul(this.depositIndex);
+    return this.indexedDeposits.mul(this.depositIndex);
   }
 
   nativeBorrows(): I80F48 {
-    return this.cachedIndexedTotalBorrows.mul(this.borrowIndex);
+    return this.indexedBorrows.mul(this.borrowIndex);
   }
 
   uiDeposits(): number {
     return nativeI80F48ToUi(
-      this.cachedIndexedTotalDeposits.mul(this.depositIndex),
+      this.indexedDeposits.mul(this.depositIndex),
       this.mintDecimals,
     ).toNumber();
   }
 
   uiBorrows(): number {
     return nativeI80F48ToUi(
-      this.cachedIndexedTotalBorrows.mul(this.borrowIndex),
+      this.indexedBorrows.mul(this.borrowIndex),
       this.mintDecimals,
     ).toNumber();
   }
 
+  /**
+   *
+   * @returns borrow rate, 0 is 0% where 1 is 100%
+   */
   getBorrowRate(): I80F48 {
     const totalBorrows = this.nativeBorrows();
     const totalDeposits = this.nativeDeposits();
@@ -298,6 +302,18 @@ export class Bank {
     }
   }
 
+  /**
+   *
+   * @returns borrow rate percentage
+   */
+  getBorrowRateUi(): number {
+    return this.getBorrowRate().toNumber() * 100;
+  }
+
+  /**
+   *
+   * @returns deposit rate, 0 is 0% where 1 is 100%
+   */
   getDepositRate(): I80F48 {
     const borrowRate = this.getBorrowRate();
     const totalBorrows = this.nativeBorrows();
@@ -311,6 +327,14 @@ export class Bank {
 
     const utilization = totalBorrows.div(totalDeposits);
     return utilization.mul(borrowRate);
+  }
+
+  /**
+   *
+   * @returns deposit rate percentage
+   */
+  getDepositRateUi(): number {
+    return this.getDepositRate().toNumber() * 100;
   }
 }
 

@@ -2,7 +2,7 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { coder } from '@project-serum/anchor/dist/cjs/spl/token';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
-import { ZERO_I80F48 } from '../accounts/I80F48';
+import { I80F48, ZERO_I80F48 } from '../accounts/I80F48';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 
@@ -69,6 +69,24 @@ async function main() {
   for (const bank of await Array.from(banksMapUsingTokenIndex.values()).sort(
     (a, b) => a.tokenIndex - b.tokenIndex,
   )) {
+    const vault = I80F48.fromNumber(
+      coder()
+        .accounts.decode(
+          'token',
+          await (
+            await client.program.provider.connection.getAccountInfo(bank.vault)
+          ).data,
+        )
+        .amount.toNumber(),
+    );
+
+    const error = vault.sub(
+      (bank as any).indexedDepositsByMangoAccounts
+        .sub((bank as any).indexedBorrowsByMangoAccounts)
+        .add(bank.collectedFeesNative)
+        .add(bank.dust),
+    );
+
     let res = `${bank.name}`;
     res =
       res +
@@ -76,6 +94,7 @@ async function main() {
       `\n ${'bank'.padEnd(40)} ${bank.publicKey}` +
       `\n ${'vault'.padEnd(40)} ${bank.vault}` +
       `\n ${'mint'.padEnd(40)} ${bank.mint}` +
+      `\n ${'error'.padEnd(40)} ${error}` +
       `\n ${'collectedFeesNative'.padEnd(40)} ${bank.collectedFeesNative}` +
       `\n ${'dust'.padEnd(40)} ${bank.dust}` +
       `\n ${'deposits'.padEnd(40)} ${bank.indexedDeposits.mul(
@@ -96,7 +115,7 @@ async function main() {
       `\n ${'cachedTotalBorrows'.padEnd(40)} ${(
         bank as any
       ).cachedIndexedTotalBorrows.mul(bank.borrowIndex)}` +
-      `\n ${'avgUtilization'.padEnd(40)} ${(
+      `\n ${'avgUtilization since last rate update'.padEnd(40)} ${(
         100 * bank.avgUtilization.toNumber()
       ).toFixed(1)}%` +
       `\n ${'rate parameters'.padEnd(40)} ${(
@@ -119,7 +138,13 @@ async function main() {
             await client.program.provider.connection.getAccountInfo(bank.vault)
           ).data,
         )
-        .amount.toNumber()}`;
+        .amount.toNumber()}` +
+      `\n ${'last index update'.padEnd(40)} ${new Date(
+        1000 * bank.indexLastUpdated.toNumber(),
+      )}` +
+      `\n ${'last rates update'.padEnd(40)} ${new Date(
+        1000 * bank.bankRateLastUpdated.toNumber(),
+      )}`;
 
     console.log(`${res}`);
   }
