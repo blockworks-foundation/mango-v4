@@ -26,6 +26,7 @@ export class Bank {
   public util0: I80F48;
   public util1: I80F48;
   public price: I80F48;
+  public uiPrice: number;
   public collectedFeesNative: I80F48;
   public loanFeeRate: I80F48;
   public loanOriginationFeeRate: I80F48;
@@ -178,6 +179,7 @@ export class Bank {
     this.liquidationFee = I80F48.from(liquidationFee);
     this.dust = I80F48.from(dust);
     this.price = undefined;
+    this.uiPrice = undefined;
   }
 
   toString(): string {

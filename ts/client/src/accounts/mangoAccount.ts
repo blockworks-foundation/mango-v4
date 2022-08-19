@@ -110,11 +110,7 @@ export class MangoAccount {
     nativeTokenPosition: TokenPosition,
   ): I80F48 {
     return nativeTokenPosition
-      ? nativeTokenPosition
-          .native(sourceBank)
-          .mul(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
-          .div(I80F48.fromNumber(Math.pow(10, sourceBank.mintDecimals)))
-          .mul(sourceBank.price)
+      ? nativeTokenPosition.native(sourceBank).mul(sourceBank.price)
       : ZERO_I80F48;
   }
 
@@ -122,10 +118,7 @@ export class MangoAccount {
     targetBank: Bank,
     nativeUsdcPosition: I80F48,
   ): I80F48 {
-    return nativeUsdcPosition
-      .div(targetBank.price)
-      .div(I80F48.fromNumber(Math.pow(10, QUOTE_DECIMALS)))
-      .mul(I80F48.fromNumber(Math.pow(10, targetBank.mintDecimals)));
+    return nativeUsdcPosition.div(targetBank.price);
   }
 
   /**
