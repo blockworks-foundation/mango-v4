@@ -247,23 +247,23 @@ export class Bank {
   }
 
   nativeDeposits(): I80F48 {
-    return this.cachedIndexedTotalDeposits.mul(this.depositIndex);
+    return this.indexedDeposits.mul(this.depositIndex);
   }
 
   nativeBorrows(): I80F48 {
-    return this.cachedIndexedTotalBorrows.mul(this.borrowIndex);
+    return this.indexedBorrows.mul(this.borrowIndex);
   }
 
   uiDeposits(): number {
     return nativeI80F48ToUi(
-      this.cachedIndexedTotalDeposits.mul(this.depositIndex),
+      this.indexedDeposits.mul(this.depositIndex),
       this.mintDecimals,
     ).toNumber();
   }
 
   uiBorrows(): number {
     return nativeI80F48ToUi(
-      this.cachedIndexedTotalBorrows.mul(this.borrowIndex),
+      this.indexedBorrows.mul(this.borrowIndex),
       this.mintDecimals,
     ).toNumber();
   }
