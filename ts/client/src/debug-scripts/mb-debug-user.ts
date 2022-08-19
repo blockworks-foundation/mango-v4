@@ -138,12 +138,14 @@ async function main() {
     );
     const userWallet = new Wallet(user);
     console.log(`User ${userWallet.publicKey.toBase58()}`);
-    const mangoAccount = (
-      await client.getMangoAccountsForOwner(group, user.publicKey)
-    )[0];
-    console.log(`MangoAccount ${mangoAccount.publicKey}`);
-
-    await debugUser(client, group, mangoAccount);
+    const mangoAccounts = await client.getMangoAccountsForOwner(
+      group,
+      user.publicKey,
+    );
+    for (const mangoAccount of mangoAccounts) {
+      console.log(`MangoAccount ${mangoAccount.publicKey}`);
+      await debugUser(client, group, mangoAccount);
+    }
   }
 
   process.exit();
