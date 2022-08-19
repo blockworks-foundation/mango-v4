@@ -110,12 +110,28 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "newAdmin",
-          "type": "publicKey"
+          "name": "newAdminOpt",
+          "type": {
+            "option": "publicKey"
+          }
         },
         {
-          "name": "newFastListingAdmin",
-          "type": "publicKey"
+          "name": "newFastListingAdminOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "testingOpt",
+          "type": {
+            "option": "u8"
+          }
+        },
+        {
+          "name": "versionOpt",
+          "type": {
+            "option": "u8"
+          }
         }
       ]
     },
@@ -762,7 +778,10 @@ export type MangoV4 = {
         {
           "name": "instructions",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "CHECK ix introspection"
+          ]
         }
       ],
       "args": []
@@ -1201,7 +1220,8 @@ export type MangoV4 = {
           "isMut": false,
           "isSigner": false,
           "docs": [
-            "Instructions Sysvar for instruction introspection"
+            "Instructions Sysvar for instruction introspection",
+            "CHECK ix introspection"
           ]
         }
       ],
@@ -2815,13 +2835,13 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "loanOriginationFeeRate",
+            "name": "loanFeeRate",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "loanFeeRate",
+            "name": "loanOriginationFeeRate",
             "type": {
               "defined": "I80F48"
             }
@@ -5157,12 +5177,28 @@ export const IDL: MangoV4 = {
       ],
       "args": [
         {
-          "name": "newAdmin",
-          "type": "publicKey"
+          "name": "newAdminOpt",
+          "type": {
+            "option": "publicKey"
+          }
         },
         {
-          "name": "newFastListingAdmin",
-          "type": "publicKey"
+          "name": "newFastListingAdminOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
+          "name": "testingOpt",
+          "type": {
+            "option": "u8"
+          }
+        },
+        {
+          "name": "versionOpt",
+          "type": {
+            "option": "u8"
+          }
         }
       ]
     },
@@ -5809,7 +5845,10 @@ export const IDL: MangoV4 = {
         {
           "name": "instructions",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "CHECK ix introspection"
+          ]
         }
       ],
       "args": []
@@ -6248,7 +6287,8 @@ export const IDL: MangoV4 = {
           "isMut": false,
           "isSigner": false,
           "docs": [
-            "Instructions Sysvar for instruction introspection"
+            "Instructions Sysvar for instruction introspection",
+            "CHECK ix introspection"
           ]
         }
       ],
@@ -7862,13 +7902,13 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "loanOriginationFeeRate",
+            "name": "loanFeeRate",
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "loanFeeRate",
+            "name": "loanOriginationFeeRate",
             "type": {
               "defined": "I80F48"
             }

@@ -6,7 +6,7 @@
 - npm 8.1.2
 - node v16.13.1
 
-Devnet deployment - m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD
+Devnet deployment - 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
 
 TS client based examples
 

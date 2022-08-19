@@ -63,8 +63,8 @@ pub struct Bank {
 
     // TODO: add ix/logic to regular send this to DAO
     pub collected_fees_native: I80F48,
-    pub loan_origination_fee_rate: I80F48,
     pub loan_fee_rate: I80F48,
+    pub loan_origination_fee_rate: I80F48,
 
     // This is a _lot_ of bytes (64) - seems unnecessary
     // (could maybe store them in one byte each, as an informal U1F7?

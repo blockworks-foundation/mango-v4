@@ -115,6 +115,7 @@ impl<T: Sized> DerefOrBorrowMut<[T]> for Vec<T> {
 }
 
 pub struct AccountLoaderDynamic<'info, D: DynamicAccountType> {
+    /// CHECK requires custom handling
     acc_info: AccountInfo<'info>,
     phantom1: PhantomData<&'info D>,
 }

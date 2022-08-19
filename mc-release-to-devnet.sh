@@ -2,7 +2,7 @@
 
 set -e pipefail
 
-# rg m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD -l | xargs -I % sed -i '' 's/m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD/5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM/g' %;
+# rg 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg -l | xargs -I % sed -i '' 's/4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg/5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM/g' %;
 
 WALLET_WITH_FUNDS=~/.config/solana/mango-devnet.json
 PROGRAM_ID=5V2zCYCQkm4sZc3WctiwQEAzvfAiFxyjbwCvzQnmtmkM

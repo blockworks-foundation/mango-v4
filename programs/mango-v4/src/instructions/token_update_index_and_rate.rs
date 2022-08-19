@@ -27,9 +27,11 @@ pub struct TokenUpdateIndexAndRate<'info> {
     )]
     pub mint_info: AccountLoader<'info, MintInfo>,
 
+    /// CHECK: The oracle can be one of several different account types
     pub oracle: UncheckedAccount<'info>,
 
     #[account(address = tx_instructions::ID)]
+    /// CHECK ix introspection
     pub instructions: UncheckedAccount<'info>,
 }
 

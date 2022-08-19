@@ -16,11 +16,27 @@ pub struct GroupEdit<'info> {
 // new_admin and new_fast_listing_admin are PDAs
 pub fn group_edit(
     ctx: Context<GroupEdit>,
-    new_admin: Pubkey,
-    new_fast_listing_admin: Pubkey,
+    new_admin_opt: Option<Pubkey>,
+    new_fast_listing_admin_opt: Option<Pubkey>,
+    testing_opt: Option<u8>,
+    version_opt: Option<u8>,
 ) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
-    group.admin = new_admin;
-    group.fast_listing_admin = new_fast_listing_admin;
+
+    if let Some(new_admin) = new_admin_opt {
+        group.admin = new_admin;
+    }
+
+    if let Some(new_fast_listing_admin) = new_fast_listing_admin_opt {
+        group.fast_listing_admin = new_fast_listing_admin;
+    }
+
+    if let Some(testing) = testing_opt {
+        group.testing = testing;
+    }
+
+    if let Some(version) = version_opt {
+        group.version = version;
+    }
     Ok(())
 }

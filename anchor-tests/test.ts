@@ -73,7 +73,7 @@ async function createUsers(
 }
 
 describe('mango-v4', () => {
-  let programId = new PublicKey('m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD');
+  let programId = new PublicKey('4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg');
   // Configure the client to use the local cluster.
   const envProvider = anchor.AnchorProvider.env();
   anchor.setProvider(envProvider);

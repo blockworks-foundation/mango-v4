@@ -21,7 +21,7 @@ pub mod types;
 
 use state::{OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex};
 
-declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
+declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
 
 #[program]
 pub mod mango_v4 {
@@ -41,10 +41,18 @@ pub mod mango_v4 {
 
     pub fn group_edit(
         ctx: Context<GroupEdit>,
-        new_admin: Pubkey,
-        new_fast_listing_admin: Pubkey,
+        new_admin_opt: Option<Pubkey>,
+        new_fast_listing_admin_opt: Option<Pubkey>,
+        testing_opt: Option<u8>,
+        version_opt: Option<u8>,
     ) -> Result<()> {
-        instructions::group_edit(ctx, new_admin, new_fast_listing_admin)
+        instructions::group_edit(
+            ctx,
+            new_admin_opt,
+            new_fast_listing_admin_opt,
+            testing_opt,
+            version_opt,
+        )
     }
 
     pub fn group_close(ctx: Context<GroupClose>) -> Result<()> {

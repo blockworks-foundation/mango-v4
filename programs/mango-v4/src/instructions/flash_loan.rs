@@ -28,6 +28,7 @@ pub struct FlashLoanBegin<'info> {
 
     /// Instructions Sysvar for instruction introspection
     #[account(address = tx_instructions::ID)]
+    /// CHECK ix introspection
     pub instructions: UncheckedAccount<'info>,
 }
 
