@@ -285,13 +285,9 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
     ) -> Result<bool> {
-        let (position_is_active, _) = self
+        Ok(self
             .withdraw_internal(position, native_amount, false, true)
-            .map(|(not_dusted, loan_origination_fee)| {
-                (not_dusted || position.is_in_use(), loan_origination_fee)
-            })?;
-
-        return Ok(position_is_active);
+            .map(|(not_dusted, _)| not_dusted || position.is_in_use())?)
     }
 
     /// Withdraws `native_amount` while applying the loan origination fee if a borrow is created.
