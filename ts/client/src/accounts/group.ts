@@ -9,6 +9,8 @@ import { Bank, MintInfo } from './bank';
 import { I80F48, ONE_I80F48 } from './I80F48';
 import { PerpMarket } from './perp';
 import { Serum3Market } from './serum3';
+import { toNativeDecimals } from '../utils';
+import BN from 'bn.js';
 
 export class Group {
   static from(
@@ -225,6 +227,7 @@ export class Group {
       for (const bank of banks[index]) {
         if (bank.name === 'USDC') {
           bank.price = ONE_I80F48;
+          bank.uiPrice = 1;
         } else {
           // TODO: Implement switchboard oracle type
           if (
@@ -234,9 +237,17 @@ export class Group {
           ) {
             const stubOracle = coder.decode('stubOracle', price.data);
             bank.price = new I80F48(stubOracle.price.val);
+            bank.uiPrice = this?.toUiPrice(
+              bank.price,
+              bank.mint,
+              this?.insuranceMint,
+            );
           } else {
-            bank.price = I80F48.fromNumber(
-              parsePriceData(price.data).previousPrice,
+            bank.uiPrice = parsePriceData(price.data).previousPrice;
+            bank.price = this?.toNativePrice(
+              bank.uiPrice,
+              bank.mint,
+              this?.insuranceMint,
             );
           }
         }
@@ -262,6 +273,35 @@ export class Group {
         console.log(bank.toString());
       }
     }
+  }
+
+  public toUiPrice(
+    price: I80F48,
+    tokenMintPk: PublicKey,
+    quoteMintPk: PublicKey,
+  ): number {
+    const tokenDecimals = this.getMintDecimals(tokenMintPk);
+    const quoteDecimals = this.getMintDecimals(quoteMintPk);
+    return price
+      .mul(I80F48.fromNumber(Math.pow(10, tokenDecimals - quoteDecimals)))
+      .toNumber();
+  }
+
+  public toNativePrice(
+    uiPrice: number,
+    tokenMintPk: PublicKey,
+    quoteMintPk: PublicKey,
+  ): I80F48 {
+    const tokenDecimals = this.getMintDecimals(tokenMintPk);
+    const quoteDecimals = this.getMintDecimals(quoteMintPk);
+    return I80F48.fromNumber(uiPrice).mul(
+      I80F48.fromNumber(Math.pow(10, quoteDecimals - tokenDecimals)),
+    );
+  }
+
+  public toNativeDecimals(uiAmount: number, mintPk: PublicKey): BN {
+    const decimals = this.getMintDecimals(mintPk);
+    return toNativeDecimals(uiAmount, decimals);
   }
 
   toString(): string {

@@ -27,7 +27,7 @@ async function main() {
   const group = await client.getGroupForCreator(admin.publicKey, 2);
   console.log(`Group ${group.publicKey.toBase58()}`);
 
-  const banks = await client.getBanksForGroup(group);
+  const banks = Array.from(group.banksMapByMint.values()).flat();
   const banksMapUsingTokenIndex = new Map(
     banks.map((bank) => {
       (bank as any).indexedDepositsByMangoAccounts = ZERO_I80F48;
@@ -94,6 +94,8 @@ async function main() {
       `\n ${'bank'.padEnd(40)} ${bank.publicKey}` +
       `\n ${'vault'.padEnd(40)} ${bank.vault}` +
       `\n ${'mint'.padEnd(40)} ${bank.mint}` +
+      `\n ${'price'.padEnd(40)} ${bank.price.toNumber()}` +
+      `\n ${'uiPrice'.padEnd(40)} ${bank.uiPrice}` +
       `\n ${'error'.padEnd(40)} ${error}` +
       `\n ${'collectedFeesNative'.padEnd(40)} ${bank.collectedFeesNative}` +
       `\n ${'dust'.padEnd(40)} ${bank.dust}` +
