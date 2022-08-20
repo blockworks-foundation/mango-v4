@@ -10,6 +10,11 @@ use crate::state::ScanningAccountRetriever;
 use crate::state::*;
 use crate::util::checked_math as cm;
 
+use crate::logs::{
+    LiquidateTokenBankruptcyLog, LoanOriginationFeeInstruction, TokenBalanceLog,
+    WithdrawLoanOriginationFeeLog,
+};
+
 // Remaining accounts:
 // - all banks for liab_mint_info (writable)
 // - merged health accounts for liqor+liqee
@@ -98,7 +103,8 @@ pub fn liq_token_bankruptcy(
 
     let (liab_bank, liab_price, opt_quote_bank_and_price) =
         account_retriever.banks_mut_and_oracles(liab_token_index, QUOTE_TOKEN_INDEX)?;
-    let liab_deposit_index = liab_bank.deposit_index;
+    let mut liab_deposit_index = liab_bank.deposit_index;
+    let liab_borrow_index = liab_bank.borrow_index;
     let (liqee_liab, liqee_raw_token_index) = liqee.token_position_mut(liab_token_index)?;
     let initial_liab_native = liqee_liab.native(&liab_bank);
     let mut remaining_liab_loss = -initial_liab_native;
@@ -151,25 +157,51 @@ pub fn liq_token_bankruptcy(
         )?;
 
         // move quote assets into liqor and withdraw liab assets
-        if let Some((quote_bank, _)) = opt_quote_bank_and_price {
+        if let Some((quote_bank, quote_price)) = opt_quote_bank_and_price {
             // account constraint #2 a)
             require_keys_eq!(quote_bank.vault, ctx.accounts.quote_vault.key());
             require_keys_eq!(quote_bank.mint, ctx.accounts.insurance_vault.mint);
+
+            let quote_deposit_index = quote_bank.deposit_index;
+            let quote_borrow_index = quote_bank.borrow_index;
 
             // credit the liqor
             let (liqor_quote, liqor_quote_raw_token_index, _) =
                 liqor.ensure_token_position(QUOTE_TOKEN_INDEX)?;
             let liqor_quote_active = quote_bank.deposit(liqor_quote, insurance_transfer_i80f48)?;
+            let liqor_quote_indexed_position = liqor_quote.indexed_position;
 
             // transfer liab from liqee to liqor
             let (liqor_liab, liqor_liab_raw_token_index, _) =
                 liqor.ensure_token_position(liab_token_index)?;
-            let liqor_liab_active = liab_bank.withdraw_with_fee(liqor_liab, liab_transfer)?;
+            let (liqor_liab_active, loan_origination_fee) =
+                liab_bank.withdraw_with_fee(liqor_liab, liab_transfer)?;
 
             // Check liqor's health
             let liqor_health =
                 compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)?;
             require!(liqor_health >= 0, MangoError::HealthMustBePositive);
+
+            // liqor quote
+            emit!(TokenBalanceLog {
+                mango_group: ctx.accounts.group.key(),
+                mango_account: ctx.accounts.liqor.key(),
+                token_index: QUOTE_TOKEN_INDEX,
+                indexed_position: liqor_quote_indexed_position.to_bits(),
+                deposit_index: quote_deposit_index.to_bits(),
+                borrow_index: quote_borrow_index.to_bits(),
+                price: quote_price.to_bits(),
+            });
+
+            if loan_origination_fee.is_positive() {
+                emit!(WithdrawLoanOriginationFeeLog {
+                    mango_group: ctx.accounts.group.key(),
+                    mango_account: ctx.accounts.liqor.key(),
+                    token_index: liab_token_index,
+                    loan_origination_fee: loan_origination_fee.to_bits(),
+                    instruction: LoanOriginationFeeInstruction::LiqTokenBankruptcy
+                });
+            }
 
             if !liqor_quote_active {
                 liqor.deactivate_token_position(liqor_quote_raw_token_index);
@@ -191,6 +223,7 @@ pub fn liq_token_bankruptcy(
 
     // Socialize loss if there's more loss and noone else could use the
     // insurance fund to cover it.
+    let mut socialized_loss = I80F48::ZERO;
     if insurance_fund_exhausted && remaining_liab_loss.is_positive() {
         // find the total deposits
         let mut indexed_total_deposits = I80F48::ZERO;
@@ -205,6 +238,8 @@ pub fn liq_token_bankruptcy(
         //        Probably not.
         let new_deposit_index =
             cm!(liab_deposit_index - remaining_liab_loss / indexed_total_deposits);
+        liab_deposit_index = new_deposit_index;
+        socialized_loss = remaining_liab_loss;
 
         let mut amount_to_credit = remaining_liab_loss;
         for bank_ai in bank_ais.iter() {
@@ -228,6 +263,28 @@ pub fn liq_token_bankruptcy(
         require_eq!(liqee_liab.indexed_position, I80F48::ZERO);
     }
 
+    // liqor liab
+    emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.liqor.key(),
+        token_index: liab_token_index,
+        indexed_position: liqee_liab.indexed_position.to_bits(),
+        deposit_index: liab_deposit_index.to_bits(),
+        borrow_index: liab_borrow_index.to_bits(),
+        price: liab_price.to_bits(),
+    });
+
+    // liqee liab
+    emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.liqee.key(),
+        token_index: liab_token_index,
+        indexed_position: liqee_liab.indexed_position.to_bits(),
+        deposit_index: liab_deposit_index.to_bits(),
+        borrow_index: liab_borrow_index.to_bits(),
+        price: liab_price.to_bits(),
+    });
+
     let liab_bank = bank_ais[0].load::<Bank>()?;
     let end_liab_native = liqee_liab.native(&liab_bank);
     liqee_health_cache
@@ -242,6 +299,18 @@ pub fn liq_token_bankruptcy(
     if !liqee_liab_active {
         liqee.deactivate_token_position(liqee_raw_token_index);
     }
+
+    emit!(LiquidateTokenBankruptcyLog {
+        mango_group: ctx.accounts.group.key(),
+        liqee: ctx.accounts.liqee.key(),
+        liqor: ctx.accounts.liqor.key(),
+        liab_token_index: liab_token_index,
+        initial_liab_native: initial_liab_native.to_bits(),
+        liab_price: liab_price.to_bits(),
+        insurance_token_index: QUOTE_TOKEN_INDEX,
+        insurance_transfer: insurance_transfer_i80f48.to_bits(),
+        socialized_loss: socialized_loss.to_bits()
+    });
 
     Ok(())
 }

@@ -6,7 +6,9 @@ use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 use fixed::types::I80F48;
 
-use crate::logs::{TokenBalanceLog, WithdrawLog};
+use crate::logs::{
+    LoanOriginationFeeInstruction, TokenBalanceLog, WithdrawLoanOriginationFeeLog, WithdrawLog,
+};
 use crate::state::new_fixed_order_account_retriever;
 use crate::util::checked_math as cm;
 
@@ -62,7 +64,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     // The bank will also be passed in remainingAccounts. Use an explicit scope
     // to drop the &mut before we borrow it immutably again later.
-    let (position_is_active, amount_i80f48) = {
+    let (position_is_active, amount_i80f48, loan_origination_fee) = {
         let mut bank = ctx.accounts.bank.load_mut()?;
         let native_position = position.native(&bank);
 
@@ -87,7 +89,8 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         let amount_i80f48 = I80F48::from(amount);
 
         // Update the bank and position
-        let position_is_active = bank.withdraw_with_fee(position, amount_i80f48)?;
+        let (position_is_active, loan_origination_fee) =
+            bank.withdraw_with_fee(position, amount_i80f48)?;
 
         // Provide a readable error message in case the vault doesn't have enough tokens
         if ctx.accounts.vault.amount < amount {
@@ -106,7 +109,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             amount,
         )?;
 
-        (position_is_active, amount_i80f48)
+        (position_is_active, amount_i80f48, loan_origination_fee)
     };
 
     let indexed_position = position.indexed_position;
@@ -155,6 +158,16 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         quantity: amount,
         price: oracle_price.to_bits(),
     });
+
+    if loan_origination_fee.is_positive() {
+        emit!(WithdrawLoanOriginationFeeLog {
+            mango_group: ctx.accounts.group.key(),
+            mango_account: ctx.accounts.account.key(),
+            token_index,
+            loan_origination_fee: loan_origination_fee.to_bits(),
+            instruction: LoanOriginationFeeInstruction::TokenWithdraw,
+        });
+    }
 
     Ok(())
 }

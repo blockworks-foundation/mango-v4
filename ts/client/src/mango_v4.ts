@@ -4323,6 +4323,35 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "LoanOriginationFeeInstruction",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Unknown"
+          },
+          {
+            "name": "LiqTokenBankruptcy"
+          },
+          {
+            "name": "LiqTokenWithToken"
+          },
+          {
+            "name": "Serum3LiqForceCancelOrders"
+          },
+          {
+            "name": "Serum3PlaceOrder"
+          },
+          {
+            "name": "Serum3SettleFunds"
+          },
+          {
+            "name": "TokenWithdraw"
+          }
+        ]
+      }
+    },
+    {
       "name": "HealthType",
       "docs": [
         "There are two types of health, initial health used for opening new positions and maintenance",
@@ -4848,6 +4877,16 @@ export type MangoV4 = {
           "name": "price",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "collectedFees",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "loanFeeRate",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -4928,6 +4967,11 @@ export type MangoV4 = {
           "name": "liabPrice",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "bankruptcy",
+          "type": "bool",
+          "index": false
         }
       ]
     },
@@ -4976,6 +5020,88 @@ export type MangoV4 = {
         },
         {
           "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "WithdrawLoanOriginationFeeLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "loanOriginationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "instruction",
+          "type": {
+            "defined": "LoanOriginationFeeInstruction"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "LiquidateTokenBankruptcyLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "initialLiabNative",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "insuranceTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "insuranceTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "socializedLoss",
           "type": "i128",
           "index": false
         }
@@ -9386,6 +9512,35 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "LoanOriginationFeeInstruction",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Unknown"
+          },
+          {
+            "name": "LiqTokenBankruptcy"
+          },
+          {
+            "name": "LiqTokenWithToken"
+          },
+          {
+            "name": "Serum3LiqForceCancelOrders"
+          },
+          {
+            "name": "Serum3PlaceOrder"
+          },
+          {
+            "name": "Serum3SettleFunds"
+          },
+          {
+            "name": "TokenWithdraw"
+          }
+        ]
+      }
+    },
+    {
       "name": "HealthType",
       "docs": [
         "There are two types of health, initial health used for opening new positions and maintenance",
@@ -9911,6 +10066,16 @@ export const IDL: MangoV4 = {
           "name": "price",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "collectedFees",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "loanFeeRate",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -9991,6 +10156,11 @@ export const IDL: MangoV4 = {
           "name": "liabPrice",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "bankruptcy",
+          "type": "bool",
+          "index": false
         }
       ]
     },
@@ -10039,6 +10209,88 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "WithdrawLoanOriginationFeeLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "loanOriginationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "instruction",
+          "type": {
+            "defined": "LoanOriginationFeeInstruction"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "LiquidateTokenBankruptcyLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "initialLiabNative",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "insuranceTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "insuranceTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "socializedLoss",
           "type": "i128",
           "index": false
         }

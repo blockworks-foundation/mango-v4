@@ -271,7 +271,10 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
     ) -> Result<bool> {
-        self.withdraw_internal(position, native_amount, false, !position.is_in_use())
+        let (position_is_active, _) =
+            self.withdraw_internal(position, native_amount, false, !position.is_in_use())?;
+
+        return Ok(position_is_active);
     }
 
     /// Like `withdraw_without_fee()` but allows dusting of in-use token accounts.
@@ -282,8 +285,9 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
     ) -> Result<bool> {
-        self.withdraw_internal(position, native_amount, false, true)
-            .map(|not_dusted| not_dusted || position.is_in_use())
+        Ok(self
+            .withdraw_internal(position, native_amount, false, true)
+            .map(|(not_dusted, _)| not_dusted || position.is_in_use())?)
     }
 
     /// Withdraws `native_amount` while applying the loan origination fee if a borrow is created.
@@ -298,7 +302,7 @@ impl Bank {
         &mut self,
         position: &mut TokenPosition,
         native_amount: I80F48,
-    ) -> Result<bool> {
+    ) -> Result<(bool, I80F48)> {
         self.withdraw_internal(position, native_amount, true, !position.is_in_use())
     }
 
@@ -309,7 +313,7 @@ impl Bank {
         mut native_amount: I80F48,
         with_loan_origination_fee: bool,
         allow_dusting: bool,
-    ) -> Result<bool> {
+    ) -> Result<(bool, I80F48)> {
         require_gte!(native_amount, 0);
         let native_position = position.native(self);
 
@@ -322,13 +326,13 @@ impl Bank {
                     self.dust = cm!(self.dust + new_native_position);
                     self.indexed_deposits = cm!(self.indexed_deposits - position.indexed_position);
                     position.indexed_position = I80F48::ZERO;
-                    return Ok(false);
+                    return Ok((false, I80F48::ZERO));
                 } else {
                     // withdraw some deposits leaving a positive balance
                     let indexed_change = cm!(native_amount / self.deposit_index);
                     self.indexed_deposits = cm!(self.indexed_deposits - indexed_change);
                     position.indexed_position = cm!(position.indexed_position - indexed_change);
-                    return Ok(true);
+                    return Ok((true, I80F48::ZERO));
                 }
             }
 
@@ -339,8 +343,9 @@ impl Bank {
             native_amount = -new_native_position;
         }
 
+        let mut loan_origination_fee = I80F48::ZERO;
         if with_loan_origination_fee {
-            let loan_origination_fee = cm!(self.loan_origination_fee_rate * native_amount);
+            loan_origination_fee = cm!(self.loan_origination_fee_rate * native_amount);
             self.collected_fees_native = cm!(self.collected_fees_native + loan_origination_fee);
             native_amount = cm!(native_amount + loan_origination_fee);
         }
@@ -350,7 +355,7 @@ impl Bank {
         self.indexed_borrows = cm!(self.indexed_borrows + indexed_change);
         position.indexed_position = cm!(position.indexed_position - indexed_change);
 
-        Ok(true)
+        Ok((true, loan_origination_fee))
     }
 
     // withdraw the loan origination fee for a borrow that happenend earlier
@@ -358,12 +363,15 @@ impl Bank {
         &mut self,
         position: &mut TokenPosition,
         already_borrowed_native_amount: I80F48,
-    ) -> Result<bool> {
+    ) -> Result<(bool, I80F48)> {
         let loan_origination_fee =
             cm!(self.loan_origination_fee_rate * already_borrowed_native_amount);
         self.collected_fees_native = cm!(self.collected_fees_native + loan_origination_fee);
 
-        self.withdraw_internal(position, loan_origination_fee, false, !position.is_in_use())
+        let (position_is_active, _) =
+            self.withdraw_internal(position, loan_origination_fee, false, !position.is_in_use())?;
+
+        Ok((position_is_active, loan_origination_fee))
     }
 
     /// Change a position without applying the loan origination fee
@@ -384,9 +392,9 @@ impl Bank {
         &mut self,
         position: &mut TokenPosition,
         native_amount: I80F48,
-    ) -> Result<bool> {
+    ) -> Result<(bool, I80F48)> {
         if native_amount >= 0 {
-            self.deposit(position, native_amount)
+            Ok((self.deposit(position, native_amount)?, I80F48::ZERO))
         } else {
             self.withdraw_with_fee(position, -native_amount)
         }
@@ -635,7 +643,7 @@ mod tests {
                 //
 
                 let change = I80F48::from(change);
-                let is_active = bank.change_with_fee(&mut account, change)?;
+                let (is_active, _) = bank.change_with_fee(&mut account, change)?;
 
                 let mut expected_native = start_native + change;
                 if expected_native >= 0.0 && expected_native < 1.0 && !is_in_use {

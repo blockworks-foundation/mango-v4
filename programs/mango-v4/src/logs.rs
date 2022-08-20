@@ -137,6 +137,8 @@ pub struct UpdateIndexLog {
     pub borrow_index: i128,    // I80F48
     pub avg_utilization: i128, // I80F48
     pub price: i128,           // I80F48
+    pub collected_fees: i128,  // I80F48
+    pub loan_fee_rate: i128,   // I80F48
 }
 
 #[event]
@@ -159,7 +161,7 @@ pub struct LiquidateTokenAndTokenLog {
     pub liab_transfer: i128,  // I80F48
     pub asset_price: i128,    // I80F48
     pub liab_price: i128,     // I80F48
-                              // pub bankruptcy: bool,
+    pub bankruptcy: bool,
 }
 
 #[event]
@@ -174,4 +176,38 @@ pub struct OpenOrdersBalanceLog {
     pub quote_free: u64,
     pub referrer_rebates_accrued: u64,
     pub price: i128, // I80F48
+}
+
+#[derive(PartialEq, Copy, Clone, Debug, AnchorSerialize, AnchorDeserialize)]
+#[repr(u8)]
+pub enum LoanOriginationFeeInstruction {
+    Unknown,
+    LiqTokenBankruptcy,
+    LiqTokenWithToken,
+    Serum3LiqForceCancelOrders,
+    Serum3PlaceOrder,
+    Serum3SettleFunds,
+    TokenWithdraw,
+}
+
+#[event]
+pub struct WithdrawLoanOriginationFeeLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub token_index: u16,
+    pub loan_origination_fee: i128, // I80F48
+    pub instruction: LoanOriginationFeeInstruction,
+}
+
+#[event]
+pub struct LiquidateTokenBankruptcyLog {
+    pub mango_group: Pubkey,
+    pub liqee: Pubkey,
+    pub liqor: Pubkey,
+    pub liab_token_index: u16,
+    pub initial_liab_native: i128,
+    pub liab_price: i128,
+    pub insurance_token_index: u16,
+    pub insurance_transfer: i128,
+    pub socialized_loss: i128,
 }

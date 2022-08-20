@@ -12,6 +12,8 @@ use serum_dex::instruction::NewOrderInstructionV3;
 use serum_dex::matching::Side;
 use serum_dex::state::OpenOrders;
 
+use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
+
 /// For loan origination fees bookkeeping purposes
 pub struct OpenOrdersSlim {
     pub native_coin_free: u64,
@@ -273,9 +275,10 @@ pub fn serum3_place_order(
 
     // Charge the difference in vault balances to the user's account
     let mut account = ctx.accounts.account.load_mut()?;
-    let vault_difference_result = {
+    let (vault_difference_result, base_loan_origination_fee, quote_loan_origination_fee) = {
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
+
         apply_vault_difference(
             &mut account.borrow_mut(),
             &mut base_bank,
@@ -297,6 +300,25 @@ pub fn serum3_place_order(
     account.fixed.maybe_recover_from_being_liquidated(health);
 
     vault_difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
+
+    if base_loan_origination_fee.is_positive() {
+        emit!(WithdrawLoanOriginationFeeLog {
+            mango_group: ctx.accounts.group.key(),
+            mango_account: ctx.accounts.account.key(),
+            token_index: serum_market.base_token_index,
+            loan_origination_fee: base_loan_origination_fee.to_bits(),
+            instruction: LoanOriginationFeeInstruction::Serum3PlaceOrder
+        });
+    }
+    if quote_loan_origination_fee.is_positive() {
+        emit!(WithdrawLoanOriginationFeeLog {
+            mango_group: ctx.accounts.group.key(),
+            mango_account: ctx.accounts.account.key(),
+            token_index: serum_market.quote_token_index,
+            loan_origination_fee: quote_loan_origination_fee.to_bits(),
+            instruction: LoanOriginationFeeInstruction::Serum3PlaceOrder
+        });
+    }
 
     Ok(())
 }
@@ -350,25 +372,31 @@ pub fn apply_vault_difference(
     quote_bank: &mut Bank,
     after_quote_vault: u64,
     before_quote_vault: u64,
-) -> Result<VaultDifferenceResult> {
+) -> Result<(VaultDifferenceResult, I80F48, I80F48)> {
     // TODO: Applying the loan origination fee here may be too early: it should only be
     // charged if an order executes and the loan materializes? Otherwise MMs that place
     // an order without having the funds will be charged for each place_order!
 
     let (base_position, base_raw_index) = account.token_position_mut(base_bank.token_index)?;
     let base_change = I80F48::from(after_base_vault) - I80F48::from(before_base_vault);
-    let base_active = base_bank.change_with_fee(base_position, base_change)?;
+    let (base_active, base_loan_origination_fee) =
+        base_bank.change_with_fee(base_position, base_change)?;
 
     let (quote_position, quote_raw_index) = account.token_position_mut(quote_bank.token_index)?;
     let quote_change = I80F48::from(after_quote_vault) - I80F48::from(before_quote_vault);
-    let quote_active = quote_bank.change_with_fee(quote_position, quote_change)?;
+    let (quote_active, quote_loan_origination_fee) =
+        quote_bank.change_with_fee(quote_position, quote_change)?;
 
-    Ok(VaultDifferenceResult {
-        base_raw_index,
-        base_active,
-        quote_raw_index,
-        quote_active,
-    })
+    Ok((
+        VaultDifferenceResult {
+            base_raw_index,
+            base_active,
+            quote_raw_index,
+            quote_active,
+        },
+        base_loan_origination_fee,
+        quote_loan_origination_fee,
+    ))
 }
 
 fn cpi_place_order(ctx: &Serum3PlaceOrder, order: NewOrderInstructionV3) -> Result<()> {

@@ -117,7 +117,9 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             deposit_index: deposit_index.to_bits(),
             borrow_index: borrow_index.to_bits(),
             avg_utilization: new_avg_utilization.to_bits(),
-            price: price.to_bits()
+            price: price.to_bits(),
+            collected_fees: some_bank.collected_fees_native.to_bits(),
+            loan_fee_rate: some_bank.loan_fee_rate.to_bits()
         });
 
         drop(some_bank);
