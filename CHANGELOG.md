@@ -6,6 +6,11 @@ Update this for each mainnet deployment.
 
 ## mainnet
 
+Aug 20, 2022 at 19:58:29 Central European Summer Time
+https://explorer.solana.com/tx/3R4frko1AekQKJmmQ5T6k3mdXF9uZVHTR7oocdspTPsc82xX7qrbgnG61r28UdhCxsjMxtQHgBqMc37FSvoHQfCN
+
+- loan fee logging for off-chain services
+
 Aug 18, 2022 at 17:17:40 Central European Summer Time
 https://explorer.solana.com/tx/4Xnyswcwx98y6khw8ptNVmdhQZwJjuNy2BvmQg2pJayoThFiw8kmS2ecRAg5cg2DncvW3NQgn2vtP8mCUtv6Q1yB
 
