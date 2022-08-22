@@ -46,6 +46,7 @@ export class Group {
       new Map(), // mintInfosMapByTokenIndex
       new Map(), // mintInfosMapByMint
       new Map(), // oraclesMap
+      new Map(), // vaultAmountsMap
     );
   }
 
@@ -67,7 +68,8 @@ export class Group {
     public perpMarketsMap: Map<string, PerpMarket>,
     public mintInfosMapByTokenIndex: Map<number, MintInfo>,
     public mintInfosMapByMint: Map<string, MintInfo>,
-    public oraclesMap: Map<string, PriceData>,
+    private oraclesMap: Map<string, PriceData>, // UNUSED
+    public vaultAmountsMap: Map<string, number>,
   ) {}
 
   public findSerum3Market(marketIndex: number): Serum3Market | undefined {
@@ -100,6 +102,8 @@ export class Group {
       this.reloadBankPrices(client, ids),
       // requires reloadSerum3Markets to have finished loading
       this.reloadSerum3ExternalMarkets(client, ids),
+      // requires reloadBanks to have finished loading
+      this.reloadVaults(client, ids),
     ]);
     // console.timeEnd('group.reload');
   }
@@ -256,6 +260,22 @@ export class Group {
     }
   }
 
+  public async reloadVaults(client: MangoClient, ids?: Id): Promise<void> {
+    const vaultPks = Array.from(this.banksMapByMint.values())
+      .flat()
+      .map((bank) => bank.vault);
+    this.vaultAmountsMap = new Map(
+      (
+        await client.program.provider.connection.getMultipleAccountsInfo(
+          vaultPks,
+        )
+      ).map((vaultAi, i) => [
+        vaultPks[i].toBase58(),
+        coder().accounts.decode('token', vaultAi.data).amount.toNumber(),
+      ]),
+    );
+  }
+
   public getMintDecimals(mintPk: PublicKey) {
     return this.banksMapByMint.get(mintPk.toString())[0].mintDecimals;
   }
@@ -272,31 +292,25 @@ export class Group {
    *
    * @param client
    * @param mintPk
-   * @returns sum of native balances of all vaults for a token
+   * @returns sum of native balances of vaults for all banks for a token (fetched from vaultAmountsMap cache)
    */
   public async getTokenVaultBalanceByMint(
     client: MangoClient,
     mintPk: PublicKey,
   ): Promise<I80F48> {
     const banks = this.banksMapByMint.get(mintPk.toString());
-    let amount = new BN(0);
+    let amount = 0;
     for (const bank of banks) {
-      amount = amount.add(
-        coder().accounts.decode(
-          'token',
-          (await client.program.provider.connection.getAccountInfo(bank.vault))
-            .data,
-        ).amount,
-      );
+      amount += this.vaultAmountsMap.get(bank.vault.toBase58());
     }
-    return I80F48.fromNumber(amount.toNumber());
+    return I80F48.fromNumber(amount);
   }
 
   /**
    *
    * @param client
    * @param mintPk
-   * @returns sum of ui balances of all vaults for a token
+   * @returns sum of ui balances of vaults for all banks for a token
    */
   public async getTokenVaultBalanceByMintUi(
     client: MangoClient,

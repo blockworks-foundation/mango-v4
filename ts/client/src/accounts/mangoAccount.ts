@@ -248,36 +248,19 @@ export class MangoAccount {
   getMaxWithdrawWithBorrowForToken(group: Group, mintPk: PublicKey): I80F48 {
     const bank: Bank = group.getFirstBankByMint(mintPk);
     const initHealth = (this.accountData as MangoAccountData).initHealth;
-    const existingPositioninUsdcUnits = MangoAccount.getEquivalentUsdcPosition(
-      bank,
-      this.findToken(bank.tokenIndex),
-    ).max(ZERO_I80F48);
-    const initHealthWithoutExistingPosition = initHealth.sub(
-      existingPositioninUsdcUnits.mul(bank.initAssetWeight),
-    );
     const maxBorrowNative = MangoAccount.getEquivalentTokenPosition(
       bank,
-      initHealthWithoutExistingPosition.div(bank.initLiabWeight),
+      initHealth.div(bank.initLiabWeight),
     );
     const maxBorrowNativeWithoutFees = maxBorrowNative.div(
       ONE_I80F48.add(bank.loanOriginationFeeRate),
     );
-
     // console.log(`initHealth ${initHealth.toNumber()}`);
-    // console.log(
-    //   `existingPositioninUsdcUnits ${existingPositioninUsdcUnits.toNumber()}`,
-    // );
-    // console.log(
-    //   `initHealthWithoutExistingPosition ${initHealthWithoutExistingPosition.toNumber()}`,
-    // );
     // console.log(`maxBorrowNative ${maxBorrowNative.toNumber()}`);
     // console.log(
     //   `maxBorrowNativeWithoutFees ${maxBorrowNativeWithoutFees.toNumber()}`,
     // );
-
-    return maxBorrowNativeWithoutFees
-      .add(this.getTokenDeposits(bank))
-      .mul(I80F48.fromString('0.99'));
+    return maxBorrowNativeWithoutFees;
   }
 
   getMaxWithdrawWithBorrowForTokenUi(group: Group, mintPk: PublicKey): number {
