@@ -13,6 +13,7 @@ pub struct GroupWithTokensConfig<'a> {
     pub mints: &'a [MintCookie],
 }
 
+#[derive(Clone)]
 pub struct Token {
     pub index: u16,
     pub mint: MintCookie,

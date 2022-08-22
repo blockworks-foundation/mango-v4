@@ -4,6 +4,9 @@ Update this for each mainnet deployment.
 
 ## not on mainnet
 
+- Add HealthRegionBegin, -End instructions
+- Add explicit "oracle" account argument for TokenDeposit and TokenWithdraw instructions
+
 ## mainnet
 
 Aug 20, 2022 at 19:58:29 Central European Summer Time

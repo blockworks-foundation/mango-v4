@@ -178,9 +178,11 @@ pub fn liq_token_bankruptcy(
                 liab_bank.withdraw_with_fee(liqor_liab, liab_transfer)?;
 
             // Check liqor's health
-            let liqor_health =
-                compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)?;
-            require!(liqor_health >= 0, MangoError::HealthMustBePositive);
+            if !liqor.fixed.is_in_health_region() {
+                let liqor_health =
+                    compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)?;
+                require!(liqor_health >= 0, MangoError::HealthMustBePositive);
+            }
 
             // liqor quote
             emit!(TokenBalanceLog {
