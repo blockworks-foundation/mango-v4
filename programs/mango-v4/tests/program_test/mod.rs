@@ -89,10 +89,12 @@ pub struct TestContextBuilder {
     mint0: Pubkey,
 }
 
+lazy_static::lazy_static! {
+    static ref PROGRAM_LOG_CAPTURE: Arc<RwLock<Vec<String>>> = Arc::new(RwLock::new(vec![]));
+}
+
 impl TestContextBuilder {
     pub fn new() -> Self {
-        let mut test = ProgramTest::new("mango_v4", mango_v4::id(), processor!(mango_v4::entry));
-
         // We need to intercept logs to capture program log output
         let log_filter = "solana_rbpf=trace,\
                     solana_runtime::message_processor=debug,\
@@ -102,18 +104,19 @@ impl TestContextBuilder {
             env_logger::Builder::from_env(env_logger::Env::new().default_filter_or(log_filter))
                 .format_timestamp_nanos()
                 .build();
-        let program_log_capture = Arc::new(RwLock::new(vec![]));
         let _ = log::set_boxed_logger(Box::new(LoggerWrapper {
             inner: env_logger,
-            program_log: program_log_capture.clone(),
+            program_log: PROGRAM_LOG_CAPTURE.clone(),
         }));
+
+        let mut test = ProgramTest::new("mango_v4", mango_v4::id(), processor!(mango_v4::entry));
 
         // intentionally set to as tight as possible, to catch potential problems early
         test.set_compute_max_units(87000);
 
         Self {
             test,
-            program_log_capture,
+            program_log_capture: PROGRAM_LOG_CAPTURE.clone(),
             mint0: Pubkey::new_unique(),
         }
     }

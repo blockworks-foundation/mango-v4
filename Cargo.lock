@@ -3208,6 +3208,7 @@ dependencies = [
  "fixed",
  "fixed-macro",
  "itertools 0.10.3",
+ "lazy_static",
  "log 0.4.17",
  "mango-macro",
  "margin-trade",
