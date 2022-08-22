@@ -3,16 +3,10 @@ import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
 import { nativeI80F48ToUi } from '../utils';
-import { Bank, QUOTE_DECIMALS } from './bank';
+import { Bank } from './bank';
 import { Group } from './group';
 import { HealthCache, HealthCacheDto } from './healthCache';
-import {
-  HUNDRED_I80F48,
-  I80F48,
-  I80F48Dto,
-  ONE_I80F48,
-  ZERO_I80F48,
-} from './I80F48';
+import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from './I80F48';
 export class MangoAccount {
   public tokens: TokenPosition[];
   public serum3: Serum3Orders[];
@@ -110,7 +104,7 @@ export class MangoAccount {
     nativeTokenPosition: TokenPosition,
   ): I80F48 {
     return nativeTokenPosition
-      ? nativeTokenPosition.native(sourceBank).mul(sourceBank.price)
+      ? nativeTokenPosition.balance(sourceBank).mul(sourceBank.price)
       : ZERO_I80F48;
   }
 
@@ -124,47 +118,47 @@ export class MangoAccount {
   /**
    *
    * @param bank
-   * @returns native balance for a token
+   * @returns native balance for a token, is signed
    */
   getTokenBalance(bank: Bank): I80F48 {
-    const ta = this.findToken(bank.tokenIndex);
-    return ta ? ta.native(bank) : ZERO_I80F48;
+    const tp = this.findToken(bank.tokenIndex);
+    return tp ? tp.balance(bank) : ZERO_I80F48;
   }
 
   /**
    *
    * @param bank
-   * @returns native balance for a token, 0 or more
+   * @returns native deposits for a token, 0 if position has borrows
    */
   getTokenDeposits(bank: Bank): I80F48 {
-    const native = this.getTokenBalance(bank);
-    return native.gte(ZERO_I80F48) ? native : ZERO_I80F48;
+    const tp = this.findToken(bank.tokenIndex);
+    return tp ? tp.deposits(bank) : ZERO_I80F48;
   }
 
   /**
    *
    * @param bank
-   * @returns native balance for a token, 0 or less
+   * @returns native borrows for a token, 0 if position has deposits
    */
   getTokenBorrows(bank: Bank): I80F48 {
-    const native = this.getTokenBalance(bank);
-    return native.lte(ZERO_I80F48) ? native : ZERO_I80F48;
+    const tp = this.findToken(bank.tokenIndex);
+    return tp ? tp.borrows(bank) : ZERO_I80F48;
   }
 
   /**
    *
    * @param bank
-   * @returns UI balance for a token
+   * @returns UI balance for a token, is signed
    */
   getTokenBalanceUi(bank: Bank): number {
-    const ta = this.findToken(bank.tokenIndex);
-    return ta ? ta.balanceUi(bank) : 0;
+    const tp = this.findToken(bank.tokenIndex);
+    return tp ? tp.balanceUi(bank) : 0;
   }
 
   /**
    *
    * @param bank
-   * @returns UI balance for a token, 0 or more
+   * @returns UI deposits for a token, 0 or more
    */
   getTokenDepositsUi(bank: Bank): number {
     const ta = this.findToken(bank.tokenIndex);
@@ -174,7 +168,7 @@ export class MangoAccount {
   /**
    *
    * @param bank
-   * @returns UI balance for a token, 0 or less
+   * @returns UI borrows for a token, 0 or less
    */
   getTokenBorrowsUi(bank: Bank): number {
     const ta = this.findToken(bank.tokenIndex);
@@ -412,7 +406,12 @@ export class TokenPosition {
     return this.tokenIndex !== TokenPosition.TokenIndexUnset;
   }
 
-  public native(bank: Bank): I80F48 {
+  /**
+   *
+   * @param bank
+   * @returns native balance
+   */
+  public balance(bank: Bank): I80F48 {
     if (this.indexedPosition.isPos()) {
       return bank.depositIndex.mul(this.indexedPosition);
     } else {
@@ -421,41 +420,51 @@ export class TokenPosition {
   }
 
   /**
+   *
    * @param bank
-   * @returns position in UI decimals, is signed
+   * @returns native deposits, 0 if position has borrows
+   */
+  public deposits(bank: Bank): I80F48 {
+    if (this.indexedPosition && this.indexedPosition.lt(ZERO_I80F48)) {
+      return ZERO_I80F48;
+    }
+    return this.balance(bank);
+  }
+
+  /**
+   *
+   * @param bank
+   * @returns native borrows, 0 if position has deposits
+   */
+  public borrows(bank: Bank): I80F48 {
+    if (this.indexedPosition && this.indexedPosition.gt(ZERO_I80F48)) {
+      return ZERO_I80F48;
+    }
+    return this.balance(bank).abs();
+  }
+
+  /**
+   * @param bank
+   * @returns UI balance, is signed
    */
   public balanceUi(bank: Bank): number {
-    return nativeI80F48ToUi(this.native(bank), bank.mintDecimals).toNumber();
+    return nativeI80F48ToUi(this.balance(bank), bank.mintDecimals).toNumber();
   }
 
   /**
    * @param bank
-   * @returns position in UI decimals, 0 if position has borrows
+   * @returns UI deposits, 0 if position has borrows
    */
   public depositsUi(bank: Bank): number {
-    if (this.indexedPosition && this.indexedPosition.lt(ZERO_I80F48)) {
-      return 0;
-    }
-
-    return nativeI80F48ToUi(
-      bank.depositIndex.mul(this.indexedPosition),
-      bank.mintDecimals,
-    ).toNumber();
+    return nativeI80F48ToUi(this.deposits(bank), bank.mintDecimals).toNumber();
   }
 
   /**
    * @param bank
-   * @returns position in UI decimals, can be 0 or negative, 0 if position has deposits
+   * @returns UI borrows, 0 if position has deposits
    */
   public borrowsUi(bank: Bank): number {
-    if (this.indexedPosition && this.indexedPosition.gt(ZERO_I80F48)) {
-      return 0;
-    }
-
-    return nativeI80F48ToUi(
-      bank.borrowIndex.mul(this.indexedPosition),
-      bank.mintDecimals,
-    ).toNumber();
+    return nativeI80F48ToUi(this.borrows(bank), bank.mintDecimals).toNumber();
   }
 
   public toString(group?: Group, index?: number): string {
@@ -463,7 +472,7 @@ export class TokenPosition {
     if (group) {
       const bank: Bank = group.getFirstBankByTokenIndex(this.tokenIndex);
       if (bank) {
-        const native = this.native(bank);
+        const native = this.balance(bank);
         extra += ', native: ' + native.toNumber();
         extra += ', ui: ' + this.balanceUi(bank);
         extra += ', tokenName: ' + bank.name;
