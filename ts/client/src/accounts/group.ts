@@ -1,16 +1,17 @@
 import { BorshAccountsCoder } from '@project-serum/anchor';
+import { coder } from '@project-serum/anchor/dist/cjs/spl/associated-token';
 import { Market } from '@project-serum/serum';
 import { parsePriceData, PriceData } from '@pythnetwork/client';
 import { PublicKey } from '@solana/web3.js';
+import BN from 'bn.js';
 import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
+import { toNativeDecimals } from '../utils';
 import { Bank, MintInfo } from './bank';
 import { I80F48, ONE_I80F48 } from './I80F48';
 import { PerpMarket } from './perp';
 import { Serum3Market } from './serum3';
-import { toNativeDecimals } from '../utils';
-import BN from 'bn.js';
 
 export class Group {
   static from(
@@ -265,6 +266,30 @@ export class Group {
 
   public getFirstBankByTokenIndex(tokenIndex: number) {
     return this.banksMapByTokenIndex.get(tokenIndex)[0];
+  }
+
+  /**
+   *
+   * @param client
+   * @param mintPk
+   * @returns sum of native balances of all vaults for a token
+   */
+  public async getGroupTokenVaultBalanceByMint(
+    client: MangoClient,
+    mintPk: PublicKey,
+  ): Promise<I80F48> {
+    const banks = this.banksMapByMint.get(mintPk.toString());
+    const amount = new BN(0);
+    for (const bank of banks) {
+      amount.add(
+        coder().accounts.decode(
+          'token',
+          (await client.program.provider.connection.getAccountInfo(bank.vault))
+            .data,
+        ).amount,
+      );
+    }
+    return new I80F48(amount);
   }
 
   public consoleLogBanks() {

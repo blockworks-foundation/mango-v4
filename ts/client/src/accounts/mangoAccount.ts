@@ -101,11 +101,9 @@ export class MangoAccount {
 
   static getEquivalentUsdcPosition(
     sourceBank: Bank,
-    nativeTokenPosition: TokenPosition,
+    tp: TokenPosition,
   ): I80F48 {
-    return nativeTokenPosition
-      ? nativeTokenPosition.balance(sourceBank).mul(sourceBank.price)
-      : ZERO_I80F48;
+    return tp ? tp.balance(sourceBank).mul(sourceBank.price) : ZERO_I80F48;
   }
 
   static getEquivalentTokenPosition(
@@ -244,23 +242,27 @@ export class MangoAccount {
   }
 
   /**
-   * The amount of given native token you can borrow, considering all existing assets as collateral except the deposits for this token.
-   * Note 1: The existing native deposits need to be added to get the full amount that could be withdrawn.
-   * Note 2: The group might have less native deposits than what this returns. TODO: loan origination fees
-   * @returns amount of given native token you can borrow, considering all existing assets as collateral except the deposits for this token, in native token
+   * The amount of given native token you can withdraw including borrows, considering all existing assets as collateral.
+   * @returns amount of given native token you can borrow, considering all existing assets as collateral, in native token
    */
   getMaxWithdrawWithBorrowForToken(group: Group, mintPk: PublicKey): I80F48 {
     const bank: Bank = group.getFirstBankByMint(mintPk);
     const initHealth = (this.accountData as MangoAccountData).initHealth;
-    const inUsdcUnits = MangoAccount.getEquivalentUsdcPosition(
+    const existingPositioninUsdcUnits = MangoAccount.getEquivalentUsdcPosition(
       bank,
       this.findToken(bank.tokenIndex),
     ).max(ZERO_I80F48);
-    const newInitHealth = initHealth.sub(inUsdcUnits.mul(bank.initAssetWeight));
-    return MangoAccount.getEquivalentTokenPosition(
-      bank,
-      newInitHealth.div(bank.initLiabWeight),
+    const initHealthWithoutExistingPosition = initHealth.sub(
+      existingPositioninUsdcUnits.mul(bank.initAssetWeight),
     );
+    const maxBorrowNative = MangoAccount.getEquivalentTokenPosition(
+      bank,
+      initHealthWithoutExistingPosition.div(bank.initLiabWeight),
+    );
+    const maxBorrowNativeWithoutFees = maxBorrowNative.div(
+      ONE_I80F48.add(bank.loanOriginationFeeRate),
+    );
+    return maxBorrowNativeWithoutFees.add(this.getTokenBalance(bank));
   }
 
   /**

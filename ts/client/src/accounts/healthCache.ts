@@ -365,8 +365,8 @@ export class HealthCache {
 
     return amount
       .div(source.oraclePrice)
-      .mul(
-        ONE_I80F48.sub(
+      .div(
+        ONE_I80F48.add(
           group.getFirstBankByMint(sourceMintPk).loanOriginationFeeRate,
         ),
       );
