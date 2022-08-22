@@ -71,6 +71,13 @@ async function debugUser(
 
   async function getMaxWithdrawWithBorrowForTokenUiWrapper(token) {
     console.log(
+      `group.getTokenVaultBalanceByMintUi ${token} ${await group.getTokenVaultBalanceByMintUi(
+        client,
+        group.banksMapByName.get(token)[0].mint,
+      )}`,
+    );
+
+    console.log(
       `mangoAccount.getMaxWithdrawWithBorrowForTokenUi(group, ${token}) ` +
         mangoAccount.getMaxWithdrawWithBorrowForTokenUi(
           group,
@@ -159,7 +166,7 @@ async function main() {
   );
 
   const group = await client.getGroupForCreator(admin.publicKey, 2);
-  // console.log(`${group.toString()}`);
+  console.log(`${group.toString()}`);
 
   for (const keypair of [
     process.env.MB_PAYER_KEYPAIR,
