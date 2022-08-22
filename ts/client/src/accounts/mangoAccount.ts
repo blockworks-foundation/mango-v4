@@ -262,8 +262,21 @@ export class MangoAccount {
     const maxBorrowNativeWithoutFees = maxBorrowNative.div(
       ONE_I80F48.add(bank.loanOriginationFeeRate),
     );
+
+    // console.log(`initHealth ${initHealth.toNumber()}`);
+    // console.log(
+    //   `existingPositioninUsdcUnits ${existingPositioninUsdcUnits.toNumber()}`,
+    // );
+    // console.log(
+    //   `initHealthWithoutExistingPosition ${initHealthWithoutExistingPosition.toNumber()}`,
+    // );
+    // console.log(`maxBorrowNative ${maxBorrowNative.toNumber()}`);
+    // console.log(
+    //   `maxBorrowNativeWithoutFees ${maxBorrowNativeWithoutFees.toNumber()}`,
+    // );
+
     return maxBorrowNativeWithoutFees
-      .add(this.getTokenBalance(bank))
+      .add(this.getTokenDeposits(bank))
       .mul(I80F48.fromString('0.99'));
   }
 
