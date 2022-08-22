@@ -236,6 +236,18 @@ pub mod mango_v4 {
         instructions::flash_loan_end(ctx, flash_loan_type)
     }
 
+    pub fn health_region_begin<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, HealthRegionBegin<'info>>,
+    ) -> Result<()> {
+        instructions::health_region_begin(ctx)
+    }
+
+    pub fn health_region_end<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, HealthRegionEnd<'info>>,
+    ) -> Result<()> {
+        instructions::health_region_end(ctx)
+    }
+
     ///
     /// Serum
     ///

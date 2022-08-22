@@ -791,6 +791,7 @@ export class MangoClient {
         account: mangoAccount.publicKey,
         bank: bank.publicKey,
         vault: bank.vault,
+        oracle: bank.oracle,
         tokenAccount: wrappedSolAccount?.publicKey ?? tokenAccountPk,
         tokenAuthority: mangoAccount.owner,
       })
@@ -864,6 +865,7 @@ export class MangoClient {
         account: mangoAccount.publicKey,
         bank: bank.publicKey,
         vault: bank.vault,
+        oracle: bank.oracle,
         tokenAccount: tokenAccountPk,
         owner: mangoAccount.owner,
       })

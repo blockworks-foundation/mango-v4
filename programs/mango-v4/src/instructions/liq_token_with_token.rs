@@ -251,9 +251,11 @@ pub fn liq_token_with_token(
         .maybe_recover_from_being_liquidated(liqee_init_health);
 
     // Check liqor's health
-    let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
-        .context("compute liqor health")?;
-    require!(liqor_health >= 0, MangoError::HealthMustBePositive);
+    if !liqor.fixed.is_in_health_region() {
+        let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
+            .context("compute liqor health")?;
+        require!(liqor_health >= 0, MangoError::HealthMustBePositive);
+    }
 
     emit!(LiquidateTokenAndTokenLog {
         mango_group: ctx.accounts.group.key(),

@@ -132,11 +132,14 @@ pub fn perp_place_order(
         )?;
     }
 
-    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-    let health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
-    msg!("health: {}", health);
-    require!(health >= 0, MangoError::HealthMustBePositive);
-    account.fixed.maybe_recover_from_being_liquidated(health);
+    if !account.fixed.is_in_health_region() {
+        let retriever =
+            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
+        let health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
+        msg!("health: {}", health);
+        require!(health >= 0, MangoError::HealthMustBePositive);
+        account.fixed.maybe_recover_from_being_liquidated(health);
+    }
 
     Ok(())
 }

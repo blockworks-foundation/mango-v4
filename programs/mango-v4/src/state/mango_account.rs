@@ -56,9 +56,16 @@ pub struct MangoAccount {
     /// Normally accounts can not be liquidated while maint_health >= 0. But when an account
     /// reaches maint_health < 0, liquidators will call a liquidation instruction and thereby
     /// set this flag. Now the account may be liquidated until init_health >= 0.
-    being_liquidated: u8,
+    ///
+    /// Many actions should be disabled while the account is being liquidated, even if
+    /// its maint health has recovered to positive. Creating new open orders would, for example,
+    /// confuse liquidators.
+    pub being_liquidated: u8,
 
-    padding2: u8,
+    /// The account is currently inside a health region marked by HealthRegionBegin...HealthRegionEnd.
+    ///
+    /// Must never be set after a transaction ends.
+    pub in_health_region: u8,
 
     pub bump: u8,
 
@@ -72,7 +79,10 @@ pub struct MangoAccount {
     // TODO: unimplemented
     pub net_settled: i64,
 
-    pub reserved: [u8; 248],
+    /// Init health as calculated during HealthReginBegin, rounded up.
+    pub health_region_pre_init_health: i64,
+
+    pub reserved: [u8; 240],
 
     // dynamic
     pub header_version: u8,
@@ -100,13 +110,14 @@ impl Default for MangoAccount {
             owner: Pubkey::default(),
             delegate: Pubkey::default(),
             being_liquidated: 0,
-            padding2: 0,
+            in_health_region: 0,
             account_num: 0,
             bump: 0,
             padding: Default::default(),
             net_deposits: 0,
             net_settled: 0,
-            reserved: [0; 248],
+            health_region_pre_init_health: 0,
+            reserved: [0; 240],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
             padding4: Default::default(),
@@ -179,14 +190,17 @@ fn test_serialization_match() {
     account.name = crate::util::fill_from_str("abcdef").unwrap();
     account.delegate = Pubkey::new_unique();
     account.account_num = 1;
-    account.bump = 2;
-    account.net_deposits = 3;
-    account.net_settled = 4;
+    account.being_liquidated = 2;
+    account.in_health_region = 3;
+    account.bump = 4;
+    account.net_deposits = 5;
+    account.net_settled = 6;
+    account.health_region_pre_init_health = 7;
     account.tokens.resize(8, TokenPosition::default());
-    account.tokens[0].token_index = 5;
+    account.tokens[0].token_index = 8;
     account.serum3.resize(8, Serum3Orders::default());
     account.perps.resize(8, PerpPosition::default());
-    account.perps[0].market_index = 6;
+    account.perps[0].market_index = 9;
     account
         .perp_open_orders
         .resize(8, PerpOpenOrders::default());
@@ -203,9 +217,15 @@ fn test_serialization_match() {
     assert_eq!(account.name, account2.fixed.name);
     assert_eq!(account.delegate, account2.fixed.delegate);
     assert_eq!(account.account_num, account2.fixed.account_num);
+    assert_eq!(account.being_liquidated, account2.fixed.being_liquidated);
+    assert_eq!(account.in_health_region, account2.fixed.in_health_region);
     assert_eq!(account.bump, account2.fixed.bump);
     assert_eq!(account.net_deposits, account2.fixed.net_deposits);
     assert_eq!(account.net_settled, account2.fixed.net_settled);
+    assert_eq!(
+        account.health_region_pre_init_health,
+        account2.fixed.health_region_begin_init_health
+    );
     assert_eq!(
         account.tokens[0].token_index,
         account2.token_position_by_raw_index(0).token_index
@@ -230,14 +250,15 @@ pub struct MangoAccountFixed {
     pub delegate: Pubkey,
     pub account_num: u32,
     being_liquidated: u8,
-    padding2: u8,
+    in_health_region: u8,
     pub bump: u8,
     pub padding: [u8; 1],
     pub net_deposits: i64,
     pub net_settled: i64,
-    pub reserved: [u8; 248],
+    pub health_region_begin_init_health: i64,
+    pub reserved: [u8; 240],
 }
-const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 2 * 8 + 248);
+const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 3 * 8 + 240);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
 
 unsafe impl bytemuck::Pod for MangoAccountFixed {}
@@ -255,11 +276,19 @@ impl MangoAccountFixed {
     }
 
     pub fn being_liquidated(&self) -> bool {
-        self.being_liquidated != 0
+        self.being_liquidated == 1
     }
 
     pub fn set_being_liquidated(&mut self, b: bool) {
         self.being_liquidated = if b { 1 } else { 0 };
+    }
+
+    pub fn is_in_health_region(&self) -> bool {
+        self.in_health_region == 1
+    }
+
+    pub fn set_in_health_region(&mut self, b: bool) {
+        self.in_health_region = if b { 1 } else { 0 };
     }
 
     pub fn maybe_recover_from_being_liquidated(&mut self, init_health: I80F48) {

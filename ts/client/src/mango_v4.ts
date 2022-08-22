@@ -1107,6 +1107,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenAccount",
           "isMut": true,
           "isSigner": false
@@ -1155,6 +1160,11 @@ export type MangoV4 = {
         {
           "name": "vault",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -1232,6 +1242,36 @@ export type MangoV4 = {
           }
         }
       ]
+    },
+    {
+      "name": "healthRegionBegin",
+      "accounts": [
+        {
+          "name": "instructions",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Instructions Sysvar for instruction introspection"
+          ]
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "healthRegionEnd",
+      "accounts": [
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
     },
     {
       "name": "serum3RegisterMarket",
@@ -3000,12 +3040,21 @@ export type MangoV4 = {
               "",
               "Normally accounts can not be liquidated while maint_health >= 0. But when an account",
               "reaches maint_health < 0, liquidators will call a liquidation instruction and thereby",
-              "set this flag. Now the account may be liquidated until init_health >= 0."
+              "set this flag. Now the account may be liquidated until init_health >= 0.",
+              "",
+              "Many actions should be disabled while the account is being liquidated, even if",
+              "its maint health has recovered to positive. Creating new open orders would, for example,",
+              "confuse liquidators."
             ],
             "type": "u8"
           },
           {
-            "name": "padding2",
+            "name": "inHealthRegion",
+            "docs": [
+              "The account is currently inside a health region marked by HealthRegionBegin...HealthRegionEnd.",
+              "",
+              "Must never be set after a transaction ends."
+            ],
             "type": "u8"
           },
           {
@@ -3030,11 +3079,18 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "healthRegionPreInitHealth",
+            "docs": [
+              "Init health as calculated during HealthReginBegin, rounded up."
+            ],
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                248
+                240
               ]
             }
           },
@@ -5183,6 +5239,11 @@ export type MangoV4 = {
       "code": 6014,
       "name": "InsufficentBankVaultFunds",
       "msg": "bank vault has insufficent funds"
+    },
+    {
+      "code": 6015,
+      "name": "BeingLiquidated",
+      "msg": "account is currently being liquidated"
     }
   ]
 };
@@ -6296,6 +6357,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenAccount",
           "isMut": true,
           "isSigner": false
@@ -6344,6 +6410,11 @@ export const IDL: MangoV4 = {
         {
           "name": "vault",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -6421,6 +6492,36 @@ export const IDL: MangoV4 = {
           }
         }
       ]
+    },
+    {
+      "name": "healthRegionBegin",
+      "accounts": [
+        {
+          "name": "instructions",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Instructions Sysvar for instruction introspection"
+          ]
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "healthRegionEnd",
+      "accounts": [
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
     },
     {
       "name": "serum3RegisterMarket",
@@ -8189,12 +8290,21 @@ export const IDL: MangoV4 = {
               "",
               "Normally accounts can not be liquidated while maint_health >= 0. But when an account",
               "reaches maint_health < 0, liquidators will call a liquidation instruction and thereby",
-              "set this flag. Now the account may be liquidated until init_health >= 0."
+              "set this flag. Now the account may be liquidated until init_health >= 0.",
+              "",
+              "Many actions should be disabled while the account is being liquidated, even if",
+              "its maint health has recovered to positive. Creating new open orders would, for example,",
+              "confuse liquidators."
             ],
             "type": "u8"
           },
           {
-            "name": "padding2",
+            "name": "inHealthRegion",
+            "docs": [
+              "The account is currently inside a health region marked by HealthRegionBegin...HealthRegionEnd.",
+              "",
+              "Must never be set after a transaction ends."
+            ],
             "type": "u8"
           },
           {
@@ -8219,11 +8329,18 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "healthRegionPreInitHealth",
+            "docs": [
+              "Init health as calculated during HealthReginBegin, rounded up."
+            ],
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                248
+                240
               ]
             }
           },
@@ -10372,6 +10489,11 @@ export const IDL: MangoV4 = {
       "code": 6014,
       "name": "InsufficentBankVaultFunds",
       "msg": "bank vault has insufficent funds"
+    },
+    {
+      "code": 6015,
+      "name": "BeingLiquidated",
+      "msg": "account is currently being liquidated"
     }
   ]
 };

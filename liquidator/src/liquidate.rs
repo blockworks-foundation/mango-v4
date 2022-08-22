@@ -4,8 +4,8 @@ use crate::account_shared_data::KeyedAccountSharedData;
 
 use client::{chain_data, AccountFetcher, MangoClient, MangoClientError, MangoGroupContext};
 use mango_v4::state::{
-    new_health_cache, oracle_price, Bank, FixedOrderAccountRetriever, HealthCache, HealthType,
-    MangoAccountValue, TokenIndex, QUOTE_TOKEN_INDEX,
+    new_health_cache, Bank, FixedOrderAccountRetriever, HealthCache, HealthType, MangoAccountValue,
+    TokenIndex, QUOTE_TOKEN_INDEX,
 };
 
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
@@ -143,11 +143,10 @@ pub fn maybe_liquidate_account(
             let token = mango_client.context.token(token_position.token_index);
             let bank = account_fetcher.fetch::<Bank>(&token.mint_info.first_bank())?;
             let oracle = account_fetcher.fetch_raw_account(token.mint_info.oracle)?;
-            let price = oracle_price(
-                &KeyedAccountSharedData::new(token.mint_info.oracle, oracle.into()),
-                bank.oracle_config.conf_filter,
-                bank.mint_decimals,
-            )?;
+            let price = bank.oracle_price(&KeyedAccountSharedData::new(
+                token.mint_info.oracle,
+                oracle.into(),
+            ))?;
             Ok((
                 token_position.token_index,
                 price,

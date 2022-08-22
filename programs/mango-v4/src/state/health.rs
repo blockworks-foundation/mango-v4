@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::serum3_cpi;
-use crate::state::{oracle_price, Bank, PerpMarket, PerpMarketIndex, TokenIndex};
+use crate::state::{Bank, PerpMarket, PerpMarketIndex, TokenIndex};
 use crate::util::checked_math as cm;
 
 use super::MangoAccountRef;
@@ -89,8 +89,7 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
 
     fn oracle_price(&self, account_index: usize, bank: &Bank) -> Result<I80F48> {
         let oracle = &self.ais[cm!(self.n_banks + account_index)];
-        require_keys_eq!(bank.oracle, *oracle.key());
-        oracle_price(oracle, bank.oracle_config.conf_filter, bank.mint_decimals)
+        bank.oracle_price(oracle)
     }
 }
 
@@ -275,8 +274,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
             let index = self.bank_index(token_index1)?;
             let bank = self.banks[index].load_mut_fully_unchecked::<Bank>()?;
             let oracle = &self.oracles[index];
-            require_keys_eq!(bank.oracle, *oracle.key);
-            let price = oracle_price(oracle, bank.oracle_config.conf_filter, bank.mint_decimals)?;
+            let price = bank.oracle_price(oracle)?;
             return Ok((bank, price, None));
         }
         let index1 = self.bank_index(token_index1)?;
@@ -294,12 +292,8 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         let bank2 = second_bank_part[second - (first + 1)].load_mut_fully_unchecked::<Bank>()?;
         let oracle1 = &self.oracles[first];
         let oracle2 = &self.oracles[second];
-        require_keys_eq!(bank1.oracle, *oracle1.key);
-        require_keys_eq!(bank2.oracle, *oracle2.key);
-        let mint_decimals1 = bank1.mint_decimals;
-        let mint_decimals2 = bank2.mint_decimals;
-        let price1 = oracle_price(oracle1, bank1.oracle_config.conf_filter, mint_decimals1)?;
-        let price2 = oracle_price(oracle2, bank2.oracle_config.conf_filter, mint_decimals2)?;
+        let price1 = bank1.oracle_price(oracle1)?;
+        let price2 = bank2.oracle_price(oracle2)?;
         if swap {
             Ok((bank2, price2, Some((bank1, price1))))
         } else {
@@ -311,11 +305,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         let index = self.bank_index(token_index)?;
         let bank = self.banks[index].load_fully_unchecked::<Bank>()?;
         let oracle = &self.oracles[index];
-        require_keys_eq!(bank.oracle, *oracle.key);
-        Ok((
-            bank,
-            oracle_price(oracle, bank.oracle_config.conf_filter, bank.mint_decimals)?,
-        ))
+        Ok((bank, bank.oracle_price(oracle)?))
     }
 
     pub fn scanned_perp_market(&self, perp_market_index: PerpMarketIndex) -> Result<&PerpMarket> {

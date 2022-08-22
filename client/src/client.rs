@@ -374,6 +374,7 @@ impl MangoClient {
                             account: self.mango_account_address,
                             bank: mint_info.first_bank(),
                             vault: mint_info.first_vault(),
+                            oracle: mint_info.oracle,
                             token_account: get_associated_token_address(
                                 &self.owner(),
                                 &mint_info.mint,
@@ -425,6 +426,7 @@ impl MangoClient {
                             owner: self.owner(),
                             bank: mint_info.first_bank(),
                             vault: mint_info.first_vault(),
+                            oracle: mint_info.oracle,
                             token_account: get_associated_token_address(
                                 &self.owner(),
                                 &mint_info.mint,

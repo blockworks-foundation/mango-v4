@@ -1,4 +1,6 @@
 use super::{OracleConfig, TokenIndex, TokenPosition};
+use crate::accounts_zerocopy::KeyedAccountReader;
+use crate::state::oracle;
 use crate::util;
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
@@ -544,6 +546,15 @@ impl Bank {
         } else {
             (self.rate0, self.rate1, self.max_rate)
         }
+    }
+
+    pub fn oracle_price(&self, oracle_acc: &impl KeyedAccountReader) -> Result<I80F48> {
+        require_keys_eq!(self.oracle, *oracle_acc.key());
+        oracle::oracle_price(
+            oracle_acc,
+            self.oracle_config.conf_filter,
+            self.mint_decimals,
+        )
     }
 }
 

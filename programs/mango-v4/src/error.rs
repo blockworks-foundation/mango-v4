@@ -35,6 +35,8 @@ pub enum MangoError {
     Serum3OpenOrdersExistAlready,
     #[msg("bank vault has insufficent funds")]
     InsufficentBankVaultFunds,
+    #[msg("account is currently being liquidated")]
+    BeingLiquidated,
 }
 
 pub trait Contextable {
