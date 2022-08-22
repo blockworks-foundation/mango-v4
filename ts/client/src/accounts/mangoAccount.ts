@@ -2,7 +2,7 @@ import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
-import { nativeI80F48ToUi } from '../utils';
+import { nativeI80F48ToUi, toUiDecimals } from '../utils';
 import { Bank } from './bank';
 import { Group } from './group';
 import { HealthCache, HealthCacheDto } from './healthCache';
@@ -262,7 +262,16 @@ export class MangoAccount {
     const maxBorrowNativeWithoutFees = maxBorrowNative.div(
       ONE_I80F48.add(bank.loanOriginationFeeRate),
     );
-    return maxBorrowNativeWithoutFees.add(this.getTokenBalance(bank));
+    return maxBorrowNativeWithoutFees
+      .add(this.getTokenBalance(bank))
+      .mul(I80F48.fromString('0.99'));
+  }
+
+  getMaxWithdrawWithBorrowForTokenUi(group: Group, mintPk: PublicKey): number {
+    return toUiDecimals(
+      this.getMaxWithdrawWithBorrowForToken(group, mintPk),
+      group.getMintDecimals(mintPk),
+    );
   }
 
   /**

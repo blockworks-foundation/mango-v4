@@ -1,13 +1,18 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
+import { Group } from '../accounts/group';
 import { I80F48 } from '../accounts/I80F48';
-import { HealthType } from '../accounts/mangoAccount';
+import { HealthType, MangoAccount } from '../accounts/mangoAccount';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 import { toUiDecimalsForQuote } from '../utils';
 
-async function debugUser(client, group, mangoAccount) {
+async function debugUser(
+  client: MangoClient,
+  group: Group,
+  mangoAccount: MangoAccount,
+) {
   console.log(mangoAccount.toString(group));
   await mangoAccount.reload(client, group);
 
@@ -64,17 +69,33 @@ async function debugUser(client, group, mangoAccount) {
 
   console.log(group.banksMapByName.get('SOL')[0].mint.toBase58());
 
-  console.log(
-    "mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL') " +
-      toUiDecimalsForQuote(
-        (
-          await mangoAccount.getMaxWithdrawWithBorrowForToken(
-            group,
-            group.banksMapByName.get('SOL')[0].mint,
-          )
-        ).toNumber(),
-      ),
-  );
+  async function getMaxWithdrawWithBorrowForTokenUiWrapper(token) {
+    console.log(
+      `mangoAccount.getMaxWithdrawWithBorrowForTokenUi(group, ${token}) ` +
+        mangoAccount.getMaxWithdrawWithBorrowForTokenUi(
+          group,
+          group.banksMapByName.get(token)[0].mint,
+        ),
+    );
+    try {
+      await client.tokenWithdraw(
+        group,
+        mangoAccount,
+        group.banksMapByName.get(token)[0].mint,
+        mangoAccount.getMaxWithdrawWithBorrowForTokenUi(
+          group,
+          group.banksMapByName.get(token)[0].mint,
+        ),
+        true,
+      );
+    } catch (error) {
+      console.log(error);
+    }
+  }
+  await getMaxWithdrawWithBorrowForTokenUiWrapper('SOL');
+  await getMaxWithdrawWithBorrowForTokenUiWrapper('MSOL');
+  await getMaxWithdrawWithBorrowForTokenUiWrapper('USDC');
+  await getMaxWithdrawWithBorrowForTokenUiWrapper('BTC');
 
   console.log(
     'mangoAccount.simHealthRatioWithTokenPositionChanges ' +
@@ -138,7 +159,7 @@ async function main() {
   );
 
   const group = await client.getGroupForCreator(admin.publicKey, 2);
-  console.log(`${group.toString()}`);
+  // console.log(`${group.toString()}`);
 
   for (const keypair of [
     process.env.MB_PAYER_KEYPAIR,
@@ -155,8 +176,13 @@ async function main() {
       user.publicKey,
     );
     for (const mangoAccount of mangoAccounts) {
-      console.log(`MangoAccount ${mangoAccount.publicKey}`);
-      await debugUser(client, group, mangoAccount);
+      if (
+        '9B8uwqH8FJqLn9kvGPVb5GEksLvmyXb3B8UKCFtRs5cq' ===
+        mangoAccount.publicKey.toBase58()
+      ) {
+        console.log(`MangoAccount ${mangoAccount.publicKey}`);
+        await debugUser(client, group, mangoAccount);
+      }
     }
   }
 
