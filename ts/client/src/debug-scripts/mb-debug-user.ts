@@ -70,19 +70,19 @@ async function debugUser(
   console.log(group.banksMapByName.get('SOL')[0].mint.toBase58());
 
   async function getMaxWithdrawWithBorrowForTokenUiWrapper(token) {
-    console.log(
-      `group.getTokenVaultBalanceByMintUi ${token} ${await group.getTokenVaultBalanceByMintUi(
-        client,
-        group.banksMapByName.get(token)[0].mint,
-      )}`,
-    );
-
+    console.log();
     console.log(
       `mangoAccount.getMaxWithdrawWithBorrowForTokenUi(group, ${token}) ` +
         mangoAccount.getMaxWithdrawWithBorrowForTokenUi(
           group,
           group.banksMapByName.get(token)[0].mint,
         ),
+    );
+    console.log(
+      `group.getTokenVaultBalanceByMintUi ${token} ${await group.getTokenVaultBalanceByMintUi(
+        client,
+        group.banksMapByName.get(token)[0].mint,
+      )}`,
     );
   }
   await getMaxWithdrawWithBorrowForTokenUiWrapper('SOL');
@@ -98,42 +98,42 @@ async function debugUser(
           .toNumber(),
     );
   }
-  simHealthRatioWithTokenPositionChangesWrapper('sol 1  ', {
-    mintPk: group.banksMapByName.get('SOL')[0].mint,
-    uiTokenAmount: 1,
-  });
-  simHealthRatioWithTokenPositionChangesWrapper('sol -1  ', {
-    mintPk: group.banksMapByName.get('SOL')[0].mint,
-    uiTokenAmount: -1,
-  });
-  simHealthRatioWithTokenPositionChangesWrapper('msol 1  ', {
-    mintPk: group.banksMapByName.get('MSOL')[0].mint,
-    uiTokenAmount: 1,
-  });
-  simHealthRatioWithTokenPositionChangesWrapper('msol -1  ', {
-    mintPk: group.banksMapByName.get('MSOL')[0].mint,
-    uiTokenAmount: -1,
-  });
-  simHealthRatioWithTokenPositionChangesWrapper('usdc 10  ', {
-    mintPk: group.banksMapByName.get('USDC')[0].mint,
-    uiTokenAmount: 10,
-  });
-  simHealthRatioWithTokenPositionChangesWrapper('usdc -10  ', {
-    mintPk: group.banksMapByName.get('USDC')[0].mint,
-    uiTokenAmount: -10,
-  });
-  simHealthRatioWithTokenPositionChangesWrapper('btc 0.001  ', {
-    mintPk: group.banksMapByName.get('BTC')[0].mint,
-    uiTokenAmount: 0.001,
-  });
-  simHealthRatioWithTokenPositionChangesWrapper('btc -0.001  ', {
-    mintPk: group.banksMapByName.get('BTC')[0].mint,
-    uiTokenAmount: -0.001,
-  });
-  simHealthRatioWithTokenPositionChangesWrapper('soETH -0.001  ', {
-    mintPk: group.banksMapByName.get('soETH')[0].mint,
-    uiTokenAmount: -0.001,
-  });
+  // simHealthRatioWithTokenPositionChangesWrapper('sol 1  ', {
+  //   mintPk: group.banksMapByName.get('SOL')[0].mint,
+  //   uiTokenAmount: 1,
+  // });
+  // simHealthRatioWithTokenPositionChangesWrapper('sol -1  ', {
+  //   mintPk: group.banksMapByName.get('SOL')[0].mint,
+  //   uiTokenAmount: -1,
+  // });
+  // simHealthRatioWithTokenPositionChangesWrapper('msol 1  ', {
+  //   mintPk: group.banksMapByName.get('MSOL')[0].mint,
+  //   uiTokenAmount: 1,
+  // });
+  // simHealthRatioWithTokenPositionChangesWrapper('msol -1  ', {
+  //   mintPk: group.banksMapByName.get('MSOL')[0].mint,
+  //   uiTokenAmount: -1,
+  // });
+  // simHealthRatioWithTokenPositionChangesWrapper('usdc 10  ', {
+  //   mintPk: group.banksMapByName.get('USDC')[0].mint,
+  //   uiTokenAmount: 10,
+  // });
+  // simHealthRatioWithTokenPositionChangesWrapper('usdc -10  ', {
+  //   mintPk: group.banksMapByName.get('USDC')[0].mint,
+  //   uiTokenAmount: -10,
+  // });
+  // simHealthRatioWithTokenPositionChangesWrapper('btc 0.001  ', {
+  //   mintPk: group.banksMapByName.get('BTC')[0].mint,
+  //   uiTokenAmount: 0.001,
+  // });
+  // simHealthRatioWithTokenPositionChangesWrapper('btc -0.001  ', {
+  //   mintPk: group.banksMapByName.get('BTC')[0].mint,
+  //   uiTokenAmount: -0.001,
+  // });
+  // simHealthRatioWithTokenPositionChangesWrapper('soETH -0.001  ', {
+  //   mintPk: group.banksMapByName.get('soETH')[0].mint,
+  //   uiTokenAmount: -0.001,
+  // });
 
   function getMaxSourceForTokenSwapWrapper(src, tgt) {
     console.log(

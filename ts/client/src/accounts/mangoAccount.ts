@@ -99,20 +99,6 @@ export class MangoAccount {
   // * functions try to be explicit by having native or ui in the name to better reflect the value
   // * some values might appear unexpected large or small, usually the doc contains a "note"
 
-  static getEquivalentUsdcPosition(
-    sourceBank: Bank,
-    tp: TokenPosition,
-  ): I80F48 {
-    return tp ? tp.balance(sourceBank).mul(sourceBank.price) : ZERO_I80F48;
-  }
-
-  static getEquivalentTokenPosition(
-    targetBank: Bank,
-    nativeUsdcPosition: I80F48,
-  ): I80F48 {
-    return nativeUsdcPosition.div(targetBank.price);
-  }
-
   /**
    *
    * @param bank
@@ -246,27 +232,64 @@ export class MangoAccount {
    * @returns amount of given native token you can borrow, considering all existing assets as collateral, in native token
    */
   getMaxWithdrawWithBorrowForToken(group: Group, mintPk: PublicKey): I80F48 {
-    const bank: Bank = group.getFirstBankByMint(mintPk);
+    const tokenBank: Bank = group.getFirstBankByMint(mintPk);
     const initHealth = (this.accountData as MangoAccountData).initHealth;
+
+    // Case 1:
+    // Cannot withdraw if init health is below 0
     if (initHealth.lte(ZERO_I80F48)) {
       return ZERO_I80F48;
     }
 
-    const maxBorrowNative = MangoAccount.getEquivalentTokenPosition(
-      bank,
-      initHealth.div(bank.initLiabWeight),
+    // Deposits need special treatment since they would neither count towards liabilities
+    // nor would be charged loanOriginationFeeRate when withdrawn
+
+    const tp = this.findToken(tokenBank.tokenIndex);
+    let existingPositionHealthContrib = ZERO_I80F48;
+    if (tp && tp.deposits(tokenBank).gte(ZERO_I80F48)) {
+      existingPositionHealthContrib = tp
+        .deposits(tokenBank)
+        .mul(tokenBank.price)
+        .mul(tokenBank.initAssetWeight);
+    }
+
+    // Case 2: token deposits have higher contribution than initHealth,
+    // can withdraw without borrowing until initHealth reaches 0
+    if (existingPositionHealthContrib.gt(initHealth)) {
+      const withdrawAbleExistingPositionHealthContrib =
+        existingPositionHealthContrib.sub(initHealth);
+      // console.log(`initHealth ${initHealth}`);
+      // console.log(
+      //   `existingPositionHealthContrib ${existingPositionHealthContrib}`,
+      // );
+      // console.log(
+      //   `withdrawAbleExistingPositionHealthContrib ${withdrawAbleExistingPositionHealthContrib}`,
+      // );
+      return withdrawAbleExistingPositionHealthContrib.div(tokenBank.price);
+    }
+
+    // Case 3: withdraw = withdraw existing deposits + borrows until initHealth reaches 0
+    const initHealthWithoutExistingPosition = initHealth.sub(
+      existingPositionHealthContrib,
     );
-    const maxBorrowNativeMinusFees = maxBorrowNative.div(
-      ONE_I80F48.add(bank.loanOriginationFeeRate),
+    const maxBorrowNative = initHealthWithoutExistingPosition
+      .div(tokenBank.initLiabWeight)
+      .div(tokenBank.price);
+    const maxBorrowNativeWithoutFees = maxBorrowNative.div(
+      ONE_I80F48.add(tokenBank.loanOriginationFeeRate),
     );
 
-    // console.log(`initHealth ${initHealth.toNumber()}`);
-    // console.log(`maxBorrowNative ${maxBorrowNative.toNumber()}`);
+    // console.log(`initHealth ${initHealth}`);
     // console.log(
-    //   `maxBorrowNativeWithoutFees ${maxBorrowNativeWithoutFees.toNumber()}`,
+    //   `existingPositionHealthContrib ${existingPositionHealthContrib}`,
     // );
+    // console.log(
+    //   `initHealthWithoutExistingPosition ${initHealthWithoutExistingPosition}`,
+    // );
+    // console.log(`maxBorrowNative ${maxBorrowNative}`);
+    // console.log(`maxBorrowNativeWithoutFees ${maxBorrowNativeWithoutFees}`);
 
-    return maxBorrowNativeMinusFees;
+    return maxBorrowNativeWithoutFees.add(this.getTokenDeposits(tokenBank));
   }
 
   getMaxWithdrawWithBorrowForTokenUi(group: Group, mintPk: PublicKey): number {
