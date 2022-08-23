@@ -2,7 +2,7 @@ import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
-import { nativeI80F48ToUi, toUiDecimals } from '../utils';
+import { nativeI80F48ToUi, toNative, toUiDecimals } from '../utils';
 import { Bank } from './bank';
 import { Group } from './group';
 import { HealthCache, HealthCacheDto } from './healthCache';
@@ -264,7 +264,9 @@ export class MangoAccount {
       // console.log(
       //   `withdrawAbleExistingPositionHealthContrib ${withdrawAbleExistingPositionHealthContrib}`,
       // );
-      return withdrawAbleExistingPositionHealthContrib.div(tokenBank.price);
+      return withdrawAbleExistingPositionHealthContrib
+        .div(tokenBank.initAssetWeight)
+        .div(tokenBank.price);
     }
 
     // Case 3: withdraw = withdraw existing deposits + borrows until initHealth reaches 0
@@ -314,7 +316,7 @@ export class MangoAccount {
         group,
         sourceMintPk,
         targetMintPk,
-        ZERO_I80F48, // target 1% health
+        ONE_I80F48, // target 1% health
       )
       .mul(I80F48.fromNumber(slippageAndFeesFactor));
   }
@@ -360,9 +362,9 @@ export class MangoAccount {
   ): I80F48 {
     const nativeTokenChanges = uiTokenChanges.map((tokenChange) => {
       return {
-        nativeTokenAmount: I80F48.fromNumber(
-          tokenChange.uiTokenAmount *
-            Math.pow(10, group.getMintDecimals(tokenChange.mintPk)),
+        nativeTokenAmount: toNative(
+          tokenChange.uiTokenAmount,
+          group.getMintDecimals(tokenChange.mintPk),
         ),
         mintPk: tokenChange.mintPk,
       };
