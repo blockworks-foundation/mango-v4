@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::serum3_cpi;
-use crate::state::{Bank, PerpMarket, PerpMarketIndex, TokenIndex};
+use crate::state::{Bank, PerpMarket, PerpMarketIndex, Serum3MarketIndex, TokenIndex};
 use crate::util::checked_math as cm;
 
 use super::MangoAccountRef;
@@ -427,6 +427,7 @@ pub struct Serum3Info {
     reserved: I80F48,
     base_index: usize,
     quote_index: usize,
+    market_index: Serum3MarketIndex,
 }
 
 impl Serum3Info {
@@ -526,13 +527,67 @@ impl HealthCache {
         health
     }
 
+    fn token_entry_index(&mut self, token_index: TokenIndex) -> Result<usize> {
+        self.token_infos
+            .iter()
+            .position(|t| t.token_index == token_index)
+            .ok_or_else(|| error_msg!("token index {} not found", token_index))
+    }
+
     pub fn adjust_token_balance(&mut self, token_index: TokenIndex, change: I80F48) -> Result<()> {
-        let mut entry = self
-            .token_infos
-            .iter_mut()
-            .find(|t| t.token_index == token_index)
-            .ok_or_else(|| error_msg!("token index {} not found", token_index))?;
+        let entry_index = self.token_entry_index(token_index)?;
+        let mut entry = &mut self.token_infos[entry_index];
         entry.balance = cm!(entry.balance + change * entry.oracle_price);
+        Ok(())
+    }
+
+    pub fn adjust_serum3_reserved(
+        &mut self,
+        market_index: Serum3MarketIndex,
+        base_token_index: TokenIndex,
+        reserved_base_change: I80F48,
+        free_base_change: I80F48,
+        quote_token_index: TokenIndex,
+        reserved_quote_change: I80F48,
+        free_quote_change: I80F48,
+    ) -> Result<()> {
+        let base_entry_index = self.token_entry_index(base_token_index)?;
+        let quote_entry_index = self.token_entry_index(quote_token_index)?;
+
+        // Compute the total reserved amount change in health reference units
+        let mut reserved_amount;
+        {
+            let base_entry = &mut self.token_infos[base_entry_index];
+            reserved_amount = cm!(reserved_base_change * base_entry.oracle_price);
+        }
+        {
+            let quote_entry = &mut self.token_infos[quote_entry_index];
+            reserved_amount =
+                cm!(reserved_amount + reserved_quote_change * quote_entry.oracle_price);
+        }
+
+        // Apply it to the tokens
+        {
+            let base_entry = &mut self.token_infos[base_entry_index];
+            base_entry.serum3_max_reserved = cm!(base_entry.serum3_max_reserved + reserved_amount);
+            base_entry.balance =
+                cm!(base_entry.balance + free_base_change * base_entry.oracle_price);
+        }
+        {
+            let quote_entry = &mut self.token_infos[quote_entry_index];
+            quote_entry.serum3_max_reserved =
+                cm!(quote_entry.serum3_max_reserved + reserved_amount);
+            quote_entry.balance =
+                cm!(quote_entry.balance + free_quote_change * quote_entry.oracle_price);
+        }
+
+        // Apply it to the serum3 info
+        let market_entry = self
+            .serum3_infos
+            .iter_mut()
+            .find(|m| m.market_index == market_index)
+            .ok_or_else(|| error_msg!("serum3 market {} not found", market_index))?;
+        market_entry.reserved = cm!(market_entry.reserved + reserved_amount);
         Ok(())
     }
 
@@ -832,6 +887,7 @@ pub fn new_health_cache(
             reserved: reserved_balance,
             base_index,
             quote_index,
+            market_index: serum_account.market_index,
         });
     }
 
