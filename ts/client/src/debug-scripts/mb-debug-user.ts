@@ -85,9 +85,7 @@ async function debugUser(
   function simHealthRatioWithTokenPositionChangesWrapper(debug, change) {
     console.log(
       `mangoAccount.simHealthRatioWithTokenPositionChanges ${debug}` +
-        mangoAccount
-          .simHealthRatioWithTokenPositionUiChanges(group, [change])
-          .toNumber(),
+        mangoAccount.simHealthRatioWithTokenPositionUiChanges(group, [change]),
     );
   }
   for (const srcToken of Array.from(group.banksMapByName.keys())) {
@@ -166,11 +164,13 @@ async function main() {
       user.publicKey,
     );
     for (const mangoAccount of mangoAccounts) {
+      console.log(`MangoAccount ${mangoAccount.publicKey}`);
       if (
-        '9B8uwqH8FJqLn9kvGPVb5GEksLvmyXb3B8UKCFtRs5cq' ===
+        'etVgrWPAQe3aUMiuZT32tEMnbtuD2yRxip6eEkSRrLV' ===
+        // '2UWD1ZBiYdusXgXputE68MBL4Kz47nZptzMn6rLnzn1K' ===
+        // '9B8uwqH8FJqLn9kvGPVb5GEksLvmyXb3B8UKCFtRs5cq' ===
         mangoAccount.publicKey.toBase58()
       ) {
-        console.log(`MangoAccount ${mangoAccount.publicKey}`);
         await debugUser(client, group, mangoAccount);
       }
     }
