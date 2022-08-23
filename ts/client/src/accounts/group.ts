@@ -91,19 +91,17 @@ export class Group {
 
     // console.time('group.reload');
     await Promise.all([
-      this.reloadBanks(client, ids),
+      this.reloadBanks(client, ids).then(() =>
+        Promise.all([
+          this.reloadBankPrices(client, ids),
+          this.reloadVaults(client, ids),
+        ]),
+      ),
       this.reloadMintInfos(client, ids),
-      this.reloadSerum3Markets(client, ids),
+      this.reloadSerum3Markets(client, ids).then(() =>
+        this.reloadSerum3ExternalMarkets(client, ids),
+      ),
       this.reloadPerpMarkets(client, ids),
-    ]);
-
-    await Promise.all([
-      // requires reloadBanks to have finished loading
-      this.reloadBankPrices(client, ids),
-      // requires reloadSerum3Markets to have finished loading
-      this.reloadSerum3ExternalMarkets(client, ids),
-      // requires reloadBanks to have finished loading
-      this.reloadVaults(client, ids),
     ]);
     // console.timeEnd('group.reload');
   }
