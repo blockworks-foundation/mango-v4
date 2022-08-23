@@ -301,21 +301,55 @@ export class MangoAccount {
 
   /**
    * Simulates new health ratio after applying tokenChanges to the token positions.
+   * Note: token changes are expected in native amounts
+   *
    * e.g. useful to simulate health after a potential swap.
    * Note: health ratio is technically ∞ if liabs are 0
    * @returns health ratio, in percentage form
    */
   simHealthRatioWithTokenPositionChanges(
     group: Group,
-    tokenChanges: {
-      tokenAmount: number;
+    nativeTokenChanges: {
+      nativeTokenAmount: I80F48;
       mintPk: PublicKey;
     }[],
     healthType: HealthType = HealthType.init,
   ): I80F48 {
     return this.accountData.healthCache.simHealthRatioWithTokenPositionChanges(
       group,
-      tokenChanges,
+      nativeTokenChanges,
+      healthType,
+    );
+  }
+
+  /**
+   * Simulates new health ratio after applying tokenChanges to the token positions.
+   * Note: token changes are expected in ui amounts
+   *
+   * e.g. useful to simulate health after a potential swap.
+   * Note: health ratio is technically ∞ if liabs are 0
+   * @returns health ratio, in percentage form
+   */
+  simHealthRatioWithTokenPositionUiChanges(
+    group: Group,
+    uiTokenChanges: {
+      uiTokenAmount: number;
+      mintPk: PublicKey;
+    }[],
+    healthType: HealthType = HealthType.init,
+  ): I80F48 {
+    const nativeTokenChanges = uiTokenChanges.map((tokenChange) => {
+      return {
+        nativeTokenAmount: I80F48.fromNumber(
+          tokenChange.uiTokenAmount *
+            Math.pow(10, group.getMintDecimals(tokenChange.mintPk)),
+        ),
+        mintPk: tokenChange.mintPk,
+      };
+    });
+    return this.accountData.healthCache.simHealthRatioWithTokenPositionChanges(
+      group,
+      nativeTokenChanges,
       healthType,
     );
   }

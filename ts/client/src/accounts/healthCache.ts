@@ -174,19 +174,27 @@ export class HealthCache {
 
   simHealthRatioWithTokenPositionChanges(
     group: Group,
-    tokenChanges: {
-      tokenAmount: number;
+    nativeTokenChanges: {
+      nativeTokenAmount: I80F48;
       mintPk: PublicKey;
     }[],
     healthType: HealthType = HealthType.init,
   ): I80F48 {
     const adjustedCache: HealthCache = _.cloneDeep(this);
-    for (const change of tokenChanges) {
+    for (const change of nativeTokenChanges) {
       const bank: Bank = group.getFirstBankByMint(change.mintPk);
       const changeIndex = adjustedCache.getOrCreateTokenInfoIndex(bank);
       adjustedCache.tokenInfos[changeIndex].balance = adjustedCache.tokenInfos[
         changeIndex
-      ].balance.add(I80F48.fromNumber(change.tokenAmount).mul(bank.price));
+      ].balance.add(change.nativeTokenAmount.mul(bank.price));
+      console.log(' ');
+      console.log(`change.mintPk ${change.mintPk.toBase58()}`);
+      console.log(`changeIndex ${changeIndex}`);
+      console.log(
+        `adjustedCache.tokenInfos[changeIndex].balance ${adjustedCache.tokenInfos[
+          changeIndex
+        ].balance.toNumber()}`,
+      );
     }
     return adjustedCache.healthRatio(healthType);
   }
