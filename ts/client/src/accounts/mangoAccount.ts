@@ -256,8 +256,7 @@ export class MangoAccount {
     // Case 2: token deposits have higher contribution than initHealth,
     // can withdraw without borrowing until initHealth reaches 0
     if (existingPositionHealthContrib.gt(initHealth)) {
-      const withdrawAbleExistingPositionHealthContrib =
-        existingPositionHealthContrib.sub(initHealth);
+      const withdrawAbleExistingPositionHealthContrib = initHealth;
       // console.log(`initHealth ${initHealth}`);
       // console.log(
       //   `existingPositionHealthContrib ${existingPositionHealthContrib}`,
@@ -278,7 +277,6 @@ export class MangoAccount {
     const maxBorrowNativeWithoutFees = maxBorrowNative.div(
       ONE_I80F48.add(tokenBank.loanOriginationFeeRate),
     );
-
     // console.log(`initHealth ${initHealth}`);
     // console.log(
     //   `existingPositionHealthContrib ${existingPositionHealthContrib}`,
@@ -288,7 +286,6 @@ export class MangoAccount {
     // );
     // console.log(`maxBorrowNative ${maxBorrowNative}`);
     // console.log(`maxBorrowNativeWithoutFees ${maxBorrowNativeWithoutFees}`);
-
     return maxBorrowNativeWithoutFees.add(this.getTokenDeposits(tokenBank));
   }
 
