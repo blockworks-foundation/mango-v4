@@ -245,10 +245,10 @@ export class MangoAccount {
     // nor would be charged loanOriginationFeeRate when withdrawn
 
     const tp = this.findToken(tokenBank.tokenIndex);
+    const existingTokenDeposits = tp ? tp.deposits(tokenBank) : ZERO_I80F48;
     let existingPositionHealthContrib = ZERO_I80F48;
-    if (tp && tp.deposits(tokenBank).gte(ZERO_I80F48)) {
-      existingPositionHealthContrib = tp
-        .deposits(tokenBank)
+    if (existingTokenDeposits.gt(ZERO_I80F48)) {
+      existingPositionHealthContrib = existingTokenDeposits
         .mul(tokenBank.price)
         .mul(tokenBank.initAssetWeight);
     }
@@ -288,7 +288,7 @@ export class MangoAccount {
     // );
     // console.log(`maxBorrowNative ${maxBorrowNative}`);
     // console.log(`maxBorrowNativeWithoutFees ${maxBorrowNativeWithoutFees}`);
-    return maxBorrowNativeWithoutFees.add(this.getTokenDeposits(tokenBank));
+    return maxBorrowNativeWithoutFees.add(existingTokenDeposits);
   }
 
   getMaxWithdrawWithBorrowForTokenUi(group: Group, mintPk: PublicKey): number {
