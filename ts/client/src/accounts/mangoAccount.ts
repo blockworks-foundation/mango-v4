@@ -317,7 +317,7 @@ export class MangoAccount {
         group,
         sourceMintPk,
         targetMintPk,
-        ONE_I80F48, // target 1% health
+        ZERO_I80F48, // target 1% health
       )
       .mul(I80F48.fromNumber(slippageAndFeesFactor));
   }

@@ -139,6 +139,7 @@ async function debugUser(
   });
 
   function getMaxSourceForTokenSwapWrapper(src, tgt) {
+    // console.log();
     console.log(
       `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
         mangoAccount
@@ -146,7 +147,7 @@ async function debugUser(
             group,
             group.banksMapByName.get(src)[0].mint,
             group.banksMapByName.get(tgt)[0].mint,
-            0.9,
+            1,
           )
           .div(
             I80F48.fromNumber(
@@ -156,8 +157,13 @@ async function debugUser(
           .toNumber(),
     );
   }
-  getMaxSourceForTokenSwapWrapper('SOL', 'BTC');
-  getMaxSourceForTokenSwapWrapper('USDC', 'USDC');
+  for (const srcToken of Array.from(group.banksMapByName.keys())) {
+    for (const tgtToken of Array.from(group.banksMapByName.keys())) {
+      // if (srcToken === 'SOL')
+      // if (tgtToken === 'MSOL')
+      getMaxSourceForTokenSwapWrapper(srcToken, tgtToken);
+    }
+  }
 }
 
 async function main() {

@@ -174,15 +174,21 @@ export class HealthCache {
 
   private static logHealthCache(debug: string, healthCache: HealthCache) {
     console.log(debug);
-    for (const token of healthCache.tokenInfos.sort(
-      (a, b) => a.tokenIndex - b.tokenIndex,
-    )) {
+    for (const token of healthCache.tokenInfos) {
       console.log(`${token.toString()}`);
     }
     console.log(
-      `assets ${healthCache.assets(HealthType.init)}, liabs ${healthCache.liabs(
+      ` assets ${healthCache.assets(
         HealthType.init,
-      )}, `,
+      )}, liabs ${healthCache.liabs(HealthType.init)}, `,
+    );
+    console.log(
+      ` health(HealthType.init) ${healthCache.health(HealthType.init)}`,
+    );
+    console.log(
+      ` healthRatio(HealthType.init) ${healthCache.healthRatio(
+        HealthType.init,
+      )}`,
     );
   }
 
@@ -249,7 +255,6 @@ export class HealthCache {
     const healthCacheClone: HealthCache = _.cloneDeep(this);
     const sourceIndex = healthCacheClone.getOrCreateTokenInfoIndex(sourceBank);
     const targetIndex = healthCacheClone.getOrCreateTokenInfoIndex(targetBank);
-
     const source = healthCacheClone.tokenInfos[sourceIndex];
     const target = healthCacheClone.tokenInfos[targetIndex];
 
@@ -261,10 +266,12 @@ export class HealthCache {
 
     function cacheAfterSwap(amount: I80F48) {
       const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
+      // HealthCache.logHealthCache('beforeSwap', adjustedCache);
       adjustedCache.tokenInfos[sourceIndex].balance =
         adjustedCache.tokenInfos[sourceIndex].balance.sub(amount);
       adjustedCache.tokenInfos[targetIndex].balance =
         adjustedCache.tokenInfos[targetIndex].balance.add(amount);
+      // HealthCache.logHealthCache('afterSwap', adjustedCache);
       return adjustedCache;
     }
 
@@ -278,10 +285,12 @@ export class HealthCache {
     const point1Amount = source.balance
       .max(target.balance.neg())
       .max(ZERO_I80F48);
-    const point0Ratio = healthRatioAfterSwap(point0Amount);
-    const cache = cacheAfterSwap(point1Amount);
-    const point1Ratio = cache.healthRatio(HealthType.init);
-    const point1Health = cache.health(HealthType.init);
+    const cache0 = cacheAfterSwap(point0Amount);
+    const point0Ratio = cache0.healthRatio(HealthType.init);
+    const point0Health = cache0.health(HealthType.init);
+    const cache1 = cacheAfterSwap(point1Amount);
+    const point1Ratio = cache1.healthRatio(HealthType.init);
+    const point1Health = cache1.health(HealthType.init);
 
     function binaryApproximationSearch(
       left: I80F48,
@@ -292,7 +301,7 @@ export class HealthCache {
     ) {
       const maxIterations = 20;
       // TODO: make relative to health ratio decimals? Might be over engineering
-      const targetError = I80F48.fromString('0.001'); // ONE_I80F48;
+      const targetError = I80F48.fromString('0.001');
 
       if (
         (leftRatio.sub(targetRatio).isPos() &&
@@ -356,7 +365,15 @@ export class HealthCache {
       const zeroHealthAmount = point1Amount.add(
         point1Health.div(source.initLiabWeight.sub(target.initAssetWeight)),
       );
+      // console.log(`point1Amount ${point1Amount}`);
+      // console.log(`point1Health ${point1Health}`);
+      // console.log(`point1Ratio ${point1Ratio}`);
+      // console.log(`point0Amount ${point0Amount}`);
+      // console.log(`point0Health ${point0Health}`);
+      // console.log(`point0Ratio ${point0Ratio}`);
+      // console.log(`zeroHealthAmount ${zeroHealthAmount}`);
       const zeroHealthRatio = healthRatioAfterSwap(zeroHealthAmount);
+      // console.log(`zeroHealthRatio ${zeroHealthRatio}`);
       amount = binaryApproximationSearch(
         point1Amount,
         point1Ratio,
@@ -451,7 +468,7 @@ export class TokenInfo {
   }
 
   toString() {
-    return `tokenIndex: ${this.tokenIndex}, balance: ${this.balance}`;
+    return `  tokenIndex: ${this.tokenIndex}, balance: ${this.balance}`;
   }
 }
 
