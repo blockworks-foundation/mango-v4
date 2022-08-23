@@ -172,6 +172,20 @@ export class HealthCache {
     return this.findTokenInfoIndex(bank.tokenIndex);
   }
 
+  private static logHealthCache(debug: string, healthCache: HealthCache) {
+    console.log(debug);
+    for (const token of healthCache.tokenInfos.sort(
+      (a, b) => a.tokenIndex - b.tokenIndex,
+    )) {
+      console.log(`${token.toString()}`);
+    }
+    console.log(
+      `assets ${healthCache.assets(HealthType.init)}, liabs ${healthCache.liabs(
+        HealthType.init,
+      )}, `,
+    );
+  }
+
   simHealthRatioWithTokenPositionChanges(
     group: Group,
     nativeTokenChanges: {
@@ -181,21 +195,15 @@ export class HealthCache {
     healthType: HealthType = HealthType.init,
   ): I80F48 {
     const adjustedCache: HealthCache = _.cloneDeep(this);
+    // HealthCache.logHealthCache('beforeChange', adjustedCache);
     for (const change of nativeTokenChanges) {
       const bank: Bank = group.getFirstBankByMint(change.mintPk);
       const changeIndex = adjustedCache.getOrCreateTokenInfoIndex(bank);
       adjustedCache.tokenInfos[changeIndex].balance = adjustedCache.tokenInfos[
         changeIndex
       ].balance.add(change.nativeTokenAmount.mul(bank.price));
-      console.log(' ');
-      console.log(`change.mintPk ${change.mintPk.toBase58()}`);
-      console.log(`changeIndex ${changeIndex}`);
-      console.log(
-        `adjustedCache.tokenInfos[changeIndex].balance ${adjustedCache.tokenInfos[
-          changeIndex
-        ].balance.toNumber()}`,
-      );
     }
+    // HealthCache.logHealthCache('afterChange', adjustedCache);
     return adjustedCache.healthRatio(healthType);
   }
 
@@ -440,6 +448,10 @@ export class TokenInfo {
         ? this.liabWeight(healthType)
         : this.assetWeight(healthType)
     ).mul(this.balance);
+  }
+
+  toString() {
+    return `tokenIndex: ${this.tokenIndex}, balance: ${this.balance}`;
   }
 }
 
