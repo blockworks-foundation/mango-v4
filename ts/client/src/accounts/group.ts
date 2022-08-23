@@ -1,16 +1,17 @@
 import { BorshAccountsCoder } from '@project-serum/anchor';
+import { coder } from '@project-serum/anchor/dist/cjs/spl/token';
 import { Market } from '@project-serum/serum';
 import { parsePriceData, PriceData } from '@pythnetwork/client';
 import { PublicKey } from '@solana/web3.js';
+import BN from 'bn.js';
 import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
+import { toNativeDecimals, toUiDecimals } from '../utils';
 import { Bank, MintInfo } from './bank';
 import { I80F48, ONE_I80F48 } from './I80F48';
 import { PerpMarket } from './perp';
 import { Serum3Market } from './serum3';
-import { toNativeDecimals } from '../utils';
-import BN from 'bn.js';
 
 export class Group {
   static from(
@@ -45,6 +46,7 @@ export class Group {
       new Map(), // mintInfosMapByTokenIndex
       new Map(), // mintInfosMapByMint
       new Map(), // oraclesMap
+      new Map(), // vaultAmountsMap
     );
   }
 
@@ -66,7 +68,8 @@ export class Group {
     public perpMarketsMap: Map<string, PerpMarket>,
     public mintInfosMapByTokenIndex: Map<number, MintInfo>,
     public mintInfosMapByMint: Map<string, MintInfo>,
-    public oraclesMap: Map<string, PriceData>,
+    private oraclesMap: Map<string, PriceData>, // UNUSED
+    public vaultAmountsMap: Map<string, number>,
   ) {}
 
   public findSerum3Market(marketIndex: number): Serum3Market | undefined {
@@ -88,17 +91,17 @@ export class Group {
 
     // console.time('group.reload');
     await Promise.all([
-      this.reloadBanks(client, ids),
+      this.reloadBanks(client, ids).then(() =>
+        Promise.all([
+          this.reloadBankPrices(client, ids),
+          this.reloadVaults(client, ids),
+        ]),
+      ),
       this.reloadMintInfos(client, ids),
-      this.reloadSerum3Markets(client, ids),
+      this.reloadSerum3Markets(client, ids).then(() =>
+        this.reloadSerum3ExternalMarkets(client, ids),
+      ),
       this.reloadPerpMarkets(client, ids),
-    ]);
-
-    await Promise.all([
-      // requires reloadBanks to have finished loading
-      this.reloadBankPrices(client, ids),
-      // requires reloadSerum3Markets to have finished loading
-      this.reloadSerum3ExternalMarkets(client, ids),
     ]);
     // console.timeEnd('group.reload');
   }
@@ -255,6 +258,22 @@ export class Group {
     }
   }
 
+  public async reloadVaults(client: MangoClient, ids?: Id): Promise<void> {
+    const vaultPks = Array.from(this.banksMapByMint.values())
+      .flat()
+      .map((bank) => bank.vault);
+    this.vaultAmountsMap = new Map(
+      (
+        await client.program.provider.connection.getMultipleAccountsInfo(
+          vaultPks,
+        )
+      ).map((vaultAi, i) => [
+        vaultPks[i].toBase58(),
+        coder().accounts.decode('token', vaultAi.data).amount.toNumber(),
+      ]),
+    );
+  }
+
   public getMintDecimals(mintPk: PublicKey) {
     return this.banksMapByMint.get(mintPk.toString())[0].mintDecimals;
   }
@@ -265,6 +284,40 @@ export class Group {
 
   public getFirstBankByTokenIndex(tokenIndex: number) {
     return this.banksMapByTokenIndex.get(tokenIndex)[0];
+  }
+
+  /**
+   *
+   * @param client
+   * @param mintPk
+   * @returns sum of native balances of vaults for all banks for a token (fetched from vaultAmountsMap cache)
+   */
+  public async getTokenVaultBalanceByMint(
+    client: MangoClient,
+    mintPk: PublicKey,
+  ): Promise<I80F48> {
+    const banks = this.banksMapByMint.get(mintPk.toString());
+    let amount = 0;
+    for (const bank of banks) {
+      amount += this.vaultAmountsMap.get(bank.vault.toBase58());
+    }
+    return I80F48.fromNumber(amount);
+  }
+
+  /**
+   *
+   * @param client
+   * @param mintPk
+   * @returns sum of ui balances of vaults for all banks for a token
+   */
+  public async getTokenVaultBalanceByMintUi(
+    client: MangoClient,
+    mintPk: PublicKey,
+  ): Promise<number> {
+    return toUiDecimals(
+      await this.getTokenVaultBalanceByMint(client, mintPk),
+      this.getMintDecimals(mintPk),
+    );
   }
 
   public consoleLogBanks() {

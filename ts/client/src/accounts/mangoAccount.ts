@@ -2,17 +2,11 @@ import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
-import { nativeI80F48ToUi } from '../utils';
-import { Bank, QUOTE_DECIMALS } from './bank';
+import { nativeI80F48ToUi, toNative, toUiDecimals } from '../utils';
+import { Bank } from './bank';
 import { Group } from './group';
 import { HealthCache, HealthCacheDto } from './healthCache';
-import {
-  HUNDRED_I80F48,
-  I80F48,
-  I80F48Dto,
-  ONE_I80F48,
-  ZERO_I80F48,
-} from './I80F48';
+import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from './I80F48';
 export class MangoAccount {
   public tokens: TokenPosition[];
   public serum3: Serum3Orders[];
@@ -105,66 +99,50 @@ export class MangoAccount {
   // * functions try to be explicit by having native or ui in the name to better reflect the value
   // * some values might appear unexpected large or small, usually the doc contains a "note"
 
-  static getEquivalentUsdcPosition(
-    sourceBank: Bank,
-    nativeTokenPosition: TokenPosition,
-  ): I80F48 {
-    return nativeTokenPosition
-      ? nativeTokenPosition.native(sourceBank).mul(sourceBank.price)
-      : ZERO_I80F48;
-  }
-
-  static getEquivalentTokenPosition(
-    targetBank: Bank,
-    nativeUsdcPosition: I80F48,
-  ): I80F48 {
-    return nativeUsdcPosition.div(targetBank.price);
-  }
-
   /**
    *
    * @param bank
-   * @returns native balance for a token
+   * @returns native balance for a token, is signed
    */
   getTokenBalance(bank: Bank): I80F48 {
-    const ta = this.findToken(bank.tokenIndex);
-    return ta ? ta.native(bank) : ZERO_I80F48;
+    const tp = this.findToken(bank.tokenIndex);
+    return tp ? tp.balance(bank) : ZERO_I80F48;
   }
 
   /**
    *
    * @param bank
-   * @returns native balance for a token, 0 or more
+   * @returns native deposits for a token, 0 if position has borrows
    */
   getTokenDeposits(bank: Bank): I80F48 {
-    const native = this.getTokenBalance(bank);
-    return native.gte(ZERO_I80F48) ? native : ZERO_I80F48;
+    const tp = this.findToken(bank.tokenIndex);
+    return tp ? tp.deposits(bank) : ZERO_I80F48;
   }
 
   /**
    *
    * @param bank
-   * @returns native balance for a token, 0 or less
+   * @returns native borrows for a token, 0 if position has deposits
    */
   getTokenBorrows(bank: Bank): I80F48 {
-    const native = this.getTokenBalance(bank);
-    return native.lte(ZERO_I80F48) ? native : ZERO_I80F48;
+    const tp = this.findToken(bank.tokenIndex);
+    return tp ? tp.borrows(bank) : ZERO_I80F48;
   }
 
   /**
    *
    * @param bank
-   * @returns UI balance for a token
+   * @returns UI balance for a token, is signed
    */
   getTokenBalanceUi(bank: Bank): number {
-    const ta = this.findToken(bank.tokenIndex);
-    return ta ? ta.balanceUi(bank) : 0;
+    const tp = this.findToken(bank.tokenIndex);
+    return tp ? tp.balanceUi(bank) : 0;
   }
 
   /**
    *
    * @param bank
-   * @returns UI balance for a token, 0 or more
+   * @returns UI deposits for a token, 0 or more
    */
   getTokenDepositsUi(bank: Bank): number {
     const ta = this.findToken(bank.tokenIndex);
@@ -174,7 +152,7 @@ export class MangoAccount {
   /**
    *
    * @param bank
-   * @returns UI balance for a token, 0 or less
+   * @returns UI borrows for a token, 0 or less
    */
   getTokenBorrowsUi(bank: Bank): number {
     const ta = this.findToken(bank.tokenIndex);
@@ -250,22 +228,73 @@ export class MangoAccount {
   }
 
   /**
-   * The amount of given native token you can borrow, considering all existing assets as collateral except the deposits for this token.
-   * Note 1: The existing native deposits need to be added to get the full amount that could be withdrawn.
-   * Note 2: The group might have less native deposits than what this returns. TODO: loan origination fees
-   * @returns amount of given native token you can borrow, considering all existing assets as collateral except the deposits for this token, in native token
+   * The amount of given native token you can withdraw including borrows, considering all existing assets as collateral.
+   * @returns amount of given native token you can borrow, considering all existing assets as collateral, in native token
    */
   getMaxWithdrawWithBorrowForToken(group: Group, mintPk: PublicKey): I80F48 {
-    const bank: Bank = group.getFirstBankByMint(mintPk);
+    const tokenBank: Bank = group.getFirstBankByMint(mintPk);
     const initHealth = (this.accountData as MangoAccountData).initHealth;
-    const inUsdcUnits = MangoAccount.getEquivalentUsdcPosition(
-      bank,
-      this.findToken(bank.tokenIndex),
-    ).max(ZERO_I80F48);
-    const newInitHealth = initHealth.sub(inUsdcUnits.mul(bank.initAssetWeight));
-    return MangoAccount.getEquivalentTokenPosition(
-      bank,
-      newInitHealth.div(bank.initLiabWeight),
+
+    // Case 1:
+    // Cannot withdraw if init health is below 0
+    if (initHealth.lte(ZERO_I80F48)) {
+      return ZERO_I80F48;
+    }
+
+    // Deposits need special treatment since they would neither count towards liabilities
+    // nor would be charged loanOriginationFeeRate when withdrawn
+
+    const tp = this.findToken(tokenBank.tokenIndex);
+    const existingTokenDeposits = tp ? tp.deposits(tokenBank) : ZERO_I80F48;
+    let existingPositionHealthContrib = ZERO_I80F48;
+    if (existingTokenDeposits.gt(ZERO_I80F48)) {
+      existingPositionHealthContrib = existingTokenDeposits
+        .mul(tokenBank.price)
+        .mul(tokenBank.initAssetWeight);
+    }
+
+    // Case 2: token deposits have higher contribution than initHealth,
+    // can withdraw without borrowing until initHealth reaches 0
+    if (existingPositionHealthContrib.gt(initHealth)) {
+      const withdrawAbleExistingPositionHealthContrib = initHealth;
+      // console.log(`initHealth ${initHealth}`);
+      // console.log(
+      //   `existingPositionHealthContrib ${existingPositionHealthContrib}`,
+      // );
+      // console.log(
+      //   `withdrawAbleExistingPositionHealthContrib ${withdrawAbleExistingPositionHealthContrib}`,
+      // );
+      return withdrawAbleExistingPositionHealthContrib
+        .div(tokenBank.initAssetWeight)
+        .div(tokenBank.price);
+    }
+
+    // Case 3: withdraw = withdraw existing deposits + borrows until initHealth reaches 0
+    const initHealthWithoutExistingPosition = initHealth.sub(
+      existingPositionHealthContrib,
+    );
+    const maxBorrowNative = initHealthWithoutExistingPosition
+      .div(tokenBank.initLiabWeight)
+      .div(tokenBank.price);
+    const maxBorrowNativeWithoutFees = maxBorrowNative.div(
+      ONE_I80F48.add(tokenBank.loanOriginationFeeRate),
+    );
+    // console.log(`initHealth ${initHealth}`);
+    // console.log(
+    //   `existingPositionHealthContrib ${existingPositionHealthContrib}`,
+    // );
+    // console.log(
+    //   `initHealthWithoutExistingPosition ${initHealthWithoutExistingPosition}`,
+    // );
+    // console.log(`maxBorrowNative ${maxBorrowNative}`);
+    // console.log(`maxBorrowNativeWithoutFees ${maxBorrowNativeWithoutFees}`);
+    return maxBorrowNativeWithoutFees.add(existingTokenDeposits);
+  }
+
+  getMaxWithdrawWithBorrowForTokenUi(group: Group, mintPk: PublicKey): number {
+    return toUiDecimals(
+      this.getMaxWithdrawWithBorrowForToken(group, mintPk),
+      group.getMintDecimals(mintPk),
     );
   }
 
@@ -294,21 +323,55 @@ export class MangoAccount {
 
   /**
    * Simulates new health ratio after applying tokenChanges to the token positions.
+   * Note: token changes are expected in native amounts
+   *
    * e.g. useful to simulate health after a potential swap.
    * Note: health ratio is technically ∞ if liabs are 0
    * @returns health ratio, in percentage form
    */
   simHealthRatioWithTokenPositionChanges(
     group: Group,
-    tokenChanges: {
-      tokenAmount: number;
+    nativeTokenChanges: {
+      nativeTokenAmount: I80F48;
       mintPk: PublicKey;
     }[],
     healthType: HealthType = HealthType.init,
   ): I80F48 {
     return this.accountData.healthCache.simHealthRatioWithTokenPositionChanges(
       group,
-      tokenChanges,
+      nativeTokenChanges,
+      healthType,
+    );
+  }
+
+  /**
+   * Simulates new health ratio after applying tokenChanges to the token positions.
+   * Note: token changes are expected in ui amounts
+   *
+   * e.g. useful to simulate health after a potential swap.
+   * Note: health ratio is technically ∞ if liabs are 0
+   * @returns health ratio, in percentage form
+   */
+  simHealthRatioWithTokenPositionUiChanges(
+    group: Group,
+    uiTokenChanges: {
+      uiTokenAmount: number;
+      mintPk: PublicKey;
+    }[],
+    healthType: HealthType = HealthType.init,
+  ): I80F48 {
+    const nativeTokenChanges = uiTokenChanges.map((tokenChange) => {
+      return {
+        nativeTokenAmount: toNative(
+          tokenChange.uiTokenAmount,
+          group.getMintDecimals(tokenChange.mintPk),
+        ),
+        mintPk: tokenChange.mintPk,
+      };
+    });
+    return this.accountData.healthCache.simHealthRatioWithTokenPositionChanges(
+      group,
+      nativeTokenChanges,
       healthType,
     );
   }
@@ -412,7 +475,12 @@ export class TokenPosition {
     return this.tokenIndex !== TokenPosition.TokenIndexUnset;
   }
 
-  public native(bank: Bank): I80F48 {
+  /**
+   *
+   * @param bank
+   * @returns native balance
+   */
+  public balance(bank: Bank): I80F48 {
     if (this.indexedPosition.isPos()) {
       return bank.depositIndex.mul(this.indexedPosition);
     } else {
@@ -421,41 +489,51 @@ export class TokenPosition {
   }
 
   /**
+   *
    * @param bank
-   * @returns position in UI decimals, is signed
+   * @returns native deposits, 0 if position has borrows
+   */
+  public deposits(bank: Bank): I80F48 {
+    if (this.indexedPosition && this.indexedPosition.lt(ZERO_I80F48)) {
+      return ZERO_I80F48;
+    }
+    return this.balance(bank);
+  }
+
+  /**
+   *
+   * @param bank
+   * @returns native borrows, 0 if position has deposits
+   */
+  public borrows(bank: Bank): I80F48 {
+    if (this.indexedPosition && this.indexedPosition.gt(ZERO_I80F48)) {
+      return ZERO_I80F48;
+    }
+    return this.balance(bank).abs();
+  }
+
+  /**
+   * @param bank
+   * @returns UI balance, is signed
    */
   public balanceUi(bank: Bank): number {
-    return nativeI80F48ToUi(this.native(bank), bank.mintDecimals).toNumber();
+    return nativeI80F48ToUi(this.balance(bank), bank.mintDecimals).toNumber();
   }
 
   /**
    * @param bank
-   * @returns position in UI decimals, 0 if position has borrows
+   * @returns UI deposits, 0 if position has borrows
    */
   public depositsUi(bank: Bank): number {
-    if (this.indexedPosition && this.indexedPosition.lt(ZERO_I80F48)) {
-      return 0;
-    }
-
-    return nativeI80F48ToUi(
-      bank.depositIndex.mul(this.indexedPosition),
-      bank.mintDecimals,
-    ).toNumber();
+    return nativeI80F48ToUi(this.deposits(bank), bank.mintDecimals).toNumber();
   }
 
   /**
    * @param bank
-   * @returns position in UI decimals, can be 0 or negative, 0 if position has deposits
+   * @returns UI borrows, 0 if position has deposits
    */
   public borrowsUi(bank: Bank): number {
-    if (this.indexedPosition && this.indexedPosition.gt(ZERO_I80F48)) {
-      return 0;
-    }
-
-    return nativeI80F48ToUi(
-      bank.borrowIndex.mul(this.indexedPosition),
-      bank.mintDecimals,
-    ).toNumber();
+    return nativeI80F48ToUi(this.borrows(bank), bank.mintDecimals).toNumber();
   }
 
   public toString(group?: Group, index?: number): string {
@@ -463,7 +541,7 @@ export class TokenPosition {
     if (group) {
       const bank: Bank = group.getFirstBankByTokenIndex(this.tokenIndex);
       if (bank) {
-        const native = this.native(bank);
+        const native = this.balance(bank);
         extra += ', native: ' + native.toNumber();
         extra += ', ui: ' + this.balanceUi(bank);
         extra += ', tokenName: ' + bank.name;

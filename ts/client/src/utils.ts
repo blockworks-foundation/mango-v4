@@ -98,6 +98,12 @@ export async function createAssociatedTokenAccountIdempotentInstruction(
   });
 }
 
+export function toNative(uiAmount: number, decimals: number): I80F48 {
+  return I80F48.fromNumber(uiAmount).mul(
+    I80F48.fromNumber(Math.pow(10, decimals)),
+  );
+}
+
 export function toNativeDecimals(amount: number, decimals: number): BN {
   return new BN(Math.trunc(amount * Math.pow(10, decimals)));
 }

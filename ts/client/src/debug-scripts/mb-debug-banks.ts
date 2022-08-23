@@ -73,9 +73,8 @@ async function main() {
       coder()
         .accounts.decode(
           'token',
-          await (
-            await client.program.provider.connection.getAccountInfo(bank.vault)
-          ).data,
+          (await client.program.provider.connection.getAccountInfo(bank.vault))
+            .data,
         )
         .amount.toNumber(),
     );

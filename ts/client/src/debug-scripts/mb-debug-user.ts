@@ -1,13 +1,18 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
+import { Group } from '../accounts/group';
 import { I80F48 } from '../accounts/I80F48';
-import { HealthType } from '../accounts/mangoAccount';
+import { HealthType, MangoAccount } from '../accounts/mangoAccount';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 import { toUiDecimalsForQuote } from '../utils';
 
-async function debugUser(client, group, mangoAccount) {
+async function debugUser(
+  client: MangoClient,
+  group: Group,
+  mangoAccount: MangoAccount,
+) {
   console.log(mangoAccount.toString(group));
   await mangoAccount.reload(client, group);
 
@@ -64,39 +69,40 @@ async function debugUser(client, group, mangoAccount) {
 
   console.log(group.banksMapByName.get('SOL')[0].mint.toBase58());
 
-  console.log(
-    "mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL') " +
-      toUiDecimalsForQuote(
-        (
-          await mangoAccount.getMaxWithdrawWithBorrowForToken(
-            group,
-            group.banksMapByName.get('SOL')[0].mint,
-          )
-        ).toNumber(),
-      ),
-  );
+  async function getMaxWithdrawWithBorrowForTokenUiWrapper(token) {
+    console.log(
+      `mangoAccount.getMaxWithdrawWithBorrowForTokenUi(group, ${token}) ` +
+        mangoAccount.getMaxWithdrawWithBorrowForTokenUi(
+          group,
+          group.banksMapByName.get(token)[0].mint,
+        ),
+    );
+  }
+  for (const srcToken of Array.from(group.banksMapByName.keys())) {
+    await getMaxWithdrawWithBorrowForTokenUiWrapper(srcToken);
+  }
 
-  console.log(
-    'mangoAccount.simHealthRatioWithTokenPositionChanges ' +
-      (
-        await mangoAccount.simHealthRatioWithTokenPositionChanges(group, [
-          {
-            mintPk: group.banksMapByName.get('USDC')[0].mint,
-            tokenAmount:
-              -95_000 *
-              Math.pow(10, group.banksMapByName.get('USDC')[0]!.mintDecimals!),
-          },
-          {
-            mintPk: group.banksMapByName.get('BTC')[0].mint,
-            tokenAmount:
-              4 *
-              Math.pow(10, group.banksMapByName.get('BTC')[0]!.mintDecimals!),
-          },
-        ])
-      ).toNumber(),
-  );
+  function simHealthRatioWithTokenPositionChangesWrapper(debug, change) {
+    console.log(
+      `mangoAccount.simHealthRatioWithTokenPositionChanges ${debug}` +
+        mangoAccount
+          .simHealthRatioWithTokenPositionUiChanges(group, [change])
+          .toNumber(),
+    );
+  }
+  for (const srcToken of Array.from(group.banksMapByName.keys())) {
+    simHealthRatioWithTokenPositionChangesWrapper(`${srcToken} 1  `, {
+      mintPk: group.banksMapByName.get(srcToken)[0].mint,
+      uiTokenAmount: 1,
+    });
+    simHealthRatioWithTokenPositionChangesWrapper(`${srcToken} -1  `, {
+      mintPk: group.banksMapByName.get(srcToken)[0].mint,
+      uiTokenAmount: -1,
+    });
+  }
 
   function getMaxSourceForTokenSwapWrapper(src, tgt) {
+    // console.log();
     console.log(
       `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
         mangoAccount
@@ -104,7 +110,7 @@ async function debugUser(client, group, mangoAccount) {
             group,
             group.banksMapByName.get(src)[0].mint,
             group.banksMapByName.get(tgt)[0].mint,
-            0.9,
+            1,
           )
           .div(
             I80F48.fromNumber(
@@ -114,8 +120,13 @@ async function debugUser(client, group, mangoAccount) {
           .toNumber(),
     );
   }
-  getMaxSourceForTokenSwapWrapper('SOL', 'BTC');
-  getMaxSourceForTokenSwapWrapper('USDC', 'USDC');
+  for (const srcToken of Array.from(group.banksMapByName.keys())) {
+    for (const tgtToken of Array.from(group.banksMapByName.keys())) {
+      // if (srcToken === 'SOL')
+      // if (tgtToken === 'MSOL')
+      getMaxSourceForTokenSwapWrapper(srcToken, tgtToken);
+    }
+  }
 }
 
 async function main() {
@@ -155,8 +166,13 @@ async function main() {
       user.publicKey,
     );
     for (const mangoAccount of mangoAccounts) {
-      console.log(`MangoAccount ${mangoAccount.publicKey}`);
-      await debugUser(client, group, mangoAccount);
+      if (
+        '9B8uwqH8FJqLn9kvGPVb5GEksLvmyXb3B8UKCFtRs5cq' ===
+        mangoAccount.publicKey.toBase58()
+      ) {
+        console.log(`MangoAccount ${mangoAccount.publicKey}`);
+        await debugUser(client, group, mangoAccount);
+      }
     }
   }
 
