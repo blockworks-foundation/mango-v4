@@ -258,9 +258,9 @@ export class Group {
               this?.insuranceMint,
             );
           } else if (isSwitchboardOracle(price)) {
-            bank.price = await parseSwitchboardOracle(price);
-            bank.uiPrice = this?.toUiPrice(
-              bank.price,
+            bank.uiPrice = await parseSwitchboardOracle(price);
+            bank.price = this?.toNativePrice(
+              bank.uiPrice,
               bank.mint,
               this?.insuranceMint,
             );

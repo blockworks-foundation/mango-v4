@@ -193,6 +193,8 @@ export class Bank {
       this.name +
       '\n vault - ' +
       this.vault.toBase58() +
+      '\n mintDecimals - ' +
+      this.mintDecimals +
       '\n oracle - ' +
       this.oracle.toBase58() +
       '\n price - ' +

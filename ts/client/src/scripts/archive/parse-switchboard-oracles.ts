@@ -8,9 +8,7 @@ async function main() {
   async function foo(obj) {
     let connection = new Connection(obj.net, options);
     let ai = await connection.getAccountInfo(new PublicKey(obj.pk));
-    console.log(
-      `${obj.name} price ${(await parseSwitchboardOracle(ai!)).toNumber()}`,
-    );
+    console.log(`${obj.name} price ${await parseSwitchboardOracle(ai!)}`);
   }
 
   for (const oracle of [

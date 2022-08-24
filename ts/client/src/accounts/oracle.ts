@@ -55,14 +55,14 @@ export class StubOracle {
 // https://gist.github.com/microwavedcola1/b741a11e6ee273a859f3ef00b35ac1f0
 export function parseSwitcboardOracleV1(
   accountInfo: AccountInfo<Buffer>,
-): I80F48 {
-  return I80F48.fromNumber(accountInfo.data.readDoubleLE(1 + 32 + 4 + 4));
+): number {
+  return accountInfo.data.readDoubleLE(1 + 32 + 4 + 4);
 }
 
 export function parseSwitcboardOracleV2(
   program,
   accountInfo: AccountInfo<Buffer>,
-): I80F48 {
+): number {
   const aggregatorAccountData = (program as any)._coder.accounts.decode(
     (program.account.aggregatorAccountData as any)._idlAccount.name,
     accountInfo.data,
@@ -70,12 +70,17 @@ export function parseSwitcboardOracleV2(
   const sbDecimal = SwitchboardDecimal.from(
     aggregatorAccountData.latestConfirmedRound.result,
   );
-  return I80F48.fromBig(sbDecimal.toBig());
+  return sbDecimal.toBig().toNumber();
 }
 
+/**
+ *
+ * @param accountInfo
+ * @returns ui price
+ */
 export async function parseSwitchboardOracle(
   accountInfo: AccountInfo<Buffer>,
-): Promise<I80F48> {
+): Promise<number> {
   if (accountInfo.owner.equals(SBV2_DEVNET_PID)) {
     if (!sbv2DevnetProgram) {
       sbv2DevnetProgram = await loadSwitchboardProgram('devnet');
