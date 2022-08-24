@@ -204,6 +204,7 @@ async fn test_perp() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+    check_prev_instruction_post_health(&solana, account_0).await;
 
     let order_id_to_cancel = solana
         .get_account::<MangoAccount>(account_0)
@@ -250,6 +251,7 @@ async fn test_perp() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+    check_prev_instruction_post_health(&solana, account_0).await;
 
     send_tx(
         solana,
@@ -291,6 +293,7 @@ async fn test_perp() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+    check_prev_instruction_post_health(&solana, account_0).await;
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
@@ -311,6 +314,7 @@ async fn test_perp() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+    check_prev_instruction_post_health(&solana, account_0).await;
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
@@ -331,6 +335,7 @@ async fn test_perp() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+    check_prev_instruction_post_health(&solana, account_0).await;
 
     send_tx(
         solana,
@@ -371,6 +376,7 @@ async fn test_perp() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+    check_prev_instruction_post_health(&solana, account_0).await;
 
     send_tx(
         solana,
@@ -392,6 +398,7 @@ async fn test_perp() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+    check_prev_instruction_post_health(&solana, account_1).await;
 
     send_tx(
         solana,

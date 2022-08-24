@@ -141,7 +141,7 @@ async fn test_health_wrap() -> Result<(), TransportError> {
         // errors due to health
         assert!(logs
             .iter()
-            .any(|line| line.contains("Error Code: HealthMustBePositive")));
+            .any(|line| line.contains("Error Code: HealthMustBePositiveOrIncrease")));
     }
 
     //

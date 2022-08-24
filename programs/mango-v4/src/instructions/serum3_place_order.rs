@@ -337,7 +337,7 @@ pub fn serum3_place_order(
         msg!("post_health: {}", post_health);
         require!(
             post_health >= 0 || post_health > pre_health,
-            MangoError::HealthMustBePositive
+            MangoError::HealthMustBePositiveOrIncrease
         );
         account
             .fixed

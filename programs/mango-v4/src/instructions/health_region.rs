@@ -115,7 +115,7 @@ pub fn health_region_end<'key, 'accounts, 'remaining, 'info>(
     msg!("post_health {:?}", post_health);
     require!(
         post_health >= 0 || post_health > account.fixed.health_region_begin_init_health,
-        MangoError::HealthMustBePositive
+        MangoError::HealthMustBePositiveOrIncrease
     );
     account
         .fixed

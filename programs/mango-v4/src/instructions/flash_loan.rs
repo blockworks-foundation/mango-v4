@@ -401,7 +401,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     msg!("post_health {:?}", post_health);
     require!(
         post_health >= 0 || post_health > pre_health,
-        MangoError::HealthMustBePositive
+        MangoError::HealthMustBePositiveOrIncrease
     );
     account
         .fixed

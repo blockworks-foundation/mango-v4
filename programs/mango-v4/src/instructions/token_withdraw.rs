@@ -156,7 +156,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         msg!("post_health: {}", post_health);
         require!(
             post_health >= 0 || post_health > pre_health,
-            MangoError::HealthMustBePositive
+            MangoError::HealthMustBePositiveOrIncrease
         );
         account
             .fixed
