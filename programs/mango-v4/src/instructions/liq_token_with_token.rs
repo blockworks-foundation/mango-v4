@@ -50,6 +50,7 @@ pub fn liq_token_with_token(
             .is_owner_or_delegate(ctx.accounts.liqor_owner.key()),
         MangoError::SomeError
     );
+    require!(!liqor.fixed.being_liquidated(), MangoError::BeingLiquidated);
 
     let mut liqee = ctx.accounts.liqee.load_mut()?;
 

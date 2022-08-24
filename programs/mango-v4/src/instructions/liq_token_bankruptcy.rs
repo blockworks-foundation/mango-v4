@@ -89,6 +89,7 @@ pub fn liq_token_bankruptcy(
             .is_owner_or_delegate(ctx.accounts.liqor_owner.key()),
         MangoError::SomeError
     );
+    require!(!liqor.fixed.being_liquidated(), MangoError::BeingLiquidated);
 
     let mut account_retriever = ScanningAccountRetriever::new(health_ais, group_pk)?;
 

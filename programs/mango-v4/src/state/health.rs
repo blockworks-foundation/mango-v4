@@ -12,7 +12,8 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::serum3_cpi;
 use crate::state::{
-    Bank, PerpMarket, PerpMarketIndex, PerpPosition, Serum3MarketIndex, TokenIndex,
+    Bank, MangoAccountFixed, PerpMarket, PerpMarketIndex, PerpPosition, Serum3MarketIndex,
+    TokenIndex,
 };
 use crate::util::checked_math as cm;
 
@@ -615,6 +616,29 @@ impl HealthCache {
         };
         self.health_sum(health_type, sum);
         health
+    }
+
+    pub fn check_health_pre(&self, account: &mut MangoAccountFixed) -> Result<I80F48> {
+        let pre_health = self.health(HealthType::Init);
+        msg!("pre_health: {}", pre_health);
+        account.maybe_recover_from_being_liquidated(pre_health);
+        require!(!account.being_liquidated(), MangoError::BeingLiquidated);
+        Ok(pre_health)
+    }
+
+    pub fn check_health_post(
+        &self,
+        account: &mut MangoAccountFixed,
+        pre_health: I80F48,
+    ) -> Result<()> {
+        let post_health = self.health(HealthType::Init);
+        msg!("post_health: {}", post_health);
+        require!(
+            post_health >= 0 || post_health > pre_health,
+            MangoError::HealthMustBePositiveOrIncrease
+        );
+        account.maybe_recover_from_being_liquidated(post_health);
+        Ok(())
     }
 
     fn token_entry_index(&mut self, token_index: TokenIndex) -> Result<usize> {

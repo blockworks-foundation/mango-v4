@@ -4,8 +4,8 @@ use crate::group_seeds;
 use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
 use crate::state::MangoAccount;
 use crate::state::{
-    compute_health, compute_health_from_fixed_accounts, new_fixed_order_account_retriever,
-    AccountLoaderDynamic, AccountRetriever, Bank, Group, HealthType, TokenIndex,
+    new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, AccountRetriever,
+    Bank, Group, TokenIndex,
 };
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
@@ -316,15 +316,8 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
     // Check health before balance adjustments
     let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
-    let pre_health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
-    msg!("pre_health {:?}", pre_health);
-    account
-        .fixed
-        .maybe_recover_from_being_liquidated(pre_health);
-    require!(
-        !account.fixed.being_liquidated(),
-        MangoError::BeingLiquidated
-    );
+    let health_cache = new_health_cache(&account.borrow(), &retriever)?;
+    let pre_health = account.check_health_pre(&health_cache)?;
 
     // Prices for logging
     let mut prices = vec![];
@@ -396,16 +389,9 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     });
 
     // Check health after account position changes
-    let post_health =
-        compute_health_from_fixed_accounts(&account.borrow(), HealthType::Init, health_ais)?;
-    msg!("post_health {:?}", post_health);
-    require!(
-        post_health >= 0 || post_health > pre_health,
-        MangoError::HealthMustBePositiveOrIncrease
-    );
-    account
-        .fixed
-        .maybe_recover_from_being_liquidated(post_health);
+    let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
+    let health_cache = new_health_cache(&account.borrow(), &retriever)?;
+    account.check_health_post(&health_cache, pre_health)?;
 
     // Deactivate inactive token accounts after health check
     for raw_token_index in deactivated_token_positions {

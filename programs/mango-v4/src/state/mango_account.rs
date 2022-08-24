@@ -22,6 +22,7 @@ use super::Serum3MarketIndex;
 use super::Side;
 use super::TokenIndex;
 use super::FREE_ORDER_SLOT;
+use super::{HealthCache, HealthType};
 use super::{PerpPosition, Serum3Orders, TokenPosition};
 use checked_math as cm;
 
@@ -607,6 +608,9 @@ impl<
     fn header_mut(&mut self) -> &mut MangoAccountDynamicHeader {
         self.header.deref_or_borrow_mut()
     }
+    fn fixed_mut(&mut self) -> &mut MangoAccountFixed {
+        self.fixed.deref_or_borrow_mut()
+    }
     fn dynamic_mut(&mut self) -> &mut [u8] {
         self.dynamic.deref_or_borrow_mut()
     }
@@ -878,6 +882,34 @@ impl<
         // fees are assessed at time of trade; no need to assess fees here
 
         pa.quote_position_native += quote;
+        Ok(())
+    }
+
+    pub fn check_health_pre(&mut self, health_cache: &HealthCache) -> Result<I80F48> {
+        let pre_health = health_cache.health(HealthType::Init);
+        msg!("pre_health: {}", pre_health);
+        self.fixed_mut()
+            .maybe_recover_from_being_liquidated(pre_health);
+        require!(
+            !self.fixed().being_liquidated(),
+            MangoError::BeingLiquidated
+        );
+        Ok(pre_health)
+    }
+
+    pub fn check_health_post(
+        &mut self,
+        health_cache: &HealthCache,
+        pre_health: I80F48,
+    ) -> Result<()> {
+        let post_health = health_cache.health(HealthType::Init);
+        msg!("post_health: {}", post_health);
+        require!(
+            post_health >= 0 || post_health > pre_health,
+            MangoError::HealthMustBePositiveOrIncrease
+        );
+        self.fixed_mut()
+            .maybe_recover_from_being_liquidated(post_health);
         Ok(())
     }
 

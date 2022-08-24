@@ -5,7 +5,7 @@ use crate::error::*;
 use crate::state::MangoAccount;
 use crate::state::{
     new_fixed_order_account_retriever, new_health_cache, oracle_price, AccountLoaderDynamic, Book,
-    BookSide, EventQueue, Group, HealthType, OrderType, PerpMarket, Side,
+    BookSide, EventQueue, Group, OrderType, PerpMarket, Side,
 };
 
 #[derive(Accounts)]
@@ -97,15 +97,7 @@ pub fn perp_place_order(
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
         let health_cache =
             new_health_cache(&account.borrow(), &retriever).context("pre-withdraw init health")?;
-        let pre_health = health_cache.health(HealthType::Init);
-        msg!("pre_health: {}", pre_health);
-        account
-            .fixed
-            .maybe_recover_from_being_liquidated(pre_health);
-        require!(
-            !account.fixed.being_liquidated(),
-            MangoError::BeingLiquidated
-        );
+        let pre_health = account.check_health_pre(&health_cache)?;
         Some((health_cache, pre_health))
     } else {
         None
@@ -164,16 +156,7 @@ pub fn perp_place_order(
     if let Some((mut health_cache, pre_health)) = pre_health_opt {
         let perp_position = account.perp_position_by_raw_index(perp_position_raw_index);
         health_cache.recompute_perp_info(perp_position, &perp_market)?;
-
-        let post_health = health_cache.health(HealthType::Init);
-        msg!("post_health: {}", post_health);
-        require!(
-            post_health >= 0 || post_health > pre_health,
-            MangoError::HealthMustBePositiveOrIncrease
-        );
-        account
-            .fixed
-            .maybe_recover_from_being_liquidated(post_health);
+        account.check_health_post(&health_cache, pre_health)?;
     }
 
     Ok(())
