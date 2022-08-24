@@ -70,15 +70,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
         let health_cache =
             new_health_cache(&account.borrow(), &retriever).context("pre-withdraw init health")?;
-        let pre_health = health_cache.health(HealthType::Init);
-        msg!("pre_health: {}", pre_health);
-        account
-            .fixed
-            .maybe_recover_from_being_liquidated(pre_health);
-        require!(
-            !account.fixed.being_liquidated(),
-            MangoError::BeingLiquidated
-        );
+        let pre_health = account.check_health_pre(&health_cache)?;
         Some((health_cache, pre_health))
     } else {
         None
@@ -152,15 +144,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     if let Some((mut health_cache, pre_health)) = pre_health_opt {
         health_cache
             .adjust_token_balance(token_index, cm!(native_position_after - native_position))?;
-        let post_health = health_cache.health(HealthType::Init);
-        msg!("post_health: {}", post_health);
-        require!(
-            post_health >= 0 || post_health > pre_health,
-            MangoError::HealthMustBePositive
-        );
-        account
-            .fixed
-            .maybe_recover_from_being_liquidated(post_health);
+        account.check_health_post(&health_cache, pre_health)?;
     }
 
     //

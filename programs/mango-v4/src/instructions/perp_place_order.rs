@@ -4,8 +4,8 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::state::MangoAccount;
 use crate::state::{
-    compute_health, new_fixed_order_account_retriever, oracle_price, AccountLoaderDynamic, Book,
-    BookSide, EventQueue, Group, HealthType, OrderType, PerpMarket, Side,
+    new_fixed_order_account_retriever, new_health_cache, oracle_price, AccountLoaderDynamic, Book,
+    BookSide, EventQueue, Group, OrderType, PerpMarket, Side,
 };
 
 #[derive(Accounts)]
@@ -83,62 +83,80 @@ pub fn perp_place_order(
 
     let account_pk = ctx.accounts.account.key();
 
-    {
-        let mut perp_market = ctx.accounts.perp_market.load_mut()?;
-        let bids = ctx.accounts.bids.load_mut()?;
-        let asks = ctx.accounts.asks.load_mut()?;
-        let mut book = Book::new(bids, asks);
+    let perp_market_index = {
+        let perp_market = ctx.accounts.perp_market.load()?;
+        perp_market.perp_market_index
+    };
+    let (_, perp_position_raw_index) = account.ensure_perp_position(perp_market_index)?;
 
-        let mut event_queue = ctx.accounts.event_queue.load_mut()?;
-
-        let oracle_price = oracle_price(
-            &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
-            perp_market.oracle_config.conf_filter,
-            perp_market.base_token_decimals,
-        )?;
-
-        let now_ts = Clock::get()?.unix_timestamp as u64;
-        let time_in_force = if expiry_timestamp != 0 {
-            // If expiry is far in the future, clamp to 255 seconds
-            let tif = expiry_timestamp.saturating_sub(now_ts).min(255);
-            if tif == 0 {
-                // If expiry is in the past, ignore the order
-                msg!("Order is already expired");
-                return Ok(());
-            }
-            tif as u8
-        } else {
-            // Never expire
-            0
-        };
-
-        // TODO reduce_only based on event queue
-
-        book.new_order(
-            side,
-            &mut perp_market,
-            &mut event_queue,
-            oracle_price,
-            &mut account.borrow_mut(),
-            &account_pk,
-            price_lots,
-            max_base_lots,
-            max_quote_lots,
-            order_type,
-            time_in_force,
-            client_order_id,
-            now_ts,
-            limit,
-        )?;
-    }
-
-    if !account.fixed.is_in_health_region() {
+    //
+    // Pre-health computation, _after_ perp position is created
+    //
+    let pre_health_opt = if !account.fixed.is_in_health_region() {
         let retriever =
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-        let health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
-        msg!("health: {}", health);
-        require!(health >= 0, MangoError::HealthMustBePositive);
-        account.fixed.maybe_recover_from_being_liquidated(health);
+        let health_cache =
+            new_health_cache(&account.borrow(), &retriever).context("pre-withdraw init health")?;
+        let pre_health = account.check_health_pre(&health_cache)?;
+        Some((health_cache, pre_health))
+    } else {
+        None
+    };
+
+    let mut perp_market = ctx.accounts.perp_market.load_mut()?;
+    let bids = ctx.accounts.bids.load_mut()?;
+    let asks = ctx.accounts.asks.load_mut()?;
+    let mut book = Book::new(bids, asks);
+
+    let mut event_queue = ctx.accounts.event_queue.load_mut()?;
+
+    let oracle_price = oracle_price(
+        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        perp_market.oracle_config.conf_filter,
+        perp_market.base_token_decimals,
+    )?;
+
+    let now_ts = Clock::get()?.unix_timestamp as u64;
+    let time_in_force = if expiry_timestamp != 0 {
+        // If expiry is far in the future, clamp to 255 seconds
+        let tif = expiry_timestamp.saturating_sub(now_ts).min(255);
+        if tif == 0 {
+            // If expiry is in the past, ignore the order
+            msg!("Order is already expired");
+            return Ok(());
+        }
+        tif as u8
+    } else {
+        // Never expire
+        0
+    };
+
+    // TODO reduce_only based on event queue
+
+    book.new_order(
+        side,
+        &mut perp_market,
+        &mut event_queue,
+        oracle_price,
+        &mut account.borrow_mut(),
+        &account_pk,
+        price_lots,
+        max_base_lots,
+        max_quote_lots,
+        order_type,
+        time_in_force,
+        client_order_id,
+        now_ts,
+        limit,
+    )?;
+
+    //
+    // Health check
+    //
+    if let Some((mut health_cache, pre_health)) = pre_health_opt {
+        let perp_position = account.perp_position_by_raw_index(perp_position_raw_index);
+        health_cache.recompute_perp_info(perp_position, &perp_market)?;
+        account.check_health_post(&health_cache, pre_health)?;
     }
 
     Ok(())

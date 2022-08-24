@@ -3,6 +3,7 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
 use anchor_lang::Discriminator;
+use fixed::types::I80F48;
 
 /// Sets up for a health region
 ///
@@ -79,19 +80,9 @@ pub fn health_region_begin<'key, 'accounts, 'remaining, 'info>(
         .context("create account retriever")?;
 
     // Compute pre-health and store it on the account
-    let pre_health = compute_health(&account.borrow(), HealthType::Init, &account_retriever)
-        .context("compute health")?;
-    msg!("pre_health {:?}", pre_health);
+    let health_cache = new_health_cache(&account.borrow(), &account_retriever)?;
+    let pre_health = account.check_health_pre(&health_cache)?;
     account.fixed.health_region_begin_init_health = pre_health.ceil().checked_to_num().unwrap();
-
-    account
-        .fixed
-        .maybe_recover_from_being_liquidated(pre_health);
-
-    require!(
-        !account.fixed.being_liquidated(),
-        MangoError::BeingLiquidated
-    );
 
     Ok(())
 }
@@ -109,17 +100,10 @@ pub fn health_region_end<'key, 'accounts, 'remaining, 'info>(
     let group = account.fixed.group;
     let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, &group)
         .context("create account retriever")?;
+    let health_cache = new_health_cache(&account.borrow(), &account_retriever)?;
 
-    let post_health = compute_health(&account.borrow(), HealthType::Init, &account_retriever)
-        .context("compute health")?;
-    msg!("post_health {:?}", post_health);
-    require!(
-        post_health >= 0 || post_health > account.fixed.health_region_begin_init_health,
-        MangoError::HealthMustBePositive
-    );
-    account
-        .fixed
-        .maybe_recover_from_being_liquidated(post_health);
+    let pre_health = I80F48::from(account.fixed.health_region_begin_init_health);
+    account.check_health_post(&health_cache, pre_health)?;
     account.fixed.health_region_begin_init_health = 0;
 
     Ok(())
