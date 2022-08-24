@@ -322,6 +322,30 @@ export class MangoAccount {
   }
 
   /**
+   * The max amount of given source ui token you can swap to a target token.
+   * note: slippageAndFeesFactor is a normalized number, <1,
+   *  e.g. a slippage of 5% and some fees which are 1%, then slippageAndFeesFactor = 0.94
+   *  the factor is used to compute how much target can be obtained by swapping source
+   * @returns max amount of given source ui token you can swap to a target token, in ui token
+   */
+  getMaxSourceUiForTokenSwap(
+    group: Group,
+    sourceMintPk: PublicKey,
+    targetMintPk: PublicKey,
+    slippageAndFeesFactor: number,
+  ): number {
+    return toUiDecimals(
+      this.getMaxSourceForTokenSwap(
+        group,
+        sourceMintPk,
+        targetMintPk,
+        slippageAndFeesFactor,
+      ),
+      group.getMintDecimals(sourceMintPk),
+    );
+  }
+
+  /**
    * Simulates new health ratio after applying tokenChanges to the token positions.
    * Note: token changes are expected in native amounts
    *
@@ -359,7 +383,7 @@ export class MangoAccount {
       mintPk: PublicKey;
     }[],
     healthType: HealthType = HealthType.init,
-  ): I80F48 {
+  ): number {
     const nativeTokenChanges = uiTokenChanges.map((tokenChange) => {
       return {
         nativeTokenAmount: toNative(
@@ -369,11 +393,13 @@ export class MangoAccount {
         mintPk: tokenChange.mintPk,
       };
     });
-    return this.accountData.healthCache.simHealthRatioWithTokenPositionChanges(
-      group,
-      nativeTokenChanges,
-      healthType,
-    );
+    return this.accountData.healthCache
+      .simHealthRatioWithTokenPositionChanges(
+        group,
+        nativeTokenChanges,
+        healthType,
+      )
+      .toNumber();
   }
 
   /**
