@@ -2501,7 +2501,6 @@ impl ClientInstruction for TokenUpdateIndexAndRateInstruction {
 
 pub struct ComputeAccountDataInstruction {
     pub account: Pubkey,
-    pub health_type: HealthType,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for ComputeAccountDataInstruction {

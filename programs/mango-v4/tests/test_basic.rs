@@ -111,15 +111,9 @@ async fn test_basic() -> Result<(), TransportError> {
     //
     // TEST: Compute the account health
     //
-    send_tx(
-        solana,
-        ComputeAccountDataInstruction {
-            account,
-            health_type: HealthType::Init,
-        },
-    )
-    .await
-    .unwrap();
+    send_tx(solana, ComputeAccountDataInstruction { account })
+        .await
+        .unwrap();
 
     //
     // TEST: Withdraw funds
