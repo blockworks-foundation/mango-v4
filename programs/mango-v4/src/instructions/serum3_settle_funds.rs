@@ -9,8 +9,8 @@ use crate::error::*;
 use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
 
-use super::{apply_vault_difference, OpenOrdersReserved, OpenOrdersSlim};
-use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
+use super::{apply_vault_difference, OpenOrdersAmounts, OpenOrdersSlim};
+use crate::logs::LoanOriginationFeeInstruction;
 
 #[derive(Accounts)]
 pub struct Serum3SettleFunds<'info> {
@@ -150,36 +150,21 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         let mut account = ctx.accounts.account.load_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-        let (vault_difference_result, base_loan_origination_fee, quote_loan_origination_fee) =
-            apply_vault_difference(
-                &mut account.borrow_mut(),
-                &mut base_bank,
-                after_base_vault,
-                before_base_vault,
-                &mut quote_bank,
-                after_quote_vault,
-                before_quote_vault,
-            )?;
-        vault_difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
-
-        if base_loan_origination_fee.is_positive() {
-            emit!(WithdrawLoanOriginationFeeLog {
-                mango_group: ctx.accounts.group.key(),
-                mango_account: ctx.accounts.account.key(),
-                token_index: serum_market.base_token_index,
-                loan_origination_fee: base_loan_origination_fee.to_bits(),
-                instruction: LoanOriginationFeeInstruction::Serum3SettleFunds
-            });
-        }
-        if quote_loan_origination_fee.is_positive() {
-            emit!(WithdrawLoanOriginationFeeLog {
-                mango_group: ctx.accounts.group.key(),
-                mango_account: ctx.accounts.account.key(),
-                token_index: serum_market.quote_token_index,
-                loan_origination_fee: quote_loan_origination_fee.to_bits(),
-                instruction: LoanOriginationFeeInstruction::Serum3SettleFunds
-            });
-        }
+        let difference_result = apply_vault_difference(
+            &mut account.borrow_mut(),
+            &mut base_bank,
+            after_base_vault,
+            before_base_vault,
+            &mut quote_bank,
+            after_quote_vault,
+            before_quote_vault,
+        )?;
+        difference_result.log_loan_origination_fees(
+            &ctx.accounts.group.key(),
+            &ctx.accounts.account.key(),
+            LoanOriginationFeeInstruction::Serum3SettleFunds,
+        );
+        difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
     }
 
     Ok(())
@@ -198,11 +183,11 @@ pub fn charge_maybe_fees(
     let maybe_actualized_coin_loan = I80F48::from_num::<u64>(
         serum3_account
             .previous_native_coin_reserved
-            .saturating_sub(after_oo.native_coin_reserved()),
+            .saturating_sub(after_oo.native_base_reserved()),
     );
 
     if maybe_actualized_coin_loan > 0 {
-        serum3_account.previous_native_coin_reserved = after_oo.native_coin_reserved();
+        serum3_account.previous_native_coin_reserved = after_oo.native_base_reserved();
 
         // loan origination fees
         let coin_token_account = account.token_position_mut(coin_bank.token_index)?.0;
@@ -223,11 +208,11 @@ pub fn charge_maybe_fees(
     let maybe_actualized_pc_loan = I80F48::from_num::<u64>(
         serum3_account
             .previous_native_pc_reserved
-            .saturating_sub(after_oo.native_pc_reserved()),
+            .saturating_sub(after_oo.native_quote_reserved()),
     );
 
     if maybe_actualized_pc_loan > 0 {
-        serum3_account.previous_native_pc_reserved = after_oo.native_pc_reserved();
+        serum3_account.previous_native_pc_reserved = after_oo.native_quote_reserved();
 
         // loan origination fees
         let pc_token_account = account.token_position_mut(pc_bank.token_index)?.0;

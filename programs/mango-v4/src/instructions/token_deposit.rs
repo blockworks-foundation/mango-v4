@@ -94,6 +94,9 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     //
     // Health computation
     //
+    // Since depositing can only increase health, we can skip the usual pre-health computation.
+    // Also, TokenDeposit is one of the rare instructions that is allowed even during being_liquidated.
+    //
     if !account.fixed.is_in_health_region() {
         let retriever =
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;

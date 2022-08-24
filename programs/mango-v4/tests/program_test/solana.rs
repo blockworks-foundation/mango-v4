@@ -223,4 +223,19 @@ impl SolanaCookie {
     pub fn program_log(&self) -> Vec<String> {
         self.program_log.read().unwrap().clone()
     }
+
+    pub fn program_log_events<T: anchor_lang::Event + anchor_lang::AnchorDeserialize>(
+        &self,
+    ) -> Vec<T> {
+        self.program_log()
+            .iter()
+            .filter_map(|data| {
+                let bytes = base64::decode(data).ok()?;
+                if bytes[0..8] != T::discriminator() {
+                    return None;
+                }
+                T::try_from_slice(&bytes[8..]).ok()
+            })
+            .collect()
+    }
 }

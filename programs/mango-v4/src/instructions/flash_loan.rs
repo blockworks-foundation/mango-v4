@@ -316,7 +316,15 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
     // Check health before balance adjustments
     let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
-    let _pre_health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
+    let pre_health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
+    msg!("pre_health {:?}", pre_health);
+    account
+        .fixed
+        .maybe_recover_from_being_liquidated(pre_health);
+    require!(
+        !account.fixed.being_liquidated(),
+        MangoError::BeingLiquidated
+    );
 
     // Prices for logging
     let mut prices = vec![];
@@ -390,8 +398,11 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     // Check health after account position changes
     let post_health =
         compute_health_from_fixed_accounts(&account.borrow(), HealthType::Init, health_ais)?;
-    msg!("post_cpi_health {:?}", post_health);
-    require!(post_health >= 0, MangoError::HealthMustBePositive);
+    msg!("post_health {:?}", post_health);
+    require!(
+        post_health >= 0 || post_health > pre_health,
+        MangoError::HealthMustBePositive
+    );
     account
         .fixed
         .maybe_recover_from_being_liquidated(post_health);

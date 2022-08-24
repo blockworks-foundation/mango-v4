@@ -5,7 +5,7 @@ use crate::error::*;
 use crate::instructions::apply_vault_difference;
 use crate::state::*;
 
-use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
+use crate::logs::LoanOriginationFeeInstruction;
 
 #[derive(Accounts)]
 pub struct Serum3LiqForceCancelOrders<'info> {
@@ -140,36 +140,21 @@ pub fn serum3_liq_force_cancel_orders(
     let mut account = ctx.accounts.account.load_mut()?;
     let mut base_bank = ctx.accounts.base_bank.load_mut()?;
     let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-    let (vault_difference_result, base_loan_origination_fee, quote_loan_origination_fee) =
-        apply_vault_difference(
-            &mut account.borrow_mut(),
-            &mut base_bank,
-            after_base_vault,
-            before_base_vault,
-            &mut quote_bank,
-            after_quote_vault,
-            before_quote_vault,
-        )?;
-    vault_difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
-
-    if base_loan_origination_fee.is_positive() {
-        emit!(WithdrawLoanOriginationFeeLog {
-            mango_group: ctx.accounts.group.key(),
-            mango_account: ctx.accounts.account.key(),
-            token_index: serum_market.base_token_index,
-            loan_origination_fee: base_loan_origination_fee.to_bits(),
-            instruction: LoanOriginationFeeInstruction::Serum3LiqForceCancelOrders
-        });
-    }
-    if quote_loan_origination_fee.is_positive() {
-        emit!(WithdrawLoanOriginationFeeLog {
-            mango_group: ctx.accounts.group.key(),
-            mango_account: ctx.accounts.account.key(),
-            token_index: serum_market.quote_token_index,
-            loan_origination_fee: quote_loan_origination_fee.to_bits(),
-            instruction: LoanOriginationFeeInstruction::Serum3LiqForceCancelOrders
-        });
-    }
+    let difference_result = apply_vault_difference(
+        &mut account.borrow_mut(),
+        &mut base_bank,
+        after_base_vault,
+        before_base_vault,
+        &mut quote_bank,
+        after_quote_vault,
+        before_quote_vault,
+    )?;
+    difference_result.log_loan_origination_fees(
+        &ctx.accounts.group.key(),
+        &ctx.accounts.account.key(),
+        LoanOriginationFeeInstruction::Serum3LiqForceCancelOrders,
+    );
+    difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
 
     Ok(())
 }
