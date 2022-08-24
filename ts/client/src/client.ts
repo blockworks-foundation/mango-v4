@@ -348,7 +348,7 @@ export class MangoClient {
     }
 
     return await this.program.methods
-      .tokenDeregister(bank.tokenIndex)
+      .tokenDeregister()
       .accounts({
         group: group.publicKey,
         admin: adminPk,

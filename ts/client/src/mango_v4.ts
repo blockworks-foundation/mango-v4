@@ -730,12 +730,7 @@ export type MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "tokenIndex",
-          "type": "u16"
-        }
-      ]
+      "args": []
     },
     {
       "name": "tokenUpdateIndexAndRate",
@@ -5980,12 +5975,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "tokenIndex",
-          "type": "u16"
-        }
-      ]
+      "args": []
     },
     {
       "name": "tokenUpdateIndexAndRate",
