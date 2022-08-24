@@ -193,6 +193,12 @@ export class Bank {
       this.name +
       '\n vault - ' +
       this.vault.toBase58() +
+      '\n oracle - ' +
+      this.oracle.toBase58() +
+      '\n price - ' +
+      this.price.toNumber() +
+      '\n uiPrice - ' +
+      this.uiPrice +
       '\n deposit index - ' +
       this.depositIndex.toNumber() +
       '\n borrow index - ' +

@@ -10,6 +10,11 @@ import { Id } from '../ids';
 import { toNativeDecimals, toUiDecimals } from '../utils';
 import { Bank, MintInfo } from './bank';
 import { I80F48, ONE_I80F48 } from './I80F48';
+import {
+  isPythOracle,
+  isSwitchboardOracle,
+  parseSwitchboardOracle,
+} from './oracle';
 import { PerpMarket } from './perp';
 import { Serum3Market } from './serum3';
 
@@ -245,12 +250,23 @@ export class Group {
               bank.mint,
               this?.insuranceMint,
             );
-          } else {
+          } else if (isPythOracle(price)) {
             bank.uiPrice = parsePriceData(price.data).previousPrice;
             bank.price = this?.toNativePrice(
               bank.uiPrice,
               bank.mint,
               this?.insuranceMint,
+            );
+          } else if (isSwitchboardOracle(price)) {
+            bank.price = await parseSwitchboardOracle(price);
+            bank.uiPrice = this?.toUiPrice(
+              bank.price,
+              bank.mint,
+              this?.insuranceMint,
+            );
+          } else {
+            throw new Error(
+              `Unknown oracle provider for oracle ${bank.oracle}, with owner ${price.owner}`,
             );
           }
         }
