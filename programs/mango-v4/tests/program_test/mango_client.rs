@@ -319,6 +319,28 @@ pub async fn account_position_f64(solana: &SolanaCookie, account: Pubkey, bank: 
     native.to_num::<f64>()
 }
 
+// Verifies that the "post_health: ..." log emitted by the previous instruction
+// matches the init health of the account.
+pub async fn check_prev_instruction_post_health(solana: &SolanaCookie, account: Pubkey) {
+    let logs = solana.program_log();
+    let post_health_str = logs
+        .iter()
+        .find_map(|line| line.strip_prefix("post_health: "))
+        .unwrap();
+    let post_health = post_health_str.parse::<f64>().unwrap();
+
+    solana.advance_by_slots(1).await; // ugly, just to avoid sending the same tx next
+    send_tx(solana, ComputeAccountDataInstruction { account })
+        .await
+        .unwrap();
+
+    let health_data = solana
+        .program_log_events::<mango_v4::events::MangoAccountData>()
+        .pop()
+        .unwrap();
+    assert_eq!(health_data.init_health.to_num::<f64>(), post_health);
+}
+
 //
 // a struct for each instruction along with its
 // ClientInstruction impl

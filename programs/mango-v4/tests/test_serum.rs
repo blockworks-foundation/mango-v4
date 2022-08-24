@@ -160,6 +160,8 @@ async fn test_serum() -> Result<(), TransportError> {
     .await
     .unwrap();
 
+    check_prev_instruction_post_health(&solana, account).await;
+
     let native0 = account_position(solana, account, base_token.bank).await;
     let native1 = account_position(solana, account, quote_token.bank).await;
     assert_eq!(native0, 1000);

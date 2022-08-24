@@ -68,6 +68,8 @@ impl Log for LoggerWrapper {
             let msg = record.args().to_string();
             if let Some(data) = msg.strip_prefix("Program log: ") {
                 self.program_log.write().unwrap().push(data.into());
+            } else if let Some(data) = msg.strip_prefix("Program data: ") {
+                self.program_log.write().unwrap().push(data.into());
             }
         }
         self.inner.log(record);
