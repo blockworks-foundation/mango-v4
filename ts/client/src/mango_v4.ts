@@ -3151,7 +3151,7 @@ export type MangoV4 = {
             "name": "perpOpenOrders",
             "type": {
               "vec": {
-                "defined": "PerpOpenOrders"
+                "defined": "PerpOpenOrder"
               }
             }
           }
@@ -3845,6 +3845,10 @@ export type MangoV4 = {
           {
             "name": "quoteIndex",
             "type": "u64"
+          },
+          {
+            "name": "marketIndex",
+            "type": "u16"
           }
         ]
       }
@@ -4133,7 +4137,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "PerpOpenOrders",
+      "name": "PerpOpenOrder",
       "type": {
         "kind": "struct",
         "fields": [
@@ -8401,7 +8405,7 @@ export const IDL: MangoV4 = {
             "name": "perpOpenOrders",
             "type": {
               "vec": {
-                "defined": "PerpOpenOrders"
+                "defined": "PerpOpenOrder"
               }
             }
           }
@@ -9095,6 +9099,10 @@ export const IDL: MangoV4 = {
           {
             "name": "quoteIndex",
             "type": "u64"
+          },
+          {
+            "name": "marketIndex",
+            "type": "u16"
           }
         ]
       }
@@ -9383,7 +9391,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "PerpOpenOrders",
+      "name": "PerpOpenOrder",
       "type": {
         "kind": "struct",
         "fields": [

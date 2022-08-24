@@ -17,7 +17,7 @@ use super::FillEvent;
 use super::LeafNode;
 use super::PerpMarket;
 use super::PerpMarketIndex;
-use super::PerpOpenOrders;
+use super::PerpOpenOrder;
 use super::Serum3MarketIndex;
 use super::Side;
 use super::TokenIndex;
@@ -99,7 +99,7 @@ pub struct MangoAccount {
     pub padding6: u32,
     pub perps: Vec<PerpPosition>,
     pub padding7: u32,
-    pub perp_open_orders: Vec<PerpOpenOrders>,
+    pub perp_open_orders: Vec<PerpOpenOrder>,
 }
 
 impl Default for MangoAccount {
@@ -127,7 +127,7 @@ impl Default for MangoAccount {
             padding6: Default::default(),
             perps: vec![PerpPosition::default(); 2],
             padding7: Default::default(),
-            perp_open_orders: vec![PerpOpenOrders::default(); 2],
+            perp_open_orders: vec![PerpOpenOrder::default(); 2],
         }
     }
 }
@@ -178,7 +178,7 @@ impl MangoAccount {
         perp_oo_count: u8,
     ) -> usize {
         Self::dynamic_perp_oo_vec_offset(token_count, serum3_count, perp_count)
-            + (BORSH_VEC_SIZE_BYTES + size_of::<PerpOpenOrders>() * usize::from(perp_oo_count))
+            + (BORSH_VEC_SIZE_BYTES + size_of::<PerpOpenOrder>() * usize::from(perp_oo_count))
     }
 }
 
@@ -201,9 +201,7 @@ fn test_serialization_match() {
     account.serum3.resize(8, Serum3Orders::default());
     account.perps.resize(8, PerpPosition::default());
     account.perps[0].market_index = 9;
-    account
-        .perp_open_orders
-        .resize(8, PerpOpenOrders::default());
+    account.perp_open_orders.resize(8, PerpOpenOrder::default());
 
     let account_bytes = AnchorSerialize::try_to_vec(&account).unwrap();
     assert_eq!(
@@ -403,7 +401,7 @@ impl MangoAccountDynamicHeader {
             self.serum3_count,
             self.perp_count,
         ) + BORSH_VEC_SIZE_BYTES
-            + raw_index * size_of::<PerpOpenOrders>()
+            + raw_index * size_of::<PerpOpenOrder>()
     }
 
     pub fn token_count(&self) -> usize {
@@ -546,11 +544,11 @@ impl<
             .filter(|p| p.is_active())
     }
 
-    pub fn perp_orders_by_raw_index(&self, raw_index: usize) -> &PerpOpenOrders {
+    pub fn perp_orders_by_raw_index(&self, raw_index: usize) -> &PerpOpenOrder {
         get_helper(self.dynamic(), self.header().perp_oo_offset(raw_index))
     }
 
-    pub fn all_perp_orders(&self) -> impl Iterator<Item = &PerpOpenOrders> {
+    pub fn all_perp_orders(&self) -> impl Iterator<Item = &PerpOpenOrder> {
         (0..self.header().perp_oo_count()).map(|i| self.perp_orders_by_raw_index(i))
     }
 
@@ -739,7 +737,7 @@ impl<
         get_helper_mut(self.dynamic_mut(), offset)
     }
 
-    pub fn perp_orders_mut_by_raw_index(&mut self, raw_index: usize) -> &mut PerpOpenOrders {
+    pub fn perp_orders_mut_by_raw_index(&mut self, raw_index: usize) -> &mut PerpOpenOrder {
         let offset = self.header().perp_oo_offset(raw_index);
         get_helper_mut(self.dynamic_mut(), offset)
     }
@@ -963,12 +961,12 @@ impl<
                 sol_memmove(
                     &mut dynamic[new_header.perp_oo_offset(0)],
                     &mut dynamic[old_header.perp_oo_offset(0)],
-                    size_of::<PerpOpenOrders>() * old_header.perp_oo_count(),
+                    size_of::<PerpOpenOrder>() * old_header.perp_oo_count(),
                 );
             }
             for i in old_header.perp_oo_count..new_perp_oo_count {
                 *get_helper_mut(dynamic, new_header.perp_oo_offset(i.into())) =
-                    PerpOpenOrders::default();
+                    PerpOpenOrder::default();
             }
         }
 

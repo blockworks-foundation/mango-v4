@@ -321,7 +321,7 @@ impl PerpPosition {
 
 #[zero_copy]
 #[derive(AnchorSerialize, AnchorDeserialize, Debug)]
-pub struct PerpOpenOrders {
+pub struct PerpOpenOrder {
     pub order_side: Side, // TODO: storing enums isn't POD
     pub padding1: [u8; 1],
     pub order_market: PerpMarketIndex,
@@ -331,7 +331,7 @@ pub struct PerpOpenOrders {
     pub reserved: [u8; 64],
 }
 
-impl Default for PerpOpenOrders {
+impl Default for PerpOpenOrder {
     fn default() -> Self {
         Self {
             order_side: Side::Bid,
@@ -345,11 +345,11 @@ impl Default for PerpOpenOrders {
     }
 }
 
-unsafe impl bytemuck::Pod for PerpOpenOrders {}
-unsafe impl bytemuck::Zeroable for PerpOpenOrders {}
+unsafe impl bytemuck::Pod for PerpOpenOrder {}
+unsafe impl bytemuck::Zeroable for PerpOpenOrder {}
 
-const_assert_eq!(size_of::<PerpOpenOrders>(), 1 + 1 + 2 + 4 + 8 + 16 + 64);
-const_assert_eq!(size_of::<PerpOpenOrders>() % 8, 0);
+const_assert_eq!(size_of::<PerpOpenOrder>(), 1 + 1 + 2 + 4 + 8 + 16 + 64);
+const_assert_eq!(size_of::<PerpOpenOrder>() % 8, 0);
 
 #[macro_export]
 macro_rules! account_seeds {
