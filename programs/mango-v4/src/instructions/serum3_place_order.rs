@@ -336,7 +336,6 @@ pub fn serum3_place_order(
         &ctx.accounts.account.key(),
         LoanOriginationFeeInstruction::Serum3PlaceOrder,
     );
-    vault_difference.deactivate_inactive_token_accounts(&mut account.borrow_mut());
 
     Ok(())
 }
