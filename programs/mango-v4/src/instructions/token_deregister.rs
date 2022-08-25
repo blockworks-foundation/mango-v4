@@ -4,8 +4,9 @@ use anchor_spl::token::{self, CloseAccount, Token, TokenAccount};
 use crate::{accounts_zerocopy::LoadZeroCopyRef, state::*};
 use anchor_lang::AccountsClose;
 
+/// In addition to these accounts, there must be remaining_accounts:
+/// all n pairs of bank and its corresponding vault account for a token
 #[derive(Accounts)]
-#[instruction(token_index: TokenIndex)]
 pub struct TokenDeregister<'info> {
     #[account(
         constraint = group.load()?.is_testing(),
@@ -18,7 +19,6 @@ pub struct TokenDeregister<'info> {
     #[account(
         mut,
         has_one = group,
-        constraint = mint_info.load()?.token_index == token_index,
         close = sol_destination
     )]
     pub mint_info: AccountLoader<'info, MintInfo>,
@@ -36,7 +36,6 @@ pub struct TokenDeregister<'info> {
 #[allow(clippy::too_many_arguments)]
 pub fn token_deregister<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, TokenDeregister<'info>>,
-    token_index: TokenIndex,
 ) -> Result<()> {
     let mint_info = ctx.accounts.mint_info.load()?;
     {
@@ -61,7 +60,7 @@ pub fn token_deregister<'key, 'accounts, 'remaining, 'info>(
         {
             let bank = bank_ai.load::<Bank>()?;
             require_keys_eq!(bank.group, ctx.accounts.group.key());
-            require_eq!(bank.token_index, token_index);
+            require_eq!(bank.token_index, mint_info.token_index);
             require_keys_eq!(bank.vault, vault_ai.key());
         }
 

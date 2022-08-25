@@ -142,9 +142,8 @@ pub mod mango_v4 {
 
     pub fn token_deregister<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, TokenDeregister<'info>>,
-        token_index: TokenIndex,
     ) -> Result<()> {
-        instructions::token_deregister(ctx, token_index)
+        instructions::token_deregister(ctx)
     }
 
     pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Result<()> {
