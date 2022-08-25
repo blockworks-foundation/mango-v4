@@ -1,5 +1,6 @@
 use crate::error::*;
 
+use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
 use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
 use anchor_lang::prelude::*;
@@ -270,7 +271,6 @@ pub fn serum3_place_order(
             after_quote_vault,
             before_quote_vault,
         )?;
-        vault_difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
         vault_difference_result
     };
 
@@ -294,6 +294,25 @@ pub fn serum3_place_order(
                 &after_oo,
                 &vault_difference_result,
             )?;
+
+        if base_loan_origination_fee.is_positive() {
+            emit!(WithdrawLoanOriginationFeeLog {
+                mango_group: ctx.accounts.group.key(),
+                mango_account: ctx.accounts.account.key(),
+                token_index: serum_market.base_token_index,
+                loan_origination_fee: base_loan_origination_fee.to_bits(),
+                instruction: LoanOriginationFeeInstruction::Serum3PlaceOrder
+            });
+        }
+        if quote_loan_origination_fee.is_positive() {
+            emit!(WithdrawLoanOriginationFeeLog {
+                mango_group: ctx.accounts.group.key(),
+                mango_account: ctx.accounts.account.key(),
+                token_index: serum_market.quote_token_index,
+                loan_origination_fee: quote_loan_origination_fee.to_bits(),
+                instruction: LoanOriginationFeeInstruction::Serum3PlaceOrder
+            });
+        }
     }
 
     //
@@ -309,6 +328,11 @@ pub fn serum3_place_order(
             require!(health >= 0, MangoError::HealthMustBePositive);
             account.fixed.maybe_recover_from_being_liquidated(health);
         }
+    }
+
+    {
+        let mut account = ctx.accounts.account.load_mut()?;
+        vault_difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
     }
 
     Ok(())
@@ -335,7 +359,6 @@ pub fn maybe_charge_fees_on_place_order(
         let serum3_account = account.serum3_orders_mut(market_index).unwrap();
         serum3_account.previous_native_coin_reserved =
             cm!(serum3_account.previous_native_coin_reserved + coin_reserved_increase);
-        drop(serum3_account);
 
         let tp = account.token_position_mut(coin_bank.token_index)?.0;
         if vault_difference_result.base_change.is_negative() && tp.native(coin_bank).is_negative() {
@@ -360,7 +383,6 @@ pub fn maybe_charge_fees_on_place_order(
         let serum3_account = account.serum3_orders_mut(market_index).unwrap();
         serum3_account.previous_native_pc_reserved =
             cm!(serum3_account.previous_native_pc_reserved + pc_reserved_increase);
-        drop(serum3_account);
 
         let tp = account.token_position_mut(pc_bank.token_index)?.0;
         if vault_difference_result.quote_change.is_negative() && tp.native(coin_bank).is_negative()
