@@ -280,10 +280,10 @@ pub fn serum3_place_order(
     {
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
+        let mut account = ctx.accounts.account.load_mut()?;
         let oo_ai = &ctx.accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
-        let mut account = ctx.accounts.account.load_mut()?;
         let (base_loan_origination_fee, quote_loan_origination_fee) =
             maybe_charge_fees_on_place_order(
                 serum_market.market_index,
@@ -351,7 +351,7 @@ pub fn maybe_charge_fees_on_place_order(
     vault_difference_result: &VaultDifferenceResult,
 ) -> Result<(I80F48, I80F48)> {
     let base_loan_origination_fee = if after_oo.native_coin_reserved()
-        > before_oo.native_coin_reserved()
+        >= before_oo.native_coin_reserved()
     {
         let coin_reserved_increase =
             after_oo.native_coin_reserved() - before_oo.native_coin_reserved();
@@ -363,8 +363,12 @@ pub fn maybe_charge_fees_on_place_order(
         let tp = account.token_position_mut(coin_bank.token_index)?.0;
         if vault_difference_result.base_change.is_negative() && tp.native(coin_bank).is_negative() {
             let base_change_abs = vault_difference_result.base_change.abs();
-            let filled_vault_borrows = cm!(base_change_abs - I80F48::from(coin_reserved_increase));
-            let actualized_loan = tp.native(coin_bank).abs().min(filled_vault_borrows);
+            let instantly_filled_order_vault_borrows =
+                cm!(base_change_abs - I80F48::from(coin_reserved_increase));
+            let actualized_loan = tp
+                .native(coin_bank)
+                .abs()
+                .min(instantly_filled_order_vault_borrows);
             coin_bank
                 .withdraw_loan_origination_fee(tp, actualized_loan)?
                 .1
@@ -376,7 +380,7 @@ pub fn maybe_charge_fees_on_place_order(
     };
 
     let quote_loan_origination_fee = if after_oo.native_pc_reserved()
-        > before_oo.native_pc_reserved()
+        >= before_oo.native_pc_reserved()
     {
         let pc_reserved_increase = after_oo.native_pc_reserved() - before_oo.native_pc_reserved();
 
@@ -388,8 +392,12 @@ pub fn maybe_charge_fees_on_place_order(
         if vault_difference_result.quote_change.is_negative() && tp.native(coin_bank).is_negative()
         {
             let quote_change_abs = vault_difference_result.quote_change.abs();
-            let filled_vault_borrows = cm!(quote_change_abs - I80F48::from(pc_reserved_increase));
-            let actualized_loan = tp.native(pc_bank).abs().min(filled_vault_borrows);
+            let instantly_filled_order_vault_borrows =
+                cm!(quote_change_abs - I80F48::from(pc_reserved_increase));
+            let actualized_loan = tp
+                .native(pc_bank)
+                .abs()
+                .min(instantly_filled_order_vault_borrows);
 
             pc_bank
                 .withdraw_loan_origination_fee(tp, actualized_loan)?
