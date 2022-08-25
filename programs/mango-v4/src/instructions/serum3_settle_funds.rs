@@ -154,13 +154,14 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         let mut account = ctx.accounts.account.load_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-        let (base_loan_origination_fee, quote_loan_origination_fee) = charge_maybe_fees(
-            serum_market.market_index,
-            &mut base_bank,
-            &mut quote_bank,
-            &mut account.borrow_mut(),
-            &after_oo,
-        )?;
+        let (base_loan_origination_fee, quote_loan_origination_fee) =
+            maybe_charge_fees_on_settle_funds(
+                serum_market.market_index,
+                &mut base_bank,
+                &mut quote_bank,
+                &mut account.borrow_mut(),
+                &after_oo,
+            )?;
 
         if base_loan_origination_fee.is_positive() {
             emit!(WithdrawLoanOriginationFeeLog {
@@ -191,7 +192,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
 }
 
 // if reserved is less than cached, charge loan fee on the difference
-pub fn charge_maybe_fees(
+pub fn maybe_charge_fees_on_settle_funds(
     market_index: Serum3MarketIndex,
     coin_bank: &mut Bank,
     pc_bank: &mut Bank,
@@ -218,10 +219,11 @@ pub fn charge_maybe_fees(
             // note: the withdraw has already happened while placing the order
             // now that the loan is actually materialized (since the fill having taken place)
             // charge the loan origination fee
-            coin_bank
+            let base_loan_origination_fees = coin_bank
                 .borrow_mut()
-                .withdraw_loan_origination_fee(coin_token_account, actualized_loan)?;
-            actualized_loan
+                .withdraw_loan_origination_fee(coin_token_account, actualized_loan)?
+                .1;
+            base_loan_origination_fees
         } else {
             I80F48::ZERO
         }
@@ -248,10 +250,11 @@ pub fn charge_maybe_fees(
             // note: the withdraw has already happened while placing the order
             // now that the loan is actually materialized (since the fill having taken place)
             // charge the loan origination fee
-            pc_bank
+            let quote_loan_origination_fee = pc_bank
                 .borrow_mut()
-                .withdraw_loan_origination_fee(pc_token_account, actualized_loan)?;
-            actualized_loan
+                .withdraw_loan_origination_fee(pc_token_account, actualized_loan)?
+                .1;
+            quote_loan_origination_fee
         } else {
             I80F48::ZERO
         }

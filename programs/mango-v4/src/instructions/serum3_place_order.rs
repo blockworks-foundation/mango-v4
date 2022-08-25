@@ -284,15 +284,16 @@ pub fn serum3_place_order(
         let open_orders = load_open_orders_ref(oo_ai)?;
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
         let mut account = ctx.accounts.account.load_mut()?;
-        maybe_charge_fees_on_place_order(
-            serum_market.market_index,
-            &mut base_bank,
-            &mut quote_bank,
-            &mut account.borrow_mut(),
-            &before_oo,
-            &after_oo,
-            &vault_difference_result,
-        )?;
+        let (base_loan_origination_fee, quote_loan_origination_fee) =
+            maybe_charge_fees_on_place_order(
+                serum_market.market_index,
+                &mut base_bank,
+                &mut quote_bank,
+                &mut account.borrow_mut(),
+                &before_oo,
+                &after_oo,
+                &vault_difference_result,
+            )?;
     }
 
     //
@@ -324,27 +325,42 @@ pub fn maybe_charge_fees_on_place_order(
     before_oo: &OpenOrdersSlim,
     after_oo: &OpenOrdersSlim,
     vault_difference_result: &VaultDifferenceResult,
-) -> Result<()> {
-    if after_oo.native_coin_reserved() > before_oo.native_coin_reserved() {
+) -> Result<(I80F48, I80F48)> {
+    let base_loan_origination_fee = if after_oo.native_coin_reserved()
+        > before_oo.native_coin_reserved()
+    {
         let coin_reserved_increase =
             after_oo.native_coin_reserved() - before_oo.native_coin_reserved();
+
+        let serum3_account = account.serum3_orders_mut(market_index).unwrap();
+        serum3_account.previous_native_coin_reserved =
+            cm!(serum3_account.previous_native_coin_reserved + coin_reserved_increase);
+        drop(serum3_account);
 
         let tp = account.token_position_mut(coin_bank.token_index)?.0;
         if vault_difference_result.base_change.is_negative() && tp.native(coin_bank).is_negative() {
             let base_change_abs = vault_difference_result.base_change.abs();
             let filled_vault_borrows = cm!(base_change_abs - I80F48::from(coin_reserved_increase));
             let actualized_loan = tp.native(coin_bank).abs().min(filled_vault_borrows);
-            coin_bank.withdraw_loan_origination_fee(tp, actualized_loan)?;
+            coin_bank
+                .withdraw_loan_origination_fee(tp, actualized_loan)?
+                .1
+        } else {
+            I80F48::ZERO
         }
-        drop(tp);
+    } else {
+        I80F48::ZERO
+    };
+
+    let quote_loan_origination_fee = if after_oo.native_pc_reserved()
+        > before_oo.native_pc_reserved()
+    {
+        let pc_reserved_increase = after_oo.native_pc_reserved() - before_oo.native_pc_reserved();
 
         let serum3_account = account.serum3_orders_mut(market_index).unwrap();
-        serum3_account.previous_native_coin_reserved =
-            cm!(serum3_account.previous_native_coin_reserved + coin_reserved_increase);
-    }
-
-    if after_oo.native_pc_reserved() > before_oo.native_pc_reserved() {
-        let pc_reserved_increase = after_oo.native_pc_reserved() - before_oo.native_pc_reserved();
+        serum3_account.previous_native_pc_reserved =
+            cm!(serum3_account.previous_native_pc_reserved + pc_reserved_increase);
+        drop(serum3_account);
 
         let tp = account.token_position_mut(pc_bank.token_index)?.0;
         if vault_difference_result.quote_change.is_negative() && tp.native(coin_bank).is_negative()
@@ -352,16 +368,18 @@ pub fn maybe_charge_fees_on_place_order(
             let quote_change_abs = vault_difference_result.quote_change.abs();
             let filled_vault_borrows = cm!(quote_change_abs - I80F48::from(pc_reserved_increase));
             let actualized_loan = tp.native(pc_bank).abs().min(filled_vault_borrows);
-            pc_bank.withdraw_loan_origination_fee(tp, actualized_loan)?;
+
+            pc_bank
+                .withdraw_loan_origination_fee(tp, actualized_loan)?
+                .1
+        } else {
+            I80F48::ZERO
         }
-        drop(tp);
+    } else {
+        I80F48::ZERO
+    };
 
-        let serum3_account = account.serum3_orders_mut(market_index).unwrap();
-        serum3_account.previous_native_pc_reserved =
-            cm!(serum3_account.previous_native_pc_reserved + pc_reserved_increase);
-    }
-
-    Ok(())
+    Ok((base_loan_origination_fee, quote_loan_origination_fee))
 }
 
 pub struct VaultDifferenceResult {
