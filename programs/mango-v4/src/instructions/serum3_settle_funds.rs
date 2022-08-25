@@ -169,7 +169,6 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
             &ctx.accounts.account.key(),
             LoanOriginationFeeInstruction::Serum3SettleFunds,
         );
-        difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
     }
 
     Ok(())

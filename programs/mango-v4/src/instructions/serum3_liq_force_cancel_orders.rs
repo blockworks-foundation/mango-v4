@@ -154,7 +154,6 @@ pub fn serum3_liq_force_cancel_orders(
         &ctx.accounts.account.key(),
         LoanOriginationFeeInstruction::Serum3LiqForceCancelOrders,
     );
-    difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
 
     Ok(())
 }
