@@ -7,12 +7,15 @@ use crate::state::*;
 pub struct Serum3CancelAllOrders<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(has_one = group)]
+    #[account(
+        has_one = group
+        // owner is checked at #1
+    )]
     pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
-    /// CHECK: Validated inline by checking against the pubkey stored in the account
+    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
     pub open_orders: UncheckedAccount<'info>,
 
     #[account(
@@ -46,6 +49,7 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
     //
     {
         let account = ctx.accounts.account.load()?;
+        // account constraint #1
         require!(
             account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
             MangoError::SomeError
@@ -53,7 +57,7 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
 
         let serum_market = ctx.accounts.serum_market.load()?;
 
-        // Validate open_orders
+        // Validate open_orders #2
         require!(
             account
                 .serum3_orders(serum_market.market_index)
