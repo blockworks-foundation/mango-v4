@@ -15,7 +15,6 @@ pub struct Serum3RegisterMarket<'info> {
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
 
-    // TODO: limit?
     /// CHECK: Can register a market for any serum program
     pub serum_program: UncheckedAccount<'info>,
     /// CHECK: Can register any serum market
@@ -42,7 +41,6 @@ pub struct Serum3RegisterMarket<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// TODO: should this be "configure_serum_market", which allows reconfiguring?
 pub fn serum3_register_market(
     ctx: Context<Serum3RegisterMarket>,
     market_index: Serum3MarketIndex,

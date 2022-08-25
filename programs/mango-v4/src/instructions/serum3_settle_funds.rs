@@ -16,12 +16,16 @@ use crate::logs::LoanOriginationFeeInstruction;
 pub struct Serum3SettleFunds<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group
+        // owner is checked at #1
+    )]
     pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
-    /// CHECK: Validated inline by checking against the pubkey stored in the account
+    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
     pub open_orders: UncheckedAccount<'info>,
 
     #[account(
@@ -48,7 +52,7 @@ pub struct Serum3SettleFunds<'info> {
     /// CHECK: Validated by the serum cpi call
     pub market_vault_signer: UncheckedAccount<'info>,
 
-    // token_index and bank.vault == vault is validated inline
+    // token_index and bank.vault == vault is validated inline at #3
     #[account(mut, has_one = group)]
     pub quote_bank: AccountLoader<'info, Bank>,
     #[account(mut)]
@@ -74,12 +78,13 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     //
     {
         let account = ctx.accounts.account.load()?;
+        // account constraint #1
         require!(
             account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
             MangoError::SomeError
         );
 
-        // Validate open_orders
+        // Validate open_orders #2
         require!(
             account
                 .serum3_orders(serum_market.market_index)
@@ -89,7 +94,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
             MangoError::SomeError
         );
 
-        // Validate banks and vaults
+        // Validate banks and vaults #3
         let quote_bank = ctx.accounts.quote_bank.load()?;
         require!(
             quote_bank.vault == ctx.accounts.quote_vault.key(),

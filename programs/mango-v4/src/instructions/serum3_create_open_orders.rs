@@ -7,7 +7,11 @@ use crate::state::*;
 pub struct Serum3CreateOpenOrders<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group
+        // owner is checked at #1
+    )]
     pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
@@ -48,6 +52,7 @@ pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result
     let serum_market = ctx.accounts.serum_market.load()?;
 
     let mut account = ctx.accounts.account.load_mut()?;
+    // account constraint #1
     require!(
         account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
         MangoError::SomeError

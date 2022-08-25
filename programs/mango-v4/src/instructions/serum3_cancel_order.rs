@@ -14,12 +14,16 @@ use checked_math as cm;
 pub struct Serum3CancelOrder<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group
+        // owner is checked at #1
+    )]
     pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
-    /// CHECK: Validated inline by checking against the pubkey stored in the account
+    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
     pub open_orders: UncheckedAccount<'info>,
 
     #[account(
@@ -59,12 +63,13 @@ pub fn serum3_cancel_order(
     //
     {
         let account = ctx.accounts.account.load()?;
+        // account constraint #1
         require!(
             account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
             MangoError::SomeError
         );
 
-        // Validate open_orders
+        // Validate open_orders #2
         require!(
             account
                 .serum3_orders(serum_market.market_index)
