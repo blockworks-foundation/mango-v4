@@ -160,6 +160,16 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+    send_tx(
+        solana,
+        Serum3SettleFundsInstruction {
+            account,
+            owner,
+            serum_market,
+        },
+    )
+    .await
+    .unwrap();
 
     //
     // TEST: Change the oracle to make health go negative

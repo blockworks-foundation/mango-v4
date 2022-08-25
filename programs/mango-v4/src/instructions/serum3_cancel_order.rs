@@ -88,17 +88,18 @@ pub fn serum3_cancel_order(
     };
     cpi_cancel_order(ctx.accounts, order)?;
 
-    {
-        let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
-        let after_oo = OpenOrdersSlim::from_oo(&open_orders);
-        let mut account = ctx.accounts.account.load_mut()?;
-        decrease_maybe_loan(
-            serum_market.market_index,
-            &mut account.borrow_mut(),
-            &before_oo,
-            &after_oo,
-        );
-    };
+    //
+    // Update cached reserved
+    //
+    let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
+    let after_oo = OpenOrdersSlim::from_oo(&open_orders);
+    let mut account = ctx.accounts.account.load_mut()?;
+    decrease_maybe_loan(
+        serum_market.market_index,
+        &mut account.borrow_mut(),
+        &before_oo,
+        &after_oo,
+    );
 
     Ok(())
 }

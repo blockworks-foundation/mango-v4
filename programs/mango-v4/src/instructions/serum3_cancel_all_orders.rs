@@ -1,7 +1,10 @@
 use anchor_lang::prelude::*;
 
 use crate::error::*;
+use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
+
+use super::{decrease_maybe_loan, OpenOrdersSlim};
 
 #[derive(Accounts)]
 pub struct Serum3CancelAllOrders<'info> {
@@ -41,6 +44,8 @@ pub struct Serum3CancelAllOrders<'info> {
 }
 
 pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) -> Result<()> {
+    let serum_market = ctx.accounts.serum_market.load()?;
+
     //
     // Validation
     //
@@ -50,8 +55,6 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
             account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
             MangoError::SomeError
         );
-
-        let serum_market = ctx.accounts.serum_market.load()?;
 
         // Validate open_orders
         require!(
@@ -67,7 +70,24 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
     //
     // Cancel
     //
+    let before_oo = {
+        let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
+        OpenOrdersSlim::from_oo(&open_orders)
+    };
     cpi_cancel_all_orders(ctx.accounts, limit)?;
+
+    //
+    // Update cached reserved
+    //
+    let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
+    let after_oo = OpenOrdersSlim::from_oo(&open_orders);
+    let mut account = ctx.accounts.account.load_mut()?;
+    decrease_maybe_loan(
+        serum_market.market_index,
+        &mut account.borrow_mut(),
+        &before_oo,
+        &after_oo,
+    );
 
     Ok(())
 }
