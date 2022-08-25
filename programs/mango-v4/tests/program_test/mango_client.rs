@@ -814,9 +814,7 @@ impl<'keypair> ClientInstruction for TokenDeregisterInstruction<'keypair> {
         _loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction {
-            token_index: self.token_index,
-        };
+        let instruction = Self::Instruction {};
 
         let accounts = Self::Accounts {
             admin: self.admin.pubkey(),
