@@ -4,7 +4,7 @@ use crate::error::*;
 use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
 
-use super::{decrease_maybe_loan, OpenOrdersSlim};
+use super::{decrease_maybe_loan_on_cancel_order, OpenOrdersSlim};
 
 #[derive(Accounts)]
 pub struct Serum3CancelAllOrders<'info> {
@@ -82,7 +82,7 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
     let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
     let after_oo = OpenOrdersSlim::from_oo(&open_orders);
     let mut account = ctx.accounts.account.load_mut()?;
-    decrease_maybe_loan(
+    decrease_maybe_loan_on_cancel_order(
         serum_market.market_index,
         &mut account.borrow_mut(),
         &before_oo,

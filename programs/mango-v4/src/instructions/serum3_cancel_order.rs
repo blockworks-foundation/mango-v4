@@ -94,7 +94,7 @@ pub fn serum3_cancel_order(
     let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
     let after_oo = OpenOrdersSlim::from_oo(&open_orders);
     let mut account = ctx.accounts.account.load_mut()?;
-    decrease_maybe_loan(
+    decrease_maybe_loan_on_cancel_order(
         serum_market.market_index,
         &mut account.borrow_mut(),
         &before_oo,
@@ -105,8 +105,8 @@ pub fn serum3_cancel_order(
 }
 
 // if free has increased, the free increase is reduction in reserved, reduce this from
-// the cached
-pub fn decrease_maybe_loan(
+// the cached, cache is used to compute loan origination fees on future fills using borrows
+pub fn decrease_maybe_loan_on_cancel_order(
     market_index: Serum3MarketIndex,
     account: &mut MangoAccountRefMut,
     before_oo: &OpenOrdersSlim,
@@ -115,16 +115,16 @@ pub fn decrease_maybe_loan(
     let serum3_account = account.serum3_orders_mut(market_index).unwrap();
 
     if after_oo.native_coin_free > before_oo.native_coin_free {
-        let native_coin_free_increase = after_oo.native_coin_free - before_oo.native_coin_free;
+        let coin_free_increase = after_oo.native_coin_free - before_oo.native_coin_free;
         serum3_account.previous_native_coin_reserved =
-            cm!(serum3_account.previous_native_coin_reserved - native_coin_free_increase);
+            cm!(serum3_account.previous_native_coin_reserved - coin_free_increase);
     }
 
     // pc
     if after_oo.native_pc_free > before_oo.native_pc_free {
-        let free_pc_increase = after_oo.native_pc_free - before_oo.native_pc_free;
+        let pc_free_increase = after_oo.native_pc_free - before_oo.native_pc_free;
         serum3_account.previous_native_pc_reserved =
-            cm!(serum3_account.previous_native_pc_reserved - free_pc_increase);
+            cm!(serum3_account.previous_native_pc_reserved - pc_free_increase);
     }
 }
 

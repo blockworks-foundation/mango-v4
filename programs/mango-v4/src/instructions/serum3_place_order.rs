@@ -256,7 +256,7 @@ pub fn serum3_place_order(
     let after_quote_vault = ctx.accounts.quote_vault.amount;
 
     // Charge the difference in vault balances to the user's account
-    {
+    let vault_difference_result = {
         let mut account = ctx.accounts.account.load_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
@@ -271,22 +271,28 @@ pub fn serum3_place_order(
             before_quote_vault,
         )?;
         vault_difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
+        vault_difference_result
     };
 
     //
-    // Update cached reserved
+    // Charge loan origination fees and update cached reserved
     //
     {
+        let mut base_bank = ctx.accounts.base_bank.load_mut()?;
+        let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
         let oo_ai = &ctx.accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
         let mut account = ctx.accounts.account.load_mut()?;
-        inc_maybe_loan(
+        maybe_charge_fees_on_place_order(
             serum_market.market_index,
+            &mut base_bank,
+            &mut quote_bank,
             &mut account.borrow_mut(),
             &before_oo,
             &after_oo,
-        );
+            &vault_difference_result,
+        )?;
     }
 
     //
@@ -307,34 +313,64 @@ pub fn serum3_place_order(
     Ok(())
 }
 
-// if reserved has increased, then increase cached value by the increase in reserved
-pub fn inc_maybe_loan(
+// 1. Charge loan origination fees on immediate fill using borrows
+// 2. If reserved has increased, then increase cached value by the increase in reserved, cache is used to
+// compute loan origination fees on future fills using borrows
+pub fn maybe_charge_fees_on_place_order(
     market_index: Serum3MarketIndex,
+    coin_bank: &mut Bank,
+    pc_bank: &mut Bank,
     account: &mut MangoAccountRefMut,
     before_oo: &OpenOrdersSlim,
     after_oo: &OpenOrdersSlim,
-) {
-    let serum3_account = account.serum3_orders_mut(market_index).unwrap();
-
+    vault_difference_result: &VaultDifferenceResult,
+) -> Result<()> {
     if after_oo.native_coin_reserved() > before_oo.native_coin_reserved() {
-        let native_coin_reserved_increase =
+        let coin_reserved_increase =
             after_oo.native_coin_reserved() - before_oo.native_coin_reserved();
+
+        let tp = account.token_position_mut(coin_bank.token_index)?.0;
+        if vault_difference_result.base_change.is_negative() && tp.native(coin_bank).is_negative() {
+            let base_change_abs = vault_difference_result.base_change.abs();
+            let filled_vault_borrows = cm!(base_change_abs - I80F48::from(coin_reserved_increase));
+            let actualized_loan = tp.native(coin_bank).abs().min(filled_vault_borrows);
+            coin_bank.withdraw_loan_origination_fee(tp, actualized_loan)?;
+        }
+        drop(tp);
+
+        let serum3_account = account.serum3_orders_mut(market_index).unwrap();
         serum3_account.previous_native_coin_reserved =
-            cm!(serum3_account.previous_native_coin_reserved + native_coin_reserved_increase);
+            cm!(serum3_account.previous_native_coin_reserved + coin_reserved_increase);
     }
 
     if after_oo.native_pc_reserved() > before_oo.native_pc_reserved() {
-        let reserved_pc_increase = after_oo.native_pc_reserved() - before_oo.native_pc_reserved();
+        let pc_reserved_increase = after_oo.native_pc_reserved() - before_oo.native_pc_reserved();
+
+        let tp = account.token_position_mut(pc_bank.token_index)?.0;
+        if vault_difference_result.quote_change.is_negative() && tp.native(coin_bank).is_negative()
+        {
+            let quote_change_abs = vault_difference_result.quote_change.abs();
+            let filled_vault_borrows = cm!(quote_change_abs - I80F48::from(pc_reserved_increase));
+            let actualized_loan = tp.native(pc_bank).abs().min(filled_vault_borrows);
+            pc_bank.withdraw_loan_origination_fee(tp, actualized_loan)?;
+        }
+        drop(tp);
+
+        let serum3_account = account.serum3_orders_mut(market_index).unwrap();
         serum3_account.previous_native_pc_reserved =
-            cm!(serum3_account.previous_native_pc_reserved + reserved_pc_increase);
+            cm!(serum3_account.previous_native_pc_reserved + pc_reserved_increase);
     }
+
+    Ok(())
 }
 
 pub struct VaultDifferenceResult {
     base_raw_index: usize,
     base_active: bool,
+    base_change: I80F48,
     quote_raw_index: usize,
     quote_active: bool,
+    quote_change: I80F48,
 }
 
 impl VaultDifferenceResult {
@@ -368,8 +404,10 @@ pub fn apply_vault_difference(
     Ok(VaultDifferenceResult {
         base_raw_index,
         base_active,
+        base_change,
         quote_raw_index,
         quote_active,
+        quote_change,
     })
 }
 
