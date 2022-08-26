@@ -2,6 +2,7 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { Group } from '../accounts/group';
+import { I80F48 } from '../accounts/I80F48';
 import { HealthType, MangoAccount } from '../accounts/mangoAccount';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
@@ -172,13 +173,7 @@ async function main() {
 
     for (const mangoAccount of mangoAccounts) {
       console.log(`MangoAccount ${mangoAccount.publicKey}`);
-      // if (
-      // 'etVgrWPAQe3aUMiuZT32tEMnbtuD2yRxip6eEkSRrLV' ===
-      // '2UWD1ZBiYdusXgXputE68MBL4Kz47nZptzMn6rLnzn1K' ===
-      // '9B8uwqH8FJqLn9kvGPVb5GEksLvmyXb3B8UKCFtRs5cq' ===
-      // mangoAccount.publicKey.toBase58()
-      // )
-      {
+      if (mangoAccount.name === '2nd Account') {
         await debugUser(client, group, mangoAccount);
       }
     }
