@@ -1,5 +1,5 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { Group } from '../accounts/group';
 import { HealthType, MangoAccount } from '../accounts/mangoAccount';
@@ -156,17 +156,20 @@ async function main() {
     );
     const userWallet = new Wallet(user);
     console.log(`User ${userWallet.publicKey.toBase58()}`);
-    // const mangoAccounts = await client.getMangoAccountsForOwner(
-    //   group,
-    //   user.publicKey,
-    // );
-    const mangoAccounts = await Promise.all([
-      await client.getMangoAccount({
-        publicKey: new PublicKey(
-          '6mqHfpJqnXcu6RgDYZSVW9CQXQPFyRYhgvdzvWXN9mPW',
-        ),
-      } as any),
-    ]);
+
+    const mangoAccounts = await client.getMangoAccountsForOwner(
+      group,
+      user.publicKey,
+    );
+
+    // const mangoAccounts = await Promise.all([
+    //   await client.getMangoAccount({
+    //     publicKey: new PublicKey(
+    //       '6mqHfpJqnXcu6RgDYZSVW9CQXQPFyRYhgvdzvWXN9mPW',
+    //     ),
+    //   } as any),
+    // ]);
+
     for (const mangoAccount of mangoAccounts) {
       console.log(`MangoAccount ${mangoAccount.publicKey}`);
       // if (
