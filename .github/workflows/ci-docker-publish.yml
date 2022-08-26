@@ -66,8 +66,8 @@ jobs:
           context: .
           push: true
           tags: |
-            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE-liquidator }}:${{ github.sha }}
-            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE-liquidator }}:latest
+            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-liquidator:${{ github.sha }}
+            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-liquidator:latest
       # Build and push the keeper runtime image
       - name: Build and Push Keeper
         uses: docker/build-push-action@v2
@@ -76,5 +76,5 @@ jobs:
           context: .
           push: true
           tags: |
-            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE-keeper }}:${{ github.sha }}
-            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE-keeper }}:latest
+            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-keeper:${{ github.sha }}
+            us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}-keeper:latest
