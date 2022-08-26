@@ -304,14 +304,10 @@ export class Group {
 
   /**
    *
-   * @param client
    * @param mintPk
    * @returns sum of native balances of vaults for all banks for a token (fetched from vaultAmountsMap cache)
    */
-  public async getTokenVaultBalanceByMint(
-    client: MangoClient,
-    mintPk: PublicKey,
-  ): Promise<I80F48> {
+  public getTokenVaultBalanceByMint(mintPk: PublicKey): I80F48 {
     const banks = this.banksMapByMint.get(mintPk.toString());
     let amount = 0;
     for (const bank of banks) {
@@ -322,16 +318,12 @@ export class Group {
 
   /**
    *
-   * @param client
    * @param mintPk
    * @returns sum of ui balances of vaults for all banks for a token
    */
-  public async getTokenVaultBalanceByMintUi(
-    client: MangoClient,
-    mintPk: PublicKey,
-  ): Promise<number> {
+  public getTokenVaultBalanceByMintUi(mintPk: PublicKey): number {
     return toUiDecimals(
-      await this.getTokenVaultBalanceByMint(client, mintPk),
+      this.getTokenVaultBalanceByMint(mintPk),
       this.getMintDecimals(mintPk),
     );
   }
