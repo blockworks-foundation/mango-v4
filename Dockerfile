@@ -9,7 +9,7 @@ COPY ./ .
 RUN sed -i 's|lib/\*|lib/checked_math|' Cargo.toml
 
 # Mount cache for downloaded and compiled dependencies
-RUN --mount=type=cache,target=/usr/local/cargo,from=rust,source=/usr/local/cargo \
+RUN --mount=type=cache,target=/usr/local/cargo \
     --mount=type=cache,target=target \
     cargo build --release --bins
 
