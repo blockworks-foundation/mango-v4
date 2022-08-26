@@ -11,6 +11,11 @@ on:
         description: 'Docker Image Name'
         required: true
         type: string
+      imageTag:
+        description: 'Docker Image Tag'
+        required: true
+        type: string
+        default: 'latest'
 
 jobs:
   deploy:
@@ -27,7 +32,7 @@ jobs:
       - name: Push
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-        run: heroku container:push ${{ inputs.imageName }} -a ${{ inputs.appName }} --recursive 
+        run: heroku container:push ${{ inputs.imageName }} -a ${{ inputs.appName }} --recursive --arg BASE_TAG=${{ inputs.imageTag }}
 
       - name: Release
         env:

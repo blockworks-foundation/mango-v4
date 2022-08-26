@@ -1,6 +1,7 @@
 # Dockerfile for keeper service in Heroku
 # heroku container:push keeper -R -a HEROKU_APP_NAME
 # heroku container:release -a HEROKU_APP_NAME
-FROM us-docker.pkg.dev/mango-markets/gcr.io/mango-v4:latest
+ARG BASE_TAG=latest
+FROM us-docker.pkg.dev/mango-markets/gcr.io/mango-v4:$BASE_TAG
 ENTRYPOINT ["keeper"] 
 CMD ["crank"]
