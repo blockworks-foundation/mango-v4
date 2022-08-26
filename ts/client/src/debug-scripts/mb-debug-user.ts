@@ -173,13 +173,7 @@ async function main() {
 
     for (const mangoAccount of mangoAccounts) {
       console.log(`MangoAccount ${mangoAccount.publicKey}`);
-      // if (
-      // 'etVgrWPAQe3aUMiuZT32tEMnbtuD2yRxip6eEkSRrLV' ===
-      // '2UWD1ZBiYdusXgXputE68MBL4Kz47nZptzMn6rLnzn1K' ===
-      // '9B8uwqH8FJqLn9kvGPVb5GEksLvmyXb3B8UKCFtRs5cq' ===
-      // mangoAccount.publicKey.toBase58()
-      // )
-      {
+      if (mangoAccount.name === '2nd Account') {
         await debugUser(client, group, mangoAccount);
       }
     }

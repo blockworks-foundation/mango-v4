@@ -5,6 +5,7 @@ import fs from 'fs';
 import { I80F48, ZERO_I80F48 } from '../accounts/I80F48';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
+import { toUiDecimals } from '../utils';
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
@@ -132,14 +133,10 @@ async function main() {
       `\n ${'borrowRate'.padEnd(40)} ${(
         100 * bank.getBorrowRate().toNumber()
       ).toFixed(2)}%` +
-      `\n ${'vault balance'.padEnd(40)} ${coder()
-        .accounts.decode(
-          'token',
-          await (
-            await client.program.provider.connection.getAccountInfo(bank.vault)
-          ).data,
-        )
-        .amount.toNumber()}` +
+      `\n ${'vault balance'.padEnd(40)} ${toUiDecimals(
+        vault,
+        bank.mintDecimals,
+      )}, ${vault} native` +
       `\n ${'last index update'.padEnd(40)} ${new Date(
         1000 * bank.indexLastUpdated.toNumber(),
       )}` +
