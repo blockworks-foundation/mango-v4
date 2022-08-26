@@ -5,8 +5,6 @@ use crate::error::*;
 use crate::instructions::apply_vault_difference;
 use crate::state::*;
 
-use crate::logs::LoanOriginationFeeInstruction;
-
 #[derive(Accounts)]
 pub struct Serum3LiqForceCancelOrders<'info> {
     pub group: AccountLoader<'info, Group>,
@@ -135,13 +133,16 @@ pub fn serum3_liq_force_cancel_orders(
     ctx.accounts.quote_vault.reload()?;
     let after_base_vault = ctx.accounts.base_vault.amount;
     let after_quote_vault = ctx.accounts.quote_vault.amount;
+    require_gte!(after_base_vault, before_base_vault);
+    require_gte!(after_quote_vault, before_quote_vault);
 
-    // Charge the difference in vault balances to the user's account
+    // Credit the difference in vault balances to the user's account
     let mut account = ctx.accounts.account.load_mut()?;
     let mut base_bank = ctx.accounts.base_bank.load_mut()?;
     let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-    let difference_result = apply_vault_difference(
+    apply_vault_difference(
         &mut account.borrow_mut(),
+        serum_market.market_index,
         &mut base_bank,
         after_base_vault,
         before_base_vault,
@@ -149,11 +150,6 @@ pub fn serum3_liq_force_cancel_orders(
         after_quote_vault,
         before_quote_vault,
     )?;
-    difference_result.log_loan_origination_fees(
-        &ctx.accounts.group.key(),
-        &ctx.accounts.account.key(),
-        LoanOriginationFeeInstruction::Serum3LiqForceCancelOrders,
-    );
 
     Ok(())
 }

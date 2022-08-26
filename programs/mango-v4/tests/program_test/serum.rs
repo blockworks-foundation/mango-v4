@@ -190,16 +190,16 @@ impl SerumCookie {
     pub async fn consume_spot_events(
         &self,
         spot_market_cookie: &SpotMarketCookie,
-        open_orders: Pubkey,
+        open_orders: &[Pubkey],
     ) {
         let instructions = [serum_dex::instruction::consume_events(
             &self.program_id,
-            vec![&open_orders],
+            open_orders.iter().collect(),
             &spot_market_cookie.market,
             &spot_market_cookie.event_q,
             &spot_market_cookie.coin_fee_account,
             &spot_market_cookie.pc_fee_account,
-            5,
+            10,
         )
         .unwrap()];
         self.solana
