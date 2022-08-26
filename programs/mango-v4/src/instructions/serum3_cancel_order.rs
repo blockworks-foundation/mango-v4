@@ -3,12 +3,9 @@ use anchor_lang::prelude::*;
 use serum_dex::instruction::CancelOrderInstructionV2;
 
 use crate::error::*;
-use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
 
-use super::OpenOrdersSlim;
 use super::Serum3Side;
-use checked_math as cm;
 
 #[derive(Accounts)]
 pub struct Serum3CancelOrder<'info> {
@@ -83,53 +80,13 @@ pub fn serum3_cancel_order(
     //
     // Cancel
     //
-    let before_oo = {
-        let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
-        OpenOrdersSlim::from_oo(&open_orders)
-    };
     let order = serum_dex::instruction::CancelOrderInstructionV2 {
         side: u8::try_from(side).unwrap().try_into().unwrap(),
         order_id,
     };
     cpi_cancel_order(ctx.accounts, order)?;
 
-    {
-        let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
-        let after_oo = OpenOrdersSlim::from_oo(&open_orders);
-        let mut account = ctx.accounts.account.load_mut()?;
-        decrease_maybe_loan(
-            serum_market.market_index,
-            &mut account.borrow_mut(),
-            &before_oo,
-            &after_oo,
-        );
-    };
-
     Ok(())
-}
-
-// if free has increased, the free increase is reduction in reserved, reduce this from
-// the cached
-pub fn decrease_maybe_loan(
-    market_index: Serum3MarketIndex,
-    account: &mut MangoAccountRefMut,
-    before_oo: &OpenOrdersSlim,
-    after_oo: &OpenOrdersSlim,
-) {
-    let serum3_account = account.serum3_orders_mut(market_index).unwrap();
-
-    if after_oo.native_coin_free > before_oo.native_coin_free {
-        let native_coin_free_increase = after_oo.native_coin_free - before_oo.native_coin_free;
-        serum3_account.previous_native_coin_reserved =
-            cm!(serum3_account.previous_native_coin_reserved - native_coin_free_increase);
-    }
-
-    // pc
-    if after_oo.native_pc_free > before_oo.native_pc_free {
-        let free_pc_increase = after_oo.native_pc_free - before_oo.native_pc_free;
-        serum3_account.previous_native_pc_reserved =
-            cm!(serum3_account.previous_native_pc_reserved - free_pc_increase);
-    }
 }
 
 fn cpi_cancel_order(ctx: &Serum3CancelOrder, order: CancelOrderInstructionV2) -> Result<()> {

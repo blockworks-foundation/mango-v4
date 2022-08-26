@@ -12,15 +12,14 @@ use serum_dex::instruction::NewOrderInstructionV3;
 use serum_dex::matching::Side;
 use serum_dex::state::OpenOrders;
 
-use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
-
 /// For loan origination fees bookkeeping purposes
+#[derive(Debug)]
 pub struct OpenOrdersSlim {
-    pub native_coin_free: u64,
-    pub native_coin_total: u64,
-    pub native_pc_free: u64,
-    pub native_pc_total: u64,
-    pub referrer_rebates_accrued: u64,
+    native_coin_free: u64,
+    native_coin_total: u64,
+    native_pc_free: u64,
+    native_pc_total: u64,
+    referrer_rebates_accrued: u64,
 }
 impl OpenOrdersSlim {
     pub fn from_oo(oo: &OpenOrders) -> Self {
@@ -38,7 +37,10 @@ pub trait OpenOrdersAmounts {
     fn native_base_reserved(&self) -> u64;
     fn native_quote_reserved(&self) -> u64;
     fn native_base_free(&self) -> u64;
-    fn native_quote_free(&self) -> u64; // includes settleable referrer rebates
+    fn native_quote_free(&self) -> u64;
+    fn native_quote_free_plus_rebates(&self) -> u64;
+    fn native_base_total(&self) -> u64;
+    fn native_quote_total_plus_rebates(&self) -> u64;
 }
 
 impl OpenOrdersAmounts for OpenOrdersSlim {
@@ -52,7 +54,16 @@ impl OpenOrdersAmounts for OpenOrdersSlim {
         self.native_coin_free
     }
     fn native_quote_free(&self) -> u64 {
+        self.native_pc_free
+    }
+    fn native_quote_free_plus_rebates(&self) -> u64 {
         cm!(self.native_pc_free + self.referrer_rebates_accrued)
+    }
+    fn native_base_total(&self) -> u64 {
+        self.native_coin_total
+    }
+    fn native_quote_total_plus_rebates(&self) -> u64 {
+        cm!(self.native_pc_total + self.referrer_rebates_accrued)
     }
 }
 
@@ -67,7 +78,16 @@ impl OpenOrdersAmounts for OpenOrders {
         self.native_coin_free
     }
     fn native_quote_free(&self) -> u64 {
+        self.native_pc_free
+    }
+    fn native_quote_free_plus_rebates(&self) -> u64 {
         cm!(self.native_pc_free + self.referrer_rebates_accrued)
+    }
+    fn native_base_total(&self) -> u64 {
+        self.native_coin_total
+    }
+    fn native_quote_total_plus_rebates(&self) -> u64 {
+        cm!(self.native_pc_total + self.referrer_rebates_accrued)
     }
 }
 
@@ -223,27 +243,6 @@ pub fn serum3_place_order(
     }
 
     //
-    // Before-order tracking
-    //
-
-    let before_base_vault = ctx.accounts.base_vault.amount;
-    let before_quote_vault = ctx.accounts.quote_vault.amount;
-
-    // Provide a readable error message in case the vault doesn't have enough tokens
-    let (vault_amount, needed_amount) = match side {
-        Serum3Side::Ask => (before_base_vault, max_base_qty),
-        Serum3Side::Bid => (before_quote_vault, max_native_quote_qty_including_fees),
-    };
-    if vault_amount < needed_amount {
-        return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {
-            format!(
-                "bank vault does not have enough tokens, need {} but have {}",
-                needed_amount, vault_amount
-            )
-        });
-    }
-
-    //
     // Pre-health computation
     //
     let mut account = ctx.accounts.account.load_mut()?;
@@ -259,8 +258,40 @@ pub fn serum3_place_order(
     };
 
     //
-    // Apply the order to serum. Also immediately settle, in case the order
-    // matched against an existing other order.
+    // Before-order tracking
+    //
+
+    let before_base_vault = ctx.accounts.base_vault.amount;
+    let before_quote_vault = ctx.accounts.quote_vault.amount;
+
+    let before_oo = {
+        let oo_ai = &ctx.accounts.open_orders.as_ref();
+        let open_orders = load_open_orders_ref(oo_ai)?;
+        OpenOrdersSlim::from_oo(&open_orders)
+    };
+
+    // Provide a readable error message in case the vault doesn't have enough tokens
+    let (vault_amount, needed_amount) = match side {
+        Serum3Side::Ask => (
+            before_base_vault,
+            max_base_qty.saturating_sub(before_oo.native_base_free()),
+        ),
+        Serum3Side::Bid => (
+            before_quote_vault,
+            max_native_quote_qty_including_fees.saturating_sub(before_oo.native_quote_free()),
+        ),
+    };
+    if vault_amount < needed_amount {
+        return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {
+            format!(
+                "bank vault does not have enough tokens, need {} but have {}",
+                needed_amount, vault_amount
+            )
+        });
+    }
+
+    //
+    // Apply the order to serum
     //
     let order = serum_dex::instruction::NewOrderInstructionV3 {
         side: u8::try_from(side).unwrap().try_into().unwrap(),
@@ -275,26 +306,12 @@ pub fn serum3_place_order(
         client_order_id,
         limit,
     };
-
-    let before_oo = {
-        let oo_ai = &ctx.accounts.open_orders.as_ref();
-        let open_orders = load_open_orders_ref(oo_ai)?;
-        OpenOrdersSlim::from_oo(&open_orders)
-    };
-
     cpi_place_order(ctx.accounts, order)?;
-    cpi_settle_funds(ctx.accounts)?;
 
     let oo_difference = {
         let oo_ai = &ctx.accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
-        inc_maybe_loan(
-            serum_market.market_index,
-            &mut account.borrow_mut(),
-            &before_oo,
-            &after_oo,
-        );
         OODifference::new(&before_oo, &after_oo)
     };
 
@@ -306,6 +323,10 @@ pub fn serum3_place_order(
     let after_base_vault = ctx.accounts.base_vault.amount;
     let after_quote_vault = ctx.accounts.quote_vault.amount;
 
+    // Placing an order cannot increase vault balances
+    require_gte!(before_base_vault, after_base_vault);
+    require_gte!(before_quote_vault, after_quote_vault);
+
     // Charge the difference in vault balances to the user's account
     let vault_difference = {
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
@@ -313,6 +334,7 @@ pub fn serum3_place_order(
 
         apply_vault_difference(
             &mut account.borrow_mut(),
+            serum_market.market_index,
             &mut base_bank,
             after_base_vault,
             before_base_vault,
@@ -331,37 +353,7 @@ pub fn serum3_place_order(
         account.check_health_post(&health_cache, pre_health)?;
     }
 
-    vault_difference.log_loan_origination_fees(
-        &ctx.accounts.group.key(),
-        &ctx.accounts.account.key(),
-        LoanOriginationFeeInstruction::Serum3PlaceOrder,
-    );
-
     Ok(())
-}
-
-// if reserved has increased, then increase cached value by the increase in reserved
-pub fn inc_maybe_loan(
-    market_index: Serum3MarketIndex,
-    account: &mut MangoAccountRefMut,
-    before_oo: &OpenOrdersSlim,
-    after_oo: &OpenOrdersSlim,
-) {
-    let serum3_account = account.serum3_orders_mut(market_index).unwrap();
-
-    if after_oo.native_base_reserved() > before_oo.native_base_reserved() {
-        let native_coin_reserved_increase =
-            after_oo.native_base_reserved() - before_oo.native_base_reserved();
-        serum3_account.previous_native_coin_reserved =
-            cm!(serum3_account.previous_native_coin_reserved + native_coin_reserved_increase);
-    }
-
-    if after_oo.native_quote_reserved() > before_oo.native_quote_reserved() {
-        let reserved_pc_increase =
-            after_oo.native_quote_reserved() - before_oo.native_quote_reserved();
-        serum3_account.previous_native_pc_reserved =
-            cm!(serum3_account.previous_native_pc_reserved + reserved_pc_increase);
-    }
 }
 
 pub struct OODifference {
@@ -380,8 +372,8 @@ impl OODifference {
                 - I80F48::from(before_oo.native_quote_reserved())),
             free_base_change: cm!(I80F48::from(after_oo.native_base_free())
                 - I80F48::from(before_oo.native_base_free())),
-            free_quote_change: cm!(I80F48::from(after_oo.native_quote_free())
-                - I80F48::from(before_oo.native_quote_free())),
+            free_quote_change: cm!(I80F48::from(after_oo.native_quote_free_plus_rebates())
+                - I80F48::from(before_oo.native_quote_free_plus_rebates())),
         }
     }
 
@@ -402,55 +394,14 @@ impl OODifference {
     }
 }
 
-pub struct VaultDifferenceResult {
-    base_raw_index: usize,
+pub struct VaultDifference {
     base_index: TokenIndex,
-    base_active: bool,
-    quote_raw_index: usize,
     quote_index: TokenIndex,
-    quote_active: bool,
-    base_loan_origination_fee: I80F48,
-    quote_loan_origination_fee: I80F48,
     base_native_change: I80F48,
     quote_native_change: I80F48,
 }
 
-impl VaultDifferenceResult {
-    pub fn deactivate_inactive_token_accounts(&self, account: &mut MangoAccountRefMut) {
-        if !self.base_active {
-            account.deactivate_token_position(self.base_raw_index);
-        }
-        if !self.quote_active {
-            account.deactivate_token_position(self.quote_raw_index);
-        }
-    }
-
-    pub fn log_loan_origination_fees(
-        &self,
-        group: &Pubkey,
-        account: &Pubkey,
-        instruction: LoanOriginationFeeInstruction,
-    ) {
-        if self.base_loan_origination_fee.is_positive() {
-            emit!(WithdrawLoanOriginationFeeLog {
-                mango_group: *group,
-                mango_account: *account,
-                token_index: self.base_index,
-                loan_origination_fee: self.base_loan_origination_fee.to_bits(),
-                instruction,
-            });
-        }
-        if self.quote_loan_origination_fee.is_positive() {
-            emit!(WithdrawLoanOriginationFeeLog {
-                mango_group: *group,
-                mango_account: *account,
-                token_index: self.quote_index,
-                loan_origination_fee: self.quote_loan_origination_fee.to_bits(),
-                instruction,
-            });
-        }
-    }
-
+impl VaultDifference {
     pub fn adjust_health_cache(&self, health_cache: &mut HealthCache) -> Result<()> {
         health_cache.adjust_token_balance(self.base_index, self.base_native_change)?;
         health_cache.adjust_token_balance(self.quote_index, self.quote_native_change)?;
@@ -458,45 +409,68 @@ impl VaultDifferenceResult {
     }
 }
 
+/// Called in settle_funds, place_order, liq_force_cancel to adjust token positions after
+/// changing the vault balances
 pub fn apply_vault_difference(
     account: &mut MangoAccountRefMut,
+    serum_market_index: Serum3MarketIndex,
     base_bank: &mut Bank,
     after_base_vault: u64,
     before_base_vault: u64,
     quote_bank: &mut Bank,
     after_quote_vault: u64,
     before_quote_vault: u64,
-) -> Result<VaultDifferenceResult> {
-    // TODO: Applying the loan origination fee here may be too early: it should only be
-    // charged if an order executes and the loan materializes? Otherwise MMs that place
-    // an order without having the funds will be charged for each place_order!
-
-    let (base_position, base_raw_index) = account.token_position_mut(base_bank.token_index)?;
-    let base_native_before = base_position.native(&base_bank);
+) -> Result<VaultDifference> {
     let base_needed_change = cm!(I80F48::from(after_base_vault) - I80F48::from(before_base_vault));
-    let (base_active, base_loan_origination_fee) =
-        base_bank.change_with_fee(base_position, base_needed_change)?;
-    let base_native_after = base_position.native(&base_bank);
 
-    let (quote_position, quote_raw_index) = account.token_position_mut(quote_bank.token_index)?;
-    let quote_native_before = quote_position.native(&quote_bank);
+    let (base_position, _) = account.token_position_mut(base_bank.token_index)?;
+    let base_native_before = base_position.native(&base_bank);
+    base_bank.change_without_fee(base_position, base_needed_change)?;
+    let base_native_after = base_position.native(&base_bank);
+    let base_native_change = cm!(base_native_after - base_native_before);
+    let base_borrows = base_native_change
+        .max(base_native_after)
+        .min(I80F48::ZERO)
+        .abs()
+        .to_num::<u64>();
+
     let quote_needed_change =
         cm!(I80F48::from(after_quote_vault) - I80F48::from(before_quote_vault));
-    let (quote_active, quote_loan_origination_fee) =
-        quote_bank.change_with_fee(quote_position, quote_needed_change)?;
-    let quote_native_after = quote_position.native(&quote_bank);
 
-    Ok(VaultDifferenceResult {
-        base_raw_index,
+    let (quote_position, _) = account.token_position_mut(quote_bank.token_index)?;
+    let quote_native_before = quote_position.native(&quote_bank);
+    quote_bank.change_without_fee(quote_position, quote_needed_change)?;
+    let quote_native_after = quote_position.native(&quote_bank);
+    let quote_native_change = cm!(quote_native_after - quote_native_before);
+    let quote_borrows = quote_native_change
+        .max(quote_native_after)
+        .min(I80F48::ZERO)
+        .abs()
+        .to_num::<u64>();
+
+    let market = account.serum3_orders_mut(serum_market_index).unwrap();
+
+    // Only for place: Add to potential borrow amounts
+    market.base_borrows_without_fee = cm!(market.base_borrows_without_fee + base_borrows);
+    market.quote_borrows_without_fee = cm!(market.quote_borrows_without_fee + quote_borrows);
+
+    // Only for settle/liq_force_cancel: Reduce the potential borrow amounts
+    if base_needed_change > 0 {
+        market.base_borrows_without_fee = market
+            .base_borrows_without_fee
+            .saturating_sub(base_needed_change.to_num::<u64>());
+    }
+    if quote_needed_change > 0 {
+        market.quote_borrows_without_fee = market
+            .quote_borrows_without_fee
+            .saturating_sub(quote_needed_change.to_num::<u64>());
+    }
+
+    Ok(VaultDifference {
         base_index: base_bank.token_index,
-        base_active,
-        quote_raw_index,
         quote_index: quote_bank.token_index,
-        quote_active,
-        base_loan_origination_fee,
-        quote_loan_origination_fee,
-        base_native_change: cm!(base_native_after - base_native_before),
-        quote_native_change: cm!(quote_native_after - quote_native_before),
+        base_native_change,
+        quote_native_change,
     })
 }
 
@@ -525,22 +499,4 @@ fn cpi_place_order(ctx: &Serum3PlaceOrder, order: NewOrderInstructionV3) -> Resu
         user_authority: ctx.group.to_account_info(),
     }
     .call(&group, order)
-}
-
-fn cpi_settle_funds(ctx: &Serum3PlaceOrder) -> Result<()> {
-    use crate::serum3_cpi;
-    let group = ctx.group.load()?;
-    serum3_cpi::SettleFunds {
-        program: ctx.serum_program.to_account_info(),
-        market: ctx.serum_market_external.to_account_info(),
-        open_orders: ctx.open_orders.to_account_info(),
-        open_orders_authority: ctx.group.to_account_info(),
-        base_vault: ctx.market_base_vault.to_account_info(),
-        quote_vault: ctx.market_quote_vault.to_account_info(),
-        user_base_wallet: ctx.base_vault.to_account_info(),
-        user_quote_wallet: ctx.quote_vault.to_account_info(),
-        vault_signer: ctx.market_vault_signer.to_account_info(),
-        token_program: ctx.token_program.to_account_info(),
-    }
-    .call(&group)
 }
