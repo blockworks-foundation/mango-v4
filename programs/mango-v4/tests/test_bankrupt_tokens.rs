@@ -10,6 +10,8 @@ use solana_sdk::{
 use mango_v4::state::*;
 use program_test::*;
 
+use mango_setup::*;
+
 mod program_test;
 
 #[tokio::test]
@@ -27,7 +29,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     // SETUP: Create a group and an account to fill the vaults
     //
 
-    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -40,37 +42,18 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     let collateral_token2 = &tokens[3];
 
     // deposit some funds, to the vaults aren't empty
-    let vault_account = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 2,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
-    )
-    .await
-    .unwrap()
-    .account;
     let vault_amount = 100000;
-    for &token_account in payer_mint_accounts {
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: vault_amount,
-                account: vault_account,
-                token_account,
-                token_authority: payer.clone(),
-                bank_index: 1,
-            },
-        )
-        .await
-        .unwrap();
-    }
+    let vault_account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        2,
+        &context.users[1],
+        mints,
+        vault_amount,
+        1,
+    )
+    .await;
 
     // also add a tiny amount to bank0 for borrow_token1, so we can test multi-bank socialized loss
     send_tx(

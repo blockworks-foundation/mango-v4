@@ -7,6 +7,8 @@ use program_test::*;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, signer::Signer, transport::TransportError};
 
+use mango_setup::*;
+
 mod program_test;
 
 #[tokio::test]
@@ -18,13 +20,12 @@ async fn test_perp() -> Result<(), TransportError> {
     let owner = &context.users[0].key;
     let payer = &context.users[1].key;
     let mints = &context.mints[0..2];
-    let payer_mint_accounts = &context.users[1].token_accounts[0..=2];
 
     //
     // SETUP: Create a group and an account
     //
 
-    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -32,102 +33,29 @@ async fn test_perp() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
-    let account_0 = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 0,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
+    let deposit_amount = 1000;
+    let account_0 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        mints,
+        deposit_amount,
+        0,
     )
-    .await
-    .unwrap()
-    .account;
-
-    let account_1 = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 1,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
+    .await;
+    let account_1 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        mints,
+        deposit_amount,
+        0,
     )
-    .await
-    .unwrap()
-    .account;
-
-    //
-    // SETUP: Deposit user funds
-    //
-    {
-        let deposit_amount = 1000;
-
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: deposit_amount,
-                account: account_0,
-                token_account: payer_mint_accounts[0],
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: deposit_amount,
-                account: account_0,
-                token_account: payer_mint_accounts[1],
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-    }
-
-    {
-        let deposit_amount = 1000;
-
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: deposit_amount,
-                account: account_1,
-                token_account: payer_mint_accounts[0],
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: deposit_amount,
-                account: account_1,
-                token_account: payer_mint_accounts[1],
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-    }
+    .await;
 
     //
     // TEST: Create a perp market

@@ -6,6 +6,8 @@ use solana_sdk::signature::Keypair;
 
 use program_test::*;
 
+use crate::mango_setup::*;
+
 mod program_test;
 
 // Check opening and closing positions
@@ -50,43 +52,18 @@ async fn test_position_lifetime() -> Result<()> {
     .unwrap()
     .account;
 
-    let funding_account = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 1,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
+    let funding_amount = 1000000;
+    create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        mints,
+        funding_amount,
+        0,
     )
-    .await
-    .unwrap()
-    .account;
-
-    //
-    // SETUP: Put some tokens into the funding account to allow borrowing
-    //
-    {
-        let funding_amount = 1000000;
-        for &payer_token in payer_mint_accounts {
-            send_tx(
-                solana,
-                TokenDepositInstruction {
-                    amount: funding_amount,
-                    account: funding_account,
-                    token_account: payer_token,
-                    token_authority: payer.clone(),
-                    bank_index: 0,
-                },
-            )
-            .await
-            .unwrap();
-        }
-    }
+    .await;
 
     //
     // TEST: Deposit and withdraw tokens for all mints
