@@ -450,6 +450,7 @@ export class MangoAccount {
     let res = 'MangoAccount';
     res = res + '\n pk: ' + this.publicKey.toString();
     res = res + '\n name: ' + this.name;
+    res = res + '\n owner: ' + this.owner;
     res = res + '\n delegate: ' + this.delegate;
 
     res =
