@@ -4,6 +4,7 @@ use mango_v4::state::*;
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, transport::TransportError};
 
+use mango_setup::*;
 use program_test::*;
 
 mod program_test;
@@ -17,13 +18,12 @@ async fn test_token_update_index_and_rate() -> Result<(), TransportError> {
     let owner = &context.users[0].key;
     let payer = &context.users[1].key;
     let mints = &context.mints[0..2];
-    let payer_mint_accounts = &context.users[1].token_accounts[0..2];
 
     //
     // SETUP: Create a group and an account to fill the vaults
     //
 
-    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -32,66 +32,18 @@ async fn test_token_update_index_and_rate() -> Result<(), TransportError> {
     .await;
 
     // deposit some funds, to the vaults aren't empty
-    let deposit_account = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 0,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
+    create_funded_account(&solana, group, owner, 0, &context.users[1], mints, 10000, 0).await;
+    let withdraw_account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        &mints[1..2],
+        100000,
+        0,
     )
-    .await
-    .unwrap()
-    .account;
-    for &token_account in payer_mint_accounts {
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: 10000,
-                account: deposit_account,
-                token_account,
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-    }
-
-    let withdraw_account = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 1,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
-    )
-    .await
-    .unwrap()
-    .account;
-
-    send_tx(
-        solana,
-        TokenDepositInstruction {
-            amount: 100000,
-            account: withdraw_account,
-            token_account: payer_mint_accounts[1],
-            token_authority: payer.clone(),
-            bank_index: 0,
-        },
-    )
-    .await
-    .unwrap();
+    .await;
 
     send_tx(
         solana,

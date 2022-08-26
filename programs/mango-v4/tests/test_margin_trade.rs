@@ -6,6 +6,8 @@ use solana_sdk::signature::Signer;
 
 use program_test::*;
 
+use mango_setup::*;
+
 mod program_test;
 
 // This is an unspecific happy-case test that just runs a few instructions to check
@@ -21,7 +23,6 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     let payer = &context.users[1].key;
     let mints = &context.mints[0..2];
     let payer_mint0_account = context.users[1].token_accounts[0];
-    let payer_mint1_account = context.users[1].token_accounts[1];
     let loan_origination_fee = 0.0005;
 
     // higher resolution that the loan_origination_fee for one token
@@ -31,7 +32,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     // SETUP: Create a group, account, register a token (mint0)
     //
 
-    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -45,48 +46,17 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     // provide some funds for tokens, so the test user can borrow
     //
     let provided_amount = 1000;
-
-    let provider_account = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 1,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
+    create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        mints,
+        provided_amount,
+        0,
     )
-    .await
-    .unwrap()
-    .account;
-
-    send_tx(
-        solana,
-        TokenDepositInstruction {
-            amount: provided_amount,
-            account: provider_account,
-            token_account: payer_mint0_account,
-            token_authority: payer.clone(),
-            bank_index: 0,
-        },
-    )
-    .await
-    .unwrap();
-    send_tx(
-        solana,
-        TokenDepositInstruction {
-            amount: provided_amount,
-            account: provider_account,
-            token_account: payer_mint1_account,
-            token_authority: payer.clone(),
-            bank_index: 0,
-        },
-    )
-    .await
-    .unwrap();
+    .await;
 
     //
     // create thes test user account

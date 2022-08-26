@@ -7,6 +7,8 @@ use mango_v4::state::MangoAccount;
 
 use program_test::*;
 
+use mango_setup::*;
+
 mod program_test;
 
 #[tokio::test]
@@ -24,7 +26,7 @@ async fn test_health_wrap() -> Result<(), TransportError> {
     // SETUP: Create a group, account, register a token (mint0)
     //
 
-    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -33,35 +35,7 @@ async fn test_health_wrap() -> Result<(), TransportError> {
     .await;
 
     // SETUP: Create an account with deposits, so the second account can borrow more than it has
-    let setup_account = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 0,
-            token_count: 8,
-            serum3_count: 0,
-            perp_count: 0,
-            perp_oo_count: 0,
-            group,
-            owner,
-            payer,
-        },
-    )
-    .await
-    .unwrap()
-    .account;
-
-    send_tx(
-        solana,
-        TokenDepositInstruction {
-            amount: 1000,
-            account: setup_account,
-            token_account: payer_mint_accounts[0],
-            token_authority: payer.clone(),
-            bank_index: 0,
-        },
-    )
-    .await
-    .unwrap();
+    create_funded_account(&solana, group, owner, 0, &context.users[1], mints, 1000, 0).await;
 
     // SETUP: Make a second account
     let account = send_tx(

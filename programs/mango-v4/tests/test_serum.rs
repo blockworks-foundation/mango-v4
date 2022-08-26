@@ -8,6 +8,8 @@ use program_test::*;
 
 mod program_test;
 
+use mango_setup::*;
+
 #[tokio::test]
 async fn test_serum() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
@@ -19,13 +21,12 @@ async fn test_serum() -> Result<(), TransportError> {
     let owner = &context.users[0].key;
     let payer = &context.users[1].key;
     let mints = &context.mints[0..2];
-    let payer_mint_accounts = &context.users[1].token_accounts[0..=2];
 
     //
     // SETUP: Create a group and an account
     //
 
-    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -35,22 +36,18 @@ async fn test_serum() -> Result<(), TransportError> {
     let base_token = &tokens[0];
     let quote_token = &tokens[1];
 
-    let account = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 0,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
+    let deposit_amount = 1000;
+    let account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        mints,
+        deposit_amount,
+        0,
     )
-    .await
-    .unwrap()
-    .account;
+    .await;
 
     //
     // SETUP: Create serum market
@@ -59,39 +56,6 @@ async fn test_serum() -> Result<(), TransportError> {
         .serum
         .list_spot_market(&base_token.mint, &quote_token.mint)
         .await;
-
-    //
-    // SETUP: Deposit user funds
-    //
-    {
-        let deposit_amount = 1000;
-
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: deposit_amount,
-                account,
-                token_account: payer_mint_accounts[0],
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: deposit_amount,
-                account,
-                token_account: payer_mint_accounts[1],
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-    }
 
     //
     // TEST: Register a serum market
