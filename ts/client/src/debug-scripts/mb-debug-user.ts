@@ -1,8 +1,7 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { Group } from '../accounts/group';
-import { I80F48 } from '../accounts/I80F48';
 import { HealthType, MangoAccount } from '../accounts/mangoAccount';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
@@ -14,6 +13,7 @@ async function debugUser(
   mangoAccount: MangoAccount,
 ) {
   console.log(mangoAccount.toString(group));
+
   await mangoAccount.reload(client, group);
 
   console.log(
@@ -66,8 +66,6 @@ async function debugUser(
         mangoAccount.getLiabsValue(HealthType.init).toNumber(),
       ),
   );
-
-  console.log(group.banksMapByName.get('SOL')[0].mint.toBase58());
 
   async function getMaxWithdrawWithBorrowForTokenUiWrapper(token) {
     console.log(
@@ -147,7 +145,6 @@ async function main() {
   );
 
   const group = await client.getGroupForCreator(admin.publicKey, 2);
-  console.log(`${group.toString()}`);
 
   for (const keypair of [
     process.env.MB_PAYER_KEYPAIR,
@@ -159,18 +156,26 @@ async function main() {
     );
     const userWallet = new Wallet(user);
     console.log(`User ${userWallet.publicKey.toBase58()}`);
-    const mangoAccounts = await client.getMangoAccountsForOwner(
-      group,
-      user.publicKey,
-    );
+    // const mangoAccounts = await client.getMangoAccountsForOwner(
+    //   group,
+    //   user.publicKey,
+    // );
+    const mangoAccounts = await Promise.all([
+      await client.getMangoAccount({
+        publicKey: new PublicKey(
+          '6mqHfpJqnXcu6RgDYZSVW9CQXQPFyRYhgvdzvWXN9mPW',
+        ),
+      } as any),
+    ]);
     for (const mangoAccount of mangoAccounts) {
       console.log(`MangoAccount ${mangoAccount.publicKey}`);
-      if (
-        'etVgrWPAQe3aUMiuZT32tEMnbtuD2yRxip6eEkSRrLV' ===
-        // '2UWD1ZBiYdusXgXputE68MBL4Kz47nZptzMn6rLnzn1K' ===
-        // '9B8uwqH8FJqLn9kvGPVb5GEksLvmyXb3B8UKCFtRs5cq' ===
-        mangoAccount.publicKey.toBase58()
-      ) {
+      // if (
+      // 'etVgrWPAQe3aUMiuZT32tEMnbtuD2yRxip6eEkSRrLV' ===
+      // '2UWD1ZBiYdusXgXputE68MBL4Kz47nZptzMn6rLnzn1K' ===
+      // '9B8uwqH8FJqLn9kvGPVb5GEksLvmyXb3B8UKCFtRs5cq' ===
+      // mangoAccount.publicKey.toBase58()
+      // )
+      {
         await debugUser(client, group, mangoAccount);
       }
     }
