@@ -31,25 +31,27 @@ export async function sendTransaction(
     }
   }
 
-  const status =
+  let status: any;
+  if (
     transaction.recentBlockhash != null &&
     transaction.lastValidBlockHeight != null
-      ? (
-          await connection.confirmTransaction(
-            {
-              signature: signature,
-              blockhash: transaction.recentBlockhash,
-              lastValidBlockHeight: transaction.lastValidBlockHeight,
-            },
-            // options && options.commitment,
-          )
-        ).value
-      : (
-          await connection.confirmTransaction(
-            signature,
-            // options && options.commitment,
-          )
-        ).value;
+  ) {
+    console.log('confirming via blockhash');
+    status = (
+      await connection.confirmTransaction(
+        {
+          signature: signature,
+          blockhash: transaction.recentBlockhash,
+          lastValidBlockHeight: transaction.lastValidBlockHeight,
+        },
+        'processed',
+      )
+    ).value;
+  } else {
+    console.log('confirming via timeout');
+    status = (await connection.confirmTransaction(signature, 'processed'))
+      .value;
+  }
 
   if (status.err) {
     throw new MangoError({
