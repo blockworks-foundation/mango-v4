@@ -308,7 +308,6 @@ export class Group {
    * @returns sum of native balances of vaults for all banks for a token (fetched from vaultAmountsMap cache)
    */
   public getTokenVaultBalanceByMint(mintPk: PublicKey): I80F48 {
-    console.log('mintPk', mintPk);
     const banks = this.banksMapByMint.get(mintPk.toBase58());
     let amount = 0;
     for (const bank of banks) {

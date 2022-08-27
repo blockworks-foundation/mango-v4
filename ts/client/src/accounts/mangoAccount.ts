@@ -76,13 +76,17 @@ export class MangoAccount {
     this.perps = perps.map((dto) => PerpPosition.from(dto));
   }
 
-  async reload(client: MangoClient, group: Group) {
+  async reload(client: MangoClient, group: Group): Promise<MangoAccount> {
     Object.assign(this, await client.getMangoAccount(this));
-    await this.reloadAccountData(client, group);
+    return await this.reloadAccountData(client, group);
   }
 
-  async reloadAccountData(client: MangoClient, group: Group) {
+  async reloadAccountData(
+    client: MangoClient,
+    group: Group,
+  ): Promise<MangoAccount> {
     this.accountData = await client.computeAccountData(group, this);
+    return this;
   }
 
   findToken(tokenIndex: number): TokenPosition | undefined {
