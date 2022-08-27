@@ -52,7 +52,7 @@ impl AddPacked for ProgramTest {
 
 struct LoggerWrapper {
     inner: env_logger::Logger,
-    program_log: Arc<RwLock<Vec<String>>>,
+    capture: Arc<RwLock<Vec<String>>>,
 }
 
 impl Log for LoggerWrapper {
@@ -67,9 +67,9 @@ impl Log for LoggerWrapper {
         {
             let msg = record.args().to_string();
             if let Some(data) = msg.strip_prefix("Program log: ") {
-                self.program_log.write().unwrap().push(data.into());
+                self.capture.write().unwrap().push(data.into());
             } else if let Some(data) = msg.strip_prefix("Program data: ") {
-                self.program_log.write().unwrap().push(data.into());
+                self.capture.write().unwrap().push(data.into());
             }
         }
         self.inner.log(record);
@@ -87,12 +87,13 @@ pub struct MarginTradeCookie {
 
 pub struct TestContextBuilder {
     test: ProgramTest,
-    program_log_capture: Arc<RwLock<Vec<String>>>,
+    logger_capture: Arc<RwLock<Vec<String>>>,
     mint0: Pubkey,
 }
 
 lazy_static::lazy_static! {
-    static ref PROGRAM_LOG_CAPTURE: Arc<RwLock<Vec<String>>> = Arc::new(RwLock::new(vec![]));
+    static ref LOGGER_CAPTURE: Arc<RwLock<Vec<String>>> = Arc::new(RwLock::new(vec![]));
+    static ref LOGGER_LOCK: Arc<RwLock<()>> = Arc::new(RwLock::new(()));
 }
 
 impl TestContextBuilder {
@@ -108,7 +109,7 @@ impl TestContextBuilder {
                 .build();
         let _ = log::set_boxed_logger(Box::new(LoggerWrapper {
             inner: env_logger,
-            program_log: PROGRAM_LOG_CAPTURE.clone(),
+            capture: LOGGER_CAPTURE.clone(),
         }));
 
         let mut test = ProgramTest::new("mango_v4", mango_v4::id(), processor!(mango_v4::entry));
@@ -118,7 +119,7 @@ impl TestContextBuilder {
 
         Self {
             test,
-            program_log_capture: PROGRAM_LOG_CAPTURE.clone(),
+            logger_capture: LOGGER_CAPTURE.clone(),
             mint0: Pubkey::new_unique(),
         }
     }
@@ -282,7 +283,9 @@ impl TestContextBuilder {
         let solana = Arc::new(SolanaCookie {
             context: RefCell::new(context),
             rent,
-            program_log: self.program_log_capture.clone(),
+            logger_capture: self.logger_capture.clone(),
+            logger_lock: LOGGER_LOCK.clone(),
+            last_transaction_log: RefCell::new(vec![]),
         });
 
         solana
