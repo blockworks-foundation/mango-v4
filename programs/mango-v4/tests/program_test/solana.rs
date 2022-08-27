@@ -17,7 +17,9 @@ use spl_token::*;
 pub struct SolanaCookie {
     pub context: RefCell<ProgramTestContext>,
     pub rent: Rent,
-    pub program_log: Arc<RwLock<Vec<String>>>,
+    pub logger_capture: Arc<RwLock<Vec<String>>>,
+    pub logger_lock: Arc<RwLock<()>>,
+    pub last_transaction_log: RefCell<Vec<String>>,
 }
 
 impl SolanaCookie {
@@ -27,7 +29,15 @@ impl SolanaCookie {
         instructions: &[Instruction],
         signers: Option<&[&Keypair]>,
     ) -> Result<(), BanksClientError> {
-        self.program_log.write().unwrap().clear();
+        // The locking in this function is convoluted:
+        // We capture the program log output by overriding the global logger and capturing
+        // messages there. This logger is potentially shared among multiple tests that run
+        // concurrently.
+        // To allow each independent SolanaCookie to capture only the logs from the transaction
+        // passed to process_transaction, wo globally hold the "program_log_lock" for the
+        // duration that the tx needs to process. So only a single one can run at a time.
+        let tx_log_lock = Arc::new(self.logger_lock.write().unwrap());
+        self.logger_capture.write().unwrap().clear();
 
         let mut context = self.context.borrow_mut();
 
@@ -45,13 +55,19 @@ impl SolanaCookie {
 
         transaction.sign(&all_signers, context.last_blockhash);
 
-        context
+        let result = context
             .banks_client
             .process_transaction_with_commitment(
                 transaction,
                 solana_sdk::commitment_config::CommitmentLevel::Processed,
             )
-            .await
+            .await;
+
+        *self.last_transaction_log.borrow_mut() = self.logger_capture.read().unwrap().clone();
+
+        drop(tx_log_lock);
+
+        result
     }
 
     pub async fn get_clock(&self) -> solana_program::clock::Clock {
@@ -221,7 +237,7 @@ impl SolanaCookie {
 
     #[allow(dead_code)]
     pub fn program_log(&self) -> Vec<String> {
-        self.program_log.read().unwrap().clone()
+        self.last_transaction_log.borrow().clone()
     }
 
     pub fn program_log_events<T: anchor_lang::Event + anchor_lang::AnchorDeserialize>(
