@@ -103,8 +103,8 @@ pub struct MangoAccount {
     pub perp_open_orders: Vec<PerpOpenOrder>,
 }
 
-impl Default for MangoAccount {
-    fn default() -> Self {
+impl MangoAccount {
+    pub fn default_for_tests() -> Self {
         Self {
             name: Default::default(),
             group: Pubkey::default(),
@@ -131,9 +131,8 @@ impl Default for MangoAccount {
             perp_open_orders: vec![PerpOpenOrder::default(); 2],
         }
     }
-}
 
-impl MangoAccount {
+    /// Number of bytes needed for the MangoAccount, including the discriminator
     pub fn space(
         token_count: u8,
         serum3_count: u8,
@@ -185,7 +184,7 @@ impl MangoAccount {
 
 #[test]
 fn test_serialization_match() {
-    let mut account = MangoAccount::default();
+    let mut account = MangoAccount::default_for_tests();
     account.group = Pubkey::new_unique();
     account.owner = Pubkey::new_unique();
     account.name = crate::util::fill_from_str("abcdef").unwrap();
@@ -502,13 +501,11 @@ impl<
 
     // get iter over all active TokenPositions
     pub fn active_token_positions(&self) -> impl Iterator<Item = &TokenPosition> + '_ {
-        (0..self.header().token_count())
-            .map(|i| self.token_position_by_raw_index(i))
-            .filter(|token| token.is_active())
+        self.all_token_positions().filter(|token| token.is_active())
     }
 
     pub fn serum3_orders(&self, market_index: Serum3MarketIndex) -> Option<&Serum3Orders> {
-        self.active_serum3_orders()
+        self.all_serum3_orders()
             .find(|p| p.is_active_for_market(market_index))
     }
 
@@ -521,13 +518,12 @@ impl<
     }
 
     pub fn active_serum3_orders(&self) -> impl Iterator<Item = &Serum3Orders> + '_ {
-        (0..self.header().serum3_count())
-            .map(|i| self.serum3_orders_by_raw_index(i))
+        self.all_serum3_orders()
             .filter(|serum3_order| serum3_order.is_active())
     }
 
     pub fn perp_position(&self, market_index: PerpMarketIndex) -> Option<&PerpPosition> {
-        self.active_perp_positions()
+        self.all_perp_positions()
             .find(|p| p.is_active_for_market(market_index))
     }
 
@@ -540,17 +536,15 @@ impl<
     }
 
     pub fn active_perp_positions(&self) -> impl Iterator<Item = &PerpPosition> {
-        (0..self.header().perp_count())
-            .map(|i| self.perp_position_by_raw_index(i))
-            .filter(|p| p.is_active())
+        self.all_perp_positions().filter(|p| p.is_active())
     }
 
-    pub fn perp_orders_by_raw_index(&self, raw_index: usize) -> &PerpOpenOrder {
+    pub fn perp_order_by_raw_index(&self, raw_index: usize) -> &PerpOpenOrder {
         get_helper(self.dynamic(), self.header().perp_oo_offset(raw_index))
     }
 
     pub fn all_perp_orders(&self) -> impl Iterator<Item = &PerpOpenOrder> {
-        (0..self.header().perp_oo_count()).map(|i| self.perp_orders_by_raw_index(i))
+        (0..self.header().perp_oo_count()).map(|i| self.perp_order_by_raw_index(i))
     }
 
     pub fn perp_next_order_slot(&self) -> Option<usize> {
@@ -563,8 +557,7 @@ impl<
         market_index: PerpMarketIndex,
         client_order_id: u64,
     ) -> Option<(i128, Side)> {
-        for i in 0..self.header().perp_oo_count() {
-            let oo = self.perp_orders_by_raw_index(i);
+        for oo in self.all_perp_orders() {
             if oo.order_market == market_index && oo.client_order_id == client_order_id {
                 return Some((oo.order_id, oo.order_side));
             }
@@ -577,8 +570,7 @@ impl<
         market_index: PerpMarketIndex,
         order_id: i128,
     ) -> Option<Side> {
-        for i in 0..self.header().perp_oo_count() {
-            let oo = self.perp_orders_by_raw_index(i);
+        for oo in self.all_perp_orders() {
             if oo.order_market == market_index && oo.order_id == order_id {
                 return Some(oo.order_side);
             }
@@ -730,7 +722,7 @@ impl<
         market_index: Serum3MarketIndex,
     ) -> Option<&mut Serum3Orders> {
         let raw_index_opt = self
-            .active_serum3_orders()
+            .all_serum3_orders()
             .position(|p| p.is_active_for_market(market_index));
         raw_index_opt.map(|raw_index| self.serum3_orders_mut_by_raw_index(raw_index))
     }
@@ -741,7 +733,7 @@ impl<
         get_helper_mut(self.dynamic_mut(), offset)
     }
 
-    pub fn perp_orders_mut_by_raw_index(&mut self, raw_index: usize) -> &mut PerpOpenOrder {
+    pub fn perp_order_mut_by_raw_index(&mut self, raw_index: usize) -> &mut PerpOpenOrder {
         let offset = self.header().perp_oo_offset(raw_index);
         get_helper_mut(self.dynamic_mut(), offset)
     }
@@ -751,7 +743,7 @@ impl<
         perp_market_index: PerpMarketIndex,
     ) -> Result<(&mut PerpPosition, usize)> {
         let mut raw_index_opt = self
-            .active_perp_positions()
+            .all_perp_positions()
             .position(|p| p.is_active_for_market(perp_market_index));
         if raw_index_opt.is_none() {
             raw_index_opt = self.all_perp_positions().position(|p| !p.is_active());
@@ -779,6 +771,7 @@ impl<
         side: Side,
         order: &LeafNode,
     ) -> Result<()> {
+        // TODO: pass in the PerpPosition, currently has a creation side-effect
         let mut perp_account = self.ensure_perp_position(perp_market_index).unwrap().0;
         match side {
             Side::Bid => {
@@ -790,7 +783,7 @@ impl<
         };
         let slot = order.owner_slot as usize;
 
-        let mut oo = self.perp_orders_mut_by_raw_index(slot);
+        let mut oo = self.perp_order_mut_by_raw_index(slot);
         oo.order_market = perp_market_index;
         oo.order_side = side;
         oo.order_id = order.key;
@@ -799,8 +792,9 @@ impl<
     }
 
     pub fn remove_perp_order(&mut self, slot: usize, quantity: i64) -> Result<()> {
+        // TODO: pass in the PerpPosition, currently has a creation side-effect
         {
-            let oo = self.perp_orders_mut_by_raw_index(slot);
+            let oo = self.perp_order_mut_by_raw_index(slot);
             require_neq!(oo.order_market, FREE_ORDER_SLOT);
             let order_side = oo.order_side;
             let perp_market_index = oo.order_market;
@@ -818,7 +812,7 @@ impl<
         }
 
         // release space
-        let oo = self.perp_orders_mut_by_raw_index(slot);
+        let oo = self.perp_order_mut_by_raw_index(slot);
         oo.order_market = FREE_ORDER_SLOT;
         oo.order_side = Side::Bid;
         oo.order_id = 0i128;
@@ -832,6 +826,7 @@ impl<
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
     ) -> Result<()> {
+        // TODO: pass in the PerpPosition, currently has a creation side-effect
         let pa = self.ensure_perp_position(perp_market_index).unwrap().0;
         pa.settle_funding(perp_market);
 
@@ -871,6 +866,7 @@ impl<
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
     ) -> Result<()> {
+        // TODO: pass in the PerpPosition, currently has a creation side-effect
         let pa = self.ensure_perp_position(perp_market_index).unwrap().0;
         pa.settle_funding(perp_market);
 
