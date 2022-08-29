@@ -322,6 +322,8 @@ pub fn serum3_place_order(
     ctx.accounts.quote_vault.reload()?;
     let after_base_vault = ctx.accounts.base_vault.amount;
     let after_quote_vault = ctx.accounts.quote_vault.amount;
+
+    // Placing an order cannot increase vault balances
     require_gte!(before_base_vault, after_base_vault);
     require_gte!(before_quote_vault, after_quote_vault);
 
@@ -407,6 +409,8 @@ impl VaultDifference {
     }
 }
 
+/// Called in settle_funds, place_order, liq_force_cancel to adjust token positions after
+/// changing the vault balances
 pub fn apply_vault_difference(
     account: &mut MangoAccountRefMut,
     serum_market_index: Serum3MarketIndex,
@@ -445,9 +449,12 @@ pub fn apply_vault_difference(
         .to_num::<u64>();
 
     let market = account.serum3_orders_mut(serum_market_index).unwrap();
+
+    // Only for place: Add to potential borrow amounts
     market.base_borrows_without_fee = cm!(market.base_borrows_without_fee + base_borrows);
     market.quote_borrows_without_fee = cm!(market.quote_borrows_without_fee + quote_borrows);
 
+    // Only for settle/liq_force_cancel: Reduce the potential borrow amounts
     if base_needed_change > 0 {
         market.base_borrows_without_fee = market
             .base_borrows_without_fee

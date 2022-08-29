@@ -149,6 +149,8 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         ctx.accounts.quote_vault.reload()?;
         let after_base_vault = ctx.accounts.base_vault.amount;
         let after_quote_vault = ctx.accounts.quote_vault.amount;
+
+        // Settle cannot decrease vault balances
         require_gte!(after_base_vault, before_base_vault);
         require_gte!(after_quote_vault, before_quote_vault);
 
@@ -171,7 +173,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     Ok(())
 }
 
-// if reserved is less than cached, charge loan fee on the difference
+// Charge fees if the potential borrows are bigger than the funds on the open orders account
 pub fn charge_loan_origination_fees(
     group_pubkey: &Pubkey,
     account_pubkey: &Pubkey,
@@ -192,8 +194,7 @@ pub fn charge_loan_origination_fees(
     if actualized_base_loan > 0 {
         serum3_account.base_borrows_without_fee = oo_base_total;
 
-        // now that the loan is actually materialized (since the fill having taken place)
-        // charge the loan origination fee
+        // now that the loan is actually materialized, charge the loan origination fee
         // note: the withdraw has already happened while placing the order
         let base_token_account = account.token_position_mut(base_bank.token_index)?.0;
         let (_, fee) =
@@ -218,8 +219,7 @@ pub fn charge_loan_origination_fees(
     if actualized_quote_loan > 0 {
         serum3_account.quote_borrows_without_fee = oo_quote_total;
 
-        // now that the loan is actually materialized (since the fill having taken place)
-        // charge the loan origination fee
+        // now that the loan is actually materialized, charge the loan origination fee
         // note: the withdraw has already happened while placing the order
         let quote_token_account = account.token_position_mut(quote_bank.token_index)?.0;
         let (_, fee) =

@@ -2,7 +2,8 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
 
 use crate::error::*;
-use crate::instructions::apply_vault_difference;
+use crate::instructions::{apply_vault_difference, charge_loan_origination_fees, OpenOrdersSlim};
+use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
 
 #[derive(Accounts)]
@@ -115,6 +116,26 @@ pub fn serum3_liq_force_cancel_orders(
     }
 
     //
+    // Charge any open loan origination fees
+    //
+    {
+        let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
+        let before_oo = OpenOrdersSlim::from_oo(&open_orders);
+        let mut account = ctx.accounts.account.load_mut()?;
+        let mut base_bank = ctx.accounts.base_bank.load_mut()?;
+        let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
+        charge_loan_origination_fees(
+            &ctx.accounts.group.key(),
+            &ctx.accounts.account.key(),
+            serum_market.market_index,
+            &mut base_bank,
+            &mut quote_bank,
+            &mut account.borrow_mut(),
+            &before_oo,
+        )?;
+    }
+
+    //
     // Before-settle tracking
     //
     let before_base_vault = ctx.accounts.base_vault.amount;
@@ -133,6 +154,8 @@ pub fn serum3_liq_force_cancel_orders(
     ctx.accounts.quote_vault.reload()?;
     let after_base_vault = ctx.accounts.base_vault.amount;
     let after_quote_vault = ctx.accounts.quote_vault.amount;
+
+    // Settle cannot decrease vault balances
     require_gte!(after_base_vault, before_base_vault);
     require_gte!(after_quote_vault, before_quote_vault);
 
