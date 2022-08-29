@@ -1159,7 +1159,7 @@ mod tests {
     // Run a health test that includes all the side values (like referrer_rebates_accrued)
     #[test]
     fn test_health0() {
-        let buffer = MangoAccount::default().try_to_vec().unwrap();
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
         let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
 
         let group = Pubkey::new_unique();
@@ -1338,7 +1338,7 @@ mod tests {
         expected_health: f64,
     }
     fn test_health1_runner(testcase: &TestHealth1Case) {
-        let buffer = MangoAccount::default().try_to_vec().unwrap();
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
         let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
 
         let group = Pubkey::new_unique();
