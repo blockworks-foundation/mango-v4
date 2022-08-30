@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::{mem, sync::Arc};
 
 use bytemuck::from_bytes;
@@ -41,7 +43,6 @@ pub struct SerumCookie {
 }
 
 impl SerumCookie {
-    #[allow(dead_code)]
     pub fn create_dex_account(&self, unpadded_len: usize) -> (Keypair, Instruction) {
         let serum_program_id = self.program_id;
         let key = Keypair::new();
@@ -57,7 +58,6 @@ impl SerumCookie {
         return (key, create_account_instr);
     }
 
-    #[allow(dead_code)]
     fn gen_listing_params(
         &self,
         _coin_mint: &Pubkey,
@@ -94,7 +94,6 @@ impl SerumCookie {
         return (info, instructions);
     }
 
-    #[allow(dead_code)]
     pub async fn list_spot_market(
         &self,
         coin_mint: &MintCookie,
@@ -186,7 +185,6 @@ impl SerumCookie {
         }
     }
 
-    #[allow(dead_code)]
     pub async fn consume_spot_events(
         &self,
         spot_market_cookie: &SpotMarketCookie,
@@ -208,13 +206,11 @@ impl SerumCookie {
             .unwrap();
     }
 
-    #[allow(dead_code)]
     fn strip_dex_padding(data: &[u8]) -> &[u8] {
         assert!(data.len() >= 12);
         &data[5..data.len() - 7]
     }
 
-    #[allow(dead_code)]
     pub async fn load_open_orders(&self, open_orders: Pubkey) -> serum_dex::state::OpenOrders {
         let data = self.solana.get_account_data(open_orders).await.unwrap();
         let slice = Self::strip_dex_padding(&data);

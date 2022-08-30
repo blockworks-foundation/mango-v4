@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::cell::RefCell;
 use std::sync::{Arc, RwLock};
 
@@ -23,7 +25,6 @@ pub struct SolanaCookie {
 }
 
 impl SolanaCookie {
-    #[allow(dead_code)]
     pub async fn process_transaction(
         &self,
         instructions: &[Instruction],
@@ -79,7 +80,6 @@ impl SolanaCookie {
             .unwrap()
     }
 
-    #[allow(dead_code)]
     pub async fn advance_by_slots(&self, slots: u64) {
         let clock = self.get_clock().await;
         self.context
@@ -87,8 +87,6 @@ impl SolanaCookie {
             .warp_to_slot(clock.slot + slots + 1)
             .unwrap();
     }
-
-    #[allow(dead_code)]
 
     pub async fn advance_clock(&self) {
         let mut clock = self.get_clock().await;
@@ -149,7 +147,6 @@ impl SolanaCookie {
         key.pubkey()
     }
 
-    #[allow(dead_code)]
     pub async fn create_token_account(&self, owner: &Pubkey, mint: Pubkey) -> Pubkey {
         let keypair = Keypair::new();
         let rent = self.rent.minimum_balance(spl_token::state::Account::LEN);
@@ -178,7 +175,6 @@ impl SolanaCookie {
     }
 
     // Note: Only one table can be created per authority per slot!
-    #[allow(dead_code)]
     pub async fn create_address_lookup_table(
         &self,
         authority: &Keypair,
@@ -196,7 +192,6 @@ impl SolanaCookie {
         alt_address
     }
 
-    #[allow(dead_code)]
     pub async fn get_account_data(&self, address: Pubkey) -> Option<Vec<u8>> {
         Some(
             self.context
@@ -210,7 +205,6 @@ impl SolanaCookie {
         )
     }
 
-    #[allow(dead_code)]
     pub async fn get_account_opt<T: AccountDeserialize>(&self, address: Pubkey) -> Option<T> {
         self.context
             .borrow_mut()
@@ -225,17 +219,14 @@ impl SolanaCookie {
         AccountDeserialize::try_deserialize(&mut data_slice).ok()
     }
 
-    #[allow(dead_code)]
     pub async fn get_account<T: AccountDeserialize>(&self, address: Pubkey) -> T {
         self.get_account_opt(address).await.unwrap()
     }
 
-    #[allow(dead_code)]
     pub async fn token_account_balance(&self, address: Pubkey) -> u64 {
         self.get_account::<TokenAccount>(address).await.amount
     }
 
-    #[allow(dead_code)]
     pub fn program_log(&self) -> Vec<String> {
         self.last_transaction_log.borrow().clone()
     }
