@@ -60,8 +60,7 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
         // Validate open_orders #2
         require!(
             account
-                .serum3_orders(serum_market.market_index)
-                .ok_or_else(|| error!(MangoError::SomeError))?
+                .serum3_orders(serum_market.market_index)?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
             MangoError::SomeError
