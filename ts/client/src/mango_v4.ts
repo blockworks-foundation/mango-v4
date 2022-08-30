@@ -1321,6 +1321,30 @@ export type MangoV4 = {
           }
         },
         {
+          "name": "indexReservation",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Serum3Index"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "market_index"
+              }
+            ]
+          }
+        },
+        {
           "name": "quoteBank",
           "isMut": false,
           "isSigner": false
@@ -3854,6 +3878,10 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "perpMarketIndex",
+            "type": "u16"
+          },
+          {
             "name": "maintAssetWeight",
             "type": {
               "defined": "I80F48"
@@ -5201,46 +5229,51 @@ export type MangoV4 = {
     },
     {
       "code": 6007,
+      "name": "HealthMustBePositiveOrIncrease",
+      "msg": "health must be positive or increase"
+    },
+    {
+      "code": 6008,
       "name": "HealthMustBeNegative",
       "msg": "health must be negative"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "IsBankrupt",
       "msg": "the account is bankrupt"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "IsNotBankrupt",
       "msg": "the account is not bankrupt"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "NoFreeTokenPositionIndex",
       "msg": "no free token position index"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "NoFreeSerum3OpenOrdersIndex",
       "msg": "no free serum3 open orders index"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "NoFreePerpPositionIndex",
       "msg": "no free perp position index"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "Serum3OpenOrdersExistAlready",
       "msg": "serum3 open orders exist already"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "InsufficentBankVaultFunds",
       "msg": "bank vault has insufficent funds"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "BeingLiquidated",
       "msg": "account is currently being liquidated"
     }
@@ -6570,6 +6603,30 @@ export const IDL: MangoV4 = {
           }
         },
         {
+          "name": "indexReservation",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Serum3Index"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "market_index"
+              }
+            ]
+          }
+        },
+        {
           "name": "quoteBank",
           "isMut": false,
           "isSigner": false
@@ -9103,6 +9160,10 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
+            "name": "perpMarketIndex",
+            "type": "u16"
+          },
+          {
             "name": "maintAssetWeight",
             "type": {
               "defined": "I80F48"
@@ -10450,46 +10511,51 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6007,
+      "name": "HealthMustBePositiveOrIncrease",
+      "msg": "health must be positive or increase"
+    },
+    {
+      "code": 6008,
       "name": "HealthMustBeNegative",
       "msg": "health must be negative"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "IsBankrupt",
       "msg": "the account is bankrupt"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "IsNotBankrupt",
       "msg": "the account is not bankrupt"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "NoFreeTokenPositionIndex",
       "msg": "no free token position index"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "NoFreeSerum3OpenOrdersIndex",
       "msg": "no free serum3 open orders index"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "NoFreePerpPositionIndex",
       "msg": "no free perp position index"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "Serum3OpenOrdersExistAlready",
       "msg": "serum3 open orders exist already"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "InsufficentBankVaultFunds",
       "msg": "bank vault has insufficent funds"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "BeingLiquidated",
       "msg": "account is currently being liquidated"
     }
