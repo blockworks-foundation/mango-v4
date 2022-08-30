@@ -51,6 +51,7 @@ export class Id {
 
   static fromIdsByName(name: string): Id {
     const groupConfig = ids.groups.find((id) => id['name'] === name);
+    if (!groupConfig) throw new Error(`Unable to find group config ${name}`);
     return new Id(
       groupConfig.cluster as Cluster,
       groupConfig.name,
@@ -69,6 +70,8 @@ export class Id {
     const groupConfig = ids.groups.find(
       (id) => id['publicKey'] === groupPk.toString(),
     );
+    if (!groupConfig)
+      throw new Error(`Unable to find group config ${groupPk.toString()}`);
     return new Id(
       groupConfig.cluster as Cluster,
       groupConfig.name,

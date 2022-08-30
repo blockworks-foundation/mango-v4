@@ -8,13 +8,15 @@
     "noImplicitAny": false,
     "sourceMap": true,
     "skipLibCheck": true,
-    "target": "es2019"
+    "target": "es2019",
+    "strictNullChecks": true
   },
   "include": ["ts/client/src", "ts/client/scripts", "ts/client/scripts"],
   "exclude": [
     "./ts/**/*.test.js",
     "node_modules",
     "**/node_modules",
-    "./ts/client/src/scripts"
+    "./ts/client/src/scripts",
+    "./ts/client/src/debug-scripts"
   ]
 }

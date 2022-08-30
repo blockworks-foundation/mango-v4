@@ -205,6 +205,10 @@ export class HealthCache {
     for (const change of nativeTokenChanges) {
       const bank: Bank = group.getFirstBankByMint(change.mintPk);
       const changeIndex = adjustedCache.getOrCreateTokenInfoIndex(bank);
+      if (!bank.price)
+        throw new Error(
+          `Oracle price not loaded for ${change.mintPk.toString()}`,
+        );
       adjustedCache.tokenInfos[changeIndex].balance = adjustedCache.tokenInfos[
         changeIndex
       ].balance.add(change.nativeTokenAmount.mul(bank.price));
@@ -435,6 +439,10 @@ export class TokenInfo {
   }
 
   static emptyFromBank(bank: Bank): TokenInfo {
+    if (!bank.price)
+      throw new Error(
+        `Failed to create TokenInfo. Bank price unavailable. ${bank.mint.toString()}`,
+      );
     return new TokenInfo(
       bank.tokenIndex,
       bank.maintAssetWeight,

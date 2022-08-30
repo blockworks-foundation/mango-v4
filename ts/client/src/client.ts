@@ -344,7 +344,7 @@ export class MangoClient {
           adminPk,
         ),
       );
-      await this.program.provider.sendAndConfirm(tx);
+      await (this.program.provider as AnchorProvider).sendAndConfirm(tx);
     }
 
     return await this.program.methods
@@ -504,7 +504,7 @@ export class MangoClient {
     ownerPk: PublicKey,
     accountNumber?: number,
     name?: string,
-  ): Promise<MangoAccount> {
+  ): Promise<MangoAccount | undefined> {
     // TODO: this function discards accountSize and name when the account exists already!
     // TODO: this function always creates accounts for this.program.owner, and not
     //       ownerPk! It needs to get passed a keypair, and we need to add
@@ -613,10 +613,13 @@ export class MangoClient {
     group: Group,
     ownerPk: PublicKey,
     accountNumber: number,
-  ): Promise<MangoAccount> {
-    return (await this.getMangoAccountsForOwner(group, ownerPk)).find(
+  ): Promise<MangoAccount | undefined> {
+    const mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
+    const foundMangoAccount = mangoAccounts.find(
       (a) => a.accountNum == accountNumber,
     );
+
+    return foundMangoAccount;
   }
 
   public async getMangoAccountsForOwner(
@@ -676,7 +679,7 @@ export class MangoClient {
   public async computeAccountData(
     group: Group,
     mangoAccount: MangoAccount,
-  ): Promise<MangoAccountData> {
+  ): Promise<MangoAccountData | undefined> {
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(AccountRetriever.Fixed, group, [
         mangoAccount,
@@ -703,10 +706,16 @@ export class MangoClient {
       )
       .simulate();
 
-    return MangoAccountData.from(
-      res?.events.find((event) => (event.name = 'MangoAccountData'))
-        .data as any,
-    );
+    if (res.events) {
+      const accountDataEvent = res?.events.find(
+        (event) => (event.name = 'MangoAccountData'),
+      );
+      return accountDataEvent
+        ? MangoAccountData.from(accountDataEvent.data as any)
+        : undefined;
+    } else {
+      return undefined;
+    }
   }
 
   public async tokenDeposit(
@@ -715,10 +724,8 @@ export class MangoClient {
     mintPk: PublicKey,
     amount: number,
   ): Promise<TransactionSignature> {
-    const nativeAmount = toNativeDecimals(
-      amount,
-      group.getMintDecimals(mintPk),
-    ).toNumber();
+    const decimals = group.getMintDecimals(mintPk);
+    const nativeAmount = toNativeDecimals(amount, decimals).toNumber();
     return await this.tokenDepositNative(
       group,
       mangoAccount,
@@ -1557,7 +1564,7 @@ export class MangoClient {
       await this.program.provider.connection.getAccountInfo(
         inputTokenAccountPk,
       );
-    const preInstructions = [];
+    const preInstructions: TransactionInstruction[] = [];
     if (!inputTokenAccExists) {
       preInstructions.push(
         await createAssociatedTokenAccountIdempotentInstruction(
@@ -1876,7 +1883,7 @@ export class MangoClient {
   ): PublicKey[] {
     const healthRemainingAccounts: PublicKey[] = [];
 
-    let tokenIndices = [];
+    let tokenIndices: number[] = [];
     for (const mangoAccount of mangoAccounts) {
       tokenIndices.push(
         ...mangoAccount.tokens
