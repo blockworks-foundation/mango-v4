@@ -1,8 +1,11 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
+use fixed::types::I80F48;
 
 use crate::error::*;
-use crate::instructions::{apply_vault_difference, charge_loan_origination_fees, OpenOrdersSlim};
+use crate::instructions::{
+    apply_vault_difference, charge_loan_origination_fees, OODifference, OpenOrdersSlim,
+};
 use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
 
@@ -104,21 +107,41 @@ pub fn serum3_liq_force_cancel_orders(
         );
     }
 
-    // TODO: do the correct health / being_liquidated check
-    {
-        let account = ctx.accounts.account.load()?;
-
+    //
+    // Check liqee health if liquidation is allowed
+    //
+    let mut health_cache = {
+        let mut account = ctx.accounts.account.load_mut()?;
         let retriever =
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-        let health = compute_health(&account.borrow(), HealthType::Maint, &retriever)?;
-        msg!("health: {}", health);
-        require!(health < 0, MangoError::SomeError);
-    }
+        let health_cache =
+            new_health_cache(&account.borrow(), &retriever).context("create health cache")?;
+
+        if account.being_liquidated() {
+            let init_health = health_cache.health(HealthType::Init);
+            if account
+                .fixed
+                .maybe_recover_from_being_liquidated(init_health)
+            {
+                msg!("Liqee init_health above zero");
+                return Ok(());
+            }
+        } else {
+            let maint_health = health_cache.health(HealthType::Maint);
+            require!(
+                maint_health < I80F48::ZERO,
+                MangoError::HealthMustBeNegative
+            );
+            account.fixed.set_being_liquidated(true);
+        }
+
+        health_cache
+    };
 
     //
     // Charge any open loan origination fees
     //
-    {
+    let before_oo = {
         let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
         let before_oo = OpenOrdersSlim::from_oo(&open_orders);
         let mut account = ctx.accounts.account.load_mut()?;
@@ -133,7 +156,9 @@ pub fn serum3_liq_force_cancel_orders(
             &mut account.borrow_mut(),
             &before_oo,
         )?;
-    }
+
+        before_oo
+    };
 
     //
     // Before-settle tracking
@@ -150,6 +175,14 @@ pub fn serum3_liq_force_cancel_orders(
     //
     // After-settle tracking
     //
+    {
+        let oo_ai = &ctx.accounts.open_orders.as_ref();
+        let open_orders = load_open_orders_ref(oo_ai)?;
+        let after_oo = OpenOrdersSlim::from_oo(&open_orders);
+        OODifference::new(&before_oo, &after_oo)
+            .adjust_health_cache(&mut health_cache, &serum_market)?;
+    };
+
     ctx.accounts.base_vault.reload()?;
     ctx.accounts.quote_vault.reload()?;
     let after_base_vault = ctx.accounts.base_vault.amount;
@@ -169,14 +202,24 @@ pub fn serum3_liq_force_cancel_orders(
         &mut base_bank,
         after_base_vault,
         before_base_vault,
-    )?;
+    )?
+    .adjust_health_cache(&mut health_cache)?;
     apply_vault_difference(
         &mut account.borrow_mut(),
         serum_market.market_index,
         &mut quote_bank,
         after_quote_vault,
         before_quote_vault,
-    )?;
+    )?
+    .adjust_health_cache(&mut health_cache)?;
+
+    //
+    // Health check at the end
+    //
+    let init_health = health_cache.health(HealthType::Init);
+    account
+        .fixed
+        .maybe_recover_from_being_liquidated(init_health);
 
     Ok(())
 }

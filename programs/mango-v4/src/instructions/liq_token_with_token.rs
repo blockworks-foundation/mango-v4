@@ -63,8 +63,7 @@ pub fn liq_token_with_token(
     // we want to allow liquidation to continue until init_health is positive,
     // to prevent constant oscillation between the two states
     if liqee.being_liquidated() {
-        if init_health > I80F48::ZERO {
-            liqee.fixed.set_being_liquidated(false);
+        if liqee.fixed.maybe_recover_from_being_liquidated(init_health) {
             msg!("Liqee init_health above zero");
             return Ok(());
         }

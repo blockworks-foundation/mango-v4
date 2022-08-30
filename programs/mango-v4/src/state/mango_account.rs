@@ -289,11 +289,14 @@ impl MangoAccountFixed {
         self.in_health_region = if b { 1 } else { 0 };
     }
 
-    pub fn maybe_recover_from_being_liquidated(&mut self, init_health: I80F48) {
+    pub fn maybe_recover_from_being_liquidated(&mut self, init_health: I80F48) -> bool {
         // This is used as threshold to flip flag instead of 0 because of dust issues
         let one_native_usdc = I80F48::ONE;
         if self.being_liquidated() && init_health > -one_native_usdc {
             self.set_being_liquidated(false);
+            true
+        } else {
+            false
         }
     }
 }
