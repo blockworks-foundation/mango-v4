@@ -203,7 +203,7 @@ impl ChainData {
                     .iter()
                     .rev()
                     .find(|w| self.is_account_write_live(w))?;
-                Some((pubkey.clone(), latest_good_write.clone()))
+                Some((*pubkey, latest_good_write.clone()))
             })
             .collect()
     }

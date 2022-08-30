@@ -150,7 +150,7 @@ pub fn liq_token_with_token(
     let (liqor_liab_active, loan_origination_fee) =
         liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer)?;
     let liqor_liab_position_indexed = liqor_liab_position.indexed_position;
-    let liqee_liab_native_after = liqee_liab_position.native(&liab_bank);
+    let liqee_liab_native_after = liqee_liab_position.native(liab_bank);
 
     let (liqor_asset_position, liqor_asset_raw_index, _) =
         liqor.ensure_token_position(asset_token_index)?;
@@ -161,7 +161,7 @@ pub fn liq_token_with_token(
     let liqee_asset_active =
         asset_bank.withdraw_without_fee_with_dusting(liqee_asset_position, asset_transfer)?;
     let liqee_asset_position_indexed = liqee_asset_position.indexed_position;
-    let liqee_assets_native_after = liqee_asset_position.native(&asset_bank);
+    let liqee_assets_native_after = liqee_asset_position.native(asset_bank);
 
     // Update the health cache
     liqee_health_cache.adjust_token_balance(

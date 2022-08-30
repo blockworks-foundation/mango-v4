@@ -396,9 +396,9 @@ pub fn apply_vault_difference(
     let needed_change = cm!(I80F48::from(vault_after) - I80F48::from(vault_before));
 
     let (position, _) = account.token_position_mut(bank.token_index)?;
-    let native_before = position.native(&bank);
+    let native_before = position.native(bank);
     bank.change_without_fee(position, needed_change)?;
-    let native_after = position.native(&bank);
+    let native_after = position.native(bank);
     let native_change = cm!(native_after - native_before);
     let new_borrows = native_change
         .max(native_after)

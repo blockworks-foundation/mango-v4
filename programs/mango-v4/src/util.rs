@@ -37,5 +37,4 @@ pub fn format_zero_terminated_utf8_bytes(
             .unwrap()
             .trim_matches(char::from(0)),
     )
-    .into()
 }

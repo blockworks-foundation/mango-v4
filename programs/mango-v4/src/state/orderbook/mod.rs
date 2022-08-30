@@ -327,10 +327,10 @@ mod tests {
 
         // simulate event queue processing
         maker
-            .execute_perp_maker(market.perp_market_index, &mut market, &fill)
+            .execute_perp_maker(market.perp_market_index, &mut market, fill)
             .unwrap();
         taker
-            .execute_perp_taker(market.perp_market_index, &mut market, &fill)
+            .execute_perp_taker(market.perp_market_index, &mut market, fill)
             .unwrap();
         assert_eq!(market.open_interest, 2 * match_quantity);
 

@@ -652,9 +652,9 @@ impl<
                 market_index: market_index as Serum3MarketIndex,
                 ..Serum3Orders::default()
             };
-            return Ok(self.serum3_orders_mut_by_raw_index(raw_index));
+            Ok(self.serum3_orders_mut_by_raw_index(raw_index))
         } else {
-            return err!(MangoError::NoFreeSerum3OpenOrdersIndex);
+            err!(MangoError::NoFreeSerum3OpenOrdersIndex)
         }
     }
 

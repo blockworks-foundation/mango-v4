@@ -27,7 +27,7 @@ pub async fn runner(
                 market_name
                     .split('/')
                     .collect::<Vec<&str>>()
-                    .get(0)
+                    .first()
                     .unwrap(),
             )
             .unwrap();

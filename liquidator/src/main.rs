@@ -332,13 +332,13 @@ fn liquidate<'a>(
     config: &liquidate::Config,
     rebalance_config: &rebalance::Config,
 ) -> anyhow::Result<()> {
-    if !liquidate::maybe_liquidate_one(&mango_client, &account_fetcher, accounts, &config) {
+    if !liquidate::maybe_liquidate_one(mango_client, account_fetcher, accounts, config) {
         return Ok(());
     }
 
     let liqor = &mango_client.mango_account_address;
     if let Err(err) =
-        rebalance::zero_all_non_quote(mango_client, account_fetcher, liqor, &rebalance_config)
+        rebalance::zero_all_non_quote(mango_client, account_fetcher, liqor, rebalance_config)
     {
         log::error!("failed to rebalance liqor: {:?}", err);
     }

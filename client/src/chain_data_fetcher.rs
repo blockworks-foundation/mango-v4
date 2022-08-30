@@ -28,11 +28,10 @@ impl AccountFetcher {
         &self,
         address: &Pubkey,
     ) -> anyhow::Result<T> {
-        Ok(self
+        Ok(*self
             .fetch_raw(address)?
             .load::<T>()
-            .with_context(|| format!("loading account {}", address))?
-            .clone())
+            .with_context(|| format!("loading account {}", address))?)
     }
 
     pub fn fetch_mango_account(&self, address: &Pubkey) -> anyhow::Result<MangoAccountValue> {
@@ -40,12 +39,12 @@ impl AccountFetcher {
 
         let data = acc.data();
         let disc_bytes = &data[0..8];
-        if disc_bytes != &MangoAccount::discriminator() {
+        if disc_bytes != MangoAccount::discriminator() {
             anyhow::bail!("not a mango account at {}", address);
         }
 
-        Ok(MangoAccountValue::from_bytes(&data[8..])
-            .with_context(|| format!("loading mango account {}", address))?)
+        MangoAccountValue::from_bytes(&data[8..])
+            .with_context(|| format!("loading mango account {}", address))
     }
 
     // fetches via RPC, stores in ChainData, returns new version
@@ -73,7 +72,7 @@ impl AccountFetcher {
     pub fn refresh_account_via_rpc(&self, address: &Pubkey) -> anyhow::Result<Slot> {
         let response = self
             .rpc
-            .get_account_with_commitment(&address, self.rpc.commitment())
+            .get_account_with_commitment(address, self.rpc.commitment())
             .with_context(|| format!("refresh account {} via rpc", address))?;
         let slot = response.context.slot;
         let account = response

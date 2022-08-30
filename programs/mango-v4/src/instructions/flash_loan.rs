@@ -72,7 +72,7 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
     let token_accounts = &ctx.remaining_accounts[2 * num_loans..3 * num_loans];
     let group_ai = &ctx.remaining_accounts[3 * num_loans];
 
-    let group_al = AccountLoader::<Group>::try_from(&group_ai)?;
+    let group_al = AccountLoader::<Group>::try_from(group_ai)?;
     let group = group_al.load()?;
     let group_seeds = group_seeds!(group);
     let seeds = [&group_seeds[..]];

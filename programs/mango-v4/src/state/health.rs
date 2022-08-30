@@ -492,7 +492,7 @@ impl PerpInfo {
         token_infos: &[TokenInfo],
     ) -> Result<Self> {
         // find the TokenInfos for the market's base and quote tokens
-        let base_index = find_token_info_index(&token_infos, perp_market.base_token_index)?;
+        let base_index = find_token_info_index(token_infos, perp_market.base_token_index)?;
         // TODO: base_index could be unset
         let base_info = &token_infos[base_index];
 
@@ -1549,7 +1549,7 @@ mod tests {
 
         for (i, testcase) in testcases.iter().enumerate() {
             println!("checking testcase {}", i);
-            test_health1_runner(&testcase);
+            test_health1_runner(testcase);
         }
     }
 

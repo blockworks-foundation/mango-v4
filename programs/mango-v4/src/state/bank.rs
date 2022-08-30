@@ -276,7 +276,7 @@ impl Bank {
         let (position_is_active, _) =
             self.withdraw_internal(position, native_amount, false, !position.is_in_use())?;
 
-        return Ok(position_is_active);
+        Ok(position_is_active)
     }
 
     /// Like `withdraw_without_fee()` but allows dusting of in-use token accounts.
@@ -287,9 +287,8 @@ impl Bank {
         position: &mut TokenPosition,
         native_amount: I80F48,
     ) -> Result<bool> {
-        Ok(self
-            .withdraw_internal(position, native_amount, false, true)
-            .map(|(not_dusted, _)| not_dusted || position.is_in_use())?)
+        self.withdraw_internal(position, native_amount, false, true)
+            .map(|(not_dusted, _)| not_dusted || position.is_in_use())
     }
 
     /// Withdraws `native_amount` while applying the loan origination fee if a borrow is created.

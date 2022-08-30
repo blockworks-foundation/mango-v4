@@ -107,7 +107,7 @@ pub fn liq_token_bankruptcy(
     let mut liab_deposit_index = liab_bank.deposit_index;
     let liab_borrow_index = liab_bank.borrow_index;
     let (liqee_liab, liqee_raw_token_index) = liqee.token_position_mut(liab_token_index)?;
-    let initial_liab_native = liqee_liab.native(&liab_bank);
+    let initial_liab_native = liqee_liab.native(liab_bank);
     let mut remaining_liab_loss = -initial_liab_native;
     require_gt!(remaining_liab_loss, I80F48::ZERO);
 
@@ -307,7 +307,7 @@ pub fn liq_token_bankruptcy(
         mango_group: ctx.accounts.group.key(),
         liqee: ctx.accounts.liqee.key(),
         liqor: ctx.accounts.liqor.key(),
-        liab_token_index: liab_token_index,
+        liab_token_index,
         initial_liab_native: initial_liab_native.to_bits(),
         liab_price: liab_price.to_bits(),
         insurance_token_index: QUOTE_TOKEN_INDEX,
