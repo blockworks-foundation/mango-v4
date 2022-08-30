@@ -169,6 +169,10 @@ pub fn serum3_liq_force_cancel_orders(
         &mut base_bank,
         after_base_vault,
         before_base_vault,
+    )?;
+    apply_vault_difference(
+        &mut account.borrow_mut(),
+        serum_market.market_index,
         &mut quote_bank,
         after_quote_vault,
         before_quote_vault,

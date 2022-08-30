@@ -1600,14 +1600,17 @@ impl<'keypair> ClientInstruction for Serum3PlaceOrderInstruction<'keypair> {
         )
         .await;
 
+        let (payer_bank, payer_vault) = match self.side {
+            Serum3Side::Bid => (quote_info.first_bank(), quote_info.first_vault()),
+            Serum3Side::Ask => (base_info.first_bank(), base_info.first_vault()),
+        };
+
         let accounts = Self::Accounts {
             group: account.fixed.group,
             account: self.account,
             open_orders,
-            quote_bank: quote_info.first_bank(),
-            quote_vault: quote_info.first_vault(),
-            base_bank: base_info.first_bank(),
-            base_vault: base_info.first_vault(),
+            payer_bank,
+            payer_vault,
             serum_market: self.serum_market,
             serum_program: serum_market.serum_program,
             serum_market_external: serum_market.serum_market_external,

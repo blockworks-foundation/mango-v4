@@ -1605,24 +1605,20 @@ export type MangoV4 = {
           ]
         },
         {
-          "name": "quoteBank",
+          "name": "payerBank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The bank that pays for the order, if necessary"
+          ]
         },
         {
-          "name": "quoteVault",
+          "name": "payerVault",
           "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "baseBank",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "baseVault",
-          "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The bank vault that pays for the order, if necessary"
+          ]
         },
         {
           "name": "tokenProgram",
@@ -4015,11 +4011,17 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "previousNativeCoinReserved",
+            "name": "baseBorrowsWithoutFee",
+            "docs": [
+              "Tracks the amount of borrows that have flowed into the serum open orders account.",
+              "These borrows did not have the loan origination fee applied, and that may happen",
+              "later (in serum3_settle_funds) if we can guarantee that the funds were used.",
+              "In particular a place-on-book, cancel, settle should not cost fees."
+            ],
             "type": "u64"
           },
           {
-            "name": "previousNativePcReserved",
+            "name": "quoteBorrowsWithoutFee",
             "type": "u64"
           },
           {
@@ -6887,24 +6889,20 @@ export const IDL: MangoV4 = {
           ]
         },
         {
-          "name": "quoteBank",
+          "name": "payerBank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The bank that pays for the order, if necessary"
+          ]
         },
         {
-          "name": "quoteVault",
+          "name": "payerVault",
           "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "baseBank",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "baseVault",
-          "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The bank vault that pays for the order, if necessary"
+          ]
         },
         {
           "name": "tokenProgram",
@@ -9297,11 +9295,17 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "previousNativeCoinReserved",
+            "name": "baseBorrowsWithoutFee",
+            "docs": [
+              "Tracks the amount of borrows that have flowed into the serum open orders account.",
+              "These borrows did not have the loan origination fee applied, and that may happen",
+              "later (in serum3_settle_funds) if we can guarantee that the funds were used.",
+              "In particular a place-on-book, cancel, settle should not cost fees."
+            ],
             "type": "u64"
           },
           {
-            "name": "previousNativePcReserved",
+            "name": "quoteBorrowsWithoutFee",
             "type": "u64"
           },
           {

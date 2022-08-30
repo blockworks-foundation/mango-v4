@@ -1079,6 +1079,13 @@ export class MangoClient {
         .baseSizeNumberToLots(size)
         .mul(serum3MarketExternal.priceNumberToLots(price)),
     );
+    const payerTokenIndex = (() => {
+      if (side == Serum3Side.bid) {
+        return serum3Market.quoteTokenIndex;
+      } else {
+        return serum3Market.baseTokenIndex;
+      }
+    })();
 
     return await this.program.methods
       .serum3PlaceOrder(
@@ -1107,14 +1114,8 @@ export class MangoClient {
         marketBaseVault: serum3MarketExternal.decoded.baseVault,
         marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
         marketVaultSigner: serum3MarketExternalVaultSigner,
-        quoteBank: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
-          .publicKey,
-        quoteVault: group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
-          .vault,
-        baseBank: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
-          .publicKey,
-        baseVault: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
-          .vault,
+        payerBank: group.getFirstBankByTokenIndex(payerTokenIndex).publicKey,
+        payerVault: group.getFirstBankByTokenIndex(payerTokenIndex).vault,
       })
       .remainingAccounts(
         healthRemainingAccounts.map(
