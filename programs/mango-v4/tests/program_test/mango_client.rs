@@ -1343,12 +1343,23 @@ impl<'keypair> ClientInstruction for Serum3RegisterMarketInstruction<'keypair> {
         )
         .0;
 
+        let index_reservation = Pubkey::find_program_address(
+            &[
+                b"Serum3Index".as_ref(),
+                self.group.as_ref(),
+                &self.market_index.to_le_bytes(),
+            ],
+            &program_id,
+        )
+        .0;
+
         let accounts = Self::Accounts {
             group: self.group,
             admin: self.admin.pubkey(),
             serum_program: self.serum_program,
             serum_market_external: self.serum_market_external,
             serum_market,
+            index_reservation,
             base_bank: self.base_bank,
             quote_bank: self.quote_bank,
             payer: self.payer.pubkey(),

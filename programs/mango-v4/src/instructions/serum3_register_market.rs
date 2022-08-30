@@ -6,6 +6,7 @@ use crate::state::*;
 use crate::util::fill_from_str;
 
 #[derive(Accounts)]
+#[instruction(market_index: Serum3MarketIndex)]
 pub struct Serum3RegisterMarket<'info> {
     #[account(
         mut,
@@ -29,6 +30,17 @@ pub struct Serum3RegisterMarket<'info> {
         space = 8 + std::mem::size_of::<Serum3Market>(),
     )]
     pub serum_market: AccountLoader<'info, Serum3Market>,
+
+    /// CHECK: Unused account
+    #[account(
+        init,
+        // block using the same market index twice
+        seeds = [b"Serum3Index".as_ref(), group.key().as_ref(), &market_index.to_le_bytes()],
+        bump,
+        payer = payer,
+        space = 1,
+    )]
+    pub index_reservation: UncheckedAccount<'info>,
 
     #[account(has_one = group)]
     pub quote_bank: AccountLoader<'info, Bank>,
