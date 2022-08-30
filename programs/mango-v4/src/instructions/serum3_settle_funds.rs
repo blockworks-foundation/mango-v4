@@ -85,8 +85,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         // Validate open_orders #2
         require!(
             account
-                .serum3_orders(serum_market.market_index)
-                .ok_or_else(|| error!(MangoError::SomeError))?
+                .serum3_orders(serum_market.market_index)?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
             MangoError::SomeError

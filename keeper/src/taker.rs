@@ -77,7 +77,7 @@ fn ensure_oo(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> {
     let account = mango_client.mango_account()?;
 
     for (market_index, serum3_market) in mango_client.context.serum3_markets.iter() {
-        if account.serum3_orders(*market_index).is_none() {
+        if account.serum3_orders(*market_index).is_err() {
             mango_client.serum3_create_open_orders(serum3_market.market.name())?;
         }
     }
