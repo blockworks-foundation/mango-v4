@@ -1,6 +1,6 @@
 use crate::error::*;
 
-use crate::serum3_cpi::load_open_orders_ref;
+use crate::serum3_cpi::{load_market_state, load_open_orders_ref};
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
@@ -252,19 +252,29 @@ pub fn serum3_place_order(
     };
 
     // Provide a readable error message in case the vault doesn't have enough tokens
-    let needed_amount = match side {
-        Serum3Side::Ask => max_base_qty.saturating_sub(before_oo.native_base_free()),
-        Serum3Side::Bid => {
-            max_native_quote_qty_including_fees.saturating_sub(before_oo.native_quote_free())
+    {
+        let base_lot_size = load_market_state(
+            &ctx.accounts.serum_market_external,
+            &ctx.accounts.serum_program.key(),
+        )?
+        .coin_lot_size;
+
+        let needed_amount = match side {
+            Serum3Side::Ask => {
+                cm!(max_base_qty * base_lot_size).saturating_sub(before_oo.native_base_free())
+            }
+            Serum3Side::Bid => {
+                max_native_quote_qty_including_fees.saturating_sub(before_oo.native_quote_free())
+            }
+        };
+        if before_vault < needed_amount {
+            return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {
+                format!(
+                    "bank vault does not have enough tokens, need {} but have {}",
+                    needed_amount, before_vault
+                )
+            });
         }
-    };
-    if before_vault < needed_amount {
-        return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {
-            format!(
-                "bank vault does not have enough tokens, need {} but have {}",
-                needed_amount, before_vault
-            )
-        });
     }
 
     //
