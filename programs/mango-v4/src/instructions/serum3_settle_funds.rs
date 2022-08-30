@@ -164,6 +164,10 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
             &mut base_bank,
             after_base_vault,
             before_base_vault,
+        )?;
+        apply_vault_difference(
+            &mut account.borrow_mut(),
+            serum_market.market_index,
             &mut quote_bank,
             after_quote_vault,
             before_quote_vault,

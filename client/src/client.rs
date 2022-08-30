@@ -605,6 +605,10 @@ impl MangoClient {
             let rates = get_fee_rates(fee_tier);
             (s3.market.pc_lot_size as f64 * (1f64 + rates.0)) as u64 * (limit_price * max_base_qty)
         };
+        let payer_mint_info = match side {
+            Serum3Side::Bid => s3.quote.mint_info,
+            Serum3Side::Ask => s3.base.mint_info,
+        };
 
         self.program()
             .request()
@@ -616,10 +620,8 @@ impl MangoClient {
                             group: self.group(),
                             account: self.mango_account_address,
                             open_orders,
-                            quote_bank: s3.quote.mint_info.first_bank(),
-                            quote_vault: s3.quote.mint_info.first_vault(),
-                            base_bank: s3.base.mint_info.first_bank(),
-                            base_vault: s3.base.mint_info.first_vault(),
+                            payer_bank: payer_mint_info.first_bank(),
+                            payer_vault: payer_mint_info.first_vault(),
                             serum_market: s3.market.address,
                             serum_program: s3.market.market.serum_program,
                             serum_market_external: s3.market.market.serum_market_external,

@@ -9,7 +9,6 @@ use fixed::types::I80F48;
 use num_enum::IntoPrimitive;
 use num_enum::TryFromPrimitive;
 use serum_dex::instruction::NewOrderInstructionV3;
-use serum_dex::matching::Side;
 use serum_dex::state::OpenOrders;
 
 /// For loan origination fees bookkeeping purposes
@@ -169,19 +168,13 @@ pub struct Serum3PlaceOrder<'info> {
     /// CHECK: Validated by the serum cpi call
     pub market_vault_signer: UncheckedAccount<'info>,
 
-    // TODO: do we need to pass both, or just payer?
-    // TODO: Can we reduce the number of accounts by requiring the banks
-    //       to be in the remainingAccounts (where they need to be anyway, for
-    //       health checks - but they need to be mut)
-    // token_index and bank.vault == vault is validated inline at #3
+    /// The bank that pays for the order, if necessary
+    // token_index and payer_bank.vault == payer_vault is validated inline at #3
     #[account(mut, has_one = group)]
-    pub quote_bank: AccountLoader<'info, Bank>,
+    pub payer_bank: AccountLoader<'info, Bank>,
+    /// The bank vault that pays for the order, if necessary
     #[account(mut)]
-    pub quote_vault: Box<Account<'info, TokenAccount>>,
-    #[account(mut, has_one = group)]
-    pub base_bank: AccountLoader<'info, Bank>,
-    #[account(mut)]
-    pub base_vault: Box<Account<'info, TokenAccount>>,
+    pub payer_vault: Box<Account<'info, TokenAccount>>,
 
     pub token_program: Program<'info, Token>,
 }
@@ -221,25 +214,14 @@ pub fn serum3_place_order(
             MangoError::SomeError
         );
 
-        // Validate banks and vaults #3
-        let quote_bank = ctx.accounts.quote_bank.load()?;
-        require!(
-            quote_bank.vault == ctx.accounts.quote_vault.key(),
-            MangoError::SomeError
-        );
-        require!(
-            quote_bank.token_index == serum_market.quote_token_index,
-            MangoError::SomeError
-        );
-        let base_bank = ctx.accounts.base_bank.load()?;
-        require!(
-            base_bank.vault == ctx.accounts.base_vault.key(),
-            MangoError::SomeError
-        );
-        require!(
-            base_bank.token_index == serum_market.base_token_index,
-            MangoError::SomeError
-        );
+        // Validate bank and vault #3
+        let payer_bank = ctx.accounts.payer_bank.load()?;
+        require_keys_eq!(payer_bank.vault, ctx.accounts.payer_vault.key());
+        let payer_token_index = match side {
+            Serum3Side::Bid => serum_market.quote_token_index,
+            Serum3Side::Ask => serum_market.base_token_index,
+        };
+        require_eq!(payer_bank.token_index, payer_token_index);
     }
 
     //
@@ -261,8 +243,7 @@ pub fn serum3_place_order(
     // Before-order tracking
     //
 
-    let before_base_vault = ctx.accounts.base_vault.amount;
-    let before_quote_vault = ctx.accounts.quote_vault.amount;
+    let before_vault = ctx.accounts.payer_vault.amount;
 
     let before_oo = {
         let oo_ai = &ctx.accounts.open_orders.as_ref();
@@ -271,21 +252,17 @@ pub fn serum3_place_order(
     };
 
     // Provide a readable error message in case the vault doesn't have enough tokens
-    let (vault_amount, needed_amount) = match side {
-        Serum3Side::Ask => (
-            before_base_vault,
-            max_base_qty.saturating_sub(before_oo.native_base_free()),
-        ),
-        Serum3Side::Bid => (
-            before_quote_vault,
-            max_native_quote_qty_including_fees.saturating_sub(before_oo.native_quote_free()),
-        ),
+    let needed_amount = match side {
+        Serum3Side::Ask => max_base_qty.saturating_sub(before_oo.native_base_free()),
+        Serum3Side::Bid => {
+            max_native_quote_qty_including_fees.saturating_sub(before_oo.native_quote_free())
+        }
     };
-    if vault_amount < needed_amount {
+    if before_vault < needed_amount {
         return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {
             format!(
                 "bank vault does not have enough tokens, need {} but have {}",
-                needed_amount, vault_amount
+                needed_amount, before_vault
             )
         });
     }
@@ -318,29 +295,21 @@ pub fn serum3_place_order(
     //
     // After-order tracking
     //
-    ctx.accounts.base_vault.reload()?;
-    ctx.accounts.quote_vault.reload()?;
-    let after_base_vault = ctx.accounts.base_vault.amount;
-    let after_quote_vault = ctx.accounts.quote_vault.amount;
+    ctx.accounts.payer_vault.reload()?;
+    let after_vault = ctx.accounts.payer_vault.amount;
 
-    // Placing an order cannot increase vault balances
-    require_gte!(before_base_vault, after_base_vault);
-    require_gte!(before_quote_vault, after_quote_vault);
+    // Placing an order cannot increase vault balance
+    require_gte!(before_vault, after_vault);
 
-    // Charge the difference in vault balances to the user's account
+    // Charge the difference in vault balance to the user's account
     let vault_difference = {
-        let mut base_bank = ctx.accounts.base_bank.load_mut()?;
-        let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-
+        let mut payer_bank = ctx.accounts.payer_bank.load_mut()?;
         apply_vault_difference(
             &mut account.borrow_mut(),
             serum_market.market_index,
-            &mut base_bank,
-            after_base_vault,
-            before_base_vault,
-            &mut quote_bank,
-            after_quote_vault,
-            before_quote_vault,
+            &mut payer_bank,
+            after_vault,
+            before_vault,
         )?
     };
 
@@ -395,16 +364,13 @@ impl OODifference {
 }
 
 pub struct VaultDifference {
-    base_index: TokenIndex,
-    quote_index: TokenIndex,
-    base_native_change: I80F48,
-    quote_native_change: I80F48,
+    token_index: TokenIndex,
+    native_change: I80F48,
 }
 
 impl VaultDifference {
     pub fn adjust_health_cache(&self, health_cache: &mut HealthCache) -> Result<()> {
-        health_cache.adjust_token_balance(self.base_index, self.base_native_change)?;
-        health_cache.adjust_token_balance(self.quote_index, self.quote_native_change)?;
+        health_cache.adjust_token_balance(self.token_index, self.native_change)?;
         Ok(())
     }
 }
@@ -414,73 +380,51 @@ impl VaultDifference {
 pub fn apply_vault_difference(
     account: &mut MangoAccountRefMut,
     serum_market_index: Serum3MarketIndex,
-    base_bank: &mut Bank,
-    after_base_vault: u64,
-    before_base_vault: u64,
-    quote_bank: &mut Bank,
-    after_quote_vault: u64,
-    before_quote_vault: u64,
+    bank: &mut Bank,
+    vault_after: u64,
+    vault_before: u64,
 ) -> Result<VaultDifference> {
-    let base_needed_change = cm!(I80F48::from(after_base_vault) - I80F48::from(before_base_vault));
+    let needed_change = cm!(I80F48::from(vault_after) - I80F48::from(vault_before));
 
-    let (base_position, _) = account.token_position_mut(base_bank.token_index)?;
-    let base_native_before = base_position.native(&base_bank);
-    base_bank.change_without_fee(base_position, base_needed_change)?;
-    let base_native_after = base_position.native(&base_bank);
-    let base_native_change = cm!(base_native_after - base_native_before);
-    let base_borrows = base_native_change
-        .max(base_native_after)
-        .min(I80F48::ZERO)
-        .abs()
-        .to_num::<u64>();
-
-    let quote_needed_change =
-        cm!(I80F48::from(after_quote_vault) - I80F48::from(before_quote_vault));
-
-    let (quote_position, _) = account.token_position_mut(quote_bank.token_index)?;
-    let quote_native_before = quote_position.native(&quote_bank);
-    quote_bank.change_without_fee(quote_position, quote_needed_change)?;
-    let quote_native_after = quote_position.native(&quote_bank);
-    let quote_native_change = cm!(quote_native_after - quote_native_before);
-    let quote_borrows = quote_native_change
-        .max(quote_native_after)
+    let (position, _) = account.token_position_mut(bank.token_index)?;
+    let native_before = position.native(&bank);
+    bank.change_without_fee(position, needed_change)?;
+    let native_after = position.native(&bank);
+    let native_change = cm!(native_after - native_before);
+    let new_borrows = native_change
+        .max(native_after)
         .min(I80F48::ZERO)
         .abs()
         .to_num::<u64>();
 
     let market = account.serum3_orders_mut(serum_market_index).unwrap();
+    let borrows_without_fee = if bank.token_index == market.base_token_index {
+        &mut market.base_borrows_without_fee
+    } else if bank.token_index == market.quote_token_index {
+        &mut market.quote_borrows_without_fee
+    } else {
+        return Err(error_msg!(
+            "assert failed: apply_vault_difference called with bad token index"
+        ));
+    };
 
-    // Only for place: Add to potential borrow amounts
-    market.base_borrows_without_fee = cm!(market.base_borrows_without_fee + base_borrows);
-    market.quote_borrows_without_fee = cm!(market.quote_borrows_without_fee + quote_borrows);
+    // Only for place: Add to potential borrow amount
+    let old_value = *borrows_without_fee;
+    *borrows_without_fee = cm!(old_value + new_borrows);
 
     // Only for settle/liq_force_cancel: Reduce the potential borrow amounts
-    if base_needed_change > 0 {
-        market.base_borrows_without_fee = market
-            .base_borrows_without_fee
-            .saturating_sub(base_needed_change.to_num::<u64>());
-    }
-    if quote_needed_change > 0 {
-        market.quote_borrows_without_fee = market
-            .quote_borrows_without_fee
-            .saturating_sub(quote_needed_change.to_num::<u64>());
+    if needed_change > 0 {
+        *borrows_without_fee = (*borrows_without_fee).saturating_sub(needed_change.to_num::<u64>());
     }
 
     Ok(VaultDifference {
-        base_index: base_bank.token_index,
-        quote_index: quote_bank.token_index,
-        base_native_change,
-        quote_native_change,
+        token_index: bank.token_index,
+        native_change,
     })
 }
 
 fn cpi_place_order(ctx: &Serum3PlaceOrder, order: NewOrderInstructionV3) -> Result<()> {
     use crate::serum3_cpi;
-
-    let order_payer_token_account = match order.side {
-        Side::Bid => &ctx.quote_vault,
-        Side::Ask => &ctx.base_vault,
-    };
 
     let group = ctx.group.load()?;
     serum3_cpi::PlaceOrder {
@@ -495,7 +439,7 @@ fn cpi_place_order(ctx: &Serum3PlaceOrder, order: NewOrderInstructionV3) -> Resu
         token_program: ctx.token_program.to_account_info(),
 
         open_orders: ctx.open_orders.to_account_info(),
-        order_payer_token_account: order_payer_token_account.to_account_info(),
+        order_payer_token_account: ctx.payer_vault.to_account_info(),
         user_authority: ctx.group.to_account_info(),
     }
     .call(&group, order)
