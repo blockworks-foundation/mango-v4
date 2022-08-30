@@ -264,6 +264,9 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     assert_eq!(native1, 900);
 
     let account_data = get_mango_account(solana, account).await;
+    assert_eq!(account_data.token_position_by_raw_index(0).in_use_count, 1);
+    assert_eq!(account_data.token_position_by_raw_index(1).in_use_count, 1);
+    assert_eq!(account_data.token_position_by_raw_index(2).in_use_count, 0);
     let serum_orders = account_data.serum3_orders_by_raw_index(0);
     assert_eq!(serum_orders.base_borrows_without_fee, 0);
     assert_eq!(serum_orders.quote_borrows_without_fee, 0);
@@ -303,6 +306,10 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+
+    let account_data = get_mango_account(solana, account).await;
+    assert_eq!(account_data.token_position_by_raw_index(0).in_use_count, 0);
+    assert_eq!(account_data.token_position_by_raw_index(1).in_use_count, 0);
 
     // deregister serum3 market
     send_tx(
