@@ -1,4 +1,5 @@
 #![cfg(feature = "test-bpf")]
+#![allow(dead_code)]
 
 use solana_program_test::*;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer, transport::TransportError};
