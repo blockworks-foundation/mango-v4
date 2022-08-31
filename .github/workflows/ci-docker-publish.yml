@@ -72,7 +72,7 @@ jobs:
       - name: Build and Push Keeper
         uses: docker/build-push-action@v2
         with:
-          file: liquidator/Dockerfile.keeper
+          file: keeper/Dockerfile.keeper
           context: .
           push: true
           tags: |
