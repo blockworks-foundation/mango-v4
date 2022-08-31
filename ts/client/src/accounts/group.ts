@@ -1,6 +1,11 @@
 import { BorshAccountsCoder } from '@project-serum/anchor';
 import { coder } from '@project-serum/anchor/dist/cjs/spl/token';
-import { Market } from '@project-serum/serum';
+import {
+  getFeeRates,
+  getFeeTier,
+  Market,
+  Orderbook,
+} from '@project-serum/serum';
 import { parsePriceData, PriceData } from '@pythnetwork/client';
 import { PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
@@ -68,20 +73,15 @@ export class Group {
     public banksMapByName: Map<string, Bank[]>,
     public banksMapByMint: Map<string, Bank[]>,
     public banksMapByTokenIndex: Map<number, Bank[]>,
-    public serum3MarketsMap: Map<string, Serum3Market>,
+    public serum3MarketsMapByExternal: Map<string, Serum3Market>,
     public serum3MarketExternalsMap: Map<string, Market>,
+    // TODO rethink key
     public perpMarketsMap: Map<string, PerpMarket>,
     public mintInfosMapByTokenIndex: Map<number, MintInfo>,
     public mintInfosMapByMint: Map<string, MintInfo>,
     private oraclesMap: Map<string, PriceData>, // UNUSED
     public vaultAmountsMap: Map<string, number>,
   ) {}
-
-  public findSerum3Market(marketIndex: number): Serum3Market | undefined {
-    return Array.from(this.serum3MarketsMap.values()).find(
-      (serum3Market) => serum3Market.marketIndex === marketIndex,
-    );
-  }
 
   public async reloadAll(client: MangoClient) {
     let ids: Id | undefined = undefined;
@@ -180,14 +180,17 @@ export class Group {
       serum3Markets = await client.serum3GetMarkets(this);
     }
 
-    this.serum3MarketsMap = new Map(
-      serum3Markets.map((serum3Market) => [serum3Market.name, serum3Market]),
+    this.serum3MarketsMapByExternal = new Map(
+      serum3Markets.map((serum3Market) => [
+        serum3Market.serumMarketExternal.toBase58(),
+        serum3Market,
+      ]),
     );
   }
 
   public async reloadSerum3ExternalMarkets(client: MangoClient, ids?: Id) {
     const externalMarkets = await Promise.all(
-      Array.from(this.serum3MarketsMap.values()).map((serum3Market) =>
+      Array.from(this.serum3MarketsMapByExternal.values()).map((serum3Market) =>
         Market.load(
           client.program.provider.connection,
           serum3Market.serumMarketExternal,
@@ -198,10 +201,12 @@ export class Group {
     );
 
     this.serum3MarketExternalsMap = new Map(
-      Array.from(this.serum3MarketsMap.values()).map((serum3Market, index) => [
-        serum3Market.name,
-        externalMarkets[index],
-      ]),
+      Array.from(this.serum3MarketsMapByExternal.values()).map(
+        (serum3Market, index) => [
+          serum3Market.serumMarketExternal.toBase58(),
+          externalMarkets[index],
+        ],
+      ),
     );
   }
 
@@ -314,6 +319,37 @@ export class Group {
       amount += this.vaultAmountsMap.get(bank.vault.toBase58());
     }
     return I80F48.fromNumber(amount);
+  }
+
+  public findSerum3Market(marketIndex: number): Serum3Market | undefined {
+    return Array.from(this.serum3MarketsMapByExternal.values()).find(
+      (serum3Market) => serum3Market.marketIndex === marketIndex,
+    );
+  }
+
+  public async loadSerum3BidsForMarket(
+    client: MangoClient,
+    externalMarketPk: PublicKey,
+  ): Promise<Orderbook> {
+    return await this.serum3MarketsMapByExternal
+      .get(externalMarketPk.toBase58())
+      .loadBids(client, this);
+  }
+
+  public async loadSerum3AsksForMarket(
+    client: MangoClient,
+    externalMarketPk: PublicKey,
+  ): Promise<Orderbook> {
+    return await this.serum3MarketsMapByExternal
+      .get(externalMarketPk.toBase58())
+      .loadAsks(client, this);
+  }
+
+  public getFeeRate(maker = true) {
+    // TODO: fetch msrm/srm vault balance
+    const feeTier = getFeeTier(0, 0);
+    const rates = getFeeRates(feeTier);
+    return maker ? rates.maker : rates.taker;
   }
 
   /**

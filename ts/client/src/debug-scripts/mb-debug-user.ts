@@ -20,10 +20,15 @@ async function debugUser(
   console.log(
     'buildFixedAccountRetrieverHealthAccounts ' +
       client
-        .buildFixedAccountRetrieverHealthAccounts(group, mangoAccount, [
-          group.banksMapByName.get('BTC')[0],
-          group.banksMapByName.get('USDC')[0],
-        ])
+        .buildFixedAccountRetrieverHealthAccounts(
+          group,
+          mangoAccount,
+          [
+            group.banksMapByName.get('BTC')[0],
+            group.banksMapByName.get('USDC')[0],
+          ],
+          [],
+        )
         .map((pk) => pk.toBase58())
         .join(', '),
   );

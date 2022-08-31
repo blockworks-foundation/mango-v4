@@ -17,6 +17,8 @@ import { MANGO_V4_ID } from '../constants';
 const DEVNET_SERUM3_MARKETS = new Map([
   ['BTC/USDC', 'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB'],
   ['SOL/USDC', '5xWpt56U1NCuHoAEtpLeUrQcxDkEpNfScjfLFaRzLPgR'],
+  ['ETH/USDC', 'BkAraCyL9TTLbeMY3L1VWrPcv32DvSi5QDDQjik1J6Ac'],
+  ['SRM/USDC', '249LDNPLLL29nRq8kjBTg9hKdXMcZf4vK2UvxszZYcuZ'],
 ]);
 const DEVNET_MINTS = new Map([
   ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'], // use devnet usdc
@@ -24,12 +26,16 @@ const DEVNET_MINTS = new Map([
   ['SOL', 'So11111111111111111111111111111111111111112'],
   ['ORCA', 'orcarKHSqC5CDDsGbho8GKvwExejWHxTqGzXgcewB9L'],
   ['MNGO', 'Bb9bsTQa1bGEtQ5KagGkvSHyuLqDWumFUcRqFusFNJWC'],
+  ['ETH', 'Cu84KB3tDL6SbFgToHMLYVDJJXdJjenNzSKikeAvzmkA'],
+  ['SRM', 'AvtB6w9xboLwA145E221vhof5TddhqsChYcx7Fy3xVMH'],
 ]);
 const DEVNET_ORACLES = new Map([
   ['BTC', 'HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J'],
   ['SOL', 'J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix'],
   ['ORCA', 'A1WttWF7X3Rg6ZRpB2YQUFHCRh1kiXV8sKKLV3S9neJV'],
   ['MNGO', '8k7F9Xb36oFJsjpCKpsXvg4cgBRoZtwNTc3EzG5Ttd2o'],
+  ['ETH', 'EdVCmQ9FSPcVe5YySXDPCRmc8aDQLKJ9xvYBMZPie1Vw'],
+  ['SRM', '992moaMQKs32GKZ9dxi8keyM2bUmbrwBZpK4p2K6X5Vs'],
 ]);
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
@@ -88,19 +94,19 @@ async function main() {
       0.1,
       0, // tokenIndex
       'USDC',
-      0.01,
-      0.4,
-      0.07,
-      0.8,
-      0.9,
-      1.5,
+      0.004,
+      0.7,
+      0.1,
+      0.85,
+      0.2,
+      2.0,
+      0.005,
       0.0005,
-      0.0005,
-      0.8,
-      0.6,
-      1.2,
-      1.4,
-      0.02,
+      1,
+      1,
+      1,
+      1,
+      0,
     );
     await group.reloadAll(client);
   } catch (error) {}
@@ -117,19 +123,19 @@ async function main() {
       0.1,
       1, // tokenIndex
       'BTC',
-      0.01,
-      0.4,
-      0.07,
-      0.8,
+      0.004,
+      0.7,
+      0.1,
+      0.85,
+      0.2,
+      2.0,
+      0.005,
+      0.0005,
       0.9,
-      0.88,
-      0.0005,
-      0.0005,
       0.8,
-      0.6,
+      1.1,
       1.2,
-      1.4,
-      0.02,
+      0.05,
     );
     await group.reloadAll(client);
   } catch (error) {
@@ -148,19 +154,19 @@ async function main() {
       0.1,
       2, // tokenIndex
       'SOL',
-      0.01,
-      0.4,
-      0.07,
-      0.8,
+      0.004,
+      0.7,
+      0.1,
+      0.85,
+      0.2,
+      2.0,
+      0.005,
+      0.0005,
       0.9,
-      0.63,
-      0.0005,
-      0.0005,
       0.8,
-      0.6,
+      1.1,
       1.2,
-      1.4,
-      0.02,
+      0.05,
     );
     await group.reloadAll(client);
   } catch (error) {
@@ -198,14 +204,75 @@ async function main() {
     console.log(error);
   }
 
-  // register token 4
+  // register token 7
+  console.log(`Registering ETH...`);
+  const ethDevnetMint = new PublicKey(DEVNET_MINTS.get('ETH')!);
+  const ethDevnetOracle = new PublicKey(DEVNET_ORACLES.get('ETH')!);
+  try {
+    await client.tokenRegister(
+      group,
+      ethDevnetMint,
+      ethDevnetOracle,
+      0.1,
+      7, // tokenIndex
+      'ETH',
+      0.004,
+      0.7,
+      0.1,
+      0.85,
+      0.2,
+      2.0,
+      0.005,
+      0.0005,
+      0.9,
+      0.8,
+      1.1,
+      1.2,
+      0.05,
+    );
+    await group.reloadAll(client);
+  } catch (error) {
+    console.log(error);
+  }
+
+  // register token 5
+  console.log(`Registering SRM...`);
+  const srmDevnetMint = new PublicKey(DEVNET_MINTS.get('SRM')!);
+  const srmDevnetOracle = new PublicKey(DEVNET_ORACLES.get('SRM')!);
+  try {
+    await client.tokenRegister(
+      group,
+      srmDevnetMint,
+      srmDevnetOracle,
+      0.1,
+      5, // tokenIndex
+      'SRM',
+      0.004,
+      0.7,
+      0.1,
+      0.85,
+      0.2,
+      2.0,
+      0.005,
+      0.0005,
+      0.9,
+      0.8,
+      1.1,
+      1.2,
+      0.05,
+    );
+    await group.reloadAll(client);
+  } catch (error) {
+    console.log(error);
+  }
+
   console.log(
     `Editing group, setting existing admin as fastListingAdmin to be able to add MNGO truslessly...`,
   );
   let sig = await client.groupEdit(
     group,
     group.admin,
-    new PublicKey('Efhak3qj3MiyzgJr3cUUqXXz5wr3oYHt9sPzuqJf9eBN'),
+    group.admin,
     undefined,
     undefined,
   );
@@ -231,7 +298,7 @@ async function main() {
 
   // register serum market
   console.log(`Registering serum3 market...`);
-  const serumMarketExternalPk = new PublicKey(
+  let serumMarketExternalPk = new PublicKey(
     DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
   );
   try {
@@ -251,7 +318,35 @@ async function main() {
     group.getFirstBankByMint(btcDevnetMint).tokenIndex,
     group.getFirstBankByMint(usdcDevnetMint).tokenIndex,
   );
-  console.log(`...registerd serum3 market ${markets[0].publicKey}`);
+  console.log(`...registered serum3 market ${markets[0].publicKey}`);
+
+  serumMarketExternalPk = new PublicKey(DEVNET_SERUM3_MARKETS.get('ETH/USDC')!);
+  try {
+    await client.serum3RegisterMarket(
+      group,
+      serumMarketExternalPk,
+      group.getFirstBankByMint(ethDevnetMint),
+      group.getFirstBankByMint(usdcDevnetMint),
+      0,
+      'ETH/USDC',
+    );
+  } catch (error) {
+    console.log(error);
+  }
+
+  serumMarketExternalPk = new PublicKey(DEVNET_SERUM3_MARKETS.get('SRM/USDC')!);
+  try {
+    await client.serum3RegisterMarket(
+      group,
+      serumMarketExternalPk,
+      group.getFirstBankByMint(srmDevnetMint),
+      group.getFirstBankByMint(usdcDevnetMint),
+      0,
+      'SRM/USDC',
+    );
+  } catch (error) {
+    console.log(error);
+  }
 
   // register perp market
   console.log(`Registering perp market...`);
@@ -292,114 +387,93 @@ async function main() {
   // edit
   //
 
-  console.log(`Editing USDC...`);
-  try {
-    let sig = await client.tokenEdit(
-      group,
-      usdcDevnetMint,
-      btcDevnetOracle,
-      0.1,
-      undefined,
-      0.01,
-      0.3,
-      0.08,
-      0.81,
-      0.91,
-      0.75,
-      0.0007,
-      1.7,
-      0.9,
-      0.7,
-      1.3,
-      1.5,
-      0.04,
-    );
-    console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-    await group.reloadAll(client);
-    console.log(group.getFirstBankByMint(btcDevnetMint).toString());
-  } catch (error) {
-    throw error;
-  }
-  console.log(`Resetting USDC...`);
-  try {
-    let sig = await client.tokenEdit(
-      group,
-      usdcDevnetMint,
-      usdcDevnetOracle.publicKey,
-      0.1,
-      undefined,
-      0.01,
-      0.4,
-      0.07,
-      0.8,
-      0.9,
-      1.5,
-      0.0005,
-      0.0005,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      0.02,
-    );
-    console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-    await group.reloadAll(client);
-    console.log(group.getFirstBankByMint(usdcDevnetMint).toString());
-  } catch (error) {
-    throw error;
-  }
+  if (true) {
+    console.log(`Editing USDC...`);
+    try {
+      let sig = await client.tokenEdit(
+        group,
+        usdcDevnetMint,
+        usdcDevnetOracle.publicKey,
+        0.1,
+        undefined,
+        0.004,
+        0.7,
+        0.1,
+        0.85,
+        0.2,
+        2.0,
+        0.005,
+        0.0005,
+        1,
+        1,
+        1,
+        1,
+        0,
+      );
+      console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+      await group.reloadAll(client);
+      console.log(group.getFirstBankByMint(btcDevnetMint).toString());
+    } catch (error) {
+      throw error;
+    }
 
-  console.log(`Editing perp market...`);
-  try {
-    let sig = await client.perpEditMarket(
-      group,
-      'BTC-PERP',
-      btcDevnetOracle,
-      0.2,
-      0,
-      6,
-      0.9,
-      0.9,
-      1.035,
-      1.06,
-      0.013,
-      0.0003,
-      0.1,
-      0.07,
-      0.07,
-      1001,
-    );
-    console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-    await group.reloadAll(client);
-    console.log(group.perpMarketsMap.get('BTC-PERP')!.toString());
-  } catch (error) {
-    console.log(error);
-  }
-  console.log(`Resetting perp market...`);
-  try {
-    let sig = await client.perpEditMarket(
-      group,
-      'BTC-PERP',
-      btcDevnetOracle,
-      0.1,
-      1,
-      6,
-      1,
-      0.95,
-      1.025,
-      1.05,
-      0.012,
-      0.0002,
-      0.0,
-      0.05,
-      0.05,
-      100,
-    );
-    console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-    await group.reloadAll(client);
-    console.log(group.perpMarketsMap.get('BTC-PERP')!.toString());
-  } catch (error) {
-    console.log(error);
+    console.log(`Editing BTC...`);
+    try {
+      let sig = await client.tokenEdit(
+        group,
+        usdcDevnetMint,
+        usdcDevnetOracle.publicKey,
+        0.1,
+        undefined,
+        0.004,
+        0.7,
+        0.1,
+        0.85,
+        0.2,
+        2.0,
+        0.005,
+        0.0005,
+        0.9,
+        0.8,
+        1.1,
+        1.2,
+        0.05,
+      );
+      console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+      await group.reloadAll(client);
+      console.log(group.getFirstBankByMint(btcDevnetMint).toString());
+    } catch (error) {
+      throw error;
+    }
+
+    console.log(`Editing SOL...`);
+    try {
+      let sig = await client.tokenEdit(
+        group,
+        usdcDevnetMint,
+        usdcDevnetOracle.publicKey,
+        0.1,
+        undefined,
+        0.004,
+        0.7,
+        0.1,
+        0.85,
+        0.2,
+        2.0,
+        0.005,
+        0.0005,
+        0.9,
+        0.8,
+        1.1,
+        1.2,
+        0.05,
+      );
+      console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+      await group.reloadAll(client);
+      console.log(group.getFirstBankByMint(btcDevnetMint).toString());
+    } catch (error) {
+      throw error;
+    }
   }
 
   process.exit();

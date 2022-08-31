@@ -1,6 +1,7 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
+import { I80F48 } from '../accounts/I80F48';
 import { HealthType } from '../accounts/mangoAccount';
 import { OrderType, Side } from '../accounts/perp';
 import {
@@ -27,6 +28,10 @@ const DEVNET_MINTS = new Map([
   ['SOL', 'So11111111111111111111111111111111111111112'],
   ['ORCA', 'orcarKHSqC5CDDsGbho8GKvwExejWHxTqGzXgcewB9L'],
   ['MNGO', 'Bb9bsTQa1bGEtQ5KagGkvSHyuLqDWumFUcRqFusFNJWC'],
+]);
+export const DEVNET_SERUM3_MARKETS = new Map([
+  ['BTC/USDC', new PublicKey('DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB')],
+  ['SOL/USDC', new PublicKey('5xWpt56U1NCuHoAEtpLeUrQcxDkEpNfScjfLFaRzLPgR')],
 ]);
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
@@ -61,7 +66,7 @@ async function main() {
     ),
   );
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
-  console.log(group.toString());
+  console.log(`${group}`);
 
   // create + fetch account
   console.log(`Creating mangoaccount...`);
@@ -70,9 +75,11 @@ async function main() {
     user.publicKey,
   );
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
-  console.log(mangoAccount.toString());
+  console.log(mangoAccount.toString(group));
 
-  if (true) {
+  await mangoAccount.reload(client, group);
+
+  if (false) {
     // set delegate, and change name
     console.log(`...changing mango account name, and setting a delegate`);
     const randomKey = new PublicKey(
@@ -99,7 +106,8 @@ async function main() {
     console.log(mangoAccount.toString());
   }
 
-  if (true) {
+  if (false) {
+    // expand account
     console.log(
       `...expanding mango account to have serum3 and perp position slots`,
     );
@@ -107,16 +115,32 @@ async function main() {
     await mangoAccount.reload(client, group);
   }
 
-  if (true) {
+  if (false) {
     // deposit and withdraw
 
     try {
-      console.log(`...depositing 50 USDC`);
+      console.log(`...depositing 50 USDC, 1 SOL, 1 MNGO`);
       await client.tokenDeposit(
         group,
         mangoAccount,
         new PublicKey(DEVNET_MINTS.get('USDC')!),
         50,
+      );
+      await mangoAccount.reload(client, group);
+
+      await client.tokenDeposit(
+        group,
+        mangoAccount,
+        new PublicKey(DEVNET_MINTS.get('SOL')!),
+        1,
+      );
+      await mangoAccount.reload(client, group);
+
+      await client.tokenDeposit(
+        group,
+        mangoAccount,
+        new PublicKey(DEVNET_MINTS.get('MNGO')!),
+        1,
       );
       await mangoAccount.reload(client, group);
 
@@ -138,21 +162,44 @@ async function main() {
         0.0005,
       );
       await mangoAccount.reload(client, group);
+
+      console.log(mangoAccount.toString(group));
     } catch (error) {
       console.log(error);
     }
+  }
 
+  if (false) {
     // serum3
+    const serum3Market = group.serum3MarketsMapByExternal.get(
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')?.toBase58()!,
+    );
+    const serum3MarketExternal = group.serum3MarketExternalsMap.get(
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')?.toBase58()!,
+    );
+    const asks = await group.loadSerum3AsksForMarket(
+      client,
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+    );
+    const lowestAsk = Array.from(asks!)[0];
+    const bids = await group.loadSerum3BidsForMarket(
+      client,
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+    );
+    const highestBid = Array.from(asks!)![0];
+
+    let price = 20;
+    let qty = 0.0001;
     console.log(
-      `...placing serum3 bid which would not be settled since its relatively low then midprice`,
+      `...placing serum3 bid which would not be settled since its relatively low then midprice at ${price} for ${qty}`,
     );
     await client.serum3PlaceOrder(
       group,
       mangoAccount,
-      'BTC/USDC',
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
       Serum3Side.bid,
-      20,
-      0.0001,
+      price,
+      qty,
       Serum3SelfTradeBehavior.decrementTake,
       Serum3OrderType.limit,
       Date.now(),
@@ -160,15 +207,18 @@ async function main() {
     );
     await mangoAccount.reload(client, group);
 
-    console.log(`...placing serum3 bid way above midprice`);
+    price = lowestAsk.price + lowestAsk.price / 2;
+    qty = 0.0001;
+    console.log(
+      `...placing serum3 bid way above midprice at ${price} for ${qty}`,
+    );
     await client.serum3PlaceOrder(
       group,
       mangoAccount,
-
-      'BTC/USDC',
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
       Serum3Side.bid,
-      90000,
-      0.0001,
+      price,
+      qty,
       Serum3SelfTradeBehavior.decrementTake,
       Serum3OrderType.limit,
       Date.now(),
@@ -176,15 +226,18 @@ async function main() {
     );
     await mangoAccount.reload(client, group);
 
-    console.log(`...placing serum3 ask way below midprice`);
+    price = highestBid.price - highestBid.price / 2;
+    qty = 0.0001;
+    console.log(
+      `...placing serum3 ask way below midprice at ${price} for ${qty}`,
+    );
     await client.serum3PlaceOrder(
       group,
       mangoAccount,
-
-      'BTC/USDC',
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
       Serum3Side.ask,
-      30000,
-      0.0001,
+      price,
+      qty,
       Serum3SelfTradeBehavior.decrementTake,
       Serum3OrderType.limit,
       Date.now(),
@@ -192,10 +245,10 @@ async function main() {
     );
 
     console.log(`...current own orders on OB`);
-    let orders = await client.getSerum3Orders(
+    let orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
+      client,
       group,
-
-      'BTC/USDC',
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
     );
     for (const order of orders) {
       console.log(
@@ -205,18 +258,17 @@ async function main() {
       await client.serum3CancelOrder(
         group,
         mangoAccount,
-
-        'BTC/USDC',
+        DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
         order.side === 'buy' ? Serum3Side.bid : Serum3Side.ask,
         order.orderId,
       );
     }
 
     console.log(`...current own orders on OB`);
-    orders = await client.getSerum3Orders(
+    orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
+      client,
       group,
-
-      'BTC/USDC',
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
     );
     for (const order of orders) {
       console.log(order);
@@ -226,12 +278,19 @@ async function main() {
     await client.serum3SettleFunds(
       group,
       mangoAccount,
-
-      'BTC/USDC',
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
     );
   }
 
-  if (true) {
+  if (false) {
+    // serum3 market
+    const serum3Market = group.serum3MarketsMapByExternal.get(
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!.toBase58(),
+    );
+    console.log(await serum3Market?.logOb(client, group));
+  }
+
+  if (false) {
     await mangoAccount.reload(client, group);
     console.log(
       '...mangoAccount.getEquity() ' +
@@ -252,13 +311,13 @@ async function main() {
     console.log(
       '...mangoAccount.getAssetsVal() ' +
         toUiDecimalsForQuote(
-          mangoAccount.getAssetsVal(HealthType.init).toNumber(),
+          mangoAccount.getAssetsValue(HealthType.init).toNumber(),
         ),
     );
     console.log(
       '...mangoAccount.getLiabsVal() ' +
         toUiDecimalsForQuote(
-          mangoAccount.getLiabsVal(HealthType.init).toNumber(),
+          mangoAccount.getLiabsValue(HealthType.init).toNumber(),
         ),
     );
     console.log(
@@ -272,14 +331,80 @@ async function main() {
           ).toNumber(),
         ),
     );
-    console.log(
-      "...mangoAccount.getSerum3MarketMarginAvailable(group, 'BTC/USDC') " +
-        toUiDecimalsForQuote(
-          mangoAccount
-            .getSerum3MarketMarginAvailable(group, 'BTC/USDC')
-            .toNumber(),
-        ),
+  }
+
+  if (true) {
+    const asks = await group.loadSerum3AsksForMarket(
+      client,
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
     );
+    const lowestAsk = Array.from(asks!)[0];
+    const bids = await group.loadSerum3BidsForMarket(
+      client,
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+    );
+    const highestBid = Array.from(asks!)![0];
+
+    function getMaxSourceForTokenSwapWrapper(src, tgt) {
+      // console.log();
+      console.log(
+        `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
+          mangoAccount
+            .getMaxSourceForTokenSwap(
+              group,
+              group.banksMapByName.get(src)![0].mint,
+              group.banksMapByName.get(tgt)![0].mint,
+              1,
+            )
+            .div(
+              I80F48.fromNumber(
+                Math.pow(10, group.banksMapByName.get(src)![0].mintDecimals),
+              ),
+            )
+            .toNumber(),
+      );
+    }
+    for (const srcToken of Array.from(group.banksMapByName.keys())) {
+      for (const tgtToken of Array.from(group.banksMapByName.keys())) {
+        getMaxSourceForTokenSwapWrapper(srcToken, tgtToken);
+      }
+    }
+
+    const maxQuoteForSerum3BidUi = mangoAccount.getMaxQuoteForSerum3BidUi(
+      group,
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+    );
+    console.log(
+      "...mangoAccount.getMaxQuoteForSerum3BidUi(group, 'BTC/USDC') " +
+        maxQuoteForSerum3BidUi,
+    );
+
+    const maxBaseForSerum3AskUi = mangoAccount.getMaxBaseForSerum3AskUi(
+      group,
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+    );
+    console.log(
+      "...mangoAccount.getMaxBaseForSerum3AskUi(group, 'BTC/USDC') " +
+        maxBaseForSerum3AskUi,
+    );
+
+    console.log(
+      `simHealthRatioWithSerum3BidUiChanges ${mangoAccount.simHealthRatioWithSerum3BidUiChanges(
+        group,
+        785,
+        DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+      )}`,
+    );
+    console.log(
+      `simHealthRatioWithSerum3AskUiChanges ${mangoAccount.simHealthRatioWithSerum3AskUiChanges(
+        group,
+        0.033,
+        DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+      )}`,
+    );
+  }
+
+  if (false) {
     console.log(
       "...mangoAccount.getPerpMarketMarginAvailable(group, 'BTC-PERP') " +
         toUiDecimalsForQuote(
@@ -290,7 +415,7 @@ async function main() {
     );
   }
 
-  if (true) {
+  if (false) {
     // perps
     console.log(`...placing perp bid`);
     try {
