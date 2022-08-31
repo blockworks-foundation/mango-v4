@@ -48,14 +48,15 @@ export function debugHealthAccounts(
   );
   const serum3 = new Map(
     mangoAccount.serum3Active().map((serum3: Serum3Orders) => {
-      return [
-        serum3.openOrders.toBase58(),
-        `${
-          Array.from(group.serum3MarketsMapByExternal.values()).find(
-            (serum3Market) => serum3Market.marketIndex === serum3.marketIndex,
-          ).name
-        } spot oo`,
-      ];
+      const serum3Market = Array.from(
+        group.serum3MarketsMapByExternal.values(),
+      ).find((serum3Market) => serum3Market.marketIndex === serum3.marketIndex);
+      if (!serum3Market) {
+        throw new Error(
+          `Serum3Orders for non existent market with market index ${serum3.marketIndex}`,
+        );
+      }
+      return [serum3.openOrders.toBase58(), `${serum3Market.name} spot oo`];
     }),
   );
   const perps = new Map(

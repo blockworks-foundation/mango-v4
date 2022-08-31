@@ -25,8 +25,8 @@ export class Bank {
   public rate1: I80F48;
   public util0: I80F48;
   public util1: I80F48;
-  public price: I80F48;
-  public uiPrice: number;
+  public price: I80F48 | undefined;
+  public uiPrice: number | undefined;
   public collectedFeesNative: I80F48;
   public loanFeeRate: I80F48;
   public loanOriginationFeeRate: I80F48;
@@ -198,7 +198,7 @@ export class Bank {
       '\n oracle - ' +
       this.oracle.toBase58() +
       '\n price - ' +
-      this.price.toNumber() +
+      this.price?.toNumber() +
       '\n uiPrice - ' +
       this.uiPrice +
       '\n deposit index - ' +

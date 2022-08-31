@@ -49,25 +49,35 @@ export class Serum3Market {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
   }
 
-  async loadBids(client: MangoClient, group: Group): Promise<Orderbook> {
+  public async loadBids(client: MangoClient, group: Group): Promise<Orderbook> {
     const serum3MarketExternal = group.serum3MarketExternalsMap.get(
       this.serumMarketExternal.toBase58(),
     );
+    if (!serum3MarketExternal) {
+      throw new Error(
+        `Unable to find serum3MarketExternal for ${this.serumMarketExternal.toBase58()}`,
+      );
+    }
     return await serum3MarketExternal.loadBids(
       client.program.provider.connection,
     );
   }
 
-  async loadAsks(client: MangoClient, group: Group): Promise<Orderbook> {
+  public async loadAsks(client: MangoClient, group: Group): Promise<Orderbook> {
     const serum3MarketExternal = group.serum3MarketExternalsMap.get(
       this.serumMarketExternal.toBase58(),
     );
+    if (!serum3MarketExternal) {
+      throw new Error(
+        `Unable to find serum3MarketExternal for ${this.serumMarketExternal.toBase58()}`,
+      );
+    }
     return await serum3MarketExternal.loadAsks(
       client.program.provider.connection,
     );
   }
 
-  async logOb(client: MangoClient, group: Group): Promise<string> {
+  public async logOb(client: MangoClient, group: Group): Promise<string> {
     let res = ``;
     res += `  ${this.name} OrderBook`;
     let orders = await this?.loadAsks(client, group);

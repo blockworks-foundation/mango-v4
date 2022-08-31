@@ -41,7 +41,7 @@ async function createGroup() {
   );
 
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.MB_CLUSTER_URL, options);
+  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
 
   const adminWallet = new Wallet(admin);
   console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
@@ -74,7 +74,7 @@ async function registerTokens() {
   );
 
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.MB_CLUSTER_URL, options);
+  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
 
   const adminWallet = new Wallet(admin);
   console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
