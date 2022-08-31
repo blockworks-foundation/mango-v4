@@ -511,12 +511,19 @@ impl MangoClient {
             .map_err(prettify_client_error)
     }
 
-    fn serum3_data<'a>(&'a self, name: &str) -> Result<Serum3Data<'a>, ClientError> {
+    fn serum3_data_by_market_name<'a>(&'a self, name: &str) -> Result<Serum3Data<'a>, ClientError> {
         let market_index = *self
             .context
             .serum3_market_indexes_by_name
             .get(name)
             .unwrap();
+        self.serum3_data_by_market_index(market_index)
+    }
+
+    fn serum3_data_by_market_index<'a>(
+        &'a self,
+        market_index: Serum3MarketIndex,
+    ) -> Result<Serum3Data<'a>, ClientError> {
         let serum3_info = self.context.serum3_markets.get(&market_index).unwrap();
 
         let quote_info = self.context.token(serum3_info.market.quote_token_index);
@@ -542,7 +549,7 @@ impl MangoClient {
         client_order_id: u64,
         limit: u16,
     ) -> anyhow::Result<Signature> {
-        let s3 = self.serum3_data(name)?;
+        let s3 = self.serum3_data_by_market_name(name)?;
 
         let account = self.mango_account()?;
         let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
@@ -659,7 +666,7 @@ impl MangoClient {
     }
 
     pub fn serum3_settle_funds(&self, name: &str) -> anyhow::Result<Signature> {
-        let s3 = self.serum3_data(name)?;
+        let s3 = self.serum3_data_by_market_name(name)?;
 
         let account = self.mango_account()?;
         let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
@@ -727,13 +734,64 @@ impl MangoClient {
         Ok(orders)
     }
 
+    pub fn serum3_liq_force_cancel_orders(
+        &self,
+        liqee: (&Pubkey, &MangoAccountValue),
+        market_index: Serum3MarketIndex,
+        open_orders: &Pubkey,
+    ) -> anyhow::Result<Signature> {
+        let s3 = self.serum3_data_by_market_index(market_index)?;
+
+        let health_remaining_ams = self
+            .context
+            .derive_health_check_remaining_account_metas(liqee.1, vec![], false)
+            .unwrap();
+
+        self.program()
+            .request()
+            .instruction(Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        &mango_v4::accounts::Serum3LiqForceCancelOrders {
+                            group: self.group(),
+                            account: *liqee.0,
+                            open_orders: *open_orders,
+                            serum_market: s3.market.address,
+                            serum_program: s3.market.market.serum_program,
+                            serum_market_external: s3.market.market.serum_market_external,
+                            market_bids: s3.market.bids,
+                            market_asks: s3.market.asks,
+                            market_event_queue: s3.market.event_q,
+                            market_base_vault: s3.market.coin_vault,
+                            market_quote_vault: s3.market.pc_vault,
+                            market_vault_signer: s3.market.vault_signer,
+                            quote_bank: s3.quote.mint_info.first_bank(),
+                            quote_vault: s3.quote.mint_info.first_vault(),
+                            base_bank: s3.base.mint_info.first_bank(),
+                            base_vault: s3.base.mint_info.first_vault(),
+                            token_program: Token::id(),
+                        },
+                        None,
+                    );
+                    ams.extend(health_remaining_ams.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(
+                    &mango_v4::instruction::Serum3LiqForceCancelOrders { limit: 5 },
+                ),
+            })
+            .send()
+            .map_err(prettify_client_error)
+    }
+
     pub fn serum3_cancel_order(
         &self,
         market_name: &str,
         side: Serum3Side,
         order_id: u128,
     ) -> anyhow::Result<()> {
-        let s3 = self.serum3_data(market_name)?;
+        let s3 = self.serum3_data_by_market_name(market_name)?;
 
         let account = self.mango_account()?;
         let open_orders = account.serum3_orders(s3.market_index).unwrap().open_orders;
