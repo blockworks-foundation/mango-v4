@@ -53,7 +53,7 @@ export class HealthCache {
   }
 
   public health(healthType: HealthType): I80F48 {
-    const health = ZERO_I80F48;
+    const health = ZERO_I80F48();
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
       health.iadd(contrib);
@@ -73,7 +73,7 @@ export class HealthCache {
   }
 
   public assets(healthType: HealthType): I80F48 {
-    const assets = ZERO_I80F48;
+    const assets = ZERO_I80F48();
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
       if (contrib.isPos()) {
@@ -99,7 +99,7 @@ export class HealthCache {
   }
 
   public liabs(healthType: HealthType): I80F48 {
-    const liabs = ZERO_I80F48;
+    const liabs = ZERO_I80F48();
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
       if (contrib.isNeg()) {
@@ -125,8 +125,8 @@ export class HealthCache {
   }
 
   public healthRatio(healthType: HealthType): I80F48 {
-    const assets = ZERO_I80F48;
-    const liabs = ZERO_I80F48;
+    const assets = ZERO_I80F48();
+    const liabs = ZERO_I80F48();
 
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
@@ -157,9 +157,9 @@ export class HealthCache {
     }
 
     if (liabs.isPos()) {
-      return HUNDRED_I80F48.mul(assets.sub(liabs).div(liabs));
+      return HUNDRED_I80F48().mul(assets.sub(liabs).div(liabs));
     } else {
-      return MAX_I80F48;
+      return MAX_I80F48();
     }
   }
 
@@ -290,11 +290,11 @@ export class HealthCache {
     adjustedCache.adjustSerum3Reserved(
       serum3Market.marketIndex,
       serum3Market.baseTokenIndex,
-      ZERO_I80F48,
-      ZERO_I80F48,
+      ZERO_I80F48(),
+      ZERO_I80F48(),
       serum3Market.quoteTokenIndex,
       bidNativeQuoteAmount,
-      ZERO_I80F48,
+      ZERO_I80F48(),
     );
     return adjustedCache.healthRatio(healthType);
   }
@@ -328,10 +328,10 @@ export class HealthCache {
       serum3Market.marketIndex,
       serum3Market.baseTokenIndex,
       askNativeBaseAmount,
-      ZERO_I80F48,
+      ZERO_I80F48(),
       serum3Market.quoteTokenIndex,
-      ZERO_I80F48,
-      ZERO_I80F48,
+      ZERO_I80F48(),
+      ZERO_I80F48(),
     );
     return adjustedCache.healthRatio(healthType);
   }
@@ -390,20 +390,20 @@ export class HealthCache {
     const targetBank: Bank = group.getFirstBankByMint(targetMintPk);
 
     if (sourceMintPk.equals(targetMintPk)) {
-      return ZERO_I80F48;
+      return ZERO_I80F48();
     }
 
-    if (!sourceBank.price || sourceBank.price.lte(ZERO_I80F48)) {
-      return ZERO_I80F48;
+    if (!sourceBank.price || sourceBank.price.lte(ZERO_I80F48())) {
+      return ZERO_I80F48();
     }
 
     if (
       sourceBank.initLiabWeight
         .sub(targetBank.initAssetWeight)
         .abs()
-        .lte(ZERO_I80F48)
+        .lte(ZERO_I80F48())
     ) {
-      return ZERO_I80F48;
+      return ZERO_I80F48();
     }
 
     // The health_ratio is a nonlinear based on swap amount.
@@ -415,8 +415,8 @@ export class HealthCache {
     // - be careful about finding the minRatio point: the function isn't convex
 
     const initialRatio = this.healthRatio(HealthType.init);
-    if (initialRatio.lte(ZERO_I80F48)) {
-      return ZERO_I80F48;
+    if (initialRatio.lte(ZERO_I80F48())) {
+      return ZERO_I80F48();
     }
 
     const healthCacheClone: HealthCache = _.cloneDeep(this);
@@ -446,10 +446,10 @@ export class HealthCache {
 
     const point0Amount = source.balance
       .min(target.balance.neg())
-      .max(ZERO_I80F48);
+      .max(ZERO_I80F48());
     const point1Amount = source.balance
       .max(target.balance.neg())
-      .max(ZERO_I80F48);
+      .max(ZERO_I80F48());
     const cache0 = cacheAfterSwap(point0Amount);
     const point0Ratio = cache0.healthRatio(HealthType.init);
     const cache1 = cacheAfterSwap(point1Amount);
@@ -473,15 +473,15 @@ export class HealthCache {
       } else if (point1Ratio.gt(initialRatio)) {
         amount = point1Amount;
       } else {
-        amount = ZERO_I80F48;
+        amount = ZERO_I80F48();
       }
     } else if (point1Ratio.gte(minRatio)) {
       // If point1Ratio is still bigger than minRatio, the target amount must be >point1Amount
       // search to the right of point1Amount: but how far?
       // At point1, source.balance < 0 and target.balance > 0, so use a simple estimation for
       // zero health: health - source_liab_weight * a + target_asset_weight * a = 0.
-      if (point1Health.lte(ZERO_I80F48)) {
-        return ZERO_I80F48;
+      if (point1Health.lte(ZERO_I80F48())) {
+        return ZERO_I80F48();
       }
       const zeroHealthAmount = point1Amount.add(
         point1Health.div(source.initLiabWeight.sub(target.initAssetWeight)),
@@ -514,7 +514,7 @@ export class HealthCache {
     return amount
       .div(source.oraclePrice)
       .div(
-        ONE_I80F48.add(
+        ONE_I80F48().add(
           group.getFirstBankByMint(sourceMintPk).loanOriginationFeeRate,
         ),
       );
@@ -550,11 +550,11 @@ export class HealthCache {
     // an amount to trade which will bring health to 0.
 
     // Current health and amount i.e. 0
-    const initialAmount = ZERO_I80F48;
+    const initialAmount = ZERO_I80F48();
     const initialHealth = this.health(HealthType.init);
     const initialRatio = this.healthRatio(HealthType.init);
-    if (initialRatio.lte(ZERO_I80F48)) {
-      return ZERO_I80F48;
+    if (initialRatio.lte(ZERO_I80F48())) {
+      return ZERO_I80F48();
     }
 
     // Amount which would bring health to 0
@@ -564,9 +564,9 @@ export class HealthCache {
     // and when its a bid, then quote->bid
     let zeroAmount;
     if (side == Serum3Side.ask) {
-      const quoteBorrows = quote.balance.lt(ZERO_I80F48)
+      const quoteBorrows = quote.balance.lt(ZERO_I80F48())
         ? quote.balance.abs()
-        : ZERO_I80F48;
+        : ZERO_I80F48();
       zeroAmount = base.balance
         .max(quoteBorrows)
         .add(
@@ -577,9 +577,9 @@ export class HealthCache {
           ),
         );
     } else {
-      const baseBorrows = base.balance.lt(ZERO_I80F48)
+      const baseBorrows = base.balance.lt(ZERO_I80F48())
         ? base.balance.abs()
-        : ZERO_I80F48;
+        : ZERO_I80F48();
       zeroAmount = quote.balance
         .max(baseBorrows)
         .add(
@@ -603,11 +603,11 @@ export class HealthCache {
       adjustedCache.adjustSerum3Reserved(
         serum3Market.marketIndex,
         serum3Market.baseTokenIndex,
-        side === Serum3Side.ask ? amount.div(base.oraclePrice) : ZERO_I80F48,
-        ZERO_I80F48,
+        side === Serum3Side.ask ? amount.div(base.oraclePrice) : ZERO_I80F48(),
+        ZERO_I80F48(),
         serum3Market.quoteTokenIndex,
-        side === Serum3Side.bid ? amount.div(quote.oraclePrice) : ZERO_I80F48,
-        ZERO_I80F48,
+        side === Serum3Side.bid ? amount.div(quote.oraclePrice) : ZERO_I80F48(),
+        ZERO_I80F48(),
       );
 
       return adjustedCache;
@@ -632,12 +632,12 @@ export class HealthCache {
     return side === Serum3Side.bid
       ? amount
           .div(quote.oraclePrice)
-          .div(ONE_I80F48.add(baseBank.loanOriginationFeeRate))
-          .div(ONE_I80F48.add(I80F48.fromNumber(group.getFeeRate(false))))
+          .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
+          .div(ONE_I80F48().add(I80F48.fromNumber(group.getFeeRate(false))))
       : amount
           .div(base.oraclePrice)
-          .div(ONE_I80F48.add(quoteBank.loanOriginationFeeRate))
-          .div(ONE_I80F48.add(I80F48.fromNumber(group.getFeeRate(false))));
+          .div(ONE_I80F48().add(quoteBank.loanOriginationFeeRate))
+          .div(ONE_I80F48().add(I80F48.fromNumber(group.getFeeRate(false))));
   }
 }
 
@@ -681,8 +681,8 @@ export class TokenInfo {
       bank.maintLiabWeight,
       bank.initLiabWeight,
       bank.price,
-      ZERO_I80F48,
-      ZERO_I80F48,
+      ZERO_I80F48(),
+      ZERO_I80F48(),
     );
   }
 
@@ -738,7 +738,7 @@ export class Serum3Info {
     const reserved = this.reserved;
 
     if (reserved.isZero()) {
-      return ZERO_I80F48;
+      return ZERO_I80F48();
     }
 
     // How much the health would increase if the reserved balance were applied to the passed
@@ -753,9 +753,9 @@ export class Serum3Info {
       let assetPart, liabPart;
       if (maxBalance.gte(reserved)) {
         assetPart = reserved;
-        liabPart = ZERO_I80F48;
+        liabPart = ZERO_I80F48();
       } else if (maxBalance.isNeg()) {
-        assetPart = ZERO_I80F48;
+        assetPart = ZERO_I80F48();
         liabPart = reserved;
       } else {
         assetPart = maxBalance;
@@ -814,7 +814,7 @@ export class PerpInfo {
 
     // FUTURE: Allow v3-style "reliable" markets where we can return
     // `self.quote + weight * self.base` here
-    return this.quote.add(weight.mul(this.base)).min(ZERO_I80F48);
+    return this.quote.add(weight.mul(this.base)).min(ZERO_I80F48());
   }
 }
 

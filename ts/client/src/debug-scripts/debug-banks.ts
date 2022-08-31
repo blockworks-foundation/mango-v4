@@ -40,8 +40,8 @@ async function main() {
   const banks = Array.from(group.banksMapByMint.values()).flat();
   const banksMapUsingTokenIndex = new Map(
     banks.map((bank) => {
-      (bank as any).indexedDepositsByMangoAccounts = ZERO_I80F48;
-      (bank as any).indexedBorrowsByMangoAccounts = ZERO_I80F48;
+      (bank as any).indexedDepositsByMangoAccounts = ZERO_I80F48();
+      (bank as any).indexedBorrowsByMangoAccounts = ZERO_I80F48();
       return [bank.tokenIndex, bank];
     }),
   );

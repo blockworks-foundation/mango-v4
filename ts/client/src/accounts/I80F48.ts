@@ -197,16 +197,16 @@ export class I80F48 {
     return this.data.cmp(x.getData());
   }
   neg(): I80F48 {
-    return this.mul(NEG_ONE_I80F48);
+    return this.mul(_NEG_ONE_I80F48);
   }
   isPos(): boolean {
-    return this.gt(ZERO_I80F48);
+    return this.gt(_ZERO_I80F48);
   }
   isNeg(): boolean {
     return this.data.isNeg();
   }
   isZero(): boolean {
-    return this.eq(ZERO_I80F48);
+    return this.eq(_ZERO_I80F48);
   }
   min(x: I80F48): I80F48 {
     return this.lte(x) ? this : x;
@@ -224,10 +224,22 @@ export class I80F48 {
 }
 
 /** @internal */
-export const ONE_I80F48 = I80F48.fromNumber(1);
+const _ZERO_I80F48 = I80F48.fromNumber(0);
 /** @internal */
-export const ZERO_I80F48 = I80F48.fromNumber(0);
-/** @internal */
-export const NEG_ONE_I80F48 = I80F48.fromNumber(-1);
-export const HUNDRED_I80F48 = I80F48.fromNumber(100);
-export const MAX_I80F48 = new I80F48(I80F48.MAX_BN);
+const _NEG_ONE_I80F48 = I80F48.fromNumber(-1);
+
+export function ONE_I80F48(): I80F48 {
+  return I80F48.fromNumber(1);
+}
+
+export function ZERO_I80F48(): I80F48 {
+  return I80F48.fromNumber(0);
+}
+
+export function HUNDRED_I80F48(): I80F48 {
+  return I80F48.fromNumber(100);
+}
+
+export function MAX_I80F48(): I80F48 {
+  return new I80F48(I80F48.MAX_BN);
+}
