@@ -278,11 +278,11 @@ export class MangoAccount {
     const tp = this.findToken(tokenBank.tokenIndex);
     if (!tokenBank.price) return undefined;
     const existingTokenDeposits = tp ? tp.deposits(tokenBank) : ZERO_I80F48;
-    let existingPositionHealthContrib = ZERO_I80F48;
+    const existingPositionHealthContrib = ZERO_I80F48;
     if (existingTokenDeposits.gt(ZERO_I80F48)) {
-      existingPositionHealthContrib = existingTokenDeposits
-        .mul(tokenBank.price)
-        .mul(tokenBank.initAssetWeight);
+      existingTokenDeposits
+        .imul(tokenBank.price)
+        .imul(tokenBank.initAssetWeight);
     }
 
     // Case 2: token deposits have higher contribution than initHealth,

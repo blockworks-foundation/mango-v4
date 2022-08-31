@@ -53,31 +53,31 @@ export class HealthCache {
   }
 
   public health(healthType: HealthType): I80F48 {
-    let health = ZERO_I80F48;
+    const health = ZERO_I80F48;
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
-      health = health.add(contrib);
+      health.iadd(contrib);
     }
     for (const serum3Info of this.serum3Infos) {
       const contrib = serum3Info.healthContribution(
         healthType,
         this.tokenInfos,
       );
-      health = health.add(contrib);
+      health.iadd(contrib);
     }
     for (const perpInfo of this.perpInfos) {
       const contrib = perpInfo.healthContribution(healthType);
-      health = health.add(contrib);
+      health.iadd(contrib);
     }
     return health;
   }
 
   public assets(healthType: HealthType): I80F48 {
-    let assets = ZERO_I80F48;
+    const assets = ZERO_I80F48;
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
       if (contrib.isPos()) {
-        assets = assets.add(contrib);
+        assets.iadd(contrib);
       }
     }
     for (const serum3Info of this.serum3Infos) {
@@ -86,24 +86,24 @@ export class HealthCache {
         this.tokenInfos,
       );
       if (contrib.isPos()) {
-        assets = assets.add(contrib);
+        assets.iadd(contrib);
       }
     }
     for (const perpInfo of this.perpInfos) {
       const contrib = perpInfo.healthContribution(healthType);
       if (contrib.isPos()) {
-        assets = assets.add(contrib);
+        assets.iadd(contrib);
       }
     }
     return assets;
   }
 
   public liabs(healthType: HealthType): I80F48 {
-    let liabs = ZERO_I80F48;
+    const liabs = ZERO_I80F48;
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
       if (contrib.isNeg()) {
-        liabs = liabs.sub(contrib);
+        liabs.isub(contrib);
       }
     }
     for (const serum3Info of this.serum3Infos) {
@@ -112,28 +112,28 @@ export class HealthCache {
         this.tokenInfos,
       );
       if (contrib.isNeg()) {
-        liabs = liabs.sub(contrib);
+        liabs.isub(contrib);
       }
     }
     for (const perpInfo of this.perpInfos) {
       const contrib = perpInfo.healthContribution(healthType);
       if (contrib.isNeg()) {
-        liabs = liabs.sub(contrib);
+        liabs.isub(contrib);
       }
     }
     return liabs;
   }
 
   public healthRatio(healthType: HealthType): I80F48 {
-    let assets = ZERO_I80F48;
-    let liabs = ZERO_I80F48;
+    const assets = ZERO_I80F48;
+    const liabs = ZERO_I80F48;
 
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
       if (contrib.isPos()) {
-        assets = assets.add(contrib);
+        assets.iadd(contrib);
       } else {
-        liabs = liabs.sub(contrib);
+        liabs.isub(contrib);
       }
     }
     for (const serum3Info of this.serum3Infos) {
@@ -142,17 +142,17 @@ export class HealthCache {
         this.tokenInfos,
       );
       if (contrib.isPos()) {
-        assets = assets.add(contrib);
+        assets.iadd(contrib);
       } else {
-        liabs = liabs.sub(contrib);
+        liabs.isub(contrib);
       }
     }
     for (const perpInfo of this.perpInfos) {
       const contrib = perpInfo.healthContribution(healthType);
       if (contrib.isPos()) {
-        assets = assets.add(contrib);
+        assets.iadd(contrib);
       } else {
-        liabs = liabs.sub(contrib);
+        liabs.isub(contrib);
       }
     }
 
@@ -189,27 +189,18 @@ export class HealthCache {
   ) {
     const baseEntryIndex = this.findTokenInfoIndex(baseTokenIndex);
     const quoteEntryIndex = this.findTokenInfoIndex(quoteTokenIndex);
-    let reservedAmount = ZERO_I80F48;
 
     const baseEntry = this.tokenInfos[baseEntryIndex];
-    reservedAmount = reservedBaseChange.mul(baseEntry.oraclePrice);
+    const reservedAmount = reservedBaseChange.mul(baseEntry.oraclePrice);
 
     const quoteEntry = this.tokenInfos[quoteEntryIndex];
-    reservedAmount = reservedAmount.add(
-      reservedQuoteChange.mul(quoteEntry.oraclePrice),
-    );
+    reservedAmount.iadd(reservedQuoteChange.mul(quoteEntry.oraclePrice));
 
     // Apply it to the tokens
-    baseEntry.serum3MaxReserved =
-      baseEntry.serum3MaxReserved.add(reservedAmount);
-    baseEntry.balance = baseEntry.balance.add(
-      freeBaseChange.mul(baseEntry.oraclePrice),
-    );
-    quoteEntry.serum3MaxReserved =
-      quoteEntry.serum3MaxReserved.add(reservedAmount);
-    quoteEntry.balance = quoteEntry.balance.add(
-      freeQuoteChange.mul(quoteEntry.oraclePrice),
-    );
+    baseEntry.serum3MaxReserved.iadd(reservedAmount);
+    baseEntry.balance.iadd(freeBaseChange.mul(baseEntry.oraclePrice));
+    quoteEntry.serum3MaxReserved.iadd(reservedAmount);
+    quoteEntry.balance.iadd(freeQuoteChange.mul(quoteEntry.oraclePrice));
 
     // Apply it to the serum3 info
     const serum3Info = this.serum3Infos.find(
@@ -263,9 +254,9 @@ export class HealthCache {
         throw new Error(
           `Oracle price not loaded for ${change.mintPk.toString()}`,
         );
-      adjustedCache.tokenInfos[changeIndex].balance = adjustedCache.tokenInfos[
-        changeIndex
-      ].balance.add(change.nativeTokenAmount.mul(bank.price));
+      adjustedCache.tokenInfos[changeIndex].balance.iadd(
+        change.nativeTokenAmount.mul(bank.price),
+      );
     }
     // HealthCache.logHealthCache('afterChange', adjustedCache);
     return adjustedCache.healthRatio(healthType);
@@ -291,9 +282,9 @@ export class HealthCache {
     // essentially simulating a place order
 
     // Reduce token balance for quote
-    adjustedCache.tokenInfos[quoteIndex].balance = adjustedCache.tokenInfos[
-      quoteIndex
-    ].balance.sub(bidNativeQuoteAmount.mul(quote.oraclePrice));
+    adjustedCache.tokenInfos[quoteIndex].balance.isub(
+      bidNativeQuoteAmount.mul(quote.oraclePrice),
+    );
 
     // Increase reserved in Serum3Info for quote
     adjustedCache.adjustSerum3Reserved(
@@ -328,9 +319,9 @@ export class HealthCache {
     // essentially simulating a place order
 
     // Reduce token balance for base
-    adjustedCache.tokenInfos[baseIndex].balance = adjustedCache.tokenInfos[
-      baseIndex
-    ].balance.sub(askNativeBaseAmount.mul(base.oraclePrice));
+    adjustedCache.tokenInfos[baseIndex].balance.isub(
+      askNativeBaseAmount.mul(base.oraclePrice),
+    );
 
     // Increase reserved in Serum3Info for base
     adjustedCache.adjustSerum3Reserved(
@@ -443,10 +434,8 @@ export class HealthCache {
     function cacheAfterSwap(amount: I80F48) {
       const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
       // HealthCache.logHealthCache('beforeSwap', adjustedCache);
-      adjustedCache.tokenInfos[sourceIndex].balance =
-        adjustedCache.tokenInfos[sourceIndex].balance.sub(amount);
-      adjustedCache.tokenInfos[targetIndex].balance =
-        adjustedCache.tokenInfos[targetIndex].balance.add(amount);
+      adjustedCache.tokenInfos[sourceIndex].balance.isub(amount);
+      adjustedCache.tokenInfos[targetIndex].balance.iadd(amount);
       // HealthCache.logHealthCache('afterSwap', adjustedCache);
       return adjustedCache;
     }
@@ -553,9 +542,7 @@ export class HealthCache {
     const healthCacheClone: HealthCache = _.cloneDeep(this);
 
     const baseIndex = healthCacheClone.getOrCreateTokenInfoIndex(baseBank);
-    const quoteIndex = healthCacheClone.getOrCreateTokenInfoIndex(
-      quoteBank,
-    );
+    const quoteIndex = healthCacheClone.getOrCreateTokenInfoIndex(quoteBank);
     const base = healthCacheClone.tokenInfos[baseIndex];
     const quote = healthCacheClone.tokenInfos[quoteIndex];
 
@@ -610,10 +597,8 @@ export class HealthCache {
       const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
 
       side === Serum3Side.ask
-        ? (adjustedCache.tokenInfos[baseIndex].balance =
-            adjustedCache.tokenInfos[baseIndex].balance.sub(amount))
-        : (adjustedCache.tokenInfos[quoteIndex].balance =
-            adjustedCache.tokenInfos[quoteIndex].balance.sub(amount));
+        ? adjustedCache.tokenInfos[baseIndex].balance.isub(amount)
+        : adjustedCache.tokenInfos[quoteIndex].balance.isub(amount);
 
       adjustedCache.adjustSerum3Reserved(
         serum3Market.marketIndex,
