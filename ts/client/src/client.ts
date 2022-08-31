@@ -685,31 +685,27 @@ export class MangoClient {
     // Use our custom simulate fn in utils/anchor.ts so signing the tx is not required
     this.program.provider.simulate = simulate;
 
-    let res;
-    try {
-      res = await this.program.methods
-        .computeAccountData()
-        .accounts({
-          group: group.publicKey,
-          account: mangoAccount.publicKey,
-        })
-        .remainingAccounts(
-          healthRemainingAccounts.map(
-            (pk) =>
-              ({
-                pubkey: pk,
-                isWritable: false,
-                isSigner: false,
-              } as AccountMeta),
-          ),
-        )
-        .simulate();
-    } catch (error) {
-      console.log(error);
-    }
+    const res = await this.program.methods
+      .computeAccountData()
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({
+              pubkey: pk,
+              isWritable: false,
+              isSigner: false,
+            } as AccountMeta),
+        ),
+      )
+      .simulate();
 
     return MangoAccountData.from(
-      res.events.find((event) => (event.name = 'MangoAccountData')).data as any,
+      res?.events.find((event) => (event.name = 'MangoAccountData'))
+        .data as any,
     );
   }
 
