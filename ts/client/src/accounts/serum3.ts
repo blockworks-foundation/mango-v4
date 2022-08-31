@@ -1,6 +1,10 @@
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
-import { PublicKey } from '@solana/web3.js';
+import { Market, Orderbook } from '@project-serum/serum/lib/market';
+import { Cluster, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
+import { MangoClient } from '../client';
+import { SERUM3_PROGRAM_ID } from '../constants';
+import { Group } from './group';
 
 export class Serum3Market {
   public name: string;
@@ -44,6 +48,43 @@ export class Serum3Market {
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
   }
+
+  async loadBids(client: MangoClient, group: Group): Promise<Orderbook> {
+    const serum3MarketExternal = group.serum3MarketExternalsMap.get(
+      this.serumMarketExternal.toBase58(),
+    );
+    return await serum3MarketExternal.loadBids(
+      client.program.provider.connection,
+    );
+  }
+
+  async loadAsks(client: MangoClient, group: Group): Promise<Orderbook> {
+    const serum3MarketExternal = group.serum3MarketExternalsMap.get(
+      this.serumMarketExternal.toBase58(),
+    );
+    return await serum3MarketExternal.loadAsks(
+      client.program.provider.connection,
+    );
+  }
+
+  async logOb(client: MangoClient, group: Group): Promise<string> {
+    let res = ``;
+    res += `  ${this.name} OrderBook`;
+    let orders = await this?.loadAsks(client, group);
+    for (const order of orders!.items(true)) {
+      res += `\n  ${order.price.toString().padStart(10)}, ${order.size
+        .toString()
+        .padStart(10)}`;
+    }
+    res += `\n  --------------------------`;
+    orders = await this?.loadBids(client, group);
+    for (const order of orders!.items(true)) {
+      res += `\n  ${order.price.toString().padStart(10)}, ${order.size
+        .toString()
+        .padStart(10)}`;
+    }
+    return res;
+  }
 }
 
 export class Serum3SelfTradeBehavior {
@@ -61,4 +102,22 @@ export class Serum3OrderType {
 export class Serum3Side {
   static bid = { bid: {} };
   static ask = { ask: {} };
+}
+
+export async function generateSerum3MarketExternalVaultSignerAddress(
+  cluster: Cluster,
+  serum3Market: Serum3Market,
+  serum3MarketExternal: Market,
+): Promise<PublicKey> {
+  return await PublicKey.createProgramAddress(
+    [
+      serum3Market.serumMarketExternal.toBuffer(),
+      serum3MarketExternal.decoded.vaultSignerNonce.toArrayLike(
+        Buffer,
+        'le',
+        8,
+      ),
+    ],
+    SERUM3_PROGRAM_ID[cluster],
+  );
 }
