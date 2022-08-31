@@ -35,6 +35,7 @@ async function main() {
 
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(`Group ${group.publicKey.toBase58()}`);
+  console.log(`${group.toString()}`);
 
   const banks = Array.from(group.banksMapByMint.values()).flat();
   const banksMapUsingTokenIndex = new Map(

@@ -5,6 +5,7 @@ import BN from 'bn.js';
 import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
 import { Group } from './group';
+import { MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from './I80F48';
 
 export class Serum3Market {
   public name: string;
@@ -47,6 +48,70 @@ export class Serum3Market {
     public registrationTime: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
+  }
+
+  /**
+   *
+   * @param group
+   * @returns maximum leverage one can bid on this market, this is only for display purposes,
+   *  also see getMaxQuoteForSerum3BidUi and getMaxBaseForSerum3AskUi
+   */
+  maxBidLeverage(group: Group): number {
+    const baseBank = group.getFirstBankByTokenIndex(this.baseTokenIndex);
+    if (!baseBank) {
+      throw new Error(
+        `bank for base token with index ${this.baseTokenIndex} not found`,
+      );
+    }
+
+    const quoteBank = group.getFirstBankByTokenIndex(this.quoteTokenIndex);
+    if (!quoteBank) {
+      throw new Error(
+        `bank for quote token with index ${this.quoteTokenIndex} not found`,
+      );
+    }
+
+    if (
+      quoteBank.initLiabWeight.sub(baseBank.initAssetWeight).lte(ZERO_I80F48)
+    ) {
+      return MAX_I80F48.toNumber();
+    }
+
+    return ONE_I80F48.div(
+      quoteBank.initLiabWeight.sub(baseBank.initAssetWeight),
+    ).toNumber();
+  }
+
+  /**
+   *
+   * @param group
+   * @returns maximum leverage one can ask on this market, this is only for display purposes,
+   *  also see getMaxQuoteForSerum3BidUi and getMaxBaseForSerum3AskUi
+   */
+  maxAskLeverage(group: Group): number {
+    const baseBank = group.getFirstBankByTokenIndex(this.baseTokenIndex);
+    if (!baseBank) {
+      throw new Error(
+        `bank for base token with index ${this.baseTokenIndex} not found`,
+      );
+    }
+
+    const quoteBank = group.getFirstBankByTokenIndex(this.quoteTokenIndex);
+    if (!quoteBank) {
+      throw new Error(
+        `bank for quote token with index ${this.quoteTokenIndex} not found`,
+      );
+    }
+
+    if (
+      baseBank.initLiabWeight.sub(quoteBank.initAssetWeight).lte(ZERO_I80F48)
+    ) {
+      return MAX_I80F48.toNumber();
+    }
+
+    return ONE_I80F48.div(
+      baseBank.initLiabWeight.sub(quoteBank.initAssetWeight),
+    ).toNumber();
   }
 
   public async loadBids(client: MangoClient, group: Group): Promise<Orderbook> {
