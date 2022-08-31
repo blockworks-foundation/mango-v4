@@ -59,7 +59,7 @@ async function main() {
           bank as any
         ).indexedDepositsByMangoAccounts.add(
           token.indexedPosition.mul(
-            banksMapUsingTokenIndex.get(token.tokenIndex).depositIndex,
+            banksMapUsingTokenIndex.get(token.tokenIndex)!.depositIndex,
           ),
         );
       }
@@ -69,7 +69,7 @@ async function main() {
         ).indexedBorrowsByMangoAccounts.add(
           token.indexedPosition
             .abs()
-            .mul(banksMapUsingTokenIndex.get(token.tokenIndex).borrowIndex),
+            .mul(banksMapUsingTokenIndex.get(token.tokenIndex)!.borrowIndex),
         );
       }
     }),
@@ -82,7 +82,7 @@ async function main() {
       coder()
         .accounts.decode(
           'token',
-          (await client.program.provider.connection.getAccountInfo(bank.vault))
+          (await client.program.provider.connection.getAccountInfo(bank.vault))!
             .data,
         )
         .amount.toNumber(),
@@ -102,7 +102,7 @@ async function main() {
       `\n ${'bank'.padEnd(40)} ${bank.publicKey}` +
       `\n ${'vault'.padEnd(40)} ${bank.vault}` +
       `\n ${'mint'.padEnd(40)} ${bank.mint}` +
-      `\n ${'price'.padEnd(40)} ${bank.price.toNumber()}` +
+      `\n ${'price'.padEnd(40)} ${bank.price?.toNumber()}` +
       `\n ${'uiPrice'.padEnd(40)} ${bank.uiPrice}` +
       `\n ${'error'.padEnd(40)} ${error}` +
       `\n ${'collectedFeesNative'.padEnd(40)} ${bank.collectedFeesNative}` +
