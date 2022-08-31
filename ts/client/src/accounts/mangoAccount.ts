@@ -68,12 +68,13 @@ export class MangoAccount {
     serum3: Serum3PositionDto[],
     perps: PerpPositionDto[],
     perpOpenOrders: PerpPositionDto[],
-    public accountData: MangoAccountData,
+    public accountData: undefined | MangoAccountData,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.tokens = tokens.map((dto) => TokenPosition.from(dto));
     this.serum3 = serum3.map((dto) => Serum3Orders.from(dto));
     this.perps = perps.map((dto) => PerpPosition.from(dto));
+    this.accountData = undefined;
   }
 
   async reload(client: MangoClient, group: Group): Promise<MangoAccount> {
@@ -168,10 +169,10 @@ export class MangoAccount {
    * @param healthType
    * @returns raw health number, in native quote
    */
-  getHealth(healthType: HealthType): I80F48 {
+  getHealth(healthType: HealthType): I80F48 | undefined {
     return healthType == HealthType.init
-      ? (this.accountData as MangoAccountData).initHealth
-      : (this.accountData as MangoAccountData).maintHealth;
+      ? this.accountData?.initHealth
+      : this.accountData?.maintHealth;
   }
 
   /**
@@ -180,8 +181,8 @@ export class MangoAccount {
    * @param healthType
    * @returns health ratio, in percentage form
    */
-  getHealthRatio(healthType: HealthType): I80F48 {
-    return this.accountData.healthCache.healthRatio(healthType);
+  getHealthRatio(healthType: HealthType): I80F48 | undefined {
+    return this.accountData?.healthCache.healthRatio(healthType);
   }
 
   /**
@@ -189,29 +190,36 @@ export class MangoAccount {
    * @param healthType
    * @returns health ratio, in percentage form, capped to 100
    */
-  getHealthRatioUi(healthType: HealthType): number {
-    const ratio = this.getHealthRatio(healthType).toNumber();
-    return ratio > 100 ? 100 : Math.trunc(ratio);
+  getHealthRatioUi(healthType: HealthType): number | undefined {
+    const ratio = this.getHealthRatio(healthType)?.toNumber();
+    if (ratio) {
+      return ratio > 100 ? 100 : Math.trunc(ratio);
+    } else {
+      return undefined;
+    }
   }
 
   /**
    * Sum of all the assets i.e. token deposits, borrows, total assets in spot open orders, (perps positions is todo) in terms of quote value.
    * @returns equity, in native quote
    */
-  getEquity(): I80F48 {
-    const equity = (this.accountData as MangoAccountData).equity;
-    const total_equity = equity.tokens.reduce(
-      (a, b) => a.add(b.value),
-      ZERO_I80F48,
-    );
-    return total_equity;
+  getEquity(): I80F48 | undefined {
+    if (this.accountData) {
+      const equity = this.accountData.equity;
+      const total_equity = equity.tokens.reduce(
+        (a, b) => a.add(b.value),
+        ZERO_I80F48,
+      );
+      return total_equity;
+    }
+    return undefined;
   }
 
   /**
    * The amount of native quote you could withdraw against your existing assets.
    * @returns collateral value, in native quote
    */
-  getCollateralValue(): I80F48 {
+  getCollateralValue(): I80F48 | undefined {
     return this.getHealth(HealthType.init);
   }
 
@@ -219,25 +227,30 @@ export class MangoAccount {
    * Sum of all positive assets.
    * @returns assets, in native quote
    */
-  getAssetsValue(healthType: HealthType): I80F48 {
-    return this.accountData.healthCache.assets(healthType);
+  getAssetsValue(healthType: HealthType): I80F48 | undefined {
+    return this.accountData?.healthCache.assets(healthType);
   }
 
   /**
    * Sum of all negative assets.
    * @returns liabs, in native quote
    */
-  getLiabsValue(healthType: HealthType): I80F48 {
-    return this.accountData.healthCache.liabs(healthType);
+  getLiabsValue(healthType: HealthType): I80F48 | undefined {
+    return this.accountData?.healthCache.liabs(healthType);
   }
 
   /**
    * The amount of given native token you can withdraw including borrows, considering all existing assets as collateral.
    * @returns amount of given native token you can borrow, considering all existing assets as collateral, in native token
    */
-  getMaxWithdrawWithBorrowForToken(group: Group, mintPk: PublicKey): I80F48 {
+  getMaxWithdrawWithBorrowForToken(
+    group: Group,
+    mintPk: PublicKey,
+  ): I80F48 | undefined {
     const tokenBank: Bank = group.getFirstBankByMint(mintPk);
-    const initHealth = (this.accountData as MangoAccountData).initHealth;
+    const initHealth = this.accountData?.initHealth;
+
+    if (!initHealth) return undefined;
 
     // Case 1:
     // Cannot withdraw if init health is below 0
@@ -249,6 +262,7 @@ export class MangoAccount {
     // nor would be charged loanOriginationFeeRate when withdrawn
 
     const tp = this.findToken(tokenBank.tokenIndex);
+    if (!tokenBank.price) return undefined;
     const existingTokenDeposits = tp ? tp.deposits(tokenBank) : ZERO_I80F48;
     let existingPositionHealthContrib = ZERO_I80F48;
     if (existingTokenDeposits.gt(ZERO_I80F48)) {
@@ -295,11 +309,19 @@ export class MangoAccount {
     return maxBorrowNativeWithoutFees.add(existingTokenDeposits);
   }
 
-  getMaxWithdrawWithBorrowForTokenUi(group: Group, mintPk: PublicKey): number {
-    return toUiDecimals(
-      this.getMaxWithdrawWithBorrowForToken(group, mintPk),
-      group.getMintDecimals(mintPk),
+  getMaxWithdrawWithBorrowForTokenUi(
+    group: Group,
+    mintPk: PublicKey,
+  ): number | undefined {
+    const maxWithdrawWithBorrow = this.getMaxWithdrawWithBorrowForToken(
+      group,
+      mintPk,
     );
+    if (maxWithdrawWithBorrow) {
+      return toUiDecimals(maxWithdrawWithBorrow, group.getMintDecimals(mintPk));
+    } else {
+      return undefined;
+    }
   }
 
   /**
@@ -314,7 +336,8 @@ export class MangoAccount {
     sourceMintPk: PublicKey,
     targetMintPk: PublicKey,
     slippageAndFeesFactor: number,
-  ): I80F48 {
+  ): I80F48 | undefined {
+    if (!this.accountData) return undefined;
     return this.accountData.healthCache
       .getMaxSourceForTokenSwap(
         group,
@@ -337,16 +360,16 @@ export class MangoAccount {
     sourceMintPk: PublicKey,
     targetMintPk: PublicKey,
     slippageAndFeesFactor: number,
-  ): number {
-    return toUiDecimals(
-      this.getMaxSourceForTokenSwap(
-        group,
-        sourceMintPk,
-        targetMintPk,
-        slippageAndFeesFactor,
-      ),
-      group.getMintDecimals(sourceMintPk),
+  ): number | undefined {
+    const maxSource = this.getMaxSourceForTokenSwap(
+      group,
+      sourceMintPk,
+      targetMintPk,
+      slippageAndFeesFactor,
     );
+    if (maxSource) {
+      return toUiDecimals(maxSource, group.getMintDecimals(sourceMintPk));
+    }
   }
 
   /**
@@ -364,7 +387,8 @@ export class MangoAccount {
       mintPk: PublicKey;
     }[],
     healthType: HealthType = HealthType.init,
-  ): I80F48 {
+  ): I80F48 | undefined {
+    if (!this.accountData) return undefined;
     return this.accountData.healthCache.simHealthRatioWithTokenPositionChanges(
       group,
       nativeTokenChanges,
@@ -387,7 +411,7 @@ export class MangoAccount {
       mintPk: PublicKey;
     }[],
     healthType: HealthType = HealthType.init,
-  ): number {
+  ): number | undefined {
     const nativeTokenChanges = uiTokenChanges.map((tokenChange) => {
       return {
         nativeTokenAmount: toNative(
@@ -397,7 +421,7 @@ export class MangoAccount {
         mintPk: tokenChange.mintPk,
       };
     });
-    return this.accountData.healthCache
+    return this.accountData?.healthCache
       .simHealthRatioWithTokenPositionChanges(
         group,
         nativeTokenChanges,
@@ -414,8 +438,12 @@ export class MangoAccount {
    * it assumes that there are no interaction effects,
    * it assumes that there are no existing borrows for either of the tokens in the market.
    */
-  getSerum3MarketMarginAvailable(group: Group, marketName: string): I80F48 {
-    const initHealth = (this.accountData as MangoAccountData).initHealth;
+  getSerum3MarketMarginAvailable(
+    group: Group,
+    marketName: string,
+  ): I80F48 | undefined {
+    if (!this.accountData) return undefined;
+    const initHealth = this.accountData.initHealth;
     const serum3Market = group.serum3MarketsMap.get(marketName)!;
     const marketAssetWeight = group.getFirstBankByTokenIndex(
       serum3Market.baseTokenIndex,
@@ -431,8 +459,12 @@ export class MangoAccount {
    * it assumes that there are no interaction effects,
    * it assumes that there are no existing borrows for either of the tokens in the market.
    */
-  getPerpMarketMarginAvailable(group: Group, marketName: string): I80F48 {
-    const initHealth = (this.accountData as MangoAccountData).initHealth;
+  getPerpMarketMarginAvailable(
+    group: Group,
+    marketName: string,
+  ): I80F48 | undefined {
+    if (!this.accountData) return undefined;
+    const initHealth = this.accountData.initHealth;
     const perpMarket = group.perpMarketsMap.get(marketName)!;
     const marketAssetWeight = perpMarket.initAssetWeight;
     return initHealth.div(ONE_I80F48.sub(marketAssetWeight));
