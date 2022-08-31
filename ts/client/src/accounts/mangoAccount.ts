@@ -79,7 +79,8 @@ export class MangoAccount {
 
   async reload(client: MangoClient, group: Group): Promise<MangoAccount> {
     Object.assign(this, await client.getMangoAccount(this));
-    return await this.reloadAccountData(client, group);
+    await this.reloadAccountData(client, group);
+    return this;
   }
 
   async reloadAccountData(
