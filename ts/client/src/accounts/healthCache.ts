@@ -278,13 +278,13 @@ export class HealthCache {
     healthType: HealthType = HealthType.init,
   ): I80F48 {
     const adjustedCache: HealthCache = _.cloneDeep(this);
-    const quoteBanks = group.banksMapByTokenIndex.get(
+    const quoteBank = group.getFirstBankByTokenIndex(
       serum3Market.quoteTokenIndex,
     );
-    if (!quoteBanks) {
+    if (!quoteBank) {
       throw new Error(`No bank for index ${serum3Market.quoteTokenIndex}`);
     }
-    const quoteIndex = adjustedCache.getOrCreateTokenInfoIndex(quoteBanks[0]);
+    const quoteIndex = adjustedCache.getOrCreateTokenInfoIndex(quoteBank);
     const quote = adjustedCache.tokenInfos[quoteIndex];
 
     // Move token balance to reserved funds in open orders,
@@ -315,13 +315,13 @@ export class HealthCache {
     healthType: HealthType = HealthType.init,
   ): I80F48 {
     const adjustedCache: HealthCache = _.cloneDeep(this);
-    const baseBanks = group.banksMapByTokenIndex.get(
+    const baseBank = group.getFirstBankByTokenIndex(
       serum3Market.baseTokenIndex,
     );
-    if (!baseBanks) {
+    if (!baseBank) {
       throw new Error(`No bank for index ${serum3Market.quoteTokenIndex}`);
     }
-    const baseIndex = adjustedCache.getOrCreateTokenInfoIndex(baseBanks[0]);
+    const baseIndex = adjustedCache.getOrCreateTokenInfoIndex(baseBank);
     const base = adjustedCache.tokenInfos[baseIndex];
 
     // Move token balance to reserved funds in open orders,
@@ -537,24 +537,24 @@ export class HealthCache {
     side: Serum3Side,
     minRatio: I80F48,
   ) {
-    const baseBanks = group.banksMapByTokenIndex.get(
+    const baseBank = group.getFirstBankByTokenIndex(
       serum3Market.baseTokenIndex,
     );
-    if (!baseBanks) {
+    if (!baseBank) {
       throw new Error(`No bank for index ${serum3Market.baseTokenIndex}`);
     }
-    const quoteBanks = group.banksMapByTokenIndex.get(
+    const quoteBank = group.getFirstBankByTokenIndex(
       serum3Market.quoteTokenIndex,
     );
-    if (!quoteBanks) {
+    if (!quoteBank) {
       throw new Error(`No bank for index ${serum3Market.quoteTokenIndex}`);
     }
 
     const healthCacheClone: HealthCache = _.cloneDeep(this);
 
-    const baseIndex = healthCacheClone.getOrCreateTokenInfoIndex(baseBanks[0]);
+    const baseIndex = healthCacheClone.getOrCreateTokenInfoIndex(baseBank);
     const quoteIndex = healthCacheClone.getOrCreateTokenInfoIndex(
-      quoteBanks[0],
+      quoteBank,
     );
     const base = healthCacheClone.tokenInfos[baseIndex];
     const quote = healthCacheClone.tokenInfos[quoteIndex];
@@ -647,11 +647,11 @@ export class HealthCache {
     return side === Serum3Side.bid
       ? amount
           .div(quote.oraclePrice)
-          .div(ONE_I80F48.add(baseBanks[0].loanOriginationFeeRate))
+          .div(ONE_I80F48.add(baseBank.loanOriginationFeeRate))
           .div(ONE_I80F48.add(I80F48.fromNumber(group.getFeeRate(false))))
       : amount
           .div(base.oraclePrice)
-          .div(ONE_I80F48.add(quoteBanks[0].loanOriginationFeeRate))
+          .div(ONE_I80F48.add(quoteBank.loanOriginationFeeRate))
           .div(ONE_I80F48.add(I80F48.fromNumber(group.getFeeRate(false))));
   }
 }
