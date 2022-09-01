@@ -652,7 +652,12 @@ impl HealthCache {
     pub fn adjust_token_balance(&mut self, token_index: TokenIndex, change: I80F48) -> Result<()> {
         let entry_index = self.token_entry_index(token_index)?;
         let mut entry = &mut self.token_infos[entry_index];
-        entry.balance = cm!(entry.balance + change * entry.oracle_price);
+
+        // Work around the fact that -((-x) * y) == x * y does not hold for I80F48:
+        // We need to make sure that if balance is before * price, then change = -before
+        // brings it to exactly zero.
+        let removed_contribution = (-change) * entry.oracle_price;
+        entry.balance = cm!(entry.balance - removed_contribution);
         Ok(())
     }
 
