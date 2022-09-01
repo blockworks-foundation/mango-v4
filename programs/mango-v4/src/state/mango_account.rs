@@ -690,6 +690,18 @@ impl<
         get_helper_mut(self.dynamic_mut(), offset)
     }
 
+    pub fn perp_position_mut(
+        &mut self,
+        market_index: PerpMarketIndex,
+    ) -> Result<&mut PerpPosition> {
+        let raw_index_opt = self
+            .all_perp_positions()
+            .position(|p| p.is_active_for_market(market_index));
+        raw_index_opt
+            .map(|raw_index| self.perp_position_mut_by_raw_index(raw_index))
+            .ok_or_else(|| error!(MangoError::PerpPositionDoesNotExist))
+    }
+
     pub fn ensure_perp_position(
         &mut self,
         perp_market_index: PerpMarketIndex,
@@ -1206,6 +1218,17 @@ mod tests {
         }
 
         {
+            let pos_res = account.perp_position_mut(1);
+            assert!(pos_res.is_ok());
+            assert_eq!(pos_res.unwrap().market_index, 1)
+        }
+
+        {
+            let pos_res = account.perp_position_mut(99);
+            assert!(pos_res.is_err());
+        }
+
+        {
             account.deactivate_perp_position(1);
 
             let (pos, raw) = account.ensure_perp_position(42).unwrap();
@@ -1228,16 +1251,5 @@ mod tests {
         assert!(account.perp_position(8).is_ok());
         assert!(account.perp_position(42).is_ok());
         assert_eq!(account.active_perp_positions().count(), 2);
-
-        /*{
-            let (pos, raw) = account.perp_position_mut(42).unwrap();
-            assert_eq!(pos.perp_index, 42);
-            assert_eq!(raw, 2);
-        }
-        {
-            let (pos, raw) = account.perp_position_mut(8).unwrap();
-            assert_eq!(pos.perp_index, 8);
-            assert_eq!(raw, 1);
-        }*/
     }
 }

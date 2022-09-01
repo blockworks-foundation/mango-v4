@@ -2481,6 +2481,61 @@ impl ClientInstruction for PerpUpdateFundingInstruction {
     }
 }
 
+pub struct PerpSettlePnlInstruction {
+    pub group: Pubkey,
+    pub account_a: Pubkey,
+    pub account_b: Pubkey,
+    pub perp_market: Pubkey,
+    pub oracle: Pubkey,
+    pub quote_bank: Pubkey,
+    pub max_settle_amount: I80F48,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpSettlePnlInstruction {
+    type Accounts = mango_v4::accounts::PerpSettlePnl;
+    type Instruction = mango_v4::instruction::PerpSettlePnl;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            max_settle_amount: self.max_settle_amount,
+        };
+        let accounts = Self::Accounts {
+            group: self.group,
+            perp_market: self.perp_market,
+            account_a: self.account_a,
+            account_b: self.account_b,
+            oracle: self.oracle,
+            quote_bank: self.quote_bank,
+        };
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+        let account_b = account_loader
+            .load_mango_account(&self.account_b)
+            .await
+            .unwrap();
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account_b,
+            None,
+            false,
+            Some(perp_market.perp_market_index),
+        )
+        .await;
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas);
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![]
+    }
+}
+
 pub struct BenchmarkInstruction {}
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for BenchmarkInstruction {

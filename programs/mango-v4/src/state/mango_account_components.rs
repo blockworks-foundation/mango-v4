@@ -235,6 +235,11 @@ impl PerpPosition {
         self.market_index == market_index
     }
 
+    // Return base position in native units for a perp market
+    pub fn base_position_native(&self, market: &PerpMarket) -> I80F48 {
+        I80F48::from(cm!(self.base_position_lots * market.base_lot_size))
+    }
+
     /// This assumes settle_funding was already called
     pub fn change_base_position(&mut self, perp_market: &mut PerpMarket, base_change: i64) {
         let start = self.base_position_lots;
