@@ -24,8 +24,8 @@ async function debugUser(
           group,
           mangoAccount,
           [
-            group.banksMapByName.get('BTC')[0],
-            group.banksMapByName.get('USDC')[0],
+            group.banksMapByName.get('BTC')![0],
+            group.banksMapByName.get('USDC')![0],
           ],
           [],
         )
@@ -34,15 +34,15 @@ async function debugUser(
   );
   console.log(
     'mangoAccount.getEquity() ' +
-      toUiDecimalsForQuote(mangoAccount.getEquity().toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getEquity()!.toNumber()),
   );
   console.log(
     'mangoAccount.getHealth(HealthType.init) ' +
-      toUiDecimalsForQuote(mangoAccount.getHealth(HealthType.init).toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getHealth(HealthType.init)!.toNumber()),
   );
   console.log(
     'mangoAccount.getHealthRatio(HealthType.init) ' +
-      mangoAccount.getHealthRatio(HealthType.init).toNumber(),
+      mangoAccount.getHealthRatio(HealthType.init)!.toNumber(),
   );
   console.log(
     'mangoAccount.getHealthRatioUi(HealthType.init) ' +
@@ -50,7 +50,7 @@ async function debugUser(
   );
   console.log(
     'mangoAccount.getHealthRatio(HealthType.maint) ' +
-      mangoAccount.getHealthRatio(HealthType.maint).toNumber(),
+      mangoAccount.getHealthRatio(HealthType.maint)!.toNumber(),
   );
   console.log(
     'mangoAccount.getHealthRatioUi(HealthType.maint) ' +
@@ -58,18 +58,18 @@ async function debugUser(
   );
   console.log(
     'mangoAccount.getCollateralValue() ' +
-      toUiDecimalsForQuote(mangoAccount.getCollateralValue().toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getCollateralValue()!.toNumber()),
   );
   console.log(
     'mangoAccount.getAssetsValue() ' +
       toUiDecimalsForQuote(
-        mangoAccount.getAssetsValue(HealthType.init).toNumber(),
+        mangoAccount.getAssetsValue(HealthType.init)!.toNumber(),
       ),
   );
   console.log(
     'mangoAccount.getLiabsValue() ' +
       toUiDecimalsForQuote(
-        mangoAccount.getLiabsValue(HealthType.init).toNumber(),
+        mangoAccount.getLiabsValue(HealthType.init)!.toNumber(),
       ),
   );
 
@@ -78,7 +78,7 @@ async function debugUser(
       `mangoAccount.getMaxWithdrawWithBorrowForTokenUi(group, ${token}) ` +
         mangoAccount.getMaxWithdrawWithBorrowForTokenUi(
           group,
-          group.banksMapByName.get(token)[0].mint,
+          group.banksMapByName.get(token)![0].mint,
         ),
     );
   }
@@ -94,29 +94,28 @@ async function debugUser(
   }
   for (const srcToken of Array.from(group.banksMapByName.keys())) {
     simHealthRatioWithTokenPositionChangesWrapper(`${srcToken} 1  `, {
-      mintPk: group.banksMapByName.get(srcToken)[0].mint,
+      mintPk: group.banksMapByName.get(srcToken)![0].mint,
       uiTokenAmount: 1,
     });
     simHealthRatioWithTokenPositionChangesWrapper(`${srcToken} -1  `, {
-      mintPk: group.banksMapByName.get(srcToken)[0].mint,
+      mintPk: group.banksMapByName.get(srcToken)![0].mint,
       uiTokenAmount: -1,
     });
   }
 
   function getMaxSourceForTokenSwapWrapper(src, tgt) {
-    // console.log();
     console.log(
       `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
         mangoAccount
           .getMaxSourceForTokenSwap(
             group,
-            group.banksMapByName.get(src)[0].mint,
-            group.banksMapByName.get(tgt)[0].mint,
+            group.banksMapByName.get(src)![0].mint,
+            group.banksMapByName.get(tgt)![0].mint,
             1,
-          )
+          )!
           .div(
             I80F48.fromNumber(
-              Math.pow(10, group.banksMapByName.get(src)[0].mintDecimals),
+              Math.pow(10, group.banksMapByName.get(src)![0].mintDecimals),
             ),
           )
           .toNumber(),
@@ -153,8 +152,8 @@ async function main() {
   const group = await client.getGroupForCreator(admin.publicKey, 2);
 
   for (const keypair of [
-    process.env.MB_PAYER_KEYPAIR,
-    process.env.MB_USER2_KEYPAIR,
+    process.env.MB_PAYER_KEYPAIR!,
+    process.env.MB_USER2_KEYPAIR!,
   ]) {
     console.log();
     const user = Keypair.fromSecretKey(

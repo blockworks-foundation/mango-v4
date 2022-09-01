@@ -72,14 +72,14 @@ export class Serum3Market {
     }
 
     if (
-      quoteBank.initLiabWeight.sub(baseBank.initAssetWeight).lte(ZERO_I80F48)
+      quoteBank.initLiabWeight.sub(baseBank.initAssetWeight).lte(ZERO_I80F48())
     ) {
-      return MAX_I80F48.toNumber();
+      return MAX_I80F48().toNumber();
     }
 
-    return ONE_I80F48.div(
-      quoteBank.initLiabWeight.sub(baseBank.initAssetWeight),
-    ).toNumber();
+    return ONE_I80F48()
+      .div(quoteBank.initLiabWeight.sub(baseBank.initAssetWeight))
+      .toNumber();
   }
 
   /**
@@ -104,14 +104,14 @@ export class Serum3Market {
     }
 
     if (
-      baseBank.initLiabWeight.sub(quoteBank.initAssetWeight).lte(ZERO_I80F48)
+      baseBank.initLiabWeight.sub(quoteBank.initAssetWeight).lte(ZERO_I80F48())
     ) {
-      return MAX_I80F48.toNumber();
+      return MAX_I80F48().toNumber();
     }
 
-    return ONE_I80F48.div(
-      baseBank.initLiabWeight.sub(quoteBank.initAssetWeight),
-    ).toNumber();
+    return ONE_I80F48()
+      .div(baseBank.initLiabWeight.sub(quoteBank.initAssetWeight))
+      .toNumber();
   }
 
   public async loadBids(client: MangoClient, group: Group): Promise<Orderbook> {

@@ -286,8 +286,8 @@ export class Bank {
     const totalBorrows = this.nativeBorrows();
     const totalDeposits = this.nativeDeposits();
 
-    if (totalDeposits.eq(ZERO_I80F48) && totalBorrows.eq(ZERO_I80F48)) {
-      return ZERO_I80F48;
+    if (totalDeposits.isZero() && totalBorrows.isZero()) {
+      return ZERO_I80F48();
     }
     if (totalDeposits.lte(totalBorrows)) {
       return this.maxRate;
@@ -329,9 +329,9 @@ export class Bank {
     const totalBorrows = this.nativeBorrows();
     const totalDeposits = this.nativeDeposits();
 
-    if (totalDeposits.eq(ZERO_I80F48) && totalBorrows.eq(ZERO_I80F48)) {
-      return ZERO_I80F48;
-    } else if (totalDeposits.eq(ZERO_I80F48)) {
+    if (totalDeposits.isZero() && totalBorrows.isZero()) {
+      return ZERO_I80F48();
+    } else if (totalDeposits.isZero()) {
       return this.maxRate;
     }
 

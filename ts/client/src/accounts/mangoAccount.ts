@@ -125,7 +125,7 @@ export class MangoAccount {
    */
   getTokenBalance(bank: Bank): I80F48 {
     const tp = this.findToken(bank.tokenIndex);
-    return tp ? tp.balance(bank) : ZERO_I80F48;
+    return tp ? tp.balance(bank) : ZERO_I80F48();
   }
 
   /**
@@ -135,7 +135,7 @@ export class MangoAccount {
    */
   getTokenDeposits(bank: Bank): I80F48 {
     const tp = this.findToken(bank.tokenIndex);
-    return tp ? tp.deposits(bank) : ZERO_I80F48;
+    return tp ? tp.deposits(bank) : ZERO_I80F48();
   }
 
   /**
@@ -145,7 +145,7 @@ export class MangoAccount {
    */
   getTokenBorrows(bank: Bank): I80F48 {
     const tp = this.findToken(bank.tokenIndex);
-    return tp ? tp.borrows(bank) : ZERO_I80F48;
+    return tp ? tp.borrows(bank) : ZERO_I80F48();
   }
 
   /**
@@ -222,7 +222,7 @@ export class MangoAccount {
       const equity = this.accountData.equity;
       const total_equity = equity.tokens.reduce(
         (a, b) => a.add(b.value),
-        ZERO_I80F48,
+        ZERO_I80F48(),
       );
       return total_equity;
     }
@@ -268,8 +268,8 @@ export class MangoAccount {
 
     // Case 1:
     // Cannot withdraw if init health is below 0
-    if (initHealth.lte(ZERO_I80F48)) {
-      return ZERO_I80F48;
+    if (initHealth.lte(ZERO_I80F48())) {
+      return ZERO_I80F48();
     }
 
     // Deposits need special treatment since they would neither count towards liabilities
@@ -277,12 +277,12 @@ export class MangoAccount {
 
     const tp = this.findToken(tokenBank.tokenIndex);
     if (!tokenBank.price) return undefined;
-    const existingTokenDeposits = tp ? tp.deposits(tokenBank) : ZERO_I80F48;
-    let existingPositionHealthContrib = ZERO_I80F48;
-    if (existingTokenDeposits.gt(ZERO_I80F48)) {
-      existingPositionHealthContrib = existingTokenDeposits
-        .mul(tokenBank.price)
-        .mul(tokenBank.initAssetWeight);
+    const existingTokenDeposits = tp ? tp.deposits(tokenBank) : ZERO_I80F48();
+    const existingPositionHealthContrib = ZERO_I80F48();
+    if (existingTokenDeposits.gt(ZERO_I80F48())) {
+      existingTokenDeposits
+        .imul(tokenBank.price)
+        .imul(tokenBank.initAssetWeight);
     }
 
     // Case 2: token deposits have higher contribution than initHealth,
@@ -309,7 +309,7 @@ export class MangoAccount {
       .div(tokenBank.initLiabWeight)
       .div(tokenBank.price);
     const maxBorrowNativeWithoutFees = maxBorrowNative.div(
-      ONE_I80F48.add(tokenBank.loanOriginationFeeRate),
+      ONE_I80F48().add(tokenBank.loanOriginationFeeRate),
     );
     // console.log(`initHealth ${initHealth}`);
     // console.log(
@@ -357,7 +357,7 @@ export class MangoAccount {
         group,
         sourceMintPk,
         targetMintPk,
-        ONE_I80F48, // target 1% health
+        ONE_I80F48(), // target 1% health
       )
       .mul(I80F48.fromNumber(slippageAndFeesFactor));
   }
@@ -690,7 +690,7 @@ export class MangoAccount {
     const initHealth = this.accountData.initHealth;
     const perpMarket = group.perpMarketsMap.get(marketName)!;
     const marketAssetWeight = perpMarket.initAssetWeight;
-    return initHealth.div(ONE_I80F48.sub(marketAssetWeight));
+    return initHealth.div(ONE_I80F48().sub(marketAssetWeight));
   }
 
   toString(group?: Group): string {
@@ -768,8 +768,8 @@ export class TokenPosition {
    * @returns native deposits, 0 if position has borrows
    */
   public deposits(bank: Bank): I80F48 {
-    if (this.indexedPosition && this.indexedPosition.lt(ZERO_I80F48)) {
-      return ZERO_I80F48;
+    if (this.indexedPosition && this.indexedPosition.lt(ZERO_I80F48())) {
+      return ZERO_I80F48();
     }
     return this.balance(bank);
   }
@@ -780,8 +780,8 @@ export class TokenPosition {
    * @returns native borrows, 0 if position has deposits
    */
   public borrows(bank: Bank): I80F48 {
-    if (this.indexedPosition && this.indexedPosition.gt(ZERO_I80F48)) {
-      return ZERO_I80F48;
+    if (this.indexedPosition && this.indexedPosition.gt(ZERO_I80F48())) {
+      return ZERO_I80F48();
     }
     return this.balance(bank).abs();
   }

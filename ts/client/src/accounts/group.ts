@@ -242,7 +242,7 @@ export class Group {
     for (const [index, price] of prices.entries()) {
       for (const bank of banks[index]) {
         if (bank.name === 'USDC') {
-          bank.price = ONE_I80F48;
+          bank.price = ONE_I80F48();
           bank.uiPrice = 1;
         } else {
           // TODO: Implement switchboard oracle type
