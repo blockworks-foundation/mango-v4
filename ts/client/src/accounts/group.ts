@@ -114,7 +114,7 @@ export class Group {
   public async reloadBanks(client: MangoClient, ids?: Id) {
     let banks: Bank[];
 
-    if (ids) {
+    if (ids && ids.getBanks().length) {
       banks = (
         await client.program.account.bank.fetchMultiple(ids.getBanks())
       ).map((account, index) =>
@@ -143,7 +143,7 @@ export class Group {
 
   public async reloadMintInfos(client: MangoClient, ids?: Id) {
     let mintInfos: MintInfo[];
-    if (ids) {
+    if (ids && ids.getMintInfos().length) {
       mintInfos = (
         await client.program.account.mintInfo.fetchMultiple(ids.getMintInfos())
       ).map((account, index) =>
@@ -212,7 +212,7 @@ export class Group {
 
   public async reloadPerpMarkets(client: MangoClient, ids?: Id) {
     let perpMarkets: PerpMarket[];
-    if (ids) {
+    if (ids && ids.getPerpMarkets().length) {
       perpMarkets = (
         await client.program.account.perpMarket.fetchMultiple(
           ids.getPerpMarkets(),

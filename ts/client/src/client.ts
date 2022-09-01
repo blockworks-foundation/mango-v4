@@ -857,6 +857,45 @@ export class MangoClient {
       mangoAccount.owner,
     );
 
+    const preInstructions: TransactionInstruction[] = [
+      // ensure withdraws don't fail with missing ATAs
+      await createAssociatedTokenAccountIdempotentInstruction(
+        mangoAccount.owner,
+        mangoAccount.owner,
+        bank.mint,
+      ),
+    ];
+
+    let wrappedSolAccount: Keypair | undefined;
+    const postInstructions: TransactionInstruction[] = [];
+    const additionalSigners: Signer[] = [];
+    if (mintPk.equals(WRAPPED_SOL_MINT)) {
+      wrappedSolAccount = new Keypair();
+      const lamports = nativeAmount + 1e7;
+      preInstructions.push(
+        SystemProgram.createAccount({
+          fromPubkey: mangoAccount.owner,
+          newAccountPubkey: wrappedSolAccount.publicKey,
+          lamports,
+          space: 165,
+          programId: TOKEN_PROGRAM_ID,
+        }),
+        initializeAccount({
+          account: wrappedSolAccount.publicKey,
+          mint: WRAPPED_SOL_MINT,
+          owner: mangoAccount.owner,
+        }),
+      );
+      postInstructions.push(
+        closeAccount({
+          source: wrappedSolAccount.publicKey,
+          destination: mangoAccount.owner,
+          owner: mangoAccount.owner,
+        }),
+      );
+      additionalSigners.push(wrappedSolAccount);
+    }
+
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
         AccountRetriever.Fixed,
@@ -883,14 +922,9 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-      .preInstructions([
-        // ensure withdraws don't fail with missing ATAs
-        await createAssociatedTokenAccountIdempotentInstruction(
-          mangoAccount.owner,
-          mangoAccount.owner,
-          bank.mint,
-        ),
-      ])
+      .preInstructions(preInstructions)
+      .postInstructions(postInstructions)
+      .signers(additionalSigners)
       .transaction();
     // .rpc({ skipPreflight: true });
 
