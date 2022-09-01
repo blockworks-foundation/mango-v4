@@ -1,6 +1,12 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
+import { Group } from '../accounts/group';
+import {
+  Serum3OrderType,
+  Serum3SelfTradeBehavior,
+  Serum3Side,
+} from '../accounts/serum3';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 
@@ -24,7 +30,14 @@ const MAINNET_ORACLES = new Map([
   ['MNGO', '79wm3jjcPr6RaNQ4DGvP5KxG1mNd3gEBsg6FsNVFezK4'],
 ]);
 
-async function createGroup() {
+// External markets are matched with those in https://github.com/blockworks-foundation/mango-client-v3/blob/main/src/ids.json
+// and verified to have best liquidity for pair on https://openserum.io/
+const MAINNET_SERUM3_MARKETS = new Map([
+  ['BTC/USDC', 'A8YFbxQYFVqKZaoYJLLUVcQiWP7G2MeEgW5wsAQgMvFw'],
+  ['SOL/USDC', '9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT'],
+]);
+
+async function buildAdminClient(): Promise<[MangoClient, Keypair]> {
   const admin = Keypair.fromSecretKey(
     Buffer.from(
       JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
@@ -37,11 +50,51 @@ async function createGroup() {
   const adminWallet = new Wallet(admin);
   console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
   const adminProvider = new AnchorProvider(connection, adminWallet, options);
+  return [
+    await MangoClient.connect(
+      adminProvider,
+      'mainnet-beta',
+      MANGO_V4_ID['mainnet-beta'],
+    ),
+    admin,
+  ];
+}
+
+async function buildUserClient(
+  userKeypair: string,
+): Promise<[MangoClient, Group, Keypair]> {
+  const options = AnchorProvider.defaultOptions();
+  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
+
+  const user = Keypair.fromSecretKey(
+    Buffer.from(JSON.parse(fs.readFileSync(userKeypair, 'utf-8'))),
+  );
+  const userWallet = new Wallet(user);
+  const userProvider = new AnchorProvider(connection, userWallet, options);
+
   const client = await MangoClient.connect(
-    adminProvider,
+    userProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
   );
+
+  const admin = Keypair.fromSecretKey(
+    Buffer.from(
+      JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
+    ),
+  );
+  console.log(`Admin ${admin.publicKey.toBase58()}`);
+  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  console.log(group);
+  console.log(`${group.toString()}`);
+
+  return [client, group, user];
+}
+
+async function createGroup() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
 
   console.log(`Creating Group...`);
   const insuranceMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
@@ -51,23 +104,9 @@ async function createGroup() {
 }
 
 async function registerTokens() {
-  const admin = Keypair.fromSecretKey(
-    Buffer.from(
-      JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
-    ),
-  );
-
-  const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
-
-  const adminWallet = new Wallet(admin);
-  console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
-  const adminProvider = new AnchorProvider(connection, adminWallet, options);
-  const client = await MangoClient.connect(
-    adminProvider,
-    'mainnet-beta',
-    MANGO_V4_ID['mainnet-beta'],
-  );
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
 
   const group = await client.getGroupForCreator(admin.publicKey, 2);
 
@@ -259,31 +298,46 @@ async function registerTokens() {
   }
 }
 
-async function createUser(userKeypair: string) {
-  const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
+async function registerSerum3Markets() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
 
-  const user = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(userKeypair, 'utf-8'))),
-  );
-  const userWallet = new Wallet(user);
-  const userProvider = new AnchorProvider(connection, userWallet, options);
-
-  const client = await MangoClient.connect(
-    userProvider,
-    'mainnet-beta',
-    MANGO_V4_ID['mainnet-beta'],
-  );
-
-  const admin = Keypair.fromSecretKey(
-    Buffer.from(
-      JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
-    ),
-  );
-  console.log(`Admin ${admin.publicKey.toBase58()}`);
   const group = await client.getGroupForCreator(admin.publicKey, 2);
-  console.log(group);
-  console.log(`${group.toString()}`);
+
+  // Bump version to 1 to unlock serum3 feature
+  await client.groupEdit(
+    group,
+    group.admin,
+    group.fastListingAdmin,
+    undefined,
+    1,
+  );
+
+  // Register BTC and SOL markets
+  await client.serum3RegisterMarket(
+    group,
+    new PublicKey(MAINNET_SERUM3_MARKETS.get('BTC/USDC')!),
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('BTC')!)),
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDC')!)),
+    0,
+    'BTC/USDC',
+  );
+  await client.serum3RegisterMarket(
+    group,
+    new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('SOL')!)),
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDC')!)),
+    1,
+    'SOL/USDC',
+  );
+}
+
+async function createUser(userKeypair: string) {
+  const result = await buildUserClient(userKeypair);
+  const client = result[0];
+  const group = result[1];
+  const user = result[2];
 
   console.log(`Creating MangoAccount...`);
   const mangoAccount = await client.getOrCreateMangoAccount(
@@ -316,6 +370,85 @@ async function createUser(userKeypair: string) {
   console.log(`...deposited 1 SOL`);
 }
 
+async function expandMangoAccount(userKeypair: string) {
+  const result = await buildUserClient(userKeypair);
+  const client = result[0];
+  const group = result[1];
+  const user = result[2];
+
+  const mangoAccounts = await client.getMangoAccountsForOwner(
+    group,
+    user.publicKey,
+  );
+  if (!mangoAccounts) {
+    throw new Error(`MangoAccounts not found for user ${user.publicKey}`);
+  }
+
+  for (const mangoAccount of mangoAccounts) {
+    console.log(`...found MangoAccount ${mangoAccount.publicKey.toBase58()}`);
+    console.log(mangoAccount.toString(group));
+    await client.expandMangoAccount(group, mangoAccount, 8, 2, 0, 0);
+  }
+}
+
+async function placeSerum3TradeAndCancelIt(userKeypair: string) {
+  const result = await buildUserClient(userKeypair);
+  const client = result[0];
+  const group = result[1];
+  const user = result[2];
+
+  const mangoAccounts = await client.getMangoAccountsForOwner(
+    group,
+    user.publicKey,
+  );
+  if (!mangoAccounts) {
+    throw new Error(`MangoAccounts not found for user ${user.publicKey}`);
+  }
+
+  for (const mangoAccount of mangoAccounts) {
+    console.log(`...found MangoAccount ${mangoAccount.publicKey.toBase58()}`);
+    console.log(mangoAccount.toString(group));
+    console.log(`...placing serum3 order`);
+    await client.serum3PlaceOrder(
+      group,
+      mangoAccount,
+      new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
+      Serum3Side.bid,
+      1,
+      1,
+      Serum3SelfTradeBehavior.decrementTake,
+      Serum3OrderType.limit,
+      Date.now(),
+      10,
+    );
+    console.log(`...current own orders on OB`);
+    let orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
+      client,
+      group,
+      new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
+    );
+    for (const order of orders) {
+      console.log(order);
+    }
+    console.log(`...cancelling serum3 orders`);
+    await client.serum3CancelAllorders(
+      group,
+      mangoAccount,
+      new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
+      10,
+    );
+    console.log(`...current own orders on OB`);
+    orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
+      client,
+      group,
+      new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
+    );
+    for (const order of orders) {
+      console.log(order);
+    }
+  }
+}
+
 async function main() {
   try {
     await createGroup();
@@ -328,8 +461,15 @@ async function main() {
     console.log(error);
   }
   try {
-    await createUser(process.env.MB_USER_KEYPAIR!);
+    await registerSerum3Markets();
+  } catch (error) {
+    console.log(error);
+  }
+  try {
+    // await createUser(process.env.MB_USER_KEYPAIR!);
     // await createUser(process.env.MB_USER2_KEYPAIR!);
+    await expandMangoAccount(process.env.MB_USER_KEYPAIR!);
+    await placeSerum3TradeAndCancelIt(process.env.MB_USER_KEYPAIR!);
   } catch (error) {
     console.log(error);
   }
