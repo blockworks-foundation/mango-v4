@@ -44,7 +44,7 @@ impl Group {
     }
 
     pub fn multiple_banks_supported(&self) -> bool {
-        self.is_testing() || self.version > 0
+        self.is_testing() || self.version > 1
     }
 
     pub fn serum3_supported(&self) -> bool {
@@ -52,7 +52,7 @@ impl Group {
     }
 
     pub fn perps_supported(&self) -> bool {
-        self.is_testing() || self.version > 0
+        self.is_testing() || self.version > 1
     }
 }
 
