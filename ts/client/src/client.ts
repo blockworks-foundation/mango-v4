@@ -993,10 +993,11 @@ export class MangoClient {
   public async serum3CreateOpenOrders(
     group: Group,
     mangoAccount: MangoAccount,
-    marketName: string,
+    externalMarketPk: PublicKey,
   ): Promise<TransactionSignature> {
-    const serum3Market: Serum3Market =
-      group.serum3MarketsMapByExternal.get(marketName)!;
+    const serum3Market: Serum3Market = group.serum3MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
 
     return await this.program.methods
       .serum3CreateOpenOrders()
@@ -1056,8 +1057,12 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
     if (!mangoAccount.findSerum3Account(serum3Market.marketIndex)) {
-      await this.serum3CreateOpenOrders(group, mangoAccount, 'BTC/USDC');
-      mangoAccount = await this.getMangoAccount(mangoAccount);
+      await this.serum3CreateOpenOrders(
+        group,
+        mangoAccount,
+        serum3Market.serumMarketExternal,
+      );
+      await mangoAccount.reload(this, group);
     }
     const serum3MarketExternal = group.serum3MarketExternalsMap.get(
       externalMarketPk.toBase58(),

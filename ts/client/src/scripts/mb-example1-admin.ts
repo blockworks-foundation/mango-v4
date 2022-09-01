@@ -85,9 +85,6 @@ async function buildUserClient(
   );
   console.log(`Admin ${admin.publicKey.toBase58()}`);
   const group = await client.getGroupForCreator(admin.publicKey, 2);
-  console.log(group);
-  console.log(`${group.toString()}`);
-
   return [client, group, user];
 }
 
@@ -349,7 +346,6 @@ async function createUser(userKeypair: string) {
   }
 
   console.log(`...created MangoAccount ${mangoAccount.publicKey.toBase58()}`);
-  console.log(mangoAccount.toString(group));
 
   await client.tokenDeposit(
     group,
@@ -386,7 +382,6 @@ async function expandMangoAccount(userKeypair: string) {
 
   for (const mangoAccount of mangoAccounts) {
     console.log(`...found MangoAccount ${mangoAccount.publicKey.toBase58()}`);
-    console.log(mangoAccount.toString(group));
     await client.expandMangoAccount(group, mangoAccount, 8, 2, 0, 0);
   }
 }
@@ -407,7 +402,6 @@ async function placeSerum3TradeAndCancelIt(userKeypair: string) {
 
   for (const mangoAccount of mangoAccounts) {
     console.log(`...found MangoAccount ${mangoAccount.publicKey.toBase58()}`);
-    console.log(mangoAccount.toString(group));
     console.log(`...placing serum3 order`);
     await client.serum3PlaceOrder(
       group,
@@ -451,24 +445,24 @@ async function placeSerum3TradeAndCancelIt(userKeypair: string) {
 
 async function main() {
   try {
-    await createGroup();
+    // await createGroup();
   } catch (error) {
     console.log(error);
   }
   try {
-    await registerTokens();
+    // await registerTokens();
   } catch (error) {
     console.log(error);
   }
   try {
-    await registerSerum3Markets();
+    // await registerSerum3Markets();
   } catch (error) {
     console.log(error);
   }
   try {
     // await createUser(process.env.MB_USER_KEYPAIR!);
     // await createUser(process.env.MB_USER2_KEYPAIR!);
-    await expandMangoAccount(process.env.MB_USER_KEYPAIR!);
+    // await expandMangoAccount(process.env.MB_USER_KEYPAIR!);
     await placeSerum3TradeAndCancelIt(process.env.MB_USER_KEYPAIR!);
   } catch (error) {
     console.log(error);

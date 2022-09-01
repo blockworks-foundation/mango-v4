@@ -168,7 +168,7 @@ export class Group {
 
   public async reloadSerum3Markets(client: MangoClient, ids?: Id) {
     let serum3Markets: Serum3Market[];
-    if (ids) {
+    if (ids && ids.getSerum3Markets().length) {
       serum3Markets = (
         await client.program.account.serum3Market.fetchMultiple(
           ids.getSerum3Markets(),
