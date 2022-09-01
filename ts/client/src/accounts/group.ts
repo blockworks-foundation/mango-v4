@@ -351,6 +351,12 @@ export class Group {
     );
   }
 
+  public findSerum3MarketByName(name: string): Serum3Market | undefined {
+    return Array.from(this.serum3MarketsMapByExternal.values()).find(
+      (serum3Market) => serum3Market.name === name,
+    );
+  }
+
   public async loadSerum3BidsForMarket(
     client: MangoClient,
     externalMarketPk: PublicKey,

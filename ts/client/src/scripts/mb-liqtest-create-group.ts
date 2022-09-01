@@ -178,6 +178,16 @@ async function main() {
     console.log(`${bank.toString()}`);
   }
 
+  console.log('Registering SOL/USDC serum market...');
+  await client.serum3RegisterMarket(
+    group,
+    new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('SOL')!)),
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDC')!)),
+    1,
+    'SOL/USDC',
+  );
+
   process.exit();
 }
 
