@@ -44,6 +44,16 @@ impl Serum3Market {
     }
 }
 
+#[account(zero_copy)]
+#[derive(Debug)]
+pub struct Serum3MarketIndexReservation {
+    pub group: Pubkey,
+    pub market_index: Serum3MarketIndex,
+    pub reserved: [u8; 38],
+}
+const_assert_eq!(size_of::<Serum3MarketIndexReservation>(), 32 + 2 + 38);
+const_assert_eq!(size_of::<Serum3MarketIndexReservation>() % 8, 0);
+
 #[macro_export]
 macro_rules! serum_market_seeds {
     ( $acc:expr ) => {

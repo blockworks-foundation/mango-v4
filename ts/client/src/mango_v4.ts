@@ -1397,26 +1397,7 @@ export type MangoV4 = {
         {
           "name": "indexReservation",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "Serum3Index"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "serum_market"
-              }
-            ]
-          }
+          "isSigner": false
         },
         {
           "name": "solDestination",
@@ -3676,6 +3657,31 @@ export type MangoV4 = {
               "array": [
                 "u8",
                 128
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "serum3MarketIndexReservation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
+            "name": "marketIndex",
+            "type": "u16"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                38
               ]
             }
           }
@@ -6705,26 +6711,7 @@ export const IDL: MangoV4 = {
         {
           "name": "indexReservation",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "Serum3Index"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "serum_market"
-              }
-            ]
-          }
+          "isSigner": false
         },
         {
           "name": "solDestination",
@@ -8984,6 +8971,31 @@ export const IDL: MangoV4 = {
               "array": [
                 "u8",
                 128
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "serum3MarketIndexReservation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
+            "name": "marketIndex",
+            "type": "u16"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                38
               ]
             }
           }
