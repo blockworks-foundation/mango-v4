@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration, time::Instant};
 
 use crate::MangoClient;
 use itertools::Itertools;
@@ -76,7 +76,7 @@ pub async fn loop_update_index_and_rate(
             let token_names = token_indices_clone
                 .iter()
                 .map(|token_index| client.context.token(*token_index).name.to_owned())
-                .join(", ");
+                .join(",");
 
             let program = client.program();
             let mut req = program.request();
@@ -112,16 +112,24 @@ pub async fn loop_update_index_and_rate(
                 ix.accounts.append(&mut banks);
                 req = req.instruction(ix);
             }
+            let pre = Instant::now();
             let sig_result = req.send().map_err(prettify_client_error);
 
             if let Err(e) = sig_result {
+                log::info!(
+                    "metricName=UpdateTokensV4Failure tokens={} durationMs={} error={}",
+                    token_names,
+                    pre.elapsed().as_millis(),
+                    e
+                );
                 log::error!("{:?}", e)
             } else {
                 log::info!(
-                    "update_index_and_rate {} {:?}",
+                    "metricName=UpdateTokensV4Success tokens={} durationMs={}",
                     token_names,
-                    sig_result.unwrap()
-                )
+                    pre.elapsed().as_millis(),
+                );
+                log::info!("{:?}", sig_result);
             }
 
             Ok(())
@@ -191,6 +199,7 @@ pub async fn loop_consume_events(
                 event_queue.pop_front()?;
             }
 
+            let pre = Instant::now();
             let sig_result = client
                 .program()
                 .request()
@@ -216,13 +225,22 @@ pub async fn loop_consume_events(
                 .map_err(prettify_client_error);
 
             if let Err(e) = sig_result {
+                log::info!(
+                    "metricName=ConsumeEventsV4Failure market={} durationMs={} consumed={} error={}",
+                    perp_market.name(),
+                    pre.elapsed().as_millis(),
+                    ams_.len(),
+                    e.to_string()
+                );
                 log::error!("{:?}", e)
             } else {
                 log::info!(
-                    "consume_event {} {:?}",
+                    "metricName=ConsumeEventsV4Success market={} durationMs={} consumed={}",
                     perp_market.name(),
-                    sig_result.unwrap()
-                )
+                    pre.elapsed().as_millis(),
+                    ams_.len(),
+                );
+                log::info!("{:?}", sig_result);
             }
 
             Ok(())
@@ -253,6 +271,7 @@ pub async fn loop_update_funding(
 
         let client = mango_client.clone();
         let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+            let pre = Instant::now();
             let sig_result = client
                 .program()
                 .request()
@@ -275,13 +294,20 @@ pub async fn loop_update_funding(
                 .send()
                 .map_err(prettify_client_error);
             if let Err(e) = sig_result {
+                log::error!(
+                    "metricName=UpdateFundingV4Error market={} durationMs={} error={}",
+                    perp_market.name(),
+                    pre.elapsed().as_millis(),
+                    e.to_string()
+                );
                 log::error!("{:?}", e)
             } else {
                 log::info!(
-                    "update_funding {} {:?}",
+                    "metricName=UpdateFundingV4Success market={} durationMs={}",
                     perp_market.name(),
-                    sig_result.unwrap()
-                )
+                    pre.elapsed().as_millis(),
+                );
+                log::info!("{:?}", sig_result);
             }
 
             Ok(())

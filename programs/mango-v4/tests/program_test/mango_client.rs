@@ -319,6 +319,28 @@ pub async fn account_position_f64(solana: &SolanaCookie, account: Pubkey, bank: 
     native.to_num::<f64>()
 }
 
+// Verifies that the "post_health: ..." log emitted by the previous instruction
+// matches the init health of the account.
+pub async fn check_prev_instruction_post_health(solana: &SolanaCookie, account: Pubkey) {
+    let logs = solana.program_log();
+    let post_health_str = logs
+        .iter()
+        .find_map(|line| line.strip_prefix("post_health: "))
+        .unwrap();
+    let post_health = post_health_str.parse::<f64>().unwrap();
+
+    solana.advance_by_slots(1).await; // ugly, just to avoid sending the same tx next
+    send_tx(solana, ComputeAccountDataInstruction { account })
+        .await
+        .unwrap();
+
+    let health_data = solana
+        .program_log_events::<mango_v4::events::MangoAccountData>()
+        .pop()
+        .unwrap();
+    assert_eq!(health_data.init_health.to_num::<f64>(), post_health);
+}
+
 //
 // a struct for each instruction along with its
 // ClientInstruction impl
@@ -502,6 +524,7 @@ impl<'keypair> ClientInstruction for TokenWithdrawInstruction<'keypair> {
             owner: self.owner.pubkey(),
             bank: mint_info.banks[self.bank_index],
             vault: mint_info.vaults[self.bank_index],
+            oracle: mint_info.oracle,
             token_account: self.token_account,
             token_program: Token::id(),
         };
@@ -569,6 +592,7 @@ impl ClientInstruction for TokenDepositInstruction {
             account: self.account,
             bank: mint_info.banks[self.bank_index],
             vault: mint_info.vaults[self.bank_index],
+            oracle: mint_info.oracle,
             token_account: self.token_account,
             token_authority: self.token_authority.pubkey(),
             token_program: Token::id(),
@@ -812,9 +836,7 @@ impl<'keypair> ClientInstruction for TokenDeregisterInstruction<'keypair> {
         _loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction {
-            token_index: self.token_index,
-        };
+        let instruction = Self::Instruction {};
 
         let accounts = Self::Accounts {
             admin: self.admin.pubkey(),
@@ -1321,12 +1343,23 @@ impl<'keypair> ClientInstruction for Serum3RegisterMarketInstruction<'keypair> {
         )
         .0;
 
+        let index_reservation = Pubkey::find_program_address(
+            &[
+                b"Serum3Index".as_ref(),
+                self.group.as_ref(),
+                &self.market_index.to_le_bytes(),
+            ],
+            &program_id,
+        )
+        .0;
+
         let accounts = Self::Accounts {
             group: self.group,
             admin: self.admin.pubkey(),
             serum_program: self.serum_program,
             serum_market_external: self.serum_market_external,
             serum_market,
+            index_reservation,
             base_bank: self.base_bank,
             quote_bank: self.quote_bank,
             payer: self.payer.pubkey(),
@@ -1567,14 +1600,17 @@ impl<'keypair> ClientInstruction for Serum3PlaceOrderInstruction<'keypair> {
         )
         .await;
 
+        let (payer_bank, payer_vault) = match self.side {
+            Serum3Side::Bid => (quote_info.first_bank(), quote_info.first_vault()),
+            Serum3Side::Ask => (base_info.first_bank(), base_info.first_vault()),
+        };
+
         let accounts = Self::Accounts {
             group: account.fixed.group,
             account: self.account,
             open_orders,
-            quote_bank: quote_info.first_bank(),
-            quote_vault: quote_info.first_vault(),
-            base_bank: base_info.first_bank(),
-            base_vault: base_info.first_vault(),
+            payer_bank,
+            payer_vault,
             serum_market: self.serum_market,
             serum_program: serum_market.serum_program,
             serum_market_external: serum_market.serum_market_external,
@@ -2499,7 +2535,6 @@ impl ClientInstruction for TokenUpdateIndexAndRateInstruction {
 
 pub struct ComputeAccountDataInstruction {
     pub account: Pubkey,
-    pub health_type: HealthType,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for ComputeAccountDataInstruction {
@@ -2528,6 +2563,94 @@ impl ClientInstruction for ComputeAccountDataInstruction {
 
         let accounts = Self::Accounts {
             group: account.fixed.group,
+            account: self.account,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![]
+    }
+}
+
+pub struct HealthRegionBeginInstruction {
+    pub account: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for HealthRegionBeginInstruction {
+    type Accounts = mango_v4::accounts::HealthRegionBegin;
+    type Instruction = mango_v4::instruction::HealthRegionBegin;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            None,
+            false,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            instructions: solana_program::sysvar::instructions::id(),
+            account: self.account,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<&Keypair> {
+        vec![]
+    }
+}
+
+pub struct HealthRegionEndInstruction {
+    pub account: Pubkey,
+    pub affected_bank: Option<Pubkey>,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for HealthRegionEndInstruction {
+    type Accounts = mango_v4::accounts::HealthRegionEnd;
+    type Instruction = mango_v4::instruction::HealthRegionEnd;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            self.affected_bank,
+            false,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
             account: self.account,
         };
 

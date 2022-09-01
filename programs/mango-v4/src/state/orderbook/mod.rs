@@ -101,7 +101,7 @@ mod tests {
 
         let mut new_order =
             |book: &mut Book, event_queue: &mut EventQueue, side, price, now_ts| -> i128 {
-                let buffer = MangoAccount::default().try_to_vec().unwrap();
+                let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
                 let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
 
                 let quantity = 1;
@@ -124,7 +124,7 @@ mod tests {
                     u8::MAX,
                 )
                 .unwrap();
-                account.perp_orders_by_raw_index(0).order_id
+                account.perp_order_by_raw_index(0).order_id
             };
 
         // insert bids until book side is full
@@ -196,7 +196,7 @@ mod tests {
         market.maker_fee = I80F48::from_num(-0.001f64);
         market.taker_fee = I80F48::from_num(0.01f64);
 
-        let buffer = MangoAccount::default().try_to_vec().unwrap();
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
         let mut maker = MangoAccountValue::from_bytes(&buffer).unwrap();
         let mut taker = MangoAccountValue::from_bytes(&buffer).unwrap();
 
@@ -225,19 +225,19 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            maker.perp_orders_mut_by_raw_index(0).order_market,
+            maker.perp_order_mut_by_raw_index(0).order_market,
             market.perp_market_index
         );
         assert_eq!(
-            maker.perp_orders_mut_by_raw_index(1).order_market,
+            maker.perp_order_mut_by_raw_index(1).order_market,
             FREE_ORDER_SLOT
         );
-        assert_ne!(maker.perp_orders_mut_by_raw_index(0).order_id, 0);
-        assert_eq!(maker.perp_orders_mut_by_raw_index(0).client_order_id, 42);
-        assert_eq!(maker.perp_orders_mut_by_raw_index(0).order_side, Side::Bid);
+        assert_ne!(maker.perp_order_mut_by_raw_index(0).order_id, 0);
+        assert_eq!(maker.perp_order_mut_by_raw_index(0).client_order_id, 42);
+        assert_eq!(maker.perp_order_mut_by_raw_index(0).order_side, Side::Bid);
         assert!(bookside_contains_key(
             &book.bids,
-            maker.perp_orders_mut_by_raw_index(0).order_id
+            maker.perp_order_mut_by_raw_index(0).order_id
         ));
         assert!(bookside_contains_price(&book.bids, price));
         assert_eq!(
@@ -279,7 +279,7 @@ mod tests {
         // the remainder of the maker order is still on the book
         // (the maker account is unchanged: it was not even passed in)
         let order =
-            bookside_leaf_by_key(&book.bids, maker.perp_orders_by_raw_index(0).order_id).unwrap();
+            bookside_leaf_by_key(&book.bids, maker.perp_order_by_raw_index(0).order_id).unwrap();
         assert_eq!(order.price(), price);
         assert_eq!(order.quantity, bid_quantity - match_quantity);
 
@@ -292,7 +292,7 @@ mod tests {
 
         // the taker account is updated
         assert_eq!(
-            taker.perp_orders_by_raw_index(0).order_market,
+            taker.perp_order_by_raw_index(0).order_market,
             FREE_ORDER_SLOT
         );
         assert_eq!(taker.perp_position_by_raw_index(0).bids_base_lots, 0);
@@ -327,14 +327,14 @@ mod tests {
 
         // simulate event queue processing
         maker
-            .execute_perp_maker(market.perp_market_index, &mut market, &fill)
+            .execute_perp_maker(market.perp_market_index, &mut market, fill)
             .unwrap();
         taker
-            .execute_perp_taker(market.perp_market_index, &mut market, &fill)
+            .execute_perp_taker(market.perp_market_index, &mut market, fill)
             .unwrap();
         assert_eq!(market.open_interest, 2 * match_quantity);
 
-        assert_eq!(maker.perp_orders_by_raw_index(0).order_market, 0);
+        assert_eq!(maker.perp_order_by_raw_index(0).order_market, 0);
         assert_eq!(
             maker.perp_position_by_raw_index(0).bids_base_lots,
             bid_quantity - match_quantity

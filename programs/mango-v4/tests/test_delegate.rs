@@ -6,6 +6,8 @@ use solana_sdk::{signature::Keypair, signature::Signer, transport::TransportErro
 use mango_v4::state::*;
 use program_test::*;
 
+use mango_setup::*;
+
 mod program_test;
 
 #[tokio::test]
@@ -24,7 +26,7 @@ async fn test_delegate() -> Result<(), TransportError> {
     // SETUP: Create a group, register a token (mint0), create an account
     //
 
-    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -33,36 +35,8 @@ async fn test_delegate() -> Result<(), TransportError> {
     .await;
     let bank = tokens[0].bank;
 
-    let account = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 0,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
-    )
-    .await
-    .unwrap()
-    .account;
-
-    // deposit
-    send_tx(
-        solana,
-        TokenDepositInstruction {
-            amount: 100,
-            account,
-            token_account: payer_mint0_account,
-            token_authority: payer.clone(),
-            bank_index: 0,
-        },
-    )
-    .await
-    .unwrap();
+    let account =
+        create_funded_account(&solana, group, owner, 0, &context.users[1], mints, 100, 0).await;
 
     //
     // TEST: Edit account - Set delegate

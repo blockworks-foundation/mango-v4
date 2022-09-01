@@ -6,6 +6,7 @@ use crate::state::*;
 use crate::util::fill_from_str;
 
 #[derive(Accounts)]
+#[instruction(market_index: Serum3MarketIndex)]
 pub struct Serum3RegisterMarket<'info> {
     #[account(
         mut,
@@ -15,7 +16,6 @@ pub struct Serum3RegisterMarket<'info> {
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
 
-    // TODO: limit?
     /// CHECK: Can register a market for any serum program
     pub serum_program: UncheckedAccount<'info>,
     /// CHECK: Can register any serum market
@@ -31,6 +31,17 @@ pub struct Serum3RegisterMarket<'info> {
     )]
     pub serum_market: AccountLoader<'info, Serum3Market>,
 
+    /// CHECK: Unused account
+    #[account(
+        init,
+        // block using the same market index twice
+        seeds = [b"Serum3Index".as_ref(), group.key().as_ref(), &market_index.to_le_bytes()],
+        bump,
+        payer = payer,
+        space = 1,
+    )]
+    pub index_reservation: UncheckedAccount<'info>,
+
     #[account(has_one = group)]
     pub quote_bank: AccountLoader<'info, Bank>,
     #[account(has_one = group)]
@@ -42,7 +53,6 @@ pub struct Serum3RegisterMarket<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// TODO: should this be "configure_serum_market", which allows reconfiguring?
 pub fn serum3_register_market(
     ctx: Context<Serum3RegisterMarket>,
     market_index: Serum3MarketIndex,

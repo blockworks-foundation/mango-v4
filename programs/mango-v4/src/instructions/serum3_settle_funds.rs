@@ -1,5 +1,3 @@
-use std::borrow::BorrowMut;
-
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
 
@@ -9,19 +7,23 @@ use crate::error::*;
 use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
 
-use super::{apply_vault_difference, OpenOrdersReserved, OpenOrdersSlim};
+use super::{apply_vault_difference, OpenOrdersAmounts, OpenOrdersSlim};
 use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
 
 #[derive(Accounts)]
 pub struct Serum3SettleFunds<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group
+        // owner is checked at #1
+    )]
     pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
-    /// CHECK: Validated inline by checking against the pubkey stored in the account
+    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
     pub open_orders: UncheckedAccount<'info>,
 
     #[account(
@@ -48,7 +50,7 @@ pub struct Serum3SettleFunds<'info> {
     /// CHECK: Validated by the serum cpi call
     pub market_vault_signer: UncheckedAccount<'info>,
 
-    // token_index and bank.vault == vault is validated inline
+    // token_index and bank.vault == vault is validated inline at #3
     #[account(mut, has_one = group)]
     pub quote_bank: AccountLoader<'info, Bank>,
     #[account(mut)]
@@ -74,22 +76,22 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     //
     {
         let account = ctx.accounts.account.load()?;
+        // account constraint #1
         require!(
             account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
             MangoError::SomeError
         );
 
-        // Validate open_orders
+        // Validate open_orders #2
         require!(
             account
-                .serum3_orders(serum_market.market_index)
-                .ok_or_else(|| error!(MangoError::SomeError))?
+                .serum3_orders(serum_market.market_index)?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
             MangoError::SomeError
         );
 
-        // Validate banks and vaults
+        // Validate banks and vaults #3
         let quote_bank = ctx.accounts.quote_bank.load()?;
         require!(
             quote_bank.vault == ctx.accounts.quote_vault.key(),
@@ -111,34 +113,35 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     }
 
     //
-    // Before-order tracking
-    //
-
-    let before_base_vault = ctx.accounts.base_vault.amount;
-    let before_quote_vault = ctx.accounts.quote_vault.amount;
-
-    //
-    // Settle
+    // Charge any open loan origination fees
     //
     {
         let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
-        cpi_settle_funds(ctx.accounts)?;
-
-        let after_oo = OpenOrdersSlim::from_oo(&open_orders);
+        let before_oo = OpenOrdersSlim::from_oo(&open_orders);
         let mut account = ctx.accounts.account.load_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-        charge_maybe_fees(
+        charge_loan_origination_fees(
+            &ctx.accounts.group.key(),
+            &ctx.accounts.account.key(),
             serum_market.market_index,
             &mut base_bank,
             &mut quote_bank,
             &mut account.borrow_mut(),
-            &after_oo,
+            &before_oo,
         )?;
     }
 
     //
-    // After-order tracking
+    // Settle
+    //
+    let before_base_vault = ctx.accounts.base_vault.amount;
+    let before_quote_vault = ctx.accounts.quote_vault.amount;
+
+    cpi_settle_funds(ctx.accounts)?;
+
+    //
+    // After-settle tracking
     //
     {
         ctx.accounts.base_vault.reload()?;
@@ -146,102 +149,92 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         let after_base_vault = ctx.accounts.base_vault.amount;
         let after_quote_vault = ctx.accounts.quote_vault.amount;
 
-        // Charge the difference in vault balances to the user's account
+        // Settle cannot decrease vault balances
+        require_gte!(after_base_vault, before_base_vault);
+        require_gte!(after_quote_vault, before_quote_vault);
+
+        // Credit the difference in vault balances to the user's account
         let mut account = ctx.accounts.account.load_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-        let (vault_difference_result, base_loan_origination_fee, quote_loan_origination_fee) =
-            apply_vault_difference(
-                &mut account.borrow_mut(),
-                &mut base_bank,
-                after_base_vault,
-                before_base_vault,
-                &mut quote_bank,
-                after_quote_vault,
-                before_quote_vault,
-            )?;
-        vault_difference_result.deactivate_inactive_token_accounts(&mut account.borrow_mut());
-
-        if base_loan_origination_fee.is_positive() {
-            emit!(WithdrawLoanOriginationFeeLog {
-                mango_group: ctx.accounts.group.key(),
-                mango_account: ctx.accounts.account.key(),
-                token_index: serum_market.base_token_index,
-                loan_origination_fee: base_loan_origination_fee.to_bits(),
-                instruction: LoanOriginationFeeInstruction::Serum3SettleFunds
-            });
-        }
-        if quote_loan_origination_fee.is_positive() {
-            emit!(WithdrawLoanOriginationFeeLog {
-                mango_group: ctx.accounts.group.key(),
-                mango_account: ctx.accounts.account.key(),
-                token_index: serum_market.quote_token_index,
-                loan_origination_fee: quote_loan_origination_fee.to_bits(),
-                instruction: LoanOriginationFeeInstruction::Serum3SettleFunds
-            });
-        }
+        apply_vault_difference(
+            &mut account.borrow_mut(),
+            serum_market.market_index,
+            &mut base_bank,
+            after_base_vault,
+            before_base_vault,
+        )?;
+        apply_vault_difference(
+            &mut account.borrow_mut(),
+            serum_market.market_index,
+            &mut quote_bank,
+            after_quote_vault,
+            before_quote_vault,
+        )?;
     }
 
     Ok(())
 }
 
-// if reserved is less than cached, charge loan fee on the difference
-pub fn charge_maybe_fees(
+// Charge fees if the potential borrows are bigger than the funds on the open orders account
+pub fn charge_loan_origination_fees(
+    group_pubkey: &Pubkey,
+    account_pubkey: &Pubkey,
     market_index: Serum3MarketIndex,
-    coin_bank: &mut Bank,
-    pc_bank: &mut Bank,
+    base_bank: &mut Bank,
+    quote_bank: &mut Bank,
     account: &mut MangoAccountRefMut,
-    after_oo: &OpenOrdersSlim,
+    before_oo: &OpenOrdersSlim,
 ) -> Result<()> {
     let serum3_account = account.serum3_orders_mut(market_index).unwrap();
 
-    let maybe_actualized_coin_loan = I80F48::from_num::<u64>(
+    let oo_base_total = before_oo.native_base_total();
+    let actualized_base_loan = I80F48::from_num(
         serum3_account
-            .previous_native_coin_reserved
-            .saturating_sub(after_oo.native_coin_reserved()),
+            .base_borrows_without_fee
+            .saturating_sub(oo_base_total),
     );
+    if actualized_base_loan > 0 {
+        serum3_account.base_borrows_without_fee = oo_base_total;
 
-    if maybe_actualized_coin_loan > 0 {
-        serum3_account.previous_native_coin_reserved = after_oo.native_coin_reserved();
+        // now that the loan is actually materialized, charge the loan origination fee
+        // note: the withdraw has already happened while placing the order
+        let base_token_account = account.token_position_mut(base_bank.token_index)?.0;
+        let (_, fee) =
+            base_bank.withdraw_loan_origination_fee(base_token_account, actualized_base_loan)?;
 
-        // loan origination fees
-        let coin_token_account = account.token_position_mut(coin_bank.token_index)?.0;
-        let coin_token_native = coin_token_account.native(coin_bank);
-
-        if coin_token_native.is_negative() {
-            let actualized_loan = coin_token_native.abs().min(maybe_actualized_coin_loan);
-            // note: the withdraw has already happened while placing the order
-            // now that the loan is actually materialized (since the fill having taken place)
-            // charge the loan origination fee
-            coin_bank
-                .borrow_mut()
-                .withdraw_loan_origination_fee(coin_token_account, actualized_loan)?;
-        }
+        emit!(WithdrawLoanOriginationFeeLog {
+            mango_group: *group_pubkey,
+            mango_account: *account_pubkey,
+            token_index: base_bank.token_index,
+            loan_origination_fee: fee.to_bits(),
+            instruction: LoanOriginationFeeInstruction::Serum3SettleFunds,
+        });
     }
 
     let serum3_account = account.serum3_orders_mut(market_index).unwrap();
-    let maybe_actualized_pc_loan = I80F48::from_num::<u64>(
+    let oo_quote_total = before_oo.native_quote_total_plus_rebates();
+    let actualized_quote_loan = I80F48::from_num::<u64>(
         serum3_account
-            .previous_native_pc_reserved
-            .saturating_sub(after_oo.native_pc_reserved()),
+            .quote_borrows_without_fee
+            .saturating_sub(oo_quote_total),
     );
+    if actualized_quote_loan > 0 {
+        serum3_account.quote_borrows_without_fee = oo_quote_total;
 
-    if maybe_actualized_pc_loan > 0 {
-        serum3_account.previous_native_pc_reserved = after_oo.native_pc_reserved();
+        // now that the loan is actually materialized, charge the loan origination fee
+        // note: the withdraw has already happened while placing the order
+        let quote_token_account = account.token_position_mut(quote_bank.token_index)?.0;
+        let (_, fee) =
+            quote_bank.withdraw_loan_origination_fee(quote_token_account, actualized_quote_loan)?;
 
-        // loan origination fees
-        let pc_token_account = account.token_position_mut(pc_bank.token_index)?.0;
-        let pc_token_native = pc_token_account.native(pc_bank);
-
-        if pc_token_native.is_negative() {
-            let actualized_loan = pc_token_native.abs().min(maybe_actualized_pc_loan);
-            // note: the withdraw has already happened while placing the order
-            // now that the loan is actually materialized (since the fill having taken place)
-            // charge the loan origination fee
-            pc_bank
-                .borrow_mut()
-                .withdraw_loan_origination_fee(pc_token_account, actualized_loan)?;
-        }
+        emit!(WithdrawLoanOriginationFeeLog {
+            mango_group: *group_pubkey,
+            mango_account: *account_pubkey,
+            token_index: quote_bank.token_index,
+            loan_origination_fee: fee.to_bits(),
+            instruction: LoanOriginationFeeInstruction::Serum3SettleFunds,
+        });
     }
 
     Ok(())

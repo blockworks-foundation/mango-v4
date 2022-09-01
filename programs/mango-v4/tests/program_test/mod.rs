@@ -52,7 +52,7 @@ impl AddPacked for ProgramTest {
 
 struct LoggerWrapper {
     inner: env_logger::Logger,
-    program_log: Arc<RwLock<Vec<String>>>,
+    capture: Arc<RwLock<Vec<String>>>,
 }
 
 impl Log for LoggerWrapper {
@@ -67,7 +67,9 @@ impl Log for LoggerWrapper {
         {
             let msg = record.args().to_string();
             if let Some(data) = msg.strip_prefix("Program log: ") {
-                self.program_log.write().unwrap().push(data.into());
+                self.capture.write().unwrap().push(data.into());
+            } else if let Some(data) = msg.strip_prefix("Program data: ") {
+                self.capture.write().unwrap().push(data.into());
             }
         }
         self.inner.log(record);
@@ -85,14 +87,17 @@ pub struct MarginTradeCookie {
 
 pub struct TestContextBuilder {
     test: ProgramTest,
-    program_log_capture: Arc<RwLock<Vec<String>>>,
+    logger_capture: Arc<RwLock<Vec<String>>>,
     mint0: Pubkey,
+}
+
+lazy_static::lazy_static! {
+    static ref LOGGER_CAPTURE: Arc<RwLock<Vec<String>>> = Arc::new(RwLock::new(vec![]));
+    static ref LOGGER_LOCK: Arc<RwLock<()>> = Arc::new(RwLock::new(()));
 }
 
 impl TestContextBuilder {
     pub fn new() -> Self {
-        let mut test = ProgramTest::new("mango_v4", mango_v4::id(), processor!(mango_v4::entry));
-
         // We need to intercept logs to capture program log output
         let log_filter = "solana_rbpf=trace,\
                     solana_runtime::message_processor=debug,\
@@ -102,18 +107,19 @@ impl TestContextBuilder {
             env_logger::Builder::from_env(env_logger::Env::new().default_filter_or(log_filter))
                 .format_timestamp_nanos()
                 .build();
-        let program_log_capture = Arc::new(RwLock::new(vec![]));
         let _ = log::set_boxed_logger(Box::new(LoggerWrapper {
             inner: env_logger,
-            program_log: program_log_capture.clone(),
+            capture: LOGGER_CAPTURE.clone(),
         }));
 
+        let mut test = ProgramTest::new("mango_v4", mango_v4::id(), processor!(mango_v4::entry));
+
         // intentionally set to as tight as possible, to catch potential problems early
-        test.set_compute_max_units(87000);
+        test.set_compute_max_units(75000);
 
         Self {
             test,
-            program_log_capture,
+            logger_capture: LOGGER_CAPTURE.clone(),
             mint0: Pubkey::new_unique(),
         }
     }
@@ -277,7 +283,9 @@ impl TestContextBuilder {
         let solana = Arc::new(SolanaCookie {
             context: RefCell::new(context),
             rent,
-            program_log: self.program_log_capture.clone(),
+            logger_capture: self.logger_capture.clone(),
+            logger_lock: LOGGER_LOCK.clone(),
+            last_transaction_log: RefCell::new(vec![]),
         });
 
         solana

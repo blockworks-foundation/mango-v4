@@ -346,9 +346,7 @@ impl<'a> Book<'a> {
                 event_queue.push_back(cast(event)).unwrap();
             }
 
-            let owner_slot = mango_account
-                .perp_next_order_slot()
-                .ok_or_else(|| error!(MangoError::SomeError))?;
+            let owner_slot = mango_account.perp_next_order_slot()?;
             let new_order = LeafNode::new(
                 owner_slot as u8,
                 order_id,
@@ -393,7 +391,7 @@ impl<'a> Book<'a> {
         side_to_cancel_option: Option<Side>,
     ) -> Result<()> {
         for i in 0..mango_account.header.perp_oo_count() {
-            let oo = mango_account.perp_orders_by_raw_index(i);
+            let oo = mango_account.perp_order_by_raw_index(i);
             if oo.order_market == FREE_ORDER_SLOT
                 || oo.order_market != perp_market.perp_market_index
             {

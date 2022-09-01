@@ -217,10 +217,9 @@ impl MangoGroupContext {
             oracles.push(mint_info.oracle);
         }
         for affected_token_index in affected_tokens {
-            if account
+            if !account
                 .active_token_positions()
-                .find(|p| p.token_index == affected_token_index)
-                .is_none()
+                .any(|p| p.token_index == affected_token_index)
             {
                 // If there is not yet an active position for the token, we need to pass
                 // the bank/oracle for health check anyway.

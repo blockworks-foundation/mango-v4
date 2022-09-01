@@ -5,7 +5,7 @@ use crate::logs::{UpdateIndexLog, UpdateRateLog};
 use crate::state::HOUR;
 use crate::{
     accounts_zerocopy::{AccountInfoRef, LoadMutZeroCopyRef, LoadZeroCopyRef},
-    state::{oracle_price, Bank, Group, MintInfo},
+    state::{Bank, Group, MintInfo},
 };
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
 use anchor_lang::Discriminator;
@@ -106,11 +106,8 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             now_ts,
         );
 
-        let price = oracle_price(
-            &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
-            some_bank.oracle_config.conf_filter,
-            some_bank.mint_decimals,
-        )?;
+        let price =
+            some_bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
         emit!(UpdateIndexLog {
             mango_group: mint_info.group.key(),
             token_index: mint_info.token_index,

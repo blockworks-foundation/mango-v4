@@ -17,11 +17,12 @@ use super::FillEvent;
 use super::LeafNode;
 use super::PerpMarket;
 use super::PerpMarketIndex;
-use super::PerpOpenOrders;
+use super::PerpOpenOrder;
 use super::Serum3MarketIndex;
 use super::Side;
 use super::TokenIndex;
 use super::FREE_ORDER_SLOT;
+use super::{HealthCache, HealthType};
 use super::{PerpPosition, Serum3Orders, TokenPosition};
 use checked_math as cm;
 
@@ -56,9 +57,16 @@ pub struct MangoAccount {
     /// Normally accounts can not be liquidated while maint_health >= 0. But when an account
     /// reaches maint_health < 0, liquidators will call a liquidation instruction and thereby
     /// set this flag. Now the account may be liquidated until init_health >= 0.
-    being_liquidated: u8,
+    ///
+    /// Many actions should be disabled while the account is being liquidated, even if
+    /// its maint health has recovered to positive. Creating new open orders would, for example,
+    /// confuse liquidators.
+    pub being_liquidated: u8,
 
-    padding2: u8,
+    /// The account is currently inside a health region marked by HealthRegionBegin...HealthRegionEnd.
+    ///
+    /// Must never be set after a transaction ends.
+    pub in_health_region: u8,
 
     pub bump: u8,
 
@@ -72,7 +80,10 @@ pub struct MangoAccount {
     // TODO: unimplemented
     pub net_settled: i64,
 
-    pub reserved: [u8; 248],
+    /// Init health as calculated during HealthReginBegin, rounded up.
+    pub health_region_pre_init_health: i64,
+
+    pub reserved: [u8; 240],
 
     // dynamic
     pub header_version: u8,
@@ -89,24 +100,25 @@ pub struct MangoAccount {
     pub padding6: u32,
     pub perps: Vec<PerpPosition>,
     pub padding7: u32,
-    pub perp_open_orders: Vec<PerpOpenOrders>,
+    pub perp_open_orders: Vec<PerpOpenOrder>,
 }
 
-impl Default for MangoAccount {
-    fn default() -> Self {
+impl MangoAccount {
+    pub fn default_for_tests() -> Self {
         Self {
             name: Default::default(),
             group: Pubkey::default(),
             owner: Pubkey::default(),
             delegate: Pubkey::default(),
             being_liquidated: 0,
-            padding2: 0,
+            in_health_region: 0,
             account_num: 0,
             bump: 0,
             padding: Default::default(),
             net_deposits: 0,
             net_settled: 0,
-            reserved: [0; 248],
+            health_region_pre_init_health: 0,
+            reserved: [0; 240],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
             padding4: Default::default(),
@@ -114,14 +126,13 @@ impl Default for MangoAccount {
             padding5: Default::default(),
             serum3: vec![Serum3Orders::default(); 5],
             padding6: Default::default(),
-            perps: vec![PerpPosition::default(); 2],
+            perps: vec![PerpPosition::default(); 4],
             padding7: Default::default(),
-            perp_open_orders: vec![PerpOpenOrders::default(); 2],
+            perp_open_orders: vec![PerpOpenOrder::default(); 6],
         }
     }
-}
 
-impl MangoAccount {
+    /// Number of bytes needed for the MangoAccount, including the discriminator
     pub fn space(
         token_count: u8,
         serum3_count: u8,
@@ -167,57 +178,8 @@ impl MangoAccount {
         perp_oo_count: u8,
     ) -> usize {
         Self::dynamic_perp_oo_vec_offset(token_count, serum3_count, perp_count)
-            + (BORSH_VEC_SIZE_BYTES + size_of::<PerpOpenOrders>() * usize::from(perp_oo_count))
+            + (BORSH_VEC_SIZE_BYTES + size_of::<PerpOpenOrder>() * usize::from(perp_oo_count))
     }
-}
-
-#[test]
-fn test_serialization_match() {
-    let mut account = MangoAccount::default();
-    account.group = Pubkey::new_unique();
-    account.owner = Pubkey::new_unique();
-    account.name = crate::util::fill_from_str("abcdef").unwrap();
-    account.delegate = Pubkey::new_unique();
-    account.account_num = 1;
-    account.bump = 2;
-    account.net_deposits = 3;
-    account.net_settled = 4;
-    account.tokens.resize(8, TokenPosition::default());
-    account.tokens[0].token_index = 5;
-    account.serum3.resize(8, Serum3Orders::default());
-    account.perps.resize(8, PerpPosition::default());
-    account.perps[0].market_index = 6;
-    account
-        .perp_open_orders
-        .resize(8, PerpOpenOrders::default());
-
-    let account_bytes = AnchorSerialize::try_to_vec(&account).unwrap();
-    assert_eq!(
-        8 + account_bytes.len(),
-        MangoAccount::space(8, 8, 8, 8).unwrap()
-    );
-
-    let account2 = MangoAccountValue::from_bytes(&account_bytes).unwrap();
-    assert_eq!(account.group, account2.fixed.group);
-    assert_eq!(account.owner, account2.fixed.owner);
-    assert_eq!(account.name, account2.fixed.name);
-    assert_eq!(account.delegate, account2.fixed.delegate);
-    assert_eq!(account.account_num, account2.fixed.account_num);
-    assert_eq!(account.bump, account2.fixed.bump);
-    assert_eq!(account.net_deposits, account2.fixed.net_deposits);
-    assert_eq!(account.net_settled, account2.fixed.net_settled);
-    assert_eq!(
-        account.tokens[0].token_index,
-        account2.token_position_by_raw_index(0).token_index
-    );
-    assert_eq!(
-        account.serum3[0].open_orders,
-        account2.serum3_orders_by_raw_index(0).open_orders
-    );
-    assert_eq!(
-        account.perps[0].market_index,
-        account2.perp_position_by_raw_index(0).market_index
-    );
 }
 
 // Mango Account fixed part for easy zero copy deserialization
@@ -230,14 +192,15 @@ pub struct MangoAccountFixed {
     pub delegate: Pubkey,
     pub account_num: u32,
     being_liquidated: u8,
-    padding2: u8,
+    in_health_region: u8,
     pub bump: u8,
     pub padding: [u8; 1],
     pub net_deposits: i64,
     pub net_settled: i64,
-    pub reserved: [u8; 248],
+    pub health_region_begin_init_health: i64,
+    pub reserved: [u8; 240],
 }
-const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 2 * 8 + 248);
+const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 3 * 8 + 240);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
 
 unsafe impl bytemuck::Pod for MangoAccountFixed {}
@@ -255,18 +218,29 @@ impl MangoAccountFixed {
     }
 
     pub fn being_liquidated(&self) -> bool {
-        self.being_liquidated != 0
+        self.being_liquidated == 1
     }
 
     pub fn set_being_liquidated(&mut self, b: bool) {
         self.being_liquidated = if b { 1 } else { 0 };
     }
 
-    pub fn maybe_recover_from_being_liquidated(&mut self, init_health: I80F48) {
+    pub fn is_in_health_region(&self) -> bool {
+        self.in_health_region == 1
+    }
+
+    pub fn set_in_health_region(&mut self, b: bool) {
+        self.in_health_region = if b { 1 } else { 0 };
+    }
+
+    pub fn maybe_recover_from_being_liquidated(&mut self, init_health: I80F48) -> bool {
         // This is used as threshold to flip flag instead of 0 because of dust issues
         let one_native_usdc = I80F48::ONE;
         if self.being_liquidated() && init_health > -one_native_usdc {
             self.set_being_liquidated(false);
+            true
+        } else {
+            false
         }
     }
 }
@@ -374,7 +348,7 @@ impl MangoAccountDynamicHeader {
             self.serum3_count,
             self.perp_count,
         ) + BORSH_VEC_SIZE_BYTES
-            + raw_index * size_of::<PerpOpenOrders>()
+            + raw_index * size_of::<PerpOpenOrder>()
     }
 
     pub fn token_count(&self) -> usize {
@@ -474,14 +448,13 @@ impl<
 
     // get iter over all active TokenPositions
     pub fn active_token_positions(&self) -> impl Iterator<Item = &TokenPosition> + '_ {
-        (0..self.header().token_count())
-            .map(|i| self.token_position_by_raw_index(i))
-            .filter(|token| token.is_active())
+        self.all_token_positions().filter(|token| token.is_active())
     }
 
-    pub fn serum3_orders(&self, market_index: Serum3MarketIndex) -> Option<&Serum3Orders> {
-        self.active_serum3_orders()
+    pub fn serum3_orders(&self, market_index: Serum3MarketIndex) -> Result<&Serum3Orders> {
+        self.all_serum3_orders()
             .find(|p| p.is_active_for_market(market_index))
+            .ok_or_else(|| error_msg!("serum3 orders for market index {} not found", market_index))
     }
 
     pub fn serum3_orders_by_raw_index(&self, raw_index: usize) -> &Serum3Orders {
@@ -493,14 +466,14 @@ impl<
     }
 
     pub fn active_serum3_orders(&self) -> impl Iterator<Item = &Serum3Orders> + '_ {
-        (0..self.header().serum3_count())
-            .map(|i| self.serum3_orders_by_raw_index(i))
+        self.all_serum3_orders()
             .filter(|serum3_order| serum3_order.is_active())
     }
 
-    pub fn perp_position(&self, market_index: PerpMarketIndex) -> Option<&PerpPosition> {
-        self.active_perp_positions()
+    pub fn perp_position(&self, market_index: PerpMarketIndex) -> Result<&PerpPosition> {
+        self.all_perp_positions()
             .find(|p| p.is_active_for_market(market_index))
+            .ok_or_else(|| error_msg!("perp position for market index {} not found", market_index))
     }
 
     pub fn perp_position_by_raw_index(&self, raw_index: usize) -> &PerpPosition {
@@ -512,22 +485,21 @@ impl<
     }
 
     pub fn active_perp_positions(&self) -> impl Iterator<Item = &PerpPosition> {
-        (0..self.header().perp_count())
-            .map(|i| self.perp_position_by_raw_index(i))
-            .filter(|p| p.is_active())
+        self.all_perp_positions().filter(|p| p.is_active())
     }
 
-    pub fn perp_orders_by_raw_index(&self, raw_index: usize) -> &PerpOpenOrders {
+    pub fn perp_order_by_raw_index(&self, raw_index: usize) -> &PerpOpenOrder {
         get_helper(self.dynamic(), self.header().perp_oo_offset(raw_index))
     }
 
-    pub fn all_perp_orders(&self) -> impl Iterator<Item = &PerpOpenOrders> {
-        (0..self.header().perp_oo_count()).map(|i| self.perp_orders_by_raw_index(i))
+    pub fn all_perp_orders(&self) -> impl Iterator<Item = &PerpOpenOrder> {
+        (0..self.header().perp_oo_count()).map(|i| self.perp_order_by_raw_index(i))
     }
 
-    pub fn perp_next_order_slot(&self) -> Option<usize> {
+    pub fn perp_next_order_slot(&self) -> Result<usize> {
         self.all_perp_orders()
             .position(|&oo| oo.order_market == FREE_ORDER_SLOT)
+            .ok_or_else(|| error_msg!("no free perp order index"))
     }
 
     pub fn perp_find_order_with_client_order_id(
@@ -535,8 +507,7 @@ impl<
         market_index: PerpMarketIndex,
         client_order_id: u64,
     ) -> Option<(i128, Side)> {
-        for i in 0..self.header().perp_oo_count() {
-            let oo = self.perp_orders_by_raw_index(i);
+        for oo in self.all_perp_orders() {
             if oo.order_market == market_index && oo.client_order_id == client_order_id {
                 return Some((oo.order_id, oo.order_side));
             }
@@ -549,8 +520,7 @@ impl<
         market_index: PerpMarketIndex,
         order_id: i128,
     ) -> Option<Side> {
-        for i in 0..self.header().perp_oo_count() {
-            let oo = self.perp_orders_by_raw_index(i);
+        for oo in self.all_perp_orders() {
             if oo.order_market == market_index && oo.order_id == order_id {
                 return Some(oo.order_side);
             }
@@ -579,6 +549,9 @@ impl<
 {
     fn header_mut(&mut self) -> &mut MangoAccountDynamicHeader {
         self.header.deref_or_borrow_mut()
+    }
+    fn fixed_mut(&mut self) -> &mut MangoAccountFixed {
+        self.fixed.deref_or_borrow_mut()
     }
     fn dynamic_mut(&mut self) -> &mut [u8] {
         self.dynamic.deref_or_borrow_mut()
@@ -669,7 +642,7 @@ impl<
         &mut self,
         market_index: Serum3MarketIndex,
     ) -> Result<&mut Serum3Orders> {
-        if self.serum3_orders(market_index).is_some() {
+        if self.serum3_orders(market_index).is_ok() {
             return err!(MangoError::Serum3OpenOrdersExistAlready);
         }
 
@@ -679,9 +652,9 @@ impl<
                 market_index: market_index as Serum3MarketIndex,
                 ..Serum3Orders::default()
             };
-            return Ok(self.serum3_orders_mut_by_raw_index(raw_index));
+            Ok(self.serum3_orders_mut_by_raw_index(raw_index))
         } else {
-            return err!(MangoError::NoFreeSerum3OpenOrdersIndex);
+            err!(MangoError::NoFreeSerum3OpenOrdersIndex)
         }
     }
 
@@ -697,11 +670,13 @@ impl<
     pub fn serum3_orders_mut(
         &mut self,
         market_index: Serum3MarketIndex,
-    ) -> Option<&mut Serum3Orders> {
+    ) -> Result<&mut Serum3Orders> {
         let raw_index_opt = self
-            .active_serum3_orders()
+            .all_serum3_orders()
             .position(|p| p.is_active_for_market(market_index));
-        raw_index_opt.map(|raw_index| self.serum3_orders_mut_by_raw_index(raw_index))
+        raw_index_opt
+            .map(|raw_index| self.serum3_orders_mut_by_raw_index(raw_index))
+            .ok_or_else(|| error_msg!("serum3 orders for market index {} not found", market_index))
     }
 
     // get mut PerpPosition at raw_index
@@ -710,7 +685,7 @@ impl<
         get_helper_mut(self.dynamic_mut(), offset)
     }
 
-    pub fn perp_orders_mut_by_raw_index(&mut self, raw_index: usize) -> &mut PerpOpenOrders {
+    pub fn perp_order_mut_by_raw_index(&mut self, raw_index: usize) -> &mut PerpOpenOrder {
         let offset = self.header().perp_oo_offset(raw_index);
         get_helper_mut(self.dynamic_mut(), offset)
     }
@@ -720,7 +695,7 @@ impl<
         perp_market_index: PerpMarketIndex,
     ) -> Result<(&mut PerpPosition, usize)> {
         let mut raw_index_opt = self
-            .active_perp_positions()
+            .all_perp_positions()
             .position(|p| p.is_active_for_market(perp_market_index));
         if raw_index_opt.is_none() {
             raw_index_opt = self.all_perp_positions().position(|p| !p.is_active());
@@ -748,6 +723,7 @@ impl<
         side: Side,
         order: &LeafNode,
     ) -> Result<()> {
+        // TODO: pass in the PerpPosition, currently has a creation side-effect
         let mut perp_account = self.ensure_perp_position(perp_market_index).unwrap().0;
         match side {
             Side::Bid => {
@@ -759,7 +735,7 @@ impl<
         };
         let slot = order.owner_slot as usize;
 
-        let mut oo = self.perp_orders_mut_by_raw_index(slot);
+        let mut oo = self.perp_order_mut_by_raw_index(slot);
         oo.order_market = perp_market_index;
         oo.order_side = side;
         oo.order_id = order.key;
@@ -768,8 +744,9 @@ impl<
     }
 
     pub fn remove_perp_order(&mut self, slot: usize, quantity: i64) -> Result<()> {
+        // TODO: pass in the PerpPosition, currently has a creation side-effect
         {
-            let oo = self.perp_orders_mut_by_raw_index(slot);
+            let oo = self.perp_order_mut_by_raw_index(slot);
             require_neq!(oo.order_market, FREE_ORDER_SLOT);
             let order_side = oo.order_side;
             let perp_market_index = oo.order_market;
@@ -787,7 +764,7 @@ impl<
         }
 
         // release space
-        let oo = self.perp_orders_mut_by_raw_index(slot);
+        let oo = self.perp_order_mut_by_raw_index(slot);
         oo.order_market = FREE_ORDER_SLOT;
         oo.order_side = Side::Bid;
         oo.order_id = 0i128;
@@ -801,6 +778,7 @@ impl<
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
     ) -> Result<()> {
+        // TODO: pass in the PerpPosition, currently has a creation side-effect
         let pa = self.ensure_perp_position(perp_market_index).unwrap().0;
         pa.settle_funding(perp_market);
 
@@ -840,6 +818,7 @@ impl<
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
     ) -> Result<()> {
+        // TODO: pass in the PerpPosition, currently has a creation side-effect
         let pa = self.ensure_perp_position(perp_market_index).unwrap().0;
         pa.settle_funding(perp_market);
 
@@ -851,6 +830,34 @@ impl<
         // fees are assessed at time of trade; no need to assess fees here
 
         pa.quote_position_native += quote;
+        Ok(())
+    }
+
+    pub fn check_health_pre(&mut self, health_cache: &HealthCache) -> Result<I80F48> {
+        let pre_health = health_cache.health(HealthType::Init);
+        msg!("pre_health: {}", pre_health);
+        self.fixed_mut()
+            .maybe_recover_from_being_liquidated(pre_health);
+        require!(
+            !self.fixed().being_liquidated(),
+            MangoError::BeingLiquidated
+        );
+        Ok(pre_health)
+    }
+
+    pub fn check_health_post(
+        &mut self,
+        health_cache: &HealthCache,
+        pre_health: I80F48,
+    ) -> Result<()> {
+        let post_health = health_cache.health(HealthType::Init);
+        msg!("post_health: {}", post_health);
+        require!(
+            post_health >= 0 || post_health > pre_health,
+            MangoError::HealthMustBePositiveOrIncrease
+        );
+        self.fixed_mut()
+            .maybe_recover_from_being_liquidated(post_health);
         Ok(())
     }
 
@@ -934,12 +941,12 @@ impl<
                 sol_memmove(
                     &mut dynamic[new_header.perp_oo_offset(0)],
                     &mut dynamic[old_header.perp_oo_offset(0)],
-                    size_of::<PerpOpenOrders>() * old_header.perp_oo_count(),
+                    size_of::<PerpOpenOrder>() * old_header.perp_oo_count(),
                 );
             }
             for i in old_header.perp_oo_count..new_perp_oo_count {
                 *get_helper_mut(dynamic, new_header.perp_oo_offset(i.into())) =
-                    PerpOpenOrders::default();
+                    PerpOpenOrder::default();
             }
         }
 
@@ -998,5 +1005,239 @@ impl<
         self.write_perp_oo_length();
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_test_account() -> MangoAccountValue {
+        let bytes = AnchorSerialize::try_to_vec(&MangoAccount::default_for_tests()).unwrap();
+        MangoAccountValue::from_bytes(&bytes).unwrap()
+    }
+
+    #[test]
+    fn test_serialization_match() {
+        let mut account = MangoAccount::default_for_tests();
+        account.group = Pubkey::new_unique();
+        account.owner = Pubkey::new_unique();
+        account.name = crate::util::fill_from_str("abcdef").unwrap();
+        account.delegate = Pubkey::new_unique();
+        account.account_num = 1;
+        account.being_liquidated = 2;
+        account.in_health_region = 3;
+        account.bump = 4;
+        account.net_deposits = 5;
+        account.net_settled = 6;
+        account.health_region_pre_init_health = 7;
+        account.tokens.resize(8, TokenPosition::default());
+        account.tokens[0].token_index = 8;
+        account.serum3.resize(8, Serum3Orders::default());
+        account.perps.resize(8, PerpPosition::default());
+        account.perps[0].market_index = 9;
+        account.perp_open_orders.resize(8, PerpOpenOrder::default());
+
+        let account_bytes = AnchorSerialize::try_to_vec(&account).unwrap();
+        assert_eq!(
+            8 + account_bytes.len(),
+            MangoAccount::space(8, 8, 8, 8).unwrap()
+        );
+
+        let account2 = MangoAccountValue::from_bytes(&account_bytes).unwrap();
+        assert_eq!(account.group, account2.fixed.group);
+        assert_eq!(account.owner, account2.fixed.owner);
+        assert_eq!(account.name, account2.fixed.name);
+        assert_eq!(account.delegate, account2.fixed.delegate);
+        assert_eq!(account.account_num, account2.fixed.account_num);
+        assert_eq!(account.being_liquidated, account2.fixed.being_liquidated);
+        assert_eq!(account.in_health_region, account2.fixed.in_health_region);
+        assert_eq!(account.bump, account2.fixed.bump);
+        assert_eq!(account.net_deposits, account2.fixed.net_deposits);
+        assert_eq!(account.net_settled, account2.fixed.net_settled);
+        assert_eq!(
+            account.health_region_pre_init_health,
+            account2.fixed.health_region_begin_init_health
+        );
+        assert_eq!(
+            account.tokens[0].token_index,
+            account2.token_position_by_raw_index(0).token_index
+        );
+        assert_eq!(
+            account.serum3[0].open_orders,
+            account2.serum3_orders_by_raw_index(0).open_orders
+        );
+        assert_eq!(
+            account.perps[0].market_index,
+            account2.perp_position_by_raw_index(0).market_index
+        );
+    }
+
+    #[test]
+    fn test_token_positions() {
+        let mut account = make_test_account();
+        assert!(account.token_position(1).is_err());
+        assert!(account.token_position_and_raw_index(2).is_err());
+        assert!(account.token_position_mut(3).is_err());
+        assert_eq!(
+            account.token_position_by_raw_index(0).token_index,
+            TokenIndex::MAX
+        );
+
+        {
+            let (pos, raw, active) = account.ensure_token_position(1).unwrap();
+            assert_eq!(raw, 0);
+            assert_eq!(active, 0);
+            assert_eq!(pos.token_index, 1);
+        }
+        {
+            let (pos, raw, active) = account.ensure_token_position(7).unwrap();
+            assert_eq!(raw, 1);
+            assert_eq!(active, 1);
+            assert_eq!(pos.token_index, 7);
+        }
+        {
+            let (pos, raw, active) = account.ensure_token_position(42).unwrap();
+            assert_eq!(raw, 2);
+            assert_eq!(active, 2);
+            assert_eq!(pos.token_index, 42);
+        }
+
+        {
+            account.deactivate_token_position(1);
+
+            let (pos, raw, active) = account.ensure_token_position(42).unwrap();
+            assert_eq!(raw, 2);
+            assert_eq!(active, 1);
+            assert_eq!(pos.token_index, 42);
+
+            let (pos, raw, active) = account.ensure_token_position(8).unwrap();
+            assert_eq!(raw, 1);
+            assert_eq!(active, 1);
+            assert_eq!(pos.token_index, 8);
+        }
+
+        assert_eq!(account.active_token_positions().count(), 3);
+        account.deactivate_token_position(0);
+        assert_eq!(
+            account.token_position_by_raw_index(0).token_index,
+            TokenIndex::MAX
+        );
+        assert!(account.token_position(1).is_err());
+        assert!(account.token_position_mut(1).is_err());
+        assert!(account.token_position(8).is_ok());
+        assert!(account.token_position(42).is_ok());
+        assert_eq!(account.token_position_and_raw_index(42).unwrap().1, 2);
+        assert_eq!(account.active_token_positions().count(), 2);
+
+        {
+            let (pos, raw) = account.token_position_mut(42).unwrap();
+            assert_eq!(pos.token_index, 42);
+            assert_eq!(raw, 2);
+        }
+        {
+            let (pos, raw) = account.token_position_mut(8).unwrap();
+            assert_eq!(pos.token_index, 8);
+            assert_eq!(raw, 1);
+        }
+    }
+
+    #[test]
+    fn test_serum3_orders() {
+        let mut account = make_test_account();
+        assert!(account.serum3_orders(1).is_err());
+        assert!(account.serum3_orders_mut(3).is_err());
+        assert_eq!(
+            account.serum3_orders_by_raw_index(0).market_index,
+            Serum3MarketIndex::MAX
+        );
+
+        assert_eq!(account.create_serum3_orders(1).unwrap().market_index, 1);
+        assert_eq!(account.create_serum3_orders(7).unwrap().market_index, 7);
+        assert_eq!(account.create_serum3_orders(42).unwrap().market_index, 42);
+        assert!(account.create_serum3_orders(7).is_err());
+        assert_eq!(account.active_serum3_orders().count(), 3);
+
+        assert!(account.deactivate_serum3_orders(7).is_ok());
+        assert_eq!(
+            account.serum3_orders_by_raw_index(1).market_index,
+            Serum3MarketIndex::MAX
+        );
+        assert!(account.create_serum3_orders(8).is_ok());
+        assert_eq!(account.serum3_orders_by_raw_index(1).market_index, 8);
+
+        assert_eq!(account.active_serum3_orders().count(), 3);
+        assert!(account.deactivate_serum3_orders(1).is_ok());
+        assert!(account.serum3_orders(1).is_err());
+        assert!(account.serum3_orders_mut(1).is_err());
+        assert!(account.serum3_orders(8).is_ok());
+        assert!(account.serum3_orders(42).is_ok());
+        assert_eq!(account.active_serum3_orders().count(), 2);
+
+        assert_eq!(account.serum3_orders_mut(42).unwrap().market_index, 42);
+        assert_eq!(account.serum3_orders_mut(8).unwrap().market_index, 8);
+        assert!(account.serum3_orders_mut(7).is_err());
+    }
+
+    #[test]
+    fn test_perp_positions() {
+        let mut account = make_test_account();
+        assert!(account.perp_position(1).is_err());
+        //assert!(account.perp_position_mut(3).is_err());
+        assert_eq!(
+            account.perp_position_by_raw_index(0).market_index,
+            PerpMarketIndex::MAX
+        );
+
+        {
+            let (pos, raw) = account.ensure_perp_position(1).unwrap();
+            assert_eq!(raw, 0);
+            assert_eq!(pos.market_index, 1);
+        }
+        {
+            let (pos, raw) = account.ensure_perp_position(7).unwrap();
+            assert_eq!(raw, 1);
+            assert_eq!(pos.market_index, 7);
+        }
+        {
+            let (pos, raw) = account.ensure_perp_position(42).unwrap();
+            assert_eq!(raw, 2);
+            assert_eq!(pos.market_index, 42);
+        }
+
+        {
+            account.deactivate_perp_position(1);
+
+            let (pos, raw) = account.ensure_perp_position(42).unwrap();
+            assert_eq!(raw, 2);
+            assert_eq!(pos.market_index, 42);
+
+            let (pos, raw) = account.ensure_perp_position(8).unwrap();
+            assert_eq!(raw, 1);
+            assert_eq!(pos.market_index, 8);
+        }
+
+        assert_eq!(account.active_perp_positions().count(), 3);
+        account.deactivate_perp_position(0);
+        assert_eq!(
+            account.perp_position_by_raw_index(0).market_index,
+            PerpMarketIndex::MAX
+        );
+        assert!(account.perp_position(1).is_err());
+        //assert!(account.perp_position_mut(1).is_err());
+        assert!(account.perp_position(8).is_ok());
+        assert!(account.perp_position(42).is_ok());
+        assert_eq!(account.active_perp_positions().count(), 2);
+
+        /*{
+            let (pos, raw) = account.perp_position_mut(42).unwrap();
+            assert_eq!(pos.perp_index, 42);
+            assert_eq!(raw, 2);
+        }
+        {
+            let (pos, raw) = account.perp_position_mut(8).unwrap();
+            assert_eq!(pos.perp_index, 8);
+            assert_eq!(raw, 1);
+        }*/
     }
 }

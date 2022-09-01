@@ -9,12 +9,12 @@ COPY ./ .
 RUN sed -i 's|lib/\*|lib/checked_math|' Cargo.toml
 
 # Mount cache for downloaded and compiled dependencies
-RUN --mount=type=cache,target=/usr/local/cargo,from=rust,source=/usr/local/cargo \
-    --mount=type=cache,target=target \
+RUN --mount=type=cache,mode=0777,target=/usr/local/cargo,from=rust,source=/usr/local/cargo \
+    --mount=type=cache,mode=0777,target=target \
     cargo build --release --bins
 
 # Copy bins out of cache
-RUN --mount=type=cache,target=target mkdir .bin && cp target/release/keeper target/release/liquidator .bin/
+RUN --mount=type=cache,mode=0777,target=target mkdir .bin && cp target/release/keeper target/release/liquidator .bin/
 
 FROM debian:bullseye-slim as run
 RUN apt-get update && apt-get -y install ca-certificates libc6

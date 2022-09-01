@@ -19,6 +19,8 @@ pub enum MangoError {
     InvalidFlashLoanTargetCpiProgram,
     #[msg("health must be positive")]
     HealthMustBePositive,
+    #[msg("health must be positive or increase")]
+    HealthMustBePositiveOrIncrease,
     #[msg("health must be negative")]
     HealthMustBeNegative,
     #[msg("the account is bankrupt")]
@@ -35,6 +37,8 @@ pub enum MangoError {
     Serum3OpenOrdersExistAlready,
     #[msg("bank vault has insufficent funds")]
     InsufficentBankVaultFunds,
+    #[msg("account is currently being liquidated")]
+    BeingLiquidated,
 }
 
 pub trait Contextable {

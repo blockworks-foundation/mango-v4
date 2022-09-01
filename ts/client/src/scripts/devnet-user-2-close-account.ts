@@ -26,7 +26,7 @@ async function main() {
   // user
   const user = Keypair.fromSecretKey(
     Buffer.from(
-      JSON.parse(fs.readFileSync(process.env.USER_KEYPAIR!, 'utf-8')),
+      JSON.parse(fs.readFileSync(process.env.USER2_KEYPAIR!, 'utf-8')),
     ),
   );
   const userWallet = new Wallet(user);

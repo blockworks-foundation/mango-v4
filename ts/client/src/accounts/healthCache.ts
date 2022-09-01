@@ -11,6 +11,7 @@ import {
   ZERO_I80F48,
 } from './I80F48';
 import { HealthType } from './mangoAccount';
+import { Serum3Market, Serum3Side } from './serum3';
 
 //               ░░░░
 //
@@ -37,42 +38,46 @@ import { HealthType } from './mangoAccount';
 // warning: this code is copy pasta from rust, keep in sync with health.rs
 
 export class HealthCache {
-  tokenInfos: TokenInfo[];
-  serum3Infos: Serum3Info[];
-  perpInfos: PerpInfo[];
+  constructor(
+    public tokenInfos: TokenInfo[],
+    public serum3Infos: Serum3Info[],
+    public perpInfos: PerpInfo[],
+  ) {}
 
-  constructor(dto: HealthCacheDto) {
-    this.tokenInfos = dto.tokenInfos.map((dto) => TokenInfo.fromDto(dto));
-    this.serum3Infos = dto.serum3Infos.map((dto) => new Serum3Info(dto));
-    this.perpInfos = dto.perpInfos.map((dto) => new PerpInfo(dto));
+  static fromDto(dto) {
+    return new HealthCache(
+      dto.tokenInfos.map((dto) => TokenInfo.fromDto(dto)),
+      dto.serum3Infos.map((dto) => Serum3Info.fromDto(dto)),
+      dto.perpInfos.map((dto) => new PerpInfo(dto)),
+    );
   }
 
   public health(healthType: HealthType): I80F48 {
-    let health = ZERO_I80F48;
+    const health = ZERO_I80F48();
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
-      health = health.add(contrib);
+      health.iadd(contrib);
     }
     for (const serum3Info of this.serum3Infos) {
       const contrib = serum3Info.healthContribution(
         healthType,
         this.tokenInfos,
       );
-      health = health.add(contrib);
+      health.iadd(contrib);
     }
     for (const perpInfo of this.perpInfos) {
       const contrib = perpInfo.healthContribution(healthType);
-      health = health.add(contrib);
+      health.iadd(contrib);
     }
     return health;
   }
 
   public assets(healthType: HealthType): I80F48 {
-    let assets = ZERO_I80F48;
+    const assets = ZERO_I80F48();
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
       if (contrib.isPos()) {
-        assets = assets.add(contrib);
+        assets.iadd(contrib);
       }
     }
     for (const serum3Info of this.serum3Infos) {
@@ -81,24 +86,24 @@ export class HealthCache {
         this.tokenInfos,
       );
       if (contrib.isPos()) {
-        assets = assets.add(contrib);
+        assets.iadd(contrib);
       }
     }
     for (const perpInfo of this.perpInfos) {
       const contrib = perpInfo.healthContribution(healthType);
       if (contrib.isPos()) {
-        assets = assets.add(contrib);
+        assets.iadd(contrib);
       }
     }
     return assets;
   }
 
   public liabs(healthType: HealthType): I80F48 {
-    let liabs = ZERO_I80F48;
+    const liabs = ZERO_I80F48();
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
       if (contrib.isNeg()) {
-        liabs = liabs.sub(contrib);
+        liabs.isub(contrib);
       }
     }
     for (const serum3Info of this.serum3Infos) {
@@ -107,28 +112,28 @@ export class HealthCache {
         this.tokenInfos,
       );
       if (contrib.isNeg()) {
-        liabs = liabs.sub(contrib);
+        liabs.isub(contrib);
       }
     }
     for (const perpInfo of this.perpInfos) {
       const contrib = perpInfo.healthContribution(healthType);
       if (contrib.isNeg()) {
-        liabs = liabs.sub(contrib);
+        liabs.isub(contrib);
       }
     }
     return liabs;
   }
 
   public healthRatio(healthType: HealthType): I80F48 {
-    let assets = ZERO_I80F48;
-    let liabs = ZERO_I80F48;
+    const assets = ZERO_I80F48();
+    const liabs = ZERO_I80F48();
 
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
       if (contrib.isPos()) {
-        assets = assets.add(contrib);
+        assets.iadd(contrib);
       } else {
-        liabs = liabs.sub(contrib);
+        liabs.isub(contrib);
       }
     }
     for (const serum3Info of this.serum3Infos) {
@@ -137,24 +142,24 @@ export class HealthCache {
         this.tokenInfos,
       );
       if (contrib.isPos()) {
-        assets = assets.add(contrib);
+        assets.iadd(contrib);
       } else {
-        liabs = liabs.sub(contrib);
+        liabs.isub(contrib);
       }
     }
     for (const perpInfo of this.perpInfos) {
       const contrib = perpInfo.healthContribution(healthType);
       if (contrib.isPos()) {
-        assets = assets.add(contrib);
+        assets.iadd(contrib);
       } else {
-        liabs = liabs.sub(contrib);
+        liabs.isub(contrib);
       }
     }
 
     if (liabs.isPos()) {
-      return HUNDRED_I80F48.mul(assets.sub(liabs).div(liabs));
+      return HUNDRED_I80F48().mul(assets.sub(liabs).div(liabs));
     } else {
-      return MAX_I80F48;
+      return MAX_I80F48();
     }
   }
 
@@ -172,10 +177,50 @@ export class HealthCache {
     return this.findTokenInfoIndex(bank.tokenIndex);
   }
 
-  private static logHealthCache(debug: string, healthCache: HealthCache) {
-    console.log(debug);
+  adjustSerum3Reserved(
+    // todo change indices to types from numbers
+    marketIndex: number,
+    baseTokenIndex: number,
+    reservedBaseChange: I80F48,
+    freeBaseChange: I80F48,
+    quoteTokenIndex: number,
+    reservedQuoteChange: I80F48,
+    freeQuoteChange: I80F48,
+  ) {
+    const baseEntryIndex = this.findTokenInfoIndex(baseTokenIndex);
+    const quoteEntryIndex = this.findTokenInfoIndex(quoteTokenIndex);
+
+    const baseEntry = this.tokenInfos[baseEntryIndex];
+    const reservedAmount = reservedBaseChange.mul(baseEntry.oraclePrice);
+
+    const quoteEntry = this.tokenInfos[quoteEntryIndex];
+    reservedAmount.iadd(reservedQuoteChange.mul(quoteEntry.oraclePrice));
+
+    // Apply it to the tokens
+    baseEntry.serum3MaxReserved.iadd(reservedAmount);
+    baseEntry.balance.iadd(freeBaseChange.mul(baseEntry.oraclePrice));
+    quoteEntry.serum3MaxReserved.iadd(reservedAmount);
+    quoteEntry.balance.iadd(freeQuoteChange.mul(quoteEntry.oraclePrice));
+
+    // Apply it to the serum3 info
+    const serum3Info = this.serum3Infos.find(
+      (serum3Info) => serum3Info.marketIndex === marketIndex,
+    );
+    if (!serum3Info) {
+      throw new Error(
+        `Serum3Info not found for market with index ${marketIndex}`,
+      );
+    }
+    serum3Info.reserved = serum3Info.reserved.add(reservedAmount);
+  }
+
+  public static logHealthCache(debug: string, healthCache: HealthCache) {
+    if (debug) console.log(debug);
     for (const token of healthCache.tokenInfos) {
-      console.log(`${token.toString()}`);
+      console.log(` ${token.toString()}`);
+    }
+    for (const serum3Info of healthCache.serum3Infos) {
+      console.log(` ${serum3Info.toString(healthCache.tokenInfos)}`);
     }
     console.log(
       ` assets ${healthCache.assets(
@@ -209,12 +254,130 @@ export class HealthCache {
         throw new Error(
           `Oracle price not loaded for ${change.mintPk.toString()}`,
         );
-      adjustedCache.tokenInfos[changeIndex].balance = adjustedCache.tokenInfos[
-        changeIndex
-      ].balance.add(change.nativeTokenAmount.mul(bank.price));
+      adjustedCache.tokenInfos[changeIndex].balance.iadd(
+        change.nativeTokenAmount.mul(bank.price),
+      );
     }
     // HealthCache.logHealthCache('afterChange', adjustedCache);
     return adjustedCache.healthRatio(healthType);
+  }
+
+  simHealthRatioWithSerum3BidChanges(
+    group: Group,
+    bidNativeQuoteAmount: I80F48,
+    serum3Market: Serum3Market,
+    healthType: HealthType = HealthType.init,
+  ): I80F48 {
+    const adjustedCache: HealthCache = _.cloneDeep(this);
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+    if (!quoteBank) {
+      throw new Error(`No bank for index ${serum3Market.quoteTokenIndex}`);
+    }
+    const quoteIndex = adjustedCache.getOrCreateTokenInfoIndex(quoteBank);
+    const quote = adjustedCache.tokenInfos[quoteIndex];
+
+    // Move token balance to reserved funds in open orders,
+    // essentially simulating a place order
+
+    // Reduce token balance for quote
+    adjustedCache.tokenInfos[quoteIndex].balance.isub(
+      bidNativeQuoteAmount.mul(quote.oraclePrice),
+    );
+
+    // Increase reserved in Serum3Info for quote
+    adjustedCache.adjustSerum3Reserved(
+      serum3Market.marketIndex,
+      serum3Market.baseTokenIndex,
+      ZERO_I80F48(),
+      ZERO_I80F48(),
+      serum3Market.quoteTokenIndex,
+      bidNativeQuoteAmount,
+      ZERO_I80F48(),
+    );
+    return adjustedCache.healthRatio(healthType);
+  }
+
+  simHealthRatioWithSerum3AskChanges(
+    group: Group,
+    askNativeBaseAmount: I80F48,
+    serum3Market: Serum3Market,
+    healthType: HealthType = HealthType.init,
+  ): I80F48 {
+    const adjustedCache: HealthCache = _.cloneDeep(this);
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
+    );
+    if (!baseBank) {
+      throw new Error(`No bank for index ${serum3Market.quoteTokenIndex}`);
+    }
+    const baseIndex = adjustedCache.getOrCreateTokenInfoIndex(baseBank);
+    const base = adjustedCache.tokenInfos[baseIndex];
+
+    // Move token balance to reserved funds in open orders,
+    // essentially simulating a place order
+
+    // Reduce token balance for base
+    adjustedCache.tokenInfos[baseIndex].balance.isub(
+      askNativeBaseAmount.mul(base.oraclePrice),
+    );
+
+    // Increase reserved in Serum3Info for base
+    adjustedCache.adjustSerum3Reserved(
+      serum3Market.marketIndex,
+      serum3Market.baseTokenIndex,
+      askNativeBaseAmount,
+      ZERO_I80F48(),
+      serum3Market.quoteTokenIndex,
+      ZERO_I80F48(),
+      ZERO_I80F48(),
+    );
+    return adjustedCache.healthRatio(healthType);
+  }
+
+  private static binaryApproximationSearch(
+    left: I80F48,
+    leftRatio: I80F48,
+    right: I80F48,
+    rightRatio: I80F48,
+    targetRatio: I80F48,
+    healthRatioAfterActionFn: (I80F48) => I80F48,
+  ) {
+    const maxIterations = 40;
+    // TODO: make relative to health ratio decimals? Might be over engineering
+    const targetError = I80F48.fromNumber(0.001);
+
+    if (
+      (leftRatio.sub(targetRatio).isPos() &&
+        rightRatio.sub(targetRatio).isPos()) ||
+      (leftRatio.sub(targetRatio).isNeg() &&
+        rightRatio.sub(targetRatio).isNeg())
+    ) {
+      throw new Error(
+        `internal error: left ${leftRatio.toNumber()}  and right ${rightRatio.toNumber()} don't contain the target value ${targetRatio.toNumber()}`,
+      );
+    }
+
+    let newAmount;
+    for (const key of Array(maxIterations).fill(0).keys()) {
+      newAmount = left.add(right).mul(I80F48.fromNumber(0.5));
+      const newAmountRatio = healthRatioAfterActionFn(newAmount);
+      const error = newAmountRatio.sub(targetRatio);
+      if (error.isPos() && error.lt(targetError)) {
+        return newAmount;
+      }
+      if (newAmountRatio.gt(targetRatio) != rightRatio.gt(targetRatio)) {
+        left = newAmount;
+      } else {
+        right = newAmount;
+        rightRatio = newAmountRatio;
+      }
+    }
+    console.error(
+      `Unable to get targetRatio within ${maxIterations} iterations`,
+    );
+    return newAmount;
   }
 
   getMaxSourceForTokenSwap(
@@ -227,20 +390,20 @@ export class HealthCache {
     const targetBank: Bank = group.getFirstBankByMint(targetMintPk);
 
     if (sourceMintPk.equals(targetMintPk)) {
-      return ZERO_I80F48;
+      return ZERO_I80F48();
     }
 
-    if (!sourceBank.price || sourceBank.price.lte(ZERO_I80F48)) {
-      return ZERO_I80F48;
+    if (!sourceBank.price || sourceBank.price.lte(ZERO_I80F48())) {
+      return ZERO_I80F48();
     }
 
     if (
       sourceBank.initLiabWeight
         .sub(targetBank.initAssetWeight)
         .abs()
-        .lte(ZERO_I80F48)
+        .lte(ZERO_I80F48())
     ) {
-      return ZERO_I80F48;
+      return ZERO_I80F48();
     }
 
     // The health_ratio is a nonlinear based on swap amount.
@@ -252,8 +415,8 @@ export class HealthCache {
     // - be careful about finding the minRatio point: the function isn't convex
 
     const initialRatio = this.healthRatio(HealthType.init);
-    if (initialRatio.lte(ZERO_I80F48)) {
-      return ZERO_I80F48;
+    if (initialRatio.lte(ZERO_I80F48())) {
+      return ZERO_I80F48();
     }
 
     const healthCacheClone: HealthCache = _.cloneDeep(this);
@@ -271,10 +434,8 @@ export class HealthCache {
     function cacheAfterSwap(amount: I80F48) {
       const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
       // HealthCache.logHealthCache('beforeSwap', adjustedCache);
-      adjustedCache.tokenInfos[sourceIndex].balance =
-        adjustedCache.tokenInfos[sourceIndex].balance.sub(amount);
-      adjustedCache.tokenInfos[targetIndex].balance =
-        adjustedCache.tokenInfos[targetIndex].balance.add(amount);
+      adjustedCache.tokenInfos[sourceIndex].balance.isub(amount);
+      adjustedCache.tokenInfos[targetIndex].balance.iadd(amount);
       // HealthCache.logHealthCache('afterSwap', adjustedCache);
       return adjustedCache;
     }
@@ -285,59 +446,15 @@ export class HealthCache {
 
     const point0Amount = source.balance
       .min(target.balance.neg())
-      .max(ZERO_I80F48);
+      .max(ZERO_I80F48());
     const point1Amount = source.balance
       .max(target.balance.neg())
-      .max(ZERO_I80F48);
+      .max(ZERO_I80F48());
     const cache0 = cacheAfterSwap(point0Amount);
     const point0Ratio = cache0.healthRatio(HealthType.init);
-    const point0Health = cache0.health(HealthType.init);
     const cache1 = cacheAfterSwap(point1Amount);
     const point1Ratio = cache1.healthRatio(HealthType.init);
     const point1Health = cache1.health(HealthType.init);
-
-    function binaryApproximationSearch(
-      left: I80F48,
-      leftRatio: I80F48,
-      right: I80F48,
-      rightRatio: I80F48,
-      targetRatio: I80F48,
-    ) {
-      const maxIterations = 20;
-      // TODO: make relative to health ratio decimals? Might be over engineering
-      const targetError = I80F48.fromString('0.001');
-
-      if (
-        (leftRatio.sub(targetRatio).isPos() &&
-          rightRatio.sub(targetRatio).isPos()) ||
-        (leftRatio.sub(targetRatio).isNeg() &&
-          rightRatio.sub(targetRatio).isNeg())
-      ) {
-        throw new Error(
-          `internal error: left ${leftRatio.toNumber()}  and right ${rightRatio.toNumber()} don't contain the target value ${targetRatio.toNumber()}`,
-        );
-      }
-
-      let newAmount;
-      for (const key of Array(maxIterations).fill(0).keys()) {
-        newAmount = left.add(right).mul(I80F48.fromString('0.5'));
-        const newAmountRatio = healthRatioAfterSwap(newAmount);
-        const error = newAmountRatio.sub(targetRatio);
-        if (error.isPos() && error.lt(targetError)) {
-          return newAmount;
-        }
-        if (newAmountRatio.gt(targetRatio) != rightRatio.gt(targetRatio)) {
-          left = newAmount;
-        } else {
-          right = newAmount;
-          rightRatio = newAmountRatio;
-        }
-      }
-      console.error(
-        `Unable to get targetRatio within ${maxIterations} iterations`,
-      );
-      return newAmount;
-    }
 
     let amount: I80F48;
 
@@ -356,43 +473,37 @@ export class HealthCache {
       } else if (point1Ratio.gt(initialRatio)) {
         amount = point1Amount;
       } else {
-        amount = ZERO_I80F48;
+        amount = ZERO_I80F48();
       }
     } else if (point1Ratio.gte(minRatio)) {
       // If point1Ratio is still bigger than minRatio, the target amount must be >point1Amount
       // search to the right of point1Amount: but how far?
       // At point1, source.balance < 0 and target.balance > 0, so use a simple estimation for
       // zero health: health - source_liab_weight * a + target_asset_weight * a = 0.
-      if (point1Health.lte(ZERO_I80F48)) {
-        return ZERO_I80F48;
+      if (point1Health.lte(ZERO_I80F48())) {
+        return ZERO_I80F48();
       }
       const zeroHealthAmount = point1Amount.add(
         point1Health.div(source.initLiabWeight.sub(target.initAssetWeight)),
       );
-      // console.log(`point1Amount ${point1Amount}`);
-      // console.log(`point1Health ${point1Health}`);
-      // console.log(`point1Ratio ${point1Ratio}`);
-      // console.log(`point0Amount ${point0Amount}`);
-      // console.log(`point0Health ${point0Health}`);
-      // console.log(`point0Ratio ${point0Ratio}`);
-      // console.log(`zeroHealthAmount ${zeroHealthAmount}`);
       const zeroHealthRatio = healthRatioAfterSwap(zeroHealthAmount);
-      // console.log(`zeroHealthRatio ${zeroHealthRatio}`);
-      amount = binaryApproximationSearch(
+      amount = HealthCache.binaryApproximationSearch(
         point1Amount,
         point1Ratio,
         zeroHealthAmount,
         zeroHealthRatio,
         minRatio,
+        healthRatioAfterSwap,
       );
     } else if (point0Ratio.gte(minRatio)) {
       // Must be between point0Amount and point1Amount.
-      amount = binaryApproximationSearch(
+      amount = HealthCache.binaryApproximationSearch(
         point0Amount,
         point0Ratio,
         point1Amount,
         point1Ratio,
         minRatio,
+        healthRatioAfterSwap,
       );
     } else {
       throw new Error(
@@ -403,10 +514,130 @@ export class HealthCache {
     return amount
       .div(source.oraclePrice)
       .div(
-        ONE_I80F48.add(
+        ONE_I80F48().add(
           group.getFirstBankByMint(sourceMintPk).loanOriginationFeeRate,
         ),
       );
+  }
+
+  getMaxForSerum3Order(
+    group: Group,
+    serum3Market: Serum3Market,
+    side: Serum3Side,
+    minRatio: I80F48,
+  ) {
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
+    );
+    if (!baseBank) {
+      throw new Error(`No bank for index ${serum3Market.baseTokenIndex}`);
+    }
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+    if (!quoteBank) {
+      throw new Error(`No bank for index ${serum3Market.quoteTokenIndex}`);
+    }
+
+    const healthCacheClone: HealthCache = _.cloneDeep(this);
+
+    const baseIndex = healthCacheClone.getOrCreateTokenInfoIndex(baseBank);
+    const quoteIndex = healthCacheClone.getOrCreateTokenInfoIndex(quoteBank);
+    const base = healthCacheClone.tokenInfos[baseIndex];
+    const quote = healthCacheClone.tokenInfos[quoteIndex];
+
+    // Binary search between current health (0 sized new order) and
+    // an amount to trade which will bring health to 0.
+
+    // Current health and amount i.e. 0
+    const initialAmount = ZERO_I80F48();
+    const initialHealth = this.health(HealthType.init);
+    const initialRatio = this.healthRatio(HealthType.init);
+    if (initialRatio.lte(ZERO_I80F48())) {
+      return ZERO_I80F48();
+    }
+
+    // Amount which would bring health to 0
+    // amount = max(A_deposits, B_borrows) + init_health / (A_liab_weight - B_asset_weight)
+    // A is what we would be essentially swapping for B
+    // So when its an ask, then base->quote,
+    // and when its a bid, then quote->bid
+    let zeroAmount;
+    if (side == Serum3Side.ask) {
+      const quoteBorrows = quote.balance.lt(ZERO_I80F48())
+        ? quote.balance.abs()
+        : ZERO_I80F48();
+      zeroAmount = base.balance
+        .max(quoteBorrows)
+        .add(
+          initialHealth.div(
+            base
+              .liabWeight(HealthType.init)
+              .sub(quote.assetWeight(HealthType.init)),
+          ),
+        );
+    } else {
+      const baseBorrows = base.balance.lt(ZERO_I80F48())
+        ? base.balance.abs()
+        : ZERO_I80F48();
+      zeroAmount = quote.balance
+        .max(baseBorrows)
+        .add(
+          initialHealth.div(
+            quote
+              .liabWeight(HealthType.init)
+              .sub(base.assetWeight(HealthType.init)),
+          ),
+        );
+    }
+    const cache = cacheAfterPlacingOrder(zeroAmount);
+    const zeroAmountRatio = cache.healthRatio(HealthType.init);
+
+    function cacheAfterPlacingOrder(amount: I80F48) {
+      const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
+
+      side === Serum3Side.ask
+        ? adjustedCache.tokenInfos[baseIndex].balance.isub(amount)
+        : adjustedCache.tokenInfos[quoteIndex].balance.isub(amount);
+
+      adjustedCache.adjustSerum3Reserved(
+        serum3Market.marketIndex,
+        serum3Market.baseTokenIndex,
+        side === Serum3Side.ask ? amount.div(base.oraclePrice) : ZERO_I80F48(),
+        ZERO_I80F48(),
+        serum3Market.quoteTokenIndex,
+        side === Serum3Side.bid ? amount.div(quote.oraclePrice) : ZERO_I80F48(),
+        ZERO_I80F48(),
+      );
+
+      return adjustedCache;
+    }
+
+    function healthRatioAfterPlacingOrder(amount: I80F48): I80F48 {
+      return cacheAfterPlacingOrder(amount).healthRatio(HealthType.init);
+    }
+
+    const amount = HealthCache.binaryApproximationSearch(
+      initialAmount,
+      initialRatio,
+      zeroAmount,
+      zeroAmountRatio,
+      minRatio,
+      healthRatioAfterPlacingOrder,
+    );
+
+    // If its a bid then the reserved fund and potential loan is in quote,
+    // If its a ask then the reserved fund and potential loan is in base,
+    // also keep some buffer for fees, use taker fees for worst case simulation.
+    return side === Serum3Side.bid
+      ? amount
+          .div(quote.oraclePrice)
+          .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
+          .div(ONE_I80F48().add(I80F48.fromNumber(group.getFeeRate(false))))
+      : amount
+          .div(base.oraclePrice)
+          .div(ONE_I80F48().add(quoteBank.loanOriginationFeeRate))
+          .div(ONE_I80F48().add(I80F48.fromNumber(group.getFeeRate(false))));
   }
 }
 
@@ -450,8 +681,8 @@ export class TokenInfo {
       bank.maintLiabWeight,
       bank.initLiabWeight,
       bank.price,
-      ZERO_I80F48,
-      ZERO_I80F48,
+      ZERO_I80F48(),
+      ZERO_I80F48(),
     );
   }
 
@@ -476,20 +707,30 @@ export class TokenInfo {
   }
 
   toString() {
-    return `  tokenIndex: ${this.tokenIndex}, balance: ${this.balance}`;
+    return `  tokenIndex: ${this.tokenIndex}, balance: ${
+      this.balance
+    }, serum3MaxReserved: ${
+      this.serum3MaxReserved
+    }, initHealth ${this.healthContribution(HealthType.init)}`;
   }
 }
 
 export class Serum3Info {
-  constructor(dto: Serum3InfoDto) {
-    this.reserved = I80F48.from(dto.reserved);
-    this.baseIndex = dto.baseIndex;
-    this.quoteIndex = dto.quoteIndex;
-  }
+  constructor(
+    public reserved: I80F48,
+    public baseIndex: number,
+    public quoteIndex: number,
+    public marketIndex: number,
+  ) {}
 
-  reserved: I80F48;
-  baseIndex: number;
-  quoteIndex: number;
+  static fromDto(dto: Serum3InfoDto) {
+    return new Serum3Info(
+      I80F48.from(dto.reserved),
+      dto.baseIndex,
+      dto.quoteIndex,
+      dto.marketIndex,
+    );
+  }
 
   healthContribution(healthType: HealthType, tokenInfos: TokenInfo[]): I80F48 {
     const baseInfo = tokenInfos[this.baseIndex];
@@ -497,7 +738,7 @@ export class Serum3Info {
     const reserved = this.reserved;
 
     if (reserved.isZero()) {
-      return ZERO_I80F48;
+      return ZERO_I80F48();
     }
 
     // How much the health would increase if the reserved balance were applied to the passed
@@ -512,15 +753,14 @@ export class Serum3Info {
       let assetPart, liabPart;
       if (maxBalance.gte(reserved)) {
         assetPart = reserved;
-        liabPart = ZERO_I80F48;
+        liabPart = ZERO_I80F48();
       } else if (maxBalance.isNeg()) {
-        assetPart = ZERO_I80F48;
+        assetPart = ZERO_I80F48();
         liabPart = reserved;
       } else {
         assetPart = maxBalance;
         liabPart = reserved.sub(maxBalance);
       }
-
       const assetWeight = tokenInfo.assetWeight(healthType);
       const liabWeight = tokenInfo.liabWeight(healthType);
       return assetWeight.mul(assetPart).add(liabWeight.mul(liabPart));
@@ -529,6 +769,14 @@ export class Serum3Info {
     const reservedAsBase = computeHealthEffect(baseInfo);
     const reservedAsQuote = computeHealthEffect(quoteInfo);
     return reservedAsBase.min(reservedAsQuote);
+  }
+
+  toString(tokenInfos: TokenInfo[]) {
+    return `  marketIndex: ${this.marketIndex}, baseIndex: ${
+      this.baseIndex
+    }, quoteIndex: ${this.quoteIndex}, reserved: ${
+      this.reserved
+    }, initHealth ${this.healthContribution(HealthType.init, tokenInfos)}`;
   }
 }
 
@@ -566,7 +814,7 @@ export class PerpInfo {
 
     // FUTURE: Allow v3-style "reliable" markets where we can return
     // `self.quote + weight * self.base` here
-    return this.quote.add(weight.mul(this.base)).min(ZERO_I80F48);
+    return this.quote.add(weight.mul(this.base)).min(ZERO_I80F48());
   }
 }
 
@@ -586,12 +834,39 @@ export class TokenInfoDto {
   balance: I80F48Dto;
   // in health-reference-token native units
   serum3MaxReserved: I80F48Dto;
+
+  constructor(
+    tokenIndex: number,
+    maintAssetWeight: I80F48Dto,
+    initAssetWeight: I80F48Dto,
+    maintLiabWeight: I80F48Dto,
+    initLiabWeight: I80F48Dto,
+    oraclePrice: I80F48Dto,
+    balance: I80F48Dto,
+    serum3MaxReserved: I80F48Dto,
+  ) {
+    this.tokenIndex = tokenIndex;
+    this.maintAssetWeight = maintAssetWeight;
+    this.initAssetWeight = initAssetWeight;
+    this.maintLiabWeight = maintLiabWeight;
+    this.initLiabWeight = initLiabWeight;
+    this.oraclePrice = oraclePrice;
+    this.balance = balance;
+    this.serum3MaxReserved = serum3MaxReserved;
+  }
 }
 
 export class Serum3InfoDto {
   reserved: I80F48Dto;
   baseIndex: number;
   quoteIndex: number;
+  marketIndex: number;
+
+  constructor(reserved: I80F48Dto, baseIndex: number, quoteIndex: number) {
+    this.reserved = reserved;
+    this.baseIndex = baseIndex;
+    this.quoteIndex = quoteIndex;
+  }
 }
 
 export class PerpInfoDto {

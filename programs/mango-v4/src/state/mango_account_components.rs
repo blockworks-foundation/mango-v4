@@ -92,12 +92,12 @@ impl TokenPosition {
 pub struct Serum3Orders {
     pub open_orders: Pubkey,
 
-    // tracks reserved funds in open orders account,
-    // used for bookkeeping of potentital loans which
-    // can be charged with loan origination fees
-    // e.g. serum3 settle funds ix
-    pub previous_native_coin_reserved: u64,
-    pub previous_native_pc_reserved: u64,
+    /// Tracks the amount of borrows that have flowed into the serum open orders account.
+    /// These borrows did not have the loan origination fee applied, and that may happen
+    /// later (in serum3_settle_funds) if we can guarantee that the funds were used.
+    /// In particular a place-on-book, cancel, settle should not cost fees.
+    pub base_borrows_without_fee: u64,
+    pub quote_borrows_without_fee: u64,
 
     pub market_index: Serum3MarketIndex,
 
@@ -138,8 +138,8 @@ impl Default for Serum3Orders {
             quote_token_index: TokenIndex::MAX,
             reserved: [0; 64],
             padding: Default::default(),
-            previous_native_coin_reserved: 0,
-            previous_native_pc_reserved: 0,
+            base_borrows_without_fee: 0,
+            quote_borrows_without_fee: 0,
         }
     }
 }
@@ -321,7 +321,7 @@ impl PerpPosition {
 
 #[zero_copy]
 #[derive(AnchorSerialize, AnchorDeserialize, Debug)]
-pub struct PerpOpenOrders {
+pub struct PerpOpenOrder {
     pub order_side: Side, // TODO: storing enums isn't POD
     pub padding1: [u8; 1],
     pub order_market: PerpMarketIndex,
@@ -331,7 +331,7 @@ pub struct PerpOpenOrders {
     pub reserved: [u8; 64],
 }
 
-impl Default for PerpOpenOrders {
+impl Default for PerpOpenOrder {
     fn default() -> Self {
         Self {
             order_side: Side::Bid,
@@ -345,11 +345,11 @@ impl Default for PerpOpenOrders {
     }
 }
 
-unsafe impl bytemuck::Pod for PerpOpenOrders {}
-unsafe impl bytemuck::Zeroable for PerpOpenOrders {}
+unsafe impl bytemuck::Pod for PerpOpenOrder {}
+unsafe impl bytemuck::Zeroable for PerpOpenOrder {}
 
-const_assert_eq!(size_of::<PerpOpenOrders>(), 1 + 1 + 2 + 4 + 8 + 16 + 64);
-const_assert_eq!(size_of::<PerpOpenOrders>() % 8, 0);
+const_assert_eq!(size_of::<PerpOpenOrder>(), 1 + 1 + 2 + 4 + 8 + 16 + 64);
+const_assert_eq!(size_of::<PerpOpenOrder>() % 8, 0);
 
 #[macro_export]
 macro_rules! account_seeds {

@@ -142,9 +142,8 @@ pub mod mango_v4 {
 
     pub fn token_deregister<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, TokenDeregister<'info>>,
-        token_index: TokenIndex,
     ) -> Result<()> {
-        instructions::token_deregister(ctx, token_index)
+        instructions::token_deregister(ctx)
     }
 
     pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Result<()> {
@@ -234,6 +233,18 @@ pub mod mango_v4 {
         flash_loan_type: FlashLoanType,
     ) -> Result<()> {
         instructions::flash_loan_end(ctx, flash_loan_type)
+    }
+
+    pub fn health_region_begin<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, HealthRegionBegin<'info>>,
+    ) -> Result<()> {
+        instructions::health_region_begin(ctx)
+    }
+
+    pub fn health_region_end<'key, 'accounts, 'remaining, 'info>(
+        ctx: Context<'key, 'accounts, 'remaining, 'info, HealthRegionEnd<'info>>,
+    ) -> Result<()> {
+        instructions::health_region_end(ctx)
     }
 
     ///

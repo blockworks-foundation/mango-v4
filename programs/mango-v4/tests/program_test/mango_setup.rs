@@ -5,7 +5,7 @@ use solana_sdk::signature::Keypair;
 
 use super::mango_client::*;
 use super::solana::SolanaCookie;
-use super::{send_tx, MintCookie};
+use super::{send_tx, ClonableKeypair, MintCookie, UserCookie};
 
 pub struct GroupWithTokensConfig<'a> {
     pub admin: &'a Keypair,
@@ -13,6 +13,7 @@ pub struct GroupWithTokensConfig<'a> {
     pub mints: &'a [MintCookie],
 }
 
+#[derive(Clone)]
 pub struct Token {
     pub index: u16,
     pub mint: MintCookie,
@@ -135,4 +136,49 @@ impl<'a> GroupWithTokensConfig<'a> {
             tokens,
         }
     }
+}
+
+pub async fn create_funded_account(
+    solana: &SolanaCookie,
+    group: Pubkey,
+    owner: &Keypair,
+    account_num: u32,
+    payer: &UserCookie,
+    mints: &[MintCookie],
+    amounts: u64,
+    bank_index: usize,
+) -> Pubkey {
+    let account = send_tx(
+        solana,
+        AccountCreateInstruction {
+            account_num,
+            token_count: 16,
+            serum3_count: 8,
+            perp_count: 8,
+            perp_oo_count: 8,
+            group,
+            owner,
+            payer: &payer.key,
+        },
+    )
+    .await
+    .unwrap()
+    .account;
+
+    for mint in mints {
+        send_tx(
+            solana,
+            TokenDepositInstruction {
+                amount: amounts,
+                account,
+                token_account: payer.token_accounts[mint.index],
+                token_authority: payer.key.clone(),
+                bank_index,
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    account
 }

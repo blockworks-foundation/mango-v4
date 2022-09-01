@@ -1,38 +1,47 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { coder } from '@project-serum/anchor/dist/cjs/spl/token';
-import { Connection, Keypair } from '@solana/web3.js';
+import { Cluster, Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { I80F48, ZERO_I80F48 } from '../accounts/I80F48';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 import { toUiDecimals } from '../utils';
 
+const CLUSTER_URL =
+  process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;
+const PAYER_KEYPAIR =
+  process.env.PAYER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
+const GROUP_NUM = Number(process.env.GROUP_NUM || 2);
+const CLUSTER: Cluster =
+  (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
+
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
+  const connection = new Connection(CLUSTER_URL!, options);
 
   const admin = Keypair.fromSecretKey(
-    Buffer.from(
-      JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
-    ),
+    Buffer.from(JSON.parse(fs.readFileSync(PAYER_KEYPAIR!, 'utf-8'))),
   );
 
   const adminWallet = new Wallet(admin);
   const adminProvider = new AnchorProvider(connection, adminWallet, options);
   const client = MangoClient.connect(
     adminProvider,
-    'mainnet-beta',
-    MANGO_V4_ID['mainnet-beta'],
+    CLUSTER,
+    MANGO_V4_ID[CLUSTER],
+    {},
+    'get-program-accounts',
   );
 
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(`Group ${group.publicKey.toBase58()}`);
+  console.log(`${group.toString()}`);
 
   const banks = Array.from(group.banksMapByMint.values()).flat();
   const banksMapUsingTokenIndex = new Map(
     banks.map((bank) => {
-      (bank as any).indexedDepositsByMangoAccounts = ZERO_I80F48;
-      (bank as any).indexedBorrowsByMangoAccounts = ZERO_I80F48;
+      (bank as any).indexedDepositsByMangoAccounts = ZERO_I80F48();
+      (bank as any).indexedBorrowsByMangoAccounts = ZERO_I80F48();
       return [bank.tokenIndex, bank];
     }),
   );
@@ -51,7 +60,7 @@ async function main() {
           bank as any
         ).indexedDepositsByMangoAccounts.add(
           token.indexedPosition.mul(
-            banksMapUsingTokenIndex.get(token.tokenIndex).depositIndex,
+            banksMapUsingTokenIndex.get(token.tokenIndex)!.depositIndex,
           ),
         );
       }
@@ -61,7 +70,7 @@ async function main() {
         ).indexedBorrowsByMangoAccounts.add(
           token.indexedPosition
             .abs()
-            .mul(banksMapUsingTokenIndex.get(token.tokenIndex).borrowIndex),
+            .mul(banksMapUsingTokenIndex.get(token.tokenIndex)!.borrowIndex),
         );
       }
     }),
@@ -74,7 +83,7 @@ async function main() {
       coder()
         .accounts.decode(
           'token',
-          (await client.program.provider.connection.getAccountInfo(bank.vault))
+          (await client.program.provider.connection.getAccountInfo(bank.vault))!
             .data,
         )
         .amount.toNumber(),
@@ -94,7 +103,7 @@ async function main() {
       `\n ${'bank'.padEnd(40)} ${bank.publicKey}` +
       `\n ${'vault'.padEnd(40)} ${bank.vault}` +
       `\n ${'mint'.padEnd(40)} ${bank.mint}` +
-      `\n ${'price'.padEnd(40)} ${bank.price.toNumber()}` +
+      `\n ${'price'.padEnd(40)} ${bank.price?.toNumber()}` +
       `\n ${'uiPrice'.padEnd(40)} ${bank.uiPrice}` +
       `\n ${'error'.padEnd(40)} ${error}` +
       `\n ${'collectedFeesNative'.padEnd(40)} ${bank.collectedFeesNative}` +

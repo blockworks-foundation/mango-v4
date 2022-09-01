@@ -4,6 +4,7 @@ use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 use fixed::types::I80F48;
 
+use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
 use crate::state::*;
 use crate::util::checked_math as cm;
@@ -21,6 +22,7 @@ pub struct TokenDeposit<'info> {
         mut,
         has_one = group,
         has_one = vault,
+        has_one = oracle,
         // the mints of bank/vault/token_account are implicitly the same because
         // spl::token::transfer succeeds between token_account and vault
     )]
@@ -28,6 +30,9 @@ pub struct TokenDeposit<'info> {
 
     #[account(mut)]
     pub vault: Account<'info, TokenAccount>,
+
+    /// CHECK: The oracle can be one of several different account types
+    pub oracle: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub token_account: Box<Account<'info, TokenAccount>>,
@@ -56,7 +61,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     // Get the account's position for that token index
     let mut account = ctx.accounts.account.load_mut()?;
 
-    let (position, raw_token_index, active_token_index) =
+    let (position, raw_token_index, _active_token_index) =
         account.ensure_token_position(token_index)?;
 
     let amount_i80f48 = I80F48::from(amount);
@@ -69,10 +74,8 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     token::transfer(ctx.accounts.transfer_ctx(), amount)?;
 
     let indexed_position = position.indexed_position;
-
-    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-    let (bank, oracle_price) =
-        retriever.bank_and_oracle(&ctx.accounts.group.key(), active_token_index, token_index)?;
+    let bank = ctx.accounts.bank.load()?;
+    let oracle_price = bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
 
     // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
     let amount_usd = cm!(amount_i80f48 * oracle_price).to_num::<i64>();
@@ -91,10 +94,17 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     //
     // Health computation
     //
-    let health = compute_health(&account.borrow(), HealthType::Init, &retriever)
-        .context("post-deposit init health")?;
-    msg!("health: {}", health);
-    account.fixed.maybe_recover_from_being_liquidated(health);
+    // Since depositing can only increase health, we can skip the usual pre-health computation.
+    // Also, TokenDeposit is one of the rare instructions that is allowed even during being_liquidated.
+    //
+    if !account.fixed.is_in_health_region() {
+        let retriever =
+            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
+        let health = compute_health(&account.borrow(), HealthType::Init, &retriever)
+            .context("post-deposit init health")?;
+        msg!("health: {}", health);
+        account.fixed.maybe_recover_from_being_liquidated(health);
+    }
 
     //
     // Deactivate the position only after the health check because the user passed in

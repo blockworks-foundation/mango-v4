@@ -89,6 +89,7 @@ pub fn liq_token_bankruptcy(
             .is_owner_or_delegate(ctx.accounts.liqor_owner.key()),
         MangoError::SomeError
     );
+    require!(!liqor.fixed.being_liquidated(), MangoError::BeingLiquidated);
 
     let mut account_retriever = ScanningAccountRetriever::new(health_ais, group_pk)?;
 
@@ -106,7 +107,7 @@ pub fn liq_token_bankruptcy(
     let mut liab_deposit_index = liab_bank.deposit_index;
     let liab_borrow_index = liab_bank.borrow_index;
     let (liqee_liab, liqee_raw_token_index) = liqee.token_position_mut(liab_token_index)?;
-    let initial_liab_native = liqee_liab.native(&liab_bank);
+    let initial_liab_native = liqee_liab.native(liab_bank);
     let mut remaining_liab_loss = -initial_liab_native;
     require_gt!(remaining_liab_loss, I80F48::ZERO);
 
@@ -178,9 +179,11 @@ pub fn liq_token_bankruptcy(
                 liab_bank.withdraw_with_fee(liqor_liab, liab_transfer)?;
 
             // Check liqor's health
-            let liqor_health =
-                compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)?;
-            require!(liqor_health >= 0, MangoError::HealthMustBePositive);
+            if !liqor.fixed.is_in_health_region() {
+                let liqor_health =
+                    compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)?;
+                require!(liqor_health >= 0, MangoError::HealthMustBePositive);
+            }
 
             // liqor quote
             emit!(TokenBalanceLog {
@@ -304,7 +307,7 @@ pub fn liq_token_bankruptcy(
         mango_group: ctx.accounts.group.key(),
         liqee: ctx.accounts.liqee.key(),
         liqor: ctx.accounts.liqor.key(),
-        liab_token_index: liab_token_index,
+        liab_token_index,
         initial_liab_native: initial_liab_native.to_bits(),
         liab_price: liab_price.to_bits(),
         insurance_token_index: QUOTE_TOKEN_INDEX,

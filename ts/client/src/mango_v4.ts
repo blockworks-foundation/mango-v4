@@ -730,12 +730,7 @@ export type MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "tokenIndex",
-          "type": "u16"
-        }
-      ]
+      "args": []
     },
     {
       "name": "tokenUpdateIndexAndRate",
@@ -1107,6 +1102,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenAccount",
           "isMut": true,
           "isSigner": false
@@ -1155,6 +1155,11 @@ export type MangoV4 = {
         {
           "name": "vault",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -1234,6 +1239,36 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "healthRegionBegin",
+      "accounts": [
+        {
+          "name": "instructions",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Instructions Sysvar for instruction introspection"
+          ]
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "healthRegionEnd",
+      "accounts": [
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "serum3RegisterMarket",
       "docs": [
         "",
@@ -1281,6 +1316,30 @@ export type MangoV4 = {
                 "kind": "account",
                 "type": "publicKey",
                 "path": "serum_market_external"
+              }
+            ]
+          }
+        },
+        {
+          "name": "indexReservation",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Serum3Index"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "market_index"
               }
             ]
           }
@@ -1546,24 +1605,20 @@ export type MangoV4 = {
           ]
         },
         {
-          "name": "quoteBank",
+          "name": "payerBank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The bank that pays for the order, if necessary"
+          ]
         },
         {
-          "name": "quoteVault",
+          "name": "payerVault",
           "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "baseBank",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "baseVault",
-          "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The bank vault that pays for the order, if necessary"
+          ]
         },
         {
           "name": "tokenProgram",
@@ -3000,12 +3055,21 @@ export type MangoV4 = {
               "",
               "Normally accounts can not be liquidated while maint_health >= 0. But when an account",
               "reaches maint_health < 0, liquidators will call a liquidation instruction and thereby",
-              "set this flag. Now the account may be liquidated until init_health >= 0."
+              "set this flag. Now the account may be liquidated until init_health >= 0.",
+              "",
+              "Many actions should be disabled while the account is being liquidated, even if",
+              "its maint health has recovered to positive. Creating new open orders would, for example,",
+              "confuse liquidators."
             ],
             "type": "u8"
           },
           {
-            "name": "padding2",
+            "name": "inHealthRegion",
+            "docs": [
+              "The account is currently inside a health region marked by HealthRegionBegin...HealthRegionEnd.",
+              "",
+              "Must never be set after a transaction ends."
+            ],
             "type": "u8"
           },
           {
@@ -3030,11 +3094,18 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "healthRegionPreInitHealth",
+            "docs": [
+              "Init health as calculated during HealthReginBegin, rounded up."
+            ],
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                248
+                240
               ]
             }
           },
@@ -3095,7 +3166,7 @@ export type MangoV4 = {
             "name": "perpOpenOrders",
             "type": {
               "vec": {
-                "defined": "PerpOpenOrders"
+                "defined": "PerpOpenOrder"
               }
             }
           }
@@ -3789,6 +3860,10 @@ export type MangoV4 = {
           {
             "name": "quoteIndex",
             "type": "u64"
+          },
+          {
+            "name": "marketIndex",
+            "type": "u16"
           }
         ]
       }
@@ -3798,6 +3873,10 @@ export type MangoV4 = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "perpMarketIndex",
+            "type": "u16"
+          },
           {
             "name": "maintAssetWeight",
             "type": {
@@ -3932,11 +4011,17 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "previousNativeCoinReserved",
+            "name": "baseBorrowsWithoutFee",
+            "docs": [
+              "Tracks the amount of borrows that have flowed into the serum open orders account.",
+              "These borrows did not have the loan origination fee applied, and that may happen",
+              "later (in serum3_settle_funds) if we can guarantee that the funds were used.",
+              "In particular a place-on-book, cancel, settle should not cost fees."
+            ],
             "type": "u64"
           },
           {
-            "name": "previousNativePcReserved",
+            "name": "quoteBorrowsWithoutFee",
             "type": "u64"
           },
           {
@@ -4077,7 +4162,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "PerpOpenOrders",
+      "name": "PerpOpenOrder",
       "type": {
         "kind": "struct",
         "fields": [
@@ -5146,43 +5231,53 @@ export type MangoV4 = {
     },
     {
       "code": 6007,
+      "name": "HealthMustBePositiveOrIncrease",
+      "msg": "health must be positive or increase"
+    },
+    {
+      "code": 6008,
       "name": "HealthMustBeNegative",
       "msg": "health must be negative"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "IsBankrupt",
       "msg": "the account is bankrupt"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "IsNotBankrupt",
       "msg": "the account is not bankrupt"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "NoFreeTokenPositionIndex",
       "msg": "no free token position index"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "NoFreeSerum3OpenOrdersIndex",
       "msg": "no free serum3 open orders index"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "NoFreePerpPositionIndex",
       "msg": "no free perp position index"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "Serum3OpenOrdersExistAlready",
       "msg": "serum3 open orders exist already"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "InsufficentBankVaultFunds",
       "msg": "bank vault has insufficent funds"
+    },
+    {
+      "code": 6016,
+      "name": "BeingLiquidated",
+      "msg": "account is currently being liquidated"
     }
   ]
 };
@@ -5919,12 +6014,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "tokenIndex",
-          "type": "u16"
-        }
-      ]
+      "args": []
     },
     {
       "name": "tokenUpdateIndexAndRate",
@@ -6296,6 +6386,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenAccount",
           "isMut": true,
           "isSigner": false
@@ -6344,6 +6439,11 @@ export const IDL: MangoV4 = {
         {
           "name": "vault",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -6423,6 +6523,36 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "healthRegionBegin",
+      "accounts": [
+        {
+          "name": "instructions",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Instructions Sysvar for instruction introspection"
+          ]
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "healthRegionEnd",
+      "accounts": [
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "serum3RegisterMarket",
       "docs": [
         "",
@@ -6470,6 +6600,30 @@ export const IDL: MangoV4 = {
                 "kind": "account",
                 "type": "publicKey",
                 "path": "serum_market_external"
+              }
+            ]
+          }
+        },
+        {
+          "name": "indexReservation",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "Serum3Index"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "arg",
+                "type": "u16",
+                "path": "market_index"
               }
             ]
           }
@@ -6735,24 +6889,20 @@ export const IDL: MangoV4 = {
           ]
         },
         {
-          "name": "quoteBank",
+          "name": "payerBank",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The bank that pays for the order, if necessary"
+          ]
         },
         {
-          "name": "quoteVault",
+          "name": "payerVault",
           "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "baseBank",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "baseVault",
-          "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The bank vault that pays for the order, if necessary"
+          ]
         },
         {
           "name": "tokenProgram",
@@ -8189,12 +8339,21 @@ export const IDL: MangoV4 = {
               "",
               "Normally accounts can not be liquidated while maint_health >= 0. But when an account",
               "reaches maint_health < 0, liquidators will call a liquidation instruction and thereby",
-              "set this flag. Now the account may be liquidated until init_health >= 0."
+              "set this flag. Now the account may be liquidated until init_health >= 0.",
+              "",
+              "Many actions should be disabled while the account is being liquidated, even if",
+              "its maint health has recovered to positive. Creating new open orders would, for example,",
+              "confuse liquidators."
             ],
             "type": "u8"
           },
           {
-            "name": "padding2",
+            "name": "inHealthRegion",
+            "docs": [
+              "The account is currently inside a health region marked by HealthRegionBegin...HealthRegionEnd.",
+              "",
+              "Must never be set after a transaction ends."
+            ],
             "type": "u8"
           },
           {
@@ -8219,11 +8378,18 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "healthRegionPreInitHealth",
+            "docs": [
+              "Init health as calculated during HealthReginBegin, rounded up."
+            ],
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                248
+                240
               ]
             }
           },
@@ -8284,7 +8450,7 @@ export const IDL: MangoV4 = {
             "name": "perpOpenOrders",
             "type": {
               "vec": {
-                "defined": "PerpOpenOrders"
+                "defined": "PerpOpenOrder"
               }
             }
           }
@@ -8978,6 +9144,10 @@ export const IDL: MangoV4 = {
           {
             "name": "quoteIndex",
             "type": "u64"
+          },
+          {
+            "name": "marketIndex",
+            "type": "u16"
           }
         ]
       }
@@ -8987,6 +9157,10 @@ export const IDL: MangoV4 = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "perpMarketIndex",
+            "type": "u16"
+          },
           {
             "name": "maintAssetWeight",
             "type": {
@@ -9121,11 +9295,17 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "previousNativeCoinReserved",
+            "name": "baseBorrowsWithoutFee",
+            "docs": [
+              "Tracks the amount of borrows that have flowed into the serum open orders account.",
+              "These borrows did not have the loan origination fee applied, and that may happen",
+              "later (in serum3_settle_funds) if we can guarantee that the funds were used.",
+              "In particular a place-on-book, cancel, settle should not cost fees."
+            ],
             "type": "u64"
           },
           {
-            "name": "previousNativePcReserved",
+            "name": "quoteBorrowsWithoutFee",
             "type": "u64"
           },
           {
@@ -9266,7 +9446,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "PerpOpenOrders",
+      "name": "PerpOpenOrder",
       "type": {
         "kind": "struct",
         "fields": [
@@ -10335,43 +10515,53 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6007,
+      "name": "HealthMustBePositiveOrIncrease",
+      "msg": "health must be positive or increase"
+    },
+    {
+      "code": 6008,
       "name": "HealthMustBeNegative",
       "msg": "health must be negative"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "IsBankrupt",
       "msg": "the account is bankrupt"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "IsNotBankrupt",
       "msg": "the account is not bankrupt"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "NoFreeTokenPositionIndex",
       "msg": "no free token position index"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "NoFreeSerum3OpenOrdersIndex",
       "msg": "no free serum3 open orders index"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "NoFreePerpPositionIndex",
       "msg": "no free perp position index"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "Serum3OpenOrdersExistAlready",
       "msg": "serum3 open orders exist already"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "InsufficentBankVaultFunds",
       "msg": "bank vault has insufficent funds"
+    },
+    {
+      "code": 6016,
+      "name": "BeingLiquidated",
+      "msg": "account is currently being liquidated"
     }
   ]
 };

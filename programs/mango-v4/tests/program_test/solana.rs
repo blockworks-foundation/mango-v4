@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::cell::RefCell;
 use std::sync::{Arc, RwLock};
 
@@ -17,17 +19,26 @@ use spl_token::*;
 pub struct SolanaCookie {
     pub context: RefCell<ProgramTestContext>,
     pub rent: Rent,
-    pub program_log: Arc<RwLock<Vec<String>>>,
+    pub logger_capture: Arc<RwLock<Vec<String>>>,
+    pub logger_lock: Arc<RwLock<()>>,
+    pub last_transaction_log: RefCell<Vec<String>>,
 }
 
 impl SolanaCookie {
-    #[allow(dead_code)]
     pub async fn process_transaction(
         &self,
         instructions: &[Instruction],
         signers: Option<&[&Keypair]>,
     ) -> Result<(), BanksClientError> {
-        self.program_log.write().unwrap().clear();
+        // The locking in this function is convoluted:
+        // We capture the program log output by overriding the global logger and capturing
+        // messages there. This logger is potentially shared among multiple tests that run
+        // concurrently.
+        // To allow each independent SolanaCookie to capture only the logs from the transaction
+        // passed to process_transaction, wo globally hold the "program_log_lock" for the
+        // duration that the tx needs to process. So only a single one can run at a time.
+        let tx_log_lock = Arc::new(self.logger_lock.write().unwrap());
+        self.logger_capture.write().unwrap().clear();
 
         let mut context = self.context.borrow_mut();
 
@@ -45,13 +56,19 @@ impl SolanaCookie {
 
         transaction.sign(&all_signers, context.last_blockhash);
 
-        context
+        let result = context
             .banks_client
             .process_transaction_with_commitment(
                 transaction,
                 solana_sdk::commitment_config::CommitmentLevel::Processed,
             )
-            .await
+            .await;
+
+        *self.last_transaction_log.borrow_mut() = self.logger_capture.read().unwrap().clone();
+
+        drop(tx_log_lock);
+
+        result
     }
 
     pub async fn get_clock(&self) -> solana_program::clock::Clock {
@@ -63,7 +80,6 @@ impl SolanaCookie {
             .unwrap()
     }
 
-    #[allow(dead_code)]
     pub async fn advance_by_slots(&self, slots: u64) {
         let clock = self.get_clock().await;
         self.context
@@ -71,8 +87,6 @@ impl SolanaCookie {
             .warp_to_slot(clock.slot + slots + 1)
             .unwrap();
     }
-
-    #[allow(dead_code)]
 
     pub async fn advance_clock(&self) {
         let mut clock = self.get_clock().await;
@@ -133,7 +147,6 @@ impl SolanaCookie {
         key.pubkey()
     }
 
-    #[allow(dead_code)]
     pub async fn create_token_account(&self, owner: &Pubkey, mint: Pubkey) -> Pubkey {
         let keypair = Keypair::new();
         let rent = self.rent.minimum_balance(spl_token::state::Account::LEN);
@@ -162,7 +175,6 @@ impl SolanaCookie {
     }
 
     // Note: Only one table can be created per authority per slot!
-    #[allow(dead_code)]
     pub async fn create_address_lookup_table(
         &self,
         authority: &Keypair,
@@ -180,7 +192,6 @@ impl SolanaCookie {
         alt_address
     }
 
-    #[allow(dead_code)]
     pub async fn get_account_data(&self, address: Pubkey) -> Option<Vec<u8>> {
         Some(
             self.context
@@ -194,7 +205,6 @@ impl SolanaCookie {
         )
     }
 
-    #[allow(dead_code)]
     pub async fn get_account_opt<T: AccountDeserialize>(&self, address: Pubkey) -> Option<T> {
         self.context
             .borrow_mut()
@@ -209,18 +219,30 @@ impl SolanaCookie {
         AccountDeserialize::try_deserialize(&mut data_slice).ok()
     }
 
-    #[allow(dead_code)]
     pub async fn get_account<T: AccountDeserialize>(&self, address: Pubkey) -> T {
         self.get_account_opt(address).await.unwrap()
     }
 
-    #[allow(dead_code)]
     pub async fn token_account_balance(&self, address: Pubkey) -> u64 {
         self.get_account::<TokenAccount>(address).await.amount
     }
 
-    #[allow(dead_code)]
     pub fn program_log(&self) -> Vec<String> {
-        self.program_log.read().unwrap().clone()
+        self.last_transaction_log.borrow().clone()
+    }
+
+    pub fn program_log_events<T: anchor_lang::Event + anchor_lang::AnchorDeserialize>(
+        &self,
+    ) -> Vec<T> {
+        self.program_log()
+            .iter()
+            .filter_map(|data| {
+                let bytes = base64::decode(data).ok()?;
+                if bytes[0..8] != T::discriminator() {
+                    return None;
+                }
+                T::try_from_slice(&bytes[8..]).ok()
+            })
+            .collect()
     }
 }

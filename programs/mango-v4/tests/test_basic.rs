@@ -111,15 +111,14 @@ async fn test_basic() -> Result<(), TransportError> {
     //
     // TEST: Compute the account health
     //
-    send_tx(
-        solana,
-        ComputeAccountDataInstruction {
-            account,
-            health_type: HealthType::Init,
-        },
-    )
-    .await
-    .unwrap();
+    send_tx(solana, ComputeAccountDataInstruction { account })
+        .await
+        .unwrap();
+    let health_data = solana
+        .program_log_events::<mango_v4::events::MangoAccountData>()
+        .pop()
+        .unwrap();
+    assert_eq!(health_data.init_health.to_num::<i64>(), 60);
 
     //
     // TEST: Withdraw funds
@@ -142,6 +141,8 @@ async fn test_basic() -> Result<(), TransportError> {
         )
         .await
         .unwrap();
+
+        check_prev_instruction_post_health(&solana, account).await;
 
         assert_eq!(solana.token_account_balance(vault).await, withdraw_amount);
         assert_eq!(

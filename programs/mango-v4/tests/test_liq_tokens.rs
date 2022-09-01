@@ -7,11 +7,15 @@ use solana_sdk::{signature::Keypair, transport::TransportError};
 use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use program_test::*;
 
+use mango_setup::*;
+
 mod program_test;
 
 #[tokio::test]
 async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
-    let context = TestContext::new().await;
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(95_000); // Serum3PlaceOrder needs 92.8k
+    let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = &Keypair::new();
@@ -24,7 +28,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     // SETUP: Create a group and an account to fill the vaults
     //
 
-    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -35,36 +39,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     let quote_token = &tokens[1];
 
     // deposit some funds, to the vaults aren't empty
-    let vault_account = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 2,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
-    )
-    .await
-    .unwrap()
-    .account;
-    for &token_account in payer_mint_accounts {
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: 10000,
-                account: vault_account,
-                token_account,
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-    }
+    create_funded_account(&solana, group, owner, 0, &context.users[1], mints, 10000, 0).await;
 
     //
     // SETUP: Create serum market
@@ -94,36 +69,18 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     //
     // SETUP: Make an account and deposit some quote
     //
-    let account = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 0,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
-    )
-    .await
-    .unwrap()
-    .account;
-
     let deposit_amount = 1000;
-    send_tx(
-        solana,
-        TokenDepositInstruction {
-            amount: deposit_amount,
-            account,
-            token_account: payer_mint_accounts[1],
-            token_authority: payer.clone(),
-            bank_index: 0,
-        },
+    let account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        &mints[1..2],
+        deposit_amount,
+        0,
     )
-    .await
-    .unwrap();
+    .await;
 
     //
     // SETUP: Create an open orders account and an order

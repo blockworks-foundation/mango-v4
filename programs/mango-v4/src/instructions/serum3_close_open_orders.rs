@@ -7,7 +7,11 @@ use crate::state::*;
 pub struct Serum3CloseOpenOrders<'info> {
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group
+        // owner is checked at #1
+    )]
     pub account: AccountLoaderDynamic<'info, MangoAccount>,
     pub owner: Signer<'info>,
 
@@ -23,7 +27,7 @@ pub struct Serum3CloseOpenOrders<'info> {
     pub serum_market_external: UncheckedAccount<'info>,
 
     #[account(mut)]
-    /// CHECK: Validated inline by checking against the pubkey stored in the account
+    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
     pub open_orders: UncheckedAccount<'info>,
 
     #[account(mut)]
@@ -36,6 +40,7 @@ pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<(
     // Validation
     //
     let mut account = ctx.accounts.account.load_mut()?;
+    // account constraint #1
     require!(
         account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
         MangoError::SomeError
@@ -43,11 +48,10 @@ pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<(
 
     let serum_market = ctx.accounts.serum_market.load()?;
 
-    // Validate open_orders
+    // Validate open_orders #2
     require!(
         account
-            .serum3_orders(serum_market.market_index)
-            .ok_or_else(|| error!(MangoError::SomeError))?
+            .serum3_orders(serum_market.market_index)?
             .open_orders
             == ctx.accounts.open_orders.key(),
         MangoError::SomeError
@@ -58,7 +62,14 @@ pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<(
     //
     cpi_close_open_orders(ctx.accounts)?;
 
-    // TODO: decrement in_use_count on the base token and quote token
+    // Reduce the in_use_count on the token positions - they no longer need to be forced open.
+    // We cannot immediately dust tiny positions because we don't have the banks.
+    let (base_position, _) = account.token_position_mut(serum_market.base_token_index)?;
+    base_position.in_use_count = base_position.in_use_count.saturating_sub(1);
+    let (quote_position, _) = account.token_position_mut(serum_market.quote_token_index)?;
+    quote_position.in_use_count = quote_position.in_use_count.saturating_sub(1);
+
+    // Deactivate the serum open orders account itself
     account.deactivate_serum3_orders(serum_market.market_index)?;
 
     Ok(())

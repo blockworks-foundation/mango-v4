@@ -1,7 +1,7 @@
 use crate::{account_shared_data::KeyedAccountSharedData, AnyhowWrap};
 
 use client::{chain_data, AccountFetcher, MangoClient, TokenContext};
-use mango_v4::state::{oracle_price, Bank, TokenIndex, TokenPosition, QUOTE_TOKEN_INDEX};
+use mango_v4::state::{Bank, TokenIndex, TokenPosition, QUOTE_TOKEN_INDEX};
 
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
@@ -44,11 +44,10 @@ impl TokenState {
         account_fetcher: &chain_data::AccountFetcher,
     ) -> anyhow::Result<I80F48> {
         let oracle = account_fetcher.fetch_raw_account(token.mint_info.oracle)?;
-        oracle_price(
-            &KeyedAccountSharedData::new(token.mint_info.oracle, oracle.into()),
-            bank.oracle_config.conf_filter,
-            bank.mint_decimals,
-        )
+        bank.oracle_price(&KeyedAccountSharedData::new(
+            token.mint_info.oracle,
+            oracle.into(),
+        ))
         .map_err_anyhow()
     }
 }

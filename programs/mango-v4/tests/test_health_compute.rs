@@ -7,6 +7,8 @@ use solana_sdk::{signature::Keypair, transport::TransportError};
 
 use program_test::*;
 
+use mango_setup::*;
+
 mod program_test;
 
 // Try to reach compute limits in health checks by having many different tokens in an account
@@ -19,13 +21,12 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     let owner = &context.users[0].key;
     let payer = &context.users[1].key;
     let mints = &context.mints[0..10];
-    let payer_mint_accounts = &context.users[1].token_accounts[0..mints.len()];
 
     //
     // SETUP: Create a group and an account
     //
 
-    let mango_setup::GroupWithTokens { group, .. } = mango_setup::GroupWithTokensConfig {
+    let GroupWithTokens { group, .. } = GroupWithTokensConfig {
         admin,
         payer,
         mints,
@@ -33,43 +34,8 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
-    let account = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 0,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
-    )
-    .await
-    .unwrap()
-    .account;
-
-    //
-    // TEST: Deposit user funds for all the mints
-    // each deposit will end with a health check
-    //
-    for &token_account in payer_mint_accounts {
-        let deposit_amount = 1000;
-
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: deposit_amount,
-                account,
-                token_account,
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-    }
+    // each deposit ends with a health check
+    create_funded_account(&solana, group, owner, 0, &context.users[1], mints, 1000, 0).await;
 
     // TODO: actual explicit CU comparisons.
     // On 2022-5-25 the final deposit costs 36905 CU and each new token increases it by roughly 1600 CU
@@ -216,36 +182,17 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
-    let account = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 0,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
+    let account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        &mints[..1],
+        1000,
+        0,
     )
-    .await
-    .unwrap()
-    .account;
-
-    // Give the account some quote currency
-    send_tx(
-        solana,
-        TokenDepositInstruction {
-            amount: 1000,
-            account,
-            token_account: payer_mint_accounts[0],
-            token_authority: payer.clone(),
-            bank_index: 0,
-        },
-    )
-    .await
-    .unwrap();
+    .await;
 
     //
     // SETUP: Create perp markets

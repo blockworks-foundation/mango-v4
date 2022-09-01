@@ -50,6 +50,7 @@ pub fn liq_token_with_token(
             .is_owner_or_delegate(ctx.accounts.liqor_owner.key()),
         MangoError::SomeError
     );
+    require!(!liqor.fixed.being_liquidated(), MangoError::BeingLiquidated);
 
     let mut liqee = ctx.accounts.liqee.load_mut()?;
 
@@ -62,8 +63,7 @@ pub fn liq_token_with_token(
     // we want to allow liquidation to continue until init_health is positive,
     // to prevent constant oscillation between the two states
     if liqee.being_liquidated() {
-        if init_health > I80F48::ZERO {
-            liqee.fixed.set_being_liquidated(false);
+        if liqee.fixed.maybe_recover_from_being_liquidated(init_health) {
             msg!("Liqee init_health above zero");
             return Ok(());
         }
@@ -150,7 +150,7 @@ pub fn liq_token_with_token(
     let (liqor_liab_active, loan_origination_fee) =
         liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer)?;
     let liqor_liab_position_indexed = liqor_liab_position.indexed_position;
-    let liqee_liab_native_after = liqee_liab_position.native(&liab_bank);
+    let liqee_liab_native_after = liqee_liab_position.native(liab_bank);
 
     let (liqor_asset_position, liqor_asset_raw_index, _) =
         liqor.ensure_token_position(asset_token_index)?;
@@ -161,7 +161,7 @@ pub fn liq_token_with_token(
     let liqee_asset_active =
         asset_bank.withdraw_without_fee_with_dusting(liqee_asset_position, asset_transfer)?;
     let liqee_asset_position_indexed = liqee_asset_position.indexed_position;
-    let liqee_assets_native_after = liqee_asset_position.native(&asset_bank);
+    let liqee_assets_native_after = liqee_asset_position.native(asset_bank);
 
     // Update the health cache
     liqee_health_cache.adjust_token_balance(
@@ -251,9 +251,11 @@ pub fn liq_token_with_token(
         .maybe_recover_from_being_liquidated(liqee_init_health);
 
     // Check liqor's health
-    let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
-        .context("compute liqor health")?;
-    require!(liqor_health >= 0, MangoError::HealthMustBePositive);
+    if !liqor.fixed.is_in_health_region() {
+        let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
+            .context("compute liqor health")?;
+        require!(liqor_health >= 0, MangoError::HealthMustBePositive);
+    }
 
     emit!(LiquidateTokenAndTokenLog {
         mango_group: ctx.accounts.group.key(),
