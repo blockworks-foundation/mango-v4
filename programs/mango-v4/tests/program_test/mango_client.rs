@@ -1387,7 +1387,7 @@ impl<'keypair> ClientInstruction for Serum3DeregisterMarketInstruction<'keypair>
     type Instruction = mango_v4::instruction::Serum3DeregisterMarket;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -1401,11 +1401,23 @@ impl<'keypair> ClientInstruction for Serum3DeregisterMarketInstruction<'keypair>
             &program_id,
         )
         .0;
+        let serum_market_data: Serum3Market = account_loader.load(&serum_market).await.unwrap();
+
+        let index_reservation = Pubkey::find_program_address(
+            &[
+                b"Serum3Index".as_ref(),
+                self.group.as_ref(),
+                &serum_market_data.market_index.to_le_bytes(),
+            ],
+            &program_id,
+        )
+        .0;
 
         let accounts = Self::Accounts {
             group: self.group,
             admin: self.admin.pubkey(),
             serum_market,
+            index_reservation,
             sol_destination: self.sol_destination,
             token_program: Token::id(),
         };
