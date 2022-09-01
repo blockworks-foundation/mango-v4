@@ -857,8 +857,8 @@ export class MangoClient {
       mangoAccount.owner,
     );
 
+    // ensure withdraws don't fail with missing ATAs
     const preInstructions: TransactionInstruction[] = [
-      // ensure withdraws don't fail with missing ATAs
       await createAssociatedTokenAccountIdempotentInstruction(
         mangoAccount.owner,
         mangoAccount.owner,
@@ -866,34 +866,15 @@ export class MangoClient {
       ),
     ];
 
-    let wrappedSolAccount: Keypair | undefined;
     const postInstructions: TransactionInstruction[] = [];
-    const additionalSigners: Signer[] = [];
     if (mintPk.equals(WRAPPED_SOL_MINT)) {
-      wrappedSolAccount = new Keypair();
-      const lamports = nativeAmount + 1e7;
-      preInstructions.push(
-        SystemProgram.createAccount({
-          fromPubkey: mangoAccount.owner,
-          newAccountPubkey: wrappedSolAccount.publicKey,
-          lamports,
-          space: 165,
-          programId: TOKEN_PROGRAM_ID,
-        }),
-        initializeAccount({
-          account: wrappedSolAccount.publicKey,
-          mint: WRAPPED_SOL_MINT,
-          owner: mangoAccount.owner,
-        }),
-      );
       postInstructions.push(
         closeAccount({
-          source: wrappedSolAccount.publicKey,
+          source: tokenAccountPk,
           destination: mangoAccount.owner,
           owner: mangoAccount.owner,
         }),
       );
-      additionalSigners.push(wrappedSolAccount);
     }
 
     const healthRemainingAccounts: PublicKey[] =
@@ -905,7 +886,7 @@ export class MangoClient {
         [],
       );
 
-    const transaction = await this.program.methods
+    const tx = await this.program.methods
       .tokenWithdraw(new BN(nativeAmount), allowBorrow)
       .accounts({
         group: group.publicKey,
@@ -924,17 +905,11 @@ export class MangoClient {
       )
       .preInstructions(preInstructions)
       .postInstructions(postInstructions)
-      .signers(additionalSigners)
       .transaction();
-    // .rpc({ skipPreflight: true });
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
-      transaction,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
-    );
+    return await sendTransaction(this.program.provider as AnchorProvider, tx, {
+      postSendTxCallback: this.postSendTxCallback,
+    });
   }
 
   // Serum
