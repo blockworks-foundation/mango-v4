@@ -157,6 +157,9 @@ impl<A: AccountReader> LoadZeroCopy for A {
         }
 
         let data = self.data();
+        if data.len() < 8 {
+            return Err(ErrorCode::AccountDiscriminatorNotFound.into());
+        }
         let disc_bytes = array_ref![data, 0, 8];
         if disc_bytes != &T::discriminator() {
             return Err(ErrorCode::AccountDiscriminatorMismatch.into());
@@ -178,6 +181,9 @@ impl<'info, 'a> LoadMutZeroCopy for AccountInfoRefMut<'info, 'a> {
             return Err(ErrorCode::AccountOwnedByWrongProgram.into());
         }
 
+        if self.data.len() < 8 {
+            return Err(ErrorCode::AccountDiscriminatorNotFound.into());
+        }
         let disc_bytes = array_ref![self.data, 0, 8];
         if disc_bytes != &T::discriminator() {
             return Err(ErrorCode::AccountDiscriminatorMismatch.into());
@@ -202,6 +208,9 @@ impl<'info> LoadZeroCopyRef for AccountInfo<'info> {
         }
 
         let data = self.try_borrow_data()?;
+        if data.len() < 8 {
+            return Err(ErrorCode::AccountDiscriminatorNotFound.into());
+        }
 
         let disc_bytes = array_ref![data, 0, 8];
         if disc_bytes != &T::discriminator() {
@@ -228,6 +237,9 @@ impl<'info> LoadMutZeroCopyRef for AccountInfo<'info> {
         }
 
         let data = self.try_borrow_mut_data()?;
+        if data.len() < 8 {
+            return Err(ErrorCode::AccountDiscriminatorNotFound.into());
+        }
 
         let disc_bytes = array_ref![data, 0, 8];
         if disc_bytes != &T::discriminator() {

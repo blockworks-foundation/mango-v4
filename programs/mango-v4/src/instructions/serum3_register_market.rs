@@ -31,16 +31,15 @@ pub struct Serum3RegisterMarket<'info> {
     )]
     pub serum_market: AccountLoader<'info, Serum3Market>,
 
-    /// CHECK: Unused account
     #[account(
         init,
         // block using the same market index twice
         seeds = [b"Serum3Index".as_ref(), group.key().as_ref(), &market_index.to_le_bytes()],
         bump,
         payer = payer,
-        space = 1,
+        space = 8 + std::mem::size_of::<Serum3MarketIndexReservation>(),
     )]
-    pub index_reservation: UncheckedAccount<'info>,
+    pub index_reservation: AccountLoader<'info, Serum3MarketIndexReservation>,
 
     #[account(has_one = group)]
     pub quote_bank: AccountLoader<'info, Bank>,
@@ -89,6 +88,13 @@ pub fn serum3_register_market(
         padding2: Default::default(),
         registration_time: Clock::get()?.unix_timestamp,
         reserved: [0; 128],
+    };
+
+    let mut serum_index_reservation = ctx.accounts.index_reservation.load_init()?;
+    *serum_index_reservation = Serum3MarketIndexReservation {
+        group: ctx.accounts.group.key(),
+        market_index,
+        reserved: [0; 38],
     };
 
     Ok(())

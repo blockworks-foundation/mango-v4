@@ -12,7 +12,7 @@ pub fn is_mango_account<'a>(
     group_id: &Pubkey,
 ) -> Option<MangoAccountRefWithHeader<'a>> {
     let data = account.data();
-    if account.owner() != program_id || data.is_empty() {
+    if account.owner() != program_id || data.len() < 8 {
         return None;
     }
 
@@ -37,7 +37,7 @@ pub fn is_mango_bank<'a>(
     group_id: &Pubkey,
 ) -> Option<&'a Bank> {
     let data = account.data();
-    if account.owner() != program_id || data.is_empty() {
+    if account.owner() != program_id || data.len() < 8 {
         return None;
     }
 
@@ -61,7 +61,7 @@ pub fn is_mint_info<'a>(
     group_id: &Pubkey,
 ) -> Option<&'a MintInfo> {
     let data = account.data();
-    if account.owner() != program_id || data.is_empty() {
+    if account.owner() != program_id || data.len() < 8 {
         return None;
     }
 
@@ -85,7 +85,7 @@ pub fn is_perp_market<'a>(
     group_id: &Pubkey,
 ) -> Option<&'a PerpMarket> {
     let data = account.data();
-    if account.owner() != program_id || data.is_empty() {
+    if account.owner() != program_id || data.len() < 8 {
         return None;
     }
 

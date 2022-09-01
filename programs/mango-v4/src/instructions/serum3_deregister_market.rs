@@ -20,6 +20,14 @@ pub struct Serum3DeregisterMarket<'info> {
     )]
     pub serum_market: AccountLoader<'info, Serum3Market>,
 
+    #[account(
+        mut,
+        has_one = group,
+        constraint = serum_market.load()?.market_index == index_reservation.load()?.market_index,
+        close = sol_destination
+    )]
+    pub index_reservation: AccountLoader<'info, Serum3MarketIndexReservation>,
+
     #[account(mut)]
     /// CHECK: target for account rent needs no checks
     pub sol_destination: UncheckedAccount<'info>,

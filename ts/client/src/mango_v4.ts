@@ -1395,6 +1395,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "indexReservation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "solDestination",
           "isMut": true,
           "isSigner": false
@@ -3652,6 +3657,31 @@ export type MangoV4 = {
               "array": [
                 "u8",
                 128
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "serum3MarketIndexReservation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
+            "name": "marketIndex",
+            "type": "u16"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                38
               ]
             }
           }
@@ -6679,6 +6709,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "indexReservation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "solDestination",
           "isMut": true,
           "isSigner": false
@@ -8936,6 +8971,31 @@ export const IDL: MangoV4 = {
               "array": [
                 "u8",
                 128
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "serum3MarketIndexReservation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
+            "name": "marketIndex",
+            "type": "u16"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                38
               ]
             }
           }

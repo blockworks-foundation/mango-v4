@@ -189,6 +189,7 @@ fn can_load_as<'a, T: ZeroCopy + Owner>(
     match load_result {
         Err(Error::AnchorError(error))
             if error.error_code_number == ErrorCode::AccountDiscriminatorMismatch as u32
+                || error.error_code_number == ErrorCode::AccountDiscriminatorNotFound as u32
                 || error.error_code_number == ErrorCode::AccountOwnedByWrongProgram as u32 =>
         {
             return None;
