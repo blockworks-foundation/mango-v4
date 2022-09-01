@@ -6,6 +6,9 @@ Update this for each mainnet deployment.
 
 ## mainnet
 
+Sep 1, 2022 at 10:24:35 Central European Summer Time
+https://explorer.solana.com/tx/3NnX13A3QwsREKKKo3iYR4jqgoongpCjdhhXuJ3y5iP6FwfPcNieVop623tpgPbyreC7m7KtphwdWdoHYE5YC394
+
 - Add HealthRegionBegin, -End instructions
 - Add explicit "oracle" account argument for TokenDeposit and TokenWithdraw instructions
 
