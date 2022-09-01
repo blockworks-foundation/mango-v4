@@ -38,3 +38,17 @@ pub fn format_zero_terminated_utf8_bytes(
             .trim_matches(char::from(0)),
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use fixed::types::I80F48;
+
+    #[test]
+    pub fn test_i80f48_mul_rounding() {
+        // It's not desired, but I80F48 seems to round to -inf
+        let price = I80F48::from_num(0.04);
+        let x = I80F48::from_bits(96590783907000000);
+        assert_eq!((x * price).to_string(), "13.726375969298193");
+        assert_eq!(((-x) * price).to_string(), "-13.726375969298196");
+    }
+}
