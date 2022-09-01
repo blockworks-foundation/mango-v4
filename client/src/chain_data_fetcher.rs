@@ -38,6 +38,13 @@ impl AccountFetcher {
         let acc = self.fetch_raw(address)?;
 
         let data = acc.data();
+        if data.len() < 8 {
+            anyhow::bail!(
+                "account at {} has only {} bytes of data",
+                address,
+                data.len()
+            );
+        }
         let disc_bytes = &data[0..8];
         if disc_bytes != MangoAccount::discriminator() {
             anyhow::bail!("not a mango account at {}", address);
