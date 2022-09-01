@@ -38,7 +38,7 @@ pub struct Serum3RegisterMarket<'info> {
         seeds = [b"Serum3Index".as_ref(), group.key().as_ref(), &market_index.to_le_bytes()],
         bump,
         payer = payer,
-        space = 1,
+        space = 8, // like an anchor account with only a discriminator
     )]
     pub index_reservation: UncheckedAccount<'info>,
 
