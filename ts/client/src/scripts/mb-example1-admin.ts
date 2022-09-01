@@ -32,7 +32,7 @@ async function createGroup() {
   );
 
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.MB_CLUSTER_URL, options);
+  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
 
   const adminWallet = new Wallet(admin);
   console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
@@ -58,7 +58,7 @@ async function registerTokens() {
   );
 
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.MB_CLUSTER_URL, options);
+  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
 
   const adminWallet = new Wallet(admin);
   console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
@@ -254,7 +254,7 @@ async function registerTokens() {
 
   // log tokens/banks
   await group.reloadAll(client);
-  for (const bank of await group.banksMap.values()) {
+  for (const bank of await Array.from(group.banksMapByMint.values()).flat()) {
     console.log(`${bank.toString()}`);
   }
 }
@@ -290,14 +290,28 @@ async function createUser(userKeypair: string) {
     group,
     user.publicKey,
   );
+  if (!mangoAccount) {
+    throw new Error(`MangoAccount not found for user ${user.publicKey}`);
+  }
+
   console.log(`...created MangoAccount ${mangoAccount.publicKey.toBase58()}`);
   console.log(mangoAccount.toString(group));
 
-  await client.tokenDeposit(group, mangoAccount, 'USDC', 10);
+  await client.tokenDeposit(
+    group,
+    mangoAccount,
+    new PublicKey(MAINNET_MINTS.get('USDC')!),
+    10,
+  );
   await mangoAccount.reload(client, group);
   console.log(`...deposited 10 USDC`);
 
-  await client.tokenDeposit(group, mangoAccount, 'SOL', 1);
+  await client.tokenDeposit(
+    group,
+    mangoAccount,
+    new PublicKey(MAINNET_MINTS.get('SOL')!),
+    1,
+  );
   await mangoAccount.reload(client, group);
   console.log(`...deposited 1 SOL`);
 }

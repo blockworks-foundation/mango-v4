@@ -74,6 +74,9 @@ async function main() {
     group,
     user.publicKey,
   );
+  if (!mangoAccount) {
+    throw new Error(`MangoAccount not found for user ${user.publicKey}`);
+  }
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString(group));
 
