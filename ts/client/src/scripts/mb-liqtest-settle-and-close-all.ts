@@ -9,7 +9,7 @@ import { MANGO_V4_ID } from '../constants';
 // by MANGO_MAINNET_PAYER_KEYPAIR in the group.
 //
 
-const GROUP_NUM = Number(process.env.GROUP_NUM || 2);
+const GROUP_NUM = Number(process.env.GROUP_NUM || 200);
 const CLUSTER_URL =
   process.env.CLUSTER_URL ||
   'https://mango.rpcpool.com/946ef7337da3f5b8d3e4a34e7f88';
@@ -18,7 +18,7 @@ const MANGO_MAINNET_PAYER_KEYPAIR =
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(CLUSTER_URL, options);
+  const connection = new Connection(CLUSTER_URL!, options);
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
@@ -31,6 +31,8 @@ async function main() {
     userProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
+    {},
+    'get-program-accounts'
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
@@ -50,7 +52,7 @@ async function main() {
     // first, settle all borrows
     for (let token of account.tokensActive()) {
       const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
-      const amount = token.native(bank).toNumber();
+      const amount = token.balance(bank).toNumber();
       if (amount < 0) {
         try {
           await client.tokenDepositNative(
@@ -76,7 +78,7 @@ async function main() {
     // withdraw all funds
     for (let token of account.tokensActive()) {
       const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
-      const amount = token.native(bank).toNumber();
+      const amount = token.balance(bank).toNumber();
       if (amount > 0) {
         try {
           const allowBorrow = false;

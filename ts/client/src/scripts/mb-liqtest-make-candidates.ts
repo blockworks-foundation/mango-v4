@@ -8,7 +8,7 @@ import { MANGO_V4_ID } from '../constants';
 // This script creates liquidation candidates
 //
 
-const GROUP_NUM = Number(process.env.GROUP_NUM || 1);
+const GROUP_NUM = Number(process.env.GROUP_NUM || 200);
 
 // native prices
 const PRICES = {
@@ -33,7 +33,7 @@ const SCENARIOS: [string, string, number, string, number][] = [
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.CLUSTER_URL, options);
+  const connection = new Connection(process.env.CLUSTER_URL!, options);
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
@@ -48,6 +48,8 @@ async function main() {
     userProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
+    {},
+    'get-program-accounts',
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
@@ -66,34 +68,37 @@ async function main() {
 
     // create account
     console.log(`Creating mangoaccount...`);
-    let mangoAccount = await client.getOrCreateMangoAccount(
+    let mangoAccount = (await client.getOrCreateMangoAccount(
       group,
       admin.publicKey,
       maxAccountNum + 1,
-    );
+    ))!;
     maxAccountNum = maxAccountNum + 1;
     console.log(
       `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
     );
 
+    const assetMint = new PublicKey(MAINNET_MINTS.get(assetName)!);
+    const liabMint = new PublicKey(MAINNET_MINTS.get(liabName)!);
+
     await client.tokenDepositNative(
       group,
       mangoAccount,
-      assetName,
+      assetMint,
       assetAmount,
     );
     await mangoAccount.reload(client, group);
 
     if (liabAmount > 0) {
       // temporarily drop the borrowed token value, so the borrow goes through
-      const oracle = group.banksMap.get(liabName).oracle;
+      const oracle = group.banksMapByName.get(liabName)![0].oracle;
       try {
         await client.stubOracleSet(group, oracle, PRICES[liabName] / 2);
 
         await client.tokenWithdrawNative(
           group,
           mangoAccount,
-          liabName,
+          liabMint,
           liabAmount,
           true,
         );

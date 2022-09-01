@@ -10,7 +10,7 @@ import { MANGO_V4_ID } from '../constants';
 //
 
 // default to group 1, to not conflict with the normal group
-const GROUP_NUM = Number(process.env.GROUP_NUM || 1);
+const GROUP_NUM = Number(process.env.GROUP_NUM || 200);
 
 const MAINNET_MINTS = new Map([
   ['USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'],
@@ -24,9 +24,16 @@ const STUB_PRICES = new Map([
   ['SOL', 0.04], // sol has 9 decimals, equivalent to $40 per SOL
 ]);
 
+// External markets are matched with those in https://github.com/blockworks-foundation/mango-client-v3/blob/main/src/ids.json
+// and verified to have best liquidity for pair on https://openserum.io/
+const MAINNET_SERUM3_MARKETS = new Map([
+  ['BTC/USDC', 'A8YFbxQYFVqKZaoYJLLUVcQiWP7G2MeEgW5wsAQgMvFw'],
+  ['SOL/USDC', '9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT'],
+]);
+
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.CLUSTER_URL, options);
+  const connection = new Connection(process.env.CLUSTER_URL!, options);
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
@@ -42,6 +49,8 @@ async function main() {
     adminProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
+    {},
+    'get-program-accounts',
   );
 
   // group
@@ -61,7 +70,7 @@ async function main() {
     console.log(`Creating stub oracle for ${name}...`);
     const mintPk = new PublicKey(mint);
     try {
-      const price = STUB_PRICES.get(name);
+      const price = STUB_PRICES.get(name)!;
       await client.stubOracleCreate(group, mintPk, price);
     } catch (error) {
       console.log(error);
@@ -69,37 +78,6 @@ async function main() {
     const oracle = (await client.getStubOracle(group, mintPk))[0];
     console.log(`...created stub oracle ${oracle.publicKey}`);
     oracles.set(name, oracle.publicKey);
-  }
-
-  // register token 1
-  console.log(`Registering BTC...`);
-  const btcMainnetMint = new PublicKey(MAINNET_MINTS.get('BTC')!);
-  const btcMainnetOracle = oracles.get('BTC');
-  try {
-    await client.tokenRegister(
-      group,
-      btcMainnetMint,
-      btcMainnetOracle,
-      0.1,
-      1,
-      'BTC',
-      0.01,
-      0.4,
-      0.07,
-      0.7,
-      0.88,
-      1.5,
-      0.0,
-      0.0001,
-      0.9,
-      0.8,
-      1.1,
-      1.2,
-      0.05,
-    );
-    await group.reloadAll(client);
-  } catch (error) {
-    console.log(error);
   }
 
   // register token 0
@@ -127,6 +105,37 @@ async function main() {
       1,
       1,
       0,
+    );
+    await group.reloadAll(client);
+  } catch (error) {
+    console.log(error);
+  }
+
+  // register token 1
+  console.log(`Registering BTC...`);
+  const btcMainnetMint = new PublicKey(MAINNET_MINTS.get('BTC')!);
+  const btcMainnetOracle = oracles.get('BTC');
+  try {
+    await client.tokenRegister(
+      group,
+      btcMainnetMint,
+      btcMainnetOracle,
+      0.1,
+      1,
+      'BTC',
+      0.01,
+      0.4,
+      0.07,
+      0.7,
+      0.88,
+      1.5,
+      0.0,
+      0.0001,
+      0.9,
+      0.8,
+      1.1,
+      1.2,
+      0.05,
     );
     await group.reloadAll(client);
   } catch (error) {
@@ -165,7 +174,7 @@ async function main() {
   }
 
   // log tokens/banks
-  for (const bank of await group.banksMap.values()) {
+  for (const bank of await group.banksMapByMint.values()) {
     console.log(`${bank.toString()}`);
   }
 
