@@ -177,9 +177,9 @@ async function main() {
 
     for (const mangoAccount of mangoAccounts) {
       console.log(`MangoAccount ${mangoAccount.publicKey}`);
-      if (mangoAccount.name === '2nd Account') {
-        await debugUser(client, group, mangoAccount);
-      }
+      // if (mangoAccount.name === '2nd Account') {
+      await debugUser(client, group, mangoAccount);
+      // }
     }
   }
 

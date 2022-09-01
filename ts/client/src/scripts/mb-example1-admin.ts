@@ -16,7 +16,7 @@ const MAINNET_MINTS = new Map([
   ['BTC', '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E'], // Wrapped Bitcoin (Sollet)
   ['ETH', '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs'], // Ether (Portal)
   ['soETH', '2FPyTwcZLUg1MDrwsyoP4D6s1tM7hAkHYRjkNb5w6Pxk'], // Wrapped Ethereum (Sollet)
-  ['SOL', 'So11111111111111111111111111111111111111112'],
+  ['SOL', 'So11111111111111111111111111111111111111112'], // Wrapped SOL
   ['MSOL', 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So'],
   ['MNGO', 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac'],
 ]);
