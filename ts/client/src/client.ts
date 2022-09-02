@@ -543,7 +543,7 @@ export class MangoClient {
     name?: string,
   ): Promise<TransactionSignature> {
     const transaction = await this.program.methods
-      .accountCreate(accountNumber ?? 0, 8, 0, 0, 0, name ?? '')
+      .accountCreate(accountNumber ?? 0, 8, 8, 0, 0, name ?? '')
       .accounts({
         group: group.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
