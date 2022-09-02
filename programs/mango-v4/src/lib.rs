@@ -101,7 +101,6 @@ pub mod mango_v4 {
     #[allow(clippy::too_many_arguments)]
     pub fn token_edit(
         ctx: Context<TokenEdit>,
-        bank_num: u64,
         oracle_opt: Option<Pubkey>,
         oracle_config_opt: Option<OracleConfig>,
         group_insurance_fund_opt: Option<bool>,
@@ -116,7 +115,6 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::token_edit(
             ctx,
-            bank_num,
             oracle_opt,
             oracle_config_opt,
             group_insurance_fund_opt,

@@ -503,10 +503,6 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "bankNum",
-          "type": "u64"
-        },
-        {
           "name": "oracleOpt",
           "type": {
             "option": "publicKey"
@@ -5816,10 +5812,6 @@ export const IDL: MangoV4 = {
         }
       ],
       "args": [
-        {
-          "name": "bankNum",
-          "type": "u64"
-        },
         {
           "name": "oracleOpt",
           "type": {
