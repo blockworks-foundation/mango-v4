@@ -1692,12 +1692,14 @@ export class MangoClient {
       .instruction();
 
     const tx = new Transaction();
-    for (const i of preInstructions) {
-      tx.add(i);
+    for (const ix of preInstructions) {
+      tx.add(ix);
     }
     tx.add(flashLoanBeginIx);
-    for (const i of userDefinedInstructions) {
-      tx.add(i);
+    for (const ix of userDefinedInstructions.filter(
+      (ix) => ix.keys.length > 2,
+    )) {
+      tx.add(ix);
     }
     tx.add(flashLoanEndIx);
 
