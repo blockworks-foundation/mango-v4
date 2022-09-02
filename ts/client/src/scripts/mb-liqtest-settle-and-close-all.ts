@@ -32,7 +32,7 @@ async function main() {
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
     {},
-    'get-program-accounts'
+    'get-program-accounts',
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
@@ -46,6 +46,20 @@ async function main() {
   console.log(group.toString());
 
   let accounts = await client.getMangoAccountsForOwner(group, admin.publicKey);
+  for (let account of accounts) {
+    for (let serumOrders of account.serum3Active()) {
+      const serumMarket = group.findSerum3Market(serumOrders.marketIndex)!;
+      const serumExternal = serumMarket.serumMarketExternal;
+      console.log(
+        `closing serum orders on: ${account} for market ${serumMarket.name}`,
+      );
+      await client.serum3CancelAllorders(group, account, serumExternal, 10);
+      await client.serum3SettleFunds(group, account, serumExternal);
+      await client.serum3CloseOpenOrders(group, account, serumExternal);
+    }
+  }
+
+  accounts = await client.getMangoAccountsForOwner(group, admin.publicKey);
   for (let account of accounts) {
     console.log(`settling borrows on account: ${account}`);
 
@@ -66,6 +80,7 @@ async function main() {
           console.log(
             `failed to deposit ${bank.name} into ${account.publicKey}: ${error}`,
           );
+          process.exit();
         }
       }
     }
@@ -94,6 +109,7 @@ async function main() {
           console.log(
             `failed to withdraw ${bank.name} from ${account.publicKey}: ${error}`,
           );
+          process.exit();
         }
       }
     }
