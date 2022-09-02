@@ -44,7 +44,7 @@ import {
 import { SERUM3_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
-import { FlashLoanType } from './types';
+import { FlashLoanType, InterestRateParams } from './types';
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
@@ -266,37 +266,39 @@ export class MangoClient {
   public async tokenEdit(
     group: Group,
     mintPk: PublicKey,
-    oracle: PublicKey,
-    oracleConfFilter: number,
-    groupInsuranceFund: boolean | undefined,
-    adjustmentFactor: number,
-    util0: number,
-    rate0: number,
-    util1: number,
-    rate1: number,
-    maxRate: number,
-    loanFeeRate: number,
-    loanOriginationFeeRate: number,
-    maintAssetWeight: number,
-    initAssetWeight: number,
-    maintLiabWeight: number,
-    initLiabWeight: number,
-    liquidationFee: number,
+    oracle: PublicKey | null,
+    oracleConfFilter: number | null,
+    groupInsuranceFund: boolean | null,
+    interestRateParams: InterestRateParams | null,
+    loanFeeRate: number | null,
+    loanOriginationFeeRate: number | null,
+    maintAssetWeight: number | null,
+    initAssetWeight: number | null,
+    maintLiabWeight: number | null,
+    initLiabWeight: number | null,
+    liquidationFee: number | null,
   ): Promise<TransactionSignature> {
     const bank = group.getFirstBankByMint(mintPk);
     const mintInfo = group.mintInfosMapByTokenIndex.get(bank.tokenIndex)!;
+
+    let oracleConf;
+    if (oracleConfFilter !== null) {
+      oracleConf = {
+        confFilter: {
+          val: I80F48.fromNumber(oracleConfFilter).getData(),
+        },
+      } as any; // future: nested custom types dont typecheck, fix if possible?
+    } else {
+      oracleConf = null;
+    }
 
     return await this.program.methods
       .tokenEdit(
         new BN(0),
         oracle,
-        {
-          confFilter: {
-            val: I80F48.fromNumber(oracleConfFilter).getData(),
-          },
-        } as any, // future: nested custom types dont typecheck, fix if possible?
-        groupInsuranceFund ?? null,
-        { adjustmentFactor, util0, rate0, util1, rate1, maxRate },
+        oracleConf,
+        groupInsuranceFund,
+        interestRateParams,
         loanFeeRate,
         loanOriginationFeeRate,
         maintAssetWeight,
