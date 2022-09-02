@@ -5,9 +5,11 @@ use crate::account_shared_data::KeyedAccountSharedData;
 use client::{chain_data, AccountFetcher, MangoClient, MangoClientError, MangoGroupContext};
 use mango_v4::state::{
     new_health_cache, Bank, FixedOrderAccountRetriever, HealthCache, HealthType, MangoAccountValue,
-    TokenIndex, QUOTE_TOKEN_INDEX,
+    Serum3Orders, TokenIndex, QUOTE_TOKEN_INDEX,
 };
 
+use itertools::Itertools;
+use rand::seq::SliceRandom;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 pub struct Config {
@@ -156,6 +158,24 @@ pub fn maybe_liquidate_account(
         .collect::<anyhow::Result<Vec<(TokenIndex, I80F48, I80F48)>>>()?;
     tokens.sort_by(|a, b| a.2.cmp(&b.2));
 
+    // look for any open serum orders or settleable balances
+    let serum_force_cancels = account
+        .active_serum3_orders()
+        .map(|orders| {
+            let open_orders_account = account_fetcher.fetch_raw_account(orders.open_orders)?;
+            let open_orders = mango_v4::serum3_cpi::load_open_orders(&open_orders_account)?;
+            let can_force_cancel = open_orders.native_coin_total > 0
+                || open_orders.native_pc_total > 0
+                || open_orders.referrer_rebates_accrued > 0;
+            if can_force_cancel {
+                Ok(Some(*orders))
+            } else {
+                Ok(None)
+            }
+        })
+        .filter_map_ok(|v| v)
+        .collect::<anyhow::Result<Vec<Serum3Orders>>>()?;
+
     let get_max_liab_transfer = |source, target| -> anyhow::Result<I80F48> {
         let mut liqor = account_fetcher
             .fetch_fresh_mango_account(&mango_client.mango_account_address)
@@ -175,7 +195,23 @@ pub fn maybe_liquidate_account(
     };
 
     // try liquidating
-    let txsig = if is_bankrupt {
+    let txsig = if !serum_force_cancels.is_empty() {
+        // pick a random market to force-cancel orders on
+        let serum_orders = serum_force_cancels.choose(&mut rand::thread_rng()).unwrap();
+        let sig = mango_client.serum3_liq_force_cancel_orders(
+            (pubkey, &account),
+            serum_orders.market_index,
+            &serum_orders.open_orders,
+        )?;
+        log::info!(
+            "Force cancelled serum market on account {}, market index {}, maint_health was {}, tx sig {:?}",
+            pubkey,
+            serum_orders.market_index,
+            maint_health,
+            sig
+        );
+        sig
+    } else if is_bankrupt {
         if tokens.is_empty() {
             anyhow::bail!("mango account {}, is bankrupt has no active tokens", pubkey);
         }

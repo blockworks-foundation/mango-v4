@@ -3092,6 +3092,7 @@ dependencies = [
  "futures 0.3.21",
  "futures-core",
  "futures-util",
+ "itertools 0.10.3",
  "jemallocator",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "jsonrpc-core-client",

@@ -1,6 +1,11 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
+import {
+  Serum3OrderType,
+  Serum3SelfTradeBehavior,
+  Serum3Side,
+} from '../accounts/serum3';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 
@@ -8,7 +13,7 @@ import { MANGO_V4_ID } from '../constants';
 // This script creates liquidation candidates
 //
 
-const GROUP_NUM = Number(process.env.GROUP_NUM || 1);
+const GROUP_NUM = Number(process.env.GROUP_NUM || 200);
 
 // native prices
 const PRICES = {
@@ -23,17 +28,16 @@ const MAINNET_MINTS = new Map([
   ['SOL', 'So11111111111111111111111111111111111111112'],
 ]);
 
-const SCENARIOS: [string, string, number, string, number][] = [
+const TOKEN_SCENARIOS: [string, string, number, string, number][] = [
   ['LIQTEST, LIQOR', 'USDC', 1000000, 'USDC', 0],
   ['LIQTEST, A: USDC, L: SOL', 'USDC', 1000 * PRICES.SOL, 'SOL', 920],
   ['LIQTEST, A: SOL, L: USDC', 'SOL', 1000, 'USDC', 920 * PRICES.SOL],
-  // TODO: needs the fix on liq+dust to go live
-  //['LIQTEST, A: BTC, L: SOL', 'BTC', 20, 'SOL', 18 * PRICES.BTC / PRICES.SOL],
+  ['LIQTEST, A: BTC, L: SOL', 'BTC', 20, 'SOL', 18 * PRICES.BTC / PRICES.SOL],
 ];
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.CLUSTER_URL, options);
+  const connection = new Connection(process.env.CLUSTER_URL!, options);
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
@@ -48,6 +52,8 @@ async function main() {
     userProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
+    {},
+    'get-program-accounts',
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
@@ -59,41 +65,45 @@ async function main() {
     group,
     admin.publicKey,
   );
-  let maxAccountNum = Math.max(...accounts.map((a) => a.accountNum));
+  let maxAccountNum = Math.max(0, ...accounts.map((a) => a.accountNum));
 
-  for (const scenario of SCENARIOS) {
+  for (const scenario of TOKEN_SCENARIOS) {
     const [name, assetName, assetAmount, liabName, liabAmount] = scenario;
 
     // create account
     console.log(`Creating mangoaccount...`);
-    let mangoAccount = await client.getOrCreateMangoAccount(
+    let mangoAccount = (await client.getOrCreateMangoAccount(
       group,
       admin.publicKey,
       maxAccountNum + 1,
-    );
+      name,
+    ))!;
     maxAccountNum = maxAccountNum + 1;
     console.log(
       `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
     );
 
+    const assetMint = new PublicKey(MAINNET_MINTS.get(assetName)!);
+    const liabMint = new PublicKey(MAINNET_MINTS.get(liabName)!);
+
     await client.tokenDepositNative(
       group,
       mangoAccount,
-      assetName,
+      assetMint,
       assetAmount,
     );
     await mangoAccount.reload(client, group);
 
     if (liabAmount > 0) {
       // temporarily drop the borrowed token value, so the borrow goes through
-      const oracle = group.banksMap.get(liabName).oracle;
+      const oracle = group.banksMapByName.get(liabName)![0].oracle;
       try {
         await client.stubOracleSet(group, oracle, PRICES[liabName] / 2);
 
         await client.tokenWithdrawNative(
           group,
           mangoAccount,
-          liabName,
+          liabMint,
           liabAmount,
           true,
         );
@@ -101,6 +111,80 @@ async function main() {
         // restore the oracle
         await client.stubOracleSet(group, oracle, PRICES[liabName]);
       }
+    }
+  }
+
+  // Serum order scenario
+  {
+    const name = 'LIQTEST, serum orders';
+
+    console.log(`Creating mangoaccount...`);
+    let mangoAccount = (await client.getOrCreateMangoAccount(
+      group,
+      admin.publicKey,
+      maxAccountNum + 1,
+      name,
+    ))!;
+    maxAccountNum = maxAccountNum + 1;
+    console.log(
+      `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
+    );
+
+    const market = group.findSerum3MarketByName('SOL/USDC')!;
+    const sellMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
+    const buyMint = new PublicKey(MAINNET_MINTS.get('SOL')!);
+
+    await client.tokenDepositNative(group, mangoAccount, sellMint, 100000);
+    await mangoAccount.reload(client, group);
+
+    // temporarily up the init asset weight of the bought token
+    await client.tokenEdit(
+      group,
+      buyMint,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      1.0,
+      1.0,
+      null,
+      null,
+      null,
+    );
+    try {
+      // At a price of $1/ui-SOL we can buy 0.1 ui-SOL for the 100k native-USDC we have.
+      // With maint weight of 0.9 we have 10x main-leverage. Buying 12x as much causes liquidation.
+      await client.serum3PlaceOrder(
+        group,
+        mangoAccount,
+        market.serumMarketExternal,
+        Serum3Side.bid,
+        1,
+        12 * 0.1,
+        Serum3SelfTradeBehavior.abortTransaction,
+        Serum3OrderType.limit,
+        0,
+        5,
+      );
+    } finally {
+      // restore the weights
+      await client.tokenEdit(
+        group,
+        buyMint,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        0.9,
+        0.8,
+        null,
+        null,
+        null,
+      );
     }
   }
 
