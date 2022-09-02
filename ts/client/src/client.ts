@@ -294,7 +294,6 @@ export class MangoClient {
 
     return await this.program.methods
       .tokenEdit(
-        new BN(0),
         oracle,
         oracleConf,
         groupInsuranceFund,

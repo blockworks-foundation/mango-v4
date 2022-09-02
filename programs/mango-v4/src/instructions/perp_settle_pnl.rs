@@ -27,6 +27,7 @@ pub struct PerpSettlePnl<'info> {
     #[account(mut, has_one = group)]
     pub account_b: AccountLoaderDynamic<'info, MangoAccount>,
 
+    /// CHECK: Oracle can have different account types, constrained by address in perp_market
     pub oracle: UncheckedAccount<'info>,
 
     #[account(mut, has_one = group)]

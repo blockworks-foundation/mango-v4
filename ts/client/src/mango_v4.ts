@@ -503,10 +503,6 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "bankNum",
-          "type": "u64"
-        },
-        {
           "name": "oracleOpt",
           "type": {
             "option": "publicKey"
@@ -2691,6 +2687,49 @@ export type MangoV4 = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "perpSettlePnl",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "accountA",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountB",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "quoteBank",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxSettleAmount",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
     },
     {
       "name": "computeAccountData",
@@ -5308,6 +5347,31 @@ export type MangoV4 = {
       "code": 6016,
       "name": "BeingLiquidated",
       "msg": "account is currently being liquidated"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidBank",
+      "msg": "invalid bank"
+    },
+    {
+      "code": 6018,
+      "name": "ProfitabilityMismatch",
+      "msg": "account profitability is mismatched"
+    },
+    {
+      "code": 6019,
+      "name": "CannotSettleWithSelf",
+      "msg": "cannot settle with self"
+    },
+    {
+      "code": 6020,
+      "name": "PerpPositionDoesNotExist",
+      "msg": "perp position does not exist"
+    },
+    {
+      "code": 6021,
+      "name": "MaxSettleAmountMustBeGreaterThanZero",
+      "msg": "max settle amount must be greater than zero"
     }
   ]
 };
@@ -5817,10 +5881,6 @@ export const IDL: MangoV4 = {
       ],
       "args": [
         {
-          "name": "bankNum",
-          "type": "u64"
-        },
-        {
           "name": "oracleOpt",
           "type": {
             "option": "publicKey"
@@ -8005,6 +8065,49 @@ export const IDL: MangoV4 = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "perpSettlePnl",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "accountA",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountB",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "quoteBank",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxSettleAmount",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
     },
     {
       "name": "computeAccountData",
@@ -10622,6 +10725,31 @@ export const IDL: MangoV4 = {
       "code": 6016,
       "name": "BeingLiquidated",
       "msg": "account is currently being liquidated"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidBank",
+      "msg": "invalid bank"
+    },
+    {
+      "code": 6018,
+      "name": "ProfitabilityMismatch",
+      "msg": "account profitability is mismatched"
+    },
+    {
+      "code": 6019,
+      "name": "CannotSettleWithSelf",
+      "msg": "cannot settle with self"
+    },
+    {
+      "code": 6020,
+      "name": "PerpPositionDoesNotExist",
+      "msg": "perp position does not exist"
+    },
+    {
+      "code": 6021,
+      "name": "MaxSettleAmountMustBeGreaterThanZero",
+      "msg": "max settle amount must be greater than zero"
     }
   ]
 };
