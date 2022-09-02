@@ -12,7 +12,6 @@ use crate::state::*;
 /// In addition to these accounts, all banks must be passed as remaining_accounts
 /// in MintInfo order.
 #[derive(Accounts)]
-#[instruction(bank_num: u64)]
 pub struct TokenEdit<'info> {
     #[account(
         has_one = admin,
@@ -31,7 +30,6 @@ pub struct TokenEdit<'info> {
 #[allow(clippy::too_many_arguments)]
 pub fn token_edit(
     ctx: Context<TokenEdit>,
-    bank_num: u64,
     oracle_opt: Option<Pubkey>,
     oracle_config_opt: Option<OracleConfig>,
     group_insurance_fund_opt: Option<bool>,
