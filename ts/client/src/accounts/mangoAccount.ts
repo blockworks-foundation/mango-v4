@@ -80,9 +80,10 @@ export class MangoAccount {
   }
 
   async reload(client: MangoClient, group: Group): Promise<MangoAccount> {
-    Object.assign(this, await client.getMangoAccount(this));
-    await this.reloadAccountData(client, group);
-    return this;
+    const mangoAccount = await client.getMangoAccount(this);
+    await mangoAccount.reloadAccountData(client, group);
+    Object.assign(this, mangoAccount);
+    return mangoAccount;
   }
 
   async reloadAccountData(
