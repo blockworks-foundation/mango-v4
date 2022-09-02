@@ -664,7 +664,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
   ): Promise<TransactionSignature> {
-    return await this.program.methods
+    const transaction = await this.program.methods
       .accountClose()
       .accounts({
         group: group.publicKey,
@@ -672,7 +672,15 @@ export class MangoClient {
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         solDestination: mangoAccount.owner,
       })
-      .rpc();
+      .transaction();
+
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      transaction,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
   }
 
   public async computeAccountData(
