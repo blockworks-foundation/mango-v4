@@ -498,12 +498,14 @@ impl PerpInfo {
         let base_info = &token_infos[base_index];
 
         let base_lot_size = I80F48::from(perp_market.base_lot_size);
-
         let base_lots = cm!(perp_position.base_position_lots + perp_position.taker_base_lots);
+
+        let unsettled_funding = perp_position.unsettled_funding(&perp_market);
         let taker_quote = I80F48::from(cm!(
             perp_position.taker_quote_lots * perp_market.quote_lot_size
         ));
-        let quote_current = cm!(perp_position.quote_position_native + taker_quote);
+        let quote_current =
+            cm!(perp_position.quote_position_native - unsettled_funding + taker_quote);
 
         // Two scenarios:
         // 1. The price goes low and all bids execute, converting to base.
@@ -1021,7 +1023,6 @@ pub fn new_health_cache(
         });
     }
 
-    // TODO: also account for perp funding in health
     // health contribution from perp accounts
     let mut perp_infos = Vec::with_capacity(account.active_perp_positions().count());
     for (i, perp_position) in account.active_perp_positions().enumerate() {
@@ -1158,6 +1159,35 @@ mod tests {
         (bank, oracle)
     }
 
+    fn mock_perp_market(
+        group: Pubkey,
+        market_index: PerpMarketIndex,
+        base_token: TokenIndex,
+        init_weights: f64,
+        maint_weights: f64,
+    ) -> TestAccount<PerpMarket> {
+        let mut pm = TestAccount::<PerpMarket>::new_zeroed();
+        pm.data().group = group;
+        pm.data().perp_market_index = market_index;
+        pm.data().base_token_index = base_token;
+        pm.data().init_asset_weight = I80F48::from_num(1.0 - init_weights);
+        pm.data().init_liab_weight = I80F48::from_num(1.0 + init_weights);
+        pm.data().maint_asset_weight = I80F48::from_num(1.0 - maint_weights);
+        pm.data().maint_liab_weight = I80F48::from_num(1.0 + maint_weights);
+        pm.data().quote_lot_size = 100;
+        pm.data().base_lot_size = 10;
+        pm
+    }
+
+    fn health_eq(a: I80F48, b: f64) -> bool {
+        if (a - I80F48::from_num(b)).abs() < 0.001 {
+            true
+        } else {
+            println!("health is {}, but expected {}", a, b);
+            false
+        }
+    }
+
     // Run a health test that includes all the side values (like referrer_rebates_accrued)
     #[test]
     fn test_health0() {
@@ -1194,16 +1224,7 @@ mod tests {
         oo1.data().native_coin_free = 3;
         oo1.data().referrer_rebates_accrued = 2;
 
-        let mut perp1 = TestAccount::<PerpMarket>::new_zeroed();
-        perp1.data().group = group;
-        perp1.data().perp_market_index = 9;
-        perp1.data().base_token_index = 4;
-        perp1.data().init_asset_weight = I80F48::from_num(1.0 - 0.2f64);
-        perp1.data().init_liab_weight = I80F48::from_num(1.0 + 0.2f64);
-        perp1.data().maint_asset_weight = I80F48::from_num(1.0 - 0.1f64);
-        perp1.data().maint_liab_weight = I80F48::from_num(1.0 + 0.1f64);
-        perp1.data().quote_lot_size = 100;
-        perp1.data().base_lot_size = 10;
+        let mut perp1 = mock_perp_market(group, 9, 4, 0.2, 0.1);
         let perpaccount = account.ensure_perp_position(9).unwrap().0;
         perpaccount.base_position_lots = 3;
         perpaccount.quote_position_native = -I80F48::from(310u16);
@@ -1222,15 +1243,6 @@ mod tests {
         ];
 
         let retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
-
-        let health_eq = |a: I80F48, b: f64| {
-            if (a - I80F48::from_num(b)).abs() < 0.001 {
-                true
-            } else {
-                println!("health is {}, but expected {}", a, b);
-                false
-            }
-        };
 
         // for bank1/oracle1, including open orders (scenario: bids execute)
         let health1 = (100.0 + 1.0 + 2.0 + (20.0 + 15.0 * 5.0)) * 0.8;
@@ -1260,9 +1272,7 @@ mod tests {
         let oo1key = oo1.pubkey;
         oo1.data().native_pc_total = 20;
 
-        let mut perp1 = TestAccount::<PerpMarket>::new_zeroed();
-        perp1.data().group = group;
-        perp1.data().perp_market_index = 9;
+        let mut perp1 = mock_perp_market(group, 9, 4, 0.2, 0.1);
 
         let oracle2_account_info = oracle2.as_account_info();
         let ais = vec![
@@ -1386,16 +1396,7 @@ mod tests {
         oo2.data().native_pc_total = testcase.oo_1_3.0;
         oo2.data().native_coin_total = testcase.oo_1_3.1;
 
-        let mut perp1 = TestAccount::<PerpMarket>::new_zeroed();
-        perp1.data().group = group;
-        perp1.data().perp_market_index = 9;
-        perp1.data().base_token_index = 4;
-        perp1.data().init_asset_weight = I80F48::from_num(1.0 - 0.2f64);
-        perp1.data().init_liab_weight = I80F48::from_num(1.0 + 0.2f64);
-        perp1.data().maint_asset_weight = I80F48::from_num(1.0 - 0.1f64);
-        perp1.data().maint_liab_weight = I80F48::from_num(1.0 + 0.1f64);
-        perp1.data().quote_lot_size = 100;
-        perp1.data().base_lot_size = 10;
+        let mut perp1 = mock_perp_market(group, 9, 4, 0.2, 0.1);
         let perpaccount = account.ensure_perp_position(9).unwrap().0;
         perpaccount.base_position_lots = testcase.perp1.0;
         perpaccount.quote_position_native = I80F48::from(testcase.perp1.1);
@@ -1415,15 +1416,6 @@ mod tests {
         ];
 
         let retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
-
-        let health_eq = |a: I80F48, b: f64| {
-            if (a - I80F48::from_num(b)).abs() < 0.001 {
-                true
-            } else {
-                println!("health is {}, but expected {}", a, b);
-                false
-            }
-        };
 
         assert!(health_eq(
             compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
@@ -1695,5 +1687,49 @@ mod tests {
             check_max_swap_result(&health_cache, 0, 1, 3.0);
             check_max_swap_result(&health_cache, 0, 1, 4.0);
         }
+    }
+
+    #[test]
+    fn test_health_perp_funding() {
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
+
+        let group = Pubkey::new_unique();
+
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
+        bank1
+            .data()
+            .change_without_fee(
+                account.ensure_token_position(1).unwrap().0,
+                I80F48::from(100),
+            )
+            .unwrap();
+
+        let mut perp1 = mock_perp_market(group, 9, 1, 0.2, 0.1);
+        perp1.data().long_funding = I80F48::from_num(10.1);
+        let perpaccount = account.ensure_perp_position(9).unwrap().0;
+        perpaccount.base_position_lots = 10; // 100 base native
+        perpaccount.quote_position_native = I80F48::from(-110);
+        perpaccount.long_settled_funding = I80F48::from_num(10.0);
+
+        let ais = vec![
+            bank1.as_account_info(),
+            oracle1.as_account_info(),
+            perp1.as_account_info(),
+        ];
+
+        let retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
+
+        assert!(health_eq(
+            compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
+            // token
+            0.8 * 100.0
+            // perp base
+            + 0.8 * 100.0
+            // perp quote
+            - 110.0
+            // perp funding (10 * (10.1 - 10.0))
+            - 1.0
+        ));
     }
 }
