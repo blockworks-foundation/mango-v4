@@ -247,21 +247,25 @@ impl PerpPosition {
         perp_market.open_interest += self.base_position_lots.abs() - start.abs();
     }
 
-    /// Move unrealized funding payments into the quote_position
-    pub fn settle_funding(&mut self, perp_market: &PerpMarket) {
+    /// The amount of funding this account still needs to pay, in native quote
+    pub fn unsettled_funding(&self, perp_market: &PerpMarket) -> I80F48 {
         match self.base_position_lots.cmp(&0) {
             Ordering::Greater => {
-                self.quote_position_native -= (perp_market.long_funding
-                    - self.long_settled_funding)
-                    * I80F48::from_num(self.base_position_lots);
+                cm!((perp_market.long_funding - self.long_settled_funding)
+                    * I80F48::from_num(self.base_position_lots))
             }
             Ordering::Less => {
-                self.quote_position_native -= (perp_market.short_funding
-                    - self.short_settled_funding)
-                    * I80F48::from_num(self.base_position_lots);
+                cm!((perp_market.short_funding - self.short_settled_funding)
+                    * I80F48::from_num(self.base_position_lots))
             }
-            Ordering::Equal => (),
+            Ordering::Equal => I80F48::ZERO,
         }
+    }
+
+    /// Move unrealized funding payments into the quote_position
+    pub fn settle_funding(&mut self, perp_market: &PerpMarket) {
+        let funding = self.unsettled_funding(perp_market);
+        cm!(self.quote_position_native -= funding);
         self.long_settled_funding = perp_market.long_funding;
         self.short_settled_funding = perp_market.short_funding;
     }
