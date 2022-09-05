@@ -108,6 +108,11 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
     Err(MangoError::UnknownOracleType.into())
 }
 
+/// Returns the price of one native base token, in native quote tokens
+///
+/// Example: The for SOL at 40 USDC/SOL it would return 0.04 (the unit is USDC-native/SOL-native)
+///
+/// This currently assumes that quote decimals is 6, like for USDC.
 pub fn oracle_price(
     acc_info: &impl KeyedAccountReader,
     oracle_conf_filter: I80F48,

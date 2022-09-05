@@ -4,8 +4,8 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::state::MangoAccount;
 use crate::state::{
-    new_fixed_order_account_retriever, new_health_cache, oracle_price, AccountLoaderDynamic, Book,
-    BookSide, EventQueue, Group, OrderType, PerpMarket, Side,
+    new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, Book, BookSide,
+    EventQueue, Group, OrderType, PerpMarket, Side,
 };
 
 #[derive(Accounts)]
@@ -110,11 +110,8 @@ pub fn perp_place_order(
 
     let mut event_queue = ctx.accounts.event_queue.load_mut()?;
 
-    let oracle_price = oracle_price(
-        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
-        perp_market.oracle_config.conf_filter,
-        perp_market.base_token_decimals,
-    )?;
+    let oracle_price =
+        perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
 
     let now_ts = Clock::get()?.unix_timestamp as u64;
     let time_in_force = if expiry_timestamp != 0 {
