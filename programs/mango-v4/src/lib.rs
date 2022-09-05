@@ -498,6 +498,10 @@ pub mod mango_v4 {
     pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: I80F48) -> Result<()> {
         instructions::perp_settle_pnl(ctx, max_settle_amount)
     }
+
+    pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: I80F48) -> Result<()> {
+        instructions::perp_settle_fees(ctx, max_settle_amount)
+    }
     // TODO
 
     // perp_force_cancel_order
@@ -505,7 +509,7 @@ pub mod mango_v4 {
     // liquidate_token_and_perp
     // liquidate_perp_and_perp
 
-    // settle_* - settle_funds, settle_fees
+    // settle_* - settle_funds
 
     // resolve_banktruptcy
 
