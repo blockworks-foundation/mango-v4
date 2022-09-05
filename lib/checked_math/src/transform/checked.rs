@@ -2,6 +2,39 @@ use proc_macro_error::abort;
 use quote::quote;
 use syn::{spanned::Spanned, BinOp, Expr, ExprBinary, ExprUnary, Ident, Lit, UnOp};
 
+pub fn transform_expr_or_panic(expr: Expr) -> proc_macro2::TokenStream {
+    match expr {
+        Expr::Group(g) => {
+            let expr = transform_expr_or_panic(*g.expr);
+            quote! {(#expr)}
+        }
+        Expr::AssignOp(assign_op) => {
+            // Rewrite `left += right` into `left = checked!(left + right).unwrap()`
+            let bin_op = Expr::Binary(ExprBinary {
+                attrs: vec![],
+                left: assign_op.left.clone(),
+                right: assign_op.right.clone(),
+                op: match assign_op.op {
+                    BinOp::AddEq(t) => BinOp::Add(syn::token::Add(t.spans[0])),
+                    BinOp::SubEq(t) => BinOp::Sub(syn::token::Sub(t.spans[0])),
+                    BinOp::MulEq(t) => BinOp::Mul(syn::token::Star(t.spans[0])),
+                    BinOp::DivEq(t) => BinOp::Div(syn::token::Div(t.spans[0])),
+                    _ => panic!("unsupported AssignOp.op: {:#?}", assign_op.op),
+                },
+            });
+            let left = assign_op.left;
+            let bin_op_tokens = transform_expr(bin_op);
+            quote! {
+                #left = (#bin_op_tokens).unwrap_or_else(|| panic!("math error"))
+            }
+        }
+        _ => {
+            let toks = transform_expr(expr);
+            quote! { (#toks).unwrap_or_else(|| panic!("math error")) }
+        }
+    }
+}
+
 pub fn transform_expr(mut expr: Expr) -> proc_macro2::TokenStream {
     match expr {
         Expr::Unary(unary) => transform_unary(unary),

@@ -613,7 +613,7 @@ impl HealthCache {
     pub fn health(&self, health_type: HealthType) -> I80F48 {
         let mut health = I80F48::ZERO;
         let sum = |contrib| {
-            health = cm!(health + contrib);
+            cm!(health += contrib);
         };
         self.health_sum(health_type, sum);
         health
@@ -657,7 +657,7 @@ impl HealthCache {
         // We need to make sure that if balance is before * price, then change = -before
         // brings it to exactly zero.
         let removed_contribution = (-change) * entry.oracle_price;
-        entry.balance = cm!(entry.balance - removed_contribution);
+        cm!(entry.balance -= removed_contribution);
         Ok(())
     }
 
@@ -682,23 +682,19 @@ impl HealthCache {
         }
         {
             let quote_entry = &mut self.token_infos[quote_entry_index];
-            reserved_amount =
-                cm!(reserved_amount + reserved_quote_change * quote_entry.oracle_price);
+            cm!(reserved_amount += reserved_quote_change * quote_entry.oracle_price);
         }
 
         // Apply it to the tokens
         {
             let base_entry = &mut self.token_infos[base_entry_index];
-            base_entry.serum3_max_reserved = cm!(base_entry.serum3_max_reserved + reserved_amount);
-            base_entry.balance =
-                cm!(base_entry.balance + free_base_change * base_entry.oracle_price);
+            cm!(base_entry.serum3_max_reserved += reserved_amount);
+            cm!(base_entry.balance += free_base_change * base_entry.oracle_price);
         }
         {
             let quote_entry = &mut self.token_infos[quote_entry_index];
-            quote_entry.serum3_max_reserved =
-                cm!(quote_entry.serum3_max_reserved + reserved_amount);
-            quote_entry.balance =
-                cm!(quote_entry.balance + free_quote_change * quote_entry.oracle_price);
+            cm!(quote_entry.serum3_max_reserved += reserved_amount);
+            cm!(quote_entry.balance += free_quote_change * quote_entry.oracle_price);
         }
 
         // Apply it to the serum3 info
@@ -707,7 +703,7 @@ impl HealthCache {
             .iter_mut()
             .find(|m| m.market_index == market_index)
             .ok_or_else(|| error_msg!("serum3 market {} not found", market_index))?;
-        market_entry.reserved = cm!(market_entry.reserved + reserved_amount);
+        cm!(market_entry.reserved += reserved_amount);
         Ok(())
     }
 
@@ -782,9 +778,9 @@ impl HealthCache {
         let mut liabs = I80F48::ZERO;
         let sum = |contrib| {
             if contrib > 0 {
-                assets = cm!(assets + contrib);
+                cm!(assets += contrib);
             } else {
-                liabs = cm!(liabs - contrib);
+                cm!(liabs -= contrib);
             }
         };
         self.health_sum(health_type, sum);
@@ -1006,16 +1002,16 @@ pub fn new_health_cache(
         // add the amounts that are freely settleable
         let base_free = I80F48::from_num(oo.native_coin_free);
         let quote_free = I80F48::from_num(cm!(oo.native_pc_free + oo.referrer_rebates_accrued));
-        base_info.balance = cm!(base_info.balance + base_free * base_info.oracle_price);
-        quote_info.balance = cm!(quote_info.balance + quote_free * quote_info.oracle_price);
+        cm!(base_info.balance += base_free * base_info.oracle_price);
+        cm!(quote_info.balance += quote_free * quote_info.oracle_price);
 
         // add the reserved amount to both sides, to have the worst-case covered
         let reserved_base = I80F48::from_num(cm!(oo.native_coin_total - oo.native_coin_free));
         let reserved_quote = I80F48::from_num(cm!(oo.native_pc_total - oo.native_pc_free));
         let reserved_balance =
             cm!(reserved_base * base_info.oracle_price + reserved_quote * quote_info.oracle_price);
-        base_info.serum3_max_reserved = cm!(base_info.serum3_max_reserved + reserved_balance);
-        quote_info.serum3_max_reserved = cm!(quote_info.serum3_max_reserved + reserved_balance);
+        cm!(base_info.serum3_max_reserved += reserved_balance);
+        cm!(quote_info.serum3_max_reserved += reserved_balance);
 
         serum3_infos.push(Serum3Info {
             reserved: reserved_balance,

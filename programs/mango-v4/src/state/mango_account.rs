@@ -739,10 +739,10 @@ impl<
         let mut perp_account = self.ensure_perp_position(perp_market_index).unwrap().0;
         match side {
             Side::Bid => {
-                perp_account.bids_base_lots = cm!(perp_account.bids_base_lots + order.quantity);
+                cm!(perp_account.bids_base_lots += order.quantity);
             }
             Side::Ask => {
-                perp_account.asks_base_lots = cm!(perp_account.asks_base_lots + order.quantity);
+                cm!(perp_account.asks_base_lots += order.quantity);
             }
         };
         let slot = order.owner_slot as usize;
@@ -767,10 +767,10 @@ impl<
             // accounting
             match order_side {
                 Side::Bid => {
-                    perp_account.bids_base_lots = cm!(perp_account.bids_base_lots - quantity);
+                    cm!(perp_account.bids_base_lots -= quantity);
                 }
                 Side::Ask => {
-                    perp_account.asks_base_lots = cm!(perp_account.asks_base_lots - quantity);
+                    cm!(perp_account.asks_base_lots -= quantity);
                 }
             }
         }
@@ -814,10 +814,10 @@ impl<
         } else {
             match side {
                 Side::Bid => {
-                    pa.bids_base_lots = cm!(pa.bids_base_lots - base_change.abs());
+                    cm!(pa.bids_base_lots -= base_change.abs());
                 }
                 Side::Ask => {
-                    pa.asks_base_lots = cm!(pa.asks_base_lots - base_change.abs());
+                    cm!(pa.asks_base_lots -= base_change.abs());
                 }
             }
             Ok(())

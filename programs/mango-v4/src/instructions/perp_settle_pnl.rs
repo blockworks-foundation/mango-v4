@@ -87,13 +87,13 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: I80F48) -
 
     // Settle for the maximum possible capped to max_settle_amount
     let settlement = a_pnl.abs().min(b_pnl.abs()).min(max_settle_amount);
-    a_perp_position.quote_position_native = cm!(a_perp_position.quote_position_native - settlement);
-    b_perp_position.quote_position_native = cm!(b_perp_position.quote_position_native + settlement);
+    cm!(a_perp_position.quote_position_native -= settlement);
+    cm!(b_perp_position.quote_position_native += settlement);
 
     // Update the account's net_settled with the new PnL
     let settlement_i64 = settlement.checked_to_num::<i64>().unwrap();
-    account_a.fixed.net_settled = cm!(account_a.fixed.net_settled + settlement_i64);
-    account_b.fixed.net_settled = cm!(account_b.fixed.net_settled - settlement_i64);
+    cm!(account_a.fixed.net_settled += settlement_i64);
+    cm!(account_b.fixed.net_settled -= settlement_i64);
 
     // Transfer token balances
     // TODO: Need to guarantee that QUOTE_TOKEN_INDEX token exists at this point. I.E. create it when placing perp order.
