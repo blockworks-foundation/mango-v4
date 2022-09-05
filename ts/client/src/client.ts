@@ -608,6 +608,20 @@ export class MangoClient {
     );
   }
 
+  public async getMangoAccountWithSlot(mangoAccountPk: PublicKey) {
+    const resp =
+      await this.program.provider.connection.getAccountInfoAndContext(
+        mangoAccountPk,
+      );
+    if (!resp?.value) return;
+    const decodedMangoAccount = this.program.coder.accounts.decode(
+      'mangoAccount',
+      resp.value.data,
+    );
+    const mangoAccount = MangoAccount.from(mangoAccountPk, decodedMangoAccount);
+    return { slot: resp.context.slot, value: mangoAccount };
+  }
+
   public async getMangoAccountForOwner(
     group: Group,
     ownerPk: PublicKey,

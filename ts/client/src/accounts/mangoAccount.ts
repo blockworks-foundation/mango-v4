@@ -86,6 +86,16 @@ export class MangoAccount {
     return mangoAccount;
   }
 
+  async reloadWithSlot(
+    client: MangoClient,
+    group: Group,
+  ): Promise<{ value: MangoAccount; slot: number }> {
+    const resp = await client.getMangoAccountWithSlot(this.publicKey);
+    await resp?.value.reloadAccountData(client, group);
+    Object.assign(this, resp?.value);
+    return { value: resp!.value, slot: resp!.slot };
+  }
+
   async reloadAccountData(
     client: MangoClient,
     group: Group,
