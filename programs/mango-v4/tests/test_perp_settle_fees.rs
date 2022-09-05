@@ -4,14 +4,13 @@ use anchor_lang::prelude::ErrorCode;
 use fixed::types::I80F48;
 use mango_v4::{error::MangoError, state::*};
 use program_test::*;
-use solana_program::instruction::InstructionError;
 use solana_program_test::*;
-use solana_sdk::{signature::Keypair, transaction::TransactionError, transport::TransportError};
+use solana_sdk::{signature::Keypair, transport::TransportError};
 
 mod program_test;
 
 #[tokio::test]
-async fn test_perp_settle_pnl() -> Result<(), TransportError> {
+async fn test_perp_settle_fees() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
@@ -299,26 +298,23 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    {
-        let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
-        let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+    assert_eq!(mango_account_0.perps[0].base_position_lots, 1);
+    assert_eq!(
+        mango_account_0.perps[0].quote_position_native.round(),
+        -100_020
+    );
 
-        assert_eq!(mango_account_0.perps[0].base_position_lots, 1);
-        assert_eq!(mango_account_1.perps[0].base_position_lots, -1);
-        assert_eq!(
-            mango_account_0.perps[0].quote_position_native.round(),
-            -100_020
-        );
-        assert_eq!(mango_account_1.perps[0].quote_position_native, 100_000);
-    }
+    let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+    assert_eq!(mango_account_1.perps[0].base_position_lots, -1);
+    assert_eq!(mango_account_1.perps[0].quote_position_native, 100_000);
 
     // Bank must be valid for quote currency
     let result = send_tx(
         solana,
-        PerpSettlePnlInstruction {
+        PerpSettleFeesInstruction {
             group,
-            account_a: account_1,
-            account_b: account_0,
+            account: account_0,
             perp_market,
             oracle: tokens[0].oracle,
             quote_bank: tokens[1].bank,
@@ -336,10 +332,9 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     // Oracle must be valid for the perp market
     let result = send_tx(
         solana,
-        PerpSettlePnlInstruction {
+        PerpSettleFeesInstruction {
             group,
-            account_a: account_1,
-            account_b: account_0,
+            account: account_0,
             perp_market,
             oracle: tokens[1].oracle, // Using oracle for token 1 not 0
             quote_bank: tokens[0].bank,
@@ -354,34 +349,12 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         "Oracle must be valid for perp market".to_string(),
     );
 
-    // Cannot settle with yourself
-    let result = send_tx(
-        solana,
-        PerpSettlePnlInstruction {
-            group,
-            account_a: account_0,
-            account_b: account_0,
-            perp_market,
-            oracle: tokens[0].oracle,
-            quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
-        },
-    )
-    .await;
-
-    assert_mango_error(
-        &result,
-        MangoError::CannotSettleWithSelf.into(),
-        "Cannot settle with yourself".to_string(),
-    );
-
     // Cannot settle position that does not exist
     let result = send_tx(
         solana,
-        PerpSettlePnlInstruction {
+        PerpSettleFeesInstruction {
             group,
-            account_a: account_0,
-            account_b: account_1,
+            account: account_1,
             perp_market: perp_market_2,
             oracle: tokens[1].oracle,
             quote_bank: tokens[0].bank,
@@ -400,10 +373,9 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     for max_amnt in vec![I80F48::ZERO, I80F48::from(-100)] {
         let result = send_tx(
             solana,
-            PerpSettlePnlInstruction {
+            PerpSettleFeesInstruction {
                 group,
-                account_a: account_0,
-                account_b: account_1,
+                account: account_1,
                 perp_market: perp_market,
                 oracle: tokens[0].oracle,
                 quote_bank: tokens[0].bank,
@@ -422,8 +394,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     // TODO: Test funding settlement
 
     {
-        let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
-        let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
         let bank = solana.get_account::<Bank>(tokens[0].bank).await;
         assert_eq!(
             mango_account_0.tokens[0].native(&bank).round(),
@@ -451,13 +421,12 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    // Account a must be the profitable one
+    // Account must have a loss
     let result = send_tx(
         solana,
-        PerpSettlePnlInstruction {
+        PerpSettleFeesInstruction {
             group,
-            account_a: account_1,
-            account_b: account_0,
+            account: account_0,
             perp_market,
             oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
@@ -469,28 +438,28 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     assert_mango_error(
         &result,
         MangoError::ProfitabilityMismatch.into(),
-        "Account a must be the profitable one".to_string(),
+        "Account must be unprofitable".to_string(),
     );
 
-    let result = send_tx(
-        solana,
-        PerpSettlePnlInstruction {
-            group,
-            account_a: account_0,
-            account_b: account_1,
-            perp_market,
-            oracle: tokens[0].oracle,
-            quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
-        },
-    )
-    .await;
+    // TODO: Difficult to test health due to fees being so small. Need alternative
+    // let result = send_tx(
+    //     solana,
+    //     PerpSettleFeesInstruction {
+    //         group,
+    //         account: account_1,
+    //         perp_market,
+    //         oracle: tokens[0].oracle,
+    //         quote_bank: tokens[0].bank,
+    //         max_settle_amount: I80F48::MAX,
+    //     },
+    // )
+    // .await;
 
-    assert_mango_error(
-        &result,
-        MangoError::HealthMustBePositive.into(),
-        "Health of losing account must be positive to settle".to_string(),
-    );
+    // assert_mango_error(
+    //     &result,
+    //     MangoError::HealthMustBePositive.into(),
+    //     "Health of losing account must be positive to settle".to_string(),
+    // );
 
     // Change the oracle to a more reasonable price
     send_tx(
@@ -510,8 +479,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     let expected_pnl_1 = I80F48::from(-500);
 
     {
-        let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
-        let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
         assert_eq!(
             get_pnl_native(&mango_account_0.perps[0], &perp_market, I80F48::from(1005)).round(),
@@ -525,14 +492,29 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
 
     solana.advance_clock().await;
 
+    // Check the fees accrued
+    let initial_fees = I80F48::from(20);
+    {
+        let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
+        assert_eq!(
+            perp_market.fees_accrued.round(),
+            initial_fees,
+            "Fees from trading have been accrued"
+        );
+        assert_eq!(
+            perp_market.fees_settled.round(),
+            0,
+            "No fees have been settled yet"
+        );
+    }
+
     // Partially execute the settle
-    let partial_settle_amount = I80F48::from(200);
+    let partial_settle_amount = I80F48::from(10);
     send_tx(
         solana,
-        PerpSettlePnlInstruction {
+        PerpSettleFeesInstruction {
             group,
-            account_a: account_0,
-            account_b: account_1,
+            account: account_1,
             perp_market,
             oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
@@ -544,34 +526,20 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
 
     {
         let bank = solana.get_account::<Bank>(tokens[0].bank).await;
-        let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
         let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+        let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
 
-        assert_eq!(
-            mango_account_0.perps[0].base_position_lots, 1,
-            "base position unchanged for account 0"
-        );
         assert_eq!(
             mango_account_1.perps[0].base_position_lots, -1,
             "base position unchanged for account 1"
         );
 
         assert_eq!(
-            mango_account_0.perps[0].quote_position_native.round(),
-            I80F48::from(-100_020) - partial_settle_amount,
-            "quote position reduced for profitable position by max_settle_amount"
-        );
-        assert_eq!(
             mango_account_1.perps[0].quote_position_native.round(),
             I80F48::from(100_000) + partial_settle_amount,
-            "quote position increased for losing position by opposite of first account"
+            "quote position increased for losing position by fee settle amount"
         );
 
-        assert_eq!(
-            mango_account_0.tokens[0].native(&bank).round(),
-            I80F48::from(initial_token_deposit) + partial_settle_amount,
-            "account 0 token native position increased (profit) by max_settle_amount"
-        );
         assert_eq!(
             mango_account_1.tokens[0].native(&bank).round(),
             I80F48::from(initial_token_deposit) - partial_settle_amount,
@@ -579,12 +547,19 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         );
 
         assert_eq!(
-            mango_account_0.net_settled, partial_settle_amount,
-            "net_settled on account 0 updated with profit from settlement"
-        );
-        assert_eq!(
             mango_account_1.net_settled, -partial_settle_amount,
             "net_settled on account 1 updated with loss from settlement"
+        );
+
+        assert_eq!(
+            perp_market.fees_accrued.round(),
+            initial_fees - partial_settle_amount,
+            "Fees accrued have been reduced by partial settle"
+        );
+        assert_eq!(
+            perp_market.fees_settled.round(),
+            partial_settle_amount,
+            "Fees have been partially settled"
         );
     }
 
@@ -593,10 +568,9 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     // Fully execute the settle
     send_tx(
         solana,
-        PerpSettlePnlInstruction {
+        PerpSettleFeesInstruction {
             group,
-            account_a: account_0,
-            account_b: account_1,
+            account: account_1,
             perp_market,
             oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
@@ -608,147 +582,40 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
 
     {
         let bank = solana.get_account::<Bank>(tokens[0].bank).await;
-        let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
         let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+        let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
 
-        assert_eq!(
-            mango_account_0.perps[0].base_position_lots, 1,
-            "base position unchanged for account 0"
-        );
         assert_eq!(
             mango_account_1.perps[0].base_position_lots, -1,
             "base position unchanged for account 1"
         );
 
         assert_eq!(
-            mango_account_0.perps[0].quote_position_native.round(),
-            I80F48::from(-100_020) - expected_pnl_0,
-            "quote position reduced for profitable position"
-        );
-        assert_eq!(
             mango_account_1.perps[0].quote_position_native.round(),
-            I80F48::from(100_000) + expected_pnl_0,
-            "quote position increased for losing position by opposite of first account"
+            I80F48::from(100_000) + initial_fees,
+            "quote position increased for losing position by fees settled"
         );
 
         assert_eq!(
-            mango_account_0.tokens[0].native(&bank).round(),
-            I80F48::from(initial_token_deposit) + expected_pnl_0,
-            "account 0 token native position increased (profit)"
-        );
-        assert_eq!(
             mango_account_1.tokens[0].native(&bank).round(),
-            I80F48::from(initial_token_deposit) - expected_pnl_0,
+            I80F48::from(initial_token_deposit) - initial_fees,
             "account 1 token native position decreased (loss)"
         );
 
         assert_eq!(
-            mango_account_0.net_settled, expected_pnl_0,
-            "net_settled on account 0 updated with profit from settlement"
-        );
-        assert_eq!(
-            mango_account_1.net_settled, -expected_pnl_0,
+            mango_account_1.net_settled, -initial_fees,
             "net_settled on account 1 updated with loss from settlement"
         );
-    }
 
-    solana.advance_clock().await;
-
-    // Change the oracle to a reasonable price in other direction
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[0].pubkey,
-            payer,
-            price: "995.0",
-        },
-    )
-    .await
-    .unwrap();
-
-    let expected_pnl_0 = I80F48::from(-1000);
-    let expected_pnl_1 = I80F48::from(980);
-
-    {
-        let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
-        let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
-        let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
         assert_eq!(
-            get_pnl_native(&mango_account_0.perps[0], &perp_market, I80F48::from(995)).round(),
-            expected_pnl_0
+            perp_market.fees_accrued.round(),
+            0,
+            "Fees accrued have been reduced to zero"
         );
         assert_eq!(
-            get_pnl_native(&mango_account_1.perps[0], &perp_market, I80F48::from(995)).round(),
-            expected_pnl_1
-        );
-    }
-
-    solana.advance_clock().await;
-
-    // Fully execute the settle
-    send_tx(
-        solana,
-        PerpSettlePnlInstruction {
-            group,
-            account_a: account_1,
-            account_b: account_0,
-            perp_market,
-            oracle: tokens[0].oracle,
-            quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
-        },
-    )
-    .await
-    .unwrap();
-
-    {
-        let bank = solana.get_account::<Bank>(tokens[0].bank).await;
-        let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
-        let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
-
-        assert_eq!(
-            mango_account_0.perps[0].base_position_lots, 1,
-            "base position unchanged for account 0"
-        );
-        assert_eq!(
-            mango_account_1.perps[0].base_position_lots, -1,
-            "base position unchanged for account 1"
-        );
-
-        assert_eq!(
-            mango_account_0.perps[0].quote_position_native.round(),
-            I80F48::from(-100_500) + expected_pnl_1,
-            "quote position increased for losing position"
-        );
-        assert_eq!(
-            mango_account_1.perps[0].quote_position_native.round(),
-            I80F48::from(100_480) - expected_pnl_1,
-            "quote position reduced for losing position by opposite of first account"
-        );
-
-        // 480 was previous settlement
-        assert_eq!(
-            mango_account_0.tokens[0].native(&bank).round(),
-            I80F48::from(initial_token_deposit + 480) - expected_pnl_1,
-            "account 0 token native position decreased (loss)"
-        );
-        assert_eq!(
-            mango_account_1.tokens[0].native(&bank).round(),
-            I80F48::from(initial_token_deposit - 480) + expected_pnl_1,
-            "account 1 token native position increased (profit)"
-        );
-
-        assert_eq!(
-            mango_account_0.net_settled,
-            I80F48::from(480) - expected_pnl_1,
-            "net_settled on account 0 updated with loss from settlement"
-        );
-        assert_eq!(
-            mango_account_1.net_settled,
-            I80F48::from(-480) + expected_pnl_1,
-            "net_settled on account 1 updated with profit from settlement"
+            perp_market.fees_settled.round(),
+            initial_fees,
+            "Fees have been fully settled"
         );
     }
 

@@ -420,6 +420,7 @@ mod tests {
             open_interest: 0,
             seq_num: 0,
             fees_accrued: I80F48::ZERO,
+            fees_settled: I80F48::ZERO,
             bump: 0,
             base_token_decimals: 0,
             reserved: [0; 128],

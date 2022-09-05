@@ -1,9 +1,14 @@
 #![allow(dead_code)]
 
 use bytemuck::{bytes_of, Contiguous};
+use fixed::types::I80F48;
+use mango_v4::state::{PerpMarket, PerpPosition};
+use solana_program::instruction::InstructionError;
 use solana_program::program_error::ProgramError;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Keypair;
+use solana_sdk::transaction::TransactionError;
+use solana_sdk::transport::TransportError;
 use std::ops::Deref;
 
 pub fn gen_signer_seeds<'a>(nonce: &'a u64, acc_pk: &'a Pubkey) -> [&'a [u8]; 2] {
@@ -73,5 +78,36 @@ impl From<&Keypair> for TestKeypair {
 impl From<Keypair> for TestKeypair {
     fn from(k: Keypair) -> Self {
         Self(k)
+    }
+}
+
+pub fn get_pnl_native(
+    perp_position: &PerpPosition,
+    perp_market: &PerpMarket,
+    oracle_price: I80F48,
+) -> I80F48 {
+    let contract_size = perp_market.base_lot_size;
+    let new_quote_pos =
+        I80F48::from_num(-perp_position.base_position_lots * contract_size) * oracle_price;
+    perp_position.quote_position_native - new_quote_pos
+}
+
+pub fn assert_mango_error<T>(
+    result: &Result<T, TransportError>,
+    expected_error: u32,
+    comment: String,
+) {
+    match result {
+        Ok(_) => assert!(false, "No error returned"),
+        Err(TransportError::TransactionError(tx_err)) => match tx_err {
+            TransactionError::InstructionError(_, err) => match err {
+                InstructionError::Custom(err_num) => {
+                    assert_eq!(*err_num, expected_error, "{}", comment);
+                }
+                _ => assert!(false, "Not a mango error"),
+            },
+            _ => assert!(false, "Not a mango error"),
+        },
+        _ => assert!(false, "Not a mango error"),
     }
 }
