@@ -212,19 +212,19 @@ impl PerpPosition {
     pub fn add_taker_trade(&mut self, side: Side, base_lots: i64, quote_lots: i64) {
         match side {
             Side::Bid => {
-                self.taker_base_lots = cm!(self.taker_base_lots + base_lots);
-                self.taker_quote_lots = cm!(self.taker_quote_lots - quote_lots);
+                cm!(self.taker_base_lots += base_lots);
+                cm!(self.taker_quote_lots -= quote_lots);
             }
             Side::Ask => {
-                self.taker_base_lots = cm!(self.taker_base_lots - base_lots);
-                self.taker_quote_lots = cm!(self.taker_quote_lots + quote_lots);
+                cm!(self.taker_base_lots -= base_lots);
+                cm!(self.taker_quote_lots += quote_lots);
             }
         }
     }
     /// Remove taker trade after it has been processed on EventQueue
     pub fn remove_taker_trade(&mut self, base_change: i64, quote_change: i64) {
-        self.taker_base_lots = cm!(self.taker_base_lots - base_change);
-        self.taker_quote_lots = cm!(self.taker_quote_lots - quote_change);
+        cm!(self.taker_base_lots -= base_change);
+        cm!(self.taker_quote_lots -= quote_change);
     }
 
     pub fn is_active(&self) -> bool {
@@ -273,10 +273,10 @@ impl PerpPosition {
         }
         let old_position = self.base_position_lots;
         let is_increasing = old_position == 0 || old_position.signum() == base_change.signum();
-        self.quote_running_native = cm!(self.quote_running_native + quote_change);
+        cm!(self.quote_running_native += quote_change);
         match is_increasing {
             true => {
-                self.quote_entry_native = cm!(self.quote_entry_native + quote_change);
+                cm!(self.quote_entry_native += quote_change);
             }
             false => {
                 let new_position = cm!(old_position + base_change);

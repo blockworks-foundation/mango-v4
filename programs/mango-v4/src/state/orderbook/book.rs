@@ -251,8 +251,8 @@ impl<'a> Book<'a> {
                 match_base_lots == max_match_by_quote || match_base_lots == remaining_base_lots;
 
             let match_quote_lots = cm!(match_base_lots * best_opposing_price);
-            remaining_base_lots = cm!(remaining_base_lots - match_base_lots);
-            remaining_quote_lots = cm!(remaining_quote_lots - match_quote_lots);
+            cm!(remaining_base_lots -= match_base_lots);
+            cm!(remaining_quote_lots -= match_quote_lots);
 
             let new_best_opposing_quantity = cm!(best_opposing.quantity - match_base_lots);
             let maker_out = new_best_opposing_quantity == 0;

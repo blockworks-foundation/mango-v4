@@ -24,3 +24,13 @@ pub fn checked_math(input: TokenStream) -> TokenStream {
 
     TokenStream::from(expanded)
 }
+
+/// Like checked_math(), but panics with "math error" on None results
+#[proc_macro]
+#[proc_macro_error]
+pub fn checked_math_or_panic(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as syn::Expr);
+    let expanded = transform::checked::transform_expr_or_panic(input);
+
+    TokenStream::from(expanded)
+}
