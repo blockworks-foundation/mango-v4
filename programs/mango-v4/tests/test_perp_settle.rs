@@ -4,9 +4,8 @@ use anchor_lang::prelude::ErrorCode;
 use fixed::types::I80F48;
 use mango_v4::{error::MangoError, state::*};
 use program_test::*;
-use solana_program::instruction::InstructionError;
 use solana_program_test::*;
-use solana_sdk::{signature::Keypair, transaction::TransactionError, transport::TransportError};
+use solana_sdk::{signature::Keypair, transport::TransportError};
 
 mod program_test;
 
