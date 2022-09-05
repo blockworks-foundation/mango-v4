@@ -5,8 +5,9 @@ use fixed::types::I80F48;
 
 use static_assertions::const_assert_eq;
 
+use crate::accounts_zerocopy::KeyedAccountReader;
 use crate::state::orderbook::order_type::Side;
-use crate::state::TokenIndex;
+use crate::state::{oracle, TokenIndex};
 use crate::util::checked_math as cm;
 
 use super::{Book, OracleConfig, DAY_I80F48};
@@ -117,6 +118,15 @@ impl PerpMarket {
             Side::Bid => upper | (!self.seq_num as i128),
             Side::Ask => upper | (self.seq_num as i128),
         }
+    }
+
+    pub fn oracle_price(&self, oracle_acc: &impl KeyedAccountReader) -> Result<I80F48> {
+        require_keys_eq!(self.oracle, *oracle_acc.key());
+        oracle::oracle_price(
+            oracle_acc,
+            self.oracle_config.conf_filter,
+            self.base_token_decimals,
+        )
     }
 
     /// Use current order book price and index price to update the instantaneous funding

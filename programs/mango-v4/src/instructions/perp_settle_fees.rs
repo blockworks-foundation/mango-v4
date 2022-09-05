@@ -10,7 +10,7 @@ use crate::state::Bank;
 use crate::state::HealthType;
 use crate::state::MangoAccount;
 use crate::state::QUOTE_TOKEN_INDEX;
-use crate::state::{oracle_price, AccountLoaderDynamic, Group, PerpMarket};
+use crate::state::{AccountLoaderDynamic, Group, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpSettleFees<'info> {
@@ -47,11 +47,8 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: I80F48)
     );
 
     // Get oracle price for market. Price is validated inside
-    let oracle_price = oracle_price(
-        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
-        perp_market.oracle_config.conf_filter,
-        perp_market.base_token_decimals,
-    )?;
+    let oracle_price =
+        perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
 
     // Fetch perp positions for accounts
     let perp_position = account.perp_position_mut(perp_market.perp_market_index)?;
