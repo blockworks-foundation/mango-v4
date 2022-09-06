@@ -308,7 +308,7 @@ impl PerpPosition {
     }
 
     /// Calculate the average entry price of the position
-    pub fn get_avg_entry_price(&self) -> I80F48 {
+    pub fn avg_entry_price(&self) -> I80F48 {
         if self.base_position_lots == 0 {
             return I80F48::ZERO; // TODO: What should this actually return? Error? NaN?
         }
@@ -316,7 +316,7 @@ impl PerpPosition {
     }
 
     /// Calculate the break even price of the position
-    pub fn get_break_even_price(&self) -> I80F48 {
+    pub fn break_even_price(&self) -> I80F48 {
         if self.base_position_lots == 0 {
             return I80F48::ZERO; // TODO: What should this actually return? Error? NaN?
         }
@@ -438,7 +438,7 @@ mod tests {
         pos.change_base_and_entry_positions(&mut market, 10, -100);
         assert_eq!(pos.quote_entry_native, -100);
         assert_eq!(pos.quote_running_native, -100);
-        assert_eq!(pos.get_avg_entry_price(), I80F48::from(10));
+        assert_eq!(pos.avg_entry_price(), I80F48::from(10));
     }
 
     #[test]
@@ -449,7 +449,7 @@ mod tests {
         pos.change_base_and_entry_positions(&mut market, -10, 100);
         assert_eq!(pos.quote_entry_native, 100);
         assert_eq!(pos.quote_running_native, 100);
-        assert_eq!(pos.get_avg_entry_price(), I80F48::from(10));
+        assert_eq!(pos.avg_entry_price(), I80F48::from(10));
     }
 
     #[test]
@@ -460,7 +460,7 @@ mod tests {
         pos.change_base_and_entry_positions(&mut market, 10, -300);
         assert_eq!(pos.quote_entry_native, -400);
         assert_eq!(pos.quote_running_native, -400);
-        assert_eq!(pos.get_avg_entry_price(), I80F48::from(20));
+        assert_eq!(pos.avg_entry_price(), I80F48::from(20));
     }
 
     #[test]
@@ -471,7 +471,7 @@ mod tests {
         pos.change_base_and_entry_positions(&mut market, -10, 300);
         assert_eq!(pos.quote_entry_native, 400);
         assert_eq!(pos.quote_running_native, 400);
-        assert_eq!(pos.get_avg_entry_price(), I80F48::from(20));
+        assert_eq!(pos.avg_entry_price(), I80F48::from(20));
     }
 
     #[test]
@@ -482,7 +482,7 @@ mod tests {
         pos.change_base_and_entry_positions(&mut market, 5, -250);
         assert_eq!(pos.quote_entry_native, 50);
         assert_eq!(pos.quote_running_native, -150);
-        assert_eq!(pos.get_avg_entry_price(), I80F48::from(10)); // Entry price remains the same when decreasing
+        assert_eq!(pos.avg_entry_price(), I80F48::from(10)); // Entry price remains the same when decreasing
     }
 
     #[test]
@@ -493,7 +493,7 @@ mod tests {
         pos.change_base_and_entry_positions(&mut market, -5, 250);
         assert_eq!(pos.quote_entry_native, -50);
         assert_eq!(pos.quote_running_native, 150);
-        assert_eq!(pos.get_avg_entry_price(), I80F48::from(10)); // Entry price remains the same when decreasing
+        assert_eq!(pos.avg_entry_price(), I80F48::from(10)); // Entry price remains the same when decreasing
     }
 
     #[test]
@@ -504,7 +504,7 @@ mod tests {
         pos.change_base_and_entry_positions(&mut market, -10, 250);
         assert_eq!(pos.quote_entry_native, 0);
         assert_eq!(pos.quote_running_native, 150);
-        assert_eq!(pos.get_avg_entry_price(), I80F48::from(0)); // Entry price zero when no position
+        assert_eq!(pos.avg_entry_price(), I80F48::from(0)); // Entry price zero when no position
     }
 
     #[test]
@@ -515,7 +515,7 @@ mod tests {
         pos.change_base_and_entry_positions(&mut market, 10, -250);
         assert_eq!(pos.quote_entry_native, 0);
         assert_eq!(pos.quote_running_native, -150);
-        assert_eq!(pos.get_avg_entry_price(), I80F48::from(0)); // Entry price zero when no position
+        assert_eq!(pos.avg_entry_price(), I80F48::from(0)); // Entry price zero when no position
     }
 
     #[test]
@@ -526,7 +526,7 @@ mod tests {
         pos.change_base_and_entry_positions(&mut market, -15, 300);
         assert_eq!(pos.quote_entry_native, 100);
         assert_eq!(pos.quote_running_native, 200);
-        assert_eq!(pos.get_avg_entry_price(), I80F48::from(20)); // Entry price zero when no position
+        assert_eq!(pos.avg_entry_price(), I80F48::from(20)); // Entry price zero when no position
     }
 
     #[test]
@@ -537,7 +537,7 @@ mod tests {
         pos.change_base_and_entry_positions(&mut market, 15, -300);
         assert_eq!(pos.quote_entry_native, -100);
         assert_eq!(pos.quote_running_native, -200);
-        assert_eq!(pos.get_avg_entry_price(), I80F48::from(20)); // Entry price zero when no position
+        assert_eq!(pos.avg_entry_price(), I80F48::from(20)); // Entry price zero when no position
     }
 
     #[test]
@@ -551,7 +551,7 @@ mod tests {
         assert_eq!(pos.quote_entry_native, -10 * 10_000);
         assert_eq!(pos.quote_running_native, -98_000);
         assert_eq!(pos.base_position_lots, 10);
-        assert_eq!(pos.get_break_even_price(), I80F48::from(9_800)); // We made 2k on the trade, so we can sell our contract up to a loss of 200 each
+        assert_eq!(pos.break_even_price(), I80F48::from(9_800)); // We made 2k on the trade, so we can sell our contract up to a loss of 200 each
     }
 
     #[test]

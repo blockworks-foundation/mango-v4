@@ -134,8 +134,8 @@ impl PerpMarket {
         let index_price = oracle_price;
 
         // Get current book price & compare it to index price
-        let bid = book.get_impact_price(Side::Bid, self.impact_quantity, now_ts);
-        let ask = book.get_impact_price(Side::Ask, self.impact_quantity, now_ts);
+        let bid = book.impact_price(Side::Bid, self.impact_quantity, now_ts);
+        let ask = book.impact_price(Side::Ask, self.impact_quantity, now_ts);
 
         let diff_price = match (bid, ask) {
             (Some(bid), Some(ask)) => {

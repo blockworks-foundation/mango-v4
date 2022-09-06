@@ -150,25 +150,25 @@ mod tests {
             }
         }
         assert!(book.bids.is_full());
-        assert_eq!(book.bids.get_min().unwrap().price(), 1001);
+        assert_eq!(book.bids.min_leaf().unwrap().price(), 1001);
         assert_eq!(
-            book.bids.get_max().unwrap().price(),
+            book.bids.max_leaf().unwrap().price(),
             (1000 + book.bids.leaf_count) as i64
         );
 
         // add another bid at a higher price before expiry, replacing the lowest-price one (1001)
         new_order(&mut book, &mut event_queue, Side::Bid, 1005, 1000000 - 1);
-        assert_eq!(book.bids.get_min().unwrap().price(), 1002);
+        assert_eq!(book.bids.min_leaf().unwrap().price(), 1002);
         assert_eq!(event_queue.len(), 1);
 
         // adding another bid after expiry removes the soonest-expiring order (1005)
         new_order(&mut book, &mut event_queue, Side::Bid, 999, 2000000);
-        assert_eq!(book.bids.get_min().unwrap().price(), 999);
+        assert_eq!(book.bids.min_leaf().unwrap().price(), 999);
         assert!(!bookside_contains_key(&book.bids, 1005));
         assert_eq!(event_queue.len(), 2);
 
         // adding an ask will wipe up to three expired bids at the top of the book
-        let bids_max = book.bids.get_max().unwrap().price();
+        let bids_max = book.bids.max_leaf().unwrap().price();
         let bids_count = book.bids.leaf_count;
         new_order(&mut book, &mut event_queue, Side::Ask, 6000, 1500000);
         assert_eq!(book.bids.leaf_count, bids_count - 5);
