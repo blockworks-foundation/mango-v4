@@ -439,6 +439,10 @@ pub mod mango_v4 {
 
     // TODO perp_change_perp_market_params
 
+    pub fn perp_close_position(ctx: Context<PerpClosePosition>) -> Result<()> {
+        instructions::perp_close_position(ctx)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn perp_place_order(
         ctx: Context<PerpPlaceOrder>,

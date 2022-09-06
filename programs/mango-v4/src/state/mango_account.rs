@@ -724,8 +724,9 @@ impl<
         }
     }
 
-    pub fn deactivate_perp_position(&mut self, raw_index: usize) {
-        self.perp_position_mut_by_raw_index(raw_index).market_index = PerpMarketIndex::MAX;
+    pub fn deactivate_perp_position(&mut self, perp_market_index: PerpMarketIndex) -> Result<()> {
+        self.perp_position_mut(perp_market_index)?.market_index = PerpMarketIndex::MAX;
+        Ok(())
     }
 
     pub fn add_perp_order(
@@ -734,8 +735,7 @@ impl<
         side: Side,
         order: &LeafNode,
     ) -> Result<()> {
-        // TODO: pass in the PerpPosition, currently has a creation side-effect
-        let mut perp_account = self.ensure_perp_position(perp_market_index).unwrap().0;
+        let mut perp_account = self.perp_position_mut(perp_market_index)?;
         match side {
             Side::Bid => {
                 cm!(perp_account.bids_base_lots += order.quantity);
@@ -755,13 +755,12 @@ impl<
     }
 
     pub fn remove_perp_order(&mut self, slot: usize, quantity: i64) -> Result<()> {
-        // TODO: pass in the PerpPosition, currently has a creation side-effect
         {
             let oo = self.perp_order_mut_by_raw_index(slot);
             require_neq!(oo.order_market, FREE_ORDER_SLOT);
             let order_side = oo.order_side;
             let perp_market_index = oo.order_market;
-            let perp_account = self.ensure_perp_position(perp_market_index).unwrap().0;
+            let perp_account = self.perp_position_mut(perp_market_index)?;
 
             // accounting
             match order_side {
@@ -789,8 +788,7 @@ impl<
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
     ) -> Result<()> {
-        // TODO: pass in the PerpPosition, currently has a creation side-effect
-        let pa = self.ensure_perp_position(perp_market_index).unwrap().0;
+        let pa = self.perp_position_mut(perp_market_index)?;
         pa.settle_funding(perp_market);
 
         let side = fill.taker_side.invert_side();
@@ -824,8 +822,7 @@ impl<
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
     ) -> Result<()> {
-        // TODO: pass in the PerpPosition, currently has a creation side-effect
-        let pa = self.ensure_perp_position(perp_market_index).unwrap().0;
+        let pa = self.perp_position_mut(perp_market_index)?;
         pa.settle_funding(perp_market);
 
         let (base_change, quote_change) = fill.base_quote_change(fill.taker_side);
@@ -1188,7 +1185,7 @@ mod tests {
     fn test_perp_positions() {
         let mut account = make_test_account();
         assert!(account.perp_position(1).is_err());
-        //assert!(account.perp_position_mut(3).is_err());
+        assert!(account.perp_position_mut(3).is_err());
         assert_eq!(
             account.perp_position_by_raw_index(0).market_index,
             PerpMarketIndex::MAX
@@ -1222,7 +1219,7 @@ mod tests {
         }
 
         {
-            account.deactivate_perp_position(1);
+            assert!(account.deactivate_perp_position(7).is_ok());
 
             let (pos, raw) = account.ensure_perp_position(42).unwrap();
             assert_eq!(raw, 2);
@@ -1234,13 +1231,13 @@ mod tests {
         }
 
         assert_eq!(account.active_perp_positions().count(), 3);
-        account.deactivate_perp_position(0);
+        assert!(account.deactivate_perp_position(1).is_ok());
         assert_eq!(
             account.perp_position_by_raw_index(0).market_index,
             PerpMarketIndex::MAX
         );
         assert!(account.perp_position(1).is_err());
-        //assert!(account.perp_position_mut(1).is_err());
+        assert!(account.perp_position_mut(1).is_err());
         assert!(account.perp_position(8).is_ok());
         assert!(account.perp_position(42).is_ok());
         assert_eq!(account.active_perp_positions().count(), 2);

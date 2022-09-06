@@ -2220,6 +2220,39 @@ impl ClientInstruction for PerpCloseMarketInstruction {
     }
 }
 
+pub struct PerpClosePositionInstruction {
+    pub account: Pubkey,
+    pub perp_market: Pubkey,
+    pub owner: TestKeypair,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpClosePositionInstruction {
+    type Accounts = mango_v4::accounts::PerpClosePosition;
+    type Instruction = mango_v4::instruction::PerpClosePosition;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+
+        let instruction = Self::Instruction {};
+        let accounts = Self::Accounts {
+            group: perp_market.group,
+            account: self.account,
+            perp_market: self.perp_market,
+            owner: self.owner.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
 pub struct PerpPlaceOrderInstruction {
     pub group: Pubkey,
     pub account: Pubkey,

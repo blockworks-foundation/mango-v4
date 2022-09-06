@@ -263,9 +263,7 @@ impl<'a> Book<'a> {
 
             // Record the taker trade in the account already, even though it will only be
             // realized when the fill event gets executed
-            let perp_account = mango_account
-                .ensure_perp_position(market.perp_market_index)?
-                .0;
+            let perp_account = mango_account.perp_position_mut(market.perp_market_index)?;
             perp_account.add_taker_trade(side, match_base_lots, match_quote_lots);
 
             let fill = FillEvent::new(
@@ -465,9 +463,7 @@ fn apply_fees(
     let maker_fees = taker_quote_native * market.maker_fee;
 
     let taker_fees = taker_quote_native * market.taker_fee;
-    let perp_account = mango_account
-        .ensure_perp_position(market.perp_market_index)?
-        .0;
+    let perp_account = mango_account.perp_position_mut(market.perp_market_index)?;
     perp_account.change_quote_position(-taker_fees);
     market.fees_accrued += taker_fees + maker_fees;
 
