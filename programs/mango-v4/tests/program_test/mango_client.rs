@@ -329,7 +329,6 @@ pub async fn check_prev_instruction_post_health(solana: &SolanaCookie, account: 
         .unwrap();
     let post_health = post_health_str.parse::<f64>().unwrap();
 
-    solana.advance_by_slots(1).await; // ugly, just to avoid sending the same tx next
     send_tx(solana, ComputeAccountDataInstruction { account })
         .await
         .unwrap();

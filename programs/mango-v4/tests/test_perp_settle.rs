@@ -522,8 +522,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         );
     }
 
-    solana.advance_clock().await;
-
     // Partially execute the settle
     let partial_settle_amount = I80F48::from(200);
     send_tx(
@@ -587,8 +585,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         );
     }
 
-    solana.advance_clock().await;
-
     // Fully execute the settle
     send_tx(
         solana,
@@ -651,8 +647,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         );
     }
 
-    solana.advance_clock().await;
-
     // Change the oracle to a reasonable price in other direction
     send_tx(
         solana,
@@ -683,8 +677,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             expected_pnl_1
         );
     }
-
-    solana.advance_clock().await;
 
     // Fully execute the settle
     send_tx(

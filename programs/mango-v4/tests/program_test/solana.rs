@@ -67,6 +67,11 @@ impl SolanaCookie {
         *self.last_transaction_log.borrow_mut() = self.logger_capture.read().unwrap().clone();
 
         drop(tx_log_lock);
+        drop(context);
+
+        // This makes sure every transaction gets a new blockhash, avoiding issues where sending
+        // the same transaction again would lead to it being skipped.
+        self.advance_by_slots(1).await;
 
         result
     }
