@@ -490,8 +490,6 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
         );
     }
 
-    solana.advance_clock().await;
-
     // Check the fees accrued
     let initial_fees = I80F48::from(20);
     {
@@ -562,8 +560,6 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             "Fees have been partially settled"
         );
     }
-
-    solana.advance_clock().await;
 
     // Fully execute the settle
     send_tx(

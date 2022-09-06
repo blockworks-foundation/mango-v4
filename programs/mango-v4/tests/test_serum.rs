@@ -119,8 +119,6 @@ impl SerumOrderPlacer {
     }
 
     async fn settle(&self) {
-        // to avoid multiple settles looking like the same tx
-        self.solana.advance_by_slots(1).await;
         send_tx(
             &self.solana,
             Serum3SettleFundsInstruction {
