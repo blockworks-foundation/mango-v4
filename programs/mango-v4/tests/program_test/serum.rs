@@ -4,19 +4,16 @@ use std::{mem, sync::Arc};
 
 use bytemuck::from_bytes;
 use solana_sdk::pubkey::Pubkey;
-use solana_sdk::{
-    instruction::Instruction,
-    signature::{Keypair, Signer},
-};
+use solana_sdk::{instruction::Instruction, signature::Signer};
 
 use crate::*;
 
 pub struct ListingKeys {
-    market_key: Keypair,
-    req_q_key: Keypair,
-    event_q_key: Keypair,
-    bids_key: Keypair,
-    asks_key: Keypair,
+    market_key: TestKeypair,
+    req_q_key: TestKeypair,
+    event_q_key: TestKeypair,
+    bids_key: TestKeypair,
+    asks_key: TestKeypair,
     vault_signer_pk: Pubkey,
     vault_signer_nonce: u64,
 }
@@ -43,9 +40,9 @@ pub struct SerumCookie {
 }
 
 impl SerumCookie {
-    pub fn create_dex_account(&self, unpadded_len: usize) -> (Keypair, Instruction) {
+    pub fn create_dex_account(&self, unpadded_len: usize) -> (TestKeypair, Instruction) {
         let serum_program_id = self.program_id;
-        let key = Keypair::new();
+        let key = TestKeypair::new();
         let len = unpadded_len + 12;
         let rent = self.solana.rent.minimum_balance(len);
         let create_account_instr = solana_sdk::system_instruction::create_account(
@@ -145,13 +142,13 @@ impl SerumCookie {
         instructions.push(init_market_instruction);
 
         let signers = vec![
-            &market_key,
-            &req_q_key,
-            &event_q_key,
-            &bids_key,
-            &asks_key,
-            &req_q_key,
-            &event_q_key,
+            market_key,
+            req_q_key,
+            event_q_key,
+            bids_key,
+            asks_key,
+            req_q_key,
+            event_q_key,
         ];
 
         self.solana

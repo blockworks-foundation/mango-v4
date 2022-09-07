@@ -1,10 +1,7 @@
 #![cfg(feature = "test-bpf")]
 
-use solana_program_test::*;
-use solana_sdk::signature::Keypair;
-use solana_sdk::signature::Signer;
-
 use program_test::*;
+use solana_program_test::*;
 
 use mango_setup::*;
 
@@ -18,9 +15,9 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     let context = builder.start_default().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..2];
     let payer_mint0_account = context.users[1].token_accounts[0];
     let loan_origination_fee = 0.0005;
@@ -156,7 +153,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
                 )
                 .unwrap(),
             );
-            tx.add_signer(&payer);
+            tx.add_signer(payer);
         }
         tx.add_instruction(FlashLoanEndInstruction {
             account,

@@ -5,7 +5,7 @@ use fixed_macro::types::I80F48;
 use mango_v4::state::*;
 use program_test::*;
 use solana_program_test::*;
-use solana_sdk::{signature::Keypair, signer::Signer, transport::TransportError};
+use solana_sdk::transport::TransportError;
 
 use mango_setup::*;
 
@@ -16,9 +16,9 @@ async fn test_perp() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..2];
 
     //

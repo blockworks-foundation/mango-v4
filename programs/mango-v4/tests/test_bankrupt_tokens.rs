@@ -2,10 +2,7 @@
 
 use fixed::types::I80F48;
 use solana_program_test::*;
-use solana_sdk::{
-    signature::{Keypair, Signer},
-    transport::TransportError,
-};
+use solana_sdk::transport::TransportError;
 
 use mango_v4::state::*;
 use program_test::*;
@@ -19,9 +16,9 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..4];
     let payer_mint_accounts = &context.users[1].token_accounts[0..4];
 
@@ -287,9 +284,9 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..4];
     let payer_mint_accounts = &context.users[1].token_accounts[0..4];
 

@@ -7,10 +7,7 @@ use std::{sync::Arc, sync::RwLock};
 use log::*;
 use solana_program::{program_option::COption, program_pack::Pack};
 use solana_program_test::*;
-use solana_sdk::{
-    pubkey::Pubkey,
-    signature::{Keypair, Signer},
-};
+use solana_sdk::pubkey::Pubkey;
 use spl_token::{state::*, *};
 
 pub use cookies::*;
@@ -80,7 +77,7 @@ impl Log for LoggerWrapper {
 
 pub struct MarginTradeCookie {
     pub program: Pubkey,
-    pub token_account: Keypair,
+    pub token_account: TestKeypair,
     pub token_account_owner: Pubkey,
     pub token_account_bump: u8,
 }
@@ -137,7 +134,7 @@ impl TestContextBuilder {
                 base_lot: 100 as f64,
                 quote_lot: 10 as f64,
                 pubkey: self.mint0,
-                authority: Keypair::new(),
+                authority: TestKeypair::new(),
             }, // symbol: "MNGO".to_string()
         ];
         for i in 1..10 {
@@ -148,7 +145,7 @@ impl TestContextBuilder {
                 base_lot: 0 as f64,
                 quote_lot: 0 as f64,
                 pubkey: Pubkey::default(),
-                authority: Keypair::new(),
+                authority: TestKeypair::new(),
             });
         }
         // Add mints in loop
@@ -181,7 +178,7 @@ impl TestContextBuilder {
         let num_users = 4;
         let mut users = Vec::new();
         for _ in 0..num_users {
-            let user_key = Keypair::new();
+            let user_key = TestKeypair::new();
             self.test.add_account(
                 user_key.pubkey(),
                 solana_sdk::account::Account::new(
@@ -228,7 +225,7 @@ impl TestContextBuilder {
 
     pub fn add_margin_trade_program(&mut self) -> MarginTradeCookie {
         let program = Pubkey::from_str("J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix").unwrap();
-        let token_account = Keypair::new();
+        let token_account = TestKeypair::new();
         let (token_account_owner, token_account_bump) =
             Pubkey::find_program_address(&[b"MarginTrade"], &program);
 
