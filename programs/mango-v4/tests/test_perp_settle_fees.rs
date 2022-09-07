@@ -299,15 +299,15 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     .unwrap();
 
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
-    assert_eq!(mango_account_0.perps[0].base_position_lots, 1);
+    assert_eq!(mango_account_0.perps[0].base_position_lots(), 1);
     assert_eq!(
-        mango_account_0.perps[0].quote_position_native.round(),
+        mango_account_0.perps[0].quote_position_native().round(),
         -100_020
     );
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
-    assert_eq!(mango_account_1.perps[0].base_position_lots, -1);
-    assert_eq!(mango_account_1.perps[0].quote_position_native, 100_000);
+    assert_eq!(mango_account_1.perps[0].base_position_lots(), -1);
+    assert_eq!(mango_account_1.perps[0].quote_position_native(), 100_000);
 
     // Bank must be valid for quote currency
     let result = send_tx(
@@ -528,12 +528,13 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
 
         assert_eq!(
-            mango_account_1.perps[0].base_position_lots, -1,
+            mango_account_1.perps[0].base_position_lots(),
+            -1,
             "base position unchanged for account 1"
         );
 
         assert_eq!(
-            mango_account_1.perps[0].quote_position_native.round(),
+            mango_account_1.perps[0].quote_position_native().round(),
             I80F48::from(100_000) + partial_settle_amount,
             "quote position increased for losing position by fee settle amount"
         );
@@ -582,12 +583,13 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
 
         assert_eq!(
-            mango_account_1.perps[0].base_position_lots, -1,
+            mango_account_1.perps[0].base_position_lots(),
+            -1,
             "base position unchanged for account 1"
         );
 
         assert_eq!(
-            mango_account_1.perps[0].quote_position_native.round(),
+            mango_account_1.perps[0].quote_position_native().round(),
             I80F48::from(100_000) + initial_fees,
             "quote position increased for losing position by fees settled"
         );

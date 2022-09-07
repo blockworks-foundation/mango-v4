@@ -302,13 +302,13 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
         let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
 
-        assert_eq!(mango_account_0.perps[0].base_position_lots, 1);
-        assert_eq!(mango_account_1.perps[0].base_position_lots, -1);
+        assert_eq!(mango_account_0.perps[0].base_position_lots(), 1);
+        assert_eq!(mango_account_1.perps[0].base_position_lots(), -1);
         assert_eq!(
-            mango_account_0.perps[0].quote_position_native.round(),
+            mango_account_0.perps[0].quote_position_native().round(),
             -100_020
         );
-        assert_eq!(mango_account_1.perps[0].quote_position_native, 100_000);
+        assert_eq!(mango_account_1.perps[0].quote_position_native(), 100_000);
     }
 
     // Bank must be valid for quote currency
@@ -545,21 +545,23 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
 
         assert_eq!(
-            mango_account_0.perps[0].base_position_lots, 1,
+            mango_account_0.perps[0].base_position_lots(),
+            1,
             "base position unchanged for account 0"
         );
         assert_eq!(
-            mango_account_1.perps[0].base_position_lots, -1,
+            mango_account_1.perps[0].base_position_lots(),
+            -1,
             "base position unchanged for account 1"
         );
 
         assert_eq!(
-            mango_account_0.perps[0].quote_position_native.round(),
+            mango_account_0.perps[0].quote_position_native().round(),
             I80F48::from(-100_020) - partial_settle_amount,
             "quote position reduced for profitable position by max_settle_amount"
         );
         assert_eq!(
-            mango_account_1.perps[0].quote_position_native.round(),
+            mango_account_1.perps[0].quote_position_native().round(),
             I80F48::from(100_000) + partial_settle_amount,
             "quote position increased for losing position by opposite of first account"
         );
@@ -607,21 +609,23 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
 
         assert_eq!(
-            mango_account_0.perps[0].base_position_lots, 1,
+            mango_account_0.perps[0].base_position_lots(),
+            1,
             "base position unchanged for account 0"
         );
         assert_eq!(
-            mango_account_1.perps[0].base_position_lots, -1,
+            mango_account_1.perps[0].base_position_lots(),
+            -1,
             "base position unchanged for account 1"
         );
 
         assert_eq!(
-            mango_account_0.perps[0].quote_position_native.round(),
+            mango_account_0.perps[0].quote_position_native().round(),
             I80F48::from(-100_020) - expected_pnl_0,
             "quote position reduced for profitable position"
         );
         assert_eq!(
-            mango_account_1.perps[0].quote_position_native.round(),
+            mango_account_1.perps[0].quote_position_native().round(),
             I80F48::from(100_000) + expected_pnl_0,
             "quote position increased for losing position by opposite of first account"
         );
@@ -700,21 +704,23 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
 
         assert_eq!(
-            mango_account_0.perps[0].base_position_lots, 1,
+            mango_account_0.perps[0].base_position_lots(),
+            1,
             "base position unchanged for account 0"
         );
         assert_eq!(
-            mango_account_1.perps[0].base_position_lots, -1,
+            mango_account_1.perps[0].base_position_lots(),
+            -1,
             "base position unchanged for account 1"
         );
 
         assert_eq!(
-            mango_account_0.perps[0].quote_position_native.round(),
+            mango_account_0.perps[0].quote_position_native().round(),
             I80F48::from(-100_500) + expected_pnl_1,
             "quote position increased for losing position"
         );
         assert_eq!(
-            mango_account_1.perps[0].quote_position_native.round(),
+            mango_account_1.perps[0].quote_position_native().round(),
             I80F48::from(100_480) - expected_pnl_1,
             "quote position reduced for losing position by opposite of first account"
         );

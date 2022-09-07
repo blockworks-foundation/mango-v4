@@ -468,7 +468,7 @@ fn apply_fees(
     let perp_account = mango_account
         .ensure_perp_position(market.perp_market_index)?
         .0;
-    perp_account.quote_position_native -= taker_fees;
+    perp_account.change_quote_position(-taker_fees);
     market.fees_accrued += taker_fees + maker_fees;
 
     Ok(())

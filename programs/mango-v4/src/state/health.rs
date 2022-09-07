@@ -498,14 +498,14 @@ impl PerpInfo {
         let base_info = &token_infos[base_index];
 
         let base_lot_size = I80F48::from(perp_market.base_lot_size);
-        let base_lots = cm!(perp_position.base_position_lots + perp_position.taker_base_lots);
+        let base_lots = cm!(perp_position.base_position_lots() + perp_position.taker_base_lots);
 
         let unsettled_funding = perp_position.unsettled_funding(&perp_market);
         let taker_quote = I80F48::from(cm!(
             perp_position.taker_quote_lots * perp_market.quote_lot_size
         ));
         let quote_current =
-            cm!(perp_position.quote_position_native - unsettled_funding + taker_quote);
+            cm!(perp_position.quote_position_native() - unsettled_funding + taker_quote);
 
         // Two scenarios:
         // 1. The price goes low and all bids execute, converting to base.
@@ -1226,8 +1226,7 @@ mod tests {
 
         let mut perp1 = mock_perp_market(group, 9, 4, 0.2, 0.1);
         let perpaccount = account.ensure_perp_position(9).unwrap().0;
-        perpaccount.base_position_lots = 3;
-        perpaccount.quote_position_native = -I80F48::from(310u16);
+        perpaccount.change_base_and_quote_positions(perp1.data(), 3, -I80F48::from(310u16));
         perpaccount.bids_base_lots = 7;
         perpaccount.asks_base_lots = 11;
         perpaccount.taker_base_lots = 1;
@@ -1398,8 +1397,11 @@ mod tests {
 
         let mut perp1 = mock_perp_market(group, 9, 4, 0.2, 0.1);
         let perpaccount = account.ensure_perp_position(9).unwrap().0;
-        perpaccount.base_position_lots = testcase.perp1.0;
-        perpaccount.quote_position_native = I80F48::from(testcase.perp1.1);
+        perpaccount.change_base_and_quote_positions(
+            perp1.data(),
+            testcase.perp1.0,
+            I80F48::from(testcase.perp1.1),
+        );
         perpaccount.bids_base_lots = testcase.perp1.2;
         perpaccount.asks_base_lots = testcase.perp1.3;
 
@@ -1708,8 +1710,7 @@ mod tests {
         let mut perp1 = mock_perp_market(group, 9, 1, 0.2, 0.1);
         perp1.data().long_funding = I80F48::from_num(10.1);
         let perpaccount = account.ensure_perp_position(9).unwrap().0;
-        perpaccount.base_position_lots = 10; // 100 base native
-        perpaccount.quote_position_native = I80F48::from(-110);
+        perpaccount.change_base_and_quote_positions(perp1.data(), 10, I80F48::from(-110));
         perpaccount.long_settled_funding = I80F48::from_num(10.0);
 
         let ais = vec![

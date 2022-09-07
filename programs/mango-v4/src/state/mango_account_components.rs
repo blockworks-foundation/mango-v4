@@ -153,10 +153,10 @@ pub struct PerpPosition {
     pub padding: [u8; 6],
 
     /// Active position size, measured in base lots
-    pub base_position_lots: i64,
+    base_position_lots: i64,
     /// Active position in quote (conversation rate is that of the time the order was settled)
     /// measured in native quote
-    pub quote_position_native: I80F48,
+    quote_position_native: I80F48,
 
     /// Tracks what the position is to calculate average entry & break even price
     pub quote_entry_native: i64,
@@ -240,8 +240,16 @@ impl PerpPosition {
         I80F48::from(cm!(self.base_position_lots * market.base_lot_size))
     }
 
+    pub fn base_position_lots(&self) -> i64 {
+        self.base_position_lots
+    }
+
+    pub fn quote_position_native(&self) -> I80F48 {
+        self.quote_position_native
+    }
+
     /// This assumes settle_funding was already called
-    pub fn change_base_position(&mut self, perp_market: &mut PerpMarket, base_change: i64) {
+    fn change_base_position(&mut self, perp_market: &mut PerpMarket, base_change: i64) {
         let start = self.base_position_lots;
         self.base_position_lots += base_change;
         perp_market.open_interest += self.base_position_lots.abs() - start.abs();
@@ -271,25 +279,24 @@ impl PerpPosition {
     }
 
     /// Update the quote entry position
-    pub fn change_quote_entry(&mut self, base_change: i64, quote_change: i64) {
+    fn update_entry_price(&mut self, base_change: i64, quote_change_native: i64) {
         if base_change == 0 {
             return;
         }
         let old_position = self.base_position_lots;
         let is_increasing = old_position == 0 || old_position.signum() == base_change.signum();
-        cm!(self.quote_running_native += quote_change);
+        cm!(self.quote_running_native += quote_change_native);
         match is_increasing {
             true => {
-                cm!(self.quote_entry_native += quote_change);
+                cm!(self.quote_entry_native += quote_change_native);
             }
             false => {
                 let new_position = cm!(old_position + base_change);
                 let changes_side = old_position.signum() == -new_position.signum();
                 self.quote_entry_native = if changes_side {
-                    cm!(
-                        ((new_position as f64) * (quote_change as f64) / (base_change as f64))
-                            .round()
-                    ) as i64
+                    cm!(((new_position as f64) * (quote_change_native as f64)
+                        / (base_change as f64))
+                        .round()) as i64
                 } else {
                     let remaining_frac =
                         (1f64 - (base_change.abs() as f64) / (old_position.abs() as f64)).max(0f64);
@@ -301,14 +308,22 @@ impl PerpPosition {
     }
 
     /// Change the base and quote positions as the result of a trade
-    pub fn change_base_and_entry_positions(
+    pub fn change_base_and_quote_positions(
         &mut self,
         perp_market: &mut PerpMarket,
         base_change: i64,
-        quote_change: i64,
+        quote_change_native: I80F48,
     ) {
-        self.change_quote_entry(base_change, quote_change);
+        self.update_entry_price(
+            base_change,
+            quote_change_native.round().checked_to_num().unwrap(),
+        );
         self.change_base_position(perp_market, base_change);
+        self.change_quote_position(quote_change_native);
+    }
+
+    pub fn change_quote_position(&mut self, quote_change_native: I80F48) {
+        cm!(self.quote_position_native += quote_change_native);
     }
 
     /// Calculate the average entry price of the position
@@ -439,7 +454,7 @@ mod tests {
         let mut market = create_perp_market();
         let mut pos = create_perp_position(0, 0, 0);
         // Go long 10 @ 10
-        pos.change_base_and_entry_positions(&mut market, 10, -100);
+        pos.change_base_and_quote_positions(&mut market, 10, I80F48::from(-100));
         assert_eq!(pos.quote_entry_native, -100);
         assert_eq!(pos.quote_running_native, -100);
         assert_eq!(pos.avg_entry_price(), I80F48::from(10));
@@ -450,7 +465,7 @@ mod tests {
         let mut market = create_perp_market();
         let mut pos = create_perp_position(0, 0, 0);
         // Go short 10 @ 10
-        pos.change_base_and_entry_positions(&mut market, -10, 100);
+        pos.change_base_and_quote_positions(&mut market, -10, I80F48::from(100));
         assert_eq!(pos.quote_entry_native, 100);
         assert_eq!(pos.quote_running_native, 100);
         assert_eq!(pos.avg_entry_price(), I80F48::from(10));
@@ -461,7 +476,7 @@ mod tests {
         let mut market = create_perp_market();
         let mut pos = create_perp_position(10, -100, -100);
         // Go long 10 @ 30
-        pos.change_base_and_entry_positions(&mut market, 10, -300);
+        pos.change_base_and_quote_positions(&mut market, 10, I80F48::from(-300));
         assert_eq!(pos.quote_entry_native, -400);
         assert_eq!(pos.quote_running_native, -400);
         assert_eq!(pos.avg_entry_price(), I80F48::from(20));
@@ -472,7 +487,7 @@ mod tests {
         let mut market = create_perp_market();
         let mut pos = create_perp_position(-10, 100, 100);
         // Go short 10 @ 10
-        pos.change_base_and_entry_positions(&mut market, -10, 300);
+        pos.change_base_and_quote_positions(&mut market, -10, I80F48::from(300));
         assert_eq!(pos.quote_entry_native, 400);
         assert_eq!(pos.quote_running_native, 400);
         assert_eq!(pos.avg_entry_price(), I80F48::from(20));
@@ -483,7 +498,7 @@ mod tests {
         let mut market = create_perp_market();
         let mut pos = create_perp_position(-10, 100, 100);
         // Go long 5 @ 50
-        pos.change_base_and_entry_positions(&mut market, 5, -250);
+        pos.change_base_and_quote_positions(&mut market, 5, I80F48::from(-250));
         assert_eq!(pos.quote_entry_native, 50);
         assert_eq!(pos.quote_running_native, -150);
         assert_eq!(pos.avg_entry_price(), I80F48::from(10)); // Entry price remains the same when decreasing
@@ -494,7 +509,7 @@ mod tests {
         let mut market = create_perp_market();
         let mut pos = create_perp_position(10, -100, -100);
         // Go short 5 @ 50
-        pos.change_base_and_entry_positions(&mut market, -5, 250);
+        pos.change_base_and_quote_positions(&mut market, -5, I80F48::from(250));
         assert_eq!(pos.quote_entry_native, -50);
         assert_eq!(pos.quote_running_native, 150);
         assert_eq!(pos.avg_entry_price(), I80F48::from(10)); // Entry price remains the same when decreasing
@@ -505,7 +520,7 @@ mod tests {
         let mut market = create_perp_market();
         let mut pos = create_perp_position(10, -100, -100);
         // Go short 10 @ 50
-        pos.change_base_and_entry_positions(&mut market, -10, 250);
+        pos.change_base_and_quote_positions(&mut market, -10, I80F48::from(250));
         assert_eq!(pos.quote_entry_native, 0);
         assert_eq!(pos.quote_running_native, 150);
         assert_eq!(pos.avg_entry_price(), I80F48::from(0)); // Entry price zero when no position
@@ -516,7 +531,7 @@ mod tests {
         let mut market = create_perp_market();
         let mut pos = create_perp_position(-10, 100, 100);
         // Go long 10 @ 50
-        pos.change_base_and_entry_positions(&mut market, 10, -250);
+        pos.change_base_and_quote_positions(&mut market, 10, I80F48::from(-250));
         assert_eq!(pos.quote_entry_native, 0);
         assert_eq!(pos.quote_running_native, -150);
         assert_eq!(pos.avg_entry_price(), I80F48::from(0)); // Entry price zero when no position
@@ -527,7 +542,7 @@ mod tests {
         let mut market = create_perp_market();
         let mut pos = create_perp_position(10, -100, -100);
         // Go short 15 @ 20
-        pos.change_base_and_entry_positions(&mut market, -15, 300);
+        pos.change_base_and_quote_positions(&mut market, -15, I80F48::from(300));
         assert_eq!(pos.quote_entry_native, 100);
         assert_eq!(pos.quote_running_native, 200);
         assert_eq!(pos.avg_entry_price(), I80F48::from(20)); // Entry price zero when no position
@@ -538,7 +553,7 @@ mod tests {
         let mut market = create_perp_market();
         let mut pos = create_perp_position(-10, 100, 100);
         // Go short 15 @ 20
-        pos.change_base_and_entry_positions(&mut market, 15, -300);
+        pos.change_base_and_quote_positions(&mut market, 15, I80F48::from(-300));
         assert_eq!(pos.quote_entry_native, -100);
         assert_eq!(pos.quote_running_native, -200);
         assert_eq!(pos.avg_entry_price(), I80F48::from(20)); // Entry price zero when no position
@@ -549,9 +564,9 @@ mod tests {
         let mut market = create_perp_market();
         let mut pos = create_perp_position(0, 0, 0);
         // Buy 11 @ 10,000
-        pos.change_base_and_entry_positions(&mut market, 11, -11 * 10_000);
+        pos.change_base_and_quote_positions(&mut market, 11, I80F48::from(-11 * 10_000));
         // Sell 1 @ 12,000
-        pos.change_base_and_entry_positions(&mut market, -1, 12_000);
+        pos.change_base_and_quote_positions(&mut market, -1, I80F48::from(12_000));
         assert_eq!(pos.quote_entry_native, -10 * 10_000);
         assert_eq!(pos.quote_running_native, -98_000);
         assert_eq!(pos.base_position_lots, 10);
@@ -574,7 +589,7 @@ mod tests {
         }
         // Apply all of the trades going forward
         trades.iter().for_each(|[qty, quote]| {
-            pos.change_base_and_entry_positions(&mut market, *qty, *quote);
+            pos.change_base_and_quote_positions(&mut market, *qty, I80F48::from(*quote));
         });
         // base_position should be sum of all base quantities
         assert_eq!(
@@ -583,7 +598,7 @@ mod tests {
         );
         // Reverse out all the trades
         trades.iter().for_each(|[qty, quote]| {
-            pos.change_base_and_entry_positions(&mut market, -*qty, -*quote);
+            pos.change_base_and_quote_positions(&mut market, -*qty, I80F48::from(-*quote));
         });
         // base position should be 0
         assert_eq!(pos.base_position_lots, 0);
