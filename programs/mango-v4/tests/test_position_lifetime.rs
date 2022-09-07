@@ -2,7 +2,6 @@
 
 use anchor_lang::prelude::*;
 use solana_program_test::*;
-use solana_sdk::signature::Keypair;
 
 use program_test::*;
 
@@ -16,9 +15,9 @@ async fn test_position_lifetime() -> Result<()> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..3];
 
     let payer_mint_accounts = &context.users[1].token_accounts[0..=2];

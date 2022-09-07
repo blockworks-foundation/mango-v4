@@ -1,15 +1,14 @@
 #![allow(dead_code)]
 
 use anchor_lang::prelude::*;
-use solana_sdk::signature::Keypair;
 
 use super::mango_client::*;
 use super::solana::SolanaCookie;
-use super::{send_tx, ClonableKeypair, MintCookie, UserCookie};
+use super::{send_tx, MintCookie, TestKeypair, UserCookie};
 
 pub struct GroupWithTokensConfig<'a> {
-    pub admin: &'a Keypair,
-    pub payer: &'a Keypair,
+    pub admin: TestKeypair,
+    pub payer: TestKeypair,
     pub mints: &'a [MintCookie],
 }
 
@@ -141,7 +140,7 @@ impl<'a> GroupWithTokensConfig<'a> {
 pub async fn create_funded_account(
     solana: &SolanaCookie,
     group: Pubkey,
-    owner: &Keypair,
+    owner: TestKeypair,
     account_num: u32,
     payer: &UserCookie,
     mints: &[MintCookie],
@@ -158,7 +157,7 @@ pub async fn create_funded_account(
             perp_oo_count: 8,
             group,
             owner,
-            payer: &payer.key,
+            payer: payer.key,
         },
     )
     .await
@@ -172,7 +171,7 @@ pub async fn create_funded_account(
                 amount: amounts,
                 account,
                 token_account: payer.token_accounts[mint.index],
-                token_authority: payer.key.clone(),
+                token_authority: payer.key,
                 bank_index,
             },
         )

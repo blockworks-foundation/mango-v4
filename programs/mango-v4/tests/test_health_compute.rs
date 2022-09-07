@@ -3,7 +3,7 @@
 use fixed::types::I80F48;
 use mango_v4::state::*;
 use solana_program_test::*;
-use solana_sdk::{signature::Keypair, transport::TransportError};
+use solana_sdk::transport::TransportError;
 
 use program_test::*;
 
@@ -17,9 +17,9 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..10];
 
     //
@@ -49,9 +49,9 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..8];
     let payer_mint_accounts = &context.users[1].token_accounts[0..mints.len()];
 
@@ -164,9 +164,9 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..8];
     let payer_mint_accounts = &context.users[1].token_accounts[0..mints.len()];
 
