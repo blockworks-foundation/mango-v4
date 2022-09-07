@@ -49,6 +49,8 @@ pub enum MangoError {
     PerpPositionDoesNotExist,
     #[msg("max settle amount must be greater than zero")]
     MaxSettleAmountMustBeGreaterThanZero,
+    #[msg("the perp position has open orders or unprocessed fill events")]
+    HasOpenPerpOrders,
 }
 
 pub trait Contextable {

@@ -506,12 +506,19 @@ pub mod mango_v4 {
     pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) -> Result<()> {
         instructions::perp_settle_fees(ctx, max_settle_amount)
     }
+
+    pub fn perp_liq_base_position(
+        ctx: Context<PerpLiqBasePosition>,
+        max_base_transfer: i64,
+    ) -> Result<()> {
+        instructions::perp_liq_base_position(ctx, max_base_transfer)
+    }
+
     // TODO
 
     // perp_force_cancel_order
 
     // liquidate_token_and_perp
-    // liquidate_perp_and_perp
 
     // settle_* - settle_funds
 
