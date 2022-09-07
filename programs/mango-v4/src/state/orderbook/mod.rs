@@ -247,11 +247,11 @@ mod tests {
         assert_eq!(maker.perp_position_by_raw_index(0).asks_base_lots, 0);
         assert_eq!(maker.perp_position_by_raw_index(0).taker_base_lots, 0);
         assert_eq!(maker.perp_position_by_raw_index(0).taker_quote_lots, 0);
-        assert_eq!(maker.perp_position_by_raw_index(0).base_position_lots, 0);
+        assert_eq!(maker.perp_position_by_raw_index(0).base_position_lots(), 0);
         assert_eq!(
             maker
                 .perp_position_by_raw_index(0)
-                .quote_position_native
+                .quote_position_native()
                 .to_num::<u32>(),
             0
         );
@@ -305,9 +305,9 @@ mod tests {
             taker.perp_position_by_raw_index(0).taker_quote_lots,
             match_quantity * price
         );
-        assert_eq!(taker.perp_position_by_raw_index(0).base_position_lots, 0);
+        assert_eq!(taker.perp_position_by_raw_index(0).base_position_lots(), 0);
         assert_eq!(
-            taker.perp_position_by_raw_index(0).quote_position_native,
+            taker.perp_position_by_raw_index(0).quote_position_native(),
             -match_quote * market.taker_fee
         );
 
@@ -343,11 +343,11 @@ mod tests {
         assert_eq!(maker.perp_position_by_raw_index(0).taker_base_lots, 0);
         assert_eq!(maker.perp_position_by_raw_index(0).taker_quote_lots, 0);
         assert_eq!(
-            maker.perp_position_by_raw_index(0).base_position_lots,
+            maker.perp_position_by_raw_index(0).base_position_lots(),
             match_quantity
         );
         assert_eq!(
-            maker.perp_position_by_raw_index(0).quote_position_native,
+            maker.perp_position_by_raw_index(0).quote_position_native(),
             -match_quote - match_quote * market.maker_fee
         );
 
@@ -356,11 +356,11 @@ mod tests {
         assert_eq!(taker.perp_position_by_raw_index(0).taker_base_lots, 0);
         assert_eq!(taker.perp_position_by_raw_index(0).taker_quote_lots, 0);
         assert_eq!(
-            taker.perp_position_by_raw_index(0).base_position_lots,
+            taker.perp_position_by_raw_index(0).base_position_lots(),
             -match_quantity
         );
         assert_eq!(
-            taker.perp_position_by_raw_index(0).quote_position_native,
+            taker.perp_position_by_raw_index(0).quote_position_native(),
             match_quote - match_quote * market.taker_fee
         );
     }

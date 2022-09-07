@@ -712,10 +712,9 @@ impl<
         if raw_index_opt.is_none() {
             raw_index_opt = self.all_perp_positions().position(|p| !p.is_active());
             if let Some(raw_index) = raw_index_opt {
-                *(self.perp_position_mut_by_raw_index(raw_index)) = PerpPosition {
-                    market_index: perp_market_index,
-                    ..Default::default()
-                };
+                let perp_position = self.perp_position_mut_by_raw_index(raw_index);
+                *perp_position = PerpPosition::default();
+                perp_position.market_index = perp_market_index;
             }
         }
         if let Some(raw_index) = raw_index_opt {
@@ -796,18 +795,13 @@ impl<
 
         let side = fill.taker_side.invert_side();
         let (base_change, quote_change) = fill.base_quote_change(side);
-        pa.change_base_and_entry_positions(perp_market, base_change, quote_change);
-        let quote = I80F48::from_num(
-            perp_market
-                .quote_lot_size
-                .checked_mul(quote_change)
-                .unwrap(),
-        );
-        let fees = quote.abs() * fill.maker_fee;
+        let quote = cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
+        let fees = cm!(quote.abs() * fill.maker_fee);
         if !fill.market_fees_applied {
-            perp_market.fees_accrued += fees;
+            cm!(perp_market.fees_accrued += fees);
         }
-        pa.quote_position_native = pa.quote_position_native.checked_add(quote - fees).unwrap();
+        let quote_change_native = cm!(quote - fees);
+        pa.change_base_and_quote_positions(perp_market, base_change, quote_change_native);
 
         if fill.maker_out {
             self.remove_perp_order(fill.maker_slot as usize, base_change.abs())
@@ -836,12 +830,11 @@ impl<
 
         let (base_change, quote_change) = fill.base_quote_change(fill.taker_side);
         pa.remove_taker_trade(base_change, quote_change);
-        pa.change_base_and_entry_positions(perp_market, base_change, quote_change);
-        let quote = I80F48::from_num(perp_market.quote_lot_size * quote_change);
-
         // fees are assessed at time of trade; no need to assess fees here
+        let quote_change_native =
+            cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
+        pa.change_base_and_quote_positions(perp_market, base_change, quote_change_native);
 
-        pa.quote_position_native += quote;
         Ok(())
     }
 

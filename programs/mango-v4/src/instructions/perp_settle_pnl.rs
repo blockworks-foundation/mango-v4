@@ -64,8 +64,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: I80F48) -
         perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
 
     // Fetch perp positions for accounts
-    let mut a_perp_position = account_a.perp_position_mut(perp_market.perp_market_index)?;
-    let mut b_perp_position = account_b.perp_position_mut(perp_market.perp_market_index)?;
+    let a_perp_position = account_a.perp_position_mut(perp_market.perp_market_index)?;
+    let b_perp_position = account_b.perp_position_mut(perp_market.perp_market_index)?;
 
     // Settle funding before settling any PnL
     a_perp_position.settle_funding(&perp_market);
@@ -74,8 +74,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: I80F48) -
     // Calculate PnL for each account
     let a_base_native = a_perp_position.base_position_native(&perp_market);
     let b_base_native = b_perp_position.base_position_native(&perp_market);
-    let a_pnl: I80F48 = cm!(a_perp_position.quote_position_native + a_base_native * oracle_price);
-    let b_pnl: I80F48 = cm!(b_perp_position.quote_position_native + b_base_native * oracle_price);
+    let a_pnl: I80F48 = cm!(a_perp_position.quote_position_native() + a_base_native * oracle_price);
+    let b_pnl: I80F48 = cm!(b_perp_position.quote_position_native() + b_base_native * oracle_price);
 
     // Account A must be profitable, and B must be unprofitable
     // PnL must be opposite signs for there to be a settlement
@@ -84,8 +84,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: I80F48) -
 
     // Settle for the maximum possible capped to max_settle_amount
     let settlement = a_pnl.abs().min(b_pnl.abs()).min(max_settle_amount);
-    cm!(a_perp_position.quote_position_native -= settlement);
-    cm!(b_perp_position.quote_position_native += settlement);
+    a_perp_position.change_quote_position(-settlement);
+    b_perp_position.change_quote_position(settlement);
 
     // Update the account's net_settled with the new PnL
     let settlement_i64 = settlement.checked_to_num::<i64>().unwrap();

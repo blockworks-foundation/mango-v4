@@ -58,7 +58,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: I80F48)
 
     // Calculate PnL for each account
     let base_native = perp_position.base_position_native(&perp_market);
-    let pnl: I80F48 = cm!(perp_position.quote_position_native + base_native * oracle_price);
+    let pnl: I80F48 = cm!(perp_position.quote_position_native() + base_native * oracle_price);
 
     // Account perp position must have a loss to be able to settle against the fee account
     require!(pnl.is_negative(), MangoError::ProfitabilityMismatch);
@@ -72,7 +72,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: I80F48)
         .abs()
         .min(perp_market.fees_accrued.abs())
         .min(max_settle_amount);
-    perp_position.quote_position_native = cm!(perp_position.quote_position_native + settlement);
+    perp_position.change_quote_position(settlement);
     perp_market.fees_accrued = cm!(perp_market.fees_accrued - settlement);
 
     // Update the account's net_settled with the new PnL
