@@ -9,16 +9,9 @@ use solana_program_test::*;
 use solana_sdk::transport::TransportError;
 
 use mango_setup::*;
+use utils::assert_equal_fixed_f64 as assert_equal;
 
 mod program_test;
-
-fn compare_fixed_f64(value: I80F48, expected: f64, max_error: f64) -> bool {
-    let ok = (value.to_num::<f64>() - expected).abs() < max_error;
-    if !ok {
-        println!("comparison failed: value: {value}, expected: {expected}");
-    }
-    ok
-}
 
 #[tokio::test]
 async fn test_perp() -> Result<(), TransportError> {
@@ -351,7 +344,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(mango_account_0.perps[0].base_position_lots(), 1);
-    assert!(compare_fixed_f64(
+    assert!(assert_equal(
         mango_account_0.perps[0].quote_position_native(),
         -99.99,
         0.001
@@ -359,7 +352,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(mango_account_1.perps[0].base_position_lots(), -1);
-    assert!(compare_fixed_f64(
+    assert!(assert_equal(
         mango_account_1.perps[0].quote_position_native(),
         99.98,
         0.001
@@ -441,7 +434,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(mango_account_0.perps[0].base_position_lots(), 0);
-    assert!(compare_fixed_f64(
+    assert!(assert_equal(
         mango_account_0.perps[0].quote_position_native(),
         0.02,
         0.001
@@ -449,7 +442,7 @@ async fn test_perp() -> Result<(), TransportError> {
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(mango_account_1.perps[0].base_position_lots(), 0);
-    assert!(compare_fixed_f64(
+    assert!(assert_equal(
         mango_account_1.perps[0].quote_position_native(),
         -0.04,
         0.001
