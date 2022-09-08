@@ -2618,6 +2618,53 @@ impl ClientInstruction for PerpSettleFeesInstruction {
     }
 }
 
+pub struct PerpLiqForceCancelOrdersInstruction {
+    pub account: Pubkey,
+    pub perp_market: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpLiqForceCancelOrdersInstruction {
+    type Accounts = mango_v4::accounts::PerpLiqForceCancelOrders;
+    type Instruction = mango_v4::instruction::PerpLiqForceCancelOrders;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction { limit: 10 };
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            None,
+            false,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            perp_market: self.perp_market,
+            account: self.account,
+            bids: perp_market.bids,
+            asks: perp_market.asks,
+        };
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas);
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![]
+    }
+}
+
 pub struct BenchmarkInstruction {}
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for BenchmarkInstruction {

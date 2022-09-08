@@ -34,7 +34,6 @@ pub fn perp_liq_force_cancel_orders(
     // Check liqee health if liquidation is allowed
     //
     let mut health_cache = {
-        let mut account = ctx.accounts.account.load_mut()?;
         let retriever =
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
         let health_cache =
