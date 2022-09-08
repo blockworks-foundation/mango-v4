@@ -514,6 +514,10 @@ pub mod mango_v4 {
         instructions::perp_liq_base_position(ctx, max_base_transfer)
     }
 
+    pub fn perp_liq_force_cancel_orders(ctx: Context<PerpLiqForceCancelOrders>) -> Result<()> {
+        instructions::perp_liq_force_cancel_orders(ctx)
+    }
+
     // TODO
 
     // perp_force_cancel_order
