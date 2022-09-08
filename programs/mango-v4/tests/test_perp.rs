@@ -365,7 +365,7 @@ async fn test_perp() -> Result<(), TransportError> {
     // Can't close yet, active positions
     assert!(send_tx(
         solana,
-        PerpClosePositionInstruction {
+        PerpDeactivatePositionInstruction {
             account: account_0,
             perp_market,
             owner,
@@ -483,7 +483,7 @@ async fn test_perp() -> Result<(), TransportError> {
     // Now closing works!
     send_tx(
         solana,
-        PerpClosePositionInstruction {
+        PerpDeactivatePositionInstruction {
             account: account_0,
             perp_market,
             owner,
@@ -493,7 +493,7 @@ async fn test_perp() -> Result<(), TransportError> {
     .unwrap();
     send_tx(
         solana,
-        PerpClosePositionInstruction {
+        PerpDeactivatePositionInstruction {
             account: account_1,
             perp_market,
             owner,

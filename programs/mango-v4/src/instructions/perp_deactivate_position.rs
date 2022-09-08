@@ -5,7 +5,7 @@ use crate::state::*;
 use crate::util::checked_math as cm;
 
 #[derive(Accounts)]
-pub struct PerpClosePosition<'info> {
+pub struct PerpDeactivatePosition<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
@@ -20,7 +20,7 @@ pub struct PerpClosePosition<'info> {
     pub perp_market: AccountLoader<'info, PerpMarket>,
 }
 
-pub fn perp_close_position(ctx: Context<PerpClosePosition>) -> Result<()> {
+pub fn perp_deactivate_position(ctx: Context<PerpDeactivatePosition>) -> Result<()> {
     let mut account = ctx.accounts.account.load_mut()?;
     // account constraint #1
     require!(

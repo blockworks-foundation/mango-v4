@@ -2220,15 +2220,15 @@ impl ClientInstruction for PerpCloseMarketInstruction {
     }
 }
 
-pub struct PerpClosePositionInstruction {
+pub struct PerpDeactivatePositionInstruction {
     pub account: Pubkey,
     pub perp_market: Pubkey,
     pub owner: TestKeypair,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for PerpClosePositionInstruction {
-    type Accounts = mango_v4::accounts::PerpClosePosition;
-    type Instruction = mango_v4::instruction::PerpClosePosition;
+impl ClientInstruction for PerpDeactivatePositionInstruction {
+    type Accounts = mango_v4::accounts::PerpDeactivatePosition;
+    type Instruction = mango_v4::instruction::PerpDeactivatePosition;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
