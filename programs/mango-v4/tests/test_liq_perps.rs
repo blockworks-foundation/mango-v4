@@ -43,13 +43,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket {
-        perp_market,
-        asks,
-        bids,
-        event_queue,
-        ..
-    } = send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -127,13 +121,8 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
-            group,
             account,
             perp_market,
-            asks,
-            bids,
-            event_queue,
-            oracle: base_token.oracle,
             owner,
             side: Side::Ask,
             price_lots,

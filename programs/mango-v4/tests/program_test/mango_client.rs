@@ -2254,13 +2254,8 @@ impl ClientInstruction for PerpDeactivatePositionInstruction {
 }
 
 pub struct PerpPlaceOrderInstruction {
-    pub group: Pubkey,
     pub account: Pubkey,
     pub perp_market: Pubkey,
-    pub asks: Pubkey,
-    pub bids: Pubkey,
-    pub event_queue: Pubkey,
-    pub oracle: Pubkey,
     pub owner: TestKeypair,
     pub side: Side,
     pub price_lots: i64,
@@ -2287,16 +2282,6 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
             expiry_timestamp: 0,
             limit: 1,
         };
-        let accounts = Self::Accounts {
-            group: self.group,
-            account: self.account,
-            perp_market: self.perp_market,
-            asks: self.asks,
-            bids: self.bids,
-            event_queue: self.event_queue,
-            oracle: self.oracle,
-            owner: self.owner.pubkey(),
-        };
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
         let account = account_loader
@@ -2312,6 +2297,16 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
         )
         .await;
 
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            perp_market: self.perp_market,
+            asks: perp_market.asks,
+            bids: perp_market.bids,
+            event_queue: perp_market.event_queue,
+            oracle: perp_market.oracle,
+            owner: self.owner.pubkey(),
+        };
         let mut instruction = make_instruction(program_id, &accounts, instruction);
         instruction.accounts.extend(health_check_metas);
 
@@ -2402,11 +2397,8 @@ impl ClientInstruction for PerpCancelOrderByClientOrderIdInstruction {
 }
 
 pub struct PerpCancelAllOrdersInstruction {
-    pub group: Pubkey,
     pub account: Pubkey,
     pub perp_market: Pubkey,
-    pub asks: Pubkey,
-    pub bids: Pubkey,
     pub owner: TestKeypair,
 }
 #[async_trait::async_trait(?Send)]
@@ -2415,16 +2407,17 @@ impl ClientInstruction for PerpCancelAllOrdersInstruction {
     type Instruction = mango_v4::instruction::PerpCancelAllOrders;
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction { limit: 5 };
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
         let accounts = Self::Accounts {
-            group: self.group,
+            group: perp_market.group,
             account: self.account,
             perp_market: self.perp_market,
-            asks: self.asks,
-            bids: self.bids,
+            asks: perp_market.asks,
+            bids: perp_market.bids,
             owner: self.owner.pubkey(),
         };
 
@@ -2438,9 +2431,7 @@ impl ClientInstruction for PerpCancelAllOrdersInstruction {
 }
 
 pub struct PerpConsumeEventsInstruction {
-    pub group: Pubkey,
     pub perp_market: Pubkey,
-    pub event_queue: Pubkey,
     pub mango_accounts: Vec<Pubkey>,
 }
 #[async_trait::async_trait(?Send)]
@@ -2449,14 +2440,16 @@ impl ClientInstruction for PerpConsumeEventsInstruction {
     type Instruction = mango_v4::instruction::PerpConsumeEvents;
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction { limit: 10 };
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
         let accounts = Self::Accounts {
-            group: self.group,
+            group: perp_market.group,
             perp_market: self.perp_market,
-            event_queue: self.event_queue,
+            event_queue: perp_market.event_queue,
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
@@ -2511,11 +2504,9 @@ impl ClientInstruction for PerpUpdateFundingInstruction {
 }
 
 pub struct PerpSettlePnlInstruction {
-    pub group: Pubkey,
     pub account_a: Pubkey,
     pub account_b: Pubkey,
     pub perp_market: Pubkey,
-    pub oracle: Pubkey,
     pub quote_bank: Pubkey,
     pub max_settle_amount: u64,
 }
@@ -2530,14 +2521,6 @@ impl ClientInstruction for PerpSettlePnlInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             max_settle_amount: self.max_settle_amount,
-        };
-        let accounts = Self::Accounts {
-            group: self.group,
-            perp_market: self.perp_market,
-            account_a: self.account_a,
-            account_b: self.account_b,
-            oracle: self.oracle,
-            quote_bank: self.quote_bank,
         };
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
@@ -2554,6 +2537,15 @@ impl ClientInstruction for PerpSettlePnlInstruction {
         )
         .await;
 
+        let accounts = Self::Accounts {
+            group: perp_market.group,
+            perp_market: self.perp_market,
+            account_a: self.account_a,
+            account_b: self.account_b,
+            oracle: perp_market.oracle,
+            quote_bank: self.quote_bank,
+        };
+
         let mut instruction = make_instruction(program_id, &accounts, instruction);
         instruction.accounts.extend(health_check_metas);
 
@@ -2566,10 +2558,8 @@ impl ClientInstruction for PerpSettlePnlInstruction {
 }
 
 pub struct PerpSettleFeesInstruction {
-    pub group: Pubkey,
     pub account: Pubkey,
     pub perp_market: Pubkey,
-    pub oracle: Pubkey,
     pub quote_bank: Pubkey,
     pub max_settle_amount: u64,
 }
@@ -2584,13 +2574,6 @@ impl ClientInstruction for PerpSettleFeesInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             max_settle_amount: self.max_settle_amount,
-        };
-        let accounts = Self::Accounts {
-            group: self.group,
-            perp_market: self.perp_market,
-            account: self.account,
-            oracle: self.oracle,
-            quote_bank: self.quote_bank,
         };
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
@@ -2607,6 +2590,13 @@ impl ClientInstruction for PerpSettleFeesInstruction {
         )
         .await;
 
+        let accounts = Self::Accounts {
+            group: perp_market.group,
+            perp_market: self.perp_market,
+            account: self.account,
+            oracle: perp_market.oracle,
+            quote_bank: self.quote_bank,
+        };
         let mut instruction = make_instruction(program_id, &accounts, instruction);
         instruction.accounts.extend(health_check_metas);
 

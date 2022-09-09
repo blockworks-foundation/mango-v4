@@ -1,6 +1,5 @@
 #![cfg(all(feature = "test-bpf"))]
 
-use anchor_lang::prelude::ErrorCode;
 use fixed::types::I80F48;
 use mango_v4::{error::MangoError, state::*};
 use program_test::*;
@@ -134,13 +133,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket {
-        perp_market,
-        asks,
-        bids,
-        event_queue,
-        ..
-    } = send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -247,13 +240,8 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
-            group,
             account: account_0,
             perp_market,
-            asks,
-            bids,
-            event_queue,
-            oracle: tokens[0].oracle,
             owner,
             side: Side::Bid,
             price_lots,
@@ -268,13 +256,8 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
-            group,
             account: account_1,
             perp_market,
-            asks,
-            bids,
-            event_queue,
-            oracle: tokens[0].oracle,
             owner,
             side: Side::Ask,
             price_lots,
@@ -289,9 +272,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpConsumeEventsInstruction {
-            group,
             perp_market,
-            event_queue,
             mango_accounts: vec![account_0, account_1],
         },
     )
@@ -315,11 +296,9 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
-            group,
             account_a: account_1,
             account_b: account_0,
             perp_market,
-            oracle: tokens[0].oracle,
             quote_bank: tokens[1].bank,
             max_settle_amount: u64::MAX,
         },
@@ -332,36 +311,13 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         "Bank must be valid for quote currency".to_string(),
     );
 
-    // Oracle must be valid for the perp market
-    let result = send_tx(
-        solana,
-        PerpSettlePnlInstruction {
-            group,
-            account_a: account_1,
-            account_b: account_0,
-            perp_market,
-            oracle: tokens[1].oracle, // Using oracle for token 1 not 0
-            quote_bank: tokens[0].bank,
-            max_settle_amount: u64::MAX,
-        },
-    )
-    .await;
-
-    assert_mango_error(
-        &result,
-        ErrorCode::ConstraintHasOne.into(),
-        "Oracle must be valid for perp market".to_string(),
-    );
-
     // Cannot settle with yourself
     let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
-            group,
             account_a: account_0,
             account_b: account_0,
             perp_market,
-            oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },
@@ -378,11 +334,9 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
-            group,
             account_a: account_0,
             account_b: account_1,
             perp_market: perp_market_2,
-            oracle: tokens[1].oracle,
             quote_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },
@@ -399,11 +353,9 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
-            group,
             account_a: account_0,
             account_b: account_1,
             perp_market: perp_market,
-            oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
             max_settle_amount: 0,
         },
@@ -452,11 +404,9 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
-            group,
             account_a: account_1,
             account_b: account_0,
             perp_market,
-            oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },
@@ -472,11 +422,9 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
-            group,
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },
@@ -525,11 +473,9 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpSettlePnlInstruction {
-            group,
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
             max_settle_amount: partial_settle_amount,
         },
@@ -590,11 +536,9 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpSettlePnlInstruction {
-            group,
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },
@@ -685,11 +629,9 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpSettlePnlInstruction {
-            group,
             account_a: account_1,
             account_b: account_0,
             perp_market,
-            oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },

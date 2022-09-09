@@ -255,18 +255,13 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     //
     // TEST: Create a perp order for each market
     //
-    for (i, &(perp_market, asks, bids, event_queue)) in perp_markets.iter().enumerate() {
+    for (i, &(perp_market, _asks, _bids, _event_queue)) in perp_markets.iter().enumerate() {
         println!("adding market {}", i);
         send_tx(
             solana,
             PerpPlaceOrderInstruction {
-                group,
                 account,
                 perp_market,
-                asks,
-                bids,
-                event_queue,
-                oracle: tokens[i + 1].oracle,
                 owner,
                 side: Side::Bid,
                 price_lots,
