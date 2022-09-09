@@ -321,7 +321,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             perp_market,
             oracle: tokens[0].oracle,
             quote_bank: tokens[1].bank,
-            max_settle_amount: I80F48::MAX,
+            max_settle_amount: u64::MAX,
         },
     )
     .await;
@@ -342,7 +342,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             perp_market,
             oracle: tokens[1].oracle, // Using oracle for token 1 not 0
             quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
+            max_settle_amount: u64::MAX,
         },
     )
     .await;
@@ -363,7 +363,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             perp_market,
             oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
+            max_settle_amount: u64::MAX,
         },
     )
     .await;
@@ -384,7 +384,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             perp_market: perp_market_2,
             oracle: tokens[1].oracle,
             quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
+            max_settle_amount: u64::MAX,
         },
     )
     .await;
@@ -396,27 +396,25 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     );
 
     // max_settle_amount must be greater than zero
-    for max_amnt in vec![I80F48::ZERO, I80F48::from(-100)] {
-        let result = send_tx(
-            solana,
-            PerpSettlePnlInstruction {
-                group,
-                account_a: account_0,
-                account_b: account_1,
-                perp_market: perp_market,
-                oracle: tokens[0].oracle,
-                quote_bank: tokens[0].bank,
-                max_settle_amount: max_amnt,
-            },
-        )
-        .await;
+    let result = send_tx(
+        solana,
+        PerpSettlePnlInstruction {
+            group,
+            account_a: account_0,
+            account_b: account_1,
+            perp_market: perp_market,
+            oracle: tokens[0].oracle,
+            quote_bank: tokens[0].bank,
+            max_settle_amount: 0,
+        },
+    )
+    .await;
 
-        assert_mango_error(
-            &result,
-            MangoError::MaxSettleAmountMustBeGreaterThanZero.into(),
-            "max_settle_amount must be greater than zero".to_string(),
-        );
-    }
+    assert_mango_error(
+        &result,
+        MangoError::MaxSettleAmountMustBeGreaterThanZero.into(),
+        "max_settle_amount must be greater than zero".to_string(),
+    );
 
     // TODO: Test funding settlement
 
@@ -460,7 +458,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             perp_market,
             oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
+            max_settle_amount: u64::MAX,
         },
     )
     .await;
@@ -480,7 +478,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             perp_market,
             oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
+            max_settle_amount: u64::MAX,
         },
     )
     .await;
@@ -523,7 +521,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     }
 
     // Partially execute the settle
-    let partial_settle_amount = I80F48::from(200);
+    let partial_settle_amount = 200;
     send_tx(
         solana,
         PerpSettlePnlInstruction {
@@ -557,32 +555,33 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
 
         assert_eq!(
             mango_account_0.perps[0].quote_position_native().round(),
-            I80F48::from(-100_020) - partial_settle_amount,
+            I80F48::from(-100_020) - I80F48::from(partial_settle_amount),
             "quote position reduced for profitable position by max_settle_amount"
         );
         assert_eq!(
             mango_account_1.perps[0].quote_position_native().round(),
-            I80F48::from(100_000) + partial_settle_amount,
+            I80F48::from(100_000 + partial_settle_amount),
             "quote position increased for losing position by opposite of first account"
         );
 
         assert_eq!(
             mango_account_0.tokens[0].native(&bank).round(),
-            I80F48::from(initial_token_deposit) + partial_settle_amount,
+            I80F48::from(initial_token_deposit + partial_settle_amount),
             "account 0 token native position increased (profit) by max_settle_amount"
         );
         assert_eq!(
             mango_account_1.tokens[0].native(&bank).round(),
-            I80F48::from(initial_token_deposit) - partial_settle_amount,
+            I80F48::from(initial_token_deposit) - I80F48::from(partial_settle_amount),
             "account 1 token native position decreased (loss) by max_settle_amount"
         );
 
         assert_eq!(
-            mango_account_0.net_settled, partial_settle_amount,
+            mango_account_0.net_settled, partial_settle_amount as i64,
             "net_settled on account 0 updated with profit from settlement"
         );
         assert_eq!(
-            mango_account_1.net_settled, -partial_settle_amount,
+            mango_account_1.net_settled,
+            -(partial_settle_amount as i64),
             "net_settled on account 1 updated with loss from settlement"
         );
     }
@@ -597,7 +596,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             perp_market,
             oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
+            max_settle_amount: u64::MAX,
         },
     )
     .await
@@ -692,7 +691,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             perp_market,
             oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
+            max_settle_amount: u64::MAX,
         },
     )
     .await

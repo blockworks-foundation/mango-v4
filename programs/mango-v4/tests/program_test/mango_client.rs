@@ -2517,7 +2517,7 @@ pub struct PerpSettlePnlInstruction {
     pub perp_market: Pubkey,
     pub oracle: Pubkey,
     pub quote_bank: Pubkey,
-    pub max_settle_amount: I80F48,
+    pub max_settle_amount: u64,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpSettlePnlInstruction {
@@ -2571,7 +2571,7 @@ pub struct PerpSettleFeesInstruction {
     pub perp_market: Pubkey,
     pub oracle: Pubkey,
     pub quote_bank: Pubkey,
-    pub max_settle_amount: I80F48,
+    pub max_settle_amount: u64,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpSettleFeesInstruction {

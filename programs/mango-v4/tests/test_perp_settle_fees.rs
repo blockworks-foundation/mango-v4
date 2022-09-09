@@ -318,7 +318,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             perp_market,
             oracle: tokens[0].oracle,
             quote_bank: tokens[1].bank,
-            max_settle_amount: I80F48::MAX,
+            max_settle_amount: u64::MAX,
         },
     )
     .await;
@@ -338,7 +338,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             perp_market,
             oracle: tokens[1].oracle, // Using oracle for token 1 not 0
             quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
+            max_settle_amount: u64::MAX,
         },
     )
     .await;
@@ -358,7 +358,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             perp_market: perp_market_2,
             oracle: tokens[1].oracle,
             quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
+            max_settle_amount: u64::MAX,
         },
     )
     .await;
@@ -370,26 +370,24 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     );
 
     // max_settle_amount must be greater than zero
-    for max_amnt in vec![I80F48::ZERO, I80F48::from(-100)] {
-        let result = send_tx(
-            solana,
-            PerpSettleFeesInstruction {
-                group,
-                account: account_1,
-                perp_market: perp_market,
-                oracle: tokens[0].oracle,
-                quote_bank: tokens[0].bank,
-                max_settle_amount: max_amnt,
-            },
-        )
-        .await;
+    let result = send_tx(
+        solana,
+        PerpSettleFeesInstruction {
+            group,
+            account: account_1,
+            perp_market: perp_market,
+            oracle: tokens[0].oracle,
+            quote_bank: tokens[0].bank,
+            max_settle_amount: 0,
+        },
+    )
+    .await;
 
-        assert_mango_error(
-            &result,
-            MangoError::MaxSettleAmountMustBeGreaterThanZero.into(),
-            "max_settle_amount must be greater than zero".to_string(),
-        );
-    }
+    assert_mango_error(
+        &result,
+        MangoError::MaxSettleAmountMustBeGreaterThanZero.into(),
+        "max_settle_amount must be greater than zero".to_string(),
+    );
 
     // TODO: Test funding settlement
 
@@ -430,7 +428,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             perp_market,
             oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
+            max_settle_amount: u64::MAX,
         },
     )
     .await;
@@ -507,7 +505,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     }
 
     // Partially execute the settle
-    let partial_settle_amount = I80F48::from(10);
+    let partial_settle_amount = 10;
     send_tx(
         solana,
         PerpSettleFeesInstruction {
@@ -535,24 +533,25 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
 
         assert_eq!(
             mango_account_1.perps[0].quote_position_native().round(),
-            I80F48::from(100_000) + partial_settle_amount,
+            I80F48::from(100_000 + partial_settle_amount),
             "quote position increased for losing position by fee settle amount"
         );
 
         assert_eq!(
             mango_account_1.tokens[0].native(&bank).round(),
-            I80F48::from(initial_token_deposit) - partial_settle_amount,
+            I80F48::from(initial_token_deposit - partial_settle_amount),
             "account 1 token native position decreased (loss) by max_settle_amount"
         );
 
         assert_eq!(
-            mango_account_1.net_settled, -partial_settle_amount,
+            mango_account_1.net_settled,
+            -(partial_settle_amount as i64),
             "net_settled on account 1 updated with loss from settlement"
         );
 
         assert_eq!(
             perp_market.fees_accrued.round(),
-            initial_fees - partial_settle_amount,
+            initial_fees - I80F48::from(partial_settle_amount),
             "Fees accrued have been reduced by partial settle"
         );
         assert_eq!(
@@ -571,7 +570,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             perp_market,
             oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
+            max_settle_amount: u64::MAX,
         },
     )
     .await

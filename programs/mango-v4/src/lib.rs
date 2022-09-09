@@ -499,11 +499,11 @@ pub mod mango_v4 {
         instructions::perp_update_funding(ctx)
     }
 
-    pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: I80F48) -> Result<()> {
+    pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: u64) -> Result<()> {
         instructions::perp_settle_pnl(ctx, max_settle_amount)
     }
 
-    pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: I80F48) -> Result<()> {
+    pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) -> Result<()> {
         instructions::perp_settle_fees(ctx, max_settle_amount)
     }
     // TODO
