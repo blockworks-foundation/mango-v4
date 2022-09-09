@@ -34,9 +34,6 @@ pub fn perp_liq_base_position(
 ) -> Result<()> {
     let group_pk = &ctx.accounts.group.key();
 
-    let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
-        .context("create account retriever")?;
-
     let mut liqor = ctx.accounts.liqor.load_mut()?;
     // account constraint #1
     require!(
@@ -50,8 +47,12 @@ pub fn perp_liq_base_position(
     let mut liqee = ctx.accounts.liqee.load_mut()?;
 
     // Initial liqee health check
-    let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
-        .context("create liqee health cache")?;
+    let mut liqee_health_cache = {
+        let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
+            .context("create account retriever")?;
+        new_health_cache(&liqee.borrow(), &account_retriever)
+            .context("create liqee health cache")?
+    };
     let liqee_init_health = liqee_health_cache.health(HealthType::Init);
 
     // Once maint_health falls below 0, we want to start liquidating,
@@ -124,7 +125,7 @@ pub fn perp_liq_base_position(
             .max(0);
         let quote_transfer = cm!(-I80F48::from(base_transfer)
             * price_per_lot
-            * (I80F48::ONE + perp_market.liquidation_fee));
+            * (I80F48::ONE - perp_market.liquidation_fee));
 
         (base_transfer, quote_transfer) // base > 0, quote < 0
     } else {
@@ -153,7 +154,7 @@ pub fn perp_liq_base_position(
             .min(0);
         let quote_transfer = cm!(-I80F48::from(base_transfer)
             * price_per_lot
-            * (I80F48::ONE - perp_market.liquidation_fee));
+            * (I80F48::ONE + perp_market.liquidation_fee));
 
         (base_transfer, quote_transfer) // base < 0, quote > 0
     };
@@ -182,6 +183,8 @@ pub fn perp_liq_base_position(
 
     // Check liqor's health
     if !liqor.fixed.is_in_health_region() {
+        let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
+            .context("create account retriever end")?;
         let liqor_health = compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)
             .context("compute liqor health")?;
         require!(liqor_health >= 0, MangoError::HealthMustBePositive);
