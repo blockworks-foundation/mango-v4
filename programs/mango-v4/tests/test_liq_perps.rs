@@ -48,25 +48,8 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
         PerpCreateMarketInstruction {
             group,
             admin,
-            oracle: base_token.oracle,
-            asks: context
-                .solana
-                .create_account_for_type::<BookSide>(&mango_v4::id())
-                .await,
-            bids: context
-                .solana
-                .create_account_for_type::<BookSide>(&mango_v4::id())
-                .await,
-            event_queue: {
-                context
-                    .solana
-                    .create_account_for_type::<EventQueue>(&mango_v4::id())
-                    .await
-            },
             payer,
             perp_market_index: 0,
-            base_token_index: base_token.index,
-            base_token_decimals: base_token.mint.decimals,
             quote_lot_size: 10,
             base_lot_size: 100,
             maint_asset_weight: 0.8,
@@ -76,6 +59,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
             liquidation_fee: 0.05,
             maker_fee: 0.0,
             taker_fee: 0.0,
+            ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, base_token).await
         },
     )
     .await

@@ -2097,6 +2097,7 @@ impl ClientInstruction for LiqTokenBankruptcyInstruction {
     }
 }
 
+#[derive(Default)]
 pub struct PerpCreateMarketInstruction {
     pub group: Pubkey,
     pub admin: TestKeypair,
@@ -2117,6 +2118,28 @@ pub struct PerpCreateMarketInstruction {
     pub liquidation_fee: f32,
     pub maker_fee: f32,
     pub taker_fee: f32,
+}
+impl PerpCreateMarketInstruction {
+    pub async fn with_new_book_and_queue(
+        solana: &SolanaCookie,
+        base: &crate::mango_setup::Token,
+    ) -> Self {
+        PerpCreateMarketInstruction {
+            asks: solana
+                .create_account_for_type::<BookSide>(&mango_v4::id())
+                .await,
+            bids: solana
+                .create_account_for_type::<BookSide>(&mango_v4::id())
+                .await,
+            event_queue: solana
+                .create_account_for_type::<EventQueue>(&mango_v4::id())
+                .await,
+            oracle: base.oracle,
+            base_token_index: base.index,
+            base_token_decimals: base.mint.decimals,
+            ..PerpCreateMarketInstruction::default()
+        }
+    }
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpCreateMarketInstruction {

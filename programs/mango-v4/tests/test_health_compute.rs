@@ -197,7 +197,6 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     //
     // SETUP: Create perp markets
     //
-    let quote_token = &tokens[0];
     let mut perp_markets = vec![];
     for (perp_market_index, token) in tokens[1..].iter().enumerate() {
         let mango_v4::accounts::PerpCreateMarket {
@@ -211,25 +210,8 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
             PerpCreateMarketInstruction {
                 group,
                 admin,
-                oracle: token.oracle,
-                asks: context
-                    .solana
-                    .create_account_for_type::<BookSide>(&mango_v4::id())
-                    .await,
-                bids: context
-                    .solana
-                    .create_account_for_type::<BookSide>(&mango_v4::id())
-                    .await,
-                event_queue: {
-                    context
-                        .solana
-                        .create_account_for_type::<EventQueue>(&mango_v4::id())
-                        .await
-                },
                 payer,
                 perp_market_index: perp_market_index as PerpMarketIndex,
-                base_token_index: quote_token.index,
-                base_token_decimals: quote_token.mint.decimals,
                 quote_lot_size: 10,
                 base_lot_size: 100,
                 maint_asset_weight: 0.975,
@@ -239,6 +221,11 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 liquidation_fee: 0.012,
                 maker_fee: 0.0002,
                 taker_fee: 0.000,
+                // HACK: Currently the base_token_index token needs to be active on the account.
+                // Using token[0] for each market allows us to have multiple perp positions with
+                // just a single token position.
+                base_token_index: tokens[0].index,
+                ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &token).await
             },
         )
         .await
