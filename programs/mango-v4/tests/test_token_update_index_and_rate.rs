@@ -6,6 +6,7 @@ use solana_sdk::transport::TransportError;
 
 use mango_setup::*;
 use program_test::*;
+use utils::assert_equal_fixed_f64 as assert_equal;
 
 mod program_test;
 
@@ -86,28 +87,22 @@ async fn test_token_update_index_and_rate() -> Result<(), TransportError> {
     let interest_change = 5000.0 * (dynamic_rate + loan_fee_rate) * diff_ts / year;
     let fee_change = 5000.0 * loan_fee_rate * diff_ts / year;
 
-    assert!(
-        (bank_after.native_borrows().to_num::<f64>()
-            - bank_before.native_borrows().to_num::<f64>()
-            - interest_change)
-            .abs()
-            < 0.1
-    );
-    assert!(
-        (bank_after.native_deposits().to_num::<f64>()
-            - bank_before.native_deposits().to_num::<f64>()
-            - interest_change)
-            .abs()
-            < 0.1
-    );
-    assert!(
-        (bank_after.collected_fees_native.to_num::<f64>()
-            - bank_before.collected_fees_native.to_num::<f64>()
-            - fee_change)
-            .abs()
-            < 0.1
-    );
-    assert!((bank_after.avg_utilization.to_num::<f64>() - utilization).abs() < 0.01);
+    assert!(assert_equal(
+        bank_after.native_borrows() - bank_before.native_borrows(),
+        interest_change,
+        0.1
+    ));
+    assert!(assert_equal(
+        bank_after.native_deposits() - bank_before.native_deposits(),
+        interest_change,
+        0.1
+    ));
+    assert!(assert_equal(
+        bank_after.collected_fees_native - bank_before.collected_fees_native,
+        fee_change,
+        0.1
+    ));
+    assert!(assert_equal(bank_after.avg_utilization, utilization, 0.01));
 
     Ok(())
 }

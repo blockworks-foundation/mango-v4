@@ -103,6 +103,9 @@ mod tests {
             |book: &mut Book, event_queue: &mut EventQueue, side, price, now_ts| -> i128 {
                 let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
                 let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
+                account
+                    .ensure_perp_position(perp_market.perp_market_index)
+                    .unwrap();
 
                 let quantity = 1;
                 let tif = 100;
@@ -199,6 +202,12 @@ mod tests {
         let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
         let mut maker = MangoAccountValue::from_bytes(&buffer).unwrap();
         let mut taker = MangoAccountValue::from_bytes(&buffer).unwrap();
+        maker
+            .ensure_perp_position(market.perp_market_index)
+            .unwrap();
+        taker
+            .ensure_perp_position(market.perp_market_index)
+            .unwrap();
 
         let maker_pk = Pubkey::new_unique();
         let taker_pk = Pubkey::new_unique();

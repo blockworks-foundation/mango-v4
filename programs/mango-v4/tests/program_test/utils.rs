@@ -111,3 +111,19 @@ pub fn assert_mango_error<T>(
         _ => assert!(false, "Not a mango error"),
     }
 }
+
+pub fn assert_equal_fixed_f64(value: I80F48, expected: f64, max_error: f64) -> bool {
+    let ok = (value.to_num::<f64>() - expected).abs() < max_error;
+    if !ok {
+        println!("comparison failed: value: {value}, expected: {expected}");
+    }
+    ok
+}
+
+pub fn assert_equal_f64_f64(value: f64, expected: f64, max_error: f64) -> bool {
+    let ok = (value - expected).abs() < max_error;
+    if !ok {
+        println!("comparison failed: value: {value}, expected: {expected}");
+    }
+    ok
+}

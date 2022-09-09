@@ -23,7 +23,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     let loan_origination_fee = 0.0005;
 
     // higher resolution that the loan_origination_fee for one token
-    let balance_f64eq = |a: f64, b: f64| (a - b).abs() < 0.0001;
+    let balance_f64eq = |a: f64, b: f64| utils::assert_equal_f64_f64(a, b, 0.0001);
 
     //
     // SETUP: Create a group, account, register a token (mint0)

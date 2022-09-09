@@ -5,8 +5,9 @@ use crate::error::*;
 use crate::state::MangoAccount;
 use crate::state::{
     new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, Book, BookSide,
-    EventQueue, Group, OrderType, PerpMarket, Side,
+    EventQueue, Group, OrderType, PerpMarket, Side, QUOTE_TOKEN_INDEX,
 };
+use crate::util::checked_math as cm;
 
 #[derive(Accounts)]
 pub struct PerpPlaceOrder<'info> {
@@ -83,11 +84,21 @@ pub fn perp_place_order(
 
     let account_pk = ctx.accounts.account.key();
 
-    let perp_market_index = {
-        let perp_market = ctx.accounts.perp_market.load()?;
-        perp_market.perp_market_index
-    };
-    let (_, perp_position_raw_index) = account.ensure_perp_position(perp_market_index)?;
+    let perp_market_index = ctx.accounts.perp_market.load()?.perp_market_index;
+
+    //
+    // Create the perp position if needed
+    //
+    if !account
+        .active_perp_positions()
+        .any(|p| p.is_active_for_market(perp_market_index))
+    {
+        account.ensure_perp_position(perp_market_index)?;
+
+        // Require that the token position for the settlement token is retained
+        let mut token_position = account.ensure_token_position(QUOTE_TOKEN_INDEX)?.0;
+        cm!(token_position.in_use_count += 1);
+    }
 
     //
     // Pre-health computation, _after_ perp position is created
@@ -151,7 +162,7 @@ pub fn perp_place_order(
     // Health check
     //
     if let Some((mut health_cache, pre_health)) = pre_health_opt {
-        let perp_position = account.perp_position_by_raw_index(perp_position_raw_index);
+        let perp_position = account.perp_position(perp_market_index)?;
         health_cache.recompute_perp_info(perp_position, &perp_market)?;
         account.check_health_post(&health_cache, pre_health)?;
     }

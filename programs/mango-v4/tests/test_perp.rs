@@ -1,6 +1,7 @@
 #![cfg(all(feature = "test-bpf"))]
 
 use anchor_lang::prelude::Pubkey;
+use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 use mango_v4::state::*;
 use program_test::*;
@@ -8,6 +9,7 @@ use solana_program_test::*;
 use solana_sdk::transport::TransportError;
 
 use mango_setup::*;
+use utils::assert_equal_fixed_f64 as assert_equal;
 
 mod program_test;
 
@@ -97,8 +99,8 @@ async fn test_perp() -> Result<(), TransportError> {
             maint_liab_weight: 1.025,
             init_liab_weight: 1.05,
             liquidation_fee: 0.012,
-            maker_fee: 0.0002,
-            taker_fee: 0.000,
+            maker_fee: -0.0001,
+            taker_fee: 0.0002,
         },
     )
     .await
@@ -342,12 +344,172 @@ async fn test_perp() -> Result<(), TransportError> {
 
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(mango_account_0.perps[0].base_position_lots(), 1);
-    assert!(mango_account_0.perps[0].quote_position_native() < -100.019);
+    assert!(assert_equal(
+        mango_account_0.perps[0].quote_position_native(),
+        -99.99,
+        0.001
+    ));
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(mango_account_1.perps[0].base_position_lots(), -1);
-    assert_eq!(mango_account_1.perps[0].quote_position_native(), 100);
+    assert!(assert_equal(
+        mango_account_1.perps[0].quote_position_native(),
+        99.98,
+        0.001
+    ));
 
+    //
+    // TEST: closing perp positions
+    //
+
+    // Can't close yet, active positions
+    assert!(send_tx(
+        solana,
+        PerpDeactivatePositionInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+        },
+    )
+    .await
+    .is_err());
+    solana.advance_by_slots(1).await;
+
+    // Trade again to bring base_position_lots to 0
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            group,
+            account: account_0,
+            perp_market,
+            asks,
+            bids,
+            event_queue,
+            oracle: tokens[0].oracle,
+            owner,
+            side: Side::Ask,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 7,
+        },
+    )
+    .await
+    .unwrap();
+    check_prev_instruction_post_health(&solana, account_0).await;
+
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            group,
+            account: account_1,
+            perp_market,
+            asks,
+            bids,
+            event_queue,
+            oracle: tokens[0].oracle,
+            owner,
+            side: Side::Bid,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 8,
+        },
+    )
+    .await
+    .unwrap();
+    check_prev_instruction_post_health(&solana, account_1).await;
+
+    send_tx(
+        solana,
+        PerpConsumeEventsInstruction {
+            group,
+            perp_market,
+            event_queue,
+            mango_accounts: vec![account_0, account_1],
+        },
+    )
+    .await
+    .unwrap();
+
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+    assert_eq!(mango_account_0.perps[0].base_position_lots(), 0);
+    assert!(assert_equal(
+        mango_account_0.perps[0].quote_position_native(),
+        0.02,
+        0.001
+    ));
+
+    let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+    assert_eq!(mango_account_1.perps[0].base_position_lots(), 0);
+    assert!(assert_equal(
+        mango_account_1.perps[0].quote_position_native(),
+        -0.04,
+        0.001
+    ));
+
+    // settle pnl and fees to bring quote_position_native fully to 0
+    send_tx(
+        solana,
+        PerpSettlePnlInstruction {
+            group,
+            account_a: account_0,
+            account_b: account_1,
+            perp_market,
+            oracle: tokens[0].oracle,
+            quote_bank: tokens[0].bank,
+            max_settle_amount: I80F48::MAX,
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        PerpSettleFeesInstruction {
+            group,
+            account: account_1,
+            perp_market,
+            oracle: tokens[0].oracle,
+            quote_bank: tokens[0].bank,
+            max_settle_amount: I80F48::MAX,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+    assert_eq!(mango_account_0.perps[0].quote_position_native(), 0);
+
+    // Now closing works!
+    send_tx(
+        solana,
+        PerpDeactivatePositionInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        PerpDeactivatePositionInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+    assert_eq!(mango_account_0.perps[0].market_index, PerpMarketIndex::MAX);
+    let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+    assert_eq!(mango_account_1.perps[0].market_index, PerpMarketIndex::MAX);
+
+    //
+    // TEST: market closing (testing only)
+    //
     send_tx(
         solana,
         PerpCloseMarketInstruction {
