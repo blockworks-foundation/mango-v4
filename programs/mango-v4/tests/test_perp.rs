@@ -1,7 +1,6 @@
 #![cfg(all(feature = "test-bpf"))]
 
 use anchor_lang::prelude::Pubkey;
-use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 use mango_v4::state::*;
 use program_test::*;
@@ -458,7 +457,7 @@ async fn test_perp() -> Result<(), TransportError> {
             perp_market,
             oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
+            max_settle_amount: u64::MAX,
         },
     )
     .await
@@ -471,7 +470,7 @@ async fn test_perp() -> Result<(), TransportError> {
             perp_market,
             oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
-            max_settle_amount: I80F48::MAX,
+            max_settle_amount: u64::MAX,
         },
     )
     .await
