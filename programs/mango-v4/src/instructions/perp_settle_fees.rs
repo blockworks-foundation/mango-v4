@@ -29,7 +29,7 @@ pub struct PerpSettleFees<'info> {
     pub quote_bank: AccountLoader<'info, Bank>,
 }
 
-pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: I80F48) -> Result<()> {
+pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) -> Result<()> {
     // max_settle_amount must greater than zero
     require!(
         max_settle_amount > 0,
@@ -71,7 +71,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: I80F48)
     let settlement = pnl
         .abs()
         .min(perp_market.fees_accrued.abs())
-        .min(max_settle_amount);
+        .min(I80F48::from(max_settle_amount));
     perp_position.change_quote_position(settlement);
     perp_market.fees_accrued = cm!(perp_market.fees_accrued - settlement);
 

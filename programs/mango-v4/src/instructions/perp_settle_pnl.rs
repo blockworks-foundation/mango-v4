@@ -34,7 +34,7 @@ pub struct PerpSettlePnl<'info> {
     pub quote_bank: AccountLoader<'info, Bank>,
 }
 
-pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: I80F48) -> Result<()> {
+pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: u64) -> Result<()> {
     // Cannot settle with yourself
     require!(
         ctx.accounts.account_a.to_account_info().key
@@ -83,7 +83,10 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: I80F48) -
     require!(b_pnl.is_negative(), MangoError::ProfitabilityMismatch);
 
     // Settle for the maximum possible capped to max_settle_amount
-    let settlement = a_pnl.abs().min(b_pnl.abs()).min(max_settle_amount);
+    let settlement = a_pnl
+        .abs()
+        .min(b_pnl.abs())
+        .min(I80F48::from(max_settle_amount));
     a_perp_position.change_quote_position(-settlement);
     b_perp_position.change_quote_position(settlement);
 
