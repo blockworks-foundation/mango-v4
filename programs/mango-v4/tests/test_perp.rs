@@ -72,25 +72,8 @@ async fn test_perp() -> Result<(), TransportError> {
         PerpCreateMarketInstruction {
             group,
             admin,
-            oracle: tokens[0].oracle,
-            asks: context
-                .solana
-                .create_account_for_type::<BookSide>(&mango_v4::id())
-                .await,
-            bids: context
-                .solana
-                .create_account_for_type::<BookSide>(&mango_v4::id())
-                .await,
-            event_queue: {
-                context
-                    .solana
-                    .create_account_for_type::<EventQueue>(&mango_v4::id())
-                    .await
-            },
             payer,
             perp_market_index: 0,
-            base_token_index: tokens[0].index,
-            base_token_decimals: tokens[0].mint.decimals,
             quote_lot_size: 10,
             base_lot_size: 100,
             maint_asset_weight: 0.975,
@@ -100,6 +83,7 @@ async fn test_perp() -> Result<(), TransportError> {
             liquidation_fee: 0.012,
             maker_fee: -0.0001,
             taker_fee: 0.0002,
+            ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[0]).await
         },
     )
     .await
@@ -116,13 +100,8 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
-            group,
             account: account_0,
             perp_market,
-            asks,
-            bids,
-            event_queue,
-            oracle: tokens[0].oracle,
             owner,
             side: Side::Bid,
             price_lots,
@@ -163,13 +142,8 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
-            group,
             account: account_0,
             perp_market,
-            asks,
-            bids,
-            event_queue,
-            oracle: tokens[0].oracle,
             owner,
             side: Side::Bid,
             price_lots,
@@ -205,13 +179,8 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
-            group,
             account: account_0,
             perp_market,
-            asks,
-            bids,
-            event_queue,
-            oracle: tokens[0].oracle,
             owner,
             side: Side::Bid,
             price_lots,
@@ -226,13 +195,8 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
-            group,
             account: account_0,
             perp_market,
-            asks,
-            bids,
-            event_queue,
-            oracle: tokens[0].oracle,
             owner,
             side: Side::Bid,
             price_lots,
@@ -247,13 +211,8 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
-            group,
             account: account_0,
             perp_market,
-            asks,
-            bids,
-            event_queue,
-            oracle: tokens[0].oracle,
             owner,
             side: Side::Bid,
             price_lots,
@@ -269,11 +228,8 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpCancelAllOrdersInstruction {
-            group,
             account: account_0,
             perp_market,
-            asks,
-            bids,
             owner,
         },
     )
@@ -288,13 +244,8 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
-            group,
             account: account_0,
             perp_market,
-            asks,
-            bids,
-            event_queue,
-            oracle: tokens[0].oracle,
             owner,
             side: Side::Bid,
             price_lots,
@@ -310,13 +261,8 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
-            group,
             account: account_1,
             perp_market,
-            asks,
-            bids,
-            event_queue,
-            oracle: tokens[0].oracle,
             owner,
             side: Side::Ask,
             price_lots,
@@ -332,9 +278,7 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpConsumeEventsInstruction {
-            group,
             perp_market,
-            event_queue,
             mango_accounts: vec![account_0, account_1],
         },
     )
@@ -378,13 +322,8 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
-            group,
             account: account_0,
             perp_market,
-            asks,
-            bids,
-            event_queue,
-            oracle: tokens[0].oracle,
             owner,
             side: Side::Ask,
             price_lots,
@@ -400,13 +339,8 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
-            group,
             account: account_1,
             perp_market,
-            asks,
-            bids,
-            event_queue,
-            oracle: tokens[0].oracle,
             owner,
             side: Side::Bid,
             price_lots,
@@ -422,9 +356,7 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpConsumeEventsInstruction {
-            group,
             perp_market,
-            event_queue,
             mango_accounts: vec![account_0, account_1],
         },
     )
@@ -451,11 +383,9 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpSettlePnlInstruction {
-            group,
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },
@@ -465,10 +395,8 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpSettleFeesInstruction {
-            group,
             account: account_1,
             perp_market,
-            oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },

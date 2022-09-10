@@ -1,6 +1,5 @@
 #![cfg(all(feature = "test-bpf"))]
 
-use anchor_lang::prelude::ErrorCode;
 use fixed::types::I80F48;
 use mango_v4::{error::MangoError, state::*};
 use program_test::*;
@@ -134,36 +133,13 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket {
-        perp_market,
-        asks,
-        bids,
-        event_queue,
-        ..
-    } = send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
             admin,
-            oracle: tokens[0].oracle,
-            asks: context
-                .solana
-                .create_account_for_type::<BookSide>(&mango_v4::id())
-                .await,
-            bids: context
-                .solana
-                .create_account_for_type::<BookSide>(&mango_v4::id())
-                .await,
-            event_queue: {
-                context
-                    .solana
-                    .create_account_for_type::<EventQueue>(&mango_v4::id())
-                    .await
-            },
             payer,
             perp_market_index: 0,
-            base_token_index: tokens[0].index,
-            base_token_decimals: tokens[0].mint.decimals,
             quote_lot_size: 10,
             base_lot_size: 100,
             maint_asset_weight: 0.975,
@@ -173,6 +149,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             liquidation_fee: 0.012,
             maker_fee: 0.0002,
             taker_fee: 0.000,
+            ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[0]).await
         },
     )
     .await
@@ -189,25 +166,8 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
         PerpCreateMarketInstruction {
             group,
             admin,
-            oracle: tokens[1].oracle,
-            asks: context
-                .solana
-                .create_account_for_type::<BookSide>(&mango_v4::id())
-                .await,
-            bids: context
-                .solana
-                .create_account_for_type::<BookSide>(&mango_v4::id())
-                .await,
-            event_queue: {
-                context
-                    .solana
-                    .create_account_for_type::<EventQueue>(&mango_v4::id())
-                    .await
-            },
             payer,
             perp_market_index: 1,
-            base_token_index: tokens[1].index,
-            base_token_decimals: tokens[1].mint.decimals,
             quote_lot_size: 10,
             base_lot_size: 100,
             maint_asset_weight: 0.975,
@@ -217,6 +177,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             liquidation_fee: 0.012,
             maker_fee: 0.0002,
             taker_fee: 0.000,
+            ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
         },
     )
     .await
@@ -247,13 +208,8 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
-            group,
             account: account_0,
             perp_market,
-            asks,
-            bids,
-            event_queue,
-            oracle: tokens[0].oracle,
             owner,
             side: Side::Bid,
             price_lots,
@@ -268,13 +224,8 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
-            group,
             account: account_1,
             perp_market,
-            asks,
-            bids,
-            event_queue,
-            oracle: tokens[0].oracle,
             owner,
             side: Side::Ask,
             price_lots,
@@ -289,9 +240,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpConsumeEventsInstruction {
-            group,
             perp_market,
-            event_queue,
             mango_accounts: vec![account_0, account_1],
         },
     )
@@ -313,10 +262,8 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     let result = send_tx(
         solana,
         PerpSettleFeesInstruction {
-            group,
             account: account_0,
             perp_market,
-            oracle: tokens[0].oracle,
             quote_bank: tokens[1].bank,
             max_settle_amount: u64::MAX,
         },
@@ -329,34 +276,12 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
         "Bank must be valid for quote currency".to_string(),
     );
 
-    // Oracle must be valid for the perp market
-    let result = send_tx(
-        solana,
-        PerpSettleFeesInstruction {
-            group,
-            account: account_0,
-            perp_market,
-            oracle: tokens[1].oracle, // Using oracle for token 1 not 0
-            quote_bank: tokens[0].bank,
-            max_settle_amount: u64::MAX,
-        },
-    )
-    .await;
-
-    assert_mango_error(
-        &result,
-        ErrorCode::ConstraintHasOne.into(),
-        "Oracle must be valid for perp market".to_string(),
-    );
-
     // Cannot settle position that does not exist
     let result = send_tx(
         solana,
         PerpSettleFeesInstruction {
-            group,
             account: account_1,
             perp_market: perp_market_2,
-            oracle: tokens[1].oracle,
             quote_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },
@@ -373,10 +298,8 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     let result = send_tx(
         solana,
         PerpSettleFeesInstruction {
-            group,
             account: account_1,
             perp_market: perp_market,
-            oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
             max_settle_amount: 0,
         },
@@ -423,10 +346,8 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     let result = send_tx(
         solana,
         PerpSettleFeesInstruction {
-            group,
             account: account_0,
             perp_market,
-            oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },
@@ -509,10 +430,8 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpSettleFeesInstruction {
-            group,
             account: account_1,
             perp_market,
-            oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
             max_settle_amount: partial_settle_amount,
         },
@@ -565,10 +484,8 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpSettleFeesInstruction {
-            group,
             account: account_1,
             perp_market,
-            oracle: tokens[0].oracle,
             quote_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },

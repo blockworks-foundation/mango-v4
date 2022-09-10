@@ -326,6 +326,14 @@ impl PerpPosition {
         cm!(self.quote_position_native += quote_change_native);
     }
 
+    /// Does the perp position have any open orders or fill events?
+    pub fn has_open_orders(&self) -> bool {
+        self.asks_base_lots != 0
+            || self.bids_base_lots != 0
+            || self.taker_base_lots != 0
+            || self.taker_quote_lots != 0
+    }
+
     /// Calculate the average entry price of the position
     pub fn avg_entry_price(&self) -> I80F48 {
         if self.base_position_lots == 0 {
