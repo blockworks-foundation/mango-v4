@@ -2158,7 +2158,6 @@ impl PerpCreateMarketInstruction {
                 .create_account_for_type::<EventQueue>(&mango_v4::id())
                 .await,
             oracle: base.oracle,
-            base_token_index: base.index,
             base_token_decimals: base.mint.decimals,
             ..PerpCreateMarketInstruction::default()
         }
@@ -2688,6 +2687,7 @@ impl ClientInstruction for PerpLiqForceCancelOrdersInstruction {
             account: self.account,
             bids: perp_market.bids,
             asks: perp_market.asks,
+            oracle: perp_market.oracle
         };
         let mut instruction = make_instruction(program_id, &accounts, instruction);
         instruction.accounts.extend(health_check_metas);

@@ -99,7 +99,7 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
         account_index: usize,
         perp_market_index: PerpMarketIndex,
     ) -> Result<&PerpMarket> {
-        let market_ai = &self.ais[account_index];
+        let market_ai = &self.ais[self.begin_perp + account_index];
         let market = market_ai.load::<PerpMarket>()?;
         require_keys_eq!(market.group, *group);
         require_eq!(market.perp_market_index, perp_market_index);
@@ -112,7 +112,7 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
     }
 
     fn oracle_price_perp(&self, account_index: usize, perp_market: &PerpMarket) -> Result<I80F48> {
-        let oracle = &self.ais[self.n_perps + account_index];
+        let oracle = &self.ais[self.begin_perp + self.n_perps + account_index];
         perp_market.oracle_price(oracle)
     }
 }
@@ -153,25 +153,23 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
         account_index: usize,
         perp_market_index: PerpMarketIndex,
     ) -> Result<(&PerpMarket, I80F48)> {
-        let market_account_index = cm!(self.begin_perp + account_index);
-
         let perp_market = self
-            .perp_market(group, market_account_index, perp_market_index)
+            .perp_market(group, account_index, perp_market_index)
             .with_context(|| {
                 format!(
                     "loading perp market with health account index {} and perp market index {}, passed account {}",
                     account_index,
                     perp_market_index,
-                    self.ais[market_account_index].key(),
+                    self.ais[self.begin_perp + account_index].key(),
                 )
             })?;
 
-        let oracle_price = self.oracle_price_perp(market_account_index, perp_market).with_context(|| {
+        let oracle_price = self.oracle_price_perp(account_index, perp_market).with_context(|| {
             format!(
                 "getting oracle for perp market with health account index {} and perp market index {}, passed account {}",
                 account_index,
                 perp_market_index,
-                self.ais[self.n_perps + account_index].key(),
+                self.ais[self.begin_perp + self.n_perps + account_index].key(),
             )
         })?;
         Ok((perp_market, oracle_price))
@@ -253,7 +251,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         ais[perps_start..]
             .iter()
             .enumerate()
-            .filter_map(can_load_as::<PerpMarket>)
+            .map_while(can_load_as::<PerpMarket>)
             .try_for_each(|(i, loaded)| {
                 (|| {
                     let perp_market = loaded?;
@@ -523,6 +521,7 @@ pub struct PerpInfo {
     base: I80F48,
     // in health-reference-token native units, no asset/liab factor needed
     quote: I80F48,
+    oracle_price: I80F48,
 }
 
 impl PerpInfo {
@@ -607,6 +606,7 @@ impl PerpInfo {
             maint_liab_weight: perp_market.maint_liab_weight,
             base,
             quote,
+            oracle_price
         })
     }
 

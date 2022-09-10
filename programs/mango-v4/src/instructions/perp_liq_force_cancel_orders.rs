@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
+use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
 use crate::state::*;
 
@@ -22,6 +23,9 @@ pub struct PerpLiqForceCancelOrders<'info> {
     pub asks: AccountLoader<'info, BookSide>,
     #[account(mut)]
     pub bids: AccountLoader<'info, BookSide>,
+
+    /// CHECK: Oracle can have different account types, constrained by address in perp_market
+    pub oracle: UncheckedAccount<'info>,
 }
 
 pub fn perp_liq_force_cancel_orders(
@@ -72,7 +76,8 @@ pub fn perp_liq_force_cancel_orders(
         book.cancel_all_orders(&mut account.borrow_mut(), &mut perp_market, limit, None)?;
 
         let perp_position = account.perp_position(perp_market.perp_market_index)?;
-        health_cache.recompute_perp_info(perp_position, &perp_market)?;
+        let oracle_price = perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
+        health_cache.recompute_perp_info(perp_position, &perp_market, oracle_price)?;
     }
 
     //

@@ -20,6 +20,9 @@ pub struct PerpMarket {
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
 
+    // ABI: Clients rely on this being at offset 40
+    pub padding0: [u8; 2],
+
     /// Lookup indices
     pub perp_market_index: PerpMarketIndex,
 

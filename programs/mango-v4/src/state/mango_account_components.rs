@@ -450,6 +450,7 @@ mod tests {
             bump: 0,
             base_token_decimals: 0,
             reserved: [0; 128],
+            padding0: Default::default(),
             padding1: Default::default(),
             padding2: Default::default(),
             registration_time: 0,

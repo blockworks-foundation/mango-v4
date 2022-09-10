@@ -221,6 +221,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 liquidation_fee: 0.012,
                 maker_fee: 0.0002,
                 taker_fee: 0.000,
+                ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &token).await
             },
         )
         .await

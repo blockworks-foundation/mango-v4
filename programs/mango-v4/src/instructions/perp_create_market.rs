@@ -96,6 +96,7 @@ pub fn perp_create_market(
         base_token_decimals,
         perp_market_index,
         registration_time: Clock::get()?.unix_timestamp,
+        padding0: Default::default(),
         padding1: Default::default(),
         padding2: Default::default(),
         reserved: [0; 128],
