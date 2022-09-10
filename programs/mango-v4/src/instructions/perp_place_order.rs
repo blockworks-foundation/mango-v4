@@ -163,7 +163,7 @@ pub fn perp_place_order(
     //
     if let Some((mut health_cache, pre_health)) = pre_health_opt {
         let perp_position = account.perp_position(perp_market_index)?;
-        health_cache.recompute_perp_info(perp_position, &perp_market)?;
+        health_cache.recompute_perp_info(perp_position, &perp_market, oracle_price)?;
         account.check_health_post(&health_cache, pre_health)?;
     }
 

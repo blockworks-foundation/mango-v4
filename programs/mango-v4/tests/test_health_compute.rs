@@ -221,11 +221,6 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 liquidation_fee: 0.012,
                 maker_fee: 0.0002,
                 taker_fee: 0.000,
-                // HACK: Currently the base_token_index token needs to be active on the account.
-                // Using token[0] for each market allows us to have multiple perp positions with
-                // just a single token position.
-                base_token_index: tokens[0].index,
-                ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &token).await
             },
         )
         .await

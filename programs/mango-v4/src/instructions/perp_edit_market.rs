@@ -22,7 +22,6 @@ pub fn perp_edit_market(
     ctx: Context<PerpEditMarket>,
     oracle_opt: Option<Pubkey>,
     oracle_config_opt: Option<OracleConfig>,
-    base_token_index_opt: Option<TokenIndex>,
     base_token_decimals_opt: Option<u8>,
     maint_asset_weight_opt: Option<f32>,
     init_asset_weight_opt: Option<f32>,
@@ -106,10 +105,6 @@ pub fn perp_edit_market(
 
     // unchanged -
     // perp_market_index
-
-    if let Some(base_token_index) = base_token_index_opt {
-        perp_market.base_token_index = base_token_index;
-    }
 
     // unchanged -
     // quote_token_index
