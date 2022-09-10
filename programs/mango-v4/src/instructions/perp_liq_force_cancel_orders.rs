@@ -76,7 +76,8 @@ pub fn perp_liq_force_cancel_orders(
         book.cancel_all_orders(&mut account.borrow_mut(), &mut perp_market, limit, None)?;
 
         let perp_position = account.perp_position(perp_market.perp_market_index)?;
-        let oracle_price = perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
+        let oracle_price =
+            perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
         health_cache.recompute_perp_info(perp_position, &perp_market, oracle_price)?;
     }
 

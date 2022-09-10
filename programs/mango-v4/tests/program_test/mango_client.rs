@@ -2687,7 +2687,7 @@ impl ClientInstruction for PerpLiqForceCancelOrdersInstruction {
             account: self.account,
             bids: perp_market.bids,
             asks: perp_market.asks,
-            oracle: perp_market.oracle
+            oracle: perp_market.oracle,
         };
         let mut instruction = make_instruction(program_id, &accounts, instruction);
         instruction.accounts.extend(health_check_metas);

@@ -606,7 +606,7 @@ impl PerpInfo {
             maint_liab_weight: perp_market.maint_liab_weight,
             base,
             quote,
-            oracle_price
+            oracle_price,
         })
     }
 
