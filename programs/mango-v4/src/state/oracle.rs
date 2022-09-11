@@ -142,8 +142,7 @@ pub fn oracle_price(
                 return Err(MangoError::SomeError.into());
             }
 
-            let decimals =
-                cm!((price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8));
+            let decimals = cm!((price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8));
             let decimal_adj = power_of_ten(decimals);
             cm!(price * decimal_adj)
         }
