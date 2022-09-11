@@ -415,7 +415,7 @@ pub mod mango_v4 {
             ctx,
             oracle_opt,
             oracle_config_opt,
-            base_token_opt,
+            base_decimals_opt,
             maint_asset_weight_opt,
             init_asset_weight_opt,
             maint_liab_weight_opt,
