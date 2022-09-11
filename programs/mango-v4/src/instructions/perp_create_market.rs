@@ -49,7 +49,7 @@ pub fn perp_create_market(
     perp_market_index: PerpMarketIndex,
     name: String,
     oracle_config: OracleConfig,
-    base_token_decimals: u8,
+    base_decimals: u8,
     quote_lot_size: i64,
     base_lot_size: i64,
     maint_asset_weight: f32,
@@ -93,7 +93,7 @@ pub fn perp_create_market(
         fees_settled: I80F48::ZERO,
         // Why optional - Perp could be based purely on an oracle
         bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
-        base_token_decimals,
+        base_decimals: base_decimals,
         perp_market_index,
         registration_time: Clock::get()?.unix_timestamp,
         padding0: Default::default(),

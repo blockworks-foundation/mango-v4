@@ -2131,7 +2131,7 @@ pub struct PerpCreateMarketInstruction {
     pub event_queue: Pubkey,
     pub payer: TestKeypair,
     pub perp_market_index: PerpMarketIndex,
-    pub base_token_decimals: u8,
+    pub base_decimals: u8,
     pub quote_lot_size: i64,
     pub base_lot_size: i64,
     pub maint_asset_weight: f32,
@@ -2158,7 +2158,7 @@ impl PerpCreateMarketInstruction {
                 .create_account_for_type::<EventQueue>(&mango_v4::id())
                 .await,
             oracle: base.oracle,
-            base_token_decimals: base.mint.decimals,
+            base_decimals: base.mint.decimals,
             ..PerpCreateMarketInstruction::default()
         }
     }
@@ -2190,7 +2190,7 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             max_funding: 0.05,
             min_funding: 0.05,
             impact_quantity: 100,
-            base_token_decimals: self.base_token_decimals,
+            base_decimals: self.base_decimals,
         };
 
         let perp_market = Pubkey::find_program_address(

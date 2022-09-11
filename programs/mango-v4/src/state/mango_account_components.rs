@@ -448,7 +448,7 @@ mod tests {
             fees_accrued: I80F48::ZERO,
             fees_settled: I80F48::ZERO,
             bump: 0,
-            base_token_decimals: 0,
+            base_decimals: 0,
             reserved: [0; 128],
             padding0: Default::default(),
             padding1: Default::default(),

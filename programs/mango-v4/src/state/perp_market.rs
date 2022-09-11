@@ -87,7 +87,7 @@ pub struct PerpMarket {
     /// PDA bump
     pub bump: u8,
 
-    pub base_token_decimals: u8,
+    pub base_decimals: u8,
 
     pub padding2: [u8; 6],
 
@@ -124,7 +124,7 @@ impl PerpMarket {
         oracle::oracle_price(
             oracle_acc,
             self.oracle_config.conf_filter,
-            self.base_token_decimals,
+            self.base_decimals,
         )
     }
 
