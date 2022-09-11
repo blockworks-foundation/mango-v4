@@ -1299,10 +1299,11 @@ mod tests {
 
     #[test]
     fn test_scanning_account_retriever() {
+        let oracle1_price = 1.0;
         let oracle2_price = 5.0;
         let group = Pubkey::new_unique();
 
-        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, oracle1_price, 0.2, 0.1);
         let (mut bank2, mut oracle2) = mock_bank_and_oracle(group, 4, oracle2_price, 0.5, 0.3);
         let (mut bank3, _) = mock_bank_and_oracle(group, 5, 1.0, 0.5, 0.3);
 
@@ -1314,17 +1315,21 @@ mod tests {
         oo1.data().native_pc_total = 20;
 
         let mut perp1 = mock_perp_market(group, oracle2.pubkey, 9, 0.2, 0.1);
+        let mut perp2 = mock_perp_market(group, oracle1.pubkey, 8, 0.2, 0.1);
 
+        let oracle1_account_info = oracle1.as_account_info();
         let oracle2_account_info = oracle2.as_account_info();
         let ais = vec![
             bank1.as_account_info(),
             bank2.as_account_info(),
             bank3.as_account_info(),
-            oracle1.as_account_info(),
+            oracle1_account_info.clone(),
             oracle2_account_info.clone(),
             oracle2_account_info.clone(),
             perp1.as_account_info(),
+            perp2.as_account_info(),
             oracle2_account_info,
+            oracle1_account_info,
             oo1.as_account_info(),
         ];
 
@@ -1333,9 +1338,9 @@ mod tests {
         assert_eq!(retriever.banks.len(), 3);
         assert_eq!(retriever.token_index_map.len(), 3);
         assert_eq!(retriever.oracles.len(), 3);
-        assert_eq!(retriever.perp_markets.len(), 1);
-        assert_eq!(retriever.perp_oracles.len(), 1);
-        assert_eq!(retriever.perp_index_map.len(), 1);
+        assert_eq!(retriever.perp_markets.len(), 2);
+        assert_eq!(retriever.perp_oracles.len(), 2);
+        assert_eq!(retriever.perp_index_map.len(), 2);
         assert_eq!(retriever.serum3_oos.len(), 1);
 
         {
@@ -1381,6 +1386,12 @@ mod tests {
             .unwrap();
         assert_eq!(identity(perp.perp_market_index), 9);
         assert_eq!(oracle_price, oracle2_price);
+
+        let (perp, oracle_price) = retriever
+            .perp_market_and_oracle_price(&group, 1, 8)
+            .unwrap();
+        assert_eq!(identity(perp.perp_market_index), 8);
+        assert_eq!(oracle_price, oracle1_price);
 
         assert!(retriever
             .perp_market_and_oracle_price(&group, 1, 5)
