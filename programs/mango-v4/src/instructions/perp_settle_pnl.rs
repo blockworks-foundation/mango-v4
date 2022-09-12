@@ -69,12 +69,12 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: u64) -> R
     // Example: With +100 USDC and -2 SOL (-80 USD) and -500 USD PNL the account may still settle
     //   100 - 1.1*80 = 12 USD perp pnl, even though the overall health is already negative.
     //   Afterwards the account is perp-bankrupt.
-    let b_health = {
+    let b_spot_health = {
         let retriever =
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account_b.borrow())?;
         new_health_cache(&account_b.borrow(), &retriever)?.spot_health(HealthType::Maint)
     };
-    require!(b_health >= 0, MangoError::HealthMustBePositive);
+    require!(b_spot_health >= 0, MangoError::HealthMustBePositive);
 
     let mut bank = ctx.accounts.quote_bank.load_mut()?;
     let perp_market = ctx.accounts.perp_market.load()?;
@@ -108,11 +108,11 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: u64) -> R
     require!(a_pnl.is_positive(), MangoError::ProfitabilityMismatch);
     require!(b_pnl.is_negative(), MangoError::ProfitabilityMismatch);
 
-    // Settle for the maximum possible capped to max_settle_amount and b's non-perp health
+    // Settle for the maximum possible capped to max_settle_amount and b's spot health
     let settlement = a_pnl
         .abs()
         .min(b_pnl.abs())
-        .min(b_health)
+        .min(b_spot_health)
         .min(I80F48::from(max_settle_amount));
     a_perp_position.change_quote_position(-settlement);
     b_perp_position.change_quote_position(settlement);
@@ -123,7 +123,6 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: u64) -> R
     cm!(account_b.fixed.net_settled -= settlement_i64);
 
     // Transfer token balances
-    // TODO: Need to guarantee that QUOTE_TOKEN_INDEX token exists at this point. I.E. create it when placing perp order.
     let a_token_position = account_a.token_position_mut(QUOTE_TOKEN_INDEX)?.0;
     let b_token_position = account_b.token_position_mut(QUOTE_TOKEN_INDEX)?.0;
     transfer_token_internal(&mut bank, b_token_position, a_token_position, settlement)?;
