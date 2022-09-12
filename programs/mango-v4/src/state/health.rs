@@ -773,6 +773,19 @@ impl HealthCache {
         }
     }
 
+    pub fn spot_health(&self, health_type: HealthType) -> I80F48 {
+        let mut health = I80F48::ZERO;
+        for token_info in self.token_infos.iter() {
+            let contrib = token_info.health_contribution(health_type);
+            cm!(health += contrib);
+        }
+        for serum3_info in self.serum3_infos.iter() {
+            let contrib = serum3_info.health_contribution(health_type, &self.token_infos);
+            cm!(health += contrib);
+        }
+        health
+    }
+
     /// Sum of only the positive health components (assets) and
     /// sum of absolute values of all negative health components (liabs, always >= 0)
     pub fn health_assets_and_liabs(&self, health_type: HealthType) -> (I80F48, I80F48) {

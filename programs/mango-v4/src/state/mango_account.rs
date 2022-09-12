@@ -473,7 +473,7 @@ impl<
     pub fn perp_position(&self, market_index: PerpMarketIndex) -> Result<&PerpPosition> {
         self.all_perp_positions()
             .find(|p| p.is_active_for_market(market_index))
-            .ok_or_else(|| error_msg!("perp position for market index {} not found", market_index))
+            .ok_or_else(|| error!(MangoError::PerpPositionDoesNotExist))
     }
 
     pub fn perp_position_by_raw_index(&self, raw_index: usize) -> &PerpPosition {
