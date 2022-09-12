@@ -420,6 +420,8 @@ mod tests {
         return PerpMarket {
             group: Pubkey::new_unique(),
             perp_market_index: 0,
+            group_insurance_fund: 0,
+            trusted_market: 0,
             name: Default::default(),
             oracle: Pubkey::new_unique(),
             oracle_config: OracleConfig {

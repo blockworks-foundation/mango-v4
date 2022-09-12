@@ -1,6 +1,7 @@
 #![cfg(all(feature = "test-bpf"))]
 
 use fixed::types::I80F48;
+use mango_setup::*;
 use mango_v4::{error::MangoError, state::*};
 use program_test::*;
 use solana_program_test::*;
@@ -27,10 +28,11 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     // SETUP: Create a group and an account
     //
 
-    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;

@@ -6,10 +6,12 @@ use super::mango_client::*;
 use super::solana::SolanaCookie;
 use super::{send_tx, MintCookie, TestKeypair, UserCookie};
 
-pub struct GroupWithTokensConfig<'a> {
+#[derive(Default)]
+pub struct GroupWithTokensConfig {
     pub admin: TestKeypair,
     pub payer: TestKeypair,
-    pub mints: &'a [MintCookie],
+    pub mints: Vec<MintCookie>,
+    pub zero_token_is_quote: bool,
 }
 
 #[derive(Clone)]
@@ -29,12 +31,13 @@ pub struct GroupWithTokens {
     pub tokens: Vec<Token>,
 }
 
-impl<'a> GroupWithTokensConfig<'a> {
+impl<'a> GroupWithTokensConfig {
     pub async fn create(self, solana: &SolanaCookie) -> GroupWithTokens {
         let GroupWithTokensConfig {
             admin,
             payer,
             mints,
+            zero_token_is_quote,
         } = self;
         let create_group_accounts = send_tx(
             solana,
@@ -76,6 +79,11 @@ impl<'a> GroupWithTokensConfig<'a> {
             .await
             .unwrap();
             let token_index = index as u16;
+            let (iaw, maw, mlw, ilw) = if token_index == 0 && zero_token_is_quote {
+                (1.0, 1.0, 1.0, 1.0)
+            } else {
+                (0.6, 0.8, 1.2, 1.4)
+            };
             let register_token_accounts = send_tx(
                 solana,
                 TokenRegisterInstruction {
@@ -89,10 +97,10 @@ impl<'a> GroupWithTokensConfig<'a> {
                     max_rate: 1.50,
                     loan_origination_fee_rate: 0.0005,
                     loan_fee_rate: 0.0005,
-                    maint_asset_weight: 0.8,
-                    init_asset_weight: 0.6,
-                    maint_liab_weight: 1.2,
-                    init_liab_weight: 1.4,
+                    maint_asset_weight: maw,
+                    init_asset_weight: iaw,
+                    maint_liab_weight: mlw,
+                    init_liab_weight: ilw,
                     liquidation_fee: 0.02,
                     group,
                     admin,

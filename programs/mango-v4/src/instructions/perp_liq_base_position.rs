@@ -86,7 +86,9 @@ pub fn perp_liq_base_position(
 
     // Fetch perp positions for accounts, creating for the liqor if needed
     let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
-    let liqor_perp_position = liqor.ensure_perp_position(perp_market_index)?.0;
+    let liqor_perp_position = liqor
+        .ensure_perp_position(perp_market_index, QUOTE_TOKEN_INDEX)?
+        .0;
     let liqee_base_lots = liqee_perp_position.base_position_lots();
 
     require!(

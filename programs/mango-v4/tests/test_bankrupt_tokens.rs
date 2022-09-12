@@ -29,7 +29,8 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;
@@ -301,7 +302,8 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;

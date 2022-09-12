@@ -31,7 +31,8 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;
@@ -199,7 +200,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;

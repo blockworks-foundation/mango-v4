@@ -2307,6 +2307,14 @@ export type MangoV4 = {
         {
           "name": "impactQuantity",
           "type": "i64"
+        },
+        {
+          "name": "groupInsuranceFund",
+          "type": "bool"
+        },
+        {
+          "name": "trustedMarket",
+          "type": "bool"
         }
       ]
     },
@@ -2408,6 +2416,18 @@ export type MangoV4 = {
           "name": "impactQuantityOpt",
           "type": {
             "option": "i64"
+          }
+        },
+        {
+          "name": "groupInsuranceFundOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "trustedMarketOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -3735,11 +3755,25 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "trustedMarket",
+            "docs": [
+              "May this market contribute positive values to health?"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "groupInsuranceFund",
+            "docs": [
+              "Is this market covered by the group insurance fund?"
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                4
+                2
               ]
             }
           },
@@ -8310,6 +8344,14 @@ export const IDL: MangoV4 = {
         {
           "name": "impactQuantity",
           "type": "i64"
+        },
+        {
+          "name": "groupInsuranceFund",
+          "type": "bool"
+        },
+        {
+          "name": "trustedMarket",
+          "type": "bool"
         }
       ]
     },
@@ -8411,6 +8453,18 @@ export const IDL: MangoV4 = {
           "name": "impactQuantityOpt",
           "type": {
             "option": "i64"
+          }
+        },
+        {
+          "name": "groupInsuranceFundOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "trustedMarketOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -9738,11 +9792,25 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "trustedMarket",
+            "docs": [
+              "May this market contribute positive values to health?"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "groupInsuranceFund",
+            "docs": [
+              "Is this market covered by the group insurance fund?"
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                4
+                2
               ]
             }
           },
