@@ -7,7 +7,6 @@ use crate::state::{
     new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, Book, BookSide,
     EventQueue, Group, OrderType, PerpMarket, Side, QUOTE_TOKEN_INDEX,
 };
-use crate::util::checked_math as cm;
 
 #[derive(Accounts)]
 pub struct PerpPlaceOrder<'info> {
@@ -89,16 +88,7 @@ pub fn perp_place_order(
     //
     // Create the perp position if needed
     //
-    if !account
-        .active_perp_positions()
-        .any(|p| p.is_active_for_market(perp_market_index))
-    {
-        account.ensure_perp_position(perp_market_index)?;
-
-        // Require that the token position for the settlement token is retained
-        let mut token_position = account.ensure_token_position(QUOTE_TOKEN_INDEX)?.0;
-        cm!(token_position.in_use_count += 1);
-    }
+    account.ensure_perp_position(perp_market_index, QUOTE_TOKEN_INDEX)?;
 
     //
     // Pre-health computation, _after_ perp position is created

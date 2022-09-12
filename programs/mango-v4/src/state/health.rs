@@ -522,6 +522,7 @@ pub struct PerpInfo {
     // in health-reference-token native units, no asset/liab factor needed
     pub quote: I80F48,
     oracle_price: I80F48,
+    has_open_orders: bool,
 }
 
 impl PerpInfo {
@@ -607,6 +608,7 @@ impl PerpInfo {
             base,
             quote,
             oracle_price,
+            has_open_orders: perp_position.has_open_orders(),
         })
     }
 
@@ -762,14 +764,20 @@ impl HealthCache {
     }
 
     pub fn has_liquidatable_assets(&self) -> bool {
-        let spot_liquidatable = self
-            .token_infos
-            .iter()
-            .any(|ti| ti.balance.is_positive() || ti.serum3_max_reserved.is_positive());
-        let perp_liquidatable = self
-            .perp_infos
-            .iter()
-            .any(|p| p.base != 0 || p.quote > ONE_NATIVE_USDC_IN_USD);
+        let spot_liquidatable = self.token_infos.iter().any(|ti| {
+            // can use token_liq_with_token
+            ti.balance.is_positive()
+            // can use serum3_liq_force_cancel_orders
+            || ti.serum3_max_reserved.is_positive()
+        });
+        let perp_liquidatable = self.perp_infos.iter().any(|p| {
+            // can use perp_liq_base_position
+            p.base != 0
+            // can use perp_settle_pnl
+            || p.quote > ONE_NATIVE_USDC_IN_USD
+            // can use perp_liq_force_cancel_orders
+            || p.has_open_orders
+        });
         spot_liquidatable || perp_liquidatable
     }
 
@@ -783,7 +791,7 @@ impl HealthCache {
     }
 
     #[cfg(feature = "client")]
-    pub fn is_bankrupt(&self) -> bool {
+    pub fn can_call_spot_bankruptcy(&self) -> bool {
         !self.has_liquidatable_assets() && self.has_borrows()
     }
 
@@ -1302,7 +1310,7 @@ mod tests {
         oo1.data().referrer_rebates_accrued = 2;
 
         let mut perp1 = mock_perp_market(group, oracle2.pubkey, 9, 0.2, 0.1);
-        let perpaccount = account.ensure_perp_position(9).unwrap().0;
+        let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
         perpaccount.change_base_and_quote_positions(perp1.data(), 3, -I80F48::from(310u16));
         perpaccount.bids_base_lots = 7;
         perpaccount.asks_base_lots = 11;
@@ -1495,7 +1503,7 @@ mod tests {
         oo2.data().native_coin_total = testcase.oo_1_3.1;
 
         let mut perp1 = mock_perp_market(group, oracle2.pubkey, 9, 0.2, 0.1);
-        let perpaccount = account.ensure_perp_position(9).unwrap().0;
+        let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
         perpaccount.change_base_and_quote_positions(
             perp1.data(),
             testcase.perp1.0,
@@ -1848,7 +1856,7 @@ mod tests {
 
         let mut perp1 = mock_perp_market(group, oracle1.pubkey, 9, 0.2, 0.1);
         perp1.data().long_funding = I80F48::from_num(10.1);
-        let perpaccount = account.ensure_perp_position(9).unwrap().0;
+        let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
         perpaccount.change_base_and_quote_positions(perp1.data(), 10, I80F48::from(-110));
         perpaccount.long_settled_funding = I80F48::from_num(10.0);
 

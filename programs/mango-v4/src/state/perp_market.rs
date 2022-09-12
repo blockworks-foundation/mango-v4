@@ -26,7 +26,13 @@ pub struct PerpMarket {
     /// Lookup indices
     pub perp_market_index: PerpMarketIndex,
 
-    pub padding1: [u8; 4],
+    /// May this market contribute positive values to health?
+    pub trusted_market: u8,
+
+    /// Is this market covered by the group insurance fund?
+    pub group_insurance_fund: u8,
+
+    pub padding1: [u8; 2],
 
     pub name: [u8; 16],
 
@@ -107,6 +113,14 @@ impl PerpMarket {
         std::str::from_utf8(&self.name)
             .unwrap()
             .trim_matches(char::from(0))
+    }
+
+    pub fn elligible_for_group_insurance_fund(&self) -> bool {
+        self.group_insurance_fund == 1
+    }
+
+    pub fn set_elligible_for_group_insurance_fund(&mut self, v: bool) {
+        self.group_insurance_fund = if v { 1 } else { 0 };
     }
 
     pub fn gen_order_id(&mut self, side: Side, price: i64) -> i128 {
@@ -190,5 +204,25 @@ impl PerpMarket {
             Side::Bid => native_price <= cm!(self.maint_liab_weight * oracle_price),
             Side::Ask => native_price >= cm!(self.maint_asset_weight * oracle_price),
         }
+    }
+
+    /// Socialize the loss in this account across all longs and shorts
+    pub fn socialize_loss(&mut self, loss: I80F48) -> Result<I80F48> {
+        require_gte!(0, loss);
+
+        // TODO convert into only socializing on one side
+        // native USDC per contract open interest
+        let socialized_loss = if self.open_interest == 0 {
+            // AUDIT: think about the following:
+            // This is kind of an unfortunate situation. This means socialized loss occurs on the
+            // last person to call settle_pnl on their profits. Any advice on better mechanism
+            // would be appreciated. Luckily, this will be an extremely rare situation.
+            I80F48::ZERO
+        } else {
+            cm!(loss / I80F48::from(self.open_interest))
+        };
+        self.long_funding -= socialized_loss;
+        self.short_funding += socialized_loss;
+        Ok(socialized_loss)
     }
 }

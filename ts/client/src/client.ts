@@ -1287,6 +1287,8 @@ export class MangoClient {
     minFunding: number,
     maxFunding: number,
     impactQuantity: number,
+    groupInsuranceFund: boolean,
+    trustedMarket: boolean,
   ): Promise<TransactionSignature> {
     const bids = new Keypair();
     const asks = new Keypair();
@@ -1314,6 +1316,8 @@ export class MangoClient {
         minFunding,
         maxFunding,
         new BN(impactQuantity),
+        groupInsuranceFund,
+        trustedMarket,
       )
       .accounts({
         group: group.publicKey,
@@ -1383,6 +1387,8 @@ export class MangoClient {
     minFunding: number,
     maxFunding: number,
     impactQuantity: number,
+    groupInsuranceFund: boolean,
+    trustedMarket: boolean,
   ): Promise<TransactionSignature> {
     const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
 
@@ -1405,6 +1411,8 @@ export class MangoClient {
         minFunding,
         maxFunding,
         new BN(impactQuantity),
+        groupInsuranceFund,
+        trustedMarket,
       )
       .accounts({
         group: group.publicKey,

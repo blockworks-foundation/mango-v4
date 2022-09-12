@@ -395,6 +395,8 @@ pub mod mango_v4 {
         min_funding: f32,
         max_funding: f32,
         impact_quantity: i64,
+        group_insurance_fund: bool,
+        trusted_market: bool,
     ) -> Result<()> {
         instructions::perp_create_market(
             ctx,
@@ -414,6 +416,8 @@ pub mod mango_v4 {
             max_funding,
             min_funding,
             impact_quantity,
+            group_insurance_fund,
+            trusted_market,
         )
     }
 
@@ -433,6 +437,8 @@ pub mod mango_v4 {
         min_funding_opt: Option<f32>,
         max_funding_opt: Option<f32>,
         impact_quantity_opt: Option<i64>,
+        group_insurance_fund_opt: Option<bool>,
+        trusted_market_opt: Option<bool>,
     ) -> Result<()> {
         instructions::perp_edit_market(
             ctx,
@@ -449,6 +455,8 @@ pub mod mango_v4 {
             min_funding_opt,
             max_funding_opt,
             impact_quantity_opt,
+            group_insurance_fund_opt,
+            trusted_market_opt,
         )
     }
 
@@ -540,15 +548,12 @@ pub mod mango_v4 {
         instructions::perp_liq_force_cancel_orders(ctx, limit)
     }
 
-    // TODO
-
-    // perp_force_cancel_order
-
-    // liquidate_token_and_perp
-
-    // settle_* - settle_funds
-
-    // resolve_banktruptcy
+    pub fn perp_liq_bankruptcy(
+        ctx: Context<PerpLiqBankruptcy>,
+        max_liab_transfer: u64,
+    ) -> Result<()> {
+        instructions::perp_liq_bankruptcy(ctx, max_liab_transfer)
+    }
 
     pub fn alt_set(ctx: Context<AltSet>, index: u8) -> Result<()> {
         instructions::alt_set(ctx, index)

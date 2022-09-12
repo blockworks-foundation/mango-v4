@@ -62,6 +62,8 @@ pub fn perp_create_market(
     min_funding: f32,
     max_funding: f32,
     impact_quantity: i64,
+    group_insurance_fund: bool,
+    trusted_market: bool,
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_init()?;
     *perp_market = PerpMarket {
@@ -96,6 +98,8 @@ pub fn perp_create_market(
         base_decimals,
         perp_market_index,
         registration_time: Clock::get()?.unix_timestamp,
+        group_insurance_fund: if group_insurance_fund { 1 } else { 0 },
+        trusted_market: if trusted_market { 1 } else { 0 },
         padding0: Default::default(),
         padding1: Default::default(),
         padding2: Default::default(),

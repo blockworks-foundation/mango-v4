@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 
 use crate::error::*;
 use crate::state::*;
-use crate::util::checked_math as cm;
 
 #[derive(Accounts)]
 pub struct PerpDeactivatePosition<'info> {
@@ -51,11 +50,7 @@ pub fn perp_deactivate_position(ctx: Context<PerpDeactivatePosition>) -> Result<
         "perp position still has events on event queue"
     );
 
-    account.deactivate_perp_position(perp_market.perp_market_index)?;
-
-    // Reduce the in-use-count of the settlement token
-    let mut token_position = account.token_position_mut(QUOTE_TOKEN_INDEX)?.0;
-    cm!(token_position.in_use_count -= 1);
+    account.deactivate_perp_position(perp_market.perp_market_index, QUOTE_TOKEN_INDEX)?;
 
     Ok(())
 }

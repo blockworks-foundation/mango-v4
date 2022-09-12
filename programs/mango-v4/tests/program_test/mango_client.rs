@@ -191,7 +191,7 @@ async fn derive_health_check_remaining_account_metas(
     }
     if let Some(affected_perp_market_index) = affected_perp_market_index {
         adjusted_account
-            .ensure_perp_position(affected_perp_market_index)
+            .ensure_perp_position(affected_perp_market_index, QUOTE_TOKEN_INDEX)
             .unwrap();
     }
 
@@ -2141,6 +2141,8 @@ pub struct PerpCreateMarketInstruction {
     pub liquidation_fee: f32,
     pub maker_fee: f32,
     pub taker_fee: f32,
+    pub group_insurance_fund: bool,
+    pub trusted_market: bool,
 }
 impl PerpCreateMarketInstruction {
     pub async fn with_new_book_and_queue(
@@ -2191,6 +2193,8 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             min_funding: 0.05,
             impact_quantity: 100,
             base_decimals: self.base_decimals,
+            group_insurance_fund: self.group_insurance_fund,
+            trusted_market: self.trusted_market,
         };
 
         let perp_market = Pubkey::find_program_address(
@@ -2747,6 +2751,81 @@ impl ClientInstruction for PerpLiqBasePositionInstruction {
             liqor: self.liqor,
             liqor_owner: self.liqor_owner.pubkey(),
             liqee: self.liqee,
+        };
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas);
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.liqor_owner]
+    }
+}
+
+pub struct PerpLiqBankruptcyInstruction {
+    pub liqor: Pubkey,
+    pub liqor_owner: TestKeypair,
+    pub liqee: Pubkey,
+    pub perp_market: Pubkey,
+    pub max_liab_transfer: u64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpLiqBankruptcyInstruction {
+    type Accounts = mango_v4::accounts::PerpLiqBankruptcy;
+    type Instruction = mango_v4::instruction::PerpLiqBankruptcy;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            max_liab_transfer: self.max_liab_transfer,
+        };
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+        let group_key = perp_market.group;
+        let liqor = account_loader
+            .load_mango_account(&self.liqor)
+            .await
+            .unwrap();
+        let liqee = account_loader
+            .load_mango_account(&self.liqee)
+            .await
+            .unwrap();
+        let health_check_metas = derive_liquidation_remaining_account_metas(
+            &account_loader,
+            &liqee,
+            &liqor,
+            TokenIndex::MAX,
+            0,
+            TokenIndex::MAX,
+            0,
+        )
+        .await;
+
+        let group = account_loader.load::<Group>(&group_key).await.unwrap();
+        let quote_mint_info = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                group_key.as_ref(),
+                group.insurance_mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let quote_mint_info: MintInfo = account_loader.load(&quote_mint_info).await.unwrap();
+
+        let accounts = Self::Accounts {
+            group: group_key,
+            perp_market: self.perp_market,
+            liqor: self.liqor,
+            liqor_owner: self.liqor_owner.pubkey(),
+            liqee: self.liqee,
+            quote_bank: quote_mint_info.first_bank(),
+            quote_vault: quote_mint_info.first_vault(),
+            insurance_vault: group.insurance_vault,
+            token_program: Token::id(),
         };
         let mut instruction = make_instruction(program_id, &accounts, instruction);
         instruction.accounts.extend(health_check_metas);

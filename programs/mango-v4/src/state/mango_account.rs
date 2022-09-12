@@ -705,6 +705,7 @@ impl<
     pub fn ensure_perp_position(
         &mut self,
         perp_market_index: PerpMarketIndex,
+        settle_token_index: TokenIndex,
     ) -> Result<(&mut PerpPosition, usize)> {
         let mut raw_index_opt = self
             .all_perp_positions()
@@ -715,6 +716,9 @@ impl<
                 let perp_position = self.perp_position_mut_by_raw_index(raw_index);
                 *perp_position = PerpPosition::default();
                 perp_position.market_index = perp_market_index;
+
+                let mut settle_token_position = self.ensure_token_position(settle_token_index)?.0;
+                cm!(settle_token_position.in_use_count += 1);
             }
         }
         if let Some(raw_index) = raw_index_opt {
@@ -724,8 +728,16 @@ impl<
         }
     }
 
-    pub fn deactivate_perp_position(&mut self, perp_market_index: PerpMarketIndex) -> Result<()> {
+    pub fn deactivate_perp_position(
+        &mut self,
+        perp_market_index: PerpMarketIndex,
+        settle_token_index: TokenIndex,
+    ) -> Result<()> {
         self.perp_position_mut(perp_market_index)?.market_index = PerpMarketIndex::MAX;
+
+        let mut settle_token_position = self.token_position_mut(settle_token_index)?.0;
+        cm!(settle_token_position.in_use_count -= 1);
+
         Ok(())
     }
 
@@ -1192,19 +1204,22 @@ mod tests {
         );
 
         {
-            let (pos, raw) = account.ensure_perp_position(1).unwrap();
+            let (pos, raw) = account.ensure_perp_position(1, 0).unwrap();
             assert_eq!(raw, 0);
             assert_eq!(pos.market_index, 1);
+            assert_eq!(account.token_position_mut(0).unwrap().0.in_use_count, 1);
         }
         {
-            let (pos, raw) = account.ensure_perp_position(7).unwrap();
+            let (pos, raw) = account.ensure_perp_position(7, 0).unwrap();
             assert_eq!(raw, 1);
             assert_eq!(pos.market_index, 7);
+            assert_eq!(account.token_position_mut(0).unwrap().0.in_use_count, 2);
         }
         {
-            let (pos, raw) = account.ensure_perp_position(42).unwrap();
+            let (pos, raw) = account.ensure_perp_position(42, 0).unwrap();
             assert_eq!(raw, 2);
             assert_eq!(pos.market_index, 42);
+            assert_eq!(account.token_position_mut(0).unwrap().0.in_use_count, 3);
         }
 
         {
@@ -1219,19 +1234,21 @@ mod tests {
         }
 
         {
-            assert!(account.deactivate_perp_position(7).is_ok());
+            assert!(account.deactivate_perp_position(7, 0).is_ok());
 
-            let (pos, raw) = account.ensure_perp_position(42).unwrap();
+            let (pos, raw) = account.ensure_perp_position(42, 0).unwrap();
             assert_eq!(raw, 2);
             assert_eq!(pos.market_index, 42);
+            assert_eq!(account.token_position_mut(0).unwrap().0.in_use_count, 2);
 
-            let (pos, raw) = account.ensure_perp_position(8).unwrap();
+            let (pos, raw) = account.ensure_perp_position(8, 0).unwrap();
             assert_eq!(raw, 1);
             assert_eq!(pos.market_index, 8);
+            assert_eq!(account.token_position_mut(0).unwrap().0.in_use_count, 3);
         }
 
         assert_eq!(account.active_perp_positions().count(), 3);
-        assert!(account.deactivate_perp_position(1).is_ok());
+        assert!(account.deactivate_perp_position(1, 0).is_ok());
         assert_eq!(
             account.perp_position_by_raw_index(0).market_index,
             PerpMarketIndex::MAX
