@@ -1797,4 +1797,35 @@ mod tests {
             - 1.0
         ));
     }
+
+    #[test]
+    fn test_scanning_retreiver_mismatched_oracle_for_perps_throws_error() {
+        let group = Pubkey::new_unique();
+
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
+        let (mut bank2, mut oracle2) = mock_bank_and_oracle(group, 4, 5.0, 0.5, 0.3);
+
+        let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
+
+        let mut perp1 = mock_perp_market(group, oracle1.pubkey, 9, 0.2, 0.1);
+        let mut perp2 = mock_perp_market(group, oracle2.pubkey, 8, 0.2, 0.1);
+
+        let oracle1_account_info = oracle1.as_account_info();
+        let oracle2_account_info = oracle2.as_account_info();
+        let ais = vec![
+            bank1.as_account_info(),
+            bank2.as_account_info(),
+            oracle1_account_info.clone(),
+            oracle2_account_info.clone(),
+            perp1.as_account_info(),
+            perp2.as_account_info(),
+            oracle2_account_info, // Oracles wrong way around
+            oracle1_account_info,
+            oo1.as_account_info(),
+        ];
+
+        let retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
+        let result = retriever.perp_market_and_oracle_price(&group, 0, 9);
+        assert!(result.is_err());
+    }
 }
