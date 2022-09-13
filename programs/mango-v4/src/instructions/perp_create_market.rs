@@ -93,7 +93,7 @@ pub fn perp_create_market(
         fees_settled: I80F48::ZERO,
         // Why optional - Perp could be based purely on an oracle
         bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
-        base_decimals: base_decimals,
+        base_decimals,
         perp_market_index,
         registration_time: Clock::get()?.unix_timestamp,
         padding0: Default::default(),
