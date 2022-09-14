@@ -173,7 +173,7 @@ pub fn perp_liq_base_position(
     );
 
     // Check liqee health again
-    liqee_health_cache.recompute_perp_info(liqee_perp_position, &perp_market, oracle_price)?;
+    liqee_health_cache.recompute_perp_info(liqee_perp_position, &perp_market)?;
     let liqee_init_health = liqee_health_cache.health(HealthType::Init);
     liqee
         .fixed

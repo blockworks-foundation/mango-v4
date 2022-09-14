@@ -747,14 +747,13 @@ impl HealthCache {
         &mut self,
         perp_position: &PerpPosition,
         perp_market: &PerpMarket,
-        oracle_price: I80F48,
     ) -> Result<()> {
         let perp_entry = self
             .perp_infos
             .iter_mut()
             .find(|m| m.perp_market_index == perp_market.perp_market_index)
             .ok_or_else(|| error_msg!("perp market {} not found", perp_market.perp_market_index))?;
-        *perp_entry = PerpInfo::new(perp_position, perp_market, oracle_price)?;
+        *perp_entry = PerpInfo::new(perp_position, perp_market, perp_entry.oracle_price)?;
         Ok(())
     }
 
