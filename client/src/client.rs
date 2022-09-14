@@ -857,7 +857,7 @@ impl MangoClient {
                 program_id: mango_v4::id(),
                 accounts: {
                     let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                        &mango_v4::accounts::LiqTokenWithToken {
+                        &mango_v4::accounts::TokenLiqWithToken {
                             group: self.group(),
                             liqee: *liqee.0,
                             liqor: self.mango_account_address,
@@ -869,7 +869,7 @@ impl MangoClient {
                     ams
                 },
                 data: anchor_lang::InstructionData::data(
-                    &mango_v4::instruction::LiqTokenWithToken {
+                    &mango_v4::instruction::TokenLiqWithToken {
                         asset_token_index,
                         liab_token_index,
                         max_liab_transfer,
@@ -918,7 +918,7 @@ impl MangoClient {
                 program_id: mango_v4::id(),
                 accounts: {
                     let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                        &mango_v4::accounts::LiqTokenBankruptcy {
+                        &mango_v4::accounts::TokenLiqBankruptcy {
                             group: self.group(),
                             liqee: *liqee.0,
                             liqor: self.mango_account_address,
@@ -935,7 +935,7 @@ impl MangoClient {
                     ams
                 },
                 data: anchor_lang::InstructionData::data(
-                    &mango_v4::instruction::LiqTokenBankruptcy { max_liab_transfer },
+                    &mango_v4::instruction::TokenLiqBankruptcy { max_liab_transfer },
                 ),
             })
             .signer(&self.owner)

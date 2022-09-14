@@ -12,7 +12,7 @@ use crate::state::*;
 use crate::util::checked_math as cm;
 
 #[derive(Accounts)]
-pub struct LiqTokenWithToken<'info> {
+pub struct TokenLiqWithToken<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
@@ -30,8 +30,8 @@ pub struct LiqTokenWithToken<'info> {
     pub liqee: AccountLoaderDynamic<'info, MangoAccount>,
 }
 
-pub fn liq_token_with_token(
-    ctx: Context<LiqTokenWithToken>,
+pub fn token_liq_with_token(
+    ctx: Context<TokenLiqWithToken>,
     asset_token_index: TokenIndex,
     liab_token_index: TokenIndex,
     max_liab_transfer: I80F48,

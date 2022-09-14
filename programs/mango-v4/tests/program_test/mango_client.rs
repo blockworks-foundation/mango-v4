@@ -1941,7 +1941,7 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
     }
 }
 
-pub struct LiqTokenWithTokenInstruction {
+pub struct TokenLiqWithTokenInstruction {
     pub liqee: Pubkey,
     pub liqor: Pubkey,
     pub liqor_owner: TestKeypair,
@@ -1953,9 +1953,9 @@ pub struct LiqTokenWithTokenInstruction {
     pub max_liab_transfer: I80F48,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for LiqTokenWithTokenInstruction {
-    type Accounts = mango_v4::accounts::LiqTokenWithToken;
-    type Instruction = mango_v4::instruction::LiqTokenWithToken;
+impl ClientInstruction for TokenLiqWithTokenInstruction {
+    type Accounts = mango_v4::accounts::TokenLiqWithToken;
+    type Instruction = mango_v4::instruction::TokenLiqWithToken;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -2004,7 +2004,7 @@ impl ClientInstruction for LiqTokenWithTokenInstruction {
     }
 }
 
-pub struct LiqTokenBankruptcyInstruction {
+pub struct TokenLiqBankruptcyInstruction {
     pub liqee: Pubkey,
     pub liqor: Pubkey,
     pub liqor_owner: TestKeypair,
@@ -2013,9 +2013,9 @@ pub struct LiqTokenBankruptcyInstruction {
     pub liab_mint_info: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for LiqTokenBankruptcyInstruction {
-    type Accounts = mango_v4::accounts::LiqTokenBankruptcy;
-    type Instruction = mango_v4::instruction::LiqTokenBankruptcy;
+impl ClientInstruction for TokenLiqBankruptcyInstruction {
+    type Accounts = mango_v4::accounts::TokenLiqBankruptcy;
+    type Instruction = mango_v4::instruction::TokenLiqBankruptcy;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
