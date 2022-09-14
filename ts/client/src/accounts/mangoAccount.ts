@@ -279,10 +279,10 @@ export class MangoAccount {
     const tp = this.findToken(tokenBank.tokenIndex);
     if (!tokenBank.price) return undefined;
     const existingTokenDeposits = tp ? tp.deposits(tokenBank) : ZERO_I80F48();
-    const existingPositionHealthContrib = ZERO_I80F48();
+    let existingPositionHealthContrib = ZERO_I80F48();
     if (existingTokenDeposits.gt(ZERO_I80F48())) {
-      existingTokenDeposits
-        .imul(tokenBank.price)
+      existingPositionHealthContrib = existingTokenDeposits
+        .mul(tokenBank.price)
         .imul(tokenBank.initAssetWeight);
     }
 
