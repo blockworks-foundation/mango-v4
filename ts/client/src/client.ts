@@ -64,7 +64,7 @@ export type IdsSource = 'api' | 'static' | 'get-program-accounts';
 // TODO: replace ui values with native as input wherever possible
 // TODO: replace token/market names with token or market indices
 export class MangoClient {
-  private postSendTxCallback?: ({ txid: string }) => void;
+  private postSendTxCallback?: ({ txid }) => void;
   private prioritizationFee: number;
 
   constructor(
@@ -1131,7 +1131,7 @@ export class MangoClient {
       }
     })();
 
-    return await this.program.methods
+    const tx = await this.program.methods
       .serum3PlaceOrder(
         side,
         limitPrice,
@@ -1167,7 +1167,11 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-      .rpc();
+      .transaction();
+
+    return await sendTransaction(this.program.provider as AnchorProvider, tx, {
+      postSendTxCallback: this.postSendTxCallback,
+    });
   }
 
   async serum3CancelAllorders(
@@ -1184,7 +1188,7 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
 
-    return await this.program.methods
+    const tx = await this.program.methods
       .serum3CancelAllOrders(limit)
       .accounts({
         group: group.publicKey,
@@ -1199,7 +1203,11 @@ export class MangoClient {
         marketAsks: serum3MarketExternal.asksAddress,
         marketEventQueue: serum3MarketExternal.decoded.eventQueue,
       })
-      .rpc();
+      .transaction();
+
+    return await sendTransaction(this.program.provider as AnchorProvider, tx, {
+      postSendTxCallback: this.postSendTxCallback,
+    });
   }
 
   async serum3SettleFunds(
@@ -1220,7 +1228,7 @@ export class MangoClient {
         serum3MarketExternal,
       );
 
-    return await this.program.methods
+    const tx = await this.program.methods
       .serum3SettleFunds()
       .accounts({
         group: group.publicKey,
@@ -1243,7 +1251,11 @@ export class MangoClient {
         baseVault: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
           .vault,
       })
-      .rpc();
+      .transaction();
+
+    return await sendTransaction(this.program.provider as AnchorProvider, tx, {
+      postSendTxCallback: this.postSendTxCallback,
+    });
   }
 
   async serum3CancelOrder(
@@ -1261,7 +1273,7 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
 
-    return await this.program.methods
+    const tx = await this.program.methods
       .serum3CancelOrder(side, orderId)
       .accounts({
         group: group.publicKey,
@@ -1275,7 +1287,11 @@ export class MangoClient {
         marketAsks: serum3MarketExternal.asksAddress,
         marketEventQueue: serum3MarketExternal.decoded.eventQueue,
       })
-      .rpc();
+      .transaction();
+
+    return await sendTransaction(this.program.provider as AnchorProvider, tx, {
+      postSendTxCallback: this.postSendTxCallback,
+    });
   }
 
   /// perps
