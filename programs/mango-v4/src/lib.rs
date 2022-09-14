@@ -10,7 +10,7 @@ use anchor_lang::prelude::*;
 use instructions::*;
 
 pub mod accounts_zerocopy;
-pub mod address_lookup_table;
+pub mod address_lookup_table_program;
 pub mod error;
 pub mod events;
 pub mod instructions;
@@ -553,6 +553,18 @@ pub mod mango_v4 {
     // settle_* - settle_funds
 
     // resolve_banktruptcy
+
+    pub fn alt_set(ctx: Context<AltSet>, index: u8) -> Result<()> {
+        instructions::alt_set(ctx, index)
+    }
+
+    pub fn alt_extend(
+        ctx: Context<AltExtend>,
+        index: u8,
+        new_addresses: Vec<Pubkey>,
+    ) -> Result<()> {
+        instructions::alt_extend(ctx, index, new_addresses)
+    }
 
     pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
         instructions::compute_account_data(ctx)
