@@ -180,7 +180,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     // eat collateral1
     send_tx(
         solana,
-        LiqTokenWithTokenInstruction {
+        TokenLiqWithTokenInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -204,7 +204,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     // eat collateral2, leaving the account bankrupt
     send_tx(
         solana,
-        LiqTokenWithTokenInstruction {
+        TokenLiqWithTokenInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -233,7 +233,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     let vault_before = account_position(solana, vault_account, borrow_token1.bank).await;
     send_tx(
         solana,
-        LiqTokenBankruptcyInstruction {
+        TokenLiqBankruptcyInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -258,7 +258,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        LiqTokenBankruptcyInstruction {
+        TokenLiqBankruptcyInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -489,7 +489,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     // eat collateral1
     send_tx(
         solana,
-        LiqTokenWithTokenInstruction {
+        TokenLiqWithTokenInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -509,7 +509,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     // eat collateral2, leaving the account bankrupt
     send_tx(
         solana,
-        LiqTokenWithTokenInstruction {
+        TokenLiqWithTokenInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -536,7 +536,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     let liqor_before = account_position(solana, vault_account, borrow_token1.bank).await;
     send_tx(
         solana,
-        LiqTokenBankruptcyInstruction {
+        TokenLiqBankruptcyInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -567,7 +567,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     let liab_transfer: f64 = 500.0 / 20.0;
     send_tx(
         solana,
-        LiqTokenBankruptcyInstruction {
+        TokenLiqBankruptcyInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -600,7 +600,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     let liqor_before = account_position(solana, vault_account, borrow_token1.bank).await;
     send_tx(
         solana,
-        LiqTokenBankruptcyInstruction {
+        TokenLiqBankruptcyInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,

@@ -338,7 +338,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        LiqTokenWithTokenInstruction {
+        TokenLiqWithTokenInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -367,7 +367,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        LiqTokenWithTokenInstruction {
+        TokenLiqWithTokenInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -395,7 +395,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        LiqTokenWithTokenInstruction {
+        TokenLiqWithTokenInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -426,7 +426,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        LiqTokenWithTokenInstruction {
+        TokenLiqWithTokenInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -503,7 +503,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        LiqTokenWithTokenInstruction {
+        TokenLiqWithTokenInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,

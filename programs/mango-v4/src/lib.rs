@@ -328,13 +328,14 @@ pub mod mango_v4 {
 
     // TODO serum3_cancel_all_spot_orders
 
+    // DEPRECATED: use token_liq_with_token
     pub fn liq_token_with_token(
-        ctx: Context<LiqTokenWithToken>,
+        ctx: Context<TokenLiqWithToken>,
         asset_token_index: TokenIndex,
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -> Result<()> {
-        instructions::liq_token_with_token(
+        instructions::token_liq_with_token(
             ctx,
             asset_token_index,
             liab_token_index,
@@ -342,11 +343,33 @@ pub mod mango_v4 {
         )
     }
 
+    // DEPRECATED: use token_liq_bankruptcy
     pub fn liq_token_bankruptcy(
-        ctx: Context<LiqTokenBankruptcy>,
+        ctx: Context<TokenLiqBankruptcy>,
         max_liab_transfer: I80F48,
     ) -> Result<()> {
-        instructions::liq_token_bankruptcy(ctx, max_liab_transfer)
+        instructions::token_liq_bankruptcy(ctx, max_liab_transfer)
+    }
+
+    pub fn token_liq_with_token(
+        ctx: Context<TokenLiqWithToken>,
+        asset_token_index: TokenIndex,
+        liab_token_index: TokenIndex,
+        max_liab_transfer: I80F48,
+    ) -> Result<()> {
+        instructions::token_liq_with_token(
+            ctx,
+            asset_token_index,
+            liab_token_index,
+            max_liab_transfer,
+        )
+    }
+
+    pub fn token_liq_bankruptcy(
+        ctx: Context<TokenLiqBankruptcy>,
+        max_liab_transfer: I80F48,
+    ) -> Result<()> {
+        instructions::token_liq_bankruptcy(ctx, max_liab_transfer)
     }
 
     ///
