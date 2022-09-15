@@ -33,9 +33,14 @@ pub struct Group {
 
     pub padding2: [u8; 5],
 
-    pub reserved: [u8; 2560],
+    pub address_lookup_tables: [Pubkey; 20],
+
+    pub reserved: [u8; 1920],
 }
-const_assert_eq!(size_of::<Group>(), 32 * 5 + 4 + 4 + 1 + 1 + 6 + 2560);
+const_assert_eq!(
+    size_of::<Group>(),
+    32 * 5 + 4 + 4 + 1 + 1 + 6 + 20 * 32 + 1920
+);
 const_assert_eq!(size_of::<Group>() % 8, 0);
 
 impl Group {

@@ -19,7 +19,7 @@ use crate::logs::{
 // - all banks for liab_mint_info (writable)
 // - merged health accounts for liqor+liqee
 #[derive(Accounts)]
-pub struct LiqTokenBankruptcy<'info> {
+pub struct TokenLiqBankruptcy<'info> {
     #[account(
         has_one = insurance_vault,
     )]
@@ -56,7 +56,7 @@ pub struct LiqTokenBankruptcy<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-impl<'info> LiqTokenBankruptcy<'info> {
+impl<'info> TokenLiqBankruptcy<'info> {
     pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
         let program = self.token_program.to_account_info();
         let accounts = token::Transfer {
@@ -68,8 +68,8 @@ impl<'info> LiqTokenBankruptcy<'info> {
     }
 }
 
-pub fn liq_token_bankruptcy(
-    ctx: Context<LiqTokenBankruptcy>,
+pub fn token_liq_bankruptcy(
+    ctx: Context<TokenLiqBankruptcy>,
     max_liab_transfer: I80F48,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
