@@ -4,7 +4,7 @@ use solana_program_test::*;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::transport::TransportError;
 
-use mango_v4::address_lookup_table_program;
+use mango_setup::*;
 use mango_v4::state::*;
 use program_test::*;
 
@@ -23,10 +23,11 @@ async fn test_alt() -> Result<(), TransportError> {
     // SETUP: Create a group, account, register a token (mint0)
     //
 
-    let mango_setup::GroupWithTokens { group, .. } = mango_setup::GroupWithTokensConfig {
+    let GroupWithTokens { group, .. } = GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;
