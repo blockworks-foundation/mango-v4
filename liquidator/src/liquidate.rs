@@ -5,7 +5,7 @@ use crate::account_shared_data::KeyedAccountSharedData;
 use client::{chain_data, AccountFetcher, MangoClient, MangoClientError, MangoGroupContext};
 use mango_v4::state::{
     new_health_cache, Bank, FixedOrderAccountRetriever, HealthCache, HealthType, MangoAccountValue,
-    Serum3Orders, TokenIndex, QUOTE_TOKEN_INDEX,
+    PerpMarketIndex, Serum3Orders, Side, TokenIndex, QUOTE_TOKEN_INDEX,
 };
 
 use itertools::Itertools;
@@ -177,6 +177,36 @@ pub fn maybe_liquidate_account(
         .filter_map_ok(|v| v)
         .collect::<anyhow::Result<Vec<Serum3Orders>>>()?;
 
+    // look for any perp open orders and base positions
+    let perp_force_cancels = account
+        .active_perp_positions()
+        .filter_map(|pp| pp.has_open_orders().then(|| pp.market_index))
+        .collect::<Vec<PerpMarketIndex>>();
+    let mut perp_base_positions = account
+        .active_perp_positions()
+        .map(|pp| {
+            let base_lots = pp.base_position_lots();
+            if base_lots == 0 {
+                return Ok(None);
+            }
+            let perp = mango_client.context.perp(pp.market_index);
+            let oracle = account_fetcher.fetch_raw_account(perp.market.oracle)?;
+            let price = perp.market.oracle_price(&KeyedAccountSharedData::new(
+                perp.market.oracle,
+                oracle.into(),
+            ))?;
+            Ok(Some((
+                pp.market_index,
+                base_lots,
+                price,
+                I80F48::from(base_lots.abs()) * price,
+            )))
+        })
+        .filter_map_ok(|v| v)
+        .collect::<anyhow::Result<Vec<(PerpMarketIndex, i64, I80F48, I80F48)>>>()?;
+    // sort by base_position_value, ascending
+    perp_base_positions.sort_by(|a, b| a.3.cmp(&b.3));
+
     let get_max_liab_transfer = |source, target| -> anyhow::Result<I80F48> {
         let mut liqor = account_fetcher
             .fetch_fresh_mango_account(&mango_client.mango_account_address)
@@ -203,7 +233,7 @@ pub fn maybe_liquidate_account(
 
     // try liquidating
     let txsig = if !serum_force_cancels.is_empty() {
-        // pick a random market to force-cancel orders on
+        // Cancel all orders on a random serum market
         let serum_orders = serum_force_cancels.choose(&mut rand::thread_rng()).unwrap();
         let sig = mango_client.serum3_liq_force_cancel_orders(
             (pubkey, &account),
@@ -211,9 +241,64 @@ pub fn maybe_liquidate_account(
             &serum_orders.open_orders,
         )?;
         log::info!(
-            "Force cancelled serum market on account {}, market index {}, maint_health was {}, tx sig {:?}",
+            "Force cancelled serum orders on account {}, market index {}, maint_health was {}, tx sig {:?}",
             pubkey,
             serum_orders.market_index,
+            maint_health,
+            sig
+        );
+        sig
+    } else if !perp_force_cancels.is_empty() {
+        // Cancel all orders on a random perp market
+        let perp_market_index = *perp_force_cancels.choose(&mut rand::thread_rng()).unwrap();
+        let sig =
+            mango_client.perp_liq_force_cancel_orders((pubkey, &account), perp_market_index)?;
+        log::info!(
+            "Force cancelled perp orders on account {}, market index {}, maint_health was {}, tx sig {:?}",
+            pubkey,
+            perp_market_index,
+            maint_health,
+            sig
+        );
+        sig
+    } else if !perp_base_positions.is_empty() {
+        // Liquidate the highest-value perp base position
+        let (perp_market_index, base_lots, price, _) = perp_base_positions.last().unwrap();
+        let perp = mango_client.context.perp(*perp_market_index);
+
+        let (side, side_signum) = if *base_lots > 0 {
+            (Side::Bid, 1)
+        } else {
+            (Side::Ask, -1)
+        };
+
+        // Compute the max number of base_lots the liqor is willing to take
+        let max_base_transfer_abs = {
+            let mut liqor = account_fetcher
+                .fetch_fresh_mango_account(&mango_client.mango_account_address)
+                .context("getting liquidator account")?;
+            liqor.ensure_perp_position(*perp_market_index, QUOTE_TOKEN_INDEX)?;
+            let health_cache = new_health_cache_(&mango_client.context, account_fetcher, &liqor)
+                .expect("always ok");
+            health_cache.max_perp_for_health_ratio(
+                *perp_market_index,
+                *price,
+                perp.market.base_lot_size,
+                side,
+                min_health_ratio,
+            )?
+        };
+        log::info!("computed max_base_transfer to be {max_base_transfer_abs}");
+
+        let sig = mango_client.perp_liq_base_position(
+            (pubkey, &account),
+            *perp_market_index,
+            side_signum * max_base_transfer_abs,
+        )?;
+        log::info!(
+            "Liquidated base position for perp market on account {}, market index {}, maint_health was {}, tx sig {:?}",
+            pubkey,
+            perp_market_index,
             maint_health,
             sig
         );
@@ -240,7 +325,7 @@ pub fn maybe_liquidate_account(
         let max_liab_transfer = get_max_liab_transfer(liab_token_index, quote_token_index)?;
 
         let sig = mango_client
-            .liq_token_bankruptcy((pubkey, &account), liab_token_index, max_liab_transfer)
+            .token_liq_bankruptcy((pubkey, &account), liab_token_index, max_liab_transfer)
             .context("sending liq_token_bankruptcy")?;
         log::info!(
             "Liquidated bankruptcy for {}, maint_health was {}, tx sig {:?}",
@@ -288,7 +373,7 @@ pub fn maybe_liquidate_account(
         // TODO: log liquee's liab_needed, need to refactor program code to be able to be accessed from client side
         //
         let sig = mango_client
-            .liq_token_with_token(
+            .token_liq_with_token(
                 (pubkey, &account),
                 asset_token_index,
                 liab_token_index,

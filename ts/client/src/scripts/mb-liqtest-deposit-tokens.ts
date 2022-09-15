@@ -39,11 +39,14 @@ async function main() {
 
   // create + fetch account
   console.log(`Creating mangoaccount...`);
-  const mangoAccount = (await client.getOrCreateMangoAccount(
+  const mangoAccount = (await client.createAndFetchMangoAccount(
     group,
-    admin.publicKey,
     ACCOUNT_NUM,
     'LIQTEST, FUNDING',
+    8,
+    4,
+    4,
+    4,
   ))!;
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString());
@@ -54,16 +57,16 @@ async function main() {
 
   // deposit
   try {
-    console.log(`...depositing 10 USDC`);
-    await client.tokenDeposit(group, mangoAccount, usdcMint, 10);
+    console.log(`...depositing 5 USDC`);
+    await client.tokenDeposit(group, mangoAccount, usdcMint, 5);
     await mangoAccount.reload(client, group);
 
-    console.log(`...depositing 0.0004 BTC`);
-    await client.tokenDeposit(group, mangoAccount, btcMint, 0.0004);
+    console.log(`...depositing 0.0002 BTC`);
+    await client.tokenDeposit(group, mangoAccount, btcMint, 0.0002);
     await mangoAccount.reload(client, group);
 
-    console.log(`...depositing 0.25 SOL`);
-    await client.tokenDeposit(group, mangoAccount, solMint, 0.25);
+    console.log(`...depositing 0.15 SOL`);
+    await client.tokenDeposit(group, mangoAccount, solMint, 0.15);
     await mangoAccount.reload(client, group);
   } catch (error) {
     console.log(error);
