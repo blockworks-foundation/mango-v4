@@ -26,8 +26,7 @@ async fn test_alt() -> Result<(), TransportError> {
     let GroupWithTokens { group, .. } = GroupWithTokensConfig {
         admin,
         payer,
-        mints: mints.to_vec(),
-        ..GroupWithTokensConfig::default()
+        mints,
     }
     .create(solana)
     .await;
