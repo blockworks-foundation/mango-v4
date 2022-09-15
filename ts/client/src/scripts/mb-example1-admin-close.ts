@@ -45,15 +45,6 @@ async function main() {
 
     let sig;
 
-    // close stub oracles
-    const stubOracles = await client.getStubOracle(group);
-    for (const stubOracle of stubOracles) {
-      sig = await client.stubOracleClose(group, stubOracle.publicKey);
-      console.log(
-        `Closed stub oracle ${stubOracle.publicKey}, sig https://explorer.solana.com/tx/${sig}`,
-      );
-    }
-
     // close all banks
     for (const banks of group.banksMapByMint.values()) {
       sig = await client.tokenDeregister(group, banks[0].mint);
@@ -78,6 +69,15 @@ async function main() {
       sig = await client.perpCloseMarket(group, market.name);
       console.log(
         `Closed perp market ${market.name}, sig https://explorer.solana.com/tx/${sig}`,
+      );
+    }
+
+    // close stub oracles
+    const stubOracles = await client.getStubOracle(group);
+    for (const stubOracle of stubOracles) {
+      sig = await client.stubOracleClose(group, stubOracle.publicKey);
+      console.log(
+        `Closed stub oracle ${stubOracle.publicKey}, sig https://explorer.solana.com/tx/${sig}`,
       );
     }
 

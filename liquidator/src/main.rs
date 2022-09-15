@@ -8,6 +8,7 @@ use client::{chain_data, keypair_from_cli, Client, MangoClient, MangoGroupContex
 use log::*;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 
+use itertools::Itertools;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use std::collections::HashSet;
@@ -126,6 +127,8 @@ async fn main() -> anyhow::Result<()> {
         .tokens
         .values()
         .map(|value| value.mint_info.oracle)
+        .chain(group_context.perp_markets.values().map(|p| p.market.oracle))
+        .unique()
         .collect::<Vec<Pubkey>>();
 
     //

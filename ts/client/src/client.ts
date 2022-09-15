@@ -34,7 +34,14 @@ import {
   PerpPosition,
 } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
-import { PerpMarket, PerpOrderSide, PerpOrderType } from './accounts/perp';
+import {
+  PerpEventQueue,
+  PerpMarket,
+  PerpOrderType,
+  PerpOrderSide,
+  FillEvent,
+  OutEvent,
+} from './accounts/perp';
 import {
   generateSerum3MarketExternalVaultSignerAddress,
   Serum3Market,
@@ -541,9 +548,20 @@ export class MangoClient {
     group: Group,
     accountNumber?: number,
     name?: string,
+    tokenCount?: number,
+    serum3Count?: number,
+    perpCount?: number,
+    perpOoCount?: number,
   ): Promise<TransactionSignature> {
     const transaction = await this.program.methods
-      .accountCreate(accountNumber ?? 0, 8, 8, 0, 0, name ?? '')
+      .accountCreate(
+        accountNumber ?? 0,
+        tokenCount ?? 8,
+        serum3Count ?? 8,
+        perpCount ?? 0,
+        perpOoCount ?? 0,
+        name ?? '',
+      )
       .accounts({
         group: group.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -557,6 +575,32 @@ export class MangoClient {
       {
         postSendTxCallback: this.postSendTxCallback,
       },
+    );
+  }
+
+  public async createAndFetchMangoAccount(
+    group: Group,
+    accountNumber?: number,
+    name?: string,
+    tokenCount?: number,
+    serum3Count?: number,
+    perpCount?: number,
+    perpOoCount?: number,
+  ): Promise<MangoAccount | undefined> {
+    const accNum = accountNumber ?? 0;
+    await this.createMangoAccount(
+      group,
+      accNum,
+      name,
+      tokenCount,
+      serum3Count,
+      perpCount,
+      perpOoCount,
+    );
+    return await this.getMangoAccountForOwner(
+      group,
+      (this.program.provider as AnchorProvider).wallet.publicKey,
+      accNum,
     );
   }
 
@@ -1511,6 +1555,37 @@ export class MangoClient {
     );
   }
 
+  async perpDeactivatePosition(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketName: string,
+  ): Promise<TransactionSignature> {
+    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        AccountRetriever.Fixed,
+        group,
+        [mangoAccount],
+        [],
+        [],
+      );
+    return await this.program.methods
+      .perpDeactivatePosition()
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        perpMarket: perpMarket.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .rpc();
+  }
+
   async perpPlaceOrder(
     group: Group,
     mangoAccount: MangoAccount,
@@ -1584,6 +1659,60 @@ export class MangoClient {
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .rpc();
+  }
+
+  async perpConsumeEvents(
+    group: Group,
+    perpMarketName: string,
+    accounts: PublicKey[],
+    limit: number,
+  ): Promise<TransactionSignature> {
+    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+    return await this.program.methods
+      .perpConsumeEvents(new BN(limit))
+      .accounts({
+        group: group.publicKey,
+        perpMarket: perpMarket.publicKey,
+        eventQueue: perpMarket.eventQueue,
+      })
+      .remainingAccounts(
+        accounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: true, isSigner: false } as AccountMeta),
+        ),
+      )
+      .rpc();
+  }
+
+  async perpConsumeAllEvents(
+    group: Group,
+    perpMarketName: string,
+  ): Promise<void> {
+    const limit = 8;
+    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+    const eventQueue = await perpMarket.loadEventQueue(this);
+    let unconsumedEvents = eventQueue.getUnconsumedEvents();
+    while (unconsumedEvents.length > 0) {
+      const events = unconsumedEvents.splice(0, limit);
+      const accounts = events
+        .map((ev) => {
+          switch (ev.eventType) {
+            case PerpEventQueue.FILL_EVENT_TYPE:
+              const fill = <FillEvent>ev;
+              return [fill.maker, fill.taker];
+            case PerpEventQueue.OUT_EVENT_TYPE:
+              const out = <OutEvent>ev;
+              return [out.owner];
+            case PerpEventQueue.LIQUIDATE_EVENT_TYPE:
+              return [];
+            default:
+              throw new Error(`Unknown event with eventType ${ev.eventType}`);
+          }
+        })
+        .flat();
+
+      await this.perpConsumeEvents(group, perpMarketName, accounts, limit);
+    }
   }
 
   public async marginTrade({
