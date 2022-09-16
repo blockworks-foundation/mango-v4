@@ -21,7 +21,6 @@ export class PerpMarket {
     publicKey: PublicKey,
     obj: {
       group: PublicKey;
-      baseTokenIndex: number;
       quoteTokenIndex: number;
       perpMarketIndex: number;
       name: number[];
@@ -49,14 +48,13 @@ export class PerpMarket {
       seqNum: any; // TODO: ts complains that this is unknown for whatever reason
       feesAccrued: I80F48Dto;
       bump: number;
-      baseTokenDecimals: number;
+      baseDecimals: number;
       registrationTime: BN;
     },
   ): PerpMarket {
     return new PerpMarket(
       publicKey,
       obj.group,
-      obj.baseTokenIndex,
       obj.quoteTokenIndex,
       obj.perpMarketIndex,
       obj.name,
@@ -84,7 +82,7 @@ export class PerpMarket {
       obj.seqNum,
       obj.feesAccrued,
       obj.bump,
-      obj.baseTokenDecimals,
+      obj.baseDecimals,
       obj.registrationTime,
     );
   }
@@ -92,7 +90,6 @@ export class PerpMarket {
   constructor(
     public publicKey: PublicKey,
     public group: PublicKey,
-    public baseTokenIndex: number,
     public quoteTokenIndex: number,
     public perpMarketIndex: number,
     name: number[],
@@ -120,7 +117,7 @@ export class PerpMarket {
     seqNum: BN,
     feesAccrued: I80F48Dto,
     bump: number,
-    public baseTokenDecimals: number,
+    public baseDecimals: number,
     public registrationTime: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
@@ -137,7 +134,7 @@ export class PerpMarket {
   }
 
   uiToNativePriceQuantity(price: number, quantity: number): [BN, BN] {
-    const baseUnit = Math.pow(10, this.baseTokenDecimals);
+    const baseUnit = Math.pow(10, this.baseDecimals);
     const quoteUnit = Math.pow(10, QUOTE_DECIMALS);
     const nativePrice = new BN(price * quoteUnit)
       .mul(this.baseLotSize)
