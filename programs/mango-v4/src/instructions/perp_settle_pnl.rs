@@ -4,8 +4,8 @@ use fixed::types::I80F48;
 
 use crate::accounts_zerocopy::*;
 use crate::error::*;
-use crate::state::compute_health;
 use crate::state::new_fixed_order_account_retriever;
+use crate::state::new_health_cache;
 use crate::state::Bank;
 use crate::state::HealthType;
 use crate::state::MangoAccount;
@@ -48,8 +48,34 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: u64) -> R
         MangoError::MaxSettleAmountMustBeGreaterThanZero
     );
 
+    let perp_market_index = {
+        let perp_market = ctx.accounts.perp_market.load()?;
+        perp_market.perp_market_index
+    };
+
     let mut account_a = ctx.accounts.account_a.load_mut()?;
     let mut account_b = ctx.accounts.account_b.load_mut()?;
+
+    // check positions exist, for nicer error messages
+    {
+        account_a.perp_position(perp_market_index)?;
+        account_a.token_position(QUOTE_TOKEN_INDEX)?;
+        account_b.perp_position(perp_market_index)?;
+        account_b.token_position(QUOTE_TOKEN_INDEX)?;
+    }
+
+    // Account B is the one that must have negative pnl. Check how much of that may be actualized
+    // given the account's health. In that, we only care about the health of spot assets on the account.
+    // Example: With +100 USDC and -2 SOL (-80 USD) and -500 USD PNL the account may still settle
+    //   100 - 1.1*80 = 12 USD perp pnl, even though the overall health is already negative.
+    //   Afterwards the account is perp-bankrupt.
+    let b_spot_health = {
+        let retriever =
+            new_fixed_order_account_retriever(ctx.remaining_accounts, &account_b.borrow())?;
+        new_health_cache(&account_b.borrow(), &retriever)?.spot_health(HealthType::Maint)
+    };
+    require!(b_spot_health >= 0, MangoError::HealthMustBePositive);
+
     let mut bank = ctx.accounts.quote_bank.load_mut()?;
     let perp_market = ctx.accounts.perp_market.load()?;
 
@@ -64,8 +90,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: u64) -> R
         perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
 
     // Fetch perp positions for accounts
-    let a_perp_position = account_a.perp_position_mut(perp_market.perp_market_index)?;
-    let b_perp_position = account_b.perp_position_mut(perp_market.perp_market_index)?;
+    let a_perp_position = account_a.perp_position_mut(perp_market_index)?;
+    let b_perp_position = account_b.perp_position_mut(perp_market_index)?;
 
     // Settle funding before settling any PnL
     a_perp_position.settle_funding(&perp_market);
@@ -82,10 +108,11 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: u64) -> R
     require!(a_pnl.is_positive(), MangoError::ProfitabilityMismatch);
     require!(b_pnl.is_negative(), MangoError::ProfitabilityMismatch);
 
-    // Settle for the maximum possible capped to max_settle_amount
+    // Settle for the maximum possible capped to max_settle_amount and b's spot health
     let settlement = a_pnl
         .abs()
         .min(b_pnl.abs())
+        .min(b_spot_health)
         .min(I80F48::from(max_settle_amount));
     a_perp_position.change_quote_position(-settlement);
     b_perp_position.change_quote_position(settlement);
@@ -96,18 +123,9 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: u64) -> R
     cm!(account_b.fixed.net_settled -= settlement_i64);
 
     // Transfer token balances
-    // TODO: Need to guarantee that QUOTE_TOKEN_INDEX token exists at this point. I.E. create it when placing perp order.
-    let a_token_position = account_a.ensure_token_position(QUOTE_TOKEN_INDEX)?.0;
-    let b_token_position = account_b.ensure_token_position(QUOTE_TOKEN_INDEX)?.0;
+    let a_token_position = account_a.token_position_mut(QUOTE_TOKEN_INDEX)?.0;
+    let b_token_position = account_b.token_position_mut(QUOTE_TOKEN_INDEX)?.0;
     transfer_token_internal(&mut bank, b_token_position, a_token_position, settlement)?;
-
-    // Bank is dropped to prevent re-borrow from remaining_accounts
-    drop(bank);
-
-    // Verify that the result of settling did not violate the health of the account that lost money
-    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account_b.borrow())?;
-    let health = compute_health(&account_b.borrow(), HealthType::Init, &retriever)?;
-    require!(health >= 0, MangoError::HealthMustBePositive);
 
     msg!("settled pnl = {}", settlement);
     Ok(())

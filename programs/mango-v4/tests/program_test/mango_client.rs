@@ -1941,7 +1941,7 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
     }
 }
 
-pub struct LiqTokenWithTokenInstruction {
+pub struct TokenLiqWithTokenInstruction {
     pub liqee: Pubkey,
     pub liqor: Pubkey,
     pub liqor_owner: TestKeypair,
@@ -1953,9 +1953,9 @@ pub struct LiqTokenWithTokenInstruction {
     pub max_liab_transfer: I80F48,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for LiqTokenWithTokenInstruction {
-    type Accounts = mango_v4::accounts::LiqTokenWithToken;
-    type Instruction = mango_v4::instruction::LiqTokenWithToken;
+impl ClientInstruction for TokenLiqWithTokenInstruction {
+    type Accounts = mango_v4::accounts::TokenLiqWithToken;
+    type Instruction = mango_v4::instruction::TokenLiqWithToken;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -2004,7 +2004,7 @@ impl ClientInstruction for LiqTokenWithTokenInstruction {
     }
 }
 
-pub struct LiqTokenBankruptcyInstruction {
+pub struct TokenLiqBankruptcyInstruction {
     pub liqee: Pubkey,
     pub liqor: Pubkey,
     pub liqor_owner: TestKeypair,
@@ -2013,9 +2013,9 @@ pub struct LiqTokenBankruptcyInstruction {
     pub liab_mint_info: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for LiqTokenBankruptcyInstruction {
-    type Accounts = mango_v4::accounts::LiqTokenBankruptcy;
-    type Instruction = mango_v4::instruction::LiqTokenBankruptcy;
+impl ClientInstruction for TokenLiqBankruptcyInstruction {
+    type Accounts = mango_v4::accounts::TokenLiqBankruptcy;
+    type Instruction = mango_v4::instruction::TokenLiqBankruptcy;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -2930,5 +2930,75 @@ impl ClientInstruction for HealthRegionEndInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![]
+    }
+}
+
+pub struct AltSetInstruction {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub address_lookup_table: Pubkey,
+    pub index: u8,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for AltSetInstruction {
+    type Accounts = mango_v4::accounts::AltSet;
+    type Instruction = mango_v4::instruction::AltSet;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction { index: self.index };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            address_lookup_table: self.address_lookup_table,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
+pub struct AltExtendInstruction {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub payer: TestKeypair,
+    pub address_lookup_table: Pubkey,
+    pub index: u8,
+    pub new_addresses: Vec<Pubkey>,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for AltExtendInstruction {
+    type Accounts = mango_v4::accounts::AltExtend;
+    type Instruction = mango_v4::instruction::AltExtend;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            index: self.index,
+            new_addresses: self.new_addresses.clone(),
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            payer: self.payer.pubkey(),
+            address_lookup_table: self.address_lookup_table,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin, self.payer]
     }
 }
