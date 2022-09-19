@@ -1429,7 +1429,6 @@ export class MangoClient {
 
   public async perpGetMarkets(
     group: Group,
-    baseTokenIndex?: number,
   ): Promise<PerpMarket[]> {
     const bumpfbuf = Buffer.alloc(1);
     bumpfbuf.writeUInt8(255);
@@ -1442,17 +1441,6 @@ export class MangoClient {
         },
       },
     ];
-
-    if (baseTokenIndex) {
-      const bbuf = Buffer.alloc(2);
-      bbuf.writeUInt16LE(baseTokenIndex);
-      filters.push({
-        memcmp: {
-          bytes: bs58.encode(bbuf),
-          offset: 40,
-        },
-      });
-    }
 
     return (await this.program.account.perpMarket.all(filters)).map((tuple) =>
       PerpMarket.from(tuple.publicKey, tuple.account),
