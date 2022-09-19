@@ -14,6 +14,7 @@ export class MangoAccount {
   public serum3: Serum3Orders[];
   public perps: PerpPosition[];
   public name: string;
+  public netDeposits: BN;
 
   static from(
     publicKey: PublicKey,
@@ -77,6 +78,7 @@ export class MangoAccount {
     this.serum3 = serum3.map((dto) => Serum3Orders.from(dto));
     this.perps = perps.map((dto) => PerpPosition.from(dto));
     this.accountData = undefined;
+    this.netDeposits = netDeposits;
   }
 
   async reload(client: MangoClient, group: Group): Promise<MangoAccount> {
@@ -252,6 +254,13 @@ export class MangoAccount {
    */
   getLiabsValue(healthType: HealthType): I80F48 | undefined {
     return this.accountData?.healthCache.liabs(healthType);
+  }
+
+  /**
+   * @returns Overall PNL, in native quote
+   */
+  getPNL(): I80F48 | undefined {
+    return this.getEquity()?.add(I80F48.fromNumber(this.netDeposits.toNumber() * -1))
   }
 
   /**
