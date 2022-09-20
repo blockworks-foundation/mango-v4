@@ -5024,11 +5024,6 @@ export type MangoV4 = {
           "index": false
         },
         {
-          "name": "price",
-          "type": "i64",
-          "index": false
-        },
-        {
           "name": "longFunding",
           "type": "i128",
           "index": false
@@ -5070,11 +5065,6 @@ export type MangoV4 = {
         },
         {
           "name": "borrowIndex",
-          "type": "i128",
-          "index": false
-        },
-        {
-          "name": "price",
           "type": "i128",
           "index": false
         }
@@ -5442,7 +5432,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "OpenOrdersBalanceLog",
+      "name": "Serum3OpenOrdersBalanceLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -5455,7 +5445,12 @@ export type MangoV4 = {
           "index": false
         },
         {
-          "name": "marketIndex",
+          "name": "baseTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quoteTokenIndex",
           "type": "u16",
           "index": false
         },
@@ -5482,11 +5477,6 @@ export type MangoV4 = {
         {
           "name": "referrerRebatesAccrued",
           "type": "u64",
-          "index": false
-        },
-        {
-          "name": "price",
-          "type": "i128",
           "index": false
         }
       ]
@@ -10719,11 +10709,6 @@ export const IDL: MangoV4 = {
           "index": false
         },
         {
-          "name": "price",
-          "type": "i64",
-          "index": false
-        },
-        {
           "name": "longFunding",
           "type": "i128",
           "index": false
@@ -10765,11 +10750,6 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "borrowIndex",
-          "type": "i128",
-          "index": false
-        },
-        {
-          "name": "price",
           "type": "i128",
           "index": false
         }
@@ -11137,7 +11117,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "OpenOrdersBalanceLog",
+      "name": "Serum3OpenOrdersBalanceLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -11150,7 +11130,12 @@ export const IDL: MangoV4 = {
           "index": false
         },
         {
-          "name": "marketIndex",
+          "name": "baseTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quoteTokenIndex",
           "type": "u16",
           "index": false
         },
@@ -11177,11 +11162,6 @@ export const IDL: MangoV4 = {
         {
           "name": "referrerRebatesAccrued",
           "type": "u64",
-          "index": false
-        },
-        {
-          "name": "price",
-          "type": "i128",
           "index": false
         }
       ]

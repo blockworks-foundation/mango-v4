@@ -187,7 +187,6 @@ pub fn token_liq_with_token(
         indexed_position: liqee_asset_position_indexed.to_bits(),
         deposit_index: asset_bank.deposit_index.to_bits(),
         borrow_index: asset_bank.borrow_index.to_bits(),
-        price: asset_price.to_bits(),
     });
     // liqee liab
     emit!(TokenBalanceLog {
@@ -197,7 +196,6 @@ pub fn token_liq_with_token(
         indexed_position: liqee_liab_position_indexed.to_bits(),
         deposit_index: liab_bank.deposit_index.to_bits(),
         borrow_index: liab_bank.borrow_index.to_bits(),
-        price: liab_price.to_bits(),
     });
     // liqor asset
     emit!(TokenBalanceLog {
@@ -207,7 +205,6 @@ pub fn token_liq_with_token(
         indexed_position: liqor_asset_position_indexed.to_bits(),
         deposit_index: asset_bank.deposit_index.to_bits(),
         borrow_index: asset_bank.borrow_index.to_bits(),
-        price: asset_price.to_bits(),
     });
     // liqor liab
     emit!(TokenBalanceLog {
@@ -217,7 +214,6 @@ pub fn token_liq_with_token(
         indexed_position: liqor_liab_position_indexed.to_bits(),
         deposit_index: liab_bank.deposit_index.to_bits(),
         borrow_index: liab_bank.borrow_index.to_bits(),
-        price: liab_price.to_bits(),
     });
 
     if loan_origination_fee.is_positive() {

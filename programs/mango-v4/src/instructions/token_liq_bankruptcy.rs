@@ -158,7 +158,7 @@ pub fn token_liq_bankruptcy(
         )?;
 
         // move quote assets into liqor and withdraw liab assets
-        if let Some((quote_bank, quote_price)) = opt_quote_bank_and_price {
+        if let Some((quote_bank, _)) = opt_quote_bank_and_price {
             // account constraint #2 a)
             require_keys_eq!(quote_bank.vault, ctx.accounts.quote_vault.key());
             require_keys_eq!(quote_bank.mint, ctx.accounts.insurance_vault.mint);
@@ -193,7 +193,6 @@ pub fn token_liq_bankruptcy(
                 indexed_position: liqor_quote_indexed_position.to_bits(),
                 deposit_index: quote_deposit_index.to_bits(),
                 borrow_index: quote_borrow_index.to_bits(),
-                price: quote_price.to_bits(),
             });
 
             if loan_origination_fee.is_positive() {
@@ -274,7 +273,6 @@ pub fn token_liq_bankruptcy(
         indexed_position: liqee_liab.indexed_position.to_bits(),
         deposit_index: liab_deposit_index.to_bits(),
         borrow_index: liab_borrow_index.to_bits(),
-        price: liab_price.to_bits(),
     });
 
     // liqee liab
@@ -285,7 +283,6 @@ pub fn token_liq_bankruptcy(
         indexed_position: liqee_liab.indexed_position.to_bits(),
         deposit_index: liab_deposit_index.to_bits(),
         borrow_index: liab_borrow_index.to_bits(),
-        price: liab_price.to_bits(),
     });
 
     let liab_bank = bank_ais[0].load::<Bank>()?;
