@@ -945,11 +945,19 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
 
+    const marketIndexBuf = Buffer.alloc(2);
+    marketIndexBuf.writeUInt16LE(serum3Market.marketIndex);
+    const [indexReservation] = await PublicKey.findProgramAddress(
+      [Buffer.from('Serum3Index'), group.publicKey.toBuffer(), marketIndexBuf],
+      this.program.programId,
+    );
+
     return await this.program.methods
       .serum3DeregisterMarket()
       .accounts({
         group: group.publicKey,
         serumMarket: serum3Market.publicKey,
+        indexReservation,
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
       })
