@@ -576,7 +576,11 @@ export class PerpEventQueue {
   }
 }
 
-interface OutEvent {
+interface Event {
+  eventType: number;
+}
+
+interface OutEvent extends Event {
   side: PerpOrderType;
   ownerSlot: number;
   timestamp: BN;
@@ -585,8 +589,7 @@ interface OutEvent {
   quantity: BN;
 }
 
-interface FillEvent {
-  eventType: number;
+interface FillEvent extends Event {
   takerSide: PerpOrderType;
   makerOut: boolean;
   makerSlot: number;
@@ -606,6 +609,6 @@ interface FillEvent {
   quantity: BN;
 }
 
-interface LiquidateEvent {
+interface LiquidateEvent extends Event {
   seqNum: BN;
 }

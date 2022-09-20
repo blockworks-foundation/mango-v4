@@ -710,6 +710,9 @@ export class MangoAccount {
     res = res + '\n delegate: ' + this.delegate;
 
     res =
+      res +
+      `\n max token slots ${this.tokens.length}, max serum3 slots ${this.serum3.length}, max perp slots ${this.perps.length}, max perp oo slots ${this.perpOpenOrders.length}`;
+    res =
       this.tokensActive().length > 0
         ? res +
           '\n tokens:' +
@@ -732,6 +735,13 @@ export class MangoAccount {
     res =
       this.perpActive().length > 0
         ? res + '\n perps:' + JSON.stringify(this.perpActive(), null, 4)
+        : res + '';
+
+    res =
+      this.perpOrdersActive().length > 0
+        ? res +
+          '\n perps oo:' +
+          JSON.stringify(this.perpOrdersActive(), null, 4)
         : res + '';
 
     return res;
@@ -892,7 +902,7 @@ export class PerpPosition {
     return new PerpPosition(
       dto.marketIndex,
       dto.basePositionLots.toNumber(),
-      dto.quotePositionNative.val.toNumber(),
+      dto.quotePositionNative.val,
       dto.bidsBaseLots.toNumber(),
       dto.asksBaseLots.toNumber(),
       dto.takerBaseLots.toNumber(),
@@ -903,7 +913,7 @@ export class PerpPosition {
   constructor(
     public marketIndex: number,
     public basePositionLots: number,
-    public quotePositionNative: number,
+    public quotePositionNative: BN,
     public bidsBaseLots: number,
     public asksBaseLots: number,
     public takerBaseLots: number,
