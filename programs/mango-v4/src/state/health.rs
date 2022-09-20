@@ -423,16 +423,16 @@ pub fn compute_health(
 
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct TokenInfo {
-    token_index: TokenIndex,
-    maint_asset_weight: I80F48,
-    init_asset_weight: I80F48,
-    maint_liab_weight: I80F48,
-    init_liab_weight: I80F48,
-    oracle_price: I80F48, // native/native
+    pub token_index: TokenIndex,
+    pub maint_asset_weight: I80F48,
+    pub init_asset_weight: I80F48,
+    pub maint_liab_weight: I80F48,
+    pub init_liab_weight: I80F48,
+    pub oracle_price: I80F48, // native/native
     // in health-reference-token native units
-    balance: I80F48,
+    pub balance: I80F48,
     // in health-reference-token native units
-    serum3_max_reserved: I80F48,
+    pub serum3_max_reserved: I80F48,
 }
 
 impl TokenInfo {
@@ -465,10 +465,10 @@ impl TokenInfo {
 
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct Serum3Info {
-    reserved: I80F48,
-    base_index: usize,
-    quote_index: usize,
-    market_index: Serum3MarketIndex,
+    pub reserved: I80F48,
+    pub base_index: usize,
+    pub quote_index: usize,
+    pub market_index: Serum3MarketIndex,
 }
 
 impl Serum3Info {
@@ -512,15 +512,15 @@ impl Serum3Info {
 
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct PerpInfo {
-    perp_market_index: PerpMarketIndex,
-    maint_asset_weight: I80F48,
-    init_asset_weight: I80F48,
-    maint_liab_weight: I80F48,
-    init_liab_weight: I80F48,
+    pub perp_market_index: PerpMarketIndex,
+    pub maint_asset_weight: I80F48,
+    pub init_asset_weight: I80F48,
+    pub maint_liab_weight: I80F48,
+    pub init_liab_weight: I80F48,
     // in health-reference-token native units, needs scaling by asset/liab
-    base: I80F48,
+    pub base: I80F48,
     // in health-reference-token native units, no asset/liab factor needed
-    quote: I80F48,
+    pub quote: I80F48,
     oracle_price: I80F48,
 }
 
@@ -678,7 +678,11 @@ impl HealthCache {
         Ok(())
     }
 
-    fn token_entry_index(&mut self, token_index: TokenIndex) -> Result<usize> {
+    pub fn token_info(&self, token_index: TokenIndex) -> Result<&TokenInfo> {
+        Ok(&self.token_infos[self.token_info_index(token_index)?])
+    }
+
+    fn token_info_index(&self, token_index: TokenIndex) -> Result<usize> {
         self.token_infos
             .iter()
             .position(|t| t.token_index == token_index)
@@ -686,7 +690,7 @@ impl HealthCache {
     }
 
     pub fn adjust_token_balance(&mut self, token_index: TokenIndex, change: I80F48) -> Result<()> {
-        let entry_index = self.token_entry_index(token_index)?;
+        let entry_index = self.token_info_index(token_index)?;
         let mut entry = &mut self.token_infos[entry_index];
 
         // Work around the fact that -((-x) * y) == x * y does not hold for I80F48:
@@ -707,8 +711,8 @@ impl HealthCache {
         reserved_quote_change: I80F48,
         free_quote_change: I80F48,
     ) -> Result<()> {
-        let base_entry_index = self.token_entry_index(base_token_index)?;
-        let quote_entry_index = self.token_entry_index(quote_token_index)?;
+        let base_entry_index = self.token_info_index(base_token_index)?;
+        let quote_entry_index = self.token_info_index(quote_token_index)?;
 
         // Compute the total reserved amount change in health reference units
         let mut reserved_amount;
@@ -857,17 +861,22 @@ impl HealthCache {
     /// How much source native tokens may be swapped for target tokens while staying
     /// above the min_ratio health ratio.
     ///
-    /// TODO: Add slippage/fees.
+    /// `price`: The amount of target native you receive for one source native. So if we
+    /// swap BTC -> SOL and they're at ui prices of $20000 and $40, that means price
+    /// should be 500000 native_SOL for a native_BTC. Because 1 BTC gives you 500 SOL
+    /// so 1e6 native_BTC gives you 500e9 native_SOL.
     #[cfg(feature = "client")]
     pub fn max_swap_source_for_health_ratio(
         &self,
         source: TokenIndex,
         target: TokenIndex,
+        price: I80F48,
         min_ratio: I80F48,
     ) -> Result<I80F48> {
         // The health_ratio is a nonlinear based on swap amount.
-        // For large swap amounts the slope is guaranteed to be negative, but small amounts
-        // can have positive slope (e.g. using source deposits to pay back target borrows).
+        // For large swap amounts the slope is guaranteed to be negative (unless the price
+        // is extremely good), but small amounts can have positive slope (e.g. using
+        // source deposits to pay back target borrows).
         //
         // That means:
         // - even if the initial ratio is < min_ratio it can be useful to swap to *increase* health
@@ -883,22 +892,39 @@ impl HealthCache {
         let source = &self.token_infos[source_index];
         let target = &self.token_infos[target_index];
 
-        // There are two key slope changes: Assume source.balance > 0 and target.balance < 0. Then
-        // initially health ratio goes up. When one of balances flips sign, the health ratio slope
-        // may be positive or negative for a bit, until both balances have flipped and the slope is
-        // negative.
-        // The maximum will be at one of these points (ignoring serum3 effects).
-        let cache_after_swap = |amount| {
+        let oracle_swap_price = cm!(source.oracle_price / target.oracle_price);
+        let price_factor = cm!(price / oracle_swap_price);
+
+        // If the price is sufficiently good, then health will just increase from swapping:
+        // once we've swapped enough, swapping x reduces health by x * source_liab_weight and
+        // increases it by x * target_asset_weight * price_factor.
+        let final_health_slope = -source.init_liab_weight + target.init_asset_weight * price_factor;
+        if final_health_slope >= 0 {
+            return Ok(I80F48::MAX);
+        }
+
+        let cache_after_swap = |amount: I80F48| {
             let mut adjusted_cache = self.clone();
             adjusted_cache.token_infos[source_index].balance -= amount;
-            adjusted_cache.token_infos[target_index].balance += amount;
+            adjusted_cache.token_infos[target_index].balance += cm!(amount * price_factor);
             adjusted_cache
         };
         let health_ratio_after_swap =
             |amount| cache_after_swap(amount).health_ratio(HealthType::Init);
 
-        let point0_amount = source.balance.min(-target.balance).max(I80F48::ZERO);
-        let point1_amount = source.balance.max(-target.balance).max(I80F48::ZERO);
+        // There are two key slope changes: Assume source.balance > 0 and target.balance < 0.
+        // When these values flip sign, the health slope decreases, but could still be positive.
+        // After point1 it's definitely negative (due to final_health_slope check above).
+        // The maximum health ratio will be at 0 or at one of these points (ignoring serum3 effects).
+        let source_for_zero_target_balance = -target.balance / price_factor;
+        let point0_amount = source
+            .balance
+            .min(source_for_zero_target_balance)
+            .max(I80F48::ZERO);
+        let point1_amount = source
+            .balance
+            .max(source_for_zero_target_balance)
+            .max(I80F48::ZERO);
         let point0_ratio = health_ratio_after_swap(point0_amount);
         let (point1_ratio, point1_health) = {
             let cache = cache_after_swap(point1_amount);
@@ -960,12 +986,11 @@ impl HealthCache {
                 // If point1_ratio is still bigger than min_ratio, the target amount must be >point1_amount
                 // search to the right of point1_amount: but how far?
                 // At point1, source.balance < 0 and target.balance > 0, so use a simple estimation for
-                // zero health: health - source_liab_weight * a + target_asset_weight * a = 0.
+                // zero health: health - source_liab_weight * a + target_asset_weight * a * price_factor = 0.
                 if point1_health <= 0 {
                     return Ok(I80F48::ZERO);
                 }
-                let zero_health_amount = point1_amount
-                    + point1_health / (source.init_liab_weight - target.init_asset_weight);
+                let zero_health_amount = point1_amount - point1_health / final_health_slope;
                 let zero_health_ratio = health_ratio_after_swap(zero_health_amount);
                 binary_approximation_search(
                     point1_amount,
@@ -984,12 +1009,14 @@ impl HealthCache {
                     min_ratio,
                 )?
             } else {
-                // can't happen because slope between 0 and point0_amount is positive!
-                return Err(error_msg!(
-                    "internal error: assert that init ratio {} <= point0 ratio {}",
+                // Must be between 0 and point0_amount
+                binary_approximation_search(
+                    I80F48::ZERO,
                     initial_ratio,
-                    point0_ratio
-                ));
+                    point0_amount,
+                    point0_ratio,
+                    min_ratio,
+                )?
             };
 
         Ok(amount / source.oracle_price)
@@ -1666,7 +1693,12 @@ mod tests {
         assert_eq!(health_cache.health_ratio(HealthType::Init), I80F48::MAX);
         assert_eq!(
             health_cache
-                .max_swap_source_for_health_ratio(0, 1, I80F48::from_num(50.0))
+                .max_swap_source_for_health_ratio(
+                    0,
+                    1,
+                    I80F48::from_num(2.0 / 3.0),
+                    I80F48::from_num(50.0)
+                )
                 .unwrap(),
             I80F48::ZERO
         );
@@ -1675,39 +1707,66 @@ mod tests {
             let ti = &mut c.token_infos[ti as usize];
             ti.balance += I80F48::from_num(usdc);
         };
-        let find_max_swap_actual =
-            |c: &HealthCache, source: TokenIndex, target: TokenIndex, ratio: f64| {
-                let source_amount = c
-                    .max_swap_source_for_health_ratio(source, target, I80F48::from_num(ratio))
-                    .unwrap();
-                let mut c = c.clone();
-                let source_price = c.token_infos[source as usize].oracle_price;
-                let target_price = c.token_infos[target as usize].oracle_price;
-                c.adjust_token_balance(source, -source_amount).unwrap();
-                c.adjust_token_balance(target, source_amount * source_price / target_price)
-                    .unwrap();
-                (
-                    source_amount.to_num::<f64>(),
-                    c.health_ratio(HealthType::Init).to_num::<f64>(),
+        let find_max_swap_actual = |c: &HealthCache,
+                                    source: TokenIndex,
+                                    target: TokenIndex,
+                                    ratio: f64,
+                                    price_factor: f64| {
+            let mut c = c.clone();
+            let source_price = c.token_infos[source as usize].oracle_price;
+            let target_price = c.token_infos[target as usize].oracle_price;
+            let swap_price = I80F48::from_num(price_factor) * source_price / target_price;
+            let source_amount = c
+                .max_swap_source_for_health_ratio(
+                    source,
+                    target,
+                    swap_price,
+                    I80F48::from_num(ratio),
                 )
-            };
-        let check_max_swap_result =
-            |c: &HealthCache, source: TokenIndex, target: TokenIndex, ratio: f64| {
-                let (source_amount, actual_ratio) = find_max_swap_actual(c, source, target, ratio);
-                println!(
-                    "checking {} to {} for target ratio {}: actual ratio: {}, amount: {}",
-                    source, target, ratio, actual_ratio, source_amount
+                .unwrap();
+            if source_amount == I80F48::MAX {
+                return (f64::MAX, f64::MAX);
+            }
+            c.adjust_token_balance(source, -source_amount).unwrap();
+            c.adjust_token_balance(target, source_amount * swap_price)
+                .unwrap();
+            (
+                source_amount.to_num::<f64>(),
+                c.health_ratio(HealthType::Init).to_num::<f64>(),
+            )
+        };
+        let check_max_swap_result = |c: &HealthCache,
+                                     source: TokenIndex,
+                                     target: TokenIndex,
+                                     ratio: f64,
+                                     price_factor: f64| {
+            let (source_amount, actual_ratio) =
+                find_max_swap_actual(c, source, target, ratio, price_factor);
+            println!(
+                    "checking {source} to {target} for price_factor: {price_factor}, target ratio {ratio}: actual ratio: {actual_ratio}, amount: {source_amount}",
                 );
-                assert!((ratio - actual_ratio).abs() < 1.0);
-            };
+            assert!((ratio - actual_ratio).abs() < 1.0);
+        };
 
         {
             println!("test 0");
             let mut health_cache = health_cache.clone();
             adjust_by_usdc(&mut health_cache, 1, 100.0);
-            check_max_swap_result(&health_cache, 0, 1, 50.0);
-            check_max_swap_result(&health_cache, 1, 0, 50.0);
-            check_max_swap_result(&health_cache, 0, 2, 50.0);
+
+            for price_factor in [0.1, 0.9, 1.1] {
+                for target in 1..100 {
+                    let target = target as f64;
+                    check_max_swap_result(&health_cache, 0, 1, target, price_factor);
+                    check_max_swap_result(&health_cache, 1, 0, target, price_factor);
+                    check_max_swap_result(&health_cache, 0, 2, target, price_factor);
+                }
+            }
+
+            // At this unlikely price it's healthy to swap infinitely
+            assert_eq!(
+                find_max_swap_actual(&health_cache, 0, 1, 50.0, 1.5).0,
+                f64::MAX
+            );
         }
 
         {
@@ -1715,10 +1774,16 @@ mod tests {
             let mut health_cache = health_cache.clone();
             adjust_by_usdc(&mut health_cache, 0, -20.0);
             adjust_by_usdc(&mut health_cache, 1, 100.0);
-            check_max_swap_result(&health_cache, 0, 1, 50.0);
-            check_max_swap_result(&health_cache, 1, 0, 50.0);
-            check_max_swap_result(&health_cache, 0, 2, 50.0);
-            check_max_swap_result(&health_cache, 2, 0, 50.0);
+
+            for price_factor in [0.1, 0.9, 1.1] {
+                for target in 1..100 {
+                    let target = target as f64;
+                    check_max_swap_result(&health_cache, 0, 1, target, price_factor);
+                    check_max_swap_result(&health_cache, 1, 0, target, price_factor);
+                    check_max_swap_result(&health_cache, 0, 2, target, price_factor);
+                    check_max_swap_result(&health_cache, 2, 0, target, price_factor);
+                }
+            }
         }
 
         {
@@ -1727,7 +1792,7 @@ mod tests {
             adjust_by_usdc(&mut health_cache, 0, -50.0);
             adjust_by_usdc(&mut health_cache, 1, 100.0);
             // possible even though the init ratio is <100
-            check_max_swap_result(&health_cache, 1, 0, 100.0);
+            check_max_swap_result(&health_cache, 1, 0, 100.0, 1.0);
         }
 
         {
@@ -1740,7 +1805,7 @@ mod tests {
             // swapping with a high ratio advises paying back all liabs
             // and then swapping even more because increasing assets in 0 has better asset weight
             let init_ratio = health_cache.health_ratio(HealthType::Init);
-            let (amount, actual_ratio) = find_max_swap_actual(&health_cache, 1, 0, 100.0);
+            let (amount, actual_ratio) = find_max_swap_actual(&health_cache, 1, 0, 100.0, 1.0);
             println!(
                 "init {}, after {}, amount {}",
                 init_ratio, actual_ratio, amount
@@ -1759,9 +1824,9 @@ mod tests {
             let init_ratio = health_cache.health_ratio(HealthType::Init);
             assert!(init_ratio > 3 && init_ratio < 4);
 
-            check_max_swap_result(&health_cache, 0, 1, 1.0);
-            check_max_swap_result(&health_cache, 0, 1, 3.0);
-            check_max_swap_result(&health_cache, 0, 1, 4.0);
+            check_max_swap_result(&health_cache, 0, 1, 1.0, 1.0);
+            check_max_swap_result(&health_cache, 0, 1, 3.0, 1.0);
+            check_max_swap_result(&health_cache, 0, 1, 4.0, 1.0);
         }
     }
 
