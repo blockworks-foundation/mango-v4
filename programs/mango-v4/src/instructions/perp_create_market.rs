@@ -100,7 +100,7 @@ pub fn perp_create_market(
         registration_time: Clock::get()?.unix_timestamp,
         padding1: Default::default(),
         padding2: Default::default(),
-        reserved: [0; 128],
+        reserved: [0; 112],
     };
 
     let mut bids = ctx.accounts.bids.load_init()?;

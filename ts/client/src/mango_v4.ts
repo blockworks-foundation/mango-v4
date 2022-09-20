@@ -3890,15 +3890,6 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "feesSettled",
-            "docs": [
-              "Fees settled in native quote currency"
-            ],
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
             "name": "bump",
             "docs": [
               "Liquidity mining metadata",
@@ -3927,11 +3918,20 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "feesSettled",
+            "docs": [
+              "Fees settled in native quote currency"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                112
               ]
             }
           }
@@ -4610,6 +4610,150 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "InnerNode",
+      "docs": [
+        "InnerNodes and LeafNodes compose the binary tree of orders.",
+        "",
+        "Each InnerNode has exactly two children, which are either InnerNodes themselves,",
+        "or LeafNodes. The children share the top `prefix_len` bits of `key`. The left",
+        "child has a 0 in the next bit, and the right a 1."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tag",
+            "type": "u32"
+          },
+          {
+            "name": "prefixLen",
+            "docs": [
+              "number of highest `key` bits that all children share",
+              "e.g. if it's 2, the two highest bits of `key` will be the same on all children"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "key",
+            "docs": [
+              "only the top `prefix_len` bits of `key` are relevant"
+            ],
+            "type": "i128"
+          },
+          {
+            "name": "children",
+            "docs": [
+              "indexes into `BookSide::nodes`"
+            ],
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "childEarliestExpiry",
+            "docs": [
+              "The earliest expiry timestamp for the left and right subtrees.",
+              "",
+              "Needed to be able to find and remove expired orders without having to",
+              "iterate through the whole bookside."
+            ],
+            "type": {
+              "array": [
+                "u64",
+                2
+              ]
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                48
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeafNode",
+      "docs": [
+        "LeafNodes represent an order in the binary tree"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tag",
+            "type": "u32"
+          },
+          {
+            "name": "ownerSlot",
+            "type": "u8"
+          },
+          {
+            "name": "orderType",
+            "type": {
+              "defined": "OrderType"
+            }
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                1
+              ]
+            }
+          },
+          {
+            "name": "timeInForce",
+            "docs": [
+              "Time in seconds after `timestamp` at which the order expires.",
+              "A value of 0 means no expiry."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "key",
+            "docs": [
+              "The binary tree key"
+            ],
+            "type": "i128"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
+            "name": "clientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "AnyNode",
       "type": {
         "kind": "struct",
@@ -4665,6 +4809,166 @@ export type MangoV4 = {
               "array": [
                 "u8",
                 207
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "FillEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "eventType",
+            "type": "u8"
+          },
+          {
+            "name": "takerSide",
+            "type": {
+              "defined": "Side"
+            }
+          },
+          {
+            "name": "makerOut",
+            "type": "bool"
+          },
+          {
+            "name": "makerSlot",
+            "type": "u8"
+          },
+          {
+            "name": "marketFeesApplied",
+            "type": "bool"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "seqNum",
+            "type": "u64"
+          },
+          {
+            "name": "maker",
+            "type": "publicKey"
+          },
+          {
+            "name": "makerOrderId",
+            "type": "i128"
+          },
+          {
+            "name": "makerClientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "makerFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "makerTimestamp",
+            "type": "u64"
+          },
+          {
+            "name": "taker",
+            "type": "publicKey"
+          },
+          {
+            "name": "takerOrderId",
+            "type": "i128"
+          },
+          {
+            "name": "takerClientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "takerFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "price",
+            "type": "i64"
+          },
+          {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OutEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "eventType",
+            "type": "u8"
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": "Side"
+            }
+          },
+          {
+            "name": "ownerSlot",
+            "type": "u8"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                5
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "seqNum",
+            "type": "u64"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
+            "name": "padding1",
+            "type": {
+              "array": [
+                "u8",
+                144
               ]
             }
           }
@@ -9575,15 +9879,6 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "feesSettled",
-            "docs": [
-              "Fees settled in native quote currency"
-            ],
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
             "name": "bump",
             "docs": [
               "Liquidity mining metadata",
@@ -9612,11 +9907,20 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "feesSettled",
+            "docs": [
+              "Fees settled in native quote currency"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                112
               ]
             }
           }
@@ -10295,6 +10599,150 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "InnerNode",
+      "docs": [
+        "InnerNodes and LeafNodes compose the binary tree of orders.",
+        "",
+        "Each InnerNode has exactly two children, which are either InnerNodes themselves,",
+        "or LeafNodes. The children share the top `prefix_len` bits of `key`. The left",
+        "child has a 0 in the next bit, and the right a 1."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tag",
+            "type": "u32"
+          },
+          {
+            "name": "prefixLen",
+            "docs": [
+              "number of highest `key` bits that all children share",
+              "e.g. if it's 2, the two highest bits of `key` will be the same on all children"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "key",
+            "docs": [
+              "only the top `prefix_len` bits of `key` are relevant"
+            ],
+            "type": "i128"
+          },
+          {
+            "name": "children",
+            "docs": [
+              "indexes into `BookSide::nodes`"
+            ],
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "childEarliestExpiry",
+            "docs": [
+              "The earliest expiry timestamp for the left and right subtrees.",
+              "",
+              "Needed to be able to find and remove expired orders without having to",
+              "iterate through the whole bookside."
+            ],
+            "type": {
+              "array": [
+                "u64",
+                2
+              ]
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                48
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeafNode",
+      "docs": [
+        "LeafNodes represent an order in the binary tree"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tag",
+            "type": "u32"
+          },
+          {
+            "name": "ownerSlot",
+            "type": "u8"
+          },
+          {
+            "name": "orderType",
+            "type": {
+              "defined": "OrderType"
+            }
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                1
+              ]
+            }
+          },
+          {
+            "name": "timeInForce",
+            "docs": [
+              "Time in seconds after `timestamp` at which the order expires.",
+              "A value of 0 means no expiry."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "key",
+            "docs": [
+              "The binary tree key"
+            ],
+            "type": "i128"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
+            "name": "clientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "AnyNode",
       "type": {
         "kind": "struct",
@@ -10350,6 +10798,166 @@ export const IDL: MangoV4 = {
               "array": [
                 "u8",
                 207
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "FillEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "eventType",
+            "type": "u8"
+          },
+          {
+            "name": "takerSide",
+            "type": {
+              "defined": "Side"
+            }
+          },
+          {
+            "name": "makerOut",
+            "type": "bool"
+          },
+          {
+            "name": "makerSlot",
+            "type": "u8"
+          },
+          {
+            "name": "marketFeesApplied",
+            "type": "bool"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "seqNum",
+            "type": "u64"
+          },
+          {
+            "name": "maker",
+            "type": "publicKey"
+          },
+          {
+            "name": "makerOrderId",
+            "type": "i128"
+          },
+          {
+            "name": "makerClientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "makerFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "makerTimestamp",
+            "type": "u64"
+          },
+          {
+            "name": "taker",
+            "type": "publicKey"
+          },
+          {
+            "name": "takerOrderId",
+            "type": "i128"
+          },
+          {
+            "name": "takerClientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "takerFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "price",
+            "type": "i64"
+          },
+          {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OutEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "eventType",
+            "type": "u8"
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": "Side"
+            }
+          },
+          {
+            "name": "ownerSlot",
+            "type": "u8"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                5
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "seqNum",
+            "type": "u64"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
+            "name": "padding1",
+            "type": {
+              "array": [
+                "u8",
+                144
               ]
             }
           }

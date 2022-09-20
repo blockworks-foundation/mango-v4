@@ -26,7 +26,7 @@ pub enum NodeTag {
 /// Each InnerNode has exactly two children, which are either InnerNodes themselves,
 /// or LeafNodes. The children share the top `prefix_len` bits of `key`. The left
 /// child has a 0 in the next bit, and the right a 1.
-#[derive(Copy, Clone, Pod)]
+#[derive(Copy, Clone, Pod, AnchorSerialize, AnchorDeserialize)]
 #[repr(C)]
 pub struct InnerNode {
     pub tag: u32,
@@ -46,8 +46,10 @@ pub struct InnerNode {
     /// iterate through the whole bookside.
     pub child_earliest_expiry: [u64; 2],
 
-    pub reserved: [u8; NODE_SIZE - 48],
+    pub reserved: [u8; 48],
 }
+const_assert_eq!(size_of::<InnerNode>() % 8, 0);
+const_assert_eq!(size_of::<InnerNode>(), NODE_SIZE);
 
 impl InnerNode {
     pub fn new(prefix_len: u32, key: i128) -> Self {
@@ -77,12 +79,14 @@ impl InnerNode {
 }
 
 /// LeafNodes represent an order in the binary tree
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Pod)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Pod, AnchorSerialize, AnchorDeserialize)]
 #[repr(C)]
 pub struct LeafNode {
     pub tag: u32,
     pub owner_slot: u8,
     pub order_type: OrderType, // this was added for TradingView move order
+
+    pub padding: [u8; 1],
 
     /// Time in seconds after `timestamp` at which the order expires.
     /// A value of 0 means no expiry.
@@ -98,8 +102,10 @@ pub struct LeafNode {
     // The time the order was placed
     pub timestamp: u64,
 
-    pub reserved: [u8; NODE_SIZE - 81],
+    pub reserved: [u8; 16],
 }
+const_assert_eq!(size_of::<LeafNode>() % 8, 0);
+const_assert_eq!(size_of::<LeafNode>(), NODE_SIZE);
 
 #[inline(always)]
 fn key_to_price(key: i128) -> i64 {
@@ -122,13 +128,14 @@ impl LeafNode {
             tag: NodeTag::LeafNode.into(),
             owner_slot,
             order_type,
+            padding: [0],
             time_in_force,
             key,
             owner,
             quantity,
             client_order_id,
             timestamp,
-            reserved: [0; NODE_SIZE - 81],
+            reserved: [0; 16],
         }
     }
 

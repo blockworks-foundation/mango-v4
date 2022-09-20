@@ -8,11 +8,13 @@ import { Bank } from './bank';
 import { Group } from './group';
 import { HealthCache, HealthCacheDto } from './healthCache';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from './I80F48';
+import { PerpOrder } from './perp';
 import { Serum3Market, Serum3Side } from './serum3';
 export class MangoAccount {
   public tokens: TokenPosition[];
   public serum3: Serum3Orders[];
   public perps: PerpPosition[];
+  public perpOpenOrders: PerpOo[];
   public name: string;
 
   static from(
@@ -49,7 +51,7 @@ export class MangoAccount {
       obj.tokens as TokenPositionDto[],
       obj.serum3 as Serum3PositionDto[],
       obj.perps as PerpPositionDto[],
-      obj.perpOpenOrders as any,
+      obj.perpOpenOrders as PerpOoDto[],
       {} as any,
     );
   }
@@ -69,13 +71,14 @@ export class MangoAccount {
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
     perps: PerpPositionDto[],
-    perpOpenOrders: PerpPositionDto[],
+    perpOpenOrders: PerpOoDto[],
     public accountData: undefined | MangoAccountData,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.tokens = tokens.map((dto) => TokenPosition.from(dto));
     this.serum3 = serum3.map((dto) => Serum3Orders.from(dto));
     this.perps = perps.map((dto) => PerpPosition.from(dto));
+    this.perpOpenOrders = perpOpenOrders.map((dto) => PerpOo.from(dto));
     this.accountData = undefined;
   }
 
@@ -103,6 +106,12 @@ export class MangoAccount {
 
   perpActive(): PerpPosition[] {
     return this.perps.filter((perp) => perp.isActive());
+  }
+
+  perpOrdersActive(): PerpOo[] {
+    return this.perpOpenOrders.filter(
+      (oo) => oo.orderMarket !== PerpOo.OrderMarketUnset,
+    );
   }
 
   findToken(tokenIndex: number): TokenPosition | undefined {
@@ -675,23 +684,22 @@ export class MangoAccount {
     ).toNumber();
   }
 
-  /**
-   * The remaining native quote margin available for given market.
-   *
-   * TODO: this is a very bad estimation atm.
-   * It assumes quote asset is always quote,
-   * it assumes that there are no interaction effects,
-   * it assumes that there are no existing borrows for either of the tokens in the market.
-   */
-  getPerpMarketMarginAvailable(
+  public async loadPerpOpenOrdersForMarket(
+    client: MangoClient,
     group: Group,
-    marketName: string,
-  ): I80F48 | undefined {
-    if (!this.accountData) return undefined;
-    const initHealth = this.accountData.initHealth;
-    const perpMarket = group.perpMarketsMap.get(marketName)!;
-    const marketAssetWeight = perpMarket.initAssetWeight;
-    return initHealth.div(ONE_I80F48().sub(marketAssetWeight));
+    perpMarketName: string,
+  ): Promise<PerpOrder[]> {
+    const perpMarket = group.perpMarketsMap.get(perpMarketName);
+    if (!perpMarket) {
+      throw new Error(`Perp Market ${perpMarketName} not found!`);
+    }
+    const [bids, asks] = await Promise.all([
+      perpMarket.loadBids(client),
+      perpMarket.loadAsks(client),
+    ]);
+    return [...Array.from(bids.items()), ...Array.from(asks.items())].filter(
+      (order) => order.owner.equals(this.publicKey),
+    );
   }
 
   toString(group?: Group): string {
@@ -701,6 +709,9 @@ export class MangoAccount {
     res = res + '\n owner: ' + this.owner;
     res = res + '\n delegate: ' + this.delegate;
 
+    res =
+      res +
+      `\n max token slots ${this.tokens.length}, max serum3 slots ${this.serum3.length}, max perp slots ${this.perps.length}, max perp oo slots ${this.perpOpenOrders.length}`;
     res =
       this.tokensActive().length > 0
         ? res +
@@ -724,6 +735,13 @@ export class MangoAccount {
     res =
       this.perpActive().length > 0
         ? res + '\n perps:' + JSON.stringify(this.perpActive(), null, 4)
+        : res + '';
+
+    res =
+      this.perpOrdersActive().length > 0
+        ? res +
+          '\n perps oo:' +
+          JSON.stringify(this.perpOrdersActive(), null, 4)
         : res + '';
 
     return res;
@@ -884,7 +902,7 @@ export class PerpPosition {
     return new PerpPosition(
       dto.marketIndex,
       dto.basePositionLots.toNumber(),
-      dto.quotePositionNative.val.toNumber(),
+      dto.quotePositionNative.val,
       dto.bidsBaseLots.toNumber(),
       dto.asksBaseLots.toNumber(),
       dto.takerBaseLots.toNumber(),
@@ -895,7 +913,7 @@ export class PerpPosition {
   constructor(
     public marketIndex: number,
     public basePositionLots: number,
-    public quotePositionNative: number,
+    public quotePositionNative: BN,
     public bidsBaseLots: number,
     public asksBaseLots: number,
     public takerBaseLots: number,
@@ -917,6 +935,33 @@ export class PerpPositionDto {
     public asksBaseLots: BN,
     public takerBaseLots: BN,
     public takerQuoteLots: BN,
+  ) {}
+}
+
+export class PerpOo {
+  static OrderMarketUnset = 65535;
+  static from(dto: PerpOoDto) {
+    return new PerpOo(
+      dto.orderSide,
+      dto.orderMarket,
+      dto.clientOrderId.toNumber(),
+      dto.orderId,
+    );
+  }
+
+  constructor(
+    public orderSide: any,
+    public orderMarket: 0,
+    public clientOrderId: number,
+    public orderId: BN,
+  ) {}
+}
+export class PerpOoDto {
+  constructor(
+    public orderSide: any,
+    public orderMarket: 0,
+    public clientOrderId: BN,
+    public orderId: BN,
   ) {}
 }
 

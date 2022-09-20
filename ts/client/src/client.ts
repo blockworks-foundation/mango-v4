@@ -33,7 +33,7 @@ import {
   TokenPosition,
 } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
-import { OrderType, PerpMarket, Side } from './accounts/perp';
+import { PerpMarket, PerpOrderType, Side } from './accounts/perp';
 import {
   generateSerum3MarketExternalVaultSignerAddress,
   Serum3Market,
@@ -945,11 +945,19 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
 
+    const marketIndexBuf = Buffer.alloc(2);
+    marketIndexBuf.writeUInt16LE(serum3Market.marketIndex);
+    const [indexReservation] = await PublicKey.findProgramAddress(
+      [Buffer.from('Serum3Index'), group.publicKey.toBuffer(), marketIndexBuf],
+      this.program.programId,
+    );
+
     return await this.program.methods
       .serum3DeregisterMarket()
       .accounts({
         group: group.publicKey,
         serumMarket: serum3Market.publicKey,
+        indexReservation,
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
       })
@@ -1472,12 +1480,11 @@ export class MangoClient {
     quantity: number,
     maxQuoteQuantity: number,
     clientOrderId: number,
-    orderType: OrderType,
+    orderType: PerpOrderType,
     expiryTimestamp: number,
     limit: number,
-  ) {
+  ): Promise<TransactionSignature> {
     const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
-
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
         AccountRetriever.Fixed,
@@ -1486,22 +1493,14 @@ export class MangoClient {
         [],
         [perpMarket],
       );
-
-    const [nativePrice, nativeQuantity] = perpMarket.uiToNativePriceQuantity(
-      price,
-      quantity,
-    );
-
-    const maxQuoteQuantityLots = maxQuoteQuantity
-      ? perpMarket.uiQuoteToLots(maxQuoteQuantity)
-      : I64_MAX_BN;
-
-    await this.program.methods
+    return await this.program.methods
       .perpPlaceOrder(
         side,
-        nativePrice,
-        nativeQuantity,
-        maxQuoteQuantityLots,
+        perpMarket.uiPriceToLots(price),
+        perpMarket.uiBaseToLots(quantity),
+        maxQuoteQuantity
+          ? perpMarket.uiQuoteToLots(maxQuoteQuantity)
+          : I64_MAX_BN,
         new BN(clientOrderId),
         orderType,
         new BN(expiryTimestamp),
@@ -1523,6 +1522,26 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
+      .rpc();
+  }
+
+  async perpCancelAllOrders(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketName: string,
+    limit: number,
+  ): Promise<TransactionSignature> {
+    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+    return await this.program.methods
+      .perpCancelAllOrders(limit)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        perpMarket: perpMarket.publicKey,
+        asks: perpMarket.asks,
+        bids: perpMarket.bids,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
       .rpc();
   }
 

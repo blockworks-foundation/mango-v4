@@ -174,7 +174,7 @@ pub enum EventType {
     Liquidate,
 }
 
-#[derive(Copy, Clone, Debug, Pod)]
+#[derive(Copy, Clone, Debug, Pod, AnchorSerialize, AnchorDeserialize)]
 #[repr(C)]
 pub struct FillEvent {
     pub event_type: u8,
@@ -203,6 +203,7 @@ pub struct FillEvent {
     pub quantity: i64, // number of quote lots
     pub reserved: [u8; 16],
 }
+const_assert_eq!(size_of::<FillEvent>() % 8, 0);
 const_assert_eq!(size_of::<FillEvent>(), EVENT_SIZE);
 
 impl FillEvent {
@@ -264,7 +265,7 @@ impl FillEvent {
     }
 }
 
-#[derive(Copy, Clone, Debug, Pod)]
+#[derive(Copy, Clone, Debug, Pod, AnchorSerialize, AnchorDeserialize)]
 #[repr(C)]
 pub struct OutEvent {
     pub event_type: u8,
@@ -275,8 +276,9 @@ pub struct OutEvent {
     pub seq_num: u64,
     pub owner: Pubkey,
     pub quantity: i64,
-    padding1: [u8; EVENT_SIZE - 64],
+    padding1: [u8; 144],
 }
+const_assert_eq!(size_of::<OutEvent>() % 8, 0);
 const_assert_eq!(size_of::<OutEvent>(), EVENT_SIZE);
 
 impl OutEvent {
