@@ -7,7 +7,7 @@ import {
   Orderbook,
 } from '@project-serum/serum';
 import { parsePriceData, PriceData } from '@pythnetwork/client';
-import { PublicKey } from '@solana/web3.js';
+import { AccountInfo, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
@@ -20,7 +20,7 @@ import {
   isSwitchboardOracle,
   parseSwitchboardOracle,
 } from './oracle';
-import { PerpMarket } from './perp';
+import { BookSide, PerpMarket } from './perp';
 import { Serum3Market } from './serum3';
 
 export class Group {
@@ -98,7 +98,7 @@ export class Group {
     await Promise.all([
       this.reloadBanks(client, ids).then(() =>
         Promise.all([
-          this.reloadBankPrices(client),
+          this.reloadBankOraclePrices(client),
           this.reloadVaults(client, ids),
         ]),
       ),
@@ -106,7 +106,9 @@ export class Group {
       this.reloadSerum3Markets(client, ids).then(() =>
         this.reloadSerum3ExternalMarkets(client, ids),
       ),
-      this.reloadPerpMarkets(client, ids),
+      this.reloadPerpMarkets(client, ids).then(() =>
+        this.reloadPerpMarketOraclePrices(client),
+      ),
     ]);
     // console.timeEnd('group.reload');
   }
@@ -229,59 +231,93 @@ export class Group {
     );
   }
 
-  public async reloadBankPrices(client: MangoClient): Promise<void> {
+  public async reloadBankOraclePrices(client: MangoClient): Promise<void> {
     const banks: Bank[][] = Array.from(
       this.banksMapByMint,
       ([, value]) => value,
     );
     const oracles = banks.map((b) => b[0].oracle);
-    const prices =
+    const ais =
       await client.program.provider.connection.getMultipleAccountsInfo(oracles);
 
     const coder = new BorshAccountsCoder(client.program.idl);
-    for (const [index, price] of prices.entries()) {
+    for (const [index, ai] of ais.entries()) {
       for (const bank of banks[index]) {
         if (bank.name === 'USDC') {
           bank.price = ONE_I80F48();
           bank.uiPrice = 1;
         } else {
-          // TODO: Implement switchboard oracle type
-          if (!price)
-            throw new Error('Undefined price object in reloadBankPrices');
-          if (
-            !BorshAccountsCoder.accountDiscriminator('stubOracle').compare(
-              price.data.slice(0, 8),
-            )
-          ) {
-            const stubOracle = coder.decode('stubOracle', price.data);
-            bank.price = new I80F48(stubOracle.price.val);
-            bank.uiPrice = this?.toUiPrice(
-              bank.price,
-              bank.mint,
-              this.insuranceMint,
-            );
-          } else if (isPythOracle(price)) {
-            bank.uiPrice = parsePriceData(price.data).previousPrice;
-            bank.price = this?.toNativePrice(
-              bank.uiPrice,
-              bank.mint,
-              this.insuranceMint,
-            );
-          } else if (isSwitchboardOracle(price)) {
-            bank.uiPrice = await parseSwitchboardOracle(price);
-            bank.price = this?.toNativePrice(
-              bank.uiPrice,
-              bank.mint,
-              this.insuranceMint,
-            );
-          } else {
+          if (!ai)
             throw new Error(
-              `Unknown oracle provider for oracle ${bank.oracle}, with owner ${price.owner}`,
+              `Undefined accountInfo object in reloadBankOraclePrices for ${bank.oracle}!`,
             );
-          }
+          const { price, uiPrice } = await this.decodePriceFromOracleAi(
+            coder,
+            bank.oracle,
+            ai,
+            this.getMintDecimals(bank.mint),
+            this.getMintDecimals(this.insuranceMint),
+          );
+          bank.price = price;
+          bank.uiPrice = uiPrice;
         }
       }
     }
+  }
+
+  public async reloadPerpMarketOraclePrices(
+    client: MangoClient,
+  ): Promise<void> {
+    const perpMarkets: PerpMarket[] = Array.from(this.perpMarketsMap.values());
+    const oracles = perpMarkets.map((b) => b.oracle);
+    const ais =
+      await client.program.provider.connection.getMultipleAccountsInfo(oracles);
+
+    const coder = new BorshAccountsCoder(client.program.idl);
+    ais.forEach(async (ai, i) => {
+      const perpMarket = perpMarkets[i];
+      if (!ai)
+        throw new Error('Undefined ai object in reloadPerpMarketOraclePrices!');
+      const { price, uiPrice } = await this.decodePriceFromOracleAi(
+        coder,
+        perpMarket.oracle,
+        ai,
+        perpMarket.baseTokenDecimals,
+        this.getMintDecimals(this.insuranceMint),
+      );
+      perpMarket.price = price;
+      perpMarket.uiPrice = uiPrice;
+    });
+  }
+
+  private async decodePriceFromOracleAi(
+    coder: BorshAccountsCoder<string>,
+    oracle: PublicKey,
+    ai: AccountInfo<Buffer>,
+    baseDecimals: number,
+    quoteDecimals: number,
+  ) {
+    let price, uiPrice;
+    if (
+      !BorshAccountsCoder.accountDiscriminator('stubOracle').compare(
+        ai.data.slice(0, 8),
+      )
+    ) {
+      const stubOracle = coder.decode('stubOracle', ai.data);
+      price = new I80F48(stubOracle.price.val);
+      uiPrice = this?.toUiPrice(price, baseDecimals, quoteDecimals);
+    } else if (isPythOracle(ai)) {
+      uiPrice = parsePriceData(ai.data).previousPrice;
+      price = this?.toNativePrice(uiPrice, baseDecimals, quoteDecimals);
+    } else if (isSwitchboardOracle(ai)) {
+      uiPrice = await parseSwitchboardOracle(ai);
+      price = this?.toNativePrice(uiPrice, baseDecimals, quoteDecimals);
+    } else {
+      throw new Error(
+        `Unknown oracle provider for oracle ${oracle}, with owner ${ai.owner}`,
+      );
+    }
+    return { price, uiPrice };
   }
 
   public async reloadVaults(client: MangoClient, ids?: Id): Promise<void> {
@@ -394,6 +430,28 @@ export class Group {
     return maker ? rates.maker : rates.taker;
   }
 
+  public async loadPerpBidsForMarket(
+    client: MangoClient,
+    marketName: string,
+  ): Promise<BookSide> {
+    const perpMarket = this.perpMarketsMap.get(marketName);
+    if (!perpMarket) {
+      throw new Error(`Perp Market ${marketName} not found!`);
+    }
+    return await perpMarket.loadBids(client);
+  }
+
+  public async loadPerpAsksForMarket(
+    client: MangoClient,
+    marketName: string,
+  ): Promise<BookSide> {
+    const perpMarket = this.perpMarketsMap.get(marketName);
+    if (!perpMarket) {
+      throw new Error(`Perp Market ${marketName} not found!`);
+    }
+    return await perpMarket.loadAsks(client);
+  }
+
   /**
    *
    * @param mintPk
@@ -416,25 +474,21 @@ export class Group {
 
   public toUiPrice(
     price: I80F48,
-    tokenMintPk: PublicKey,
-    quoteMintPk: PublicKey,
+    baseDecimals: number,
+    quoteDecimals: number,
   ): number {
-    const tokenDecimals = this.getMintDecimals(tokenMintPk);
-    const quoteDecimals = this.getMintDecimals(quoteMintPk);
     return price
-      .mul(I80F48.fromNumber(Math.pow(10, tokenDecimals - quoteDecimals)))
+      .mul(I80F48.fromNumber(Math.pow(10, baseDecimals - quoteDecimals)))
       .toNumber();
   }
 
   public toNativePrice(
     uiPrice: number,
-    tokenMintPk: PublicKey,
-    quoteMintPk: PublicKey,
+    baseDecimals: number,
+    quoteDecimals: number,
   ): I80F48 {
-    const tokenDecimals = this.getMintDecimals(tokenMintPk);
-    const quoteDecimals = this.getMintDecimals(quoteMintPk);
     return I80F48.fromNumber(uiPrice).mul(
-      I80F48.fromNumber(Math.pow(10, quoteDecimals - tokenDecimals)),
+      I80F48.fromNumber(Math.pow(10, quoteDecimals - baseDecimals)),
     );
   }
 

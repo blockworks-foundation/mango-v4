@@ -188,8 +188,14 @@ pub fn maybe_liquidate_account(
 
         let health_cache =
             new_health_cache_(&mango_client.context, account_fetcher, &liqor).expect("always ok");
+
+        let source_price = health_cache.token_info(source).unwrap().oracle_price;
+        let target_price = health_cache.token_info(target).unwrap().oracle_price;
+        // TODO: This is where we could multiply in the liquidation fee factors
+        let oracle_swap_price = source_price / target_price;
+
         let amount = health_cache
-            .max_swap_source_for_health_ratio(source, target, min_health_ratio)
+            .max_swap_source_for_health_ratio(source, target, oracle_swap_price, min_health_ratio)
             .context("getting max_swap_source")?;
         Ok(amount)
     };
