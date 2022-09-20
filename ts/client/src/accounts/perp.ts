@@ -16,12 +16,14 @@ export class PerpMarket {
   public liquidationFee: I80F48;
   public makerFee: I80F48;
   public takerFee: I80F48;
+  public minFunding: I80F48;
+  public maxFunding: I80F48;
   public openInterest: number;
   public seqNum: number;
   public feesAccrued: I80F48;
-  priceLotsToUiConvertor: number;
-  baseLotsToUiConvertor: number;
-  quoteLotsToUiConvertor: number;
+  priceLotsToUiConverter: number;
+  baseLotsToUiConverter: number;
+  quoteLotsToUiConverter: number;
   public price: number;
   public uiPrice: number;
 
@@ -119,7 +121,7 @@ export class PerpMarket {
     makerFee: I80F48Dto,
     takerFee: I80F48Dto,
     minFunding: I80F48Dto,
-    maxFundingI80F48Dto,
+    maxFunding: I80F48Dto,
     public impactQuantity: BN,
     longFunding: I80F48Dto,
     shortFunding: I80F48Dto,
@@ -139,22 +141,24 @@ export class PerpMarket {
     this.liquidationFee = I80F48.from(liquidationFee);
     this.makerFee = I80F48.from(makerFee);
     this.takerFee = I80F48.from(takerFee);
+    this.minFunding = I80F48.from(minFunding);
+    this.maxFunding = I80F48.from(maxFunding);
     this.openInterest = openInterest.toNumber();
     this.seqNum = seqNum.toNumber();
     this.feesAccrued = I80F48.from(feesAccrued);
 
-    this.priceLotsToUiConvertor = new Big(10)
+    this.priceLotsToUiConverter = new Big(10)
       .pow(baseTokenDecimals - QUOTE_DECIMALS)
       .mul(new Big(this.quoteLotSize.toString()))
       .div(new Big(this.baseLotSize.toString()))
       .toNumber();
 
-    this.baseLotsToUiConvertor = new Big(this.baseLotSize.toString())
+    this.baseLotsToUiConverter = new Big(this.baseLotSize.toString())
       .div(new Big(10).pow(baseTokenDecimals))
       .toNumber();
 
-    this.quoteLotsToUiConvertor = new Big(this.baseLotSize.toString())
-      .div(new Big(10).pow(baseTokenDecimals))
+    this.quoteLotsToUiConverter = new Big(this.quoteLotSize.toString())
+      .div(new Big(10).pow(QUOTE_DECIMALS))
       .toNumber();
   }
 
@@ -189,8 +193,9 @@ export class PerpMarket {
    * @returns returns funding rate per hour
    */
   public getCurrentFundingRate(bids: BookSide, asks: BookSide) {
-    const MIN_FUNDING = -0.05;
-    const MAX_FUNDING = 0.05;
+    const MIN_FUNDING = this.minFunding.toNumber();
+    const MAX_FUNDING = this.maxFunding.toNumber();
+
     const bid = bids.getImpactPriceUi(new BN(this.impactQuantity));
     const ask = asks.getImpactPriceUi(new BN(this.impactQuantity));
     const indexPrice = this.uiPrice;
@@ -231,15 +236,15 @@ export class PerpMarket {
   }
 
   public priceLotsToUi(price: BN): number {
-    return parseFloat(price.toString()) * this.priceLotsToUiConvertor;
+    return parseFloat(price.toString()) * this.priceLotsToUiConverter;
   }
 
   public baseLotsToUi(quantity: BN): number {
-    return parseFloat(quantity.toString()) * this.baseLotsToUiConvertor;
+    return parseFloat(quantity.toString()) * this.baseLotsToUiConverter;
   }
 
   public quoteLotsToUi(quantity: BN): number {
-    return parseFloat(quantity.toString()) * this.quoteLotsToUiConvertor;
+    return parseFloat(quantity.toString()) * this.quoteLotsToUiConverter;
   }
 
   toString(): string {
@@ -476,7 +481,7 @@ export class PerpOrderType {
 
 export class PerpOrder {
   static from(perpMarket: PerpMarket, leafNode: LeafNode, type: BookSideType) {
-    const side = (type == BookSideType.bids ? 'buy' : 'sell') as 'buy' | 'sell';
+    const side = type == BookSideType.bids ? Side.bid : Side.ask;
     const price = BookSide.getPriceFromKey(leafNode.key);
     const expiryTimestamp = leafNode.timeInForce
       ? leafNode.timestamp.add(new BN(leafNode.timeInForce))
@@ -508,7 +513,7 @@ export class PerpOrder {
     public priceLots: BN,
     public size: number,
     public sizeLots: BN,
-    public side: 'buy' | 'sell',
+    public side: Side,
     public timestamp: BN,
     public expiryTimestamp: BN,
   ) {}
