@@ -535,7 +535,7 @@ export class PerpEventQueue {
     this.head = header.head;
     this.count = header.count;
     this.seqNum = header.seqNum;
-    this.rawEvents = buf.slice(0, this.count).map((event) => {
+    this.rawEvents = buf.slice(this.head, this.count).map((event) => {
       if (event.eventType === PerpEventQueue.FILL_EVENT_TYPE) {
         return (client.program as any)._coder.types.typeLayouts
           .get('FillEvent')
@@ -581,11 +581,11 @@ export class PerpEventQueue {
   }
 }
 
-interface Event {
+export interface Event {
   eventType: number;
 }
 
-interface OutEvent extends Event {
+export interface OutEvent extends Event {
   side: PerpOrderType;
   ownerSlot: number;
   timestamp: BN;
@@ -594,7 +594,7 @@ interface OutEvent extends Event {
   quantity: BN;
 }
 
-interface FillEvent extends Event {
+export interface FillEvent extends Event {
   takerSide: PerpOrderType;
   makerOut: boolean;
   makerSlot: number;
@@ -614,6 +614,6 @@ interface FillEvent extends Event {
   quantity: BN;
 }
 
-interface LiquidateEvent extends Event {
+export interface LiquidateEvent extends Event {
   seqNum: BN;
 }

@@ -1,4 +1,4 @@
-import { AnchorProvider, BN, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { I80F48 } from '../accounts/I80F48';
@@ -424,58 +424,58 @@ async function main() {
     );
     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
-    // // scenario 1
-    // // not going to be hit orders, far from each other
-    // try {
-    //   const clientId = Math.floor(Math.random() * 99999);
-    //   const price =
-    //     group.banksMapByName.get('BTC')![0].uiPrice! -
-    //     Math.floor(Math.random() * 100);
-    //   console.log(`...placing perp bid ${clientId} at ${price}`);
-    //   const sig = await client.perpPlaceOrder(
-    //     group,
-    //     mangoAccount,
-    //     'BTC-PERP',
-    //     Side.bid,
-    //     price,
-    //     0.01,
-    //     price * 0.01,
-    //     clientId,
-    //     PerpOrderType.limit,
-    //     0, //Date.now() + 200,
-    //     1,
-    //   );
-    //   console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-    // } catch (error) {
-    //   console.log(error);
-    // }
-    // try {
-    //   const clientId = Math.floor(Math.random() * 99999);
-    //   const price =
-    //     group.banksMapByName.get('BTC')![0].uiPrice! +
-    //     Math.floor(Math.random() * 100);
-    //   console.log(`...placing perp ask ${clientId} at ${price}`);
-    //   const sig = await client.perpPlaceOrder(
-    //     group,
-    //     mangoAccount,
-    //     'BTC-PERP',
-    //     Side.ask,
-    //     price,
-    //     0.01,
-    //     price * 0.01,
-    //     clientId,
-    //     PerpOrderType.limit,
-    //     0, //Date.now() + 200,
-    //     1,
-    //   );
-    //   console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-    // } catch (error) {
-    //   console.log(error);
-    // }
-    // // should be able to cancel them
-    // console.log(`...cancelling all perp orders`);
-    // sig = await client.perpCancelAllOrders(group, mangoAccount, 'BTC-PERP', 10);
-    // console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    // scenario 1
+    // not going to be hit orders, far from each other
+    try {
+      const clientId = Math.floor(Math.random() * 99999);
+      const price =
+        group.banksMapByName.get('BTC')![0].uiPrice! -
+        Math.floor(Math.random() * 100);
+      console.log(`...placing perp bid ${clientId} at ${price}`);
+      const sig = await client.perpPlaceOrder(
+        group,
+        mangoAccount,
+        'BTC-PERP',
+        Side.bid,
+        price,
+        0.01,
+        price * 0.01,
+        clientId,
+        PerpOrderType.limit,
+        0, //Date.now() + 200,
+        1,
+      );
+      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    } catch (error) {
+      console.log(error);
+    }
+    try {
+      const clientId = Math.floor(Math.random() * 99999);
+      const price =
+        group.banksMapByName.get('BTC')![0].uiPrice! +
+        Math.floor(Math.random() * 100);
+      console.log(`...placing perp ask ${clientId} at ${price}`);
+      const sig = await client.perpPlaceOrder(
+        group,
+        mangoAccount,
+        'BTC-PERP',
+        Side.ask,
+        price,
+        0.01,
+        price * 0.01,
+        clientId,
+        PerpOrderType.limit,
+        0, //Date.now() + 200,
+        1,
+      );
+      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    } catch (error) {
+      console.log(error);
+    }
+    // should be able to cancel them
+    console.log(`...cancelling all perp orders`);
+    sig = await client.perpCancelAllOrders(group, mangoAccount, 'BTC-PERP', 10);
+    console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
     // scenario 2
     // make + take orders
@@ -511,7 +511,7 @@ async function main() {
         Side.ask,
         price,
         0.01,
-        price * 0.01,
+        price * 0.011,
         clientId,
         PerpOrderType.limit,
         0, //Date.now() + 200,
@@ -521,17 +521,17 @@ async function main() {
     } catch (error) {
       console.log(error);
     }
-    // should be able to cancel them
-    console.log(`...cancelling all perp orders`);
-    sig = await client.perpCancelAllOrders(group, mangoAccount, 'BTC-PERP', 10);
-    console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    // // should be able to cancel them : know bug
+    // console.log(`...cancelling all perp orders`);
+    // sig = await client.perpCancelAllOrders(group, mangoAccount, 'BTC-PERP', 10);
+    // console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
     const perpMarket = group.perpMarketsMap.get('BTC-PERP');
 
     const bids: BookSide = await perpMarket?.loadBids(client)!;
-    console.log(Array.from(bids.items()));
+    console.log(`bids - ${Array.from(bids.items())}`);
     const asks: BookSide = await perpMarket?.loadAsks(client)!;
-    console.log(Array.from(asks.items()));
+    console.log(`asks - ${Array.from(asks.items())}`);
 
     await perpMarket?.loadEventQueue(client)!;
     const fr = await perpMarket?.getCurrentFundingRate(
@@ -541,8 +541,7 @@ async function main() {
     console.log(`current funding rate per hour is ${fr}`);
 
     const eq = await perpMarket?.loadEventQueue(client)!;
-    console.log(eq.rawEvents);
-    console.log(eq.eventsSince(new BN(0)));
+    console.log(`raw events - ${eq.rawEvents}`);
 
     // sleep so that keeper can catch up
     await new Promise((r) => setTimeout(r, 2000));
