@@ -450,7 +450,7 @@ mod tests {
             fees_settled: I80F48::ZERO,
             bump: 0,
             base_token_decimals: 0,
-            reserved: [0; 128],
+            reserved: [0; 112],
             padding1: Default::default(),
             padding2: Default::default(),
             registration_time: 0,
