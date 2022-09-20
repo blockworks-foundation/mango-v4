@@ -327,7 +327,7 @@ async function main() {
       serumMarketExternalPk,
       group.getFirstBankByMint(ethDevnetMint),
       group.getFirstBankByMint(usdcDevnetMint),
-      0,
+      1,
       'ETH/USDC',
     );
   } catch (error) {
@@ -341,7 +341,7 @@ async function main() {
       serumMarketExternalPk,
       group.getFirstBankByMint(srmDevnetMint),
       group.getFirstBankByMint(usdcDevnetMint),
-      0,
+      2,
       'SRM/USDC',
     );
   } catch (error) {

@@ -32,7 +32,7 @@ const TOKEN_SCENARIOS: [string, string, number, string, number][] = [
   ['LIQTEST, LIQOR', 'USDC', 1000000, 'USDC', 0],
   ['LIQTEST, A: USDC, L: SOL', 'USDC', 1000 * PRICES.SOL, 'SOL', 920],
   ['LIQTEST, A: SOL, L: USDC', 'SOL', 1000, 'USDC', 920 * PRICES.SOL],
-  ['LIQTEST, A: BTC, L: SOL', 'BTC', 20, 'SOL', 18 * PRICES.BTC / PRICES.SOL],
+  ['LIQTEST, A: BTC, L: SOL', 'BTC', 20, 'SOL', (18 * PRICES.BTC) / PRICES.SOL],
 ];
 
 async function main() {
