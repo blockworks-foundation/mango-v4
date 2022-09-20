@@ -609,7 +609,7 @@ export class MangoClient {
     );
   }
 
-  public async getMangoAccountFromPk(mangoAccountPk: PublicKey) {
+  public async getMangoAccountForPublicKey(mangoAccountPk: PublicKey) {
     return MangoAccount.from(
       mangoAccountPk,
       await this.program.account.mangoAccount.fetch(mangoAccountPk),
