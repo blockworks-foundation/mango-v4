@@ -1435,9 +1435,7 @@ export class MangoClient {
       .rpc();
   }
 
-  public async perpGetMarkets(
-    group: Group,
-  ): Promise<PerpMarket[]> {
+  public async perpGetMarkets(group: Group): Promise<PerpMarket[]> {
     const bumpfbuf = Buffer.alloc(1);
     bumpfbuf.writeUInt8(255);
 
@@ -1964,7 +1962,7 @@ export class MangoClient {
       ...mintInfos.map((mintInfo) => mintInfo.oracle),
     );
 
-    const perpsToAdd: PerpMarket[] = []
+    const perpsToAdd: PerpMarket[] = [];
 
     for (const mangoAccount of mangoAccounts) {
       perpsToAdd.push(
@@ -1994,14 +1992,10 @@ export class MangoClient {
     }
 
     // Add perp accounts
-    healthRemainingAccounts.push(
-      ...perpsToAdd.map((p) => p.publicKey)
-    )
+    healthRemainingAccounts.push(...perpsToAdd.map((p) => p.publicKey));
     // Add oracle for each perp
-    healthRemainingAccounts.push(
-      ...perpsToAdd.map((p) => p.oracle)
-    )
-    
+    healthRemainingAccounts.push(...perpsToAdd.map((p) => p.oracle));
+
     for (const mangoAccount of mangoAccounts) {
       healthRemainingAccounts.push(
         ...mangoAccount.serum3
