@@ -31,6 +31,7 @@ import {
   MangoAccount,
   MangoAccountData,
   TokenPosition,
+  PerpPosition,
 } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
 import { PerpMarket, PerpOrderType, Side } from './accounts/perp';
@@ -1518,7 +1519,8 @@ export class MangoClient {
         AccountRetriever.Fixed,
         group,
         [mangoAccount],
-        [],
+        // Settlement token bank, because a position for it may be created
+        [group.getFirstBankByTokenIndex(0)],
         [perpMarket],
       );
     return await this.program.methods
@@ -1930,40 +1932,29 @@ export class MangoClient {
       ...mintInfos.map((mintInfo) => mintInfo.oracle),
     );
 
-    healthRemainingAccounts.push(
-      ...mangoAccount.perps
-        .filter((perp) => perp.marketIndex !== 65535)
-        .map(
-          (perp) =>
-            Array.from(group.perpMarketsMap.values()).filter(
-              (perpMarket) => perpMarket.perpMarketIndex === perp.marketIndex,
-            )[0].publicKey,
-        ),
-    );
+    const allPerpIndices = mangoAccount.perps.map((perp) => perp.marketIndex);
 
-    healthRemainingAccounts.push(
-      ...mangoAccount.perps
-        .filter((perp) => perp.marketIndex !== 65535)
-        .map(
-          (perp) =>
-            Array.from(group.perpMarketsMap.values()).filter(
-              (perpMarket) => perpMarket.perpMarketIndex === perp.marketIndex,
-            )[0].oracle,
-        ),
-    );
-
-    for (const perpMarket of perpMarkets) {
-      const alreadyAdded = mangoAccount.perps.find(
-        (p) => p.marketIndex === perpMarket.perpMarketIndex,
-      );
-      if (!alreadyAdded) {
-        healthRemainingAccounts.push(
-          Array.from(group.perpMarketsMap.values()).filter(
-            (p) => p.perpMarketIndex === perpMarket.perpMarketIndex,
-          )[0].publicKey,
-        );
+    // insert any extra perp markets in the free perp position slots
+    if (perpMarkets) {
+      for (const perpMarket of perpMarkets) {
+        if (allPerpIndices.indexOf(perpMarket.perpMarketIndex) < 0) {
+          allPerpIndices[
+            mangoAccount.perps.findIndex(
+              (perp, index) =>
+                !perp.isActive() &&
+                allPerpIndices[index] == PerpPosition.PerpMarketIndexUnset,
+            )
+          ] = perpMarket.perpMarketIndex;
+        }
       }
     }
+    const allPerpMarkets = allPerpIndices
+      .filter((index) => index != PerpPosition.PerpMarketIndexUnset)
+      .map((index) => group.findPerpMarket(index)!);
+    healthRemainingAccounts.push(
+      ...allPerpMarkets.map((perp) => perp.publicKey),
+    );
+    healthRemainingAccounts.push(...allPerpMarkets.map((perp) => perp.oracle));
 
     healthRemainingAccounts.push(
       ...mangoAccount.serum3
@@ -2010,39 +2001,24 @@ export class MangoClient {
       ...mintInfos.map((mintInfo) => mintInfo.oracle),
     );
 
-    const perpsToAdd: PerpMarket[] = [];
-
+    let perpIndices: number[] = [];
     for (const mangoAccount of mangoAccounts) {
-      perpsToAdd.push(
+      perpIndices.push(
         ...mangoAccount.perps
           .filter((perp) => perp.marketIndex !== 65535)
-          .map(
-            (perp) =>
-              Array.from(group.perpMarketsMap.values()).filter(
-                (perpMarket) => perpMarket.perpMarketIndex === perp.marketIndex,
-              )[0],
-          ),
+          .map((perp) => perp.marketIndex),
       );
     }
-    for (const mangoAccount of mangoAccounts) {
-      for (const perpMarket of perpMarkets) {
-        const alreadyAdded = mangoAccount.perps.find(
-          (p) => p.marketIndex === perpMarket.perpMarketIndex,
-        );
-        if (!alreadyAdded) {
-          perpsToAdd.push(
-            Array.from(group.perpMarketsMap.values()).filter(
-              (p) => p.perpMarketIndex === perpMarket.perpMarketIndex,
-            )[0],
-          );
-        }
-      }
-    }
+    perpIndices.push(...perpMarkets.map((perp) => perp.perpMarketIndex));
+
+    const allPerpMarkets = [...new Set(perpIndices)].map(
+      (marketIndex) => group.findPerpMarket(marketIndex)!,
+    );
 
     // Add perp accounts
-    healthRemainingAccounts.push(...perpsToAdd.map((p) => p.publicKey));
+    healthRemainingAccounts.push(...allPerpMarkets.map((p) => p.publicKey));
     // Add oracle for each perp
-    healthRemainingAccounts.push(...perpsToAdd.map((p) => p.oracle));
+    healthRemainingAccounts.push(...allPerpMarkets.map((p) => p.oracle));
 
     for (const mangoAccount of mangoAccounts) {
       healthRemainingAccounts.push(
