@@ -6,8 +6,8 @@ use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
 
 use crate::accounts_zerocopy::KeyedAccountReader;
+use crate::state::oracle;
 use crate::state::orderbook::order_type::Side;
-use crate::state::{oracle, TokenIndex};
 use crate::util::checked_math as cm;
 
 use super::{Book, OracleConfig, DAY_I80F48};
@@ -20,9 +20,8 @@ pub struct PerpMarket {
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
 
-    // TODO: Remove!
     // ABI: Clients rely on this being at offset 40
-    pub base_token_index: TokenIndex,
+    pub padding0: [u8; 2],
 
     /// Lookup indices
     pub perp_market_index: PerpMarketIndex,
@@ -85,7 +84,7 @@ pub struct PerpMarket {
     /// PDA bump
     pub bump: u8,
 
-    pub base_token_decimals: u8,
+    pub base_decimals: u8,
 
     pub padding2: [u8; 6],
 
@@ -125,7 +124,7 @@ impl PerpMarket {
         oracle::oracle_price(
             oracle_acc,
             self.oracle_config.conf_filter,
-            self.base_token_decimals,
+            self.base_decimals,
         )
     }
 

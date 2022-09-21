@@ -22,6 +22,9 @@ pub struct PerpLiqForceCancelOrders<'info> {
     pub asks: AccountLoader<'info, BookSide>,
     #[account(mut)]
     pub bids: AccountLoader<'info, BookSide>,
+
+    /// CHECK: Oracle can have different account types, constrained by address in perp_market
+    pub oracle: UncheckedAccount<'info>,
 }
 
 pub fn perp_liq_force_cancel_orders(

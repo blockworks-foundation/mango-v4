@@ -1273,8 +1273,7 @@ export class MangoClient {
     perpMarketIndex: number,
     name: string,
     oracleConfFilter: number,
-    baseTokenIndex: number,
-    baseTokenDecimals: number,
+    baseDecimals: number,
     quoteTokenIndex: number,
     quoteLotSize: number,
     baseLotSize: number,
@@ -1302,8 +1301,7 @@ export class MangoClient {
             val: I80F48.fromNumber(oracleConfFilter).getData(),
           },
         } as any, // future: nested custom types dont typecheck, fix if possible?
-        baseTokenIndex,
-        baseTokenDecimals,
+        baseDecimals,
         new BN(quoteLotSize),
         new BN(baseLotSize),
         maintAssetWeight,
@@ -1374,8 +1372,7 @@ export class MangoClient {
     perpMarketName: string,
     oracle: PublicKey,
     oracleConfFilter: number,
-    baseTokenIndex: number,
-    baseTokenDecimals: number,
+    baseDecimals: number,
     maintAssetWeight: number,
     initAssetWeight: number,
     maintLiabWeight: number,
@@ -1397,8 +1394,7 @@ export class MangoClient {
             val: I80F48.fromNumber(oracleConfFilter).getData(),
           },
         } as any, // future: nested custom types dont typecheck, fix if possible?
-        baseTokenIndex,
-        baseTokenDecimals,
+        baseDecimals,
         maintAssetWeight,
         initAssetWeight,
         maintLiabWeight,
@@ -1439,10 +1435,7 @@ export class MangoClient {
       .rpc();
   }
 
-  public async perpGetMarkets(
-    group: Group,
-    baseTokenIndex?: number,
-  ): Promise<PerpMarket[]> {
+  public async perpGetMarkets(group: Group): Promise<PerpMarket[]> {
     const bumpfbuf = Buffer.alloc(1);
     bumpfbuf.writeUInt8(255);
 
@@ -1454,17 +1447,6 @@ export class MangoClient {
         },
       },
     ];
-
-    if (baseTokenIndex) {
-      const bbuf = Buffer.alloc(2);
-      bbuf.writeUInt16LE(baseTokenIndex);
-      filters.push({
-        memcmp: {
-          bytes: bs58.encode(bbuf),
-          offset: 40,
-        },
-      });
-    }
 
     return (await this.program.account.perpMarket.all(filters)).map((tuple) =>
       PerpMarket.from(tuple.publicKey, tuple.account),
@@ -1910,6 +1892,18 @@ export class MangoClient {
             )[0].publicKey,
         ),
     );
+
+    healthRemainingAccounts.push(
+      ...mangoAccount.perps
+        .filter((perp) => perp.marketIndex !== 65535)
+        .map(
+          (perp) =>
+            Array.from(group.perpMarketsMap.values()).filter(
+              (perpMarket) => perpMarket.perpMarketIndex === perp.marketIndex,
+            )[0].oracle,
+        ),
+    );
+
     for (const perpMarket of perpMarkets) {
       const alreadyAdded = mangoAccount.perps.find(
         (p) => p.marketIndex === perpMarket.perpMarketIndex,
@@ -1968,23 +1962,17 @@ export class MangoClient {
       ...mintInfos.map((mintInfo) => mintInfo.oracle),
     );
 
-    for (const mangoAccount of mangoAccounts) {
-      healthRemainingAccounts.push(
-        ...mangoAccount.serum3
-          .filter((serum3Account) => serum3Account.marketIndex !== 65535)
-          .map((serum3Account) => serum3Account.openOrders),
-      );
-    }
+    const perpsToAdd: PerpMarket[] = [];
 
     for (const mangoAccount of mangoAccounts) {
-      healthRemainingAccounts.push(
+      perpsToAdd.push(
         ...mangoAccount.perps
           .filter((perp) => perp.marketIndex !== 65535)
           .map(
             (perp) =>
               Array.from(group.perpMarketsMap.values()).filter(
                 (perpMarket) => perpMarket.perpMarketIndex === perp.marketIndex,
-              )[0].publicKey,
+              )[0],
           ),
       );
     }
@@ -1994,13 +1982,26 @@ export class MangoClient {
           (p) => p.marketIndex === perpMarket.perpMarketIndex,
         );
         if (!alreadyAdded) {
-          healthRemainingAccounts.push(
+          perpsToAdd.push(
             Array.from(group.perpMarketsMap.values()).filter(
               (p) => p.perpMarketIndex === perpMarket.perpMarketIndex,
-            )[0].publicKey,
+            )[0],
           );
         }
       }
+    }
+
+    // Add perp accounts
+    healthRemainingAccounts.push(...perpsToAdd.map((p) => p.publicKey));
+    // Add oracle for each perp
+    healthRemainingAccounts.push(...perpsToAdd.map((p) => p.oracle));
+
+    for (const mangoAccount of mangoAccounts) {
+      healthRemainingAccounts.push(
+        ...mangoAccount.serum3
+          .filter((serum3Account) => serum3Account.marketIndex !== 65535)
+          .map((serum3Account) => serum3Account.openOrders),
+      );
     }
 
     return healthRemainingAccounts;

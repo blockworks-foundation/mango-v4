@@ -2257,13 +2257,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "baseTokenIndexOpt",
-          "type": {
-            "option": "u16"
-          }
-        },
-        {
-          "name": "baseTokenDecimals",
+          "name": "baseDecimals",
           "type": "u8"
         },
         {
@@ -2351,13 +2345,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "baseTokenIndexOpt",
-          "type": {
-            "option": "u16"
-          }
-        },
-        {
-          "name": "baseTokenDecimalsOpt",
+          "name": "baseDecimalsOpt",
           "type": {
             "option": "u8"
           }
@@ -2952,6 +2940,11 @@ export type MangoV4 = {
         {
           "name": "bids",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
           "isSigner": false
         }
       ],
@@ -3726,8 +3719,13 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "baseTokenIndex",
-            "type": "u16"
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
           },
           {
             "name": "perpMarketIndex",
@@ -3901,7 +3899,7 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "baseTokenDecimals",
+            "name": "baseDecimals",
             "type": "u8"
           },
           {
@@ -4290,6 +4288,12 @@ export type MangoV4 = {
           },
           {
             "name": "quote",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "oraclePrice",
             "type": {
               "defined": "I80F48"
             }
@@ -8256,13 +8260,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "baseTokenIndexOpt",
-          "type": {
-            "option": "u16"
-          }
-        },
-        {
-          "name": "baseTokenDecimals",
+          "name": "baseDecimals",
           "type": "u8"
         },
         {
@@ -8350,13 +8348,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "baseTokenIndexOpt",
-          "type": {
-            "option": "u16"
-          }
-        },
-        {
-          "name": "baseTokenDecimalsOpt",
+          "name": "baseDecimalsOpt",
           "type": {
             "option": "u8"
           }
@@ -8951,6 +8943,11 @@ export const IDL: MangoV4 = {
         {
           "name": "bids",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
           "isSigner": false
         }
       ],
@@ -9725,8 +9722,13 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "baseTokenIndex",
-            "type": "u16"
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
           },
           {
             "name": "perpMarketIndex",
@@ -9900,7 +9902,7 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "baseTokenDecimals",
+            "name": "baseDecimals",
             "type": "u8"
           },
           {
@@ -10289,6 +10291,12 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "quote",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "oraclePrice",
             "type": {
               "defined": "I80F48"
             }

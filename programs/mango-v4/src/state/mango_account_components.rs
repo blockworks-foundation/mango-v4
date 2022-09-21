@@ -419,7 +419,6 @@ mod tests {
     fn create_perp_market() -> PerpMarket {
         return PerpMarket {
             group: Pubkey::new_unique(),
-            base_token_index: 0,
             perp_market_index: 0,
             name: Default::default(),
             oracle: Pubkey::new_unique(),
@@ -449,8 +448,9 @@ mod tests {
             fees_accrued: I80F48::ZERO,
             fees_settled: I80F48::ZERO,
             bump: 0,
-            base_token_decimals: 0,
+            base_decimals: 0,
             reserved: [0; 112],
+            padding0: Default::default(),
             padding1: Default::default(),
             padding2: Default::default(),
             registration_time: 0,
