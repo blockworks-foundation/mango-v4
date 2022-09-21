@@ -629,7 +629,7 @@ impl PerpInfo {
     /// balances they could now borrow other assets).
     #[inline(always)]
     fn health_contribution(&self, health_type: HealthType) -> I80F48 {
-        let c = self.unlimited_health_contribution(health_type);
+        let c = self.uncapped_health_contribution(health_type);
 
         // FUTURE: Allow v3-style "reliable" markets where we can return
         // `self.quote + weight * self.base` here
@@ -637,7 +637,7 @@ impl PerpInfo {
     }
 
     #[inline(always)]
-    fn unlimited_health_contribution(&self, health_type: HealthType) -> I80F48 {
+    fn uncapped_health_contribution(&self, health_type: HealthType) -> I80F48 {
         let weight = match (health_type, self.base.is_negative()) {
             (HealthType::Init, true) => self.init_liab_weight,
             (HealthType::Init, false) => self.init_asset_weight,
@@ -645,7 +645,7 @@ impl PerpInfo {
             (HealthType::Maint, false) => self.maint_asset_weight,
         };
 
-        self.quote + weight * self.base
+        cm!(self.quote + weight * self.base)
     }
 }
 
