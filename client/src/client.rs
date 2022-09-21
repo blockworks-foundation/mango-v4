@@ -341,6 +341,10 @@ impl MangoClient {
             .active_perp_positions()
             .chain(account.active_perp_positions())
             .map(|&pa| self.context.perp_market_address(pa.market_index));
+        let perp_oracles = liqee
+            .active_perp_positions()
+            .chain(account.active_perp_positions())
+            .map(|&pa| self.context.perp(pa.market_index).market.oracle);
 
         Ok(banks
             .iter()
@@ -351,6 +355,7 @@ impl MangoClient {
             })
             .chain(oracles.into_iter().map(to_readonly_account_meta))
             .chain(perp_markets.map(to_readonly_account_meta))
+            .chain(perp_oracles.map(to_readonly_account_meta))
             .chain(serum_oos.map(to_readonly_account_meta))
             .collect())
     }
