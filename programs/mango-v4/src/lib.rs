@@ -10,7 +10,7 @@ use anchor_lang::prelude::*;
 use instructions::*;
 
 pub mod accounts_zerocopy;
-pub mod address_lookup_table;
+pub mod address_lookup_table_program;
 pub mod error;
 pub mod events;
 pub mod instructions;
@@ -328,13 +328,14 @@ pub mod mango_v4 {
 
     // TODO serum3_cancel_all_spot_orders
 
+    // DEPRECATED: use token_liq_with_token
     pub fn liq_token_with_token(
-        ctx: Context<LiqTokenWithToken>,
+        ctx: Context<TokenLiqWithToken>,
         asset_token_index: TokenIndex,
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -> Result<()> {
-        instructions::liq_token_with_token(
+        instructions::token_liq_with_token(
             ctx,
             asset_token_index,
             liab_token_index,
@@ -342,11 +343,33 @@ pub mod mango_v4 {
         )
     }
 
+    // DEPRECATED: use token_liq_bankruptcy
     pub fn liq_token_bankruptcy(
-        ctx: Context<LiqTokenBankruptcy>,
+        ctx: Context<TokenLiqBankruptcy>,
         max_liab_transfer: I80F48,
     ) -> Result<()> {
-        instructions::liq_token_bankruptcy(ctx, max_liab_transfer)
+        instructions::token_liq_bankruptcy(ctx, max_liab_transfer)
+    }
+
+    pub fn token_liq_with_token(
+        ctx: Context<TokenLiqWithToken>,
+        asset_token_index: TokenIndex,
+        liab_token_index: TokenIndex,
+        max_liab_transfer: I80F48,
+    ) -> Result<()> {
+        instructions::token_liq_with_token(
+            ctx,
+            asset_token_index,
+            liab_token_index,
+            max_liab_transfer,
+        )
+    }
+
+    pub fn token_liq_bankruptcy(
+        ctx: Context<TokenLiqBankruptcy>,
+        max_liab_transfer: I80F48,
+    ) -> Result<()> {
+        instructions::token_liq_bankruptcy(ctx, max_liab_transfer)
     }
 
     ///
@@ -359,8 +382,7 @@ pub mod mango_v4 {
         perp_market_index: PerpMarketIndex,
         name: String,
         oracle_config: OracleConfig,
-        base_token_index_opt: Option<TokenIndex>,
-        base_token_decimals: u8,
+        base_decimals: u8,
         quote_lot_size: i64,
         base_lot_size: i64,
         maint_asset_weight: f32,
@@ -373,14 +395,15 @@ pub mod mango_v4 {
         min_funding: f32,
         max_funding: f32,
         impact_quantity: i64,
+        group_insurance_fund: bool,
+        trusted_market: bool,
     ) -> Result<()> {
         instructions::perp_create_market(
             ctx,
             perp_market_index,
             name,
             oracle_config,
-            base_token_index_opt,
-            base_token_decimals,
+            base_decimals,
             quote_lot_size,
             base_lot_size,
             maint_asset_weight,
@@ -393,6 +416,8 @@ pub mod mango_v4 {
             max_funding,
             min_funding,
             impact_quantity,
+            group_insurance_fund,
+            trusted_market,
         )
     }
 
@@ -401,8 +426,7 @@ pub mod mango_v4 {
         ctx: Context<PerpEditMarket>,
         oracle_opt: Option<Pubkey>,
         oracle_config_opt: Option<OracleConfig>,
-        base_token_index_opt: Option<TokenIndex>,
-        base_token_decimals_opt: Option<u8>,
+        base_decimals_opt: Option<u8>,
         maint_asset_weight_opt: Option<f32>,
         init_asset_weight_opt: Option<f32>,
         maint_liab_weight_opt: Option<f32>,
@@ -413,13 +437,14 @@ pub mod mango_v4 {
         min_funding_opt: Option<f32>,
         max_funding_opt: Option<f32>,
         impact_quantity_opt: Option<i64>,
+        group_insurance_fund_opt: Option<bool>,
+        trusted_market_opt: Option<bool>,
     ) -> Result<()> {
         instructions::perp_edit_market(
             ctx,
             oracle_opt,
             oracle_config_opt,
-            base_token_index_opt,
-            base_token_decimals_opt,
+            base_decimals_opt,
             maint_asset_weight_opt,
             init_asset_weight_opt,
             maint_liab_weight_opt,
@@ -430,6 +455,8 @@ pub mod mango_v4 {
             min_funding_opt,
             max_funding_opt,
             impact_quantity_opt,
+            group_insurance_fund_opt,
+            trusted_market_opt,
         )
     }
 
@@ -438,6 +465,10 @@ pub mod mango_v4 {
     }
 
     // TODO perp_change_perp_market_params
+
+    pub fn perp_deactivate_position(ctx: Context<PerpDeactivatePosition>) -> Result<()> {
+        instructions::perp_deactivate_position(ctx)
+    }
 
     #[allow(clippy::too_many_arguments)]
     pub fn perp_place_order(
@@ -495,16 +526,46 @@ pub mod mango_v4 {
         instructions::perp_update_funding(ctx)
     }
 
-    // TODO
+    pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: u64) -> Result<()> {
+        instructions::perp_settle_pnl(ctx, max_settle_amount)
+    }
 
-    // perp_force_cancel_order
+    pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) -> Result<()> {
+        instructions::perp_settle_fees(ctx, max_settle_amount)
+    }
 
-    // liquidate_token_and_perp
-    // liquidate_perp_and_perp
+    pub fn perp_liq_base_position(
+        ctx: Context<PerpLiqBasePosition>,
+        max_base_transfer: i64,
+    ) -> Result<()> {
+        instructions::perp_liq_base_position(ctx, max_base_transfer)
+    }
 
-    // settle_* - settle_funds, settle_pnl, settle_fees
+    pub fn perp_liq_force_cancel_orders(
+        ctx: Context<PerpLiqForceCancelOrders>,
+        limit: u8,
+    ) -> Result<()> {
+        instructions::perp_liq_force_cancel_orders(ctx, limit)
+    }
 
-    // resolve_banktruptcy
+    pub fn perp_liq_bankruptcy(
+        ctx: Context<PerpLiqBankruptcy>,
+        max_liab_transfer: u64,
+    ) -> Result<()> {
+        instructions::perp_liq_bankruptcy(ctx, max_liab_transfer)
+    }
+
+    pub fn alt_set(ctx: Context<AltSet>, index: u8) -> Result<()> {
+        instructions::alt_set(ctx, index)
+    }
+
+    pub fn alt_extend(
+        ctx: Context<AltExtend>,
+        index: u8,
+        new_addresses: Vec<Pubkey>,
+    ) -> Result<()> {
+        instructions::alt_extend(ctx, index, new_addresses)
+    }
 
     pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
         instructions::compute_account_data(ctx)

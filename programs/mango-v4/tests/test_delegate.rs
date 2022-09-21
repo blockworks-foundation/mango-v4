@@ -1,7 +1,7 @@
 #![cfg(feature = "test-bpf")]
 
 use solana_program_test::*;
-use solana_sdk::{signature::Keypair, signature::Signer, transport::TransportError};
+use solana_sdk::transport::TransportError;
 
 use mango_v4::state::*;
 use program_test::*;
@@ -15,10 +15,10 @@ async fn test_delegate() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
-    let delegate = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let delegate = context.users[1].key;
     let mints = &context.mints[0..1];
     let payer_mint0_account = context.users[1].token_accounts[0];
 
@@ -29,7 +29,8 @@ async fn test_delegate() -> Result<(), TransportError> {
     let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;

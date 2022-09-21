@@ -9,7 +9,7 @@ import { MANGO_V4_ID } from '../constants';
 // by MANGO_MAINNET_PAYER_KEYPAIR in the group.
 //
 
-const GROUP_NUM = Number(process.env.GROUP_NUM || 2);
+const GROUP_NUM = Number(process.env.GROUP_NUM || 200);
 const CLUSTER_URL =
   process.env.CLUSTER_URL ||
   'https://mango.rpcpool.com/946ef7337da3f5b8d3e4a34e7f88';
@@ -18,7 +18,7 @@ const MANGO_MAINNET_PAYER_KEYPAIR =
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(CLUSTER_URL, options);
+  const connection = new Connection(CLUSTER_URL!, options);
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
@@ -31,6 +31,8 @@ async function main() {
     userProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
+    {},
+    'get-program-accounts',
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
@@ -45,12 +47,26 @@ async function main() {
 
   let accounts = await client.getMangoAccountsForOwner(group, admin.publicKey);
   for (let account of accounts) {
+    for (let serumOrders of account.serum3Active()) {
+      const serumMarket = group.findSerum3Market(serumOrders.marketIndex)!;
+      const serumExternal = serumMarket.serumMarketExternal;
+      console.log(
+        `closing serum orders on: ${account} for market ${serumMarket.name}`,
+      );
+      await client.serum3CancelAllorders(group, account, serumExternal, 10);
+      await client.serum3SettleFunds(group, account, serumExternal);
+      await client.serum3CloseOpenOrders(group, account, serumExternal);
+    }
+  }
+
+  accounts = await client.getMangoAccountsForOwner(group, admin.publicKey);
+  for (let account of accounts) {
     console.log(`settling borrows on account: ${account}`);
 
     // first, settle all borrows
     for (let token of account.tokensActive()) {
       const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
-      const amount = token.native(bank).toNumber();
+      const amount = token.balance(bank).toNumber();
       if (amount < 0) {
         try {
           await client.tokenDepositNative(
@@ -64,6 +80,7 @@ async function main() {
           console.log(
             `failed to deposit ${bank.name} into ${account.publicKey}: ${error}`,
           );
+          process.exit();
         }
       }
     }
@@ -76,7 +93,7 @@ async function main() {
     // withdraw all funds
     for (let token of account.tokensActive()) {
       const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
-      const amount = token.native(bank).toNumber();
+      const amount = token.balance(bank).toNumber();
       if (amount > 0) {
         try {
           const allowBorrow = false;
@@ -92,6 +109,7 @@ async function main() {
           console.log(
             `failed to withdraw ${bank.name} from ${account.publicKey}: ${error}`,
           );
+          process.exit();
         }
       }
     }

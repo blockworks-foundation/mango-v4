@@ -13,7 +13,7 @@ const GROUP_NUM = process.env.GROUP_NUM;
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.MB_CLUSTER_URL, options);
+  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
@@ -27,6 +27,8 @@ async function main() {
     adminProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
+    {},
+    'get-program-accounts',
   );
 
   const groups = await (async () => {
@@ -53,16 +55,19 @@ async function main() {
     }
 
     // close all banks
-    for (const bank of group.banksMap.values()) {
-      sig = await client.tokenDeregister(group, bank.name);
+    for (const banks of group.banksMapByMint.values()) {
+      sig = await client.tokenDeregister(group, banks[0].mint);
       console.log(
-        `Removed token ${bank.name}, sig https://explorer.solana.com/tx/${sig}`,
+        `Removed token ${banks[0].name}, sig https://explorer.solana.com/tx/${sig}`,
       );
     }
 
     // deregister all serum markets
-    for (const market of group.serum3MarketsMap.values()) {
-      sig = await client.serum3deregisterMarket(group, market.name);
+    for (const market of group.serum3MarketsMapByExternal.values()) {
+      sig = await client.serum3deregisterMarket(
+        group,
+        market.serumMarketExternal,
+      );
       console.log(
         `Deregistered serum market ${market.name}, sig https://explorer.solana.com/tx/${sig}`,
       );

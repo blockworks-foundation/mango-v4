@@ -1,10 +1,7 @@
 #![cfg(feature = "test-bpf")]
 
-use solana_program_test::*;
-use solana_sdk::signature::Keypair;
-use solana_sdk::signature::Signer;
-
 use program_test::*;
+use solana_program_test::*;
 
 use mango_setup::*;
 
@@ -18,15 +15,15 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     let context = builder.start_default().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..2];
     let payer_mint0_account = context.users[1].token_accounts[0];
     let loan_origination_fee = 0.0005;
 
     // higher resolution that the loan_origination_fee for one token
-    let balance_f64eq = |a: f64, b: f64| (a - b).abs() < 0.0001;
+    let balance_f64eq = |a: f64, b: f64| utils::assert_equal_f64_f64(a, b, 0.0001);
 
     //
     // SETUP: Create a group, account, register a token (mint0)
@@ -35,7 +32,8 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;
@@ -156,7 +154,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
                 )
                 .unwrap(),
             );
-            tx.add_signer(&payer);
+            tx.add_signer(payer);
         }
         tx.add_instruction(FlashLoanEndInstruction {
             account,

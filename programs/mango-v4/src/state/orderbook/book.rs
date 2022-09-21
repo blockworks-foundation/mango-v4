@@ -3,7 +3,7 @@ use std::cell::RefMut;
 use crate::accounts_zerocopy::*;
 use crate::state::MangoAccountRefMut;
 use crate::{
-    error::MangoError,
+    error::*,
     state::{
         orderbook::{bookside::BookSide, nodes::LeafNode},
         EventQueue, PerpMarket, FREE_ORDER_SLOT,
@@ -64,7 +64,7 @@ impl<'a> Book<'a> {
         ))
     }
 
-    pub fn get_bookside(&mut self, side: Side) -> &mut BookSide {
+    pub fn bookside(&mut self, side: Side) -> &mut BookSide {
         match side {
             Side::Bid => &mut self.bids,
             Side::Ask => &mut self.asks,
@@ -72,24 +72,24 @@ impl<'a> Book<'a> {
     }
 
     /// Returns best valid bid
-    pub fn get_best_bid_price(&self, now_ts: u64) -> Option<i64> {
+    pub fn best_bid_price(&self, now_ts: u64) -> Option<i64> {
         Some(self.bids.iter_valid(now_ts).next()?.1.price())
     }
 
     /// Returns best valid ask
-    pub fn get_best_ask_price(&self, now_ts: u64) -> Option<i64> {
+    pub fn best_ask_price(&self, now_ts: u64) -> Option<i64> {
         Some(self.asks.iter_valid(now_ts).next()?.1.price())
     }
 
-    pub fn get_best_price(&self, now_ts: u64, side: Side) -> Option<i64> {
+    pub fn best_price(&self, now_ts: u64, side: Side) -> Option<i64> {
         match side {
-            Side::Bid => self.get_best_bid_price(now_ts),
-            Side::Ask => self.get_best_ask_price(now_ts),
+            Side::Bid => self.best_bid_price(now_ts),
+            Side::Ask => self.best_ask_price(now_ts),
         }
     }
 
     /// Get the quantity of valid bids above and including the price
-    pub fn get_bids_size_above(&self, price: i64, max_depth: i64, now_ts: u64) -> i64 {
+    pub fn bids_size_above(&self, price: i64, max_depth: i64, now_ts: u64) -> i64 {
         let mut sum: i64 = 0;
         for (_, bid) in self.bids.iter_valid(now_ts) {
             if price > bid.price() || sum >= max_depth {
@@ -102,7 +102,7 @@ impl<'a> Book<'a> {
 
     /// Walk up the book `quantity` units and return the price at that level. If `quantity` units
     /// not on book, return None
-    pub fn get_impact_price(&self, side: Side, quantity: i64, now_ts: u64) -> Option<i64> {
+    pub fn impact_price(&self, side: Side, quantity: i64, now_ts: u64) -> Option<i64> {
         let mut sum: i64 = 0;
         let book_side = match side {
             Side::Bid => self.bids.iter_valid(now_ts),
@@ -118,7 +118,7 @@ impl<'a> Book<'a> {
     }
 
     /// Get the quantity of valid asks below and including the price
-    pub fn get_asks_size_below(&self, price: i64, max_depth: i64, now_ts: u64) -> i64 {
+    pub fn asks_size_below(&self, price: i64, max_depth: i64, now_ts: u64) -> i64 {
         let mut s = 0;
         for (_, ask) in self.asks.iter_valid(now_ts) {
             if price < ask.price() || s >= max_depth {
@@ -129,7 +129,7 @@ impl<'a> Book<'a> {
         s.min(max_depth)
     }
     /// Get the quantity of valid bids above this order id. Will return full size of book if order id not found
-    pub fn get_bids_size_above_order(&self, order_id: i128, max_depth: i64, now_ts: u64) -> i64 {
+    pub fn bids_size_above_order(&self, order_id: i128, max_depth: i64, now_ts: u64) -> i64 {
         let mut s = 0;
         for (_, bid) in self.bids.iter_valid(now_ts) {
             if bid.key == order_id || s >= max_depth {
@@ -141,7 +141,7 @@ impl<'a> Book<'a> {
     }
 
     /// Get the quantity of valid asks above this order id. Will return full size of book if order id not found
-    pub fn get_asks_size_below_order(&self, order_id: i128, max_depth: i64, now_ts: u64) -> i64 {
+    pub fn asks_size_below_order(&self, order_id: i128, max_depth: i64, now_ts: u64) -> i64 {
         let mut s = 0;
         for (_, ask) in self.asks.iter_valid(now_ts) {
             if ask.key == order_id || s >= max_depth {
@@ -178,8 +178,7 @@ impl<'a> Book<'a> {
             OrderType::PostOnly => (true, true, price_lots),
             OrderType::Market => (false, false, market_order_limit_for_side(side)),
             OrderType::PostOnlySlide => {
-                let price = if let Some(best_other_price) = self.get_best_price(now_ts, other_side)
-                {
+                let price = if let Some(best_other_price) = self.best_price(now_ts, other_side) {
                     post_only_slide_limit(side, best_other_price, price_lots)
                 } else {
                     price_lots
@@ -209,7 +208,7 @@ impl<'a> Book<'a> {
         let mut matched_order_changes: Vec<(NodeHandle, i64)> = vec![];
         let mut matched_order_deletes: Vec<i128> = vec![];
         let mut number_of_dropped_expired_orders = 0;
-        let opposing_bookside = self.get_bookside(other_side);
+        let opposing_bookside = self.bookside(other_side);
         for (best_opposing_h, best_opposing) in opposing_bookside.iter_all_including_invalid() {
             if !best_opposing.is_valid(now_ts) {
                 // Remove the order from the book unless we've done that enough
@@ -251,8 +250,8 @@ impl<'a> Book<'a> {
                 match_base_lots == max_match_by_quote || match_base_lots == remaining_base_lots;
 
             let match_quote_lots = cm!(match_base_lots * best_opposing_price);
-            remaining_base_lots = cm!(remaining_base_lots - match_base_lots);
-            remaining_quote_lots = cm!(remaining_quote_lots - match_quote_lots);
+            cm!(remaining_base_lots -= match_base_lots);
+            cm!(remaining_quote_lots -= match_quote_lots);
 
             let new_best_opposing_quantity = cm!(best_opposing.quantity - match_base_lots);
             let maker_out = new_best_opposing_quantity == 0;
@@ -264,9 +263,7 @@ impl<'a> Book<'a> {
 
             // Record the taker trade in the account already, even though it will only be
             // realized when the fill event gets executed
-            let perp_account = mango_account
-                .ensure_perp_position(market.perp_market_index)?
-                .0;
+            let perp_account = mango_account.perp_position_mut(market.perp_market_index)?;
             perp_account.add_taker_trade(side, match_base_lots, match_quote_lots);
 
             let fill = FillEvent::new(
@@ -299,7 +296,7 @@ impl<'a> Book<'a> {
         // Apply changes to matched asks (handles invalidate on delete!)
         for (handle, new_quantity) in matched_order_changes {
             opposing_bookside
-                .get_mut(handle)
+                .node_mut(handle)
                 .unwrap()
                 .as_leaf_mut()
                 .unwrap()
@@ -314,7 +311,7 @@ impl<'a> Book<'a> {
         msg!("{:?}", post_allowed);
         if post_allowed && book_base_quantity > 0 {
             // Drop an expired order if possible
-            let bookside = self.get_bookside(side);
+            let bookside = self.bookside(side);
             if let Some(expired_order) = bookside.remove_one_expired(now_ts) {
                 let event = OutEvent::new(
                     side,
@@ -383,7 +380,10 @@ impl<'a> Book<'a> {
         Ok(())
     }
 
-    pub fn cancel_all_order(
+    /// Cancels up to `limit` orders that are listed on the mango account for the given perp market.
+    /// Optionally filters by `side_to_cancel_option`.
+    /// The orders are removed from the book and from the mango account open order list.
+    pub fn cancel_all_orders(
         &mut self,
         mango_account: &mut MangoAccountRefMut,
         perp_market: &mut PerpMarket,
@@ -398,19 +398,15 @@ impl<'a> Book<'a> {
                 continue;
             }
 
-            let order_id = oo.order_id;
             let order_side = oo.order_side;
-
             if let Some(side_to_cancel) = side_to_cancel_option {
                 if side_to_cancel != order_side {
                     continue;
                 }
             }
 
-            if let Ok(leaf_node) = self.cancel_order(order_id, order_side) {
-                mango_account
-                    .remove_perp_order(leaf_node.owner_slot as usize, leaf_node.quantity)?
-            };
+            let order_id = oo.order_id;
+            self.cancel_order(mango_account, order_id, order_side, None)?;
 
             limit -= 1;
             if limit == 0 {
@@ -421,17 +417,28 @@ impl<'a> Book<'a> {
         Ok(())
     }
 
-    pub fn cancel_order(&mut self, order_id: i128, side: Side) -> Result<LeafNode> {
-        match side {
-            Side::Bid => self
-                .bids
-                .remove_by_key(order_id)
-                .ok_or_else(|| error!(MangoError::SomeError)), // InvalidOrderId
-            Side::Ask => self
-                .asks
-                .remove_by_key(order_id)
-                .ok_or_else(|| error!(MangoError::SomeError)), // InvalidOrderId
+    /// Cancels an order on a side, removing it from the book and the mango account orders list
+    pub fn cancel_order(
+        &mut self,
+        mango_account: &mut MangoAccountRefMut,
+        order_id: i128,
+        side: Side,
+        expected_owner: Option<Pubkey>,
+    ) -> Result<LeafNode> {
+        let leaf_node =
+            match side {
+                Side::Bid => self.bids.remove_by_key(order_id).ok_or_else(|| {
+                    error_msg!("invalid perp order id {order_id} for side {side:?}")
+                }),
+                Side::Ask => self.asks.remove_by_key(order_id).ok_or_else(|| {
+                    error_msg!("invalid perp order id {order_id} for side {side:?}")
+                }),
+            }?;
+        if let Some(owner) = expected_owner {
+            require_keys_eq!(leaf_node.owner, owner);
         }
+        mango_account.remove_perp_order(leaf_node.owner_slot as usize, leaf_node.quantity)?;
+        Ok(leaf_node)
     }
 }
 
@@ -456,10 +463,8 @@ fn apply_fees(
     let maker_fees = taker_quote_native * market.maker_fee;
 
     let taker_fees = taker_quote_native * market.taker_fee;
-    let perp_account = mango_account
-        .ensure_perp_position(market.perp_market_index)?
-        .0;
-    perp_account.quote_position_native -= taker_fees;
+    let perp_account = mango_account.perp_position_mut(market.perp_market_index)?;
+    perp_account.change_quote_position(-taker_fees);
     market.fees_accrued += taker_fees + maker_fees;
 
     Ok(())

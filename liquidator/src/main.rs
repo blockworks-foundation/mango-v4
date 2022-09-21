@@ -318,6 +318,11 @@ async fn main() -> anyhow::Result<()> {
                 if one_snapshot_done {
                     if let Err(err) = rebalance::zero_all_non_quote(&mango_client, &account_fetcher, &cli.liqor_mango_account, &rebalance_config) {
                         log::error!("failed to rebalance liqor: {:?}", err);
+
+                        // Workaround: We really need a sequence enforcer in the liquidator since we don't want to
+                        // accidentally send a similar tx again when we incorrectly believe an earlier one got forked
+                        // off. For now, hard sleep on error to avoid the most frequent error cases.
+                        std::thread::sleep(Duration::from_secs(10));
                     }
                 }
             }

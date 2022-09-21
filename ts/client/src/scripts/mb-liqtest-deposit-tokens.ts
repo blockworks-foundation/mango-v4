@@ -8,12 +8,12 @@ import { MANGO_V4_ID } from '../constants';
 // This script deposits some tokens, so other liquidation scripts can borrow.
 //
 
-const GROUP_NUM = Number(process.env.GROUP_NUM || 1);
+const GROUP_NUM = Number(process.env.GROUP_NUM || 200);
 const ACCOUNT_NUM = Number(process.env.ACCOUNT_NUM || 0);
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.CLUSTER_URL, options);
+  const connection = new Connection(process.env.CLUSTER_URL!, options);
 
   const admin = Keypair.fromSecretKey(
     Buffer.from(
@@ -28,6 +28,8 @@ async function main() {
     userProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
+    {},
+    'get-program-accounts',
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
@@ -37,26 +39,31 @@ async function main() {
 
   // create + fetch account
   console.log(`Creating mangoaccount...`);
-  const mangoAccount = await client.getOrCreateMangoAccount(
+  const mangoAccount = (await client.getOrCreateMangoAccount(
     group,
     admin.publicKey,
     ACCOUNT_NUM,
-  );
+    'LIQTEST, FUNDING',
+  ))!;
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString());
+
+  const usdcMint = group.banksMapByName.get('USDC')![0].mint;
+  const btcMint = group.banksMapByName.get('BTC')![0].mint;
+  const solMint = group.banksMapByName.get('SOL')![0].mint;
 
   // deposit
   try {
     console.log(`...depositing 10 USDC`);
-    await client.tokenDeposit(group, mangoAccount, 'USDC', 10);
+    await client.tokenDeposit(group, mangoAccount, usdcMint, 10);
     await mangoAccount.reload(client, group);
 
     console.log(`...depositing 0.0004 BTC`);
-    await client.tokenDeposit(group, mangoAccount, 'BTC', 0.0004);
+    await client.tokenDeposit(group, mangoAccount, btcMint, 0.0004);
     await mangoAccount.reload(client, group);
 
     console.log(`...depositing 0.25 SOL`);
-    await client.tokenDeposit(group, mangoAccount, 'SOL', 0.25);
+    await client.tokenDeposit(group, mangoAccount, solMint, 0.25);
     await mangoAccount.reload(client, group);
   } catch (error) {
     console.log(error);

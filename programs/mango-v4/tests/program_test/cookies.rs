@@ -1,9 +1,8 @@
 use solana_program::pubkey::*;
-use solana_sdk::signature::Keypair;
 
 use crate::utils::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct MintCookie {
     pub index: usize,
     pub decimals: u8,
@@ -11,24 +10,11 @@ pub struct MintCookie {
     pub base_lot: f64,
     pub quote_lot: f64,
     pub pubkey: Pubkey,
-    pub authority: Keypair,
+    pub authority: TestKeypair,
 }
 
-impl Clone for MintCookie {
-    fn clone(&self) -> Self {
-        Self {
-            index: self.index,
-            decimals: self.decimals,
-            unit: self.unit,
-            base_lot: self.base_lot,
-            quote_lot: self.quote_lot,
-            pubkey: self.pubkey.clone(),
-            authority: clone_keypair(&self.authority),
-        }
-    }
-}
-
+#[derive(Debug, Clone)]
 pub struct UserCookie {
-    pub key: Keypair,
+    pub key: TestKeypair,
     pub token_accounts: Vec<Pubkey>,
 }

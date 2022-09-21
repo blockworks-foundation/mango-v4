@@ -12,13 +12,12 @@ use mango_v4::state::{MangoAccount, MangoAccountValue};
 use solana_program::instruction::Instruction;
 use solana_program_test::BanksClientError;
 use solana_sdk::instruction;
-use solana_sdk::signature::{Keypair, Signer};
 use solana_sdk::transport::TransportError;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use super::solana::SolanaCookie;
-use super::utils::clone_keypair;
+use super::utils::TestKeypair;
 use mango_v4::state::*;
 
 #[async_trait::async_trait(?Send)]
@@ -60,7 +59,7 @@ pub async fn send_tx<CI: ClientInstruction>(
 pub struct ClientTransaction {
     solana: Arc<SolanaCookie>,
     instructions: Vec<instruction::Instruction>,
-    signers: Vec<Keypair>,
+    signers: Vec<TestKeypair>,
 }
 
 impl<'a> ClientTransaction {
@@ -76,8 +75,7 @@ impl<'a> ClientTransaction {
         let solana: &SolanaCookie = &self.solana;
         let (accounts, instruction) = ix.to_instruction(solana).await;
         self.instructions.push(instruction);
-        self.signers
-            .extend(ix.signers().iter().map(|k| clone_keypair(k)));
+        self.signers.extend(ix.signers());
         accounts
     }
 
@@ -85,14 +83,13 @@ impl<'a> ClientTransaction {
         self.instructions.push(ix);
     }
 
-    pub fn add_signer(&mut self, keypair: &Keypair) {
-        self.signers.push(clone_keypair(keypair));
+    pub fn add_signer(&mut self, keypair: TestKeypair) {
+        self.signers.push(keypair);
     }
 
     pub async fn send(&self) -> std::result::Result<(), BanksClientError> {
-        let signer_refs = self.signers.iter().map(|k| k).collect::<Vec<&Keypair>>();
         self.solana
-            .process_transaction(&self.instructions, Some(&signer_refs[..]))
+            .process_transaction(&self.instructions, Some(&self.signers))
             .await
     }
 }
@@ -106,7 +103,7 @@ pub trait ClientInstruction {
         &self,
         loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction);
-    fn signers(&self) -> Vec<&Keypair>;
+    fn signers(&self) -> Vec<TestKeypair>;
 }
 
 fn make_instruction(
@@ -169,6 +166,14 @@ fn get_perp_market_address_by_index(group: Pubkey, perp_market_index: PerpMarket
     .0
 }
 
+async fn get_oracle_address_from_perp_market_address(
+    account_loader: &impl ClientAccountLoader,
+    perp_market_address: &Pubkey,
+) -> Pubkey {
+    let perp_market: PerpMarket = account_loader.load(&perp_market_address).await.unwrap();
+    perp_market.oracle
+}
+
 // all the accounts that instructions like deposit/withdraw need to compute account health
 async fn derive_health_check_remaining_account_metas(
     account_loader: &impl ClientAccountLoader,
@@ -186,7 +191,7 @@ async fn derive_health_check_remaining_account_metas(
     }
     if let Some(affected_perp_market_index) = affected_perp_market_index {
         adjusted_account
-            .ensure_perp_position(affected_perp_market_index)
+            .ensure_perp_position(affected_perp_market_index, QUOTE_TOKEN_INDEX)
             .unwrap();
     }
 
@@ -203,6 +208,14 @@ async fn derive_health_check_remaining_account_metas(
     let perp_markets = adjusted_account
         .active_perp_positions()
         .map(|perp| get_perp_market_address_by_index(account.fixed.group, perp.market_index));
+
+    let mut perp_oracles = vec![];
+    for perp in adjusted_account
+        .active_perp_positions()
+        .map(|perp| get_perp_market_address_by_index(account.fixed.group, perp.market_index))
+    {
+        perp_oracles.push(get_oracle_address_from_perp_market_address(account_loader, &perp).await)
+    }
 
     let serum_oos = account.active_serum3_orders().map(|&s| s.open_orders);
 
@@ -221,6 +234,7 @@ async fn derive_health_check_remaining_account_metas(
         })
         .chain(oracles.into_iter().map(to_account_meta))
         .chain(perp_markets.map(to_account_meta))
+        .chain(perp_oracles.into_iter().map(to_account_meta))
         .chain(serum_oos.map(to_account_meta))
         .collect()
 }
@@ -254,11 +268,17 @@ async fn derive_liquidation_remaining_account_metas(
         oracles.push(mint_info.oracle);
     }
 
-    let perp_markets = liqee
+    let perp_markets: Vec<Pubkey> = liqee
         .active_perp_positions()
         .chain(liqee.active_perp_positions())
         .map(|perp| get_perp_market_address_by_index(liqee.fixed.group, perp.market_index))
-        .unique();
+        .unique()
+        .collect();
+
+    let mut perp_oracles = vec![];
+    for &perp in &perp_markets {
+        perp_oracles.push(get_oracle_address_from_perp_market_address(account_loader, &perp).await)
+    }
 
     let serum_oos = liqee
         .active_serum3_orders()
@@ -279,7 +299,8 @@ async fn derive_liquidation_remaining_account_metas(
             is_signer: false,
         })
         .chain(oracles.into_iter().map(to_account_meta))
-        .chain(perp_markets.map(to_account_meta))
+        .chain(perp_markets.into_iter().map(to_account_meta))
+        .chain(perp_oracles.into_iter().map(to_account_meta))
         .chain(serum_oos.map(to_account_meta))
         .collect()
 }
@@ -329,7 +350,6 @@ pub async fn check_prev_instruction_post_health(solana: &SolanaCookie, account: 
         .unwrap();
     let post_health = post_health_str.parse::<f64>().unwrap();
 
-    solana.advance_by_slots(1).await; // ugly, just to avoid sending the same tx next
     send_tx(solana, ComputeAccountDataInstruction { account })
         .await
         .unwrap();
@@ -397,21 +417,21 @@ impl ClientInstruction for FlashLoanBeginInstruction {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![]
     }
 }
 
-pub struct FlashLoanEndInstruction<'keypair> {
+pub struct FlashLoanEndInstruction {
     pub account: Pubkey,
-    pub owner: &'keypair Keypair,
+    pub owner: TestKeypair,
     pub mango_token_bank: Pubkey,
     pub mango_token_vault: Pubkey,
     pub target_token_account: Pubkey,
     pub flash_loan_type: mango_v4::instructions::FlashLoanType,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for FlashLoanEndInstruction<'keypair> {
+impl ClientInstruction for FlashLoanEndInstruction {
     type Accounts = mango_v4::accounts::FlashLoanEnd;
     type Instruction = mango_v4::instruction::FlashLoanEnd;
     async fn to_instruction(
@@ -464,22 +484,22 @@ impl<'keypair> ClientInstruction for FlashLoanEndInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner]
     }
 }
 
-pub struct TokenWithdrawInstruction<'keypair> {
+pub struct TokenWithdrawInstruction {
     pub amount: u64,
     pub allow_borrow: bool,
 
     pub account: Pubkey,
-    pub owner: &'keypair Keypair,
+    pub owner: TestKeypair,
     pub token_account: Pubkey,
     pub bank_index: usize,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for TokenWithdrawInstruction<'keypair> {
+impl ClientInstruction for TokenWithdrawInstruction {
     type Accounts = mango_v4::accounts::TokenWithdraw;
     type Instruction = mango_v4::instruction::TokenWithdraw;
     async fn to_instruction(
@@ -535,7 +555,7 @@ impl<'keypair> ClientInstruction for TokenWithdrawInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner]
     }
 }
@@ -545,7 +565,7 @@ pub struct TokenDepositInstruction {
 
     pub account: Pubkey,
     pub token_account: Pubkey,
-    pub token_authority: Keypair,
+    pub token_authority: TestKeypair,
     pub bank_index: usize,
 }
 #[async_trait::async_trait(?Send)]
@@ -604,12 +624,12 @@ impl ClientInstruction for TokenDepositInstruction {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
-        vec![&self.token_authority]
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.token_authority]
     }
 }
 
-pub struct TokenRegisterInstruction<'keypair> {
+pub struct TokenRegisterInstruction {
     pub token_index: TokenIndex,
     pub decimals: u8,
     pub adjustment_factor: f32,
@@ -627,12 +647,12 @@ pub struct TokenRegisterInstruction<'keypair> {
     pub liquidation_fee: f32,
 
     pub group: Pubkey,
-    pub admin: &'keypair Keypair,
+    pub admin: TestKeypair,
     pub mint: Pubkey,
-    pub payer: &'keypair Keypair,
+    pub payer: TestKeypair,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
+impl ClientInstruction for TokenRegisterInstruction {
     type Accounts = mango_v4::accounts::TokenRegister;
     type Instruction = mango_v4::instruction::TokenRegister;
     async fn to_instruction(
@@ -725,21 +745,21 @@ impl<'keypair> ClientInstruction for TokenRegisterInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.admin, self.payer]
     }
 }
 
-pub struct TokenAddBankInstruction<'keypair> {
+pub struct TokenAddBankInstruction {
     pub token_index: TokenIndex,
     pub bank_num: u32,
 
     pub group: Pubkey,
-    pub admin: &'keypair Keypair,
-    pub payer: &'keypair Keypair,
+    pub admin: TestKeypair,
+    pub payer: TestKeypair,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for TokenAddBankInstruction<'keypair> {
+impl ClientInstruction for TokenAddBankInstruction {
     type Accounts = mango_v4::accounts::TokenAddBank;
     type Instruction = mango_v4::instruction::TokenAddBank;
     async fn to_instruction(
@@ -810,14 +830,14 @@ impl<'keypair> ClientInstruction for TokenAddBankInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.admin, self.payer]
     }
 }
 
-pub struct TokenDeregisterInstruction<'keypair> {
-    pub admin: &'keypair Keypair,
-    pub payer: &'keypair Keypair,
+pub struct TokenDeregisterInstruction {
+    pub admin: TestKeypair,
+    pub payer: TestKeypair,
     pub group: Pubkey,
     pub mint_info: Pubkey,
     pub banks: Vec<Pubkey>,
@@ -827,7 +847,7 @@ pub struct TokenDeregisterInstruction<'keypair> {
     pub sol_destination: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for TokenDeregisterInstruction<'keypair> {
+impl ClientInstruction for TokenDeregisterInstruction {
     type Accounts = mango_v4::accounts::TokenDeregister;
     type Instruction = mango_v4::instruction::TokenDeregister;
 
@@ -875,20 +895,20 @@ impl<'keypair> ClientInstruction for TokenDeregisterInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.admin]
     }
 }
 
-pub struct StubOracleSetInstruction<'keypair> {
+pub struct StubOracleSetInstruction {
     pub mint: Pubkey,
     pub group: Pubkey,
-    pub admin: &'keypair Keypair,
-    pub payer: &'keypair Keypair,
+    pub admin: TestKeypair,
+    pub payer: TestKeypair,
     pub price: &'static str,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for StubOracleSetInstruction<'keypair> {
+impl ClientInstruction for StubOracleSetInstruction {
     type Accounts = mango_v4::accounts::StubOracleSet;
     type Instruction = mango_v4::instruction::StubOracleSet;
 
@@ -922,19 +942,19 @@ impl<'keypair> ClientInstruction for StubOracleSetInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.payer, self.admin]
     }
 }
 
-pub struct StubOracleCreate<'keypair> {
+pub struct StubOracleCreate {
     pub group: Pubkey,
     pub mint: Pubkey,
-    pub admin: &'keypair Keypair,
-    pub payer: &'keypair Keypair,
+    pub admin: TestKeypair,
+    pub payer: TestKeypair,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for StubOracleCreate<'keypair> {
+impl ClientInstruction for StubOracleCreate {
     type Accounts = mango_v4::accounts::StubOracleCreate;
     type Instruction = mango_v4::instruction::StubOracleCreate;
 
@@ -970,19 +990,19 @@ impl<'keypair> ClientInstruction for StubOracleCreate<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.payer, self.admin]
     }
 }
 
-pub struct StubOracleCloseInstruction<'keypair> {
+pub struct StubOracleCloseInstruction {
     pub group: Pubkey,
     pub mint: Pubkey,
-    pub admin: &'keypair Keypair,
+    pub admin: TestKeypair,
     pub sol_destination: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for StubOracleCloseInstruction<'keypair> {
+impl ClientInstruction for StubOracleCloseInstruction {
     type Accounts = mango_v4::accounts::StubOracleClose;
     type Instruction = mango_v4::instruction::StubOracleClose;
 
@@ -1015,18 +1035,18 @@ impl<'keypair> ClientInstruction for StubOracleCloseInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.admin]
     }
 }
 
-pub struct GroupCreateInstruction<'keypair> {
-    pub creator: &'keypair Keypair,
-    pub payer: &'keypair Keypair,
+pub struct GroupCreateInstruction {
+    pub creator: TestKeypair,
+    pub payer: TestKeypair,
     pub insurance_mint: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for GroupCreateInstruction<'keypair> {
+impl ClientInstruction for GroupCreateInstruction {
     type Accounts = mango_v4::accounts::GroupCreate;
     type Instruction = mango_v4::instruction::GroupCreate;
     async fn to_instruction(
@@ -1071,18 +1091,18 @@ impl<'keypair> ClientInstruction for GroupCreateInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.creator, self.payer]
     }
 }
 
-pub struct GroupCloseInstruction<'keypair> {
-    pub admin: &'keypair Keypair,
+pub struct GroupCloseInstruction {
+    pub admin: TestKeypair,
     pub group: Pubkey,
     pub sol_destination: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for GroupCloseInstruction<'keypair> {
+impl ClientInstruction for GroupCloseInstruction {
     type Accounts = mango_v4::accounts::GroupClose;
     type Instruction = mango_v4::instruction::GroupClose;
     async fn to_instruction(
@@ -1110,23 +1130,23 @@ impl<'keypair> ClientInstruction for GroupCloseInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.admin]
     }
 }
 
-pub struct AccountCreateInstruction<'keypair> {
+pub struct AccountCreateInstruction {
     pub account_num: u32,
     pub token_count: u8,
     pub serum3_count: u8,
     pub perp_count: u8,
     pub perp_oo_count: u8,
     pub group: Pubkey,
-    pub owner: &'keypair Keypair,
-    pub payer: &'keypair Keypair,
+    pub owner: TestKeypair,
+    pub payer: TestKeypair,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for AccountCreateInstruction<'keypair> {
+impl ClientInstruction for AccountCreateInstruction {
     type Accounts = mango_v4::accounts::AccountCreate;
     type Instruction = mango_v4::instruction::AccountCreate;
     async fn to_instruction(
@@ -1166,23 +1186,23 @@ impl<'keypair> ClientInstruction for AccountCreateInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner, self.payer]
     }
 }
 
-pub struct AccountExpandInstruction<'keypair> {
+pub struct AccountExpandInstruction {
     pub account_num: u32,
     pub group: Pubkey,
-    pub owner: &'keypair Keypair,
-    pub payer: &'keypair Keypair,
+    pub owner: TestKeypair,
+    pub payer: TestKeypair,
     pub token_count: u8,
     pub serum3_count: u8,
     pub perp_count: u8,
     pub perp_oo_count: u8,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for AccountExpandInstruction<'keypair> {
+impl ClientInstruction for AccountExpandInstruction {
     type Accounts = mango_v4::accounts::AccountExpand;
     type Instruction = mango_v4::instruction::AccountExpand;
     async fn to_instruction(
@@ -1220,20 +1240,20 @@ impl<'keypair> ClientInstruction for AccountExpandInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner, self.payer]
     }
 }
 
-pub struct AccountEditInstruction<'keypair> {
+pub struct AccountEditInstruction {
     pub account_num: u32,
     pub group: Pubkey,
-    pub owner: &'keypair Keypair,
+    pub owner: TestKeypair,
     pub name: String,
     pub delegate: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for AccountEditInstruction<'keypair> {
+impl ClientInstruction for AccountEditInstruction {
     type Accounts = mango_v4::accounts::AccountEdit;
     type Instruction = mango_v4::instruction::AccountEdit;
     async fn to_instruction(
@@ -1267,19 +1287,19 @@ impl<'keypair> ClientInstruction for AccountEditInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner]
     }
 }
 
-pub struct AccountCloseInstruction<'keypair> {
+pub struct AccountCloseInstruction {
     pub group: Pubkey,
     pub account: Pubkey,
-    pub owner: &'keypair Keypair,
+    pub owner: TestKeypair,
     pub sol_destination: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for AccountCloseInstruction<'keypair> {
+impl ClientInstruction for AccountCloseInstruction {
     type Accounts = mango_v4::accounts::AccountClose;
     type Instruction = mango_v4::instruction::AccountClose;
     async fn to_instruction(
@@ -1301,15 +1321,15 @@ impl<'keypair> ClientInstruction for AccountCloseInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner]
     }
 }
 
-pub struct Serum3RegisterMarketInstruction<'keypair> {
+pub struct Serum3RegisterMarketInstruction {
     pub group: Pubkey,
-    pub admin: &'keypair Keypair,
-    pub payer: &'keypair Keypair,
+    pub admin: TestKeypair,
+    pub payer: TestKeypair,
 
     pub serum_program: Pubkey,
     pub serum_market_external: Pubkey,
@@ -1320,7 +1340,7 @@ pub struct Serum3RegisterMarketInstruction<'keypair> {
     pub market_index: Serum3MarketIndex,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for Serum3RegisterMarketInstruction<'keypair> {
+impl ClientInstruction for Serum3RegisterMarketInstruction {
     type Accounts = mango_v4::accounts::Serum3RegisterMarket;
     type Instruction = mango_v4::instruction::Serum3RegisterMarket;
     async fn to_instruction(
@@ -1370,19 +1390,19 @@ impl<'keypair> ClientInstruction for Serum3RegisterMarketInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.admin, self.payer]
     }
 }
 
-pub struct Serum3DeregisterMarketInstruction<'keypair> {
+pub struct Serum3DeregisterMarketInstruction {
     pub group: Pubkey,
-    pub admin: &'keypair Keypair,
+    pub admin: TestKeypair,
     pub serum_market_external: Pubkey,
     pub sol_destination: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for Serum3DeregisterMarketInstruction<'keypair> {
+impl ClientInstruction for Serum3DeregisterMarketInstruction {
     type Accounts = mango_v4::accounts::Serum3DeregisterMarket;
     type Instruction = mango_v4::instruction::Serum3DeregisterMarket;
     async fn to_instruction(
@@ -1426,19 +1446,19 @@ impl<'keypair> ClientInstruction for Serum3DeregisterMarketInstruction<'keypair>
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.admin]
     }
 }
 
-pub struct Serum3CreateOpenOrdersInstruction<'keypair> {
+pub struct Serum3CreateOpenOrdersInstruction {
     pub account: Pubkey,
     pub serum_market: Pubkey,
-    pub owner: &'keypair Keypair,
-    pub payer: &'keypair Keypair,
+    pub owner: TestKeypair,
+    pub payer: TestKeypair,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for Serum3CreateOpenOrdersInstruction<'keypair> {
+impl ClientInstruction for Serum3CreateOpenOrdersInstruction {
     type Accounts = mango_v4::accounts::Serum3CreateOpenOrders;
     type Instruction = mango_v4::instruction::Serum3CreateOpenOrders;
     async fn to_instruction(
@@ -1477,19 +1497,19 @@ impl<'keypair> ClientInstruction for Serum3CreateOpenOrdersInstruction<'keypair>
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner, self.payer]
     }
 }
 
-pub struct Serum3CloseOpenOrdersInstruction<'keypair> {
+pub struct Serum3CloseOpenOrdersInstruction {
     pub account: Pubkey,
     pub serum_market: Pubkey,
-    pub owner: &'keypair Keypair,
+    pub owner: TestKeypair,
     pub sol_destination: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for Serum3CloseOpenOrdersInstruction<'keypair> {
+impl ClientInstruction for Serum3CloseOpenOrdersInstruction {
     type Accounts = mango_v4::accounts::Serum3CloseOpenOrders;
     type Instruction = mango_v4::instruction::Serum3CloseOpenOrders;
     async fn to_instruction(
@@ -1526,12 +1546,12 @@ impl<'keypair> ClientInstruction for Serum3CloseOpenOrdersInstruction<'keypair> 
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner]
     }
 }
 
-pub struct Serum3PlaceOrderInstruction<'keypair> {
+pub struct Serum3PlaceOrderInstruction {
     pub side: Serum3Side,
     pub limit_price: u64,
     pub max_base_qty: u64,
@@ -1542,12 +1562,12 @@ pub struct Serum3PlaceOrderInstruction<'keypair> {
     pub limit: u16,
 
     pub account: Pubkey,
-    pub owner: &'keypair Keypair,
+    pub owner: TestKeypair,
 
     pub serum_market: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for Serum3PlaceOrderInstruction<'keypair> {
+impl ClientInstruction for Serum3PlaceOrderInstruction {
     type Accounts = mango_v4::accounts::Serum3PlaceOrder;
     type Instruction = mango_v4::instruction::Serum3PlaceOrder;
     async fn to_instruction(
@@ -1643,22 +1663,22 @@ impl<'keypair> ClientInstruction for Serum3PlaceOrderInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner]
     }
 }
 
-pub struct Serum3CancelOrderInstruction<'keypair> {
+pub struct Serum3CancelOrderInstruction {
     pub side: Serum3Side,
     pub order_id: u128,
 
     pub account: Pubkey,
-    pub owner: &'keypair Keypair,
+    pub owner: TestKeypair,
 
     pub serum_market: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for Serum3CancelOrderInstruction<'keypair> {
+impl ClientInstruction for Serum3CancelOrderInstruction {
     type Accounts = mango_v4::accounts::Serum3CancelOrder;
     type Instruction = mango_v4::instruction::Serum3CancelOrder;
     async fn to_instruction(
@@ -1710,19 +1730,19 @@ impl<'keypair> ClientInstruction for Serum3CancelOrderInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner]
     }
 }
 
-pub struct Serum3CancelAllOrdersInstruction<'keypair> {
+pub struct Serum3CancelAllOrdersInstruction {
     pub limit: u8,
     pub account: Pubkey,
-    pub owner: &'keypair Keypair,
+    pub owner: TestKeypair,
     pub serum_market: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for Serum3CancelAllOrdersInstruction<'keypair> {
+impl ClientInstruction for Serum3CancelAllOrdersInstruction {
     type Accounts = mango_v4::accounts::Serum3CancelAllOrders;
     type Instruction = mango_v4::instruction::Serum3CancelAllOrders;
     async fn to_instruction(
@@ -1771,19 +1791,19 @@ impl<'keypair> ClientInstruction for Serum3CancelAllOrdersInstruction<'keypair> 
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner]
     }
 }
 
-pub struct Serum3SettleFundsInstruction<'keypair> {
+pub struct Serum3SettleFundsInstruction {
     pub account: Pubkey,
-    pub owner: &'keypair Keypair,
+    pub owner: TestKeypair,
 
     pub serum_market: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for Serum3SettleFundsInstruction<'keypair> {
+impl ClientInstruction for Serum3SettleFundsInstruction {
     type Accounts = mango_v4::accounts::Serum3SettleFunds;
     type Instruction = mango_v4::instruction::Serum3SettleFunds;
     async fn to_instruction(
@@ -1848,7 +1868,7 @@ impl<'keypair> ClientInstruction for Serum3SettleFundsInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner]
     }
 }
@@ -1940,15 +1960,15 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![]
     }
 }
 
-pub struct LiqTokenWithTokenInstruction<'keypair> {
+pub struct TokenLiqWithTokenInstruction {
     pub liqee: Pubkey,
     pub liqor: Pubkey,
-    pub liqor_owner: &'keypair Keypair,
+    pub liqor_owner: TestKeypair,
 
     pub asset_token_index: TokenIndex,
     pub asset_bank_index: usize,
@@ -1957,9 +1977,9 @@ pub struct LiqTokenWithTokenInstruction<'keypair> {
     pub max_liab_transfer: I80F48,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for LiqTokenWithTokenInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::LiqTokenWithToken;
-    type Instruction = mango_v4::instruction::LiqTokenWithToken;
+impl ClientInstruction for TokenLiqWithTokenInstruction {
+    type Accounts = mango_v4::accounts::TokenLiqWithToken;
+    type Instruction = mango_v4::instruction::TokenLiqWithToken;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -2003,23 +2023,23 @@ impl<'keypair> ClientInstruction for LiqTokenWithTokenInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.liqor_owner]
     }
 }
 
-pub struct LiqTokenBankruptcyInstruction<'keypair> {
+pub struct TokenLiqBankruptcyInstruction {
     pub liqee: Pubkey,
     pub liqor: Pubkey,
-    pub liqor_owner: &'keypair Keypair,
+    pub liqor_owner: TestKeypair,
 
     pub max_liab_transfer: I80F48,
     pub liab_mint_info: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for LiqTokenBankruptcyInstruction<'keypair> {
-    type Accounts = mango_v4::accounts::LiqTokenBankruptcy;
-    type Instruction = mango_v4::instruction::LiqTokenBankruptcy;
+impl ClientInstruction for TokenLiqBankruptcyInstruction {
+    type Accounts = mango_v4::accounts::TokenLiqBankruptcy;
+    type Instruction = mango_v4::instruction::TokenLiqBankruptcy;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -2096,22 +2116,22 @@ impl<'keypair> ClientInstruction for LiqTokenBankruptcyInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.liqor_owner]
     }
 }
 
-pub struct PerpCreateMarketInstruction<'keypair> {
+#[derive(Default)]
+pub struct PerpCreateMarketInstruction {
     pub group: Pubkey,
-    pub admin: &'keypair Keypair,
+    pub admin: TestKeypair,
     pub oracle: Pubkey,
     pub asks: Pubkey,
     pub bids: Pubkey,
     pub event_queue: Pubkey,
-    pub payer: &'keypair Keypair,
+    pub payer: TestKeypair,
     pub perp_market_index: PerpMarketIndex,
-    pub base_token_index: TokenIndex,
-    pub base_token_decimals: u8,
+    pub base_decimals: u8,
     pub quote_lot_size: i64,
     pub base_lot_size: i64,
     pub maint_asset_weight: f32,
@@ -2121,9 +2141,32 @@ pub struct PerpCreateMarketInstruction<'keypair> {
     pub liquidation_fee: f32,
     pub maker_fee: f32,
     pub taker_fee: f32,
+    pub group_insurance_fund: bool,
+    pub trusted_market: bool,
+}
+impl PerpCreateMarketInstruction {
+    pub async fn with_new_book_and_queue(
+        solana: &SolanaCookie,
+        base: &crate::mango_setup::Token,
+    ) -> Self {
+        PerpCreateMarketInstruction {
+            asks: solana
+                .create_account_for_type::<BookSide>(&mango_v4::id())
+                .await,
+            bids: solana
+                .create_account_for_type::<BookSide>(&mango_v4::id())
+                .await,
+            event_queue: solana
+                .create_account_for_type::<EventQueue>(&mango_v4::id())
+                .await,
+            oracle: base.oracle,
+            base_decimals: base.mint.decimals,
+            ..PerpCreateMarketInstruction::default()
+        }
+    }
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for PerpCreateMarketInstruction<'keypair> {
+impl ClientInstruction for PerpCreateMarketInstruction {
     type Accounts = mango_v4::accounts::PerpCreateMarket;
     type Instruction = mango_v4::instruction::PerpCreateMarket;
     async fn to_instruction(
@@ -2137,7 +2180,6 @@ impl<'keypair> ClientInstruction for PerpCreateMarketInstruction<'keypair> {
                 conf_filter: I80F48::from_num::<f32>(0.10),
             },
             perp_market_index: self.perp_market_index,
-            base_token_index_opt: Option::from(self.base_token_index),
             quote_lot_size: self.quote_lot_size,
             base_lot_size: self.base_lot_size,
             maint_asset_weight: self.maint_asset_weight,
@@ -2150,7 +2192,9 @@ impl<'keypair> ClientInstruction for PerpCreateMarketInstruction<'keypair> {
             max_funding: 0.05,
             min_funding: 0.05,
             impact_quantity: 100,
-            base_token_decimals: self.base_token_decimals,
+            base_decimals: self.base_decimals,
+            group_insurance_fund: self.group_insurance_fund,
+            trusted_market: self.trusted_market,
         };
 
         let perp_market = Pubkey::find_program_address(
@@ -2179,14 +2223,14 @@ impl<'keypair> ClientInstruction for PerpCreateMarketInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.admin, self.payer]
     }
 }
 
-pub struct PerpCloseMarketInstruction<'keypair> {
+pub struct PerpCloseMarketInstruction {
     pub group: Pubkey,
-    pub admin: &'keypair Keypair,
+    pub admin: TestKeypair,
     pub perp_market: Pubkey,
     pub asks: Pubkey,
     pub bids: Pubkey,
@@ -2194,7 +2238,7 @@ pub struct PerpCloseMarketInstruction<'keypair> {
     pub sol_destination: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for PerpCloseMarketInstruction<'keypair> {
+impl ClientInstruction for PerpCloseMarketInstruction {
     type Accounts = mango_v4::accounts::PerpCloseMarket;
     type Instruction = mango_v4::instruction::PerpCloseMarket;
     async fn to_instruction(
@@ -2219,20 +2263,48 @@ impl<'keypair> ClientInstruction for PerpCloseMarketInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.admin]
     }
 }
 
-pub struct PerpPlaceOrderInstruction<'keypair> {
-    pub group: Pubkey,
+pub struct PerpDeactivatePositionInstruction {
     pub account: Pubkey,
     pub perp_market: Pubkey,
-    pub asks: Pubkey,
-    pub bids: Pubkey,
-    pub event_queue: Pubkey,
-    pub oracle: Pubkey,
-    pub owner: &'keypair Keypair,
+    pub owner: TestKeypair,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpDeactivatePositionInstruction {
+    type Accounts = mango_v4::accounts::PerpDeactivatePosition;
+    type Instruction = mango_v4::instruction::PerpDeactivatePosition;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+
+        let instruction = Self::Instruction {};
+        let accounts = Self::Accounts {
+            group: perp_market.group,
+            account: self.account,
+            perp_market: self.perp_market,
+            owner: self.owner.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+pub struct PerpPlaceOrderInstruction {
+    pub account: Pubkey,
+    pub perp_market: Pubkey,
+    pub owner: TestKeypair,
     pub side: Side,
     pub price_lots: i64,
     pub max_base_lots: i64,
@@ -2240,7 +2312,7 @@ pub struct PerpPlaceOrderInstruction<'keypair> {
     pub client_order_id: u64,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for PerpPlaceOrderInstruction<'keypair> {
+impl ClientInstruction for PerpPlaceOrderInstruction {
     type Accounts = mango_v4::accounts::PerpPlaceOrder;
     type Instruction = mango_v4::instruction::PerpPlaceOrder;
     async fn to_instruction(
@@ -2258,16 +2330,6 @@ impl<'keypair> ClientInstruction for PerpPlaceOrderInstruction<'keypair> {
             expiry_timestamp: 0,
             limit: 1,
         };
-        let accounts = Self::Accounts {
-            group: self.group,
-            account: self.account,
-            perp_market: self.perp_market,
-            asks: self.asks,
-            bids: self.bids,
-            event_queue: self.event_queue,
-            oracle: self.oracle,
-            owner: self.owner.pubkey(),
-        };
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
         let account = account_loader
@@ -2283,28 +2345,38 @@ impl<'keypair> ClientInstruction for PerpPlaceOrderInstruction<'keypair> {
         )
         .await;
 
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            perp_market: self.perp_market,
+            asks: perp_market.asks,
+            bids: perp_market.bids,
+            event_queue: perp_market.event_queue,
+            oracle: perp_market.oracle,
+            owner: self.owner.pubkey(),
+        };
         let mut instruction = make_instruction(program_id, &accounts, instruction);
         instruction.accounts.extend(health_check_metas);
 
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner]
     }
 }
 
-pub struct PerpCancelOrderInstruction<'keypair> {
+pub struct PerpCancelOrderInstruction {
     pub group: Pubkey,
     pub account: Pubkey,
     pub perp_market: Pubkey,
     pub asks: Pubkey,
     pub bids: Pubkey,
-    pub owner: &'keypair Keypair,
+    pub owner: TestKeypair,
     pub order_id: i128,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for PerpCancelOrderInstruction<'keypair> {
+impl ClientInstruction for PerpCancelOrderInstruction {
     type Accounts = mango_v4::accounts::PerpCancelOrder;
     type Instruction = mango_v4::instruction::PerpCancelOrder;
     async fn to_instruction(
@@ -2328,22 +2400,22 @@ impl<'keypair> ClientInstruction for PerpCancelOrderInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner]
     }
 }
 
-pub struct PerpCancelOrderByClientOrderIdInstruction<'keypair> {
+pub struct PerpCancelOrderByClientOrderIdInstruction {
     pub group: Pubkey,
     pub account: Pubkey,
     pub perp_market: Pubkey,
     pub asks: Pubkey,
     pub bids: Pubkey,
-    pub owner: &'keypair Keypair,
+    pub owner: TestKeypair,
     pub client_order_id: u64,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for PerpCancelOrderByClientOrderIdInstruction<'keypair> {
+impl ClientInstruction for PerpCancelOrderByClientOrderIdInstruction {
     type Accounts = mango_v4::accounts::PerpCancelOrderByClientOrderId;
     type Instruction = mango_v4::instruction::PerpCancelOrderByClientOrderId;
     async fn to_instruction(
@@ -2367,35 +2439,33 @@ impl<'keypair> ClientInstruction for PerpCancelOrderByClientOrderIdInstruction<'
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner]
     }
 }
 
-pub struct PerpCancelAllOrdersInstruction<'keypair> {
-    pub group: Pubkey,
+pub struct PerpCancelAllOrdersInstruction {
     pub account: Pubkey,
     pub perp_market: Pubkey,
-    pub asks: Pubkey,
-    pub bids: Pubkey,
-    pub owner: &'keypair Keypair,
+    pub owner: TestKeypair,
 }
 #[async_trait::async_trait(?Send)]
-impl<'keypair> ClientInstruction for PerpCancelAllOrdersInstruction<'keypair> {
+impl ClientInstruction for PerpCancelAllOrdersInstruction {
     type Accounts = mango_v4::accounts::PerpCancelAllOrders;
     type Instruction = mango_v4::instruction::PerpCancelAllOrders;
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction { limit: 5 };
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
         let accounts = Self::Accounts {
-            group: self.group,
+            group: perp_market.group,
             account: self.account,
             perp_market: self.perp_market,
-            asks: self.asks,
-            bids: self.bids,
+            asks: perp_market.asks,
+            bids: perp_market.bids,
             owner: self.owner.pubkey(),
         };
 
@@ -2403,15 +2473,13 @@ impl<'keypair> ClientInstruction for PerpCancelAllOrdersInstruction<'keypair> {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner]
     }
 }
 
 pub struct PerpConsumeEventsInstruction {
-    pub group: Pubkey,
     pub perp_market: Pubkey,
-    pub event_queue: Pubkey,
     pub mango_accounts: Vec<Pubkey>,
 }
 #[async_trait::async_trait(?Send)]
@@ -2420,14 +2488,16 @@ impl ClientInstruction for PerpConsumeEventsInstruction {
     type Instruction = mango_v4::instruction::PerpConsumeEvents;
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction { limit: 10 };
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
         let accounts = Self::Accounts {
-            group: self.group,
+            group: perp_market.group,
             perp_market: self.perp_market,
-            event_queue: self.event_queue,
+            event_queue: perp_market.event_queue,
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
@@ -2441,7 +2511,7 @@ impl ClientInstruction for PerpConsumeEventsInstruction {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![]
     }
 }
@@ -2476,8 +2546,295 @@ impl ClientInstruction for PerpUpdateFundingInstruction {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![]
+    }
+}
+
+pub struct PerpSettlePnlInstruction {
+    pub account_a: Pubkey,
+    pub account_b: Pubkey,
+    pub perp_market: Pubkey,
+    pub quote_bank: Pubkey,
+    pub max_settle_amount: u64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpSettlePnlInstruction {
+    type Accounts = mango_v4::accounts::PerpSettlePnl;
+    type Instruction = mango_v4::instruction::PerpSettlePnl;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            max_settle_amount: self.max_settle_amount,
+        };
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+        let account_b = account_loader
+            .load_mango_account(&self.account_b)
+            .await
+            .unwrap();
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account_b,
+            None,
+            false,
+            Some(perp_market.perp_market_index),
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: perp_market.group,
+            perp_market: self.perp_market,
+            account_a: self.account_a,
+            account_b: self.account_b,
+            oracle: perp_market.oracle,
+            quote_bank: self.quote_bank,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas);
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![]
+    }
+}
+
+pub struct PerpSettleFeesInstruction {
+    pub account: Pubkey,
+    pub perp_market: Pubkey,
+    pub quote_bank: Pubkey,
+    pub max_settle_amount: u64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpSettleFeesInstruction {
+    type Accounts = mango_v4::accounts::PerpSettleFees;
+    type Instruction = mango_v4::instruction::PerpSettleFees;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            max_settle_amount: self.max_settle_amount,
+        };
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            None,
+            false,
+            Some(perp_market.perp_market_index),
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: perp_market.group,
+            perp_market: self.perp_market,
+            account: self.account,
+            oracle: perp_market.oracle,
+            quote_bank: self.quote_bank,
+        };
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas);
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![]
+    }
+}
+
+pub struct PerpLiqForceCancelOrdersInstruction {
+    pub account: Pubkey,
+    pub perp_market: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpLiqForceCancelOrdersInstruction {
+    type Accounts = mango_v4::accounts::PerpLiqForceCancelOrders;
+    type Instruction = mango_v4::instruction::PerpLiqForceCancelOrders;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction { limit: 10 };
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            None,
+            false,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            perp_market: self.perp_market,
+            account: self.account,
+            bids: perp_market.bids,
+            asks: perp_market.asks,
+            oracle: perp_market.oracle,
+        };
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas);
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![]
+    }
+}
+
+pub struct PerpLiqBasePositionInstruction {
+    pub liqor: Pubkey,
+    pub liqor_owner: TestKeypair,
+    pub liqee: Pubkey,
+    pub perp_market: Pubkey,
+    pub max_base_transfer: i64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpLiqBasePositionInstruction {
+    type Accounts = mango_v4::accounts::PerpLiqBasePosition;
+    type Instruction = mango_v4::instruction::PerpLiqBasePosition;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            max_base_transfer: self.max_base_transfer,
+        };
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+        let liqor = account_loader
+            .load_mango_account(&self.liqor)
+            .await
+            .unwrap();
+        let liqee = account_loader
+            .load_mango_account(&self.liqee)
+            .await
+            .unwrap();
+        let health_check_metas = derive_liquidation_remaining_account_metas(
+            &account_loader,
+            &liqee,
+            &liqor,
+            TokenIndex::MAX,
+            0,
+            TokenIndex::MAX,
+            0,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: liqor.fixed.group,
+            perp_market: self.perp_market,
+            oracle: perp_market.oracle,
+            liqor: self.liqor,
+            liqor_owner: self.liqor_owner.pubkey(),
+            liqee: self.liqee,
+        };
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas);
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.liqor_owner]
+    }
+}
+
+pub struct PerpLiqBankruptcyInstruction {
+    pub liqor: Pubkey,
+    pub liqor_owner: TestKeypair,
+    pub liqee: Pubkey,
+    pub perp_market: Pubkey,
+    pub max_liab_transfer: u64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpLiqBankruptcyInstruction {
+    type Accounts = mango_v4::accounts::PerpLiqBankruptcy;
+    type Instruction = mango_v4::instruction::PerpLiqBankruptcy;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            max_liab_transfer: self.max_liab_transfer,
+        };
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+        let group_key = perp_market.group;
+        let liqor = account_loader
+            .load_mango_account(&self.liqor)
+            .await
+            .unwrap();
+        let liqee = account_loader
+            .load_mango_account(&self.liqee)
+            .await
+            .unwrap();
+        let health_check_metas = derive_liquidation_remaining_account_metas(
+            &account_loader,
+            &liqee,
+            &liqor,
+            TokenIndex::MAX,
+            0,
+            TokenIndex::MAX,
+            0,
+        )
+        .await;
+
+        let group = account_loader.load::<Group>(&group_key).await.unwrap();
+        let quote_mint_info = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                group_key.as_ref(),
+                group.insurance_mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let quote_mint_info: MintInfo = account_loader.load(&quote_mint_info).await.unwrap();
+
+        let accounts = Self::Accounts {
+            group: group_key,
+            perp_market: self.perp_market,
+            liqor: self.liqor,
+            liqor_owner: self.liqor_owner.pubkey(),
+            liqee: self.liqee,
+            quote_bank: quote_mint_info.first_bank(),
+            quote_vault: quote_mint_info.first_vault(),
+            insurance_vault: group.insurance_vault,
+            token_program: Token::id(),
+        };
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas);
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.liqor_owner]
     }
 }
 
@@ -2498,7 +2855,7 @@ impl ClientInstruction for BenchmarkInstruction {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![]
     }
 }
@@ -2540,7 +2897,7 @@ impl ClientInstruction for TokenUpdateIndexAndRateInstruction {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![]
     }
 }
@@ -2584,7 +2941,7 @@ impl ClientInstruction for ComputeAccountDataInstruction {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![]
     }
 }
@@ -2628,7 +2985,7 @@ impl ClientInstruction for HealthRegionBeginInstruction {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![]
     }
 }
@@ -2672,7 +3029,77 @@ impl ClientInstruction for HealthRegionEndInstruction {
         (accounts, instruction)
     }
 
-    fn signers(&self) -> Vec<&Keypair> {
+    fn signers(&self) -> Vec<TestKeypair> {
         vec![]
+    }
+}
+
+pub struct AltSetInstruction {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub address_lookup_table: Pubkey,
+    pub index: u8,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for AltSetInstruction {
+    type Accounts = mango_v4::accounts::AltSet;
+    type Instruction = mango_v4::instruction::AltSet;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction { index: self.index };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            address_lookup_table: self.address_lookup_table,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
+pub struct AltExtendInstruction {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub payer: TestKeypair,
+    pub address_lookup_table: Pubkey,
+    pub index: u8,
+    pub new_addresses: Vec<Pubkey>,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for AltExtendInstruction {
+    type Accounts = mango_v4::accounts::AltExtend;
+    type Instruction = mango_v4::instruction::AltExtend;
+    async fn to_instruction(
+        &self,
+        _account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            index: self.index,
+            new_addresses: self.new_addresses.clone(),
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            payer: self.payer.pubkey(),
+            address_lookup_table: self.address_lookup_table,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin, self.payer]
     }
 }

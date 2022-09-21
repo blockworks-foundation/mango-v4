@@ -67,7 +67,7 @@ impl BookSide {
         BookSideIter::new(self, 0)
     }
 
-    pub fn get_mut(&mut self, key: NodeHandle) -> Option<&mut AnyNode> {
+    pub fn node_mut(&mut self, key: NodeHandle) -> Option<&mut AnyNode> {
         let node = &mut self.nodes[key as usize];
         let tag = NodeTag::try_from(node.tag);
         match tag {
@@ -75,7 +75,7 @@ impl BookSide {
             _ => None,
         }
     }
-    pub fn get(&self, key: NodeHandle) -> Option<&AnyNode> {
+    pub fn node(&self, key: NodeHandle) -> Option<&AnyNode> {
         let node = &self.nodes[key as usize];
         let tag = NodeTag::try_from(node.tag);
         match tag {
@@ -85,11 +85,11 @@ impl BookSide {
     }
 
     pub fn remove_min(&mut self) -> Option<LeafNode> {
-        self.remove_by_key(self.get(self.find_min()?)?.key()?)
+        self.remove_by_key(self.min_leaf()?.key)
     }
 
     pub fn remove_max(&mut self) -> Option<LeafNode> {
-        self.remove_by_key(self.get(self.find_max()?)?.key()?)
+        self.remove_by_key(self.max_leaf()?.key)
     }
 
     pub fn remove_worst(&mut self) -> Option<LeafNode> {
@@ -103,14 +103,10 @@ impl BookSide {
     pub fn remove_one_expired(&mut self, now_ts: u64) -> Option<LeafNode> {
         let (expired_h, expires_at) = self.find_earliest_expiry()?;
         if expires_at < now_ts {
-            self.remove_by_key(self.get(expired_h)?.key()?)
+            self.remove_by_key(self.node(expired_h)?.key()?)
         } else {
             None
         }
-    }
-
-    pub fn find_max(&self) -> Option<NodeHandle> {
-        self.find_min_max(true)
     }
 
     pub fn root(&self) -> Option<NodeHandle> {
@@ -119,10 +115,6 @@ impl BookSide {
         } else {
             Some(self.root_node)
         }
-    }
-
-    pub fn find_min(&self) -> Option<NodeHandle> {
-        self.find_min_max(false)
     }
 
     #[cfg(test)]
@@ -138,7 +130,7 @@ impl BookSide {
         let right = !reverse as usize;
         let mut stack = vec![];
         loop {
-            let root_contents = self.get(current).unwrap(); // should never fail unless book is already fucked
+            let root_contents = self.node(current).unwrap(); // should never fail unless book is already fucked
             match root_contents.case().unwrap() {
                 NodeRef::Inner(inner) => {
                     stack.push(inner);
@@ -159,34 +151,19 @@ impl BookSide {
         }
     }
 
-    fn find_min_max(&self, find_max: bool) -> Option<NodeHandle> {
+    pub fn min_leaf(&self) -> Option<&LeafNode> {
+        self.leaf_min_max(false)
+    }
+
+    pub fn max_leaf(&self) -> Option<&LeafNode> {
+        self.leaf_min_max(true)
+    }
+    fn leaf_min_max(&self, find_max: bool) -> Option<&LeafNode> {
         let mut root: NodeHandle = self.root()?;
 
         let i = if find_max { 1 } else { 0 };
         loop {
-            let root_contents = self.get(root).unwrap();
-            match root_contents.case().unwrap() {
-                NodeRef::Inner(&InnerNode { children, .. }) => {
-                    root = children[i];
-                }
-                _ => return Some(root),
-            }
-        }
-    }
-
-    pub fn get_min(&self) -> Option<&LeafNode> {
-        self.get_min_max(false)
-    }
-
-    pub fn get_max(&self) -> Option<&LeafNode> {
-        self.get_min_max(true)
-    }
-    pub fn get_min_max(&self, find_max: bool) -> Option<&LeafNode> {
-        let mut root: NodeHandle = self.root()?;
-
-        let i = if find_max { 1 } else { 0 };
-        loop {
-            let root_contents = self.get(root)?;
+            let root_contents = self.node(root)?;
             match root_contents.case()? {
                 NodeRef::Inner(inner) => {
                     root = inner.children[i];
@@ -204,7 +181,7 @@ impl BookSide {
 
         // special case potentially removing the root
         let mut parent_h = self.root()?;
-        let (mut child_h, mut crit_bit) = match self.get(parent_h).unwrap().case().unwrap() {
+        let (mut child_h, mut crit_bit) = match self.node(parent_h).unwrap().case().unwrap() {
             NodeRef::Leaf(&leaf) if leaf.key == search_key => {
                 assert_eq!(self.leaf_count, 1);
                 self.root_node = 0;
@@ -219,7 +196,7 @@ impl BookSide {
 
         // walk down the tree until finding the key
         loop {
-            match self.get(child_h).unwrap().case().unwrap() {
+            match self.node(child_h).unwrap().case().unwrap() {
                 NodeRef::Inner(inner) => {
                     parent_h = child_h;
                     let (new_child_h, new_crit_bit) = inner.walk_down(search_key);
@@ -238,10 +215,10 @@ impl BookSide {
 
         // replace parent with its remaining child node
         // free child_h, replace *parent_h with *other_child_h, free other_child_h
-        let other_child_h = self.get(parent_h).unwrap().children().unwrap()[!crit_bit as usize];
+        let other_child_h = self.node(parent_h).unwrap().children().unwrap()[!crit_bit as usize];
         let other_child_node_contents = self.remove(other_child_h).unwrap();
         let new_expiry = other_child_node_contents.earliest_expiry();
-        *self.get_mut(parent_h).unwrap() = other_child_node_contents;
+        *self.node_mut(parent_h).unwrap() = other_child_node_contents;
         self.leaf_count -= 1;
         let removed_leaf: LeafNode = cast(self.remove(child_h).unwrap());
 
@@ -254,7 +231,7 @@ impl BookSide {
     }
 
     pub fn remove(&mut self, key: NodeHandle) -> Option<AnyNode> {
-        let val = *self.get(key)?;
+        let val = *self.node(key)?;
 
         self.nodes[key as usize] = cast(FreeNode {
             tag: if self.free_list_len == 0 {
@@ -324,13 +301,13 @@ impl BookSide {
         // walk down the tree until we find the insert location
         loop {
             // require if the new node will be a child of the root
-            let root_contents = *self.get(root).unwrap();
+            let root_contents = *self.node(root).unwrap();
             let root_key = root_contents.key().unwrap();
             if root_key == new_leaf.key {
                 // This should never happen because key should never match
                 if let Some(NodeRef::Leaf(&old_root_as_leaf)) = root_contents.case() {
                     // clobber the existing leaf
-                    *self.get_mut(root).unwrap() = *new_leaf.as_ref();
+                    *self.node_mut(root).unwrap() = *new_leaf.as_ref();
                     self.update_parent_earliest_expiry(
                         &stack,
                         old_root_as_leaf.expiry(),
@@ -371,7 +348,7 @@ impl BookSide {
                 }
             };
 
-            let new_root: &mut InnerNode = cast_mut(self.get_mut(root).unwrap());
+            let new_root: &mut InnerNode = cast_mut(self.node_mut(root).unwrap());
             *new_root = InnerNode::new(shared_prefix_len, new_leaf.key);
 
             new_root.children[new_leaf_crit_bit as usize] = new_leaf_handle;
@@ -409,7 +386,7 @@ impl BookSide {
         // Walk from the top of the stack to the root of the tree.
         // Since the stack grows by appending, we need to iterate the slice in reverse order.
         for (parent_h, crit_bit) in stack.iter().rev() {
-            let parent = self.get_mut(*parent_h).unwrap().as_inner_mut().unwrap();
+            let parent = self.node_mut(*parent_h).unwrap().as_inner_mut().unwrap();
             if parent.child_earliest_expiry[*crit_bit as usize] != outdated_expiry {
                 break;
             }
@@ -427,7 +404,7 @@ impl BookSide {
         };
 
         loop {
-            let contents = *self.get(current).unwrap();
+            let contents = *self.node(current).unwrap();
             match contents.case() {
                 None => unreachable!(),
                 Some(NodeRef::Inner(inner)) => {
@@ -477,10 +454,10 @@ mod tests {
         };
 
         fn recursive_check(bookside: &BookSide, h: NodeHandle) {
-            match bookside.get(h).unwrap().case().unwrap() {
+            match bookside.node(h).unwrap().case().unwrap() {
                 NodeRef::Inner(&inner) => {
-                    let left = bookside.get(inner.children[0]).unwrap().key().unwrap();
-                    let right = bookside.get(inner.children[1]).unwrap().key().unwrap();
+                    let left = bookside.node(inner.children[0]).unwrap().key().unwrap();
+                    let right = bookside.node(inner.children[1]).unwrap().key().unwrap();
 
                     // the left and right keys share the InnerNode's prefix
                     assert!((inner.key ^ left).leading_zeros() >= inner.prefix_len);
@@ -526,10 +503,10 @@ mod tests {
         };
 
         fn recursive_check(bookside: &BookSide, h: NodeHandle) {
-            match bookside.get(h).unwrap().case().unwrap() {
+            match bookside.node(h).unwrap().case().unwrap() {
                 NodeRef::Inner(&inner) => {
-                    let left = bookside.get(inner.children[0]).unwrap().earliest_expiry();
-                    let right = bookside.get(inner.children[1]).unwrap().earliest_expiry();
+                    let left = bookside.node(inner.children[0]).unwrap().earliest_expiry();
+                    let right = bookside.node(inner.children[1]).unwrap().earliest_expiry();
 
                     // child_expiry must hold the expiry of the children
                     assert_eq!(inner.child_earliest_expiry[0], left);
@@ -579,7 +556,7 @@ mod tests {
         verify_bookside(&bids);
         // the first two levels of the tree are innernodes, with 0;1 on one side and 2;3 on the other
         assert_eq!(
-            bids.get_mut(bids.root_node)
+            bids.node_mut(bids.root_node)
                 .unwrap()
                 .as_inner_mut()
                 .unwrap()
@@ -590,7 +567,7 @@ mod tests {
         bids.remove_by_key(3).unwrap();
         verify_bookside(&bids);
         assert_eq!(
-            bids.get_mut(bids.root_node)
+            bids.node_mut(bids.root_node)
                 .unwrap()
                 .as_inner_mut()
                 .unwrap()
@@ -602,7 +579,7 @@ mod tests {
         bids.remove_by_key(0).unwrap();
         verify_bookside(&bids);
         assert_eq!(
-            bids.get_mut(bids.root_node)
+            bids.node_mut(bids.root_node)
                 .unwrap()
                 .as_inner_mut()
                 .unwrap()

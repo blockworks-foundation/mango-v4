@@ -283,7 +283,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             token::transfer(transfer_ctx, repay)?;
 
             let repay = I80F48::from(repay);
-            change = cm!(change + repay);
+            cm!(change += repay);
         }
 
         changes.push(TokenVaultChange {
@@ -349,7 +349,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         };
 
         let loan_origination_fee = cm!(loan * bank.loan_origination_fee_rate);
-        bank.collected_fees_native = cm!(bank.collected_fees_native + loan_origination_fee);
+        cm!(bank.collected_fees_native += loan_origination_fee);
 
         let is_active =
             bank.change_without_fee(position, cm!(change.amount - loan_origination_fee))?;

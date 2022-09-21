@@ -15,6 +15,7 @@ import { I80F48 } from './accounts/I80F48';
 import { MangoAccount, Serum3Orders } from './accounts/mangoAccount';
 import { PerpMarket } from './accounts/perp';
 
+export const U64_MAX_BN = new BN('18446744073709551615');
 export const I64_MAX_BN = new BN('9223372036854775807').toTwos(64);
 
 export function debugAccountMetas(ams: AccountMeta[]) {

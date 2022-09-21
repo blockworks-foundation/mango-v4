@@ -2071,6 +2071,100 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "tokenLiqWithToken",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "assetTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "maxLiabTransfer",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
+    },
+    {
+      "name": "tokenLiqBankruptcy",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liabMintInfo",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "quoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxLiabTransfer",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
+    },
+    {
       "name": "perpCreateMarket",
       "docs": [
         "",
@@ -2163,13 +2257,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "baseTokenIndexOpt",
-          "type": {
-            "option": "u16"
-          }
-        },
-        {
-          "name": "baseTokenDecimals",
+          "name": "baseDecimals",
           "type": "u8"
         },
         {
@@ -2219,6 +2307,14 @@ export type MangoV4 = {
         {
           "name": "impactQuantity",
           "type": "i64"
+        },
+        {
+          "name": "groupInsuranceFund",
+          "type": "bool"
+        },
+        {
+          "name": "trustedMarket",
+          "type": "bool"
         }
       ]
     },
@@ -2257,13 +2353,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "baseTokenIndexOpt",
-          "type": {
-            "option": "u16"
-          }
-        },
-        {
-          "name": "baseTokenDecimalsOpt",
+          "name": "baseDecimalsOpt",
           "type": {
             "option": "u8"
           }
@@ -2327,6 +2417,18 @@ export type MangoV4 = {
           "type": {
             "option": "i64"
           }
+        },
+        {
+          "name": "groupInsuranceFundOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "trustedMarketOpt",
+          "type": {
+            "option": "bool"
+          }
         }
       ]
     },
@@ -2370,6 +2472,32 @@ export type MangoV4 = {
         },
         {
           "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "perpDeactivatePosition",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "perpMarket",
           "isMut": false,
           "isSigner": false
         }
@@ -2687,6 +2815,228 @@ export type MangoV4 = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "perpSettlePnl",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "accountA",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountB",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "quoteBank",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxSettleAmount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "perpSettleFees",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "quoteBank",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxSettleAmount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "perpLiqBasePosition",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBaseTransfer",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "perpLiqForceCancelOrders",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "limit",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "altSet",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "addressLookupTable",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "altExtend",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "addressLookupTable",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u8"
+        },
+        {
+          "name": "newAddresses",
+          "type": {
+            "vec": "publicKey"
+          }
+        }
+      ]
     },
     {
       "name": "computeAccountData",
@@ -3008,11 +3358,20 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "addressLookupTables",
+            "type": {
+              "array": [
+                "publicKey",
+                20
+              ]
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                1920
               ]
             }
           }
@@ -3380,8 +3739,13 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "baseTokenIndex",
-            "type": "u16"
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
           },
           {
             "name": "perpMarketIndex",
@@ -3391,11 +3755,25 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "trustedMarket",
+            "docs": [
+              "May this market contribute positive values to health?"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "groupInsuranceFund",
+            "docs": [
+              "Is this market covered by the group insurance fund?"
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                4
+                2
               ]
             }
           },
@@ -3555,7 +3933,7 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "baseTokenDecimals",
+            "name": "baseDecimals",
             "type": "u8"
           },
           {
@@ -3572,11 +3950,20 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "feesSettled",
+            "docs": [
+              "Fees settled in native quote currency"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                112
               ]
             }
           }
@@ -3938,6 +4325,12 @@ export type MangoV4 = {
             "type": {
               "defined": "I80F48"
             }
+          },
+          {
+            "name": "oraclePrice",
+            "type": {
+              "defined": "I80F48"
+            }
           }
         ]
       }
@@ -4255,6 +4648,150 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "InnerNode",
+      "docs": [
+        "InnerNodes and LeafNodes compose the binary tree of orders.",
+        "",
+        "Each InnerNode has exactly two children, which are either InnerNodes themselves,",
+        "or LeafNodes. The children share the top `prefix_len` bits of `key`. The left",
+        "child has a 0 in the next bit, and the right a 1."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tag",
+            "type": "u32"
+          },
+          {
+            "name": "prefixLen",
+            "docs": [
+              "number of highest `key` bits that all children share",
+              "e.g. if it's 2, the two highest bits of `key` will be the same on all children"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "key",
+            "docs": [
+              "only the top `prefix_len` bits of `key` are relevant"
+            ],
+            "type": "i128"
+          },
+          {
+            "name": "children",
+            "docs": [
+              "indexes into `BookSide::nodes`"
+            ],
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "childEarliestExpiry",
+            "docs": [
+              "The earliest expiry timestamp for the left and right subtrees.",
+              "",
+              "Needed to be able to find and remove expired orders without having to",
+              "iterate through the whole bookside."
+            ],
+            "type": {
+              "array": [
+                "u64",
+                2
+              ]
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                48
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeafNode",
+      "docs": [
+        "LeafNodes represent an order in the binary tree"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tag",
+            "type": "u32"
+          },
+          {
+            "name": "ownerSlot",
+            "type": "u8"
+          },
+          {
+            "name": "orderType",
+            "type": {
+              "defined": "OrderType"
+            }
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                1
+              ]
+            }
+          },
+          {
+            "name": "timeInForce",
+            "docs": [
+              "Time in seconds after `timestamp` at which the order expires.",
+              "A value of 0 means no expiry."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "key",
+            "docs": [
+              "The binary tree key"
+            ],
+            "type": "i128"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
+            "name": "clientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "AnyNode",
       "type": {
         "kind": "struct",
@@ -4310,6 +4847,166 @@ export type MangoV4 = {
               "array": [
                 "u8",
                 207
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "FillEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "eventType",
+            "type": "u8"
+          },
+          {
+            "name": "takerSide",
+            "type": {
+              "defined": "Side"
+            }
+          },
+          {
+            "name": "makerOut",
+            "type": "bool"
+          },
+          {
+            "name": "makerSlot",
+            "type": "u8"
+          },
+          {
+            "name": "marketFeesApplied",
+            "type": "bool"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "seqNum",
+            "type": "u64"
+          },
+          {
+            "name": "maker",
+            "type": "publicKey"
+          },
+          {
+            "name": "makerOrderId",
+            "type": "i128"
+          },
+          {
+            "name": "makerClientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "makerFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "makerTimestamp",
+            "type": "u64"
+          },
+          {
+            "name": "taker",
+            "type": "publicKey"
+          },
+          {
+            "name": "takerOrderId",
+            "type": "i128"
+          },
+          {
+            "name": "takerClientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "takerFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "price",
+            "type": "i64"
+          },
+          {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OutEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "eventType",
+            "type": "u8"
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": "Side"
+            }
+          },
+          {
+            "name": "ownerSlot",
+            "type": "u8"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                5
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "seqNum",
+            "type": "u64"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
+            "name": "padding1",
+            "type": {
+              "array": [
+                "u8",
+                144
               ]
             }
           }
@@ -5304,6 +6001,36 @@ export type MangoV4 = {
       "code": 6016,
       "name": "BeingLiquidated",
       "msg": "account is currently being liquidated"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidBank",
+      "msg": "invalid bank"
+    },
+    {
+      "code": 6018,
+      "name": "ProfitabilityMismatch",
+      "msg": "account profitability is mismatched"
+    },
+    {
+      "code": 6019,
+      "name": "CannotSettleWithSelf",
+      "msg": "cannot settle with self"
+    },
+    {
+      "code": 6020,
+      "name": "PerpPositionDoesNotExist",
+      "msg": "perp position does not exist"
+    },
+    {
+      "code": 6021,
+      "name": "MaxSettleAmountMustBeGreaterThanZero",
+      "msg": "max settle amount must be greater than zero"
+    },
+    {
+      "code": 6022,
+      "name": "HasOpenPerpOrders",
+      "msg": "the perp position has open orders or unprocessed fill events"
     }
   ]
 };
@@ -7381,6 +8108,100 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "tokenLiqWithToken",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "assetTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16"
+        },
+        {
+          "name": "maxLiabTransfer",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
+    },
+    {
+      "name": "tokenLiqBankruptcy",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liabMintInfo",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "quoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxLiabTransfer",
+          "type": {
+            "defined": "I80F48"
+          }
+        }
+      ]
+    },
+    {
       "name": "perpCreateMarket",
       "docs": [
         "",
@@ -7473,13 +8294,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "baseTokenIndexOpt",
-          "type": {
-            "option": "u16"
-          }
-        },
-        {
-          "name": "baseTokenDecimals",
+          "name": "baseDecimals",
           "type": "u8"
         },
         {
@@ -7529,6 +8344,14 @@ export const IDL: MangoV4 = {
         {
           "name": "impactQuantity",
           "type": "i64"
+        },
+        {
+          "name": "groupInsuranceFund",
+          "type": "bool"
+        },
+        {
+          "name": "trustedMarket",
+          "type": "bool"
         }
       ]
     },
@@ -7567,13 +8390,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "baseTokenIndexOpt",
-          "type": {
-            "option": "u16"
-          }
-        },
-        {
-          "name": "baseTokenDecimalsOpt",
+          "name": "baseDecimalsOpt",
           "type": {
             "option": "u8"
           }
@@ -7637,6 +8454,18 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "i64"
           }
+        },
+        {
+          "name": "groupInsuranceFundOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "trustedMarketOpt",
+          "type": {
+            "option": "bool"
+          }
         }
       ]
     },
@@ -7680,6 +8509,32 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "perpDeactivatePosition",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "perpMarket",
           "isMut": false,
           "isSigner": false
         }
@@ -7997,6 +8852,228 @@ export const IDL: MangoV4 = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "perpSettlePnl",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "accountA",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "accountB",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "quoteBank",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxSettleAmount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "perpSettleFees",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "quoteBank",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxSettleAmount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "perpLiqBasePosition",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBaseTransfer",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "perpLiqForceCancelOrders",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "limit",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "altSet",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "addressLookupTable",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "altExtend",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "addressLookupTable",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u8"
+        },
+        {
+          "name": "newAddresses",
+          "type": {
+            "vec": "publicKey"
+          }
+        }
+      ]
     },
     {
       "name": "computeAccountData",
@@ -8318,11 +9395,20 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "addressLookupTables",
+            "type": {
+              "array": [
+                "publicKey",
+                20
+              ]
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                1920
               ]
             }
           }
@@ -8690,8 +9776,13 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "baseTokenIndex",
-            "type": "u16"
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
           },
           {
             "name": "perpMarketIndex",
@@ -8701,11 +9792,25 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "trustedMarket",
+            "docs": [
+              "May this market contribute positive values to health?"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "groupInsuranceFund",
+            "docs": [
+              "Is this market covered by the group insurance fund?"
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                4
+                2
               ]
             }
           },
@@ -8865,7 +9970,7 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "baseTokenDecimals",
+            "name": "baseDecimals",
             "type": "u8"
           },
           {
@@ -8882,11 +9987,20 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "feesSettled",
+            "docs": [
+              "Fees settled in native quote currency"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                112
               ]
             }
           }
@@ -9248,6 +10362,12 @@ export const IDL: MangoV4 = {
             "type": {
               "defined": "I80F48"
             }
+          },
+          {
+            "name": "oraclePrice",
+            "type": {
+              "defined": "I80F48"
+            }
           }
         ]
       }
@@ -9565,6 +10685,150 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "InnerNode",
+      "docs": [
+        "InnerNodes and LeafNodes compose the binary tree of orders.",
+        "",
+        "Each InnerNode has exactly two children, which are either InnerNodes themselves,",
+        "or LeafNodes. The children share the top `prefix_len` bits of `key`. The left",
+        "child has a 0 in the next bit, and the right a 1."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tag",
+            "type": "u32"
+          },
+          {
+            "name": "prefixLen",
+            "docs": [
+              "number of highest `key` bits that all children share",
+              "e.g. if it's 2, the two highest bits of `key` will be the same on all children"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "key",
+            "docs": [
+              "only the top `prefix_len` bits of `key` are relevant"
+            ],
+            "type": "i128"
+          },
+          {
+            "name": "children",
+            "docs": [
+              "indexes into `BookSide::nodes`"
+            ],
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "childEarliestExpiry",
+            "docs": [
+              "The earliest expiry timestamp for the left and right subtrees.",
+              "",
+              "Needed to be able to find and remove expired orders without having to",
+              "iterate through the whole bookside."
+            ],
+            "type": {
+              "array": [
+                "u64",
+                2
+              ]
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                48
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeafNode",
+      "docs": [
+        "LeafNodes represent an order in the binary tree"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tag",
+            "type": "u32"
+          },
+          {
+            "name": "ownerSlot",
+            "type": "u8"
+          },
+          {
+            "name": "orderType",
+            "type": {
+              "defined": "OrderType"
+            }
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                1
+              ]
+            }
+          },
+          {
+            "name": "timeInForce",
+            "docs": [
+              "Time in seconds after `timestamp` at which the order expires.",
+              "A value of 0 means no expiry."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "key",
+            "docs": [
+              "The binary tree key"
+            ],
+            "type": "i128"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
+            "name": "clientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "AnyNode",
       "type": {
         "kind": "struct",
@@ -9620,6 +10884,166 @@ export const IDL: MangoV4 = {
               "array": [
                 "u8",
                 207
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "FillEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "eventType",
+            "type": "u8"
+          },
+          {
+            "name": "takerSide",
+            "type": {
+              "defined": "Side"
+            }
+          },
+          {
+            "name": "makerOut",
+            "type": "bool"
+          },
+          {
+            "name": "makerSlot",
+            "type": "u8"
+          },
+          {
+            "name": "marketFeesApplied",
+            "type": "bool"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "seqNum",
+            "type": "u64"
+          },
+          {
+            "name": "maker",
+            "type": "publicKey"
+          },
+          {
+            "name": "makerOrderId",
+            "type": "i128"
+          },
+          {
+            "name": "makerClientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "makerFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "makerTimestamp",
+            "type": "u64"
+          },
+          {
+            "name": "taker",
+            "type": "publicKey"
+          },
+          {
+            "name": "takerOrderId",
+            "type": "i128"
+          },
+          {
+            "name": "takerClientOrderId",
+            "type": "u64"
+          },
+          {
+            "name": "takerFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "price",
+            "type": "i64"
+          },
+          {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OutEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "eventType",
+            "type": "u8"
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": "Side"
+            }
+          },
+          {
+            "name": "ownerSlot",
+            "type": "u8"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                5
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "seqNum",
+            "type": "u64"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
+            "name": "padding1",
+            "type": {
+              "array": [
+                "u8",
+                144
               ]
             }
           }
@@ -10614,6 +12038,36 @@ export const IDL: MangoV4 = {
       "code": 6016,
       "name": "BeingLiquidated",
       "msg": "account is currently being liquidated"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidBank",
+      "msg": "invalid bank"
+    },
+    {
+      "code": 6018,
+      "name": "ProfitabilityMismatch",
+      "msg": "account profitability is mismatched"
+    },
+    {
+      "code": 6019,
+      "name": "CannotSettleWithSelf",
+      "msg": "cannot settle with self"
+    },
+    {
+      "code": 6020,
+      "name": "PerpPositionDoesNotExist",
+      "msg": "perp position does not exist"
+    },
+    {
+      "code": 6021,
+      "name": "MaxSettleAmountMustBeGreaterThanZero",
+      "msg": "max settle amount must be greater than zero"
+    },
+    {
+      "code": 6022,
+      "name": "HasOpenPerpOrders",
+      "msg": "the perp position has open orders or unprocessed fill events"
     }
   ]
 };

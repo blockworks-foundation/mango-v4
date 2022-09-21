@@ -3,7 +3,7 @@
 use fixed::types::I80F48;
 use mango_v4::state::*;
 use solana_program_test::*;
-use solana_sdk::{signature::Keypair, transport::TransportError};
+use solana_sdk::transport::TransportError;
 
 use program_test::*;
 
@@ -17,9 +17,9 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..10];
 
     //
@@ -29,7 +29,8 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     let GroupWithTokens { group, .. } = GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;
@@ -49,9 +50,9 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..8];
     let payer_mint_accounts = &context.users[1].token_accounts[0..mints.len()];
 
@@ -62,7 +63,8 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;
@@ -164,9 +166,9 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..8];
     let payer_mint_accounts = &context.users[1].token_accounts[0..mints.len()];
 
@@ -177,7 +179,8 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;
@@ -197,7 +200,6 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     //
     // SETUP: Create perp markets
     //
-    let quote_token = &tokens[0];
     let mut perp_markets = vec![];
     for (perp_market_index, token) in tokens[1..].iter().enumerate() {
         let mango_v4::accounts::PerpCreateMarket {
@@ -211,25 +213,8 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
             PerpCreateMarketInstruction {
                 group,
                 admin,
-                oracle: token.oracle,
-                asks: context
-                    .solana
-                    .create_account_for_type::<BookSide>(&mango_v4::id())
-                    .await,
-                bids: context
-                    .solana
-                    .create_account_for_type::<BookSide>(&mango_v4::id())
-                    .await,
-                event_queue: {
-                    context
-                        .solana
-                        .create_account_for_type::<EventQueue>(&mango_v4::id())
-                        .await
-                },
                 payer,
                 perp_market_index: perp_market_index as PerpMarketIndex,
-                base_token_index: quote_token.index,
-                base_token_decimals: quote_token.mint.decimals,
                 quote_lot_size: 10,
                 base_lot_size: 100,
                 maint_asset_weight: 0.975,
@@ -239,6 +224,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 liquidation_fee: 0.012,
                 maker_fee: 0.0002,
                 taker_fee: 0.000,
+                ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &token).await
             },
         )
         .await
@@ -255,18 +241,13 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     //
     // TEST: Create a perp order for each market
     //
-    for (i, &(perp_market, asks, bids, event_queue)) in perp_markets.iter().enumerate() {
+    for (i, &(perp_market, _asks, _bids, _event_queue)) in perp_markets.iter().enumerate() {
         println!("adding market {}", i);
         send_tx(
             solana,
             PerpPlaceOrderInstruction {
-                group,
                 account,
                 perp_market,
-                asks,
-                bids,
-                event_queue,
-                oracle: tokens[i + 1].oracle,
                 owner,
                 side: Side::Bid,
                 price_lots,

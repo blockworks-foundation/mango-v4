@@ -233,19 +233,19 @@ impl Bank {
             let new_indexed_value = cm!(position.indexed_position + indexed_change);
             if new_indexed_value.is_negative() {
                 // pay back borrows only, leaving a negative position
-                self.indexed_borrows = cm!(self.indexed_borrows - indexed_change);
+                cm!(self.indexed_borrows -= indexed_change);
                 position.indexed_position = new_indexed_value;
                 return Ok(true);
             } else if new_native_position < I80F48::ONE && allow_dusting {
                 // if there's less than one token deposited, zero the position
-                self.dust = cm!(self.dust + new_native_position);
-                self.indexed_borrows = cm!(self.indexed_borrows + position.indexed_position);
+                cm!(self.dust += new_native_position);
+                cm!(self.indexed_borrows += position.indexed_position);
                 position.indexed_position = I80F48::ZERO;
                 return Ok(false);
             }
 
             // pay back all borrows
-            self.indexed_borrows = cm!(self.indexed_borrows + position.indexed_position); // position.value is negative
+            cm!(self.indexed_borrows += position.indexed_position); // position.value is negative
             position.indexed_position = I80F48::ZERO;
             // deposit the rest
             // note: .max(0) because there's a scenario where new_indexed_value == 0 and new_native_position < 0
@@ -254,8 +254,8 @@ impl Bank {
 
         // add to deposits
         let indexed_change = div_rounding_up(native_amount, self.deposit_index);
-        self.indexed_deposits = cm!(self.indexed_deposits + indexed_change);
-        position.indexed_position = cm!(position.indexed_position + indexed_change);
+        cm!(self.indexed_deposits += indexed_change);
+        cm!(position.indexed_position += indexed_change);
 
         Ok(true)
     }
@@ -324,21 +324,21 @@ impl Bank {
                 // withdraw deposits only
                 if new_native_position < I80F48::ONE && allow_dusting {
                     // zero the account collecting the leftovers in `dust`
-                    self.dust = cm!(self.dust + new_native_position);
-                    self.indexed_deposits = cm!(self.indexed_deposits - position.indexed_position);
+                    cm!(self.dust += new_native_position);
+                    cm!(self.indexed_deposits -= position.indexed_position);
                     position.indexed_position = I80F48::ZERO;
                     return Ok((false, I80F48::ZERO));
                 } else {
                     // withdraw some deposits leaving a positive balance
                     let indexed_change = cm!(native_amount / self.deposit_index);
-                    self.indexed_deposits = cm!(self.indexed_deposits - indexed_change);
-                    position.indexed_position = cm!(position.indexed_position - indexed_change);
+                    cm!(self.indexed_deposits -= indexed_change);
+                    cm!(position.indexed_position -= indexed_change);
                     return Ok((true, I80F48::ZERO));
                 }
             }
 
             // withdraw all deposits
-            self.indexed_deposits = cm!(self.indexed_deposits - position.indexed_position);
+            cm!(self.indexed_deposits -= position.indexed_position);
             position.indexed_position = I80F48::ZERO;
             // borrow the rest
             native_amount = -new_native_position;
@@ -347,14 +347,14 @@ impl Bank {
         let mut loan_origination_fee = I80F48::ZERO;
         if with_loan_origination_fee {
             loan_origination_fee = cm!(self.loan_origination_fee_rate * native_amount);
-            self.collected_fees_native = cm!(self.collected_fees_native + loan_origination_fee);
-            native_amount = cm!(native_amount + loan_origination_fee);
+            cm!(self.collected_fees_native += loan_origination_fee);
+            cm!(native_amount += loan_origination_fee);
         }
 
         // add to borrows
         let indexed_change = cm!(native_amount / self.borrow_index);
-        self.indexed_borrows = cm!(self.indexed_borrows + indexed_change);
-        position.indexed_position = cm!(position.indexed_position - indexed_change);
+        cm!(self.indexed_borrows += indexed_change);
+        cm!(position.indexed_position -= indexed_change);
 
         Ok((true, loan_origination_fee))
     }
@@ -367,7 +367,7 @@ impl Bank {
     ) -> Result<(bool, I80F48)> {
         let loan_origination_fee =
             cm!(self.loan_origination_fee_rate * already_borrowed_native_amount);
-        self.collected_fees_native = cm!(self.collected_fees_native + loan_origination_fee);
+        cm!(self.collected_fees_native += loan_origination_fee);
 
         let (position_is_active, _) =
             self.withdraw_internal(position, loan_origination_fee, false, !position.is_in_use())?;

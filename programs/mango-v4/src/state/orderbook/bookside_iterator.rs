@@ -45,7 +45,7 @@ impl<'a> BookSideIter<'a> {
     ) -> Option<(NodeHandle, &'a LeafNode)> {
         let mut current = start;
         loop {
-            match self.book_side.get(current).unwrap().case().unwrap() {
+            match self.book_side.node(current).unwrap().case().unwrap() {
                 NodeRef::Inner(inner) => {
                     self.stack.push(inner);
                     current = inner.children[self.left];

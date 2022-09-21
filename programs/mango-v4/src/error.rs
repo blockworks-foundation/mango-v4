@@ -39,6 +39,18 @@ pub enum MangoError {
     InsufficentBankVaultFunds,
     #[msg("account is currently being liquidated")]
     BeingLiquidated,
+    #[msg("invalid bank")]
+    InvalidBank,
+    #[msg("account profitability is mismatched")]
+    ProfitabilityMismatch,
+    #[msg("cannot settle with self")]
+    CannotSettleWithSelf,
+    #[msg("perp position does not exist")]
+    PerpPositionDoesNotExist,
+    #[msg("max settle amount must be greater than zero")]
+    MaxSettleAmountMustBeGreaterThanZero,
+    #[msg("the perp position has open orders or unprocessed fill events")]
+    HasOpenPerpOrders,
 }
 
 pub trait Contextable {

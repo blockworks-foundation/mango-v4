@@ -15,7 +15,9 @@ pub mod queue;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::{MangoAccount, MangoAccountValue, PerpMarket, FREE_ORDER_SLOT};
+    use crate::state::{
+        MangoAccount, MangoAccountValue, PerpMarket, FREE_ORDER_SLOT, QUOTE_TOKEN_INDEX,
+    };
     use anchor_lang::prelude::*;
     use bytemuck::Zeroable;
     use fixed::types::I80F48;
@@ -103,6 +105,9 @@ mod tests {
             |book: &mut Book, event_queue: &mut EventQueue, side, price, now_ts| -> i128 {
                 let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
                 let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
+                account
+                    .ensure_perp_position(perp_market.perp_market_index, QUOTE_TOKEN_INDEX)
+                    .unwrap();
 
                 let quantity = 1;
                 let tif = 100;
@@ -150,25 +155,25 @@ mod tests {
             }
         }
         assert!(book.bids.is_full());
-        assert_eq!(book.bids.get_min().unwrap().price(), 1001);
+        assert_eq!(book.bids.min_leaf().unwrap().price(), 1001);
         assert_eq!(
-            book.bids.get_max().unwrap().price(),
+            book.bids.max_leaf().unwrap().price(),
             (1000 + book.bids.leaf_count) as i64
         );
 
         // add another bid at a higher price before expiry, replacing the lowest-price one (1001)
         new_order(&mut book, &mut event_queue, Side::Bid, 1005, 1000000 - 1);
-        assert_eq!(book.bids.get_min().unwrap().price(), 1002);
+        assert_eq!(book.bids.min_leaf().unwrap().price(), 1002);
         assert_eq!(event_queue.len(), 1);
 
         // adding another bid after expiry removes the soonest-expiring order (1005)
         new_order(&mut book, &mut event_queue, Side::Bid, 999, 2000000);
-        assert_eq!(book.bids.get_min().unwrap().price(), 999);
+        assert_eq!(book.bids.min_leaf().unwrap().price(), 999);
         assert!(!bookside_contains_key(&book.bids, 1005));
         assert_eq!(event_queue.len(), 2);
 
         // adding an ask will wipe up to three expired bids at the top of the book
-        let bids_max = book.bids.get_max().unwrap().price();
+        let bids_max = book.bids.max_leaf().unwrap().price();
         let bids_count = book.bids.leaf_count;
         new_order(&mut book, &mut event_queue, Side::Ask, 6000, 1500000);
         assert_eq!(book.bids.leaf_count, bids_count - 5);
@@ -199,6 +204,12 @@ mod tests {
         let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
         let mut maker = MangoAccountValue::from_bytes(&buffer).unwrap();
         let mut taker = MangoAccountValue::from_bytes(&buffer).unwrap();
+        maker
+            .ensure_perp_position(market.perp_market_index, QUOTE_TOKEN_INDEX)
+            .unwrap();
+        taker
+            .ensure_perp_position(market.perp_market_index, QUOTE_TOKEN_INDEX)
+            .unwrap();
 
         let maker_pk = Pubkey::new_unique();
         let taker_pk = Pubkey::new_unique();
@@ -247,11 +258,11 @@ mod tests {
         assert_eq!(maker.perp_position_by_raw_index(0).asks_base_lots, 0);
         assert_eq!(maker.perp_position_by_raw_index(0).taker_base_lots, 0);
         assert_eq!(maker.perp_position_by_raw_index(0).taker_quote_lots, 0);
-        assert_eq!(maker.perp_position_by_raw_index(0).base_position_lots, 0);
+        assert_eq!(maker.perp_position_by_raw_index(0).base_position_lots(), 0);
         assert_eq!(
             maker
                 .perp_position_by_raw_index(0)
-                .quote_position_native
+                .quote_position_native()
                 .to_num::<u32>(),
             0
         );
@@ -305,9 +316,9 @@ mod tests {
             taker.perp_position_by_raw_index(0).taker_quote_lots,
             match_quantity * price
         );
-        assert_eq!(taker.perp_position_by_raw_index(0).base_position_lots, 0);
+        assert_eq!(taker.perp_position_by_raw_index(0).base_position_lots(), 0);
         assert_eq!(
-            taker.perp_position_by_raw_index(0).quote_position_native,
+            taker.perp_position_by_raw_index(0).quote_position_native(),
             -match_quote * market.taker_fee
         );
 
@@ -343,11 +354,11 @@ mod tests {
         assert_eq!(maker.perp_position_by_raw_index(0).taker_base_lots, 0);
         assert_eq!(maker.perp_position_by_raw_index(0).taker_quote_lots, 0);
         assert_eq!(
-            maker.perp_position_by_raw_index(0).base_position_lots,
+            maker.perp_position_by_raw_index(0).base_position_lots(),
             match_quantity
         );
         assert_eq!(
-            maker.perp_position_by_raw_index(0).quote_position_native,
+            maker.perp_position_by_raw_index(0).quote_position_native(),
             -match_quote - match_quote * market.maker_fee
         );
 
@@ -356,11 +367,11 @@ mod tests {
         assert_eq!(taker.perp_position_by_raw_index(0).taker_base_lots, 0);
         assert_eq!(taker.perp_position_by_raw_index(0).taker_quote_lots, 0);
         assert_eq!(
-            taker.perp_position_by_raw_index(0).base_position_lots,
+            taker.perp_position_by_raw_index(0).base_position_lots(),
             -match_quantity
         );
         assert_eq!(
-            taker.perp_position_by_raw_index(0).quote_position_native,
+            taker.perp_position_by_raw_index(0).quote_position_native(),
             match_quote - match_quote * market.taker_fee
         );
     }

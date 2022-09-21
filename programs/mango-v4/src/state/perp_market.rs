@@ -5,8 +5,9 @@ use fixed::types::I80F48;
 
 use static_assertions::const_assert_eq;
 
+use crate::accounts_zerocopy::KeyedAccountReader;
+use crate::state::oracle;
 use crate::state::orderbook::order_type::Side;
-use crate::state::TokenIndex;
 use crate::util::checked_math as cm;
 
 use super::{Book, OracleConfig, DAY_I80F48};
@@ -19,14 +20,19 @@ pub struct PerpMarket {
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
 
-    // TODO: Remove!
     // ABI: Clients rely on this being at offset 40
-    pub base_token_index: TokenIndex,
+    pub padding0: [u8; 2],
 
     /// Lookup indices
     pub perp_market_index: PerpMarketIndex,
 
-    pub padding1: [u8; 4],
+    /// May this market contribute positive values to health?
+    pub trusted_market: u8,
+
+    /// Is this market covered by the group insurance fund?
+    pub group_insurance_fund: u8,
+
+    pub padding1: [u8; 2],
 
     pub name: [u8; 16],
 
@@ -84,18 +90,21 @@ pub struct PerpMarket {
     /// PDA bump
     pub bump: u8,
 
-    pub base_token_decimals: u8,
+    pub base_decimals: u8,
 
     pub padding2: [u8; 6],
 
     pub registration_time: i64,
 
-    pub reserved: [u8; 128],
+    /// Fees settled in native quote currency
+    pub fees_settled: I80F48,
+
+    pub reserved: [u8; 112],
 }
 
 const_assert_eq!(
     size_of::<PerpMarket>(),
-    32 + 2 + 2 + 4 + 16 + 32 + 16 + 32 * 3 + 8 * 2 + 16 * 11 + 8 * 2 + 8 * 2 + 16 + 2 + 6 + 8 + 128
+    32 + 2 + 2 + 4 + 16 + 32 + 16 + 32 * 3 + 8 * 2 + 16 * 12 + 8 * 2 + 8 * 2 + 16 + 2 + 6 + 8 + 112
 );
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
 
@@ -104,6 +113,14 @@ impl PerpMarket {
         std::str::from_utf8(&self.name)
             .unwrap()
             .trim_matches(char::from(0))
+    }
+
+    pub fn elligible_for_group_insurance_fund(&self) -> bool {
+        self.group_insurance_fund == 1
+    }
+
+    pub fn set_elligible_for_group_insurance_fund(&mut self, v: bool) {
+        self.group_insurance_fund = if v { 1 } else { 0 };
     }
 
     pub fn gen_order_id(&mut self, side: Side, price: i64) -> i128 {
@@ -116,13 +133,22 @@ impl PerpMarket {
         }
     }
 
+    pub fn oracle_price(&self, oracle_acc: &impl KeyedAccountReader) -> Result<I80F48> {
+        require_keys_eq!(self.oracle, *oracle_acc.key());
+        oracle::oracle_price(
+            oracle_acc,
+            self.oracle_config.conf_filter,
+            self.base_decimals,
+        )
+    }
+
     /// Use current order book price and index price to update the instantaneous funding
     pub fn update_funding(&mut self, book: &Book, oracle_price: I80F48, now_ts: u64) -> Result<()> {
         let index_price = oracle_price;
 
         // Get current book price & compare it to index price
-        let bid = book.get_impact_price(Side::Bid, self.impact_quantity, now_ts);
-        let ask = book.get_impact_price(Side::Ask, self.impact_quantity, now_ts);
+        let bid = book.impact_price(Side::Bid, self.impact_quantity, now_ts);
+        let ask = book.impact_price(Side::Ask, self.impact_quantity, now_ts);
 
         let diff_price = match (bid, ask) {
             (Some(bid), Some(ask)) => {
@@ -178,5 +204,25 @@ impl PerpMarket {
             Side::Bid => native_price <= cm!(self.maint_liab_weight * oracle_price),
             Side::Ask => native_price >= cm!(self.maint_asset_weight * oracle_price),
         }
+    }
+
+    /// Socialize the loss in this account across all longs and shorts
+    pub fn socialize_loss(&mut self, loss: I80F48) -> Result<I80F48> {
+        require_gte!(0, loss);
+
+        // TODO convert into only socializing on one side
+        // native USDC per contract open interest
+        let socialized_loss = if self.open_interest == 0 {
+            // AUDIT: think about the following:
+            // This is kind of an unfortunate situation. This means socialized loss occurs on the
+            // last person to call settle_pnl on their profits. Any advice on better mechanism
+            // would be appreciated. Luckily, this will be an extremely rare situation.
+            I80F48::ZERO
+        } else {
+            cm!(loss / I80F48::from(self.open_interest))
+        };
+        self.long_funding -= socialized_loss;
+        self.short_funding += socialized_loss;
+        Ok(socialized_loss)
     }
 }

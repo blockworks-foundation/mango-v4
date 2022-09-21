@@ -3,6 +3,7 @@
 use std::cell::RefCell;
 use std::sync::{Arc, RwLock};
 
+use crate::utils::TestKeypair;
 use anchor_lang::AccountDeserialize;
 use anchor_spl::token::TokenAccount;
 use solana_program::{program_pack::Pack, rent::*, system_instruction};
@@ -28,7 +29,7 @@ impl SolanaCookie {
     pub async fn process_transaction(
         &self,
         instructions: &[Instruction],
-        signers: Option<&[&Keypair]>,
+        signers: Option<&[TestKeypair]>,
     ) -> Result<(), BanksClientError> {
         // The locking in this function is convoluted:
         // We capture the program log output by overriding the global logger and capturing
@@ -46,9 +47,14 @@ impl SolanaCookie {
             Transaction::new_with_payer(&instructions, Some(&context.payer.pubkey()));
 
         let mut all_signers = vec![&context.payer];
+        let signer_keypairs =
+            signers.map(|signers| signers.iter().map(|s| s.into()).collect::<Vec<Keypair>>());
+        let signer_keypair_refs = signer_keypairs
+            .as_ref()
+            .map(|kps| kps.iter().map(|kp| kp).collect::<Vec<&Keypair>>());
 
-        if let Some(signers) = signers {
-            all_signers.extend_from_slice(signers);
+        if let Some(signer_keypair_refs) = signer_keypair_refs {
+            all_signers.extend(signer_keypair_refs.iter());
         }
 
         // This fails when warping is involved - https://gitmemory.com/issue/solana-labs/solana/18201/868325078
@@ -67,6 +73,11 @@ impl SolanaCookie {
         *self.last_transaction_log.borrow_mut() = self.logger_capture.read().unwrap().clone();
 
         drop(tx_log_lock);
+        drop(context);
+
+        // This makes sure every transaction gets a new blockhash, avoiding issues where sending
+        // the same transaction again would lead to it being skipped.
+        self.advance_by_slots(1).await;
 
         result
     }
@@ -115,7 +126,7 @@ impl SolanaCookie {
     }
 
     pub async fn create_account_from_len(&self, owner: &Pubkey, len: usize) -> Pubkey {
-        let key = Keypair::new();
+        let key = TestKeypair::new();
         let rent = self.rent.minimum_balance(len);
         let create_account_instr = solana_sdk::system_instruction::create_account(
             &self.context.borrow().payer.pubkey(),
@@ -124,14 +135,14 @@ impl SolanaCookie {
             len as u64,
             &owner,
         );
-        self.process_transaction(&[create_account_instr], Some(&[&key]))
+        self.process_transaction(&[create_account_instr], Some(&[key]))
             .await
             .unwrap();
         key.pubkey()
     }
 
     pub async fn create_account_for_type<T>(&self, owner: &Pubkey) -> Pubkey {
-        let key = Keypair::new();
+        let key = TestKeypair::new();
         let len = 8 + std::mem::size_of::<T>();
         let rent = self.rent.minimum_balance(len);
         let create_account_instr = solana_sdk::system_instruction::create_account(
@@ -141,14 +152,14 @@ impl SolanaCookie {
             len as u64,
             &owner,
         );
-        self.process_transaction(&[create_account_instr], Some(&[&key]))
+        self.process_transaction(&[create_account_instr], Some(&[key]))
             .await
             .unwrap();
         key.pubkey()
     }
 
     pub async fn create_token_account(&self, owner: &Pubkey, mint: Pubkey) -> Pubkey {
-        let keypair = Keypair::new();
+        let keypair = TestKeypair::new();
         let rent = self.rent.minimum_balance(spl_token::state::Account::LEN);
 
         let instructions = [
@@ -168,7 +179,7 @@ impl SolanaCookie {
             .unwrap(),
         ];
 
-        self.process_transaction(&instructions, Some(&[&keypair]))
+        self.process_transaction(&instructions, Some(&[keypair]))
             .await
             .unwrap();
         return keypair.pubkey();
@@ -177,8 +188,8 @@ impl SolanaCookie {
     // Note: Only one table can be created per authority per slot!
     pub async fn create_address_lookup_table(
         &self,
-        authority: &Keypair,
-        payer: &Keypair,
+        authority: TestKeypair,
+        payer: TestKeypair,
     ) -> Pubkey {
         let (instruction, alt_address) =
             solana_address_lookup_table_program::instruction::create_lookup_table(

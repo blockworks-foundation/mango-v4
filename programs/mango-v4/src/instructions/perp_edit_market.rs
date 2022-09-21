@@ -22,8 +22,7 @@ pub fn perp_edit_market(
     ctx: Context<PerpEditMarket>,
     oracle_opt: Option<Pubkey>,
     oracle_config_opt: Option<OracleConfig>,
-    base_token_index_opt: Option<TokenIndex>,
-    base_token_decimals_opt: Option<u8>,
+    base_decimals_opt: Option<u8>,
     maint_asset_weight_opt: Option<f32>,
     init_asset_weight_opt: Option<f32>,
     maint_liab_weight_opt: Option<f32>,
@@ -34,6 +33,8 @@ pub fn perp_edit_market(
     min_funding_opt: Option<f32>,
     max_funding_opt: Option<f32>,
     impact_quantity_opt: Option<i64>,
+    group_insurance_fund_opt: Option<bool>,
+    trusted_market_opt: Option<bool>,
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
@@ -100,19 +101,22 @@ pub fn perp_edit_market(
     // fees_accrued
     // bump
 
-    if let Some(base_token_decimals) = base_token_decimals_opt {
-        perp_market.base_token_decimals = base_token_decimals;
+    if let Some(base_decimals) = base_decimals_opt {
+        perp_market.base_decimals = base_decimals;
     }
 
     // unchanged -
     // perp_market_index
 
-    if let Some(base_token_index) = base_token_index_opt {
-        perp_market.base_token_index = base_token_index;
-    }
-
     // unchanged -
-    // quote_token_index
+    // registration_time
+
+    if let Some(group_insurance_fund) = group_insurance_fund_opt {
+        perp_market.set_elligible_for_group_insurance_fund(group_insurance_fund);
+    }
+    if let Some(trusted_market) = trusted_market_opt {
+        perp_market.trusted_market = if trusted_market { 1 } else { 0 };
+    }
 
     Ok(())
 }

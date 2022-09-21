@@ -186,7 +186,7 @@ pub fn zero_all_non_quote(
             if !refresh_mango_account(account_fetcher, txsig)? {
                 return Ok(());
             }
-        } else {
+        } else if amount > dust_threshold {
             anyhow::bail!(
                 "unexpected {} position after rebalance swap: {} native",
                 token.name,

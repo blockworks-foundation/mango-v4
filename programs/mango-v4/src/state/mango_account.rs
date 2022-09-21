@@ -473,7 +473,7 @@ impl<
     pub fn perp_position(&self, market_index: PerpMarketIndex) -> Result<&PerpPosition> {
         self.all_perp_positions()
             .find(|p| p.is_active_for_market(market_index))
-            .ok_or_else(|| error_msg!("perp position for market index {} not found", market_index))
+            .ok_or_else(|| error!(MangoError::PerpPositionDoesNotExist))
     }
 
     pub fn perp_position_by_raw_index(&self, raw_index: usize) -> &PerpPosition {
@@ -690,9 +690,22 @@ impl<
         get_helper_mut(self.dynamic_mut(), offset)
     }
 
+    pub fn perp_position_mut(
+        &mut self,
+        market_index: PerpMarketIndex,
+    ) -> Result<&mut PerpPosition> {
+        let raw_index_opt = self
+            .all_perp_positions()
+            .position(|p| p.is_active_for_market(market_index));
+        raw_index_opt
+            .map(|raw_index| self.perp_position_mut_by_raw_index(raw_index))
+            .ok_or_else(|| error!(MangoError::PerpPositionDoesNotExist))
+    }
+
     pub fn ensure_perp_position(
         &mut self,
         perp_market_index: PerpMarketIndex,
+        settle_token_index: TokenIndex,
     ) -> Result<(&mut PerpPosition, usize)> {
         let mut raw_index_opt = self
             .all_perp_positions()
@@ -700,10 +713,12 @@ impl<
         if raw_index_opt.is_none() {
             raw_index_opt = self.all_perp_positions().position(|p| !p.is_active());
             if let Some(raw_index) = raw_index_opt {
-                *(self.perp_position_mut_by_raw_index(raw_index)) = PerpPosition {
-                    market_index: perp_market_index,
-                    ..Default::default()
-                };
+                let perp_position = self.perp_position_mut_by_raw_index(raw_index);
+                *perp_position = PerpPosition::default();
+                perp_position.market_index = perp_market_index;
+
+                let mut settle_token_position = self.ensure_token_position(settle_token_index)?.0;
+                cm!(settle_token_position.in_use_count += 1);
             }
         }
         if let Some(raw_index) = raw_index_opt {
@@ -713,8 +728,17 @@ impl<
         }
     }
 
-    pub fn deactivate_perp_position(&mut self, raw_index: usize) {
-        self.perp_position_mut_by_raw_index(raw_index).market_index = PerpMarketIndex::MAX;
+    pub fn deactivate_perp_position(
+        &mut self,
+        perp_market_index: PerpMarketIndex,
+        settle_token_index: TokenIndex,
+    ) -> Result<()> {
+        self.perp_position_mut(perp_market_index)?.market_index = PerpMarketIndex::MAX;
+
+        let mut settle_token_position = self.token_position_mut(settle_token_index)?.0;
+        cm!(settle_token_position.in_use_count -= 1);
+
+        Ok(())
     }
 
     pub fn add_perp_order(
@@ -723,14 +747,13 @@ impl<
         side: Side,
         order: &LeafNode,
     ) -> Result<()> {
-        // TODO: pass in the PerpPosition, currently has a creation side-effect
-        let mut perp_account = self.ensure_perp_position(perp_market_index).unwrap().0;
+        let mut perp_account = self.perp_position_mut(perp_market_index)?;
         match side {
             Side::Bid => {
-                perp_account.bids_base_lots = cm!(perp_account.bids_base_lots + order.quantity);
+                cm!(perp_account.bids_base_lots += order.quantity);
             }
             Side::Ask => {
-                perp_account.asks_base_lots = cm!(perp_account.asks_base_lots + order.quantity);
+                cm!(perp_account.asks_base_lots += order.quantity);
             }
         };
         let slot = order.owner_slot as usize;
@@ -744,21 +767,20 @@ impl<
     }
 
     pub fn remove_perp_order(&mut self, slot: usize, quantity: i64) -> Result<()> {
-        // TODO: pass in the PerpPosition, currently has a creation side-effect
         {
             let oo = self.perp_order_mut_by_raw_index(slot);
             require_neq!(oo.order_market, FREE_ORDER_SLOT);
             let order_side = oo.order_side;
             let perp_market_index = oo.order_market;
-            let perp_account = self.ensure_perp_position(perp_market_index).unwrap().0;
+            let perp_account = self.perp_position_mut(perp_market_index)?;
 
             // accounting
             match order_side {
                 Side::Bid => {
-                    perp_account.bids_base_lots = cm!(perp_account.bids_base_lots - quantity);
+                    cm!(perp_account.bids_base_lots -= quantity);
                 }
                 Side::Ask => {
-                    perp_account.asks_base_lots = cm!(perp_account.asks_base_lots - quantity);
+                    cm!(perp_account.asks_base_lots -= quantity);
                 }
             }
         }
@@ -778,34 +800,28 @@ impl<
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
     ) -> Result<()> {
-        // TODO: pass in the PerpPosition, currently has a creation side-effect
-        let pa = self.ensure_perp_position(perp_market_index).unwrap().0;
+        let pa = self.perp_position_mut(perp_market_index)?;
         pa.settle_funding(perp_market);
 
         let side = fill.taker_side.invert_side();
         let (base_change, quote_change) = fill.base_quote_change(side);
-        pa.change_base_and_entry_positions(perp_market, base_change, quote_change);
-        let quote = I80F48::from_num(
-            perp_market
-                .quote_lot_size
-                .checked_mul(quote_change)
-                .unwrap(),
-        );
-        let fees = quote.abs() * fill.maker_fee;
+        let quote = cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
+        let fees = cm!(quote.abs() * fill.maker_fee);
         if !fill.market_fees_applied {
-            perp_market.fees_accrued += fees;
+            cm!(perp_market.fees_accrued += fees);
         }
-        pa.quote_position_native = pa.quote_position_native.checked_add(quote - fees).unwrap();
+        let quote_change_native = cm!(quote - fees);
+        pa.change_base_and_quote_positions(perp_market, base_change, quote_change_native);
 
         if fill.maker_out {
             self.remove_perp_order(fill.maker_slot as usize, base_change.abs())
         } else {
             match side {
                 Side::Bid => {
-                    pa.bids_base_lots = cm!(pa.bids_base_lots - base_change.abs());
+                    cm!(pa.bids_base_lots -= base_change.abs());
                 }
                 Side::Ask => {
-                    pa.asks_base_lots = cm!(pa.asks_base_lots - base_change.abs());
+                    cm!(pa.asks_base_lots -= base_change.abs());
                 }
             }
             Ok(())
@@ -818,18 +834,16 @@ impl<
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
     ) -> Result<()> {
-        // TODO: pass in the PerpPosition, currently has a creation side-effect
-        let pa = self.ensure_perp_position(perp_market_index).unwrap().0;
+        let pa = self.perp_position_mut(perp_market_index)?;
         pa.settle_funding(perp_market);
 
         let (base_change, quote_change) = fill.base_quote_change(fill.taker_side);
         pa.remove_taker_trade(base_change, quote_change);
-        pa.change_base_and_entry_positions(perp_market, base_change, quote_change);
-        let quote = I80F48::from_num(perp_market.quote_lot_size * quote_change);
-
         // fees are assessed at time of trade; no need to assess fees here
+        let quote_change_native =
+            cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
+        pa.change_base_and_quote_positions(perp_market, base_change, quote_change_native);
 
-        pa.quote_position_native += quote;
         Ok(())
     }
 
@@ -1183,61 +1197,66 @@ mod tests {
     fn test_perp_positions() {
         let mut account = make_test_account();
         assert!(account.perp_position(1).is_err());
-        //assert!(account.perp_position_mut(3).is_err());
+        assert!(account.perp_position_mut(3).is_err());
         assert_eq!(
             account.perp_position_by_raw_index(0).market_index,
             PerpMarketIndex::MAX
         );
 
         {
-            let (pos, raw) = account.ensure_perp_position(1).unwrap();
+            let (pos, raw) = account.ensure_perp_position(1, 0).unwrap();
             assert_eq!(raw, 0);
             assert_eq!(pos.market_index, 1);
+            assert_eq!(account.token_position_mut(0).unwrap().0.in_use_count, 1);
         }
         {
-            let (pos, raw) = account.ensure_perp_position(7).unwrap();
+            let (pos, raw) = account.ensure_perp_position(7, 0).unwrap();
             assert_eq!(raw, 1);
             assert_eq!(pos.market_index, 7);
+            assert_eq!(account.token_position_mut(0).unwrap().0.in_use_count, 2);
         }
         {
-            let (pos, raw) = account.ensure_perp_position(42).unwrap();
+            let (pos, raw) = account.ensure_perp_position(42, 0).unwrap();
             assert_eq!(raw, 2);
             assert_eq!(pos.market_index, 42);
+            assert_eq!(account.token_position_mut(0).unwrap().0.in_use_count, 3);
         }
 
         {
-            account.deactivate_perp_position(1);
+            let pos_res = account.perp_position_mut(1);
+            assert!(pos_res.is_ok());
+            assert_eq!(pos_res.unwrap().market_index, 1)
+        }
 
-            let (pos, raw) = account.ensure_perp_position(42).unwrap();
+        {
+            let pos_res = account.perp_position_mut(99);
+            assert!(pos_res.is_err());
+        }
+
+        {
+            assert!(account.deactivate_perp_position(7, 0).is_ok());
+
+            let (pos, raw) = account.ensure_perp_position(42, 0).unwrap();
             assert_eq!(raw, 2);
             assert_eq!(pos.market_index, 42);
+            assert_eq!(account.token_position_mut(0).unwrap().0.in_use_count, 2);
 
-            let (pos, raw) = account.ensure_perp_position(8).unwrap();
+            let (pos, raw) = account.ensure_perp_position(8, 0).unwrap();
             assert_eq!(raw, 1);
             assert_eq!(pos.market_index, 8);
+            assert_eq!(account.token_position_mut(0).unwrap().0.in_use_count, 3);
         }
 
         assert_eq!(account.active_perp_positions().count(), 3);
-        account.deactivate_perp_position(0);
+        assert!(account.deactivate_perp_position(1, 0).is_ok());
         assert_eq!(
             account.perp_position_by_raw_index(0).market_index,
             PerpMarketIndex::MAX
         );
         assert!(account.perp_position(1).is_err());
-        //assert!(account.perp_position_mut(1).is_err());
+        assert!(account.perp_position_mut(1).is_err());
         assert!(account.perp_position(8).is_ok());
         assert!(account.perp_position(42).is_ok());
         assert_eq!(account.active_perp_positions().count(), 2);
-
-        /*{
-            let (pos, raw) = account.perp_position_mut(42).unwrap();
-            assert_eq!(pos.perp_index, 42);
-            assert_eq!(raw, 2);
-        }
-        {
-            let (pos, raw) = account.perp_position_mut(8).unwrap();
-            assert_eq!(pos.perp_index, 8);
-            assert_eq!(raw, 1);
-        }*/
     }
 }

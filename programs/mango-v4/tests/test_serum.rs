@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 
 use solana_program_test::*;
-use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer, transport::TransportError};
+use solana_sdk::{pubkey::Pubkey, transport::TransportError};
 
 use mango_v4::instructions::{
     OpenOrdersSlim, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
@@ -19,7 +19,7 @@ struct SerumOrderPlacer {
     solana: Arc<SolanaCookie>,
     serum: Arc<SerumCookie>,
     account: Pubkey,
-    owner: Keypair,
+    owner: TestKeypair,
     serum_market: Pubkey,
     open_orders: Pubkey,
     next_client_order_id: u64,
@@ -59,7 +59,7 @@ impl SerumOrderPlacer {
                 client_order_id,
                 limit: 10,
                 account: self.account,
-                owner: &self.owner,
+                owner: self.owner,
                 serum_market: self.serum_market,
             },
         )
@@ -83,7 +83,7 @@ impl SerumOrderPlacer {
                 client_order_id,
                 limit: 10,
                 account: self.account,
-                owner: &self.owner,
+                owner: self.owner,
                 serum_market: self.serum_market,
             },
         )
@@ -110,7 +110,7 @@ impl SerumOrderPlacer {
                 side,
                 order_id,
                 account: self.account,
-                owner: &self.owner,
+                owner: self.owner,
                 serum_market: self.serum_market,
             },
         )
@@ -119,13 +119,11 @@ impl SerumOrderPlacer {
     }
 
     async fn settle(&self) {
-        // to avoid multiple settles looking like the same tx
-        self.solana.advance_by_slots(1).await;
         send_tx(
             &self.solana,
             Serum3SettleFundsInstruction {
                 account: self.account,
-                owner: &self.owner,
+                owner: self.owner,
                 serum_market: self.serum_market,
             },
         )
@@ -154,9 +152,9 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..2];
 
     //
@@ -166,7 +164,8 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;
@@ -334,9 +333,9 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..3];
 
     //
@@ -346,7 +345,8 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
     let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::error::MangoError;
+use crate::error::*;
 use crate::state::{AccountLoaderDynamic, Book, BookSide, Group, MangoAccount, PerpMarket};
 
 #[derive(Accounts)]
@@ -41,13 +41,14 @@ pub fn perp_cancel_order_by_client_order_id(
 
     let (order_id, side) = account
         .perp_find_order_with_client_order_id(perp_market.perp_market_index, client_order_id)
-        .ok_or_else(|| error!(MangoError::SomeError))?;
+        .ok_or_else(|| error_msg!("could not find perp order with client order id {client_order_id} in perp order books"))?;
 
-    let order = book.cancel_order(order_id, side)?;
-    require!(
-        order.owner == ctx.accounts.account.key(),
-        MangoError::SomeError // InvalidOwner
-    );
+    book.cancel_order(
+        &mut account.borrow_mut(),
+        order_id,
+        side,
+        Some(ctx.accounts.account.key()),
+    )?;
 
-    account.remove_perp_order(order.owner_slot as usize, order.quantity)
+    Ok(())
 }

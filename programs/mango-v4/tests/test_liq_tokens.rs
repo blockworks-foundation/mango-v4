@@ -2,7 +2,7 @@
 
 use fixed::types::I80F48;
 use solana_program_test::*;
-use solana_sdk::{signature::Keypair, transport::TransportError};
+use solana_sdk::transport::TransportError;
 
 use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use program_test::*;
@@ -18,9 +18,9 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..2];
     let payer_mint_accounts = &context.users[1].token_accounts[0..2];
 
@@ -31,7 +31,8 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;
@@ -186,9 +187,9 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
-    let admin = &Keypair::new();
-    let owner = &context.users[0].key;
-    let payer = &context.users[1].key;
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
     let mints = &context.mints[0..4];
     let payer_mint_accounts = &context.users[1].token_accounts[0..4];
 
@@ -199,7 +200,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;
@@ -338,7 +340,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        LiqTokenWithTokenInstruction {
+        TokenLiqWithTokenInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -367,7 +369,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        LiqTokenWithTokenInstruction {
+        TokenLiqWithTokenInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -395,7 +397,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        LiqTokenWithTokenInstruction {
+        TokenLiqWithTokenInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -426,7 +428,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     //
     send_tx(
         solana,
-        LiqTokenWithTokenInstruction {
+        TokenLiqWithTokenInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,
@@ -503,7 +505,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        LiqTokenWithTokenInstruction {
+        TokenLiqWithTokenInstruction {
             liqee: account,
             liqor: vault_account,
             liqor_owner: owner,

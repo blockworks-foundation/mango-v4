@@ -5,9 +5,11 @@ use crate::account_shared_data::KeyedAccountSharedData;
 use client::{chain_data, AccountFetcher, MangoClient, MangoClientError, MangoGroupContext};
 use mango_v4::state::{
     new_health_cache, Bank, FixedOrderAccountRetriever, HealthCache, HealthType, MangoAccountValue,
-    TokenIndex, QUOTE_TOKEN_INDEX,
+    Serum3Orders, TokenIndex, QUOTE_TOKEN_INDEX,
 };
 
+use itertools::Itertools;
+use rand::seq::SliceRandom;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 pub struct Config {
@@ -37,6 +39,7 @@ pub fn new_health_cache_(
     let retriever = FixedOrderAccountRetriever {
         ais: accounts,
         n_banks: active_token_len,
+        n_perps: active_perp_len,
         begin_perp: active_token_len * 2,
         begin_serum3: active_token_len * 2 + active_perp_len,
     };
@@ -111,19 +114,15 @@ pub fn maybe_liquidate_account(
     let health_cache =
         new_health_cache_(&mango_client.context, account_fetcher, &account).expect("always ok");
     let maint_health = health_cache.health(HealthType::Maint);
-    let is_bankrupt = health_cache.is_bankrupt();
-    let is_liquidatable = health_cache.is_liquidatable();
-
-    if !is_liquidatable && !is_bankrupt {
+    if !health_cache.is_liquidatable() {
         return Ok(false);
     }
 
     log::trace!(
-        "possible candidate: {}, with owner: {}, maint health: {}, bankrupt: {}",
+        "possible candidate: {}, with owner: {}, maint health: {}",
         pubkey,
         account.fixed.owner,
         maint_health,
-        is_bankrupt,
     );
 
     // Fetch a fresh account and re-compute
@@ -132,9 +131,13 @@ pub fn maybe_liquidate_account(
     let account = account_fetcher.fetch_fresh_mango_account(pubkey)?;
     let health_cache =
         new_health_cache_(&mango_client.context, account_fetcher, &account).expect("always ok");
+    if !health_cache.is_liquidatable() {
+        return Ok(false);
+    }
+
     let maint_health = health_cache.health(HealthType::Maint);
-    let is_bankrupt = health_cache.is_bankrupt();
-    let is_liquidatable = health_cache.is_liquidatable();
+    let is_spot_bankrupt = health_cache.can_call_spot_bankruptcy();
+    let is_spot_liquidatable = health_cache.has_borrows() && !is_spot_bankrupt;
 
     // find asset and liab tokens
     let mut tokens = account
@@ -156,6 +159,24 @@ pub fn maybe_liquidate_account(
         .collect::<anyhow::Result<Vec<(TokenIndex, I80F48, I80F48)>>>()?;
     tokens.sort_by(|a, b| a.2.cmp(&b.2));
 
+    // look for any open serum orders or settleable balances
+    let serum_force_cancels = account
+        .active_serum3_orders()
+        .map(|orders| {
+            let open_orders_account = account_fetcher.fetch_raw_account(orders.open_orders)?;
+            let open_orders = mango_v4::serum3_cpi::load_open_orders(&open_orders_account)?;
+            let can_force_cancel = open_orders.native_coin_total > 0
+                || open_orders.native_pc_total > 0
+                || open_orders.referrer_rebates_accrued > 0;
+            if can_force_cancel {
+                Ok(Some(*orders))
+            } else {
+                Ok(None)
+            }
+        })
+        .filter_map_ok(|v| v)
+        .collect::<anyhow::Result<Vec<Serum3Orders>>>()?;
+
     let get_max_liab_transfer = |source, target| -> anyhow::Result<I80F48> {
         let mut liqor = account_fetcher
             .fetch_fresh_mango_account(&mango_client.mango_account_address)
@@ -168,14 +189,36 @@ pub fn maybe_liquidate_account(
 
         let health_cache =
             new_health_cache_(&mango_client.context, account_fetcher, &liqor).expect("always ok");
+
+        let source_price = health_cache.token_info(source).unwrap().oracle_price;
+        let target_price = health_cache.token_info(target).unwrap().oracle_price;
+        // TODO: This is where we could multiply in the liquidation fee factors
+        let oracle_swap_price = source_price / target_price;
+
         let amount = health_cache
-            .max_swap_source_for_health_ratio(source, target, min_health_ratio)
+            .max_swap_source_for_health_ratio(source, target, oracle_swap_price, min_health_ratio)
             .context("getting max_swap_source")?;
         Ok(amount)
     };
 
     // try liquidating
-    let txsig = if is_bankrupt {
+    let txsig = if !serum_force_cancels.is_empty() {
+        // pick a random market to force-cancel orders on
+        let serum_orders = serum_force_cancels.choose(&mut rand::thread_rng()).unwrap();
+        let sig = mango_client.serum3_liq_force_cancel_orders(
+            (pubkey, &account),
+            serum_orders.market_index,
+            &serum_orders.open_orders,
+        )?;
+        log::info!(
+            "Force cancelled serum market on account {}, market index {}, maint_health was {}, tx sig {:?}",
+            pubkey,
+            serum_orders.market_index,
+            maint_health,
+            sig
+        );
+        sig
+    } else if is_spot_bankrupt {
         if tokens.is_empty() {
             anyhow::bail!("mango account {}, is bankrupt has no active tokens", pubkey);
         }
@@ -206,7 +249,7 @@ pub fn maybe_liquidate_account(
             sig
         );
         sig
-    } else if is_liquidatable {
+    } else if is_spot_liquidatable {
         let asset_token_index = tokens
             .iter()
             .rev()
@@ -243,7 +286,6 @@ pub fn maybe_liquidate_account(
         //
         // TODO: log liqor's assets in UI form
         // TODO: log liquee's liab_needed, need to refactor program code to be able to be accessed from client side
-        // TODO: swap inherited liabs to desired asset for liqor
         //
         let sig = mango_client
             .liq_token_with_token(
@@ -261,7 +303,11 @@ pub fn maybe_liquidate_account(
         );
         sig
     } else {
-        return Ok(false);
+        anyhow::bail!(
+            "Don't know what to do with liquidatable account {}, maint_health was {}",
+            pubkey,
+            maint_health
+        );
     };
 
     let slot = account_fetcher.transaction_max_slot(&[txsig])?;
