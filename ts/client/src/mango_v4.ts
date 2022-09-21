@@ -3888,15 +3888,6 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "feesSettled",
-            "docs": [
-              "Fees settled in native quote currency"
-            ],
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
             "name": "bump",
             "docs": [
               "Liquidity mining metadata",
@@ -3925,11 +3916,20 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "feesSettled",
+            "docs": [
+              "Fees settled in native quote currency"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                112
               ]
             }
           }
@@ -9891,15 +9891,6 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "feesSettled",
-            "docs": [
-              "Fees settled in native quote currency"
-            ],
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
             "name": "bump",
             "docs": [
               "Liquidity mining metadata",
@@ -9928,11 +9919,20 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "feesSettled",
+            "docs": [
+              "Fees settled in native quote currency"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                112
               ]
             }
           }

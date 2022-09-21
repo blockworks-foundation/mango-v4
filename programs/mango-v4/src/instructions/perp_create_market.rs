@@ -99,7 +99,7 @@ pub fn perp_create_market(
         padding0: Default::default(),
         padding1: Default::default(),
         padding2: Default::default(),
-        reserved: [0; 128],
+        reserved: [0; 112],
     };
 
     let mut bids = ctx.accounts.bids.load_init()?;

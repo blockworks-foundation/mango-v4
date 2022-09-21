@@ -75,9 +75,6 @@ pub struct PerpMarket {
     /// Fees accrued in native quote currency
     pub fees_accrued: I80F48,
 
-    /// Fees settled in native quote currency
-    pub fees_settled: I80F48,
-
     /// Liquidity mining metadata
     /// pub liquidity_mining_info: LiquidityMiningInfo,
 
@@ -93,12 +90,15 @@ pub struct PerpMarket {
 
     pub registration_time: i64,
 
-    pub reserved: [u8; 128],
+    /// Fees settled in native quote currency
+    pub fees_settled: I80F48,
+
+    pub reserved: [u8; 112],
 }
 
 const_assert_eq!(
     size_of::<PerpMarket>(),
-    32 + 2 + 2 + 4 + 16 + 32 + 16 + 32 * 3 + 8 * 2 + 16 * 12 + 8 * 2 + 8 * 2 + 16 + 2 + 6 + 8 + 128
+    32 + 2 + 2 + 4 + 16 + 32 + 16 + 32 * 3 + 8 * 2 + 16 * 12 + 8 * 2 + 8 * 2 + 16 + 2 + 6 + 8 + 112
 );
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
 
