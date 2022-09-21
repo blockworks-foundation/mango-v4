@@ -145,13 +145,13 @@ export class PerpMarket {
     this.feesAccrued = I80F48.from(feesAccrued);
 
     this.priceLotsToUiConverter = new Big(10)
-      .pow(baseTokenDecimals - QUOTE_DECIMALS)
+      .pow(baseDecimals - QUOTE_DECIMALS)
       .mul(new Big(this.quoteLotSize.toString()))
       .div(new Big(this.baseLotSize.toString()))
       .toNumber();
 
     this.baseLotsToUiConverter = new Big(this.baseLotSize.toString())
-      .div(new Big(10).pow(baseTokenDecimals))
+      .div(new Big(10).pow(baseDecimals))
       .toNumber();
 
     this.quoteLotsToUiConverter = new Big(this.quoteLotSize.toString())
@@ -217,11 +217,11 @@ export class PerpMarket {
   public uiPriceToLots(price: number): BN {
     return new BN(price * Math.pow(10, QUOTE_DECIMALS))
       .mul(this.baseLotSize)
-      .div(this.quoteLotSize.mul(new BN(Math.pow(10, this.baseTokenDecimals))));
+      .div(this.quoteLotSize.mul(new BN(Math.pow(10, this.baseDecimals))));
   }
 
   public uiBaseToLots(quantity: number): BN {
-    return new BN(quantity * Math.pow(10, this.baseTokenDecimals)).div(
+    return new BN(quantity * Math.pow(10, this.baseDecimals)).div(
       this.baseLotSize,
     );
   }

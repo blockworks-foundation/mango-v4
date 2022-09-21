@@ -282,7 +282,7 @@ export class Group {
         coder,
         perpMarket.oracle,
         ai,
-        perpMarket.baseTokenDecimals,
+        perpMarket.baseDecimals,
         this.getMintDecimals(this.insuranceMint),
       );
       perpMarket.price = price;
