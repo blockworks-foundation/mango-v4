@@ -201,7 +201,7 @@ pub async fn loop_consume_events(
                 num_of_events+=1;
             }
 
-            if num_of_events == 0{
+            if num_of_events == 0 {
                 return Ok(());
             }
 
