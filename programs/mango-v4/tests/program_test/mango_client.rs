@@ -2143,6 +2143,7 @@ pub struct PerpCreateMarketInstruction {
     pub taker_fee: f32,
     pub group_insurance_fund: bool,
     pub trusted_market: bool,
+    pub fee_penalty: f32,
 }
 impl PerpCreateMarketInstruction {
     pub async fn with_new_book_and_queue(
@@ -2195,6 +2196,7 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             base_decimals: self.base_decimals,
             group_insurance_fund: self.group_insurance_fund,
             trusted_market: self.trusted_market,
+            fee_penalty: self.fee_penalty,
         };
 
         let perp_market = Pubkey::find_program_address(

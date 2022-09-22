@@ -64,6 +64,7 @@ pub fn perp_create_market(
     impact_quantity: i64,
     group_insurance_fund: bool,
     trusted_market: bool,
+    fee_penalty: f32,
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_init()?;
     *perp_market = PerpMarket {
@@ -103,7 +104,8 @@ pub fn perp_create_market(
         padding0: Default::default(),
         padding1: Default::default(),
         padding2: Default::default(),
-        reserved: [0; 112],
+        fee_penalty,
+        reserved: [0; 108],
     };
 
     let mut bids = ctx.accounts.bids.load_init()?;
