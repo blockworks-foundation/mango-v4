@@ -2315,6 +2315,10 @@ export type MangoV4 = {
         {
           "name": "trustedMarket",
           "type": "bool"
+        },
+        {
+          "name": "feePenalty",
+          "type": "f32"
         }
       ]
     },
@@ -2428,6 +2432,12 @@ export type MangoV4 = {
           "name": "trustedMarketOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "feePenaltyOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -4015,11 +4025,15 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "feePenalty",
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                112
+                108
               ]
             }
           }
@@ -8412,6 +8426,10 @@ export const IDL: MangoV4 = {
         {
           "name": "trustedMarket",
           "type": "bool"
+        },
+        {
+          "name": "feePenalty",
+          "type": "f32"
         }
       ]
     },
@@ -8525,6 +8543,12 @@ export const IDL: MangoV4 = {
           "name": "trustedMarketOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "feePenaltyOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -10112,11 +10136,15 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "feePenalty",
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                112
+                108
               ]
             }
           }
