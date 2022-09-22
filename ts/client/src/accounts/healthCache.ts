@@ -177,18 +177,52 @@ export class HealthCache {
     return this.findTokenInfoIndex(bank.tokenIndex);
   }
 
+  findSerum3InfoIndex(marketIndex: number): number {
+    return this.serum3Infos.findIndex(
+      (serum3Info) => serum3Info.marketIndex === marketIndex,
+    );
+  }
+
+  getOrCreateSerum3InfoIndex(group: Group, serum3Market: Serum3Market): number {
+    const index = this.findSerum3InfoIndex(serum3Market.marketIndex);
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
+    );
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+    const baseEntryIndex = this.getOrCreateTokenInfoIndex(baseBank);
+    const quoteEntryIndex = this.getOrCreateTokenInfoIndex(quoteBank);
+    if (index == -1) {
+      this.serum3Infos.push(
+        Serum3Info.emptyFromSerum3Market(
+          serum3Market,
+          baseEntryIndex,
+          quoteEntryIndex,
+        ),
+      );
+    }
+    return this.findSerum3InfoIndex(serum3Market.marketIndex);
+  }
+
   adjustSerum3Reserved(
     // todo change indices to types from numbers
-    marketIndex: number,
-    baseTokenIndex: number,
+    group: Group,
+    serum3Market: Serum3Market,
     reservedBaseChange: I80F48,
     freeBaseChange: I80F48,
-    quoteTokenIndex: number,
     reservedQuoteChange: I80F48,
     freeQuoteChange: I80F48,
   ) {
-    const baseEntryIndex = this.findTokenInfoIndex(baseTokenIndex);
-    const quoteEntryIndex = this.findTokenInfoIndex(quoteTokenIndex);
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
+    );
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+
+    const baseEntryIndex = this.getOrCreateTokenInfoIndex(baseBank);
+    const quoteEntryIndex = this.getOrCreateTokenInfoIndex(quoteBank);
 
     const baseEntry = this.tokenInfos[baseEntryIndex];
     const reservedAmount = reservedBaseChange.mul(baseEntry.oraclePrice);
@@ -203,14 +237,8 @@ export class HealthCache {
     quoteEntry.balance.iadd(freeQuoteChange.mul(quoteEntry.oraclePrice));
 
     // Apply it to the serum3 info
-    const serum3Info = this.serum3Infos.find(
-      (serum3Info) => serum3Info.marketIndex === marketIndex,
-    );
-    if (!serum3Info) {
-      throw new Error(
-        `Serum3Info not found for market with index ${marketIndex}`,
-      );
-    }
+    const index = this.getOrCreateSerum3InfoIndex(group, serum3Market);
+    const serum3Info = this.serum3Infos[index];
     serum3Info.reserved = serum3Info.reserved.add(reservedAmount);
   }
 
@@ -288,11 +316,10 @@ export class HealthCache {
 
     // Increase reserved in Serum3Info for quote
     adjustedCache.adjustSerum3Reserved(
-      serum3Market.marketIndex,
-      serum3Market.baseTokenIndex,
+      group,
+      serum3Market,
       ZERO_I80F48(),
       ZERO_I80F48(),
-      serum3Market.quoteTokenIndex,
       bidNativeQuoteAmount,
       ZERO_I80F48(),
     );
@@ -325,11 +352,10 @@ export class HealthCache {
 
     // Increase reserved in Serum3Info for base
     adjustedCache.adjustSerum3Reserved(
-      serum3Market.marketIndex,
-      serum3Market.baseTokenIndex,
+      group,
+      serum3Market,
       askNativeBaseAmount,
       ZERO_I80F48(),
-      serum3Market.quoteTokenIndex,
       ZERO_I80F48(),
       ZERO_I80F48(),
     );
@@ -558,7 +584,8 @@ export class HealthCache {
     }
 
     // Amount which would bring health to 0
-    // amount = max(A_deposits, B_borrows) + init_health / (A_liab_weight - B_asset_weight)
+    // where M = max(A_deposits, B_borrows)
+    // amount = M + (init_health + M * (B_init_liab - A_init_asset)) / (A_init_liab - B_init_asset);
     // A is what we would be essentially swapping for B
     // So when its an ask, then base->quote,
     // and when its a bid, then quote->bid
@@ -567,30 +594,34 @@ export class HealthCache {
       const quoteBorrows = quote.balance.lt(ZERO_I80F48())
         ? quote.balance.abs()
         : ZERO_I80F48();
-      zeroAmount = base.balance
-        .max(quoteBorrows)
-        .add(
-          initialHealth.div(
+      const max = base.balance.max(quoteBorrows);
+      zeroAmount = max.add(
+        initialHealth
+          .add(max.mul(quote.initLiabWeight.sub(base.initAssetWeight)))
+          .div(
             base
               .liabWeight(HealthType.init)
               .sub(quote.assetWeight(HealthType.init)),
           ),
-        );
+      );
     } else {
       const baseBorrows = base.balance.lt(ZERO_I80F48())
         ? base.balance.abs()
         : ZERO_I80F48();
-      zeroAmount = quote.balance
-        .max(baseBorrows)
-        .add(
-          initialHealth.div(
+      const max = quote.balance.max(baseBorrows);
+      zeroAmount = max.add(
+        initialHealth
+          .add(max.mul(base.initLiabWeight.sub(quote.initAssetWeight)))
+          .div(
             quote
               .liabWeight(HealthType.init)
               .sub(base.assetWeight(HealthType.init)),
           ),
-        );
+      );
     }
+
     const cache = cacheAfterPlacingOrder(zeroAmount);
+    const zeroAmountHealth = cache.health(HealthType.init);
     const zeroAmountRatio = cache.healthRatio(HealthType.init);
 
     function cacheAfterPlacingOrder(amount: I80F48) {
@@ -601,11 +632,10 @@ export class HealthCache {
         : adjustedCache.tokenInfos[quoteIndex].balance.isub(amount);
 
       adjustedCache.adjustSerum3Reserved(
-        serum3Market.marketIndex,
-        serum3Market.baseTokenIndex,
+        group,
+        serum3Market,
         side === Serum3Side.ask ? amount.div(base.oraclePrice) : ZERO_I80F48(),
         ZERO_I80F48(),
-        serum3Market.quoteTokenIndex,
         side === Serum3Side.bid ? amount.div(quote.oraclePrice) : ZERO_I80F48(),
         ZERO_I80F48(),
       );
@@ -729,6 +759,19 @@ export class Serum3Info {
       dto.baseIndex,
       dto.quoteIndex,
       dto.marketIndex,
+    );
+  }
+
+  static emptyFromSerum3Market(
+    serum3Market: Serum3Market,
+    baseEntryIndex: number,
+    quoteEntryIndex: number,
+  ) {
+    return new Serum3Info(
+      ZERO_I80F48(),
+      baseEntryIndex,
+      quoteEntryIndex,
+      serum3Market.marketIndex,
     );
   }
 
