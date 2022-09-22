@@ -268,8 +268,6 @@ pub mod mango_v4 {
         instructions::serum3_deregister_market(ctx)
     }
 
-    // TODO serum3_change_spot_market_params
-
     pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result<()> {
         instructions::serum3_create_open_orders(ctx)
     }
@@ -325,8 +323,6 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::serum3_liq_force_cancel_orders(ctx, limit)
     }
-
-    // TODO serum3_cancel_all_spot_orders
 
     // DEPRECATED: use token_liq_with_token
     pub fn liq_token_with_token(
@@ -463,8 +459,6 @@ pub mod mango_v4 {
     pub fn perp_close_market(ctx: Context<PerpCloseMarket>) -> Result<()> {
         instructions::perp_close_market(ctx)
     }
-
-    // TODO perp_change_perp_market_params
 
     pub fn perp_deactivate_position(ctx: Context<PerpDeactivatePosition>) -> Result<()> {
         instructions::perp_deactivate_position(ctx)
