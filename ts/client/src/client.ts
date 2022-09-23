@@ -610,6 +610,13 @@ export class MangoClient {
     );
   }
 
+  public async getMangoAccountForPublicKey(mangoAccountPk: PublicKey) {
+    return MangoAccount.from(
+      mangoAccountPk,
+      await this.program.account.mangoAccount.fetch(mangoAccountPk),
+    );
+  }
+  
   public async getMangoAccountWithSlot(mangoAccountPk: PublicKey) {
     const resp =
       await this.program.provider.connection.getAccountInfoAndContext(

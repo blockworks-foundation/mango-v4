@@ -21,6 +21,7 @@ export class MangoAccount {
   public perps: PerpPosition[];
   public perpOpenOrders: PerpOo[];
   public name: string;
+  public netDeposits: BN;
 
   static from(
     publicKey: PublicKey,
@@ -85,6 +86,7 @@ export class MangoAccount {
     this.perps = perps.map((dto) => PerpPosition.from(dto));
     this.perpOpenOrders = perpOpenOrders.map((dto) => PerpOo.from(dto));
     this.accountData = undefined;
+    this.netDeposits = netDeposits;
   }
 
   async reload(client: MangoClient, group: Group): Promise<MangoAccount> {
@@ -277,6 +279,15 @@ export class MangoAccount {
    */
   getLiabsValue(healthType: HealthType): I80F48 | undefined {
     return this.accountData?.healthCache.liabs(healthType);
+  }
+
+  /**
+   * @returns Overall PNL, in native quote
+   * PNL is defined here as spot value + serum3 open orders value + perp value - net deposits value (evaluated at native quote price at the time of the deposit/withdraw)
+   * spot value + serum3 open orders value + perp value is returned by getEquity (open orders values are added to spot token values implicitly)
+   */
+   getPnl(): I80F48 | undefined {
+    return this.getEquity()?.add((I80F48.fromI64(this.netDeposits)).mul(I80F48.fromNumber(-1)))
   }
 
   /**
