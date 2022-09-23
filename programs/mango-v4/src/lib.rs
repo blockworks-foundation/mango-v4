@@ -268,8 +268,6 @@ pub mod mango_v4 {
         instructions::serum3_deregister_market(ctx)
     }
 
-    // TODO serum3_change_spot_market_params
-
     pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result<()> {
         instructions::serum3_create_open_orders(ctx)
     }
@@ -326,8 +324,6 @@ pub mod mango_v4 {
         instructions::serum3_liq_force_cancel_orders(ctx, limit)
     }
 
-    // TODO serum3_cancel_all_spot_orders
-
     // DEPRECATED: use token_liq_with_token
     pub fn liq_token_with_token(
         ctx: Context<TokenLiqWithToken>,
@@ -382,8 +378,7 @@ pub mod mango_v4 {
         perp_market_index: PerpMarketIndex,
         name: String,
         oracle_config: OracleConfig,
-        base_token_index_opt: Option<TokenIndex>,
-        base_token_decimals: u8,
+        base_decimals: u8,
         quote_lot_size: i64,
         base_lot_size: i64,
         maint_asset_weight: f32,
@@ -396,14 +391,15 @@ pub mod mango_v4 {
         min_funding: f32,
         max_funding: f32,
         impact_quantity: i64,
+        group_insurance_fund: bool,
+        trusted_market: bool,
     ) -> Result<()> {
         instructions::perp_create_market(
             ctx,
             perp_market_index,
             name,
             oracle_config,
-            base_token_index_opt,
-            base_token_decimals,
+            base_decimals,
             quote_lot_size,
             base_lot_size,
             maint_asset_weight,
@@ -416,6 +412,8 @@ pub mod mango_v4 {
             max_funding,
             min_funding,
             impact_quantity,
+            group_insurance_fund,
+            trusted_market,
         )
     }
 
@@ -424,8 +422,7 @@ pub mod mango_v4 {
         ctx: Context<PerpEditMarket>,
         oracle_opt: Option<Pubkey>,
         oracle_config_opt: Option<OracleConfig>,
-        base_token_index_opt: Option<TokenIndex>,
-        base_token_decimals_opt: Option<u8>,
+        base_decimals_opt: Option<u8>,
         maint_asset_weight_opt: Option<f32>,
         init_asset_weight_opt: Option<f32>,
         maint_liab_weight_opt: Option<f32>,
@@ -436,13 +433,14 @@ pub mod mango_v4 {
         min_funding_opt: Option<f32>,
         max_funding_opt: Option<f32>,
         impact_quantity_opt: Option<i64>,
+        group_insurance_fund_opt: Option<bool>,
+        trusted_market_opt: Option<bool>,
     ) -> Result<()> {
         instructions::perp_edit_market(
             ctx,
             oracle_opt,
             oracle_config_opt,
-            base_token_index_opt,
-            base_token_decimals_opt,
+            base_decimals_opt,
             maint_asset_weight_opt,
             init_asset_weight_opt,
             maint_liab_weight_opt,
@@ -453,6 +451,8 @@ pub mod mango_v4 {
             min_funding_opt,
             max_funding_opt,
             impact_quantity_opt,
+            group_insurance_fund_opt,
+            trusted_market_opt,
         )
     }
 
@@ -544,15 +544,12 @@ pub mod mango_v4 {
         instructions::perp_liq_force_cancel_orders(ctx, limit)
     }
 
-    // TODO
-
-    // perp_force_cancel_order
-
-    // liquidate_token_and_perp
-
-    // settle_* - settle_funds
-
-    // resolve_banktruptcy
+    pub fn perp_liq_bankruptcy(
+        ctx: Context<PerpLiqBankruptcy>,
+        max_liab_transfer: u64,
+    ) -> Result<()> {
+        instructions::perp_liq_bankruptcy(ctx, max_liab_transfer)
+    }
 
     pub fn alt_set(ctx: Context<AltSet>, index: u8) -> Result<()> {
         instructions::alt_set(ctx, index)

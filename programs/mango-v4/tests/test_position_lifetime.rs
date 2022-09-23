@@ -5,7 +5,7 @@ use solana_program_test::*;
 
 use program_test::*;
 
-use crate::mango_setup::*;
+use mango_setup::*;
 
 mod program_test;
 
@@ -26,10 +26,11 @@ async fn test_position_lifetime() -> Result<()> {
     // SETUP: Create a group and accounts
     //
 
-    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;

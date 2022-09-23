@@ -49,8 +49,7 @@ pub fn perp_create_market(
     perp_market_index: PerpMarketIndex,
     name: String,
     oracle_config: OracleConfig,
-    base_token_index_opt: Option<TokenIndex>,
-    base_token_decimals: u8,
+    base_decimals: u8,
     quote_lot_size: i64,
     base_lot_size: i64,
     maint_asset_weight: f32,
@@ -63,6 +62,8 @@ pub fn perp_create_market(
     min_funding: f32,
     max_funding: f32,
     impact_quantity: i64,
+    group_insurance_fund: bool,
+    trusted_market: bool,
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_init()?;
     *perp_market = PerpMarket {
@@ -94,10 +95,12 @@ pub fn perp_create_market(
         fees_settled: I80F48::ZERO,
         // Why optional - Perp could be based purely on an oracle
         bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
-        base_token_decimals,
+        base_decimals,
         perp_market_index,
-        base_token_index: base_token_index_opt.ok_or(TokenIndex::MAX).unwrap(),
         registration_time: Clock::get()?.unix_timestamp,
+        group_insurance_fund: if group_insurance_fund { 1 } else { 0 },
+        trusted_market: if trusted_market { 1 } else { 0 },
+        padding0: Default::default(),
         padding1: Default::default(),
         padding2: Default::default(),
         reserved: [0; 112],

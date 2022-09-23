@@ -2257,13 +2257,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "baseTokenIndexOpt",
-          "type": {
-            "option": "u16"
-          }
-        },
-        {
-          "name": "baseTokenDecimals",
+          "name": "baseDecimals",
           "type": "u8"
         },
         {
@@ -2313,6 +2307,14 @@ export type MangoV4 = {
         {
           "name": "impactQuantity",
           "type": "i64"
+        },
+        {
+          "name": "groupInsuranceFund",
+          "type": "bool"
+        },
+        {
+          "name": "trustedMarket",
+          "type": "bool"
         }
       ]
     },
@@ -2351,13 +2353,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "baseTokenIndexOpt",
-          "type": {
-            "option": "u16"
-          }
-        },
-        {
-          "name": "baseTokenDecimalsOpt",
+          "name": "baseDecimalsOpt",
           "type": {
             "option": "u8"
           }
@@ -2420,6 +2416,18 @@ export type MangoV4 = {
           "name": "impactQuantityOpt",
           "type": {
             "option": "i64"
+          }
+        },
+        {
+          "name": "groupInsuranceFundOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "trustedMarketOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -2953,12 +2961,73 @@ export type MangoV4 = {
           "name": "bids",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
           "name": "limit",
           "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "perpLiqBankruptcy",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "quoteBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "quoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxLiabTransfer",
+          "type": "u64"
         }
       ]
     },
@@ -3726,8 +3795,13 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "baseTokenIndex",
-            "type": "u16"
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
           },
           {
             "name": "perpMarketIndex",
@@ -3737,11 +3811,25 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "trustedMarket",
+            "docs": [
+              "May this market contribute positive values to health?"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "groupInsuranceFund",
+            "docs": [
+              "Is this market covered by the group insurance fund?"
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                4
+                2
               ]
             }
           },
@@ -3901,7 +3989,7 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "baseTokenDecimals",
+            "name": "baseDecimals",
             "type": "u8"
           },
           {
@@ -4293,6 +4381,16 @@ export type MangoV4 = {
             "type": {
               "defined": "I80F48"
             }
+          },
+          {
+            "name": "oraclePrice",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "hasOpenOrders",
+            "type": "bool"
           }
         ]
       }
@@ -8256,13 +8354,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "baseTokenIndexOpt",
-          "type": {
-            "option": "u16"
-          }
-        },
-        {
-          "name": "baseTokenDecimals",
+          "name": "baseDecimals",
           "type": "u8"
         },
         {
@@ -8312,6 +8404,14 @@ export const IDL: MangoV4 = {
         {
           "name": "impactQuantity",
           "type": "i64"
+        },
+        {
+          "name": "groupInsuranceFund",
+          "type": "bool"
+        },
+        {
+          "name": "trustedMarket",
+          "type": "bool"
         }
       ]
     },
@@ -8350,13 +8450,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "baseTokenIndexOpt",
-          "type": {
-            "option": "u16"
-          }
-        },
-        {
-          "name": "baseTokenDecimalsOpt",
+          "name": "baseDecimalsOpt",
           "type": {
             "option": "u8"
           }
@@ -8419,6 +8513,18 @@ export const IDL: MangoV4 = {
           "name": "impactQuantityOpt",
           "type": {
             "option": "i64"
+          }
+        },
+        {
+          "name": "groupInsuranceFundOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "trustedMarketOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -8952,12 +9058,73 @@ export const IDL: MangoV4 = {
           "name": "bids",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
           "name": "limit",
           "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "perpLiqBankruptcy",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "liqorOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "liqee",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "quoteBank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "quoteVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "maxLiabTransfer",
+          "type": "u64"
         }
       ]
     },
@@ -9725,8 +9892,13 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "baseTokenIndex",
-            "type": "u16"
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
           },
           {
             "name": "perpMarketIndex",
@@ -9736,11 +9908,25 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "trustedMarket",
+            "docs": [
+              "May this market contribute positive values to health?"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "groupInsuranceFund",
+            "docs": [
+              "Is this market covered by the group insurance fund?"
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                4
+                2
               ]
             }
           },
@@ -9900,7 +10086,7 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "baseTokenDecimals",
+            "name": "baseDecimals",
             "type": "u8"
           },
           {
@@ -10292,6 +10478,16 @@ export const IDL: MangoV4 = {
             "type": {
               "defined": "I80F48"
             }
+          },
+          {
+            "name": "oraclePrice",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "hasOpenOrders",
+            "type": "bool"
           }
         ]
       }

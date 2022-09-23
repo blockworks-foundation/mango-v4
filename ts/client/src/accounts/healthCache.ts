@@ -1,6 +1,6 @@
 import { PublicKey } from '@solana/web3.js';
 import _ from 'lodash';
-import { Bank } from './bank';
+import { Bank, BankForHealth } from './bank';
 import { Group } from './group';
 import {
   HUNDRED_I80F48,
@@ -11,6 +11,7 @@ import {
   ZERO_I80F48,
 } from './I80F48';
 import { HealthType } from './mangoAccount';
+import { PerpMarket, PerpOrderSide } from './perp';
 import { Serum3Market, Serum3Side } from './serum3';
 
 //               ░░░░
@@ -45,10 +46,26 @@ export class HealthCache {
   ) {}
 
   static fromDto(dto) {
+    // console.log(
+    JSON.stringify(
+      dto,
+      function replacer(k, v) {
+        // console.log(k);
+        console.log(v);
+        // if (v instanceof BN) {
+        // console.log(v);
+        // return new I80F48(v).toNumber();
+        // }
+        // return v;
+      },
+      2,
+    ),
+      // );
+      process.exit(0);
     return new HealthCache(
       dto.tokenInfos.map((dto) => TokenInfo.fromDto(dto)),
       dto.serum3Infos.map((dto) => Serum3Info.fromDto(dto)),
-      dto.perpInfos.map((dto) => new PerpInfo(dto)),
+      dto.perpInfos.map((dto) => PerpInfo.fromDto(dto)),
     );
   }
 
@@ -169,7 +186,7 @@ export class HealthCache {
     );
   }
 
-  getOrCreateTokenInfoIndex(bank: Bank): number {
+  getOrCreateTokenInfoIndex(bank: BankForHealth): number {
     const index = this.findTokenInfoIndex(bank.tokenIndex);
     if (index == -1) {
       this.tokenInfos.push(TokenInfo.emptyFromBank(bank));
@@ -177,18 +194,52 @@ export class HealthCache {
     return this.findTokenInfoIndex(bank.tokenIndex);
   }
 
+  findSerum3InfoIndex(marketIndex: number): number {
+    return this.serum3Infos.findIndex(
+      (serum3Info) => serum3Info.marketIndex === marketIndex,
+    );
+  }
+
+  getOrCreateSerum3InfoIndex(group: Group, serum3Market: Serum3Market): number {
+    const index = this.findSerum3InfoIndex(serum3Market.marketIndex);
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
+    );
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+    const baseEntryIndex = this.getOrCreateTokenInfoIndex(baseBank);
+    const quoteEntryIndex = this.getOrCreateTokenInfoIndex(quoteBank);
+    if (index == -1) {
+      this.serum3Infos.push(
+        Serum3Info.emptyFromSerum3Market(
+          serum3Market,
+          baseEntryIndex,
+          quoteEntryIndex,
+        ),
+      );
+    }
+    return this.findSerum3InfoIndex(serum3Market.marketIndex);
+  }
+
   adjustSerum3Reserved(
     // todo change indices to types from numbers
-    marketIndex: number,
-    baseTokenIndex: number,
+    group: Group,
+    serum3Market: Serum3Market,
     reservedBaseChange: I80F48,
     freeBaseChange: I80F48,
-    quoteTokenIndex: number,
     reservedQuoteChange: I80F48,
     freeQuoteChange: I80F48,
   ) {
-    const baseEntryIndex = this.findTokenInfoIndex(baseTokenIndex);
-    const quoteEntryIndex = this.findTokenInfoIndex(quoteTokenIndex);
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
+    );
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+
+    const baseEntryIndex = this.getOrCreateTokenInfoIndex(baseBank);
+    const quoteEntryIndex = this.getOrCreateTokenInfoIndex(quoteBank);
 
     const baseEntry = this.tokenInfos[baseEntryIndex];
     const reservedAmount = reservedBaseChange.mul(baseEntry.oraclePrice);
@@ -203,15 +254,23 @@ export class HealthCache {
     quoteEntry.balance.iadd(freeQuoteChange.mul(quoteEntry.oraclePrice));
 
     // Apply it to the serum3 info
-    const serum3Info = this.serum3Infos.find(
-      (serum3Info) => serum3Info.marketIndex === marketIndex,
-    );
-    if (!serum3Info) {
-      throw new Error(
-        `Serum3Info not found for market with index ${marketIndex}`,
-      );
-    }
+    const index = this.getOrCreateSerum3InfoIndex(group, serum3Market);
+    const serum3Info = this.serum3Infos[index];
     serum3Info.reserved = serum3Info.reserved.add(reservedAmount);
+  }
+
+  findPerpInfoIndex(perpMarketIndex: number): number {
+    return this.perpInfos.findIndex(
+      (perpInfo) => perpInfo.perpMarketIndex === perpMarketIndex,
+    );
+  }
+
+  getOrCreatePerpInfoIndex(perpMarket: PerpMarket): number {
+    const index = this.findPerpInfoIndex(perpMarket.perpMarketIndex);
+    if (index == -1) {
+      this.perpInfos.push(PerpInfo.emptyFromPerpMarket(perpMarket));
+    }
+    return this.findPerpInfoIndex(perpMarket.perpMarketIndex);
   }
 
   public static logHealthCache(debug: string, healthCache: HealthCache) {
@@ -288,11 +347,10 @@ export class HealthCache {
 
     // Increase reserved in Serum3Info for quote
     adjustedCache.adjustSerum3Reserved(
-      serum3Market.marketIndex,
-      serum3Market.baseTokenIndex,
+      group,
+      serum3Market,
       ZERO_I80F48(),
       ZERO_I80F48(),
-      serum3Market.quoteTokenIndex,
       bidNativeQuoteAmount,
       ZERO_I80F48(),
     );
@@ -325,11 +383,10 @@ export class HealthCache {
 
     // Increase reserved in Serum3Info for base
     adjustedCache.adjustSerum3Reserved(
-      serum3Market.marketIndex,
-      serum3Market.baseTokenIndex,
+      group,
+      serum3Market,
       askNativeBaseAmount,
       ZERO_I80F48(),
-      serum3Market.quoteTokenIndex,
       ZERO_I80F48(),
       ZERO_I80F48(),
     );
@@ -381,19 +438,17 @@ export class HealthCache {
   }
 
   getMaxSourceForTokenSwap(
-    group: Group,
-    sourceMintPk: PublicKey,
-    targetMintPk: PublicKey,
+    sourceBank: BankForHealth,
+    targetBank: BankForHealth,
     minRatio: I80F48,
+    priceFactor: I80F48,
   ): I80F48 {
-    const sourceBank: Bank = group.getFirstBankByMint(sourceMintPk);
-    const targetBank: Bank = group.getFirstBankByMint(targetMintPk);
-
-    if (sourceMintPk.equals(targetMintPk)) {
-      return ZERO_I80F48();
-    }
-
-    if (!sourceBank.price || sourceBank.price.lte(ZERO_I80F48())) {
+    if (
+      !sourceBank.price ||
+      sourceBank.price.lte(ZERO_I80F48()) ||
+      !targetBank.price ||
+      targetBank.price.lte(ZERO_I80F48())
+    ) {
       return ZERO_I80F48();
     }
 
@@ -415,8 +470,19 @@ export class HealthCache {
     // - be careful about finding the minRatio point: the function isn't convex
 
     const initialRatio = this.healthRatio(HealthType.init);
+    const initialHealth = this.health(HealthType.init);
     if (initialRatio.lte(ZERO_I80F48())) {
       return ZERO_I80F48();
+    }
+
+    // If the price is sufficiently good, then health will just increase from swapping:
+    // once we've swapped enough, swapping x reduces health by x * source_liab_weight and
+    // increases it by x * target_asset_weight * price_factor.
+    const finalHealthSlope = sourceBank.initLiabWeight
+      .neg()
+      .add(targetBank.initAssetWeight.mul(priceFactor));
+    if (finalHealthSlope.gte(ZERO_I80F48())) {
+      return MAX_I80F48();
     }
 
     const healthCacheClone: HealthCache = _.cloneDeep(this);
@@ -435,7 +501,9 @@ export class HealthCache {
       const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
       // HealthCache.logHealthCache('beforeSwap', adjustedCache);
       adjustedCache.tokenInfos[sourceIndex].balance.isub(amount);
-      adjustedCache.tokenInfos[targetIndex].balance.iadd(amount);
+      adjustedCache.tokenInfos[targetIndex].balance.iadd(
+        amount.mul(priceFactor),
+      );
       // HealthCache.logHealthCache('afterSwap', adjustedCache);
       return adjustedCache;
     }
@@ -444,11 +512,16 @@ export class HealthCache {
       return cacheAfterSwap(amount).healthRatio(HealthType.init);
     }
 
+    // There are two key slope changes: Assume source.balance > 0 and target.balance < 0.
+    // When these values flip sign, the health slope decreases, but could still be positive.
+    // After point1 it's definitely negative (due to finalHealthSlope check above).
+    // The maximum health ratio will be at 0 or at one of these points (ignoring serum3 effects).
+    const sourceForZeroTargetBalance = target.balance.neg().div(priceFactor);
     const point0Amount = source.balance
-      .min(target.balance.neg())
+      .min(sourceForZeroTargetBalance)
       .max(ZERO_I80F48());
     const point1Amount = source.balance
-      .max(target.balance.neg())
+      .max(sourceForZeroTargetBalance)
       .max(ZERO_I80F48());
     const cache0 = cacheAfterSwap(point0Amount);
     const point0Ratio = cache0.healthRatio(HealthType.init);
@@ -479,12 +552,12 @@ export class HealthCache {
       // If point1Ratio is still bigger than minRatio, the target amount must be >point1Amount
       // search to the right of point1Amount: but how far?
       // At point1, source.balance < 0 and target.balance > 0, so use a simple estimation for
-      // zero health: health - source_liab_weight * a + target_asset_weight * a = 0.
+      // zero health: health - source_liab_weight * a + target_asset_weight * a * priceFactor = 0.
       if (point1Health.lte(ZERO_I80F48())) {
         return ZERO_I80F48();
       }
-      const zeroHealthAmount = point1Amount.add(
-        point1Health.div(source.initLiabWeight.sub(target.initAssetWeight)),
+      const zeroHealthAmount = point1Amount.sub(
+        point1Health.div(finalHealthSlope),
       );
       const zeroHealthRatio = healthRatioAfterSwap(zeroHealthAmount);
       amount = HealthCache.binaryApproximationSearch(
@@ -506,21 +579,21 @@ export class HealthCache {
         healthRatioAfterSwap,
       );
     } else {
-      throw new Error(
-        `internal error: assert that init ratio ${initialRatio.toNumber()} <= point0 ratio ${point0Ratio.toNumber()}`,
+      // Must be between 0 and point0_amount
+      amount = HealthCache.binaryApproximationSearch(
+        ZERO_I80F48(),
+        initialRatio,
+        point0Amount,
+        point0Ratio,
+        minRatio,
+        healthRatioAfterSwap,
       );
     }
 
-    return amount
-      .div(source.oraclePrice)
-      .div(
-        ONE_I80F48().add(
-          group.getFirstBankByMint(sourceMintPk).loanOriginationFeeRate,
-        ),
-      );
+    return amount.div(source.oraclePrice);
   }
 
-  getMaxForSerum3Order(
+  getMaxSerum3OrderForHealthRatio(
     group: Group,
     serum3Market: Serum3Market,
     side: Serum3Side,
@@ -558,7 +631,8 @@ export class HealthCache {
     }
 
     // Amount which would bring health to 0
-    // amount = max(A_deposits, B_borrows) + init_health / (A_liab_weight - B_asset_weight)
+    // where M = max(A_deposits, B_borrows)
+    // amount = M + (init_health + M * (B_init_liab - A_init_asset)) / (A_init_liab - B_init_asset);
     // A is what we would be essentially swapping for B
     // So when its an ask, then base->quote,
     // and when its a bid, then quote->bid
@@ -567,30 +641,34 @@ export class HealthCache {
       const quoteBorrows = quote.balance.lt(ZERO_I80F48())
         ? quote.balance.abs()
         : ZERO_I80F48();
-      zeroAmount = base.balance
-        .max(quoteBorrows)
-        .add(
-          initialHealth.div(
+      const max = base.balance.max(quoteBorrows);
+      zeroAmount = max.add(
+        initialHealth
+          .add(max.mul(quote.initLiabWeight.sub(base.initAssetWeight)))
+          .div(
             base
               .liabWeight(HealthType.init)
               .sub(quote.assetWeight(HealthType.init)),
           ),
-        );
+      );
     } else {
       const baseBorrows = base.balance.lt(ZERO_I80F48())
         ? base.balance.abs()
         : ZERO_I80F48();
-      zeroAmount = quote.balance
-        .max(baseBorrows)
-        .add(
-          initialHealth.div(
+      const max = quote.balance.max(baseBorrows);
+      zeroAmount = max.add(
+        initialHealth
+          .add(max.mul(base.initLiabWeight.sub(quote.initAssetWeight)))
+          .div(
             quote
               .liabWeight(HealthType.init)
               .sub(base.assetWeight(HealthType.init)),
           ),
-        );
+      );
     }
+
     const cache = cacheAfterPlacingOrder(zeroAmount);
+    const zeroAmountHealth = cache.health(HealthType.init);
     const zeroAmountRatio = cache.healthRatio(HealthType.init);
 
     function cacheAfterPlacingOrder(amount: I80F48) {
@@ -601,11 +679,10 @@ export class HealthCache {
         : adjustedCache.tokenInfos[quoteIndex].balance.isub(amount);
 
       adjustedCache.adjustSerum3Reserved(
-        serum3Market.marketIndex,
-        serum3Market.baseTokenIndex,
+        group,
+        serum3Market,
         side === Serum3Side.ask ? amount.div(base.oraclePrice) : ZERO_I80F48(),
         ZERO_I80F48(),
-        serum3Market.quoteTokenIndex,
         side === Serum3Side.bid ? amount.div(quote.oraclePrice) : ZERO_I80F48(),
         ZERO_I80F48(),
       );
@@ -639,6 +716,115 @@ export class HealthCache {
           .div(ONE_I80F48().add(quoteBank.loanOriginationFeeRate))
           .div(ONE_I80F48().add(I80F48.fromNumber(group.getFeeRate(false))));
   }
+
+  getMaxPerpForHealthRatio(
+    perpMarket: PerpMarket,
+    side: PerpOrderSide,
+    minRatio: I80F48,
+    price: I80F48,
+  ): I80F48 {
+    const healthCacheClone: HealthCache = _.cloneDeep(this);
+
+    const initialRatio = this.healthRatio(HealthType.init);
+    if (initialRatio.lt(ZERO_I80F48())) {
+      return ZERO_I80F48();
+    }
+
+    const direction = side == PerpOrderSide.bid ? 1 : -1;
+
+    const perpInfoIndex = this.getOrCreatePerpInfoIndex(perpMarket);
+    const perpInfo = this.perpInfos[perpInfoIndex];
+    const oraclePrice = perpInfo.oraclePrice;
+    const baseLotSize = I80F48.fromString(perpMarket.baseLotSize.toString());
+
+    // If the price is sufficiently good then health will just increase from trading
+    const finalHealthSlope =
+      direction == 1
+        ? perpInfo.initAssetWeight.mul(oraclePrice).sub(price)
+        : price.sub(perpInfo.initLiabWeight.mul(oraclePrice));
+    if (finalHealthSlope.gte(ZERO_I80F48())) {
+      return MAX_I80F48();
+    }
+
+    function cacheAfterTrade(baseLots: I80F48): HealthCache {
+      const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
+      const d = I80F48.fromNumber(direction);
+      adjustedCache.perpInfos[perpInfoIndex].base.iadd(
+        d.mul(baseLots.mul(baseLotSize.mul(oraclePrice))),
+      );
+      adjustedCache.perpInfos[perpInfoIndex].quote.isub(
+        d.mul(baseLots.mul(baseLotSize.mul(price))),
+      );
+      return adjustedCache;
+    }
+
+    function healthAfterTrade(baseLots: I80F48): I80F48 {
+      return cacheAfterTrade(baseLots).health(HealthType.init);
+    }
+    function healthRatioAfterTrade(baseLots: I80F48): I80F48 {
+      return cacheAfterTrade(baseLots).healthRatio(HealthType.init);
+    }
+
+    const initialBaseLots = perpInfo.base
+      .div(perpInfo.oraclePrice)
+      .div(baseLotSize);
+
+    // There are two cases:
+    // 1. We are increasing abs(baseLots)
+    // 2. We are bringing the base position to 0, and then going to case 1.
+    const hasCase2 =
+      (initialBaseLots.gt(ZERO_I80F48()) && direction == -1) ||
+      (initialBaseLots.lt(ZERO_I80F48()) && direction == 1);
+
+    let case1Start: I80F48, case1StartRatio: I80F48;
+    if (hasCase2) {
+      case1Start = initialBaseLots.abs();
+      case1StartRatio = healthRatioAfterTrade(case1Start);
+    } else {
+      case1Start = ZERO_I80F48();
+      case1StartRatio = initialRatio;
+    }
+
+    // If we start out below minRatio and can't go above, pick the best case
+    let baseLots: I80F48;
+    if (initialRatio.lte(minRatio) && case1StartRatio.lt(minRatio)) {
+      if (case1StartRatio.gte(initialRatio)) {
+        baseLots = case1Start;
+      } else {
+        baseLots = ZERO_I80F48();
+      }
+    } else if (case1StartRatio.gte(minRatio)) {
+      // Must reach minRatio to the right of case1Start
+      const case1StartHealth = healthAfterTrade(case1Start);
+      if (case1StartHealth.lte(ZERO_I80F48())) {
+        return ZERO_I80F48();
+      }
+      const zeroHealthAmount = case1Start.sub(
+        case1StartHealth.div(finalHealthSlope).div(baseLotSize),
+      );
+      const zeroHealthRatio = healthRatioAfterTrade(zeroHealthAmount);
+      baseLots = HealthCache.binaryApproximationSearch(
+        case1Start,
+        case1StartRatio,
+        zeroHealthAmount,
+        zeroHealthRatio,
+        minRatio,
+        healthRatioAfterTrade,
+      );
+    } else {
+      // Between 0 and case1Start
+      baseLots = HealthCache.binaryApproximationSearch(
+        ZERO_I80F48(),
+        initialRatio,
+        case1Start,
+        case1StartRatio,
+        minRatio,
+        healthRatioAfterTrade,
+      );
+    }
+
+    return baseLots.floor();
+  }
 }
 
 export class TokenInfo {
@@ -669,10 +855,10 @@ export class TokenInfo {
     );
   }
 
-  static emptyFromBank(bank: Bank): TokenInfo {
+  static emptyFromBank(bank: BankForHealth): TokenInfo {
     if (!bank.price)
       throw new Error(
-        `Failed to create TokenInfo. Bank price unavailable. ${bank.mint.toString()}`,
+        `Failed to create TokenInfo. Bank price unavailable for bank with tokenIndex ${bank.tokenIndex}`,
       );
     return new TokenInfo(
       bank.tokenIndex,
@@ -732,6 +918,19 @@ export class Serum3Info {
     );
   }
 
+  static emptyFromSerum3Market(
+    serum3Market: Serum3Market,
+    baseEntryIndex: number,
+    quoteEntryIndex: number,
+  ) {
+    return new Serum3Info(
+      ZERO_I80F48(),
+      baseEntryIndex,
+      quoteEntryIndex,
+      serum3Market.marketIndex,
+    );
+  }
+
   healthContribution(healthType: HealthType, tokenInfos: TokenInfo[]): I80F48 {
     const baseInfo = tokenInfos[this.baseIndex];
     const quoteInfo = tokenInfos[this.quoteIndex];
@@ -781,22 +980,33 @@ export class Serum3Info {
 }
 
 export class PerpInfo {
-  constructor(dto: PerpInfoDto) {
-    this.maintAssetWeight = I80F48.from(dto.maintAssetWeight);
-    this.initAssetWeight = I80F48.from(dto.initAssetWeight);
-    this.maintLiabWeight = I80F48.from(dto.maintLiabWeight);
-    this.initLiabWeight = I80F48.from(dto.initLiabWeight);
-    this.base = I80F48.from(dto.base);
-    this.quote = I80F48.from(dto.quote);
+  constructor(
+    public perpMarketIndex: number,
+    public maintAssetWeight: I80F48,
+    public initAssetWeight: I80F48,
+    public maintLiabWeight: I80F48,
+    public initLiabWeight: I80F48,
+    // in health-reference-token native units, needs scaling by asset/liab
+    public base: I80F48,
+    // in health-reference-token native units, no asset/liab factor needed
+    public quote: I80F48,
+    public oraclePrice: I80F48,
+    public hasOpenOrders: boolean,
+  ) {}
+
+  static fromDto(dto: PerpInfoDto) {
+    return new PerpInfo(
+      dto.perpMarketIndex,
+      I80F48.from(dto.maintAssetWeight),
+      I80F48.from(dto.initAssetWeight),
+      I80F48.from(dto.maintLiabWeight),
+      I80F48.from(dto.initLiabWeight),
+      I80F48.from(dto.base),
+      I80F48.from(dto.quote),
+      I80F48.from(dto.oraclePrice),
+      dto.hasOpenOrders,
+    );
   }
-  maintAssetWeight: I80F48;
-  initAssetWeight: I80F48;
-  maintLiabWeight: I80F48;
-  initLiabWeight: I80F48;
-  // in health-reference-token native units, needs scaling by asset/liab
-  base: I80F48;
-  // in health-reference-token native units, no asset/liab factor needed
-  quote: I80F48;
 
   healthContribution(healthType: HealthType): I80F48 {
     let weight;
@@ -815,6 +1025,24 @@ export class PerpInfo {
     // FUTURE: Allow v3-style "reliable" markets where we can return
     // `self.quote + weight * self.base` here
     return this.quote.add(weight.mul(this.base)).min(ZERO_I80F48());
+  }
+
+  static emptyFromPerpMarket(perpMarket: PerpMarket): PerpInfo {
+    if (!perpMarket.price)
+      throw new Error(
+        `Failed to create PerpInfo. Oracle price unavailable. ${perpMarket.oracle.toString()}`,
+      );
+    return new PerpInfo(
+      perpMarket.perpMarketIndex,
+      perpMarket.maintAssetWeight,
+      perpMarket.initAssetWeight,
+      perpMarket.maintLiabWeight,
+      perpMarket.initLiabWeight,
+      ZERO_I80F48(),
+      ZERO_I80F48(),
+      I80F48.fromNumber(perpMarket.price),
+      false,
+    );
   }
 }
 
@@ -870,6 +1098,7 @@ export class Serum3InfoDto {
 }
 
 export class PerpInfoDto {
+  perpMarketIndex: number;
   maintAssetWeight: I80F48Dto;
   initAssetWeight: I80F48Dto;
   maintLiabWeight: I80F48Dto;
@@ -878,4 +1107,6 @@ export class PerpInfoDto {
   base: I80F48Dto;
   // in health-reference-token native units, no asset/liab factor needed
   quote: I80F48Dto;
+  oraclePrice: I80F48Dto;
+  hasOpenOrders: boolean;
 }

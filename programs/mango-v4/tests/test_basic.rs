@@ -30,7 +30,8 @@ async fn test_basic() -> Result<(), TransportError> {
     let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..mango_setup::GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;

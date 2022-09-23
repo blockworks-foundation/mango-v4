@@ -164,7 +164,8 @@ async fn test_serum_basics() -> Result<(), TransportError> {
     let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;
@@ -344,7 +345,8 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
     let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;

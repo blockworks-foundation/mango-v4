@@ -78,6 +78,10 @@ impl MangoGroupContext {
         self.tokens.get(&token_index).unwrap()
     }
 
+    pub fn perp(&self, perp_market_index: PerpMarketIndex) -> &PerpMarketContext {
+        self.perp_markets.get(&perp_market_index).unwrap()
+    }
+
     pub fn token_by_mint(&self, mint: &Pubkey) -> anyhow::Result<&TokenContext> {
         self.tokens
             .iter()
@@ -86,7 +90,7 @@ impl MangoGroupContext {
     }
 
     pub fn perp_market_address(&self, perp_market_index: PerpMarketIndex) -> Pubkey {
-        self.perp_markets.get(&perp_market_index).unwrap().address
+        self.perp(perp_market_index).address
     }
 
     pub fn new_from_rpc(
@@ -237,6 +241,15 @@ impl MangoGroupContext {
         let perp_markets = account
             .active_perp_positions()
             .map(|&pa| self.perp_market_address(pa.market_index));
+        let perp_oracles = account
+            .active_perp_positions()
+            .map(|&pa| self.perp(pa.market_index).market.oracle);
+
+        let to_account_meta = |pubkey| AccountMeta {
+            pubkey,
+            is_writable: false,
+            is_signer: false,
+        };
 
         Ok(banks
             .iter()
@@ -245,21 +258,10 @@ impl MangoGroupContext {
                 is_writable: writable_banks,
                 is_signer: false,
             })
-            .chain(oracles.iter().map(|&pubkey| AccountMeta {
-                pubkey,
-                is_writable: false,
-                is_signer: false,
-            }))
-            .chain(perp_markets.map(|pubkey| AccountMeta {
-                pubkey,
-                is_writable: false,
-                is_signer: false,
-            }))
-            .chain(serum_oos.map(|pubkey| AccountMeta {
-                pubkey,
-                is_writable: false,
-                is_signer: false,
-            }))
+            .chain(oracles.into_iter().map(to_account_meta))
+            .chain(perp_markets.map(to_account_meta))
+            .chain(perp_oracles.map(to_account_meta))
+            .chain(serum_oos.map(to_account_meta))
             .collect())
     }
 }

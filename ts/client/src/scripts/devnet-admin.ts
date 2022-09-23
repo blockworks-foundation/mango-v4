@@ -357,7 +357,6 @@ async function main() {
       0,
       'BTC-PERP',
       0.1,
-      1,
       6,
       1,
       10,
@@ -372,15 +371,14 @@ async function main() {
       0.05,
       0.05,
       100,
+      true,
+      true,
     );
     console.log('done');
   } catch (error) {
     console.log(error);
   }
-  const perpMarkets = await client.perpGetMarkets(
-    group,
-    group.getFirstBankByMint(btcDevnetMint).tokenIndex,
-  );
+  const perpMarkets = await client.perpGetMarkets(group);
   console.log(`...created perp market ${perpMarkets[0].publicKey}`);
 
   //
@@ -473,6 +471,34 @@ async function main() {
         1.1,
         1.2,
         0.05,
+      );
+      console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+      await group.reloadAll(client);
+      console.log(group.getFirstBankByMint(btcDevnetMint).toString());
+    } catch (error) {
+      throw error;
+    }
+
+    console.log(`Editing BTC-PERP...`);
+    try {
+      let sig = await client.perpEditMarket(
+        group,
+        'BTC-PERP',
+        btcDevnetOracle,
+        0.1,
+        6,
+        0.975,
+        0.95,
+        1.025,
+        1.05,
+        0.012,
+        0.0002,
+        0.0,
+        0.05,
+        0.05,
+        100,
+        true,
+        true,
       );
       console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
       await group.reloadAll(client);

@@ -39,6 +39,7 @@ pub fn new_health_cache_(
     let retriever = FixedOrderAccountRetriever {
         ais: accounts,
         n_banks: active_token_len,
+        n_perps: active_perp_len,
         begin_perp: active_token_len * 2,
         begin_serum3: active_token_len * 2 + active_perp_len,
     };
@@ -113,19 +114,15 @@ pub fn maybe_liquidate_account(
     let health_cache =
         new_health_cache_(&mango_client.context, account_fetcher, &account).expect("always ok");
     let maint_health = health_cache.health(HealthType::Maint);
-    let is_bankrupt = health_cache.is_bankrupt();
-    let is_liquidatable = health_cache.is_liquidatable();
-
-    if !is_liquidatable && !is_bankrupt {
+    if !health_cache.is_liquidatable() {
         return Ok(false);
     }
 
     log::trace!(
-        "possible candidate: {}, with owner: {}, maint health: {}, bankrupt: {}",
+        "possible candidate: {}, with owner: {}, maint health: {}",
         pubkey,
         account.fixed.owner,
         maint_health,
-        is_bankrupt,
     );
 
     // Fetch a fresh account and re-compute
@@ -134,9 +131,13 @@ pub fn maybe_liquidate_account(
     let account = account_fetcher.fetch_fresh_mango_account(pubkey)?;
     let health_cache =
         new_health_cache_(&mango_client.context, account_fetcher, &account).expect("always ok");
+    if !health_cache.is_liquidatable() {
+        return Ok(false);
+    }
+
     let maint_health = health_cache.health(HealthType::Maint);
-    let is_bankrupt = health_cache.is_bankrupt();
-    let is_liquidatable = health_cache.is_liquidatable();
+    let is_spot_bankrupt = health_cache.can_call_spot_bankruptcy();
+    let is_spot_liquidatable = health_cache.has_borrows() && !is_spot_bankrupt;
 
     // find asset and liab tokens
     let mut tokens = account
@@ -217,7 +218,7 @@ pub fn maybe_liquidate_account(
             sig
         );
         sig
-    } else if is_bankrupt {
+    } else if is_spot_bankrupt {
         if tokens.is_empty() {
             anyhow::bail!("mango account {}, is bankrupt has no active tokens", pubkey);
         }
@@ -248,7 +249,7 @@ pub fn maybe_liquidate_account(
             sig
         );
         sig
-    } else if is_liquidatable {
+    } else if is_spot_liquidatable {
         let asset_token_index = tokens
             .iter()
             .rev()
@@ -285,7 +286,6 @@ pub fn maybe_liquidate_account(
         //
         // TODO: log liqor's assets in UI form
         // TODO: log liquee's liab_needed, need to refactor program code to be able to be accessed from client side
-        // TODO: swap inherited liabs to desired asset for liqor
         //
         let sig = mango_client
             .liq_token_with_token(
@@ -303,7 +303,11 @@ pub fn maybe_liquidate_account(
         );
         sig
     } else {
-        return Ok(false);
+        anyhow::bail!(
+            "Don't know what to do with liquidatable account {}, maint_health was {}",
+            pubkey,
+            maint_health
+        );
     };
 
     let slot = account_fetcher.transaction_max_slot(&[txsig])?;

@@ -3,13 +3,18 @@ import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { Order, Orderbook } from '@project-serum/serum/lib/market';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
-import { nativeI80F48ToUi, toNative, toUiDecimals } from '../utils';
+import {
+  nativeI80F48ToUi,
+  toNative,
+  toUiDecimals,
+  toUiDecimalsForQuote,
+} from '../utils';
 import { Bank } from './bank';
 import { Group } from './group';
 import { HealthCache, HealthCacheDto } from './healthCache';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from './I80F48';
-import { PerpOrder } from './perp';
-import { Serum3Market, Serum3Side } from './serum3';
+import { PerpOrder, PerpOrderSide } from './perp';
+import { Serum3Side } from './serum3';
 export class MangoAccount {
   public tokens: TokenPosition[];
   public serum3: Serum3Orders[];
@@ -85,9 +90,20 @@ export class MangoAccount {
   }
 
   async reload(client: MangoClient, group: Group): Promise<MangoAccount> {
-    Object.assign(this, await client.getMangoAccount(this));
-    await this.reloadAccountData(client, group);
-    return this;
+    const mangoAccount = await client.getMangoAccount(this);
+    await mangoAccount.reloadAccountData(client, group);
+    Object.assign(this, mangoAccount);
+    return mangoAccount;
+  }
+
+  async reloadWithSlot(
+    client: MangoClient,
+    group: Group,
+  ): Promise<{ value: MangoAccount; slot: number }> {
+    const resp = await client.getMangoAccountWithSlot(this.publicKey);
+    await resp?.value.reloadAccountData(client, group);
+    Object.assign(this, resp?.value);
+    return { value: resp!.value, slot: resp!.slot };
   }
 
   async reloadAccountData(
@@ -310,13 +326,6 @@ export class MangoAccount {
     // can withdraw without borrowing until initHealth reaches 0
     if (existingPositionHealthContrib.gt(initHealth)) {
       const withdrawAbleExistingPositionHealthContrib = initHealth;
-      // console.log(`initHealth ${initHealth}`);
-      // console.log(
-      //   `existingPositionHealthContrib ${existingPositionHealthContrib}`,
-      // );
-      // console.log(
-      //   `withdrawAbleExistingPositionHealthContrib ${withdrawAbleExistingPositionHealthContrib}`,
-      // );
       return withdrawAbleExistingPositionHealthContrib
         .div(tokenBank.initAssetWeight)
         .div(tokenBank.price);
@@ -332,15 +341,6 @@ export class MangoAccount {
     const maxBorrowNativeWithoutFees = maxBorrowNative.div(
       ONE_I80F48().add(tokenBank.loanOriginationFeeRate),
     );
-    // console.log(`initHealth ${initHealth}`);
-    // console.log(
-    //   `existingPositionHealthContrib ${existingPositionHealthContrib}`,
-    // );
-    // console.log(
-    //   `initHealthWithoutExistingPosition ${initHealthWithoutExistingPosition}`,
-    // );
-    // console.log(`maxBorrowNative ${maxBorrowNative}`);
-    // console.log(`maxBorrowNativeWithoutFees ${maxBorrowNativeWithoutFees}`);
     return maxBorrowNativeWithoutFees.add(existingTokenDeposits);
   }
 
@@ -360,75 +360,43 @@ export class MangoAccount {
   }
 
   /**
-   * The max amount of given source native token you can swap to a target token.
-   * note: slippageAndFeesFactor is a normalized number, <1,
-   *  e.g. a slippage of 5% and some fees which are 1%, then slippageAndFeesFactor = 0.94
-   *  the factor is used to compute how much target can be obtained by swapping source
-   * @returns max amount of given source native token you can swap to a target token, in native token
-   */
-  getMaxSourceForTokenSwap(
-    group: Group,
-    sourceMintPk: PublicKey,
-    targetMintPk: PublicKey,
-    slippageAndFeesFactor: number,
-  ): I80F48 | undefined {
-    if (!this.accountData) return undefined;
-    return this.accountData.healthCache
-      .getMaxSourceForTokenSwap(
-        group,
-        sourceMintPk,
-        targetMintPk,
-        ONE_I80F48(), // target 1% health
-      )
-      .mul(I80F48.fromNumber(slippageAndFeesFactor));
-  }
-
-  /**
    * The max amount of given source ui token you can swap to a target token.
-   * note: slippageAndFeesFactor is a normalized number, <1,
-   *  e.g. a slippage of 5% and some fees which are 1%, then slippageAndFeesFactor = 0.94
+   *  PriceFactor is ratio between A - how many source tokens can be traded for target tokens
+   *  and B - source native oracle price / target native oracle price.
+   *  e.g. a slippage of 5% and some fees which are 1%, then priceFactor = 0.94
    *  the factor is used to compute how much target can be obtained by swapping source
+   *  in reality, and not only relying on oracle prices, and taking in account e.g. slippage which
+   *  can occur at large size
    * @returns max amount of given source ui token you can swap to a target token, in ui token
    */
   getMaxSourceUiForTokenSwap(
     group: Group,
     sourceMintPk: PublicKey,
     targetMintPk: PublicKey,
-    slippageAndFeesFactor: number,
+    priceFactor: number,
   ): number | undefined {
-    const maxSource = this.getMaxSourceForTokenSwap(
-      group,
-      sourceMintPk,
-      targetMintPk,
-      slippageAndFeesFactor,
+    if (!this.accountData) {
+      throw new Error(
+        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
+      );
+    }
+    if (sourceMintPk.equals(targetMintPk)) {
+      return 0;
+    }
+    const maxSource = this.accountData.healthCache.getMaxSourceForTokenSwap(
+      group.getFirstBankByMint(sourceMintPk),
+      group.getFirstBankByMint(targetMintPk),
+      ONE_I80F48(), // target 1% health
+      I80F48.fromNumber(priceFactor),
+    );
+    maxSource.idiv(
+      ONE_I80F48().add(
+        group.getFirstBankByMint(sourceMintPk).loanOriginationFeeRate,
+      ),
     );
     if (maxSource) {
       return toUiDecimals(maxSource, group.getMintDecimals(sourceMintPk));
     }
-  }
-
-  /**
-   * Simulates new health ratio after applying tokenChanges to the token positions.
-   * Note: token changes are expected in native amounts
-   *
-   * e.g. useful to simulate health after a potential swap.
-   * Note: health ratio is technically ∞ if liabs are 0
-   * @returns health ratio, in percentage form
-   */
-  simHealthRatioWithTokenPositionChanges(
-    group: Group,
-    nativeTokenChanges: {
-      nativeTokenAmount: I80F48;
-      mintPk: PublicKey;
-    }[],
-    healthType: HealthType = HealthType.init,
-  ): I80F48 | undefined {
-    if (!this.accountData) return undefined;
-    return this.accountData.healthCache.simHealthRatioWithTokenPositionChanges(
-      group,
-      nativeTokenChanges,
-      healthType,
-    );
   }
 
   /**
@@ -506,28 +474,11 @@ export class MangoAccount {
   }
 
   /**
-   *
+   * TODO priceFactor
    * @param group
-   * @param serum3Market
-   * @returns maximum native quote which can be traded for base token given current health
+   * @param externalMarketPk
+   * @returns maximum ui quote which can be traded for base token given current health
    */
-  public getMaxQuoteForSerum3Bid(
-    group: Group,
-    serum3Market: Serum3Market,
-  ): I80F48 {
-    if (!this.accountData) {
-      throw new Error(
-        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
-      );
-    }
-    return this.accountData.healthCache.getMaxForSerum3Order(
-      group,
-      serum3Market,
-      Serum3Side.bid,
-      I80F48.fromNumber(3),
-    );
-  }
-
   public getMaxQuoteForSerum3BidUi(
     group: Group,
     externalMarketPk: PublicKey,
@@ -540,7 +491,18 @@ export class MangoAccount {
         `Unable to find mint serum3Market for ${externalMarketPk.toString()}`,
       );
     }
-    const nativeAmount = this.getMaxQuoteForSerum3Bid(group, serum3Market);
+    if (!this.accountData) {
+      throw new Error(
+        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
+      );
+    }
+    const nativeAmount =
+      this.accountData.healthCache.getMaxSerum3OrderForHealthRatio(
+        group,
+        serum3Market,
+        Serum3Side.bid,
+        I80F48.fromNumber(1),
+      );
     return toUiDecimals(
       nativeAmount,
       group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex).mintDecimals,
@@ -548,28 +510,11 @@ export class MangoAccount {
   }
 
   /**
-   *
+   * TODO priceFactor
    * @param group
-   * @param serum3Market
-   * @returns maximum native base which can be traded for quote token given current health
+   * @param externalMarketPk
+   * @returns maximum ui base which can be traded for quote token given current health
    */
-  public getMaxBaseForSerum3Ask(
-    group: Group,
-    serum3Market: Serum3Market,
-  ): I80F48 {
-    if (!this.accountData) {
-      throw new Error(
-        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
-      );
-    }
-    return this.accountData.healthCache.getMaxForSerum3Order(
-      group,
-      serum3Market,
-      Serum3Side.ask,
-      I80F48.fromNumber(3),
-    );
-  }
-
   public getMaxBaseForSerum3AskUi(
     group: Group,
     externalMarketPk: PublicKey,
@@ -582,7 +527,18 @@ export class MangoAccount {
         `Unable to find mint serum3Market for ${externalMarketPk.toString()}`,
       );
     }
-    const nativeAmount = this.getMaxBaseForSerum3Ask(group, serum3Market);
+    if (!this.accountData) {
+      throw new Error(
+        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
+      );
+    }
+    const nativeAmount =
+      this.accountData.healthCache.getMaxSerum3OrderForHealthRatio(
+        group,
+        serum3Market,
+        Serum3Side.ask,
+        I80F48.fromNumber(1),
+      );
     return toUiDecimals(
       nativeAmount,
       group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex).mintDecimals,
@@ -592,31 +548,12 @@ export class MangoAccount {
   /**
    *
    * @param group
-   * @param nativeQuoteAmount
-   * @param serum3Market
+   * @param uiQuoteAmount
+   * @param externalMarketPk
    * @param healthType
-   * @returns health ratio after a bid with nativeQuoteAmount is placed
+   * @returns health ratio after a bid with uiQuoteAmount is placed
    */
-  simHealthRatioWithSerum3BidChanges(
-    group: Group,
-    nativeQuoteAmount: I80F48,
-    serum3Market: Serum3Market,
-    healthType: HealthType = HealthType.init,
-  ): I80F48 {
-    if (!this.accountData) {
-      throw new Error(
-        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
-      );
-    }
-    return this.accountData.healthCache.simHealthRatioWithSerum3BidChanges(
-      group,
-      nativeQuoteAmount,
-      serum3Market,
-      healthType,
-    );
-  }
-
-  simHealthRatioWithSerum3BidUiChanges(
+  public simHealthRatioWithSerum3BidUiChanges(
     group: Group,
     uiQuoteAmount: number,
     externalMarketPk: PublicKey,
@@ -630,46 +567,34 @@ export class MangoAccount {
         `Unable to find mint serum3Market for ${externalMarketPk.toString()}`,
       );
     }
-    return this.simHealthRatioWithSerum3BidChanges(
-      group,
-      toNative(
-        uiQuoteAmount,
-        group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
-          .mintDecimals,
-      ),
-      serum3Market,
-      healthType,
-    ).toNumber();
-  }
-
-  /**
-   *
-   * @param group
-   * @param nativeBaseAmount
-   * @param serum3Market
-   * @param healthType
-   * @returns health ratio after an ask with nativeBaseAmount is placed
-   */
-  simHealthRatioWithSerum3AskChanges(
-    group: Group,
-    nativeBaseAmount: I80F48,
-    serum3Market: Serum3Market,
-    healthType: HealthType = HealthType.init,
-  ): I80F48 {
     if (!this.accountData) {
       throw new Error(
         `accountData not loaded on MangoAccount, try reloading MangoAccount`,
       );
     }
-    return this.accountData.healthCache.simHealthRatioWithSerum3AskChanges(
-      group,
-      nativeBaseAmount,
-      serum3Market,
-      healthType,
-    );
+    return this.accountData.healthCache
+      .simHealthRatioWithSerum3BidChanges(
+        group,
+        toNative(
+          uiQuoteAmount,
+          group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
+            .mintDecimals,
+        ),
+        serum3Market,
+        healthType,
+      )
+      .toNumber();
   }
 
-  simHealthRatioWithSerum3AskUiChanges(
+  /**
+   *
+   * @param group
+   * @param uiBaseAmount
+   * @param externalMarketPk
+   * @param healthType
+   * @returns health ratio after an ask with uiBaseAmount is placed
+   */
+  public simHealthRatioWithSerum3AskUiChanges(
     group: Group,
     uiBaseAmount: number,
     externalMarketPk: PublicKey,
@@ -683,16 +608,87 @@ export class MangoAccount {
         `Unable to find mint serum3Market for ${externalMarketPk.toString()}`,
       );
     }
-    return this.simHealthRatioWithSerum3AskChanges(
-      group,
-      toNative(
-        uiBaseAmount,
-        group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
-          .mintDecimals,
-      ),
-      serum3Market,
-      healthType,
-    ).toNumber();
+    if (!this.accountData) {
+      throw new Error(
+        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
+      );
+    }
+    return this.accountData.healthCache
+      .simHealthRatioWithSerum3AskChanges(
+        group,
+        toNative(
+          uiBaseAmount,
+          group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
+            .mintDecimals,
+        ),
+        serum3Market,
+        healthType,
+      )
+      .toNumber();
+  }
+
+  /**
+   *
+   * @param group
+   * @param perpMarketName
+   * @param uiPrice ui price at which bid would be placed at
+   * @returns max ui quote bid
+   */
+  public getMaxQuoteForPerpBidUi(
+    group: Group,
+    perpMarketName: string,
+    uiPrice: number,
+  ): number {
+    const perpMarket = group.perpMarketsMap.get(perpMarketName);
+    if (!perpMarket) {
+      throw new Error(`PerpMarket for ${perpMarketName} not found!`);
+    }
+    if (!this.accountData) {
+      throw new Error(
+        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
+      );
+    }
+    const baseLots = this.accountData.healthCache.getMaxPerpForHealthRatio(
+      perpMarket,
+      PerpOrderSide.bid,
+      I80F48.fromNumber(1),
+      group.toNativePrice(uiPrice, perpMarket.baseDecimals),
+    );
+    const nativeBase = baseLots.mul(
+      I80F48.fromString(perpMarket.baseLotSize.toString()),
+    );
+    const nativeQuote = nativeBase.mul(I80F48.fromNumber(perpMarket.price));
+    return toUiDecimalsForQuote(nativeQuote.toNumber());
+  }
+
+  /**
+   *
+   * @param group
+   * @param perpMarketName
+   * @param uiPrice ui price at which ask would be placed at
+   * @returns max ui base ask
+   */
+  public getMaxBaseForPerpAskUi(
+    group: Group,
+    perpMarketName: string,
+    uiPrice: number,
+  ): number {
+    const perpMarket = group.perpMarketsMap.get(perpMarketName);
+    if (!perpMarket) {
+      throw new Error(`PerpMarket for ${perpMarketName} not found!`);
+    }
+    if (!this.accountData) {
+      throw new Error(
+        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
+      );
+    }
+    const baseLots = this.accountData.healthCache.getMaxPerpForHealthRatio(
+      perpMarket,
+      PerpOrderSide.ask,
+      I80F48.fromNumber(1),
+      group.toNativePrice(uiPrice, perpMarket.baseDecimals),
+    );
+    return perpMarket.baseLotsToUi(new BN(baseLots.toString()));
   }
 
   public async loadPerpOpenOrdersForMarket(

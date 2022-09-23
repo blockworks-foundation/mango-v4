@@ -15,7 +15,9 @@ pub mod queue;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::{MangoAccount, MangoAccountValue, PerpMarket, FREE_ORDER_SLOT};
+    use crate::state::{
+        MangoAccount, MangoAccountValue, PerpMarket, FREE_ORDER_SLOT, QUOTE_TOKEN_INDEX,
+    };
     use anchor_lang::prelude::*;
     use bytemuck::Zeroable;
     use fixed::types::I80F48;
@@ -104,7 +106,7 @@ mod tests {
                 let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
                 let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
                 account
-                    .ensure_perp_position(perp_market.perp_market_index)
+                    .ensure_perp_position(perp_market.perp_market_index, QUOTE_TOKEN_INDEX)
                     .unwrap();
 
                 let quantity = 1;
@@ -203,10 +205,10 @@ mod tests {
         let mut maker = MangoAccountValue::from_bytes(&buffer).unwrap();
         let mut taker = MangoAccountValue::from_bytes(&buffer).unwrap();
         maker
-            .ensure_perp_position(market.perp_market_index)
+            .ensure_perp_position(market.perp_market_index, QUOTE_TOKEN_INDEX)
             .unwrap();
         taker
-            .ensure_perp_position(market.perp_market_index)
+            .ensure_perp_position(market.perp_market_index, QUOTE_TOKEN_INDEX)
             .unwrap();
 
         let maker_pk = Pubkey::new_unique();

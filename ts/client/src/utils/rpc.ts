@@ -8,9 +8,11 @@ export async function sendTransaction(
 ) {
   const connection = provider.connection;
   const payer = provider.wallet;
-  transaction.recentBlockhash = (
-    await connection.getLatestBlockhash(opts.preflightCommitment)
-  ).blockhash;
+  const latestBlockhash = await connection.getLatestBlockhash(
+    opts.preflightCommitment,
+  );
+  transaction.recentBlockhash = latestBlockhash.blockhash;
+  transaction.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
   transaction.feePayer = payer.publicKey;
   if (opts.additionalSigners?.length > 0) {
     transaction.partialSign(...opts.additionalSigners);

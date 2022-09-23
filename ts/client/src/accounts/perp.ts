@@ -31,7 +31,6 @@ export class PerpMarket {
     publicKey: PublicKey,
     obj: {
       group: PublicKey;
-      baseTokenIndex: number;
       quoteTokenIndex: number;
       perpMarketIndex: number;
       name: number[];
@@ -59,14 +58,13 @@ export class PerpMarket {
       seqNum: any; // TODO: ts complains that this is unknown for whatever reason
       feesAccrued: I80F48Dto;
       bump: number;
-      baseTokenDecimals: number;
+      baseDecimals: number;
       registrationTime: BN;
     },
   ): PerpMarket {
     return new PerpMarket(
       publicKey,
       obj.group,
-      obj.baseTokenIndex,
       obj.quoteTokenIndex,
       obj.perpMarketIndex,
       obj.name,
@@ -94,7 +92,7 @@ export class PerpMarket {
       obj.seqNum,
       obj.feesAccrued,
       obj.bump,
-      obj.baseTokenDecimals,
+      obj.baseDecimals,
       obj.registrationTime,
     );
   }
@@ -102,7 +100,6 @@ export class PerpMarket {
   constructor(
     public publicKey: PublicKey,
     public group: PublicKey,
-    public baseTokenIndex: number,
     public quoteTokenIndex: number,
     public perpMarketIndex: number,
     name: number[],
@@ -130,7 +127,7 @@ export class PerpMarket {
     seqNum: BN,
     feesAccrued: I80F48Dto,
     bump: number,
-    public baseTokenDecimals: number,
+    public baseDecimals: number,
     public registrationTime: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
@@ -148,13 +145,13 @@ export class PerpMarket {
     this.feesAccrued = I80F48.from(feesAccrued);
 
     this.priceLotsToUiConverter = new Big(10)
-      .pow(baseTokenDecimals - QUOTE_DECIMALS)
+      .pow(baseDecimals - QUOTE_DECIMALS)
       .mul(new Big(this.quoteLotSize.toString()))
       .div(new Big(this.baseLotSize.toString()))
       .toNumber();
 
     this.baseLotsToUiConverter = new Big(this.baseLotSize.toString())
-      .div(new Big(10).pow(baseTokenDecimals))
+      .div(new Big(10).pow(baseDecimals))
       .toNumber();
 
     this.quoteLotsToUiConverter = new Big(this.quoteLotSize.toString())
@@ -220,11 +217,11 @@ export class PerpMarket {
   public uiPriceToLots(price: number): BN {
     return new BN(price * Math.pow(10, QUOTE_DECIMALS))
       .mul(this.baseLotSize)
-      .div(this.quoteLotSize.mul(new BN(Math.pow(10, this.baseTokenDecimals))));
+      .div(this.quoteLotSize.mul(new BN(Math.pow(10, this.baseDecimals))));
   }
 
   public uiBaseToLots(quantity: number): BN {
-    return new BN(quantity * Math.pow(10, this.baseTokenDecimals)).div(
+    return new BN(quantity * Math.pow(10, this.baseDecimals)).div(
       this.baseLotSize,
     );
   }
@@ -367,7 +364,7 @@ export class BookSide {
     for (const order of this.items()) {
       s.iadd(order.sizeLots);
       if (s.gte(baseLots)) {
-        return order.price;
+        return order.uiPrice;
       }
     }
     return undefined;
@@ -394,7 +391,7 @@ export class BookSide {
 
   public getL2Ui(depth: number): [number, number][] {
     const levels: [number, number][] = [];
-    for (const { price, size } of this.items()) {
+    for (const { uiPrice: price, uiSize: size } of this.items()) {
       if (levels.length > 0 && levels[levels.length - 1][0] === price) {
         levels[levels.length - 1][1] += size;
       } else if (levels.length === depth) {
@@ -466,7 +463,7 @@ export class InnerNode {
   constructor(public children: [number]) {}
 }
 
-export class Side {
+export class PerpOrderSide {
   static bid = { bid: {} };
   static ask = { ask: {} };
 }
@@ -481,7 +478,8 @@ export class PerpOrderType {
 
 export class PerpOrder {
   static from(perpMarket: PerpMarket, leafNode: LeafNode, type: BookSideType) {
-    const side = type == BookSideType.bids ? Side.bid : Side.ask;
+    const side =
+      type == BookSideType.bids ? PerpOrderSide.bid : PerpOrderSide.ask;
     const price = BookSide.getPriceFromKey(leafNode.key);
     const expiryTimestamp = leafNode.timeInForce
       ? leafNode.timestamp.add(new BN(leafNode.timeInForce))
@@ -509,11 +507,11 @@ export class PerpOrder {
     public owner: PublicKey,
     public openOrdersSlot: number,
     public feeTier: 0,
-    public price: number,
+    public uiPrice: number,
     public priceLots: BN,
-    public size: number,
+    public uiSize: number,
     public sizeLots: BN,
-    public side: Side,
+    public side: PerpOrderSide,
     public timestamp: BN,
     public expiryTimestamp: BN,
   ) {}

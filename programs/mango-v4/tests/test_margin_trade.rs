@@ -32,7 +32,8 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
         admin,
         payer,
-        mints,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
     }
     .create(solana)
     .await;

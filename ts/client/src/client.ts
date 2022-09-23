@@ -31,9 +31,10 @@ import {
   MangoAccount,
   MangoAccountData,
   TokenPosition,
+  PerpPosition,
 } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
-import { PerpMarket, PerpOrderType, Side } from './accounts/perp';
+import { PerpMarket, PerpOrderSide, PerpOrderType } from './accounts/perp';
 import {
   generateSerum3MarketExternalVaultSignerAddress,
   Serum3Market,
@@ -64,7 +65,7 @@ export type IdsSource = 'api' | 'static' | 'get-program-accounts';
 // TODO: replace ui values with native as input wherever possible
 // TODO: replace token/market names with token or market indices
 export class MangoClient {
-  private postSendTxCallback?: ({ txid: string }) => void;
+  private postSendTxCallback?: ({ txid }) => void;
   private prioritizationFee: number;
 
   constructor(
@@ -615,6 +616,20 @@ export class MangoClient {
       await this.program.account.mangoAccount.fetch(mangoAccountPk),
     );
   }
+  
+  public async getMangoAccountWithSlot(mangoAccountPk: PublicKey) {
+    const resp =
+      await this.program.provider.connection.getAccountInfoAndContext(
+        mangoAccountPk,
+      );
+    if (!resp?.value) return;
+    const decodedMangoAccount = this.program.coder.accounts.decode(
+      'mangoAccount',
+      resp.value.data,
+    );
+    const mangoAccount = MangoAccount.from(mangoAccountPk, decodedMangoAccount);
+    return { slot: resp.context.slot, value: mangoAccount };
+  }
 
   public async getMangoAccountForOwner(
     group: Group,
@@ -672,7 +687,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
   ): Promise<TransactionSignature> {
-    return await this.program.methods
+    const transaction = await this.program.methods
       .accountClose()
       .accounts({
         group: group.publicKey,
@@ -680,7 +695,15 @@ export class MangoClient {
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         solDestination: mangoAccount.owner,
       })
-      .rpc();
+      .transaction();
+
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      transaction,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
   }
 
   public async computeAccountData(
@@ -1125,7 +1148,7 @@ export class MangoClient {
       }
     })();
 
-    return await this.program.methods
+    const tx = await this.program.methods
       .serum3PlaceOrder(
         side,
         limitPrice,
@@ -1161,7 +1184,11 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-      .rpc();
+      .transaction();
+
+    return await sendTransaction(this.program.provider as AnchorProvider, tx, {
+      postSendTxCallback: this.postSendTxCallback,
+    });
   }
 
   async serum3CancelAllorders(
@@ -1178,7 +1205,7 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
 
-    return await this.program.methods
+    const tx = await this.program.methods
       .serum3CancelAllOrders(limit)
       .accounts({
         group: group.publicKey,
@@ -1193,7 +1220,11 @@ export class MangoClient {
         marketAsks: serum3MarketExternal.asksAddress,
         marketEventQueue: serum3MarketExternal.decoded.eventQueue,
       })
-      .rpc();
+      .transaction();
+
+    return await sendTransaction(this.program.provider as AnchorProvider, tx, {
+      postSendTxCallback: this.postSendTxCallback,
+    });
   }
 
   async serum3SettleFunds(
@@ -1214,7 +1245,7 @@ export class MangoClient {
         serum3MarketExternal,
       );
 
-    return await this.program.methods
+    const tx = await this.program.methods
       .serum3SettleFunds()
       .accounts({
         group: group.publicKey,
@@ -1237,7 +1268,11 @@ export class MangoClient {
         baseVault: group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
           .vault,
       })
-      .rpc();
+      .transaction();
+
+    return await sendTransaction(this.program.provider as AnchorProvider, tx, {
+      postSendTxCallback: this.postSendTxCallback,
+    });
   }
 
   async serum3CancelOrder(
@@ -1255,7 +1290,7 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
 
-    return await this.program.methods
+    const tx = await this.program.methods
       .serum3CancelOrder(side, orderId)
       .accounts({
         group: group.publicKey,
@@ -1269,7 +1304,11 @@ export class MangoClient {
         marketAsks: serum3MarketExternal.asksAddress,
         marketEventQueue: serum3MarketExternal.decoded.eventQueue,
       })
-      .rpc();
+      .transaction();
+
+    return await sendTransaction(this.program.provider as AnchorProvider, tx, {
+      postSendTxCallback: this.postSendTxCallback,
+    });
   }
 
   /// perps
@@ -1280,8 +1319,7 @@ export class MangoClient {
     perpMarketIndex: number,
     name: string,
     oracleConfFilter: number,
-    baseTokenIndex: number,
-    baseTokenDecimals: number,
+    baseDecimals: number,
     quoteTokenIndex: number,
     quoteLotSize: number,
     baseLotSize: number,
@@ -1295,6 +1333,8 @@ export class MangoClient {
     minFunding: number,
     maxFunding: number,
     impactQuantity: number,
+    groupInsuranceFund: boolean,
+    trustedMarket: boolean,
   ): Promise<TransactionSignature> {
     const bids = new Keypair();
     const asks = new Keypair();
@@ -1309,8 +1349,7 @@ export class MangoClient {
             val: I80F48.fromNumber(oracleConfFilter).getData(),
           },
         } as any, // future: nested custom types dont typecheck, fix if possible?
-        baseTokenIndex,
-        baseTokenDecimals,
+        baseDecimals,
         new BN(quoteLotSize),
         new BN(baseLotSize),
         maintAssetWeight,
@@ -1323,6 +1362,8 @@ export class MangoClient {
         minFunding,
         maxFunding,
         new BN(impactQuantity),
+        groupInsuranceFund,
+        trustedMarket,
       )
       .accounts({
         group: group.publicKey,
@@ -1381,8 +1422,7 @@ export class MangoClient {
     perpMarketName: string,
     oracle: PublicKey,
     oracleConfFilter: number,
-    baseTokenIndex: number,
-    baseTokenDecimals: number,
+    baseDecimals: number,
     maintAssetWeight: number,
     initAssetWeight: number,
     maintLiabWeight: number,
@@ -1393,6 +1433,8 @@ export class MangoClient {
     minFunding: number,
     maxFunding: number,
     impactQuantity: number,
+    groupInsuranceFund: boolean,
+    trustedMarket: boolean,
   ): Promise<TransactionSignature> {
     const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
 
@@ -1404,8 +1446,7 @@ export class MangoClient {
             val: I80F48.fromNumber(oracleConfFilter).getData(),
           },
         } as any, // future: nested custom types dont typecheck, fix if possible?
-        baseTokenIndex,
-        baseTokenDecimals,
+        baseDecimals,
         maintAssetWeight,
         initAssetWeight,
         maintLiabWeight,
@@ -1416,6 +1457,8 @@ export class MangoClient {
         minFunding,
         maxFunding,
         new BN(impactQuantity),
+        groupInsuranceFund,
+        trustedMarket,
       )
       .accounts({
         group: group.publicKey,
@@ -1446,10 +1489,7 @@ export class MangoClient {
       .rpc();
   }
 
-  public async perpGetMarkets(
-    group: Group,
-    baseTokenIndex?: number,
-  ): Promise<PerpMarket[]> {
+  public async perpGetMarkets(group: Group): Promise<PerpMarket[]> {
     const bumpfbuf = Buffer.alloc(1);
     bumpfbuf.writeUInt8(255);
 
@@ -1462,17 +1502,6 @@ export class MangoClient {
       },
     ];
 
-    if (baseTokenIndex) {
-      const bbuf = Buffer.alloc(2);
-      bbuf.writeUInt16LE(baseTokenIndex);
-      filters.push({
-        memcmp: {
-          bytes: bs58.encode(bbuf),
-          offset: 40,
-        },
-      });
-    }
-
     return (await this.program.account.perpMarket.all(filters)).map((tuple) =>
       PerpMarket.from(tuple.publicKey, tuple.account),
     );
@@ -1482,7 +1511,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     perpMarketName: string,
-    side: Side,
+    side: PerpOrderSide,
     price: number,
     quantity: number,
     maxQuoteQuantity: number,
@@ -1497,7 +1526,8 @@ export class MangoClient {
         AccountRetriever.Fixed,
         group,
         [mangoAccount],
-        [],
+        // Settlement token bank, because a position for it may be created
+        [group.getFirstBankByTokenIndex(0)],
         [perpMarket],
       );
     return await this.program.methods
@@ -1711,12 +1741,14 @@ export class MangoClient {
       .instruction();
 
     const tx = new Transaction();
-    for (const i of preInstructions) {
-      tx.add(i);
+    for (const ix of preInstructions) {
+      tx.add(ix);
     }
     tx.add(flashLoanBeginIx);
-    for (const i of userDefinedInstructions) {
-      tx.add(i);
+    for (const ix of userDefinedInstructions.filter(
+      (ix) => ix.keys.length > 2,
+    )) {
+      tx.add(ix);
     }
     tx.add(flashLoanEndIx);
 
@@ -1907,28 +1939,29 @@ export class MangoClient {
       ...mintInfos.map((mintInfo) => mintInfo.oracle),
     );
 
-    healthRemainingAccounts.push(
-      ...mangoAccount.perps
-        .filter((perp) => perp.marketIndex !== 65535)
-        .map(
-          (perp) =>
-            Array.from(group.perpMarketsMap.values()).filter(
-              (perpMarket) => perpMarket.perpMarketIndex === perp.marketIndex,
-            )[0].publicKey,
-        ),
-    );
-    for (const perpMarket of perpMarkets) {
-      const alreadyAdded = mangoAccount.perps.find(
-        (p) => p.marketIndex === perpMarket.perpMarketIndex,
-      );
-      if (!alreadyAdded) {
-        healthRemainingAccounts.push(
-          Array.from(group.perpMarketsMap.values()).filter(
-            (p) => p.perpMarketIndex === perpMarket.perpMarketIndex,
-          )[0].publicKey,
-        );
+    const allPerpIndices = mangoAccount.perps.map((perp) => perp.marketIndex);
+
+    // insert any extra perp markets in the free perp position slots
+    if (perpMarkets) {
+      for (const perpMarket of perpMarkets) {
+        if (allPerpIndices.indexOf(perpMarket.perpMarketIndex) < 0) {
+          allPerpIndices[
+            mangoAccount.perps.findIndex(
+              (perp, index) =>
+                !perp.isActive() &&
+                allPerpIndices[index] == PerpPosition.PerpMarketIndexUnset,
+            )
+          ] = perpMarket.perpMarketIndex;
+        }
       }
     }
+    const allPerpMarkets = allPerpIndices
+      .filter((index) => index != PerpPosition.PerpMarketIndexUnset)
+      .map((index) => group.findPerpMarket(index)!);
+    healthRemainingAccounts.push(
+      ...allPerpMarkets.map((perp) => perp.publicKey),
+    );
+    healthRemainingAccounts.push(...allPerpMarkets.map((perp) => perp.oracle));
 
     healthRemainingAccounts.push(
       ...mangoAccount.serum3
@@ -1975,39 +2008,31 @@ export class MangoClient {
       ...mintInfos.map((mintInfo) => mintInfo.oracle),
     );
 
+    let perpIndices: number[] = [];
+    for (const mangoAccount of mangoAccounts) {
+      perpIndices.push(
+        ...mangoAccount.perps
+          .filter((perp) => perp.marketIndex !== 65535)
+          .map((perp) => perp.marketIndex),
+      );
+    }
+    perpIndices.push(...perpMarkets.map((perp) => perp.perpMarketIndex));
+
+    const allPerpMarkets = [...new Set(perpIndices)].map(
+      (marketIndex) => group.findPerpMarket(marketIndex)!,
+    );
+
+    // Add perp accounts
+    healthRemainingAccounts.push(...allPerpMarkets.map((p) => p.publicKey));
+    // Add oracle for each perp
+    healthRemainingAccounts.push(...allPerpMarkets.map((p) => p.oracle));
+
     for (const mangoAccount of mangoAccounts) {
       healthRemainingAccounts.push(
         ...mangoAccount.serum3
           .filter((serum3Account) => serum3Account.marketIndex !== 65535)
           .map((serum3Account) => serum3Account.openOrders),
       );
-    }
-
-    for (const mangoAccount of mangoAccounts) {
-      healthRemainingAccounts.push(
-        ...mangoAccount.perps
-          .filter((perp) => perp.marketIndex !== 65535)
-          .map(
-            (perp) =>
-              Array.from(group.perpMarketsMap.values()).filter(
-                (perpMarket) => perpMarket.perpMarketIndex === perp.marketIndex,
-              )[0].publicKey,
-          ),
-      );
-    }
-    for (const mangoAccount of mangoAccounts) {
-      for (const perpMarket of perpMarkets) {
-        const alreadyAdded = mangoAccount.perps.find(
-          (p) => p.marketIndex === perpMarket.perpMarketIndex,
-        );
-        if (!alreadyAdded) {
-          healthRemainingAccounts.push(
-            Array.from(group.perpMarketsMap.values()).filter(
-              (p) => p.perpMarketIndex === perpMarket.perpMarketIndex,
-            )[0].publicKey,
-          );
-        }
-      }
     }
 
     return healthRemainingAccounts;
