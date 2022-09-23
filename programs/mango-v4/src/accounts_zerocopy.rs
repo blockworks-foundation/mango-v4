@@ -110,6 +110,63 @@ impl<T: solana_sdk::account::ReadableAccount> AccountReader for T {
     }
 }
 
+#[cfg(feature = "solana-sdk")]
+#[derive(Clone)]
+pub struct KeyedAccount {
+    pub key: Pubkey,
+    pub account: solana_sdk::account::Account,
+}
+
+#[cfg(feature = "solana-sdk")]
+impl AccountReader for KeyedAccount {
+    fn owner(&self) -> &Pubkey {
+        self.account.owner()
+    }
+
+    fn data(&self) -> &[u8] {
+        self.account.data()
+    }
+}
+
+#[cfg(feature = "solana-sdk")]
+impl KeyedAccountReader for KeyedAccount {
+    fn key(&self) -> &Pubkey {
+        &self.key
+    }
+}
+
+#[cfg(feature = "solana-sdk")]
+#[derive(Clone)]
+pub struct KeyedAccountSharedData {
+    pub key: Pubkey,
+    pub data: solana_sdk::account::AccountSharedData,
+}
+
+#[cfg(feature = "solana-sdk")]
+impl KeyedAccountSharedData {
+    pub fn new(key: Pubkey, data: solana_sdk::account::AccountSharedData) -> Self {
+        Self { key, data }
+    }
+}
+
+#[cfg(feature = "solana-sdk")]
+impl AccountReader for KeyedAccountSharedData {
+    fn owner(&self) -> &Pubkey {
+        AccountReader::owner(&self.data)
+    }
+
+    fn data(&self) -> &[u8] {
+        AccountReader::data(&self.data)
+    }
+}
+
+#[cfg(feature = "solana-sdk")]
+impl KeyedAccountReader for KeyedAccountSharedData {
+    fn key(&self) -> &Pubkey {
+        &self.key
+    }
+}
+
 //
 // Common traits for loading from account data.
 //

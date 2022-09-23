@@ -1,11 +1,9 @@
 use std::time::Duration;
 
-use crate::account_shared_data::KeyedAccountSharedData;
-
-use client::{chain_data, AccountFetcher, MangoClient, MangoClientError, MangoGroupContext};
+use client::{chain_data, health_cache, AccountFetcher, MangoClient, MangoClientError};
+use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
-    new_health_cache, Bank, FixedOrderAccountRetriever, HealthCache, HealthType, MangoAccountValue,
-    PerpMarketIndex, Serum3Orders, Side, TokenIndex, QUOTE_TOKEN_INDEX,
+    Bank, HealthType, PerpMarketIndex, Serum3Orders, Side, TokenIndex, QUOTE_TOKEN_INDEX,
 };
 
 use itertools::Itertools;
@@ -15,35 +13,6 @@ use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 pub struct Config {
     pub min_health_ratio: f64,
     pub refresh_timeout: Duration,
-}
-
-pub fn new_health_cache_(
-    context: &MangoGroupContext,
-    account_fetcher: &chain_data::AccountFetcher,
-    account: &MangoAccountValue,
-) -> anyhow::Result<HealthCache> {
-    let active_token_len = account.active_token_positions().count();
-    let active_perp_len = account.active_perp_positions().count();
-
-    let metas = context.derive_health_check_remaining_account_metas(account, vec![], false)?;
-    let accounts = metas
-        .iter()
-        .map(|meta| {
-            Ok(KeyedAccountSharedData::new(
-                meta.pubkey,
-                account_fetcher.fetch_raw(&meta.pubkey)?,
-            ))
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-
-    let retriever = FixedOrderAccountRetriever {
-        ais: accounts,
-        n_banks: active_token_len,
-        n_perps: active_perp_len,
-        begin_perp: active_token_len * 2,
-        begin_serum3: active_token_len * 2 + active_perp_len,
-    };
-    new_health_cache(&account.borrow(), &retriever).context("make health cache")
 }
 
 pub fn jupiter_market_can_buy(
@@ -112,7 +81,7 @@ pub fn maybe_liquidate_account(
 
     let account = account_fetcher.fetch_mango_account(pubkey)?;
     let health_cache =
-        new_health_cache_(&mango_client.context, account_fetcher, &account).expect("always ok");
+        health_cache::new(&mango_client.context, account_fetcher, &account).expect("always ok");
     let maint_health = health_cache.health(HealthType::Maint);
     if !health_cache.is_liquidatable() {
         return Ok(false);
@@ -130,7 +99,7 @@ pub fn maybe_liquidate_account(
     // be great at providing timely updates to the account data.
     let account = account_fetcher.fetch_fresh_mango_account(pubkey)?;
     let health_cache =
-        new_health_cache_(&mango_client.context, account_fetcher, &account).expect("always ok");
+        health_cache::new(&mango_client.context, account_fetcher, &account).expect("always ok");
     if !health_cache.is_liquidatable() {
         return Ok(false);
     }
@@ -145,7 +114,7 @@ pub fn maybe_liquidate_account(
         .map(|token_position| {
             let token = mango_client.context.token(token_position.token_index);
             let bank = account_fetcher.fetch::<Bank>(&token.mint_info.first_bank())?;
-            let oracle = account_fetcher.fetch_raw_account(token.mint_info.oracle)?;
+            let oracle = account_fetcher.fetch_raw_account(&token.mint_info.oracle)?;
             let price = bank.oracle_price(&KeyedAccountSharedData::new(
                 token.mint_info.oracle,
                 oracle.into(),
@@ -163,7 +132,7 @@ pub fn maybe_liquidate_account(
     let serum_force_cancels = account
         .active_serum3_orders()
         .map(|orders| {
-            let open_orders_account = account_fetcher.fetch_raw_account(orders.open_orders)?;
+            let open_orders_account = account_fetcher.fetch_raw_account(&orders.open_orders)?;
             let open_orders = mango_v4::serum3_cpi::load_open_orders(&open_orders_account)?;
             let can_force_cancel = open_orders.native_coin_total > 0
                 || open_orders.native_pc_total > 0
@@ -190,7 +159,7 @@ pub fn maybe_liquidate_account(
                 return Ok(None);
             }
             let perp = mango_client.context.perp(pp.market_index);
-            let oracle = account_fetcher.fetch_raw_account(perp.market.oracle)?;
+            let oracle = account_fetcher.fetch_raw_account(&perp.market.oracle)?;
             let price = perp.market.oracle_price(&KeyedAccountSharedData::new(
                 perp.market.oracle,
                 oracle.into(),
@@ -218,7 +187,7 @@ pub fn maybe_liquidate_account(
         liqor.ensure_token_position(target)?;
 
         let health_cache =
-            new_health_cache_(&mango_client.context, account_fetcher, &liqor).expect("always ok");
+            health_cache::new(&mango_client.context, account_fetcher, &liqor).expect("always ok");
 
         let source_price = health_cache.token_info(source).unwrap().oracle_price;
         let target_price = health_cache.token_info(target).unwrap().oracle_price;
@@ -278,7 +247,7 @@ pub fn maybe_liquidate_account(
                 .fetch_fresh_mango_account(&mango_client.mango_account_address)
                 .context("getting liquidator account")?;
             liqor.ensure_perp_position(*perp_market_index, QUOTE_TOKEN_INDEX)?;
-            let health_cache = new_health_cache_(&mango_client.context, account_fetcher, &liqor)
+            let health_cache = health_cache::new(&mango_client.context, account_fetcher, &liqor)
                 .expect("always ok");
             health_cache.max_perp_for_health_ratio(
                 *perp_market_index,

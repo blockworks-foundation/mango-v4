@@ -24,12 +24,13 @@ use solana_client::rpc_client::RpcClient;
 use solana_sdk::signer::keypair;
 
 use crate::account_fetcher::*;
-use crate::context::{MangoGroupContext, PerpMarketContext, Serum3MarketContext, TokenContext};
+use crate::context::{MangoGroupContext, Serum3MarketContext, TokenContext};
 use crate::gpa::fetch_mango_accounts;
 use crate::jupiter;
 use crate::util::MyClone;
 
 use anyhow::Context;
+use solana_sdk::account::ReadableAccount;
 use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::sysvar;
@@ -230,7 +231,7 @@ impl MangoClient {
     ) -> anyhow::Result<Self> {
         let rpc = client.rpc();
         let account_fetcher = Arc::new(CachedAccountFetcher::new(RpcAccountFetcher { rpc }));
-        let mango_account = account_fetcher_fetch_mango_account(&*account_fetcher, account)?;
+        let mango_account = account_fetcher_fetch_mango_account(&*account_fetcher, &account)?;
         let group = mango_account.fixed.group;
         if mango_account.fixed.owner != owner.pubkey() {
             anyhow::bail!(
@@ -290,12 +291,12 @@ impl MangoClient {
     }
 
     pub fn mango_account(&self) -> anyhow::Result<MangoAccountValue> {
-        account_fetcher_fetch_mango_account(&*self.account_fetcher, self.mango_account_address)
+        account_fetcher_fetch_mango_account(&*self.account_fetcher, &self.mango_account_address)
     }
 
     pub fn first_bank(&self, token_index: TokenIndex) -> anyhow::Result<Bank> {
         let bank_address = self.context.mint_info(token_index).first_bank();
-        account_fetcher_fetch_anchor_account(&*self.account_fetcher, bank_address)
+        account_fetcher_fetch_anchor_account(&*self.account_fetcher, &bank_address)
     }
 
     pub fn derive_health_check_remaining_account_metas(
@@ -461,8 +462,8 @@ impl MangoClient {
     ) -> Result<pyth_sdk_solana::Price, anyhow::Error> {
         let token_index = *self.context.token_indexes_by_name.get(token_name).unwrap();
         let mint_info = self.context.mint_info(token_index);
-        let oracle_account = self.account_fetcher.fetch_raw_account(mint_info.oracle)?;
-        Ok(pyth_sdk_solana::load_price(&oracle_account.data).unwrap())
+        let oracle_account = self.account_fetcher.fetch_raw_account(&mint_info.oracle)?;
+        Ok(pyth_sdk_solana::load_price(&oracle_account.data()).unwrap())
     }
 
     //
@@ -719,8 +720,8 @@ impl MangoClient {
             .unwrap();
         let account = self.mango_account()?;
         let open_orders = account.serum3_orders(market_index).unwrap().open_orders;
-
-        let open_orders_bytes = self.account_fetcher.fetch_raw_account(open_orders)?.data;
+        let open_orders_acc = self.account_fetcher.fetch_raw_account(&open_orders)?;
+        let open_orders_bytes = open_orders_acc.data();
         let open_orders_data: &serum_dex::state::OpenOrders = bytemuck::from_bytes(
             &open_orders_bytes[5..5 + std::mem::size_of::<serum_dex::state::OpenOrders>()],
         );
@@ -838,11 +839,45 @@ impl MangoClient {
     //
     // Perps
     //
-    fn perp_data_by_market_index(
+    pub fn perp_settle_pnl(
         &self,
         market_index: PerpMarketIndex,
-    ) -> Result<&PerpMarketContext, ClientError> {
-        Ok(self.context.perp_markets.get(&market_index).unwrap())
+        account_a: &Pubkey,
+        account_b: (&Pubkey, &MangoAccountValue),
+    ) -> anyhow::Result<Signature> {
+        let perp = self.context.perp(market_index);
+        let settlement_token = self.context.token(0);
+
+        let health_remaining_ams = self
+            .context
+            .derive_health_check_remaining_account_metas(account_b.1, vec![], false)
+            .unwrap();
+
+        self.program()
+            .request()
+            .instruction(Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        &mango_v4::accounts::PerpSettlePnl {
+                            group: self.group(),
+                            perp_market: perp.address,
+                            account_a: *account_a,
+                            account_b: *account_b.0,
+                            oracle: perp.market.oracle,
+                            quote_bank: settlement_token.mint_info.first_bank(),
+                        },
+                        None,
+                    );
+                    ams.extend(health_remaining_ams.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpSettlePnl {
+                    max_settle_amount: u64::MAX,
+                }),
+            })
+            .send()
+            .map_err(prettify_client_error)
     }
 
     pub fn perp_liq_force_cancel_orders(
@@ -850,7 +885,7 @@ impl MangoClient {
         liqee: (&Pubkey, &MangoAccountValue),
         market_index: PerpMarketIndex,
     ) -> anyhow::Result<Signature> {
-        let perp = self.perp_data_by_market_index(market_index)?;
+        let perp = self.context.perp(market_index);
 
         let health_remaining_ams = self
             .context
@@ -890,7 +925,7 @@ impl MangoClient {
         market_index: PerpMarketIndex,
         max_base_transfer: i64,
     ) -> anyhow::Result<Signature> {
-        let perp = self.perp_data_by_market_index(market_index)?;
+        let perp = self.context.perp(market_index);
 
         let health_remaining_ams = self
             .context
@@ -1002,7 +1037,7 @@ impl MangoClient {
 
         let group = account_fetcher_fetch_anchor_account::<Group>(
             &*self.account_fetcher,
-            self.context.group,
+            &self.context.group,
         )?;
 
         self.program()

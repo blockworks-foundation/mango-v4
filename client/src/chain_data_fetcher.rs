@@ -138,7 +138,31 @@ impl AccountFetcher {
 }
 
 impl crate::AccountFetcher for AccountFetcher {
-    fn fetch_raw_account(&self, address: Pubkey) -> anyhow::Result<solana_sdk::account::Account> {
-        self.fetch_raw(&address).map(|a| a.into())
+    fn fetch_raw_account(
+        &self,
+        address: &Pubkey,
+    ) -> anyhow::Result<solana_sdk::account::AccountSharedData> {
+        self.fetch_raw(&address)
+    }
+
+    fn fetch_program_accounts(
+        &self,
+        program: &Pubkey,
+        discriminator: [u8; 8],
+    ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
+        let chain_data = self.chain_data.read().unwrap();
+        Ok(chain_data
+            .iter_accounts()
+            .filter_map(|(pk, data)| {
+                if data.account.owner() != program {
+                    return None;
+                }
+                let acc_data = data.account.data();
+                if acc_data.len() < 8 || acc_data[..8] != discriminator {
+                    return None;
+                }
+                Some((*pk, data.account.clone()))
+            })
+            .collect::<Vec<_>>())
     }
 }
