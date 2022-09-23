@@ -878,7 +878,8 @@ impl HealthCache {
         let (assets, liabs) = self.health_assets_and_liabs(health_type);
         let hundred = I80F48::from(100);
         if liabs > 0 {
-            cm!(hundred * (assets - liabs) / liabs)
+            // feel free to saturate to MAX for tiny liabs
+            cm!(hundred * (assets - liabs)).saturating_div(liabs)
         } else {
             I80F48::MAX
         }
