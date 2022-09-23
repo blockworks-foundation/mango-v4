@@ -19,6 +19,7 @@
     "build": "npm run build:esm; npm run build:cjs",
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
+    "test": "ts-mocha ts/client/**/*.spec.ts",
     "clean": "rm -rf dist",
     "example1-user": "ts-node ts/client/src/scripts/example1-user.ts",
     "example1-admin": "ts-node ts/client/src/scripts/example1-admin.ts",

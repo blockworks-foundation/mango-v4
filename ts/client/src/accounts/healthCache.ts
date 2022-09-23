@@ -173,7 +173,7 @@ export class HealthCache {
       }
     }
 
-    if (liabs.gt(I80F48.fromNumber(0.001))) {
+  if (liabs.gt(I80F48.fromNumber(0.001))) {
       return HUNDRED_I80F48().mul(assets.sub(liabs).div(liabs));
     } else {
       return MAX_I80F48();
