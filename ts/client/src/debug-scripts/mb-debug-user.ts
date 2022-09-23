@@ -131,7 +131,7 @@ async function debugUser(
   }
 
   function getMaxForSerum3Wrapper(serum3Market: Serum3Market) {
-    if (serum3Market.name !== 'SOL/USDC') return;
+    // if (serum3Market.name !== 'SOL/USDC') return;
     console.log(
       `getMaxQuoteForSerum3BidUi ${serum3Market.name} ` +
         mangoAccount.getMaxQuoteForSerum3BidUi(
