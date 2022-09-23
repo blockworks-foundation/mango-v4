@@ -1,5 +1,6 @@
 use crate::error::*;
 
+use crate::logs::{Serum3OpenOrdersBalanceLog, TokenBalanceLog};
 use crate::serum3_cpi::{load_market_state, load_open_orders_ref};
 use crate::state::*;
 use anchor_lang::prelude::*;
@@ -39,7 +40,9 @@ pub trait OpenOrdersAmounts {
     fn native_quote_free(&self) -> u64;
     fn native_quote_free_plus_rebates(&self) -> u64;
     fn native_base_total(&self) -> u64;
+    fn native_quote_total(&self) -> u64;
     fn native_quote_total_plus_rebates(&self) -> u64;
+    fn native_rebates(&self) -> u64;
 }
 
 impl OpenOrdersAmounts for OpenOrdersSlim {
@@ -61,8 +64,14 @@ impl OpenOrdersAmounts for OpenOrdersSlim {
     fn native_base_total(&self) -> u64 {
         self.native_coin_total
     }
+    fn native_quote_total(&self) -> u64 {
+        self.native_pc_total
+    }
     fn native_quote_total_plus_rebates(&self) -> u64 {
         cm!(self.native_pc_total + self.referrer_rebates_accrued)
+    }
+    fn native_rebates(&self) -> u64 {
+        self.referrer_rebates_accrued
     }
 }
 
@@ -85,8 +94,14 @@ impl OpenOrdersAmounts for OpenOrders {
     fn native_base_total(&self) -> u64 {
         self.native_coin_total
     }
+    fn native_quote_total(&self) -> u64 {
+        self.native_pc_total
+    }
     fn native_quote_total_plus_rebates(&self) -> u64 {
         cm!(self.native_pc_total + self.referrer_rebates_accrued)
+    }
+    fn native_rebates(&self) -> u64 {
+        self.referrer_rebates_accrued
     }
 }
 
@@ -298,6 +313,19 @@ pub fn serum3_place_order(
         let oo_ai = &ctx.accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
+
+        emit!(Serum3OpenOrdersBalanceLog {
+            mango_group: ctx.accounts.group.key(),
+            mango_account: ctx.accounts.account.key(),
+            base_token_index: serum_market.base_token_index,
+            quote_token_index: serum_market.quote_token_index,
+            base_total: after_oo.native_coin_total,
+            base_free: after_oo.native_coin_free,
+            quote_total: after_oo.native_pc_total,
+            quote_free: after_oo.native_pc_free,
+            referrer_rebates_accrued: after_oo.referrer_rebates_accrued,
+        });
+
         OODifference::new(&before_oo, &after_oo)
     };
 
@@ -314,6 +342,7 @@ pub fn serum3_place_order(
     let vault_difference = {
         let mut payer_bank = ctx.accounts.payer_bank.load_mut()?;
         apply_vault_difference(
+            ctx.accounts.account.key(),
             &mut account.borrow_mut(),
             serum_market.market_index,
             &mut payer_bank,
@@ -386,7 +415,9 @@ impl VaultDifference {
 
 /// Called in settle_funds, place_order, liq_force_cancel to adjust token positions after
 /// changing the vault balances
+/// Also logs changes to token balances
 pub fn apply_vault_difference(
+    account_pk: Pubkey,
     account: &mut MangoAccountRefMut,
     serum_market_index: Serum3MarketIndex,
     bank: &mut Bank,
@@ -406,6 +437,7 @@ pub fn apply_vault_difference(
         .abs()
         .to_num::<u64>();
 
+    let indexed_position = position.indexed_position;
     let market = account.serum3_orders_mut(serum_market_index).unwrap();
     let borrows_without_fee = if bank.token_index == market.base_token_index {
         &mut market.base_borrows_without_fee
@@ -425,6 +457,15 @@ pub fn apply_vault_difference(
     if needed_change > 0 {
         *borrows_without_fee = (*borrows_without_fee).saturating_sub(needed_change.to_num::<u64>());
     }
+
+    emit!(TokenBalanceLog {
+        mango_group: bank.group,
+        mango_account: account_pk,
+        token_index: bank.token_index,
+        indexed_position: indexed_position.to_bits(),
+        deposit_index: bank.deposit_index.to_bits(),
+        borrow_index: bank.borrow_index.to_bits(),
+    });
 
     Ok(VaultDifference {
         token_index: bank.token_index,

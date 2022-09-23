@@ -377,7 +377,6 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             indexed_position: position.indexed_position.to_bits(),
             deposit_index: bank.deposit_index.to_bits(),
             borrow_index: bank.borrow_index.to_bits(),
-            price: price.to_bits(),
         });
     }
 
