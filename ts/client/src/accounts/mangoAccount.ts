@@ -524,7 +524,7 @@ export class MangoAccount {
       group,
       serum3Market,
       Serum3Side.bid,
-      I80F48.fromNumber(3),
+      I80F48.fromNumber(1),
     );
   }
 
@@ -566,7 +566,7 @@ export class MangoAccount {
       group,
       serum3Market,
       Serum3Side.ask,
-      I80F48.fromNumber(3),
+      I80F48.fromNumber(1),
     );
   }
 
