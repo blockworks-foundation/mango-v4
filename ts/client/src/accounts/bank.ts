@@ -10,7 +10,18 @@ export type OracleConfig = {
   confFilter: I80F48Dto;
 };
 
-export class Bank {
+export class BankForHealth {
+  constructor(
+    public tokenIndex: number,
+    public maintAssetWeight: I80F48,
+    public initAssetWeight: I80F48,
+    public maintLiabWeight: I80F48,
+    public initLiabWeight: I80F48,
+    public price: I80F48 | undefined,
+  ) {}
+}
+
+export class Bank extends BankForHealth {
   public name: string;
   public depositIndex: I80F48;
   public borrowIndex: I80F48;

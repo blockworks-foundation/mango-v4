@@ -256,7 +256,6 @@ export class Group {
             bank.oracle,
             ai,
             this.getMintDecimals(bank.mint),
-            this.getMintDecimals(this.insuranceMint),
           );
           bank.price = price;
           bank.uiPrice = uiPrice;
@@ -283,7 +282,6 @@ export class Group {
         perpMarket.oracle,
         ai,
         perpMarket.baseDecimals,
-        this.getMintDecimals(this.insuranceMint),
       );
       perpMarket.price = price;
       perpMarket.uiPrice = uiPrice;
@@ -295,7 +293,6 @@ export class Group {
     oracle: PublicKey,
     ai: AccountInfo<Buffer>,
     baseDecimals: number,
-    quoteDecimals: number,
   ) {
     let price, uiPrice;
     if (
@@ -305,13 +302,13 @@ export class Group {
     ) {
       const stubOracle = coder.decode('stubOracle', ai.data);
       price = new I80F48(stubOracle.price.val);
-      uiPrice = this?.toUiPrice(price, baseDecimals, quoteDecimals);
+      uiPrice = this?.toUiPrice(price, baseDecimals);
     } else if (isPythOracle(ai)) {
       uiPrice = parsePriceData(ai.data).previousPrice;
-      price = this?.toNativePrice(uiPrice, baseDecimals, quoteDecimals);
+      price = this?.toNativePrice(uiPrice, baseDecimals);
     } else if (isSwitchboardOracle(ai)) {
       uiPrice = await parseSwitchboardOracle(ai);
-      price = this?.toNativePrice(uiPrice, baseDecimals, quoteDecimals);
+      price = this?.toNativePrice(uiPrice, baseDecimals);
     } else {
       throw new Error(
         `Unknown oracle provider for oracle ${oracle}, with owner ${ai.owner}`,
@@ -345,6 +342,10 @@ export class Group {
     if (!banks)
       throw new Error(`Unable to find mint decimals for ${mintPk.toString()}`);
     return banks[0].mintDecimals;
+  }
+
+  public getInsuranceMintDecimals(): number {
+    return this.getMintDecimals(this.insuranceMint);
   }
 
   public getFirstBankByMint(mintPk: PublicKey): Bank {
@@ -472,23 +473,21 @@ export class Group {
     }
   }
 
-  public toUiPrice(
-    price: I80F48,
-    baseDecimals: number,
-    quoteDecimals: number,
-  ): number {
+  public toUiPrice(price: I80F48, baseDecimals: number): number {
     return price
-      .mul(I80F48.fromNumber(Math.pow(10, baseDecimals - quoteDecimals)))
+      .mul(
+        I80F48.fromNumber(
+          Math.pow(10, baseDecimals - this.getInsuranceMintDecimals()),
+        ),
+      )
       .toNumber();
   }
 
-  public toNativePrice(
-    uiPrice: number,
-    baseDecimals: number,
-    quoteDecimals: number,
-  ): I80F48 {
+  public toNativePrice(uiPrice: number, baseDecimals: number): I80F48 {
     return I80F48.fromNumber(uiPrice).mul(
-      I80F48.fromNumber(Math.pow(10, quoteDecimals - baseDecimals)),
+      I80F48.fromNumber(
+        Math.pow(10, this.getInsuranceMintDecimals() - baseDecimals),
+      ),
     );
   }
 

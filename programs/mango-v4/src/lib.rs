@@ -460,6 +460,8 @@ pub mod mango_v4 {
         instructions::perp_close_market(ctx)
     }
 
+    // TODO perp_change_perp_market_params
+
     pub fn perp_deactivate_position(ctx: Context<PerpDeactivatePosition>) -> Result<()> {
         instructions::perp_deactivate_position(ctx)
     }

@@ -891,6 +891,8 @@ impl HealthCache {
     /// swap BTC -> SOL and they're at ui prices of $20000 and $40, that means price
     /// should be 500000 native_SOL for a native_BTC. Because 1 BTC gives you 500 SOL
     /// so 1e6 native_BTC gives you 500e9 native_SOL.
+    ///
+    /// NOTE: keep getMaxSourceForTokenSwap in ts/client in sync with changes here
     #[cfg(feature = "client")]
     pub fn max_swap_source_for_health_ratio(
         &self,
@@ -1018,6 +1020,7 @@ impl HealthCache {
     }
 
     #[cfg(feature = "client")]
+    /// NOTE: keep getMaxSourceForTokenSwap in ts/client in sync with changes here
     pub fn max_perp_for_health_ratio(
         &self,
         perp_market_index: PerpMarketIndex,

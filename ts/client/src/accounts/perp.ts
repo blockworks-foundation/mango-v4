@@ -364,7 +364,7 @@ export class BookSide {
     for (const order of this.items()) {
       s.iadd(order.sizeLots);
       if (s.gte(baseLots)) {
-        return order.price;
+        return order.uiPrice;
       }
     }
     return undefined;
@@ -391,7 +391,7 @@ export class BookSide {
 
   public getL2Ui(depth: number): [number, number][] {
     const levels: [number, number][] = [];
-    for (const { price, size } of this.items()) {
+    for (const { uiPrice: price, uiSize: size } of this.items()) {
       if (levels.length > 0 && levels[levels.length - 1][0] === price) {
         levels[levels.length - 1][1] += size;
       } else if (levels.length === depth) {
@@ -463,7 +463,7 @@ export class InnerNode {
   constructor(public children: [number]) {}
 }
 
-export class Side {
+export class PerpOrderSide {
   static bid = { bid: {} };
   static ask = { ask: {} };
 }
@@ -478,7 +478,8 @@ export class PerpOrderType {
 
 export class PerpOrder {
   static from(perpMarket: PerpMarket, leafNode: LeafNode, type: BookSideType) {
-    const side = type == BookSideType.bids ? Side.bid : Side.ask;
+    const side =
+      type == BookSideType.bids ? PerpOrderSide.bid : PerpOrderSide.ask;
     const price = BookSide.getPriceFromKey(leafNode.key);
     const expiryTimestamp = leafNode.timeInForce
       ? leafNode.timestamp.add(new BN(leafNode.timeInForce))
@@ -506,11 +507,11 @@ export class PerpOrder {
     public owner: PublicKey,
     public openOrdersSlot: number,
     public feeTier: 0,
-    public price: number,
+    public uiPrice: number,
     public priceLots: BN,
-    public size: number,
+    public uiSize: number,
     public sizeLots: BN,
-    public side: Side,
+    public side: PerpOrderSide,
     public timestamp: BN,
     public expiryTimestamp: BN,
   ) {}

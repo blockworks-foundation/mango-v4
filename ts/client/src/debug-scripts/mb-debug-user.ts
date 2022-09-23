@@ -1,13 +1,23 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair } from '@solana/web3.js';
+import { Cluster, Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { Group } from '../accounts/group';
-import { I80F48 } from '../accounts/I80F48';
 import { HealthType, MangoAccount } from '../accounts/mangoAccount';
+import { PerpMarket } from '../accounts/perp';
 import { Serum3Market } from '../accounts/serum3';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 import { toUiDecimalsForQuote } from '../utils';
+
+const CLUSTER_URL =
+  process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;
+const PAYER_KEYPAIR =
+  process.env.PAYER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
+const USER_KEYPAIR =
+  process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
+const GROUP_NUM = Number(process.env.GROUP_NUM || 2);
+const CLUSTER: Cluster =
+  (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
 
 async function debugUser(
   client: MangoClient,
@@ -107,19 +117,12 @@ async function debugUser(
   function getMaxSourceForTokenSwapWrapper(src, tgt) {
     console.log(
       `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
-        mangoAccount
-          .getMaxSourceForTokenSwap(
-            group,
-            group.banksMapByName.get(src)![0].mint,
-            group.banksMapByName.get(tgt)![0].mint,
-            1,
-          )!
-          .div(
-            I80F48.fromNumber(
-              Math.pow(10, group.banksMapByName.get(src)![0].mintDecimals),
-            ),
-          )
-          .toNumber(),
+        mangoAccount.getMaxSourceUiForTokenSwap(
+          group,
+          group.banksMapByName.get(src)![0].mint,
+          group.banksMapByName.get(tgt)![0].mint,
+          1,
+        ),
     );
   }
   for (const srcToken of Array.from(group.banksMapByName.keys())) {
@@ -128,6 +131,28 @@ async function debugUser(
       // if (tgtToken === 'MSOL')
       getMaxSourceForTokenSwapWrapper(srcToken, tgtToken);
     }
+  }
+
+  function getMaxForPerpWrapper(perpMarket: PerpMarket) {
+    console.log(
+      `getMaxQuoteForPerpBidUi ${perpMarket.name} ` +
+        mangoAccount.getMaxQuoteForPerpBidUi(
+          group,
+          perpMarket.name,
+          perpMarket.price,
+        ),
+    );
+    console.log(
+      `getMaxBaseForPerpAskUi ${perpMarket.name} ` +
+        mangoAccount.getMaxBaseForPerpAskUi(
+          group,
+          perpMarket.name,
+          perpMarket.price,
+        ),
+    );
+  }
+  for (const perpMarket of Array.from(group.perpMarketsMap.values())) {
+    getMaxForPerpWrapper(perpMarket);
   }
 
   function getMaxForSerum3Wrapper(serum3Market: Serum3Market) {
@@ -156,12 +181,10 @@ async function debugUser(
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
+  const connection = new Connection(CLUSTER_URL!, options);
 
   const admin = Keypair.fromSecretKey(
-    Buffer.from(
-      JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
-    ),
+    Buffer.from(JSON.parse(fs.readFileSync(PAYER_KEYPAIR!, 'utf-8'))),
   );
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
@@ -169,16 +192,15 @@ async function main() {
   const adminProvider = new AnchorProvider(connection, adminWallet, options);
   const client = MangoClient.connect(
     adminProvider,
-    'mainnet-beta',
-    MANGO_V4_ID['mainnet-beta'],
+    CLUSTER,
+    MANGO_V4_ID[CLUSTER],
+    {},
+    'get-program-accounts',
   );
 
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
 
-  for (const keypair of [
-    process.env.MB_PAYER_KEYPAIR!,
-    process.env.MB_USER2_KEYPAIR!,
-  ]) {
+  for (const keypair of [USER_KEYPAIR!]) {
     console.log();
     const user = Keypair.fromSecretKey(
       Buffer.from(JSON.parse(fs.readFileSync(keypair, 'utf-8'))),
