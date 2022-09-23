@@ -4,6 +4,7 @@ import fs from 'fs';
 import { Group } from '../accounts/group';
 import { I80F48 } from '../accounts/I80F48';
 import { HealthType, MangoAccount } from '../accounts/mangoAccount';
+import { Serum3Market } from '../accounts/serum3';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 import { toUiDecimalsForQuote } from '../utils';
@@ -128,6 +129,29 @@ async function debugUser(
       getMaxSourceForTokenSwapWrapper(srcToken, tgtToken);
     }
   }
+
+  function getMaxForSerum3Wrapper(serum3Market: Serum3Market) {
+    // if (serum3Market.name !== 'SOL/USDC') return;
+    console.log(
+      `getMaxQuoteForSerum3BidUi ${serum3Market.name} ` +
+        mangoAccount.getMaxQuoteForSerum3BidUi(
+          group,
+          serum3Market.serumMarketExternal,
+        ),
+    );
+    console.log(
+      `getMaxBaseForSerum3AskUi ${serum3Market.name} ` +
+        mangoAccount.getMaxBaseForSerum3AskUi(
+          group,
+          serum3Market.serumMarketExternal,
+        ),
+    );
+  }
+  for (const serum3Market of Array.from(
+    group.serum3MarketsMapByExternal.values(),
+  )) {
+    getMaxForSerum3Wrapper(serum3Market);
+  }
 }
 
 async function main() {
@@ -177,7 +201,7 @@ async function main() {
 
     for (const mangoAccount of mangoAccounts) {
       console.log(`MangoAccount ${mangoAccount.publicKey}`);
-      // if (mangoAccount.name === '2nd Account') {
+      // if (mangoAccount.name === 'PnL Test') {
       await debugUser(client, group, mangoAccount);
       // }
     }
