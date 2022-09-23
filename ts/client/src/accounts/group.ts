@@ -486,7 +486,12 @@ export class Group {
   public toNativePrice(uiPrice: number, baseDecimals: number): I80F48 {
     return I80F48.fromNumber(uiPrice).mul(
       I80F48.fromNumber(
-        Math.pow(10, this.getInsuranceMintDecimals() - baseDecimals),
+        Math.pow(
+          10,
+          // note: our oracles are quoted in USD and our insurance mint is USD
+          // please update when these assumptions change
+          this.getInsuranceMintDecimals() - baseDecimals,
+        ),
       ),
     );
   }
