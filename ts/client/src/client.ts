@@ -34,7 +34,7 @@ import {
   PerpPosition,
 } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
-import { PerpMarket, PerpOrderType, Side } from './accounts/perp';
+import { PerpMarket, PerpOrderSide, PerpOrderType } from './accounts/perp';
 import {
   generateSerum3MarketExternalVaultSignerAddress,
   Serum3Market,
@@ -1504,7 +1504,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     perpMarketName: string,
-    side: Side,
+    side: PerpOrderSide,
     price: number,
     quantity: number,
     maxQuoteQuantity: number,
