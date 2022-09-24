@@ -98,29 +98,6 @@ impl TokenPosition {
     pub fn is_in_use(&self) -> bool {
         self.in_use_count > 0
     }
-
-    pub fn update_cumulative_interest(
-        mut self,
-        opening_indexed_position: I80F48,
-        deposit_index: I80F48,
-        borrow_index: I80F48,
-    ) {
-        if opening_indexed_position.is_positive() {
-            self.cumulative_deposit_interest +=
-                cm!((deposit_index - self.previous_index) * opening_indexed_position)
-                    .to_num::<i64>();
-        } else {
-            self.cumulative_borrow_interest +=
-                cm!((borrow_index - self.previous_index) * opening_indexed_position)
-                    .to_num::<i64>();
-        }
-
-        if self.indexed_position.is_positive() {
-            self.previous_index = deposit_index
-        } else {
-            self.previous_index = borrow_index
-        }
-    }
 }
 
 #[zero_copy]

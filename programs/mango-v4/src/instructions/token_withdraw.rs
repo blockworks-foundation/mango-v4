@@ -79,7 +79,6 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     let mut bank = ctx.accounts.bank.load_mut()?;
     let position = account.token_position_mut_by_raw_index(raw_token_index);
     let native_position = position.native(&bank);
-    let opening_indexed_position = position.indexed_position;
 
     // Handle amount special case for withdrawing everything
     let amount = if amount == u64::MAX && !allow_borrow {
@@ -125,11 +124,6 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     let native_position_after = position.native(&bank);
     let oracle_price = bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
 
-    position.update_cumulative_interest(
-        opening_indexed_position,
-        bank.deposit_index,
-        bank.borrow_index,
-    );
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),

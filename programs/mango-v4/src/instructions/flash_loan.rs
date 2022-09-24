@@ -339,7 +339,6 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     for (change, price) in changes.iter().zip(prices.iter()) {
         let mut bank = health_ais[change.bank_index].load_mut::<Bank>()?;
         let position = account.token_position_mut_by_raw_index(change.raw_token_index);
-        let opening_indexed_position = position.indexed_position;
         let native = position.native(&bank);
         let approved_amount = I80F48::from(bank.flash_loan_approved_amount);
 
@@ -371,11 +370,6 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             price: price.to_bits(),
         });
 
-        position.update_cumulative_interest(
-            opening_indexed_position,
-            bank.deposit_index,
-            bank.borrow_index,
-        );
         emit!(TokenBalanceLog {
             mango_group: group.key(),
             mango_account: ctx.accounts.account.key(),
