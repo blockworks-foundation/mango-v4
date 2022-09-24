@@ -28,6 +28,12 @@ pub struct TokenPosition {
     /// incremented when a market requires this position to stay alive
     pub in_use_count: u8,
 
+    #[derivative(Debug = "ignore")]
+    pub padding: [u8; 5],
+
+    #[derivative(Debug = "ignore")]
+    pub reserved: [u8; 40],
+
     // bookkeeping variable for onchain interest calculation
     // either deposit_index or borrow_index at last indexed_position change
     pub previous_index: I80F48,
@@ -35,21 +41,12 @@ pub struct TokenPosition {
     // Cumulative interest in token native units
     pub cumulative_deposit_interest: i64,
     pub cumulative_borrow_interest: i64,
-
-    #[derivative(Debug = "ignore")]
-    pub padding: [u8; 5],
-
-    #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 40],
 }
 
 unsafe impl bytemuck::Pod for TokenPosition {}
 unsafe impl bytemuck::Zeroable for TokenPosition {}
 
-const_assert_eq!(
-    size_of::<TokenPosition>(),
-    16 * 2 + 2 + 1 + 8 * 2 + 5 + 40 + 8 // size of each of the fields plus 8 (why?)
-);
+const_assert_eq!(size_of::<TokenPosition>(), 16 * 2 + 2 + 1 + 8 * 2 + 5 + 40);
 const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
 
 impl Default for TokenPosition {
