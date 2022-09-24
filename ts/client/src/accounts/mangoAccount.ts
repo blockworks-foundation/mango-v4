@@ -1,8 +1,9 @@
 import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
-import { Order, Orderbook } from '@project-serum/serum/lib/market';
+import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
+import { SERUM3_PROGRAM_ID } from '../constants';
 import { nativeI80F48ToUi, toNative, toUiDecimals } from '../utils';
 import { Bank } from './bank';
 import { Group } from './group';
@@ -463,6 +464,27 @@ export class MangoAccount {
         healthType,
       )
       .toNumber();
+  }
+
+  public async loadSerum3OpenOrdersAccounts(
+    client: MangoClient,
+  ): Promise<(OpenOrders | undefined)[]> {
+    const accounts =
+      await client.program.provider.connection.getMultipleAccountsInfo(
+        this.serum3.map((s) => s.openOrders),
+      );
+
+    return accounts.map((acc, index) => {
+      if (acc) {
+        return OpenOrders.fromAccountInfo(
+          this.serum3[index].openOrders,
+          acc,
+          SERUM3_PROGRAM_ID[client.cluster],
+        );
+      } else {
+        return undefined;
+      }
+    });
   }
 
   public async loadSerum3OpenOrdersForMarket(
