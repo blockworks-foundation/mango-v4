@@ -616,6 +616,9 @@ impl<
                     indexed_position: I80F48::ZERO,
                     token_index,
                     in_use_count: 0,
+                    cumulative_deposit_interest: 0,
+                    cumulative_borrow_interest: 0,
+                    previous_index: I80F48::ZERO,
                     padding: Default::default(),
                     reserved: [0; 40],
                 };

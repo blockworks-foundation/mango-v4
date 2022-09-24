@@ -428,6 +428,8 @@ pub fn apply_vault_difference(
 
     let (position, _) = account.token_position_mut(bank.token_index)?;
     let native_before = position.native(bank);
+    let opening_indexed_position = position.indexed_position;
+
     bank.change_without_fee(position, needed_change)?;
     let native_after = position.native(bank);
     let native_change = cm!(native_after - native_before);
@@ -437,7 +439,20 @@ pub fn apply_vault_difference(
         .abs()
         .to_num::<u64>();
 
-    let indexed_position = position.indexed_position;
+    position.update_cumulative_interest(
+        opening_indexed_position,
+        bank.deposit_index,
+        bank.borrow_index,
+    );
+    emit!(TokenBalanceLog {
+        mango_group: bank.group,
+        mango_account: account_pk,
+        token_index: bank.token_index,
+        indexed_position: position.indexed_position.to_bits(),
+        deposit_index: bank.deposit_index.to_bits(),
+        borrow_index: bank.borrow_index.to_bits(),
+    });
+
     let market = account.serum3_orders_mut(serum_market_index).unwrap();
     let borrows_without_fee = if bank.token_index == market.base_token_index {
         &mut market.base_borrows_without_fee
@@ -457,15 +472,6 @@ pub fn apply_vault_difference(
     if needed_change > 0 {
         *borrows_without_fee = (*borrows_without_fee).saturating_sub(needed_change.to_num::<u64>());
     }
-
-    emit!(TokenBalanceLog {
-        mango_group: bank.group,
-        mango_account: account_pk,
-        token_index: bank.token_index,
-        indexed_position: indexed_position.to_bits(),
-        deposit_index: bank.deposit_index.to_bits(),
-        borrow_index: bank.borrow_index.to_bits(),
-    });
 
     Ok(VaultDifference {
         token_index: bank.token_index,

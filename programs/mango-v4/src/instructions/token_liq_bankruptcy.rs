@@ -107,6 +107,7 @@ pub fn token_liq_bankruptcy(
     let mut liab_deposit_index = liab_bank.deposit_index;
     let liab_borrow_index = liab_bank.borrow_index;
     let (liqee_liab, liqee_raw_token_index) = liqee.token_position_mut(liab_token_index)?;
+    let liqee_liab_opening_indexed_position = liqee_liab.indexed_position;
     let initial_liab_native = liqee_liab.native(liab_bank);
     let mut remaining_liab_loss = -initial_liab_native;
     require_gt!(remaining_liab_loss, I80F48::ZERO);
@@ -169,23 +170,16 @@ pub fn token_liq_bankruptcy(
             // credit the liqor
             let (liqor_quote, liqor_quote_raw_token_index, _) =
                 liqor.ensure_token_position(QUOTE_TOKEN_INDEX)?;
+            let liqor_quote_opening_indexed_position = liqor_quote.indexed_position;
             let liqor_quote_active = quote_bank.deposit(liqor_quote, insurance_transfer_i80f48)?;
             let liqor_quote_indexed_position = liqor_quote.indexed_position;
 
-            // transfer liab from liqee to liqor
-            let (liqor_liab, liqor_liab_raw_token_index, _) =
-                liqor.ensure_token_position(liab_token_index)?;
-            let (liqor_liab_active, loan_origination_fee) =
-                liab_bank.withdraw_with_fee(liqor_liab, liab_transfer)?;
-
-            // Check liqor's health
-            if !liqor.fixed.is_in_health_region() {
-                let liqor_health =
-                    compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)?;
-                require!(liqor_health >= 0, MangoError::HealthMustBePositive);
-            }
-
             // liqor quote
+            liqor_quote.update_cumulative_interest(
+                liqor_quote_opening_indexed_position,
+                quote_bank.deposit_index,
+                quote_bank.borrow_index,
+            );
             emit!(TokenBalanceLog {
                 mango_group: ctx.accounts.group.key(),
                 mango_account: ctx.accounts.liqor.key(),
@@ -194,6 +188,35 @@ pub fn token_liq_bankruptcy(
                 deposit_index: quote_deposit_index.to_bits(),
                 borrow_index: quote_borrow_index.to_bits(),
             });
+
+            // transfer liab from liqee to liqor
+            let (liqor_liab, liqor_liab_raw_token_index, _) =
+                liqor.ensure_token_position(liab_token_index)?;
+            let liqor_liab_opening_indexed_position = liqor_liab.indexed_position;
+            let (liqor_liab_active, loan_origination_fee) =
+                liab_bank.withdraw_with_fee(liqor_liab, liab_transfer)?;
+
+            // liqor liab
+            liqor_liab.update_cumulative_interest(
+                liqor_liab_opening_indexed_position,
+                liab_bank.deposit_index,
+                liab_bank.borrow_index,
+            );
+            emit!(TokenBalanceLog {
+                mango_group: ctx.accounts.group.key(),
+                mango_account: ctx.accounts.liqor.key(),
+                token_index: liab_token_index,
+                indexed_position: liqor_liab.indexed_position.to_bits(),
+                deposit_index: liab_deposit_index.to_bits(),
+                borrow_index: liab_borrow_index.to_bits(),
+            });
+
+            // Check liqor's health
+            if !liqor.fixed.is_in_health_region() {
+                let liqor_health =
+                    compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)?;
+                require!(liqor_health >= 0, MangoError::HealthMustBePositive);
+            }
 
             if loan_origination_fee.is_positive() {
                 emit!(WithdrawLoanOriginationFeeLog {
@@ -265,17 +288,12 @@ pub fn token_liq_bankruptcy(
         require_eq!(liqee_liab.indexed_position, I80F48::ZERO);
     }
 
-    // liqor liab
-    emit!(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.liqor.key(),
-        token_index: liab_token_index,
-        indexed_position: liqee_liab.indexed_position.to_bits(),
-        deposit_index: liab_deposit_index.to_bits(),
-        borrow_index: liab_borrow_index.to_bits(),
-    });
-
     // liqee liab
+    liqee_liab.update_cumulative_interest(
+        liqee_liab_opening_indexed_position,
+        liab_deposit_index,
+        liab_borrow_index,
+    );
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.liqee.key(),

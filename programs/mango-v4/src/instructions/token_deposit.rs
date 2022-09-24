@@ -63,6 +63,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
 
     let (position, raw_token_index, _active_token_index) =
         account.ensure_token_position(token_index)?;
+    let opening_indexed_position = position.indexed_position;
 
     let amount_i80f48 = I80F48::from(amount);
     let position_is_active = {
@@ -77,10 +78,11 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     let bank = ctx.accounts.bank.load()?;
     let oracle_price = bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
 
-    // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
-    let amount_usd = cm!(amount_i80f48 * oracle_price).to_num::<i64>();
-    cm!(account.fixed.net_deposits += amount_usd);
-
+    position.update_cumulative_interest(
+        opening_indexed_position,
+        bank.deposit_index,
+        bank.borrow_index,
+    );
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
@@ -89,6 +91,10 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
         deposit_index: bank.deposit_index.to_bits(),
         borrow_index: bank.borrow_index.to_bits(),
     });
+
+    // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
+    let amount_usd = cm!(amount_i80f48 * oracle_price).to_num::<i64>();
+    cm!(account.fixed.net_deposits += amount_usd);
 
     //
     // Health computation

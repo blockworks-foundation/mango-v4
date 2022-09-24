@@ -28,6 +28,14 @@ pub struct TokenPosition {
     /// incremented when a market requires this position to stay alive
     pub in_use_count: u8,
 
+    // bookkeeping variable for onchain interest calculation
+    // either deposit_index or borrow_index at last indexed_position change
+    pub previous_index: I80F48,
+
+    // Cumulative interest in token native units
+    pub cumulative_deposit_interest: i64,
+    pub cumulative_borrow_interest: i64,
+
     #[derivative(Debug = "ignore")]
     pub padding: [u8; 5],
 
@@ -38,7 +46,10 @@ pub struct TokenPosition {
 unsafe impl bytemuck::Pod for TokenPosition {}
 unsafe impl bytemuck::Zeroable for TokenPosition {}
 
-const_assert_eq!(size_of::<TokenPosition>(), 24 + 40);
+const_assert_eq!(
+    size_of::<TokenPosition>(),
+    16 * 2 + 2 + 1 + 8 * 2 + 5 + 40 + 8 // size of each of the fields plus 8 (why?)
+);
 const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
 
 impl Default for TokenPosition {
@@ -47,6 +58,9 @@ impl Default for TokenPosition {
             indexed_position: I80F48::ZERO,
             token_index: TokenIndex::MAX,
             in_use_count: 0,
+            cumulative_deposit_interest: 0,
+            cumulative_borrow_interest: 0,
+            previous_index: I80F48::ZERO,
             padding: Default::default(),
             reserved: [0; 40],
         }
@@ -83,6 +97,29 @@ impl TokenPosition {
 
     pub fn is_in_use(&self) -> bool {
         self.in_use_count > 0
+    }
+
+    pub fn update_cumulative_interest(
+        mut self,
+        opening_indexed_position: I80F48,
+        deposit_index: I80F48,
+        borrow_index: I80F48,
+    ) {
+        if opening_indexed_position.is_positive() {
+            self.cumulative_deposit_interest +=
+                cm!((deposit_index - self.previous_index) * opening_indexed_position)
+                    .to_num::<i64>();
+        } else {
+            self.cumulative_borrow_interest +=
+                cm!((borrow_index - self.previous_index) * opening_indexed_position)
+                    .to_num::<i64>();
+        }
+
+        if self.indexed_position.is_positive() {
+            self.previous_index = deposit_index
+        } else {
+            self.previous_index = borrow_index
+        }
     }
 }
 
