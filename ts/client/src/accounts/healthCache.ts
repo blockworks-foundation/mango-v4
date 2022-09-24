@@ -7,7 +7,6 @@ import {
   I80F48,
   I80F48Dto,
   MAX_I80F48,
-  ONE_I80F48,
   ZERO_I80F48,
 } from './I80F48';
 import { HealthType } from './mangoAccount';
@@ -184,14 +183,12 @@ export class HealthCache {
     );
   }
 
-  getOrCreateSerum3InfoIndex(group: Group, serum3Market: Serum3Market): number {
+  getOrCreateSerum3InfoIndex(
+    baseBank: BankForHealth,
+    quoteBank: BankForHealth,
+    serum3Market: Serum3Market,
+  ): number {
     const index = this.findSerum3InfoIndex(serum3Market.marketIndex);
-    const baseBank = group.getFirstBankByTokenIndex(
-      serum3Market.baseTokenIndex,
-    );
-    const quoteBank = group.getFirstBankByTokenIndex(
-      serum3Market.quoteTokenIndex,
-    );
     const baseEntryIndex = this.getOrCreateTokenInfoIndex(baseBank);
     const quoteEntryIndex = this.getOrCreateTokenInfoIndex(quoteBank);
     if (index == -1) {
@@ -208,20 +205,14 @@ export class HealthCache {
 
   adjustSerum3Reserved(
     // todo change indices to types from numbers
-    group: Group,
+    baseBank: BankForHealth,
+    quoteBank: BankForHealth,
     serum3Market: Serum3Market,
     reservedBaseChange: I80F48,
     freeBaseChange: I80F48,
     reservedQuoteChange: I80F48,
     freeQuoteChange: I80F48,
   ) {
-    const baseBank = group.getFirstBankByTokenIndex(
-      serum3Market.baseTokenIndex,
-    );
-    const quoteBank = group.getFirstBankByTokenIndex(
-      serum3Market.quoteTokenIndex,
-    );
-
     const baseEntryIndex = this.getOrCreateTokenInfoIndex(baseBank);
     const quoteEntryIndex = this.getOrCreateTokenInfoIndex(quoteBank);
 
@@ -238,7 +229,11 @@ export class HealthCache {
     quoteEntry.balance.iadd(freeQuoteChange.mul(quoteEntry.oraclePrice));
 
     // Apply it to the serum3 info
-    const index = this.getOrCreateSerum3InfoIndex(group, serum3Market);
+    const index = this.getOrCreateSerum3InfoIndex(
+      baseBank,
+      quoteBank,
+      serum3Market,
+    );
     const serum3Info = this.serum3Infos[index];
     serum3Info.reserved = serum3Info.reserved.add(reservedAmount);
   }
@@ -306,18 +301,13 @@ export class HealthCache {
   }
 
   simHealthRatioWithSerum3BidChanges(
-    group: Group,
+    baseBank: BankForHealth,
+    quoteBank: BankForHealth,
     bidNativeQuoteAmount: I80F48,
     serum3Market: Serum3Market,
     healthType: HealthType = HealthType.init,
   ): I80F48 {
     const adjustedCache: HealthCache = _.cloneDeep(this);
-    const quoteBank = group.getFirstBankByTokenIndex(
-      serum3Market.quoteTokenIndex,
-    );
-    if (!quoteBank) {
-      throw new Error(`No bank for index ${serum3Market.quoteTokenIndex}`);
-    }
     const quoteIndex = adjustedCache.getOrCreateTokenInfoIndex(quoteBank);
     const quote = adjustedCache.tokenInfos[quoteIndex];
 
@@ -331,7 +321,8 @@ export class HealthCache {
 
     // Increase reserved in Serum3Info for quote
     adjustedCache.adjustSerum3Reserved(
-      group,
+      baseBank,
+      quoteBank,
       serum3Market,
       ZERO_I80F48(),
       ZERO_I80F48(),
@@ -342,18 +333,13 @@ export class HealthCache {
   }
 
   simHealthRatioWithSerum3AskChanges(
-    group: Group,
+    baseBank: BankForHealth,
+    quoteBank: BankForHealth,
     askNativeBaseAmount: I80F48,
     serum3Market: Serum3Market,
     healthType: HealthType = HealthType.init,
   ): I80F48 {
     const adjustedCache: HealthCache = _.cloneDeep(this);
-    const baseBank = group.getFirstBankByTokenIndex(
-      serum3Market.baseTokenIndex,
-    );
-    if (!baseBank) {
-      throw new Error(`No bank for index ${serum3Market.quoteTokenIndex}`);
-    }
     const baseIndex = adjustedCache.getOrCreateTokenInfoIndex(baseBank);
     const base = adjustedCache.tokenInfos[baseIndex];
 
@@ -367,7 +353,8 @@ export class HealthCache {
 
     // Increase reserved in Serum3Info for base
     adjustedCache.adjustSerum3Reserved(
-      group,
+      baseBank,
+      quoteBank,
       serum3Market,
       askNativeBaseAmount,
       ZERO_I80F48(),
@@ -578,24 +565,12 @@ export class HealthCache {
   }
 
   getMaxSerum3OrderForHealthRatio(
-    group: Group,
+    baseBank: BankForHealth,
+    quoteBank: BankForHealth,
     serum3Market: Serum3Market,
     side: Serum3Side,
     minRatio: I80F48,
   ) {
-    const baseBank = group.getFirstBankByTokenIndex(
-      serum3Market.baseTokenIndex,
-    );
-    if (!baseBank) {
-      throw new Error(`No bank for index ${serum3Market.baseTokenIndex}`);
-    }
-    const quoteBank = group.getFirstBankByTokenIndex(
-      serum3Market.quoteTokenIndex,
-    );
-    if (!quoteBank) {
-      throw new Error(`No bank for index ${serum3Market.quoteTokenIndex}`);
-    }
-
     const healthCacheClone: HealthCache = _.cloneDeep(this);
 
     const baseIndex = healthCacheClone.getOrCreateTokenInfoIndex(baseBank);
@@ -663,7 +638,8 @@ export class HealthCache {
         : adjustedCache.tokenInfos[quoteIndex].balance.isub(amount);
 
       adjustedCache.adjustSerum3Reserved(
-        group,
+        baseBank,
+        quoteBank,
         serum3Market,
         side === Serum3Side.ask ? amount.div(base.oraclePrice) : ZERO_I80F48(),
         ZERO_I80F48(),
@@ -687,18 +663,7 @@ export class HealthCache {
       healthRatioAfterPlacingOrder,
     );
 
-    // If its a bid then the reserved fund and potential loan is in quote,
-    // If its a ask then the reserved fund and potential loan is in base,
-    // also keep some buffer for fees, use taker fees for worst case simulation.
-    return side === Serum3Side.bid
-      ? amount
-          .div(quote.oraclePrice)
-          .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
-          .div(ONE_I80F48().add(I80F48.fromNumber(group.getFeeRate(false))))
-      : amount
-          .div(base.oraclePrice)
-          .div(ONE_I80F48().add(quoteBank.loanOriginationFeeRate))
-          .div(ONE_I80F48().add(I80F48.fromNumber(group.getFeeRate(false))));
+    return amount;
   }
 
   getMaxPerpForHealthRatio(

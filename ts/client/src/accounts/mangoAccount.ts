@@ -498,13 +498,32 @@ export class MangoAccount {
         `accountData not loaded on MangoAccount, try reloading MangoAccount`,
       );
     }
-    const nativeAmount =
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
+    );
+    if (!baseBank) {
+      throw new Error(`No bank for index ${serum3Market.baseTokenIndex}`);
+    }
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+    if (!quoteBank) {
+      throw new Error(`No bank for index ${serum3Market.quoteTokenIndex}`);
+    }
+    let nativeAmount =
       this.accountData.healthCache.getMaxSerum3OrderForHealthRatio(
-        group,
+        baseBank,
+        quoteBank,
         serum3Market,
         Serum3Side.bid,
         I80F48.fromNumber(1),
       );
+    // If its a bid then the reserved fund and potential loan is in base
+    // also keep some buffer for fees, use taker fees for worst case simulation.
+    nativeAmount = nativeAmount
+      .div(quoteBank.price)
+      .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
+      .div(ONE_I80F48().add(I80F48.fromNumber(group.getFeeRate(false))));
     return toUiDecimals(
       nativeAmount,
       group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex).mintDecimals,
@@ -534,13 +553,32 @@ export class MangoAccount {
         `accountData not loaded on MangoAccount, try reloading MangoAccount`,
       );
     }
-    const nativeAmount =
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
+    );
+    if (!baseBank) {
+      throw new Error(`No bank for index ${serum3Market.baseTokenIndex}`);
+    }
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+    if (!quoteBank) {
+      throw new Error(`No bank for index ${serum3Market.quoteTokenIndex}`);
+    }
+    let nativeAmount =
       this.accountData.healthCache.getMaxSerum3OrderForHealthRatio(
-        group,
+        baseBank,
+        quoteBank,
         serum3Market,
         Serum3Side.ask,
         I80F48.fromNumber(1),
       );
+    // If its a ask then the reserved fund and potential loan is in base
+    // also keep some buffer for fees, use taker fees for worst case simulation.
+    nativeAmount = nativeAmount
+      .div(baseBank.price)
+      .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
+      .div(ONE_I80F48().add(I80F48.fromNumber(group.getFeeRate(false))));
     return toUiDecimals(
       nativeAmount,
       group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex).mintDecimals,
@@ -574,9 +612,22 @@ export class MangoAccount {
         `accountData not loaded on MangoAccount, try reloading MangoAccount`,
       );
     }
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
+    );
+    if (!baseBank) {
+      throw new Error(`No bank for index ${serum3Market.baseTokenIndex}`);
+    }
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+    if (!quoteBank) {
+      throw new Error(`No bank for index ${serum3Market.quoteTokenIndex}`);
+    }
     return this.accountData.healthCache
       .simHealthRatioWithSerum3BidChanges(
-        group,
+        baseBank,
+        quoteBank,
         toNative(
           uiQuoteAmount,
           group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
@@ -615,9 +666,22 @@ export class MangoAccount {
         `accountData not loaded on MangoAccount, try reloading MangoAccount`,
       );
     }
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
+    );
+    if (!baseBank) {
+      throw new Error(`No bank for index ${serum3Market.baseTokenIndex}`);
+    }
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+    if (!quoteBank) {
+      throw new Error(`No bank for index ${serum3Market.quoteTokenIndex}`);
+    }
     return this.accountData.healthCache
       .simHealthRatioWithSerum3AskChanges(
-        group,
+        baseBank,
+        quoteBank,
         toNative(
           uiBaseAmount,
           group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
