@@ -114,6 +114,12 @@ export class Serum3Market {
       .toNumber();
   }
 
+  public getSerum3ExternalMarket(group: Group) {
+    return group.serum3MarketExternalsMap.get(
+      this.serumMarketExternal.toBase58(),
+    );
+  }
+
   public async loadBids(client: MangoClient, group: Group): Promise<Orderbook> {
     const serum3MarketExternal = group.serum3MarketExternalsMap.get(
       this.serumMarketExternal.toBase58(),
