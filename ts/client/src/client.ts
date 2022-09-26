@@ -602,10 +602,14 @@ export class MangoClient {
     );
   }
 
-  public async getMangoAccount(mangoAccount: MangoAccount) {
+  public async getMangoAccount(mangoAccount: MangoAccount | PublicKey) {
+    const mangoAccountPk =
+      mangoAccount instanceof MangoAccount
+        ? mangoAccount.publicKey
+        : mangoAccount;
     return MangoAccount.from(
-      mangoAccount.publicKey,
-      await this.program.account.mangoAccount.fetch(mangoAccount.publicKey),
+      mangoAccountPk,
+      await this.program.account.mangoAccount.fetch(mangoAccountPk),
     );
   }
 
