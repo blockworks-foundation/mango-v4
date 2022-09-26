@@ -18,6 +18,8 @@ export class PerpMarket {
   public takerFee: I80F48;
   public minFunding: I80F48;
   public maxFunding: I80F48;
+  public longFunding: I80F48;
+  public shortFunding: I80F48;
   public openInterest: number;
   public seqNum: number;
   public feesAccrued: I80F48;
@@ -140,6 +142,8 @@ export class PerpMarket {
     this.takerFee = I80F48.from(takerFee);
     this.minFunding = I80F48.from(minFunding);
     this.maxFunding = I80F48.from(maxFunding);
+    this.longFunding = I80F48.from(longFunding);
+    this.shortFunding = I80F48.from(shortFunding);
     this.openInterest = openInterest.toNumber();
     this.seqNum = seqNum.toNumber();
     this.feesAccrued = I80F48.from(feesAccrued);

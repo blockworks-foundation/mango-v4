@@ -30,8 +30,8 @@ import { I80F48 } from './accounts/I80F48';
 import {
   MangoAccount,
   MangoAccountData,
-  TokenPosition,
   PerpPosition,
+  TokenPosition,
 } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
 import {

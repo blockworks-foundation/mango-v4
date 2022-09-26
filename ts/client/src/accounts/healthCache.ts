@@ -1,3 +1,5 @@
+import { BN } from '@project-serum/anchor';
+import { OpenOrders } from '@project-serum/serum';
 import { PublicKey } from '@solana/web3.js';
 import _ from 'lodash';
 import { Bank, BankForHealth } from './bank';
@@ -9,7 +11,8 @@ import {
   MAX_I80F48,
   ZERO_I80F48,
 } from './I80F48';
-import { HealthType } from './mangoAccount';
+
+import { HealthType, MangoAccount } from './mangoAccount';
 import { PerpMarket, PerpOrderSide } from './perp';
 import { Serum3Market, Serum3Side } from './serum3';
 
@@ -44,6 +47,150 @@ export class HealthCache {
     public perpInfos: PerpInfo[],
   ) {}
 
+  static fromMangoAccount(group: Group, mangoAccount: MangoAccount) {
+    // token contribution from token accounts
+    const tokenInfos = mangoAccount.tokensActive().map((tokenPosition) => {
+      const bank = group.getFirstBankByTokenIndex(tokenPosition.tokenIndex);
+      return new TokenInfo(
+        bank.tokenIndex,
+        bank.maintAssetWeight,
+        bank.initAssetWeight,
+        bank.maintLiabWeight,
+        bank.initLiabWeight,
+        bank.price,
+        tokenPosition.balance(bank).mul(bank.price),
+        ZERO_I80F48(),
+      );
+    });
+
+    // Fill the TokenInfo balance with free funds in serum3 oo accounts, and fill
+    // the serum3MaxReserved with their reserved funds. Also build Serum3Infos.
+    const serum3Infos = mangoAccount.serum3Active().map((serum3) => {
+      const oo: OpenOrders | undefined =
+        mangoAccount.serum3OosMapByMarketIndex.get(serum3.marketIndex);
+
+      if (!oo) {
+        throw new Error(
+          `Open orders account not loaded for market ${serum3.marketIndex}!`,
+        );
+      }
+
+      console.log(
+        `oo ${oo.baseTokenFree.toNumber()} ${oo.quoteTokenFree.toNumber()}`,
+      );
+
+      // find the TokenInfos for the market's base and quote tokens
+      const baseIndex = tokenInfos.findIndex(
+        (tokenInfo) => tokenInfo.tokenIndex === serum3.baseTokenIndex,
+      );
+      const baseInfo = tokenInfos[baseIndex];
+      if (!baseInfo) {
+        throw new Error(`baseInfo not found for market ${serum3.marketIndex}`);
+      }
+      const quoteIndex = tokenInfos.findIndex(
+        (tokenInfo) => tokenInfo.tokenIndex === serum3.quoteTokenIndex,
+      );
+      const quoteInfo = tokenInfos[quoteIndex];
+      if (!quoteInfo) {
+        throw new Error(`quoteInfo not found for market ${serum3.marketIndex}`);
+      }
+
+      // add the amounts that are freely settleable
+      const baseFree = I80F48.fromString(oo.baseTokenFree.toString());
+      // TODO: referrer_rebates_accrued is not available on oo
+      const quoteFree = I80F48.fromString(oo.quoteTokenFree.toString());
+      baseInfo.balance.iadd(baseFree.mul(baseInfo.oraclePrice));
+      quoteInfo.balance.iadd(quoteFree.mul(quoteInfo.oraclePrice));
+
+      // add the reserved amount to both sides, to have the worst-case covered
+      const reservedBase = I80F48.fromString(
+        oo.baseTokenTotal.sub(oo.baseTokenFree).toString(),
+      );
+      const reservedQuote = I80F48.fromString(
+        oo.quoteTokenTotal.sub(oo.quoteTokenFree).toString(),
+      );
+      const reservedBalance = reservedBase
+        .mul(baseInfo.oraclePrice)
+        .add(reservedQuote.mul(quoteInfo.oraclePrice));
+      baseInfo.serum3MaxReserved.iadd(reservedBalance);
+      quoteInfo.serum3MaxReserved.iadd(reservedBalance);
+
+      return new Serum3Info(
+        reservedBalance,
+        baseIndex,
+        quoteIndex,
+        serum3.marketIndex,
+      );
+    });
+
+    // health contribution from perp accounts
+    const perpInfos = mangoAccount.perpActive().map((perpPosition) => {
+      const perpMarket = group.findPerpMarket(perpPosition.marketIndex);
+
+      if (!perpMarket) {
+        throw new Error(
+          `PerpMarket not loaded for ${perpPosition.marketIndex}`,
+        );
+      }
+
+      const baseLotSize = I80F48.fromString(perpMarket.baseLotSize.toString());
+      const baseLots = I80F48.fromNumber(
+        perpPosition.basePositionLots + perpPosition.takerBaseLots,
+      );
+
+      const unsettledFunding = perpPosition.unsettledFunding(perpMarket);
+
+      const takerQuote = I80F48.fromString(
+        new BN(perpPosition.takerQuoteLots)
+          .mul(perpMarket.quoteLotSize)
+          .toString(),
+      );
+      const quoteCurrent = I80F48.fromString(
+        perpPosition.quotePositionNative.toString(),
+      )
+        .sub(unsettledFunding)
+        .add(takerQuote);
+
+      const bidsNetLots = baseLots.add(
+        I80F48.fromNumber(perpPosition.bidsBaseLots),
+      );
+      const asksNetLots = baseLots.sub(
+        I80F48.fromNumber(perpPosition.asksBaseLots),
+      );
+
+      const lotsToQuote = baseLotSize.mul(I80F48.fromNumber(perpMarket.price));
+
+      let base, quote;
+      if (bidsNetLots.abs().gt(asksNetLots.abs())) {
+        const bidsBaseLots = I80F48.fromString(
+          perpPosition.bidsBaseLots.toString(),
+        );
+        base = bidsNetLots.mul(lotsToQuote);
+        quote = quoteCurrent.sub(bidsBaseLots.mul(lotsToQuote));
+      } else {
+        const asksBaseLots = I80F48.fromString(
+          perpPosition.asksBaseLots.toString(),
+        );
+        base = asksNetLots.mul(lotsToQuote);
+        quote = quoteCurrent.add(asksBaseLots.mul(lotsToQuote));
+      }
+
+      return new PerpInfo(
+        perpMarket.perpMarketIndex,
+        perpMarket.maintAssetWeight,
+        perpMarket.initAssetWeight,
+        perpMarket.maintLiabWeight,
+        perpMarket.maintAssetWeight,
+        base,
+        quote,
+        I80F48.fromNumber(perpMarket.price),
+        perpPosition.hasOpenOrders(),
+      );
+    });
+
+    return new HealthCache(tokenInfos, serum3Infos, perpInfos);
+  }
+
   static fromDto(dto) {
     return new HealthCache(
       dto.tokenInfos.map((dto) => TokenInfo.fromDto(dto)),
@@ -58,6 +205,7 @@ export class HealthCache {
       const contrib = tokenInfo.healthContribution(healthType);
       health.iadd(contrib);
     }
+    console.log(` -health ${health}`);
     for (const serum3Info of this.serum3Infos) {
       const contrib = serum3Info.healthContribution(
         healthType,
@@ -65,10 +213,12 @@ export class HealthCache {
       );
       health.iadd(contrib);
     }
+    console.log(` -health ${health}`);
     for (const perpInfo of this.perpInfos) {
       const contrib = perpInfo.healthContribution(healthType);
       health.iadd(contrib);
     }
+    console.log(` -health ${health}`);
     return health;
   }
 
@@ -288,10 +438,6 @@ export class HealthCache {
     for (const change of nativeTokenChanges) {
       const bank: Bank = group.getFirstBankByMint(change.mintPk);
       const changeIndex = adjustedCache.getOrCreateTokenInfoIndex(bank);
-      if (!bank.price)
-        throw new Error(
-          `Oracle price not loaded for ${change.mintPk.toString()}`,
-        );
       adjustedCache.tokenInfos[changeIndex].balance.iadd(
         change.nativeTokenAmount.mul(bank.price),
       );
@@ -414,15 +560,6 @@ export class HealthCache {
     minRatio: I80F48,
     priceFactor: I80F48,
   ): I80F48 {
-    if (
-      !sourceBank.price ||
-      sourceBank.price.lte(ZERO_I80F48()) ||
-      !targetBank.price ||
-      targetBank.price.lte(ZERO_I80F48())
-    ) {
-      return ZERO_I80F48();
-    }
-
     if (
       sourceBank.initLiabWeight
         .sub(targetBank.initAssetWeight)
@@ -805,10 +942,6 @@ export class TokenInfo {
   }
 
   static emptyFromBank(bank: BankForHealth): TokenInfo {
-    if (!bank.price)
-      throw new Error(
-        `Failed to create TokenInfo. Bank price unavailable for bank with tokenIndex ${bank.tokenIndex}`,
-      );
     return new TokenInfo(
       bank.tokenIndex,
       bank.maintAssetWeight,
@@ -935,9 +1068,7 @@ export class PerpInfo {
     public initAssetWeight: I80F48,
     public maintLiabWeight: I80F48,
     public initLiabWeight: I80F48,
-    // in health-reference-token native units, needs scaling by asset/liab
     public base: I80F48,
-    // in health-reference-token native units, no asset/liab factor needed
     public quote: I80F48,
     public oraclePrice: I80F48,
     public hasOpenOrders: boolean,
@@ -992,6 +1123,14 @@ export class PerpInfo {
       I80F48.fromNumber(perpMarket.price),
       false,
     );
+  }
+
+  toString(tokenInfos: TokenInfo[]) {
+    return `  perpMarketIndex: ${this.perpMarketIndex}, base: ${
+      this.base
+    }, quote: ${this.quote}, oraclePrice: ${
+      this.oraclePrice
+    }, initHealth ${this.healthContribution(HealthType.init)}`;
   }
 }
 
@@ -1052,9 +1191,7 @@ export class PerpInfoDto {
   initAssetWeight: I80F48Dto;
   maintLiabWeight: I80F48Dto;
   initLiabWeight: I80F48Dto;
-  // in health-reference-token native units, needs scaling by asset/liab
   base: I80F48Dto;
-  // in health-reference-token native units, no asset/liab factor needed
   quote: I80F48Dto;
   oraclePrice: I80F48Dto;
   hasOpenOrders: boolean;

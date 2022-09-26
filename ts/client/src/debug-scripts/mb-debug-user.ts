@@ -2,6 +2,7 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Cluster, Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { Group } from '../accounts/group';
+import { HealthCache } from '../accounts/healthCache';
 import { HealthType, MangoAccount } from '../accounts/mangoAccount';
 import { PerpMarket } from '../accounts/perp';
 import { Serum3Market } from '../accounts/serum3';
@@ -28,6 +29,16 @@ async function debugUser(
 
   await mangoAccount.reload(client, group);
 
+  /////
+  const hc = HealthCache.fromMangoAccount(group, mangoAccount);
+  console.log(hc.health(HealthType.init));
+  console.log(mangoAccount.accountData?.healthCache.health(HealthType.init));
+  console.log(`${hc.perpInfos}`);
+  console.log(`${mangoAccount.accountData?.healthCache.perpInfos}`);
+  return;
+
+  /////
+
   console.log(
     'buildFixedAccountRetrieverHealthAccounts ' +
       client
@@ -50,6 +61,14 @@ async function debugUser(
   console.log(
     'mangoAccount.getHealth(HealthType.init) ' +
       toUiDecimalsForQuote(mangoAccount.getHealth(HealthType.init)!.toNumber()),
+  );
+  console.log(
+    'HealthCache.fromMangoAccount(group,mangoAccount).health(HealthType.init) ' +
+      toUiDecimalsForQuote(
+        HealthCache.fromMangoAccount(group, mangoAccount)
+          .health(HealthType.init)
+          .toNumber(),
+      ),
   );
   console.log(
     'mangoAccount.getHealthRatio(HealthType.init) ' +

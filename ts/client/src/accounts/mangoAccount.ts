@@ -1,8 +1,9 @@
 import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
-import { Order, Orderbook } from '@project-serum/serum/lib/market';
+import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
+import { SERUM3_PROGRAM_ID } from '../constants';
 import {
   nativeI80F48ToUi,
   toNative,
@@ -13,7 +14,7 @@ import { Bank } from './bank';
 import { Group } from './group';
 import { HealthCache, HealthCacheDto } from './healthCache';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from './I80F48';
-import { PerpOrder, PerpOrderSide } from './perp';
+import { PerpMarket, PerpOrder, PerpOrderSide } from './perp';
 import { Serum3Side } from './serum3';
 export class MangoAccount {
   public tokens: TokenPosition[];
@@ -59,6 +60,7 @@ export class MangoAccount {
       obj.perps as PerpPositionDto[],
       obj.perpOpenOrders as PerpOoDto[],
       {} as any,
+      new Map(),
     );
   }
 
@@ -79,6 +81,7 @@ export class MangoAccount {
     perps: PerpPositionDto[],
     perpOpenOrders: PerpOoDto[],
     public accountData: undefined | MangoAccountData,
+    public serum3OosMapByMarketIndex: Map<number, OpenOrders>,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.tokens = tokens.map((dto) => TokenPosition.from(dto));
@@ -110,6 +113,31 @@ export class MangoAccount {
     client: MangoClient,
     group: Group,
   ): Promise<MangoAccount> {
+    const serum3Active = this.serum3Active();
+    const ais =
+      await client.program.provider.connection.getMultipleAccountsInfo(
+        serum3Active.map((serum3) => serum3.openOrders),
+      );
+    this.serum3OosMapByMarketIndex = new Map(
+      Array.from(
+        ais.map((ai, i) => {
+          if (!ai) {
+            throw new Error(
+              `AccountInfo is undefined for market ${serum3Active[i].marketIndex} and open orders ${serum3Active[i].openOrders}`,
+            );
+          }
+          return [
+            serum3Active[i].marketIndex,
+            OpenOrders.fromAccountInfo(
+              serum3Active[i].openOrders,
+              ai,
+              SERUM3_PROGRAM_ID[client.cluster],
+            ),
+          ];
+        }),
+      ),
+    );
+
     this.accountData = await client.computeAccountData(group, this);
     return this;
   }
@@ -315,7 +343,6 @@ export class MangoAccount {
     // nor would be charged loanOriginationFeeRate when withdrawn
 
     const tp = this.findToken(tokenBank.tokenIndex);
-    if (!tokenBank.price) return undefined;
     const existingTokenDeposits = tp ? tp.deposits(tokenBank) : ZERO_I80F48();
     let existingPositionHealthContrib = ZERO_I80F48();
     if (existingTokenDeposits.gt(ZERO_I80F48())) {
@@ -975,26 +1002,52 @@ export class PerpPosition {
     return new PerpPosition(
       dto.marketIndex,
       dto.basePositionLots.toNumber(),
-      dto.quotePositionNative.val,
+      I80F48.from(dto.quotePositionNative),
       dto.bidsBaseLots.toNumber(),
       dto.asksBaseLots.toNumber(),
       dto.takerBaseLots.toNumber(),
       dto.takerQuoteLots.toNumber(),
+      I80F48.from(dto.longSettledFunding),
+      I80F48.from(dto.shortSettledFunding),
     );
   }
 
   constructor(
     public marketIndex: number,
     public basePositionLots: number,
-    public quotePositionNative: BN,
+    public quotePositionNative: I80F48,
     public bidsBaseLots: number,
     public asksBaseLots: number,
     public takerBaseLots: number,
     public takerQuoteLots: number,
+    public longSettledFunding: I80F48,
+    public shortSettledFunding: I80F48,
   ) {}
 
   isActive(): boolean {
     return this.marketIndex != PerpPosition.PerpMarketIndexUnset;
+  }
+
+  public unsettledFunding(perpMarket: PerpMarket): I80F48 {
+    if (this.basePositionLots > 0) {
+      return perpMarket.longFunding
+        .sub(this.longSettledFunding)
+        .mul(I80F48.fromString(this.basePositionLots.toString()));
+    } else if (this.basePositionLots < 0) {
+      return perpMarket.shortFunding
+        .sub(this.shortSettledFunding)
+        .mul(I80F48.fromString(this.basePositionLots.toString()));
+    }
+    return ZERO_I80F48();
+  }
+
+  public hasOpenOrders(): boolean {
+    return (
+      this.asksBaseLots != 0 ||
+      this.bidsBaseLots != 0 ||
+      this.takerBaseLots != 0 ||
+      this.takerQuoteLots != 0
+    );
   }
 }
 
@@ -1008,6 +1061,8 @@ export class PerpPositionDto {
     public asksBaseLots: BN,
     public takerBaseLots: BN,
     public takerQuoteLots: BN,
+    public longSettledFunding: I80F48Dto,
+    public shortSettledFunding: I80F48Dto,
   ) {}
 }
 

@@ -382,12 +382,6 @@ export class Group {
     return I80F48.fromNumber(totalAmount);
   }
 
-  public findPerpMarket(marketIndex: number): PerpMarket | undefined {
-    return Array.from(this.perpMarketsMap.values()).find(
-      (perpMarket) => perpMarket.perpMarketIndex === marketIndex,
-    );
-  }
-
   public findSerum3Market(marketIndex: number): Serum3Market | undefined {
     return Array.from(this.serum3MarketsMapByExternal.values()).find(
       (serum3Market) => serum3Market.marketIndex === marketIndex,
@@ -435,6 +429,12 @@ export class Group {
     const feeTier = getFeeTier(0, 0);
     const rates = getFeeRates(feeTier);
     return maker ? rates.maker : rates.taker;
+  }
+
+  public findPerpMarket(marketIndex: number): PerpMarket | undefined {
+    return Array.from(this.perpMarketsMap.values()).find(
+      (perpMarket) => perpMarket.perpMarketIndex === marketIndex,
+    );
   }
 
   public async loadPerpBidsForMarket(
