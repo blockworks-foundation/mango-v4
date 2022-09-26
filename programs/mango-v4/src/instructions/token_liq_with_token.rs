@@ -228,16 +228,16 @@ pub fn token_liq_with_token(
 
     // Since we use a scanning account retriever, it's safe to deactivate inactive token positions
     if !liqee_asset_active {
-        liqee.deactivate_token_position(liqee_asset_raw_index);
+        liqee.deactivate_token_position(liqee_asset_raw_index, ctx.accounts.liqee.key());
     }
     if !liqee_liab_active {
-        liqee.deactivate_token_position(liqee_liab_raw_index);
+        liqee.deactivate_token_position(liqee_liab_raw_index, ctx.accounts.liqee.key());
     }
     if !liqor_asset_active {
-        liqor.deactivate_token_position(liqor_asset_raw_index);
+        liqor.deactivate_token_position(liqor_asset_raw_index, ctx.accounts.liqor.key());
     }
     if !liqor_liab_active {
-        liqor.deactivate_token_position(liqor_liab_raw_index)
+        liqor.deactivate_token_position(liqor_liab_raw_index, ctx.accounts.liqor.key())
     }
 
     // Check liqee health again

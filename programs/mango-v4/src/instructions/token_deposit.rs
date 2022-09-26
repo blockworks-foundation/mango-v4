@@ -112,7 +112,7 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     // Deposits can deactivate a position if they cancel out a previous borrow.
     //
     if !position_is_active {
-        account.deactivate_token_position(raw_token_index);
+        account.deactivate_token_position(raw_token_index, ctx.accounts.account.key());
     }
 
     emit!(DepositLog {
