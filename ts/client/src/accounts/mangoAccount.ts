@@ -469,7 +469,7 @@ export class MangoAccount {
 
   public async loadSerum3OpenOrdersAccounts(
     client: MangoClient,
-  ): Promise<(OpenOrders | undefined)[]> {
+  ): Promise<OpenOrders[]> {
     const response =
       await client.program.provider.connection.getMultipleAccountsInfo(
         this.serum3.map((s) => s.openOrders),
