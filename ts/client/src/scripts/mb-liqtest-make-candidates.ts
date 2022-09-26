@@ -130,7 +130,7 @@ async function main() {
       `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
     );
 
-    const market = group.findSerum3MarketByName('SOL/USDC')!;
+    const market = group.getSerum3MarketByIndexByName('SOL/USDC')!;
     const sellMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
     const buyMint = new PublicKey(MAINNET_MINTS.get('SOL')!);
 

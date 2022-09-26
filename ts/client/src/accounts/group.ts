@@ -381,13 +381,19 @@ export class Group {
     return I80F48.fromNumber(totalAmount);
   }
 
-  public findSerum3Market(marketIndex: number): Serum3Market | undefined {
+  public getSerum3MarketByPk(pk: PublicKey): Serum3Market | undefined {
+    return Array.from(this.serum3MarketsMapByExternal.values()).find(
+      (serum3Market) => serum3Market.serumMarketExternal.equals(pk),
+    );
+  }
+
+  public getSerum3MarketByIndex(marketIndex: number): Serum3Market | undefined {
     return Array.from(this.serum3MarketsMapByExternal.values()).find(
       (serum3Market) => serum3Market.marketIndex === marketIndex,
     );
   }
 
-  public findSerum3MarketByName(name: string): Serum3Market | undefined {
+  public getSerum3MarketByName(name: string): Serum3Market | undefined {
     return Array.from(this.serum3MarketsMapByExternal.values()).find(
       (serum3Market) => serum3Market.name === name,
     );
