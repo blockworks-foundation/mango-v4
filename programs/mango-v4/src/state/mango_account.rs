@@ -620,7 +620,7 @@ impl<
                     cumulative_borrow_interest: 0,
                     previous_index: I80F48::ZERO,
                     padding: Default::default(),
-                    reserved: [0; 40],
+                    reserved: [0; 8],
                 };
             }
             Ok((v, raw_index, bank_index))

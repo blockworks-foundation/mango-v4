@@ -4473,9 +4473,23 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                40
+                8
               ]
             }
+          },
+          {
+            "name": "previousIndex",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "cumulativeDepositInterest",
+            "type": "i64"
+          },
+          {
+            "name": "cumulativeBorrowInterest",
+            "type": "i64"
           }
         ]
       }
@@ -10560,9 +10574,23 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                40
+                8
               ]
             }
+          },
+          {
+            "name": "previousIndex",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "cumulativeDepositInterest",
+            "type": "i64"
+          },
+          {
+            "name": "cumulativeBorrowInterest",
+            "type": "i64"
           }
         ]
       }
