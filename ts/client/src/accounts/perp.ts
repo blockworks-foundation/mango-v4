@@ -533,7 +533,7 @@ export class PerpEventQueue {
     this.head = header.head;
     this.count = header.count;
     this.seqNum = header.seqNum;
-    this.rawEvents = buf.slice(this.head, this.count).map((event) => {
+    this.rawEvents = buf.map((event) => {
       if (event.eventType === PerpEventQueue.FILL_EVENT_TYPE) {
         return (client.program as any)._coder.types.typeLayouts
           .get('FillEvent')
