@@ -22,6 +22,7 @@ const PRICES = {
   BTC: 20000.0,
   SOL: 0.04,
   USDC: 1,
+  MNGO: 0.04,
 };
 
 const MAINNET_MINTS = new Map([
@@ -295,6 +296,109 @@ async function main() {
       await client.perpConsumeAllEvents(group, 'MNGO-PERP');
     } finally {
       await client.stubOracleSet(group, collateralOracle, PRICES['SOL']);
+    }
+  }
+
+  // borrows and positive perp pnl (but no position)
+  {
+    const name = 'LIQTEST, perp positive pnl';
+
+    console.log(`Creating mangoaccount...`);
+    let mangoAccount = await createMangoAccount(name);
+    console.log(
+      `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
+    );
+
+    const baseMint = new PublicKey(MAINNET_MINTS.get('MNGO')!);
+    const baseOracle = (await client.getStubOracle(group, baseMint))[0]
+      .publicKey;
+    const liabMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
+    const collateralMint = new PublicKey(MAINNET_MINTS.get('SOL')!);
+    const collateralOracle = group.banksMapByName.get('SOL')![0].oracle;
+
+    await client.tokenDepositNative(
+      group,
+      mangoAccount,
+      collateralMint,
+      100000,
+    ); // valued as $0.004 maint collateral
+    await mangoAccount.reload(client, group);
+
+    try {
+      await client.stubOracleSet(group, collateralOracle, PRICES['SOL'] * 10);
+
+      // Spot-borrow more than the collateral is worth
+      await client.tokenWithdrawNative(
+        group,
+        mangoAccount,
+        liabMint,
+        -5000,
+        true,
+      );
+      await mangoAccount.reload(client, group);
+
+      // Execute two trades that leave the account with +$0.022 positive pnl
+      await client.stubOracleSet(group, baseOracle, PRICES['MNGO'] / 2);
+      await client.perpPlaceOrder(
+        group,
+        fundingAccount,
+        'MNGO-PERP',
+        Side.ask,
+        20,
+        0.0011, // ui base quantity, 11 base lots, $0.022
+        0.022, // ui quote quantity
+        4200,
+        PerpOrderType.limit,
+        0,
+        5,
+      );
+      await client.perpPlaceOrder(
+        group,
+        mangoAccount,
+        'MNGO-PERP',
+        Side.bid,
+        20,
+        0.0011, // ui base quantity, 11 base lots, $0.022
+        0.022, // ui quote quantity
+        4200,
+        PerpOrderType.market,
+        0,
+        5,
+      );
+      await client.perpConsumeAllEvents(group, 'MNGO-PERP');
+
+      await client.stubOracleSet(group, baseOracle, PRICES['MNGO']);
+
+      await client.perpPlaceOrder(
+        group,
+        fundingAccount,
+        'MNGO-PERP',
+        Side.bid,
+        40,
+        0.0011, // ui base quantity, 11 base lots, $0.044
+        0.044, // ui quote quantity
+        4201,
+        PerpOrderType.limit,
+        0,
+        5,
+      );
+      await client.perpPlaceOrder(
+        group,
+        mangoAccount,
+        'MNGO-PERP',
+        Side.ask,
+        40,
+        0.0011, // ui base quantity, 11 base lots, $0.044
+        0.044, // ui quote quantity
+        4201,
+        PerpOrderType.market,
+        0,
+        5,
+      );
+      await client.perpConsumeAllEvents(group, 'MNGO-PERP');
+    } finally {
+      await client.stubOracleSet(group, collateralOracle, PRICES['SOL']);
+      await client.stubOracleSet(group, baseOracle, PRICES['MNGO']);
     }
   }
 

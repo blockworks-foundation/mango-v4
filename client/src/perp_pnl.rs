@@ -18,12 +18,12 @@ pub fn fetch_top(
     context: &crate::context::MangoGroupContext,
     account_fetcher: &impl AccountFetcher,
     perp_market_index: PerpMarketIndex,
-    perp_market_address: &Pubkey,
     direction: Direction,
     count: usize,
 ) -> anyhow::Result<Vec<(Pubkey, MangoAccountValue, I80F48)>> {
+    let perp = context.perp(perp_market_index);
     let perp_market =
-        account_fetcher_fetch_anchor_account::<PerpMarket>(account_fetcher, perp_market_address)?;
+        account_fetcher_fetch_anchor_account::<PerpMarket>(account_fetcher, &perp.address)?;
     let oracle_acc = account_fetcher.fetch_raw_account(&perp_market.oracle)?;
     let oracle_price =
         perp_market.oracle_price(&KeyedAccountSharedData::new(perp_market.oracle, oracle_acc))?;
@@ -99,5 +99,5 @@ pub fn fetch_top(
     }
 
     // return highest abs pnl accounts
-    Ok(accounts_pnl[0..count].to_vec())
+    Ok(accounts_pnl.into_iter().take(count).collect::<Vec<_>>())
 }
