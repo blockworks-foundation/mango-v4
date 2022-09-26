@@ -11,6 +11,7 @@ import { HealthCache, HealthCacheDto } from './healthCache';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from './I80F48';
 import { PerpOrder } from './perp';
 import { Serum3Market, Serum3Side } from './serum3';
+import { AccountInfo } from '@solana/web3.js';
 export class MangoAccount {
   public tokens: TokenPosition[];
   public serum3: Serum3Orders[];
@@ -469,21 +470,20 @@ export class MangoAccount {
   public async loadSerum3OpenOrdersAccounts(
     client: MangoClient,
   ): Promise<(OpenOrders | undefined)[]> {
-    const accounts =
+    const response =
       await client.program.provider.connection.getMultipleAccountsInfo(
         this.serum3.map((s) => s.openOrders),
       );
+    const accounts = response.filter((a): a is AccountInfo<Buffer> =>
+      Boolean(a),
+    );
 
     return accounts.map((acc, index) => {
-      if (acc) {
-        return OpenOrders.fromAccountInfo(
-          this.serum3[index].openOrders,
-          acc,
-          SERUM3_PROGRAM_ID[client.cluster],
-        );
-      } else {
-        return undefined;
-      }
+      return OpenOrders.fromAccountInfo(
+        this.serum3[index].openOrders,
+        acc,
+        SERUM3_PROGRAM_ID[client.cluster],
+      );
     });
   }
 
