@@ -148,7 +148,7 @@ impl<'a> LiquidateHelper<'a> {
         Ok(Some(sig))
     }
 
-    fn liq_perp_base_position(&self) -> anyhow::Result<Option<Signature>> {
+    fn perp_liq_base_position(&self) -> anyhow::Result<Option<Signature>> {
         let mut perp_base_positions = self
             .liqee
             .active_perp_positions()
@@ -225,14 +225,14 @@ impl<'a> LiquidateHelper<'a> {
         Ok(Some(sig))
     }
 
-    fn settle_perp_pnl(&self) -> anyhow::Result<Option<Signature>> {
+    fn perp_settle_pnl(&self) -> anyhow::Result<Option<Signature>> {
         let spot_health = self.health_cache.spot_health(HealthType::Maint);
         let mut perp_settleable_pnl = self
             .liqee
             .active_perp_positions()
-            .map(|pp| {
+            .filter_map(|pp| {
                 if pp.base_position_lots() != 0 {
-                    return Ok(None);
+                    return None;
                 }
                 let pnl = pp.quote_position_native();
                 let settleable_pnl = if pnl > 0 {
@@ -240,12 +240,11 @@ impl<'a> LiquidateHelper<'a> {
                 } else if pnl < 0 && spot_health > 0 {
                     pnl.max(-spot_health)
                 } else {
-                    return Ok(None);
+                    return None;
                 };
-                Ok(Some((pp.market_index, settleable_pnl)))
+                Some((pp.market_index, settleable_pnl))
             })
-            .filter_map_ok(|v| v)
-            .collect::<anyhow::Result<Vec<(PerpMarketIndex, I80F48)>>>()?;
+            .collect::<Vec<(PerpMarketIndex, I80F48)>>();
         // sort by pnl, descending
         perp_settleable_pnl.sort_by(|a, b| b.1.cmp(&a.1));
 
@@ -291,6 +290,44 @@ impl<'a> LiquidateHelper<'a> {
             return Ok(Some(sig));
         }
         return Ok(None);
+    }
+
+    fn perp_liq_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
+        if self.health_cache.has_liquidatable_assets() {
+            return Ok(None);
+        }
+        let mut perp_bankruptcies = self
+            .liqee
+            .active_perp_positions()
+            .filter_map(|pp| {
+                let quote = pp.quote_position_native();
+                if quote >= 0 {
+                    return None;
+                }
+                Some((pp.market_index, quote))
+            })
+            .collect::<Vec<(PerpMarketIndex, I80F48)>>();
+        perp_bankruptcies.sort_by(|a, b| a.1.cmp(&b.1));
+
+        if perp_bankruptcies.is_empty() {
+            return Ok(None);
+        }
+        let (perp_market_index, _) = perp_bankruptcies.first().unwrap();
+
+        let sig = self.client.perp_liq_bankruptcy(
+            (self.pubkey, &self.liqee),
+            *perp_market_index,
+            // Always use the max amount, since the health effect is always positive
+            u64::MAX,
+        )?;
+        log::info!(
+            "Liquidated bankruptcy for perp market on account {}, market index {}, maint_health was {}, tx sig {:?}",
+            self.pubkey,
+            perp_market_index,
+            self.maint_health,
+            sig
+        );
+        Ok(Some(sig))
     }
 
     fn tokens(&self) -> anyhow::Result<Vec<(TokenIndex, I80F48, I80F48)>> {
@@ -354,7 +391,7 @@ impl<'a> LiquidateHelper<'a> {
         Ok(amount)
     }
 
-    fn liq_spot(&self) -> anyhow::Result<Option<Signature>> {
+    fn token_liq(&self) -> anyhow::Result<Option<Signature>> {
         if !self.health_cache.has_borrows() || self.health_cache.can_call_spot_bankruptcy() {
             return Ok(None);
         }
@@ -417,7 +454,7 @@ impl<'a> LiquidateHelper<'a> {
         Ok(Some(sig))
     }
 
-    fn bankrupt_spot(&self) -> anyhow::Result<Option<Signature>> {
+    fn token_liq_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
         if !self.health_cache.can_call_spot_bankruptcy() {
             return Ok(None);
         }
@@ -484,7 +521,7 @@ impl<'a> LiquidateHelper<'a> {
             return Ok(txsig);
         }
 
-        if let Some(txsig) = self.liq_perp_base_position()? {
+        if let Some(txsig) = self.perp_liq_base_position()? {
             return Ok(txsig);
         }
 
@@ -493,21 +530,26 @@ impl<'a> LiquidateHelper<'a> {
         // It's possible that some positive pnl can't be settled (if there's
         // no liquid counterparty) and that some negative pnl can't be settled
         // (if the liqee isn't liquid enough).
-        if let Some(txsig) = self.settle_perp_pnl()? {
+        if let Some(txsig) = self.perp_settle_pnl()? {
             return Ok(txsig);
         }
 
-        if let Some(txsig) = self.liq_spot()? {
+        if let Some(txsig) = self.token_liq()? {
             return Ok(txsig);
         }
 
-        // TODO: socialize unsettleable negative pnl
-        // if let Some(txsig) = self.bankrupt_perp()? {
-        //     return Ok(txsig);
-        // }
-        if let Some(txsig) = self.bankrupt_spot()? {
+        // Socialize/insurance fund unsettleable negative pnl
+        if let Some(txsig) = self.perp_liq_bankruptcy()? {
             return Ok(txsig);
         }
+
+        // Socialize/insurance fund unliquidatable borrows
+        if let Some(txsig) = self.token_liq_bankruptcy()? {
+            return Ok(txsig);
+        }
+
+        // TODO: What about unliquidatable positive perp pnl?
+
         anyhow::bail!(
             "Don't know what to do with liquidatable account {}, maint_health was {}",
             self.pubkey,
