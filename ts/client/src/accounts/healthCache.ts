@@ -46,22 +46,6 @@ export class HealthCache {
   ) {}
 
   static fromDto(dto) {
-    // console.log(
-    JSON.stringify(
-      dto,
-      function replacer(k, v) {
-        // console.log(k);
-        console.log(v);
-        // if (v instanceof BN) {
-        // console.log(v);
-        // return new I80F48(v).toNumber();
-        // }
-        // return v;
-      },
-      2,
-    ),
-      // );
-      process.exit(0);
     return new HealthCache(
       dto.tokenInfos.map((dto) => TokenInfo.fromDto(dto)),
       dto.serum3Infos.map((dto) => Serum3Info.fromDto(dto)),
@@ -173,7 +157,7 @@ export class HealthCache {
       }
     }
 
-  if (liabs.gt(I80F48.fromNumber(0.001))) {
+    if (liabs.gt(I80F48.fromNumber(0.001))) {
       return HUNDRED_I80F48().mul(assets.sub(liabs).div(liabs));
     } else {
       return MAX_I80F48();
