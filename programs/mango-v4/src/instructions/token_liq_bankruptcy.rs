@@ -215,13 +215,13 @@ pub fn token_liq_bankruptcy(
             }
 
             if !liqor_quote_active {
-                liqor.deactivate_token_position(
+                liqor.deactivate_token_position_and_log(
                     liqor_quote_raw_token_index,
                     ctx.accounts.liqor.key(),
                 );
             }
             if !liqor_liab_active {
-                liqor.deactivate_token_position(
+                liqor.deactivate_token_position_and_log(
                     liqor_liab_raw_token_index,
                     ctx.accounts.liqor.key(),
                 );
@@ -302,7 +302,7 @@ pub fn token_liq_bankruptcy(
         .maybe_recover_from_being_liquidated(liqee_init_health);
 
     if !liqee_liab_active {
-        liqee.deactivate_token_position(liqee_raw_token_index, ctx.accounts.liqee.key());
+        liqee.deactivate_token_position_and_log(liqee_raw_token_index, ctx.accounts.liqee.key());
     }
 
     emit!(LiquidateTokenBankruptcyLog {

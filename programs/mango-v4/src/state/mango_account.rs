@@ -73,10 +73,12 @@ pub struct MangoAccount {
 
     pub padding: [u8; 1],
 
+    // (Display only)
     // Cumulative (deposits - withdraws)
     // using USD prices at the time of the deposit/withdraw
     // in USD units with 6 decimals
     pub net_deposits: i64,
+    // (Display only)
     // Cumulative settles on perp positions
     // TODO: unimplemented
     pub net_settled: i64,
@@ -617,11 +619,11 @@ impl<
                     indexed_position: I80F48::ZERO,
                     token_index,
                     in_use_count: 0,
-                    cumulative_deposit_interest: 0,
-                    cumulative_borrow_interest: 0,
+                    cumulative_deposit_interest: 0.0,
+                    cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,
                     padding: Default::default(),
-                    reserved: [0; 8],
+                    reserved: [0; 16],
                 };
             }
             Ok((v, raw_index, bank_index))
@@ -631,7 +633,16 @@ impl<
         }
     }
 
-    pub fn deactivate_token_position(&mut self, raw_index: usize, mango_account_pubkey: Pubkey) {
+    pub fn deactivate_token_position(&mut self, raw_index: usize) {
+        assert!(self.token_position_mut_by_raw_index(raw_index).in_use_count == 0);
+        self.token_position_mut_by_raw_index(raw_index).token_index = TokenIndex::MAX;
+    }
+
+    pub fn deactivate_token_position_and_log(
+        &mut self,
+        raw_index: usize,
+        mango_account_pubkey: Pubkey,
+    ) {
         let mango_group = self.fixed.deref_or_borrow().group;
         let token_position = self.token_position_mut_by_raw_index(raw_index);
         assert!(token_position.in_use_count == 0);
@@ -1103,7 +1114,6 @@ mod tests {
     #[test]
     fn test_token_positions() {
         let mut account = make_test_account();
-        let acccount_pubkey = Pubkey::new_unique();
         assert!(account.token_position(1).is_err());
         assert!(account.token_position_and_raw_index(2).is_err());
         assert!(account.token_position_mut(3).is_err());
@@ -1132,7 +1142,7 @@ mod tests {
         }
 
         {
-            account.deactivate_token_position(1, acccount_pubkey);
+            account.deactivate_token_position(1);
 
             let (pos, raw, active) = account.ensure_token_position(42).unwrap();
             assert_eq!(raw, 2);
@@ -1146,7 +1156,7 @@ mod tests {
         }
 
         assert_eq!(account.active_token_positions().count(), 3);
-        account.deactivate_token_position(0, acccount_pubkey);
+        account.deactivate_token_position(0);
         assert_eq!(
             account.token_position_by_raw_index(0).token_index,
             TokenIndex::MAX

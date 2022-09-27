@@ -415,13 +415,15 @@ impl Bank {
         opening_indexed_position: I80F48,
     ) {
         if opening_indexed_position.is_positive() {
-            position.cumulative_deposit_interest +=
+            let interest =
                 cm!((self.deposit_index - position.previous_index) * opening_indexed_position)
-                    .to_num::<i64>();
+                    .to_num::<f32>();
+            position.cumulative_deposit_interest += interest;
         } else {
-            position.cumulative_borrow_interest +=
+            let interest =
                 cm!((self.borrow_index - position.previous_index) * opening_indexed_position)
-                    .to_num::<i64>();
+                    .to_num::<f32>();
+            position.cumulative_borrow_interest += interest;
         }
 
         if position.indexed_position.is_positive() {
@@ -664,11 +666,11 @@ mod tests {
                     indexed_position: I80F48::ZERO,
                     token_index: 0,
                     in_use_count: if is_in_use { 1 } else { 0 },
-                    cumulative_deposit_interest: 0,
-                    cumulative_borrow_interest: 0,
+                    cumulative_deposit_interest: 0.0,
+                    cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,
                     padding: Default::default(),
-                    reserved: [0; 8],
+                    reserved: [0; 16],
                 };
 
                 account.indexed_position = indexed(I80F48::from_num(start), &bank);
