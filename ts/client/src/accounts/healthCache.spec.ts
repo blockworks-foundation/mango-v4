@@ -7,23 +7,23 @@ import { I80F48, ZERO_I80F48 } from './I80F48';
 describe('Health Cache', () => {
   it('max swap tokens for min ratio', () => {
     // USDC like
-    const sourceBank = new BankForHealth(
-      0,
-      I80F48.fromNumber(1),
-      I80F48.fromNumber(1),
-      I80F48.fromNumber(1),
-      I80F48.fromNumber(1),
-      I80F48.fromNumber(1),
-    );
+    const sourceBank: BankForHealth = {
+      tokenIndex: 0,
+      maintAssetWeight: I80F48.fromNumber(1),
+      initAssetWeight: I80F48.fromNumber(1),
+      maintLiabWeight: I80F48.fromNumber(1),
+      initLiabWeight: I80F48.fromNumber(1),
+      price: I80F48.fromNumber(1),
+    };
     // BTC like
-    const targetBank = new BankForHealth(
-      1,
-      I80F48.fromNumber(0.9),
-      I80F48.fromNumber(0.8),
-      I80F48.fromNumber(1.1),
-      I80F48.fromNumber(1.2),
-      I80F48.fromNumber(20000),
-    );
+    const targetBank: BankForHealth = {
+      tokenIndex: 1,
+      maintAssetWeight: I80F48.fromNumber(0.9),
+      initAssetWeight: I80F48.fromNumber(0.8),
+      maintLiabWeight: I80F48.fromNumber(1.1),
+      initLiabWeight: I80F48.fromNumber(1.2),
+      price: I80F48.fromNumber(20000),
+    };
 
     const hc = new HealthCache(
       [

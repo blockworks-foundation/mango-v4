@@ -244,8 +244,8 @@ export class Group {
     for (const [index, ai] of ais.entries()) {
       for (const bank of banks[index]) {
         if (bank.name === 'USDC') {
-          bank.price = ONE_I80F48();
-          bank.uiPrice = 1;
+          bank._price = ONE_I80F48();
+          bank._uiPrice = 1;
         } else {
           if (!ai)
             throw new Error(
@@ -257,8 +257,8 @@ export class Group {
             ai,
             this.getMintDecimals(bank.mint),
           );
-          bank.price = price;
-          bank.uiPrice = uiPrice;
+          bank._price = price;
+          bank._uiPrice = uiPrice;
         }
       }
     }

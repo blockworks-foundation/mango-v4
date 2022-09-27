@@ -10,18 +10,16 @@ export type OracleConfig = {
   confFilter: I80F48Dto;
 };
 
-export class BankForHealth {
-  constructor(
-    public tokenIndex: number,
-    public maintAssetWeight: I80F48,
-    public initAssetWeight: I80F48,
-    public maintLiabWeight: I80F48,
-    public initLiabWeight: I80F48,
-    public price: I80F48 | undefined,
-  ) {}
+export interface BankForHealth {
+  tokenIndex: number;
+  maintAssetWeight: I80F48;
+  initAssetWeight: I80F48;
+  maintLiabWeight: I80F48;
+  initLiabWeight: I80F48;
+  price: I80F48;
 }
 
-export class Bank extends BankForHealth {
+export class Bank implements BankForHealth {
   public name: string;
   public depositIndex: I80F48;
   public borrowIndex: I80F48;
@@ -36,8 +34,8 @@ export class Bank extends BankForHealth {
   public rate1: I80F48;
   public util0: I80F48;
   public util1: I80F48;
-  public price: I80F48 | undefined;
-  public uiPrice: number | undefined;
+  public _price: I80F48 | undefined;
+  public _uiPrice: number | undefined;
   public collectedFeesNative: I80F48;
   public loanFeeRate: I80F48;
   public loanOriginationFeeRate: I80F48;
@@ -189,8 +187,8 @@ export class Bank extends BankForHealth {
     this.initLiabWeight = I80F48.from(initLiabWeight);
     this.liquidationFee = I80F48.from(liquidationFee);
     this.dust = I80F48.from(dust);
-    this.price = undefined;
-    this.uiPrice = undefined;
+    this._price = undefined;
+    this._uiPrice = undefined;
   }
 
   toString(): string {
@@ -265,6 +263,24 @@ export class Bank extends BankForHealth {
       '\n getBorrowRate() - ' +
       this.getBorrowRate().toNumber()
     );
+  }
+
+  get price(): I80F48 {
+    if (!this._price) {
+      throw new Error(
+        `Undefined price for bank ${this.publicKey}, tokenIndex ${this.tokenIndex}`,
+      );
+    }
+    return this._price;
+  }
+
+  get uiPrice(): number {
+    if (!this._uiPrice) {
+      throw new Error(
+        `Undefined uiPrice for bank ${this.publicKey}, tokenIndex ${this.tokenIndex}`,
+      );
+    }
+    return this._uiPrice;
   }
 
   nativeDeposits(): I80F48 {
