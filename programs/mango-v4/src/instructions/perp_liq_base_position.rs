@@ -112,7 +112,8 @@ pub fn perp_liq_base_position(
         // and increased by `base * price * (1 - liq_fee) * quote_init_asset_weight`
         let quote_asset_weight = I80F48::ONE;
         let health_per_lot = cm!(price_per_lot
-            * (quote_asset_weight - perp_market.init_asset_weight - perp_market.liquidation_fee));
+            * (quote_asset_weight * (I80F48::ONE - perp_market.liquidation_fee)
+                - perp_market.init_asset_weight));
 
         // number of lots to transfer to bring health to zero, rounded up
         let base_transfer_for_zero: i64 = cm!(-liqee_init_health / health_per_lot)
@@ -141,7 +142,8 @@ pub fn perp_liq_base_position(
         // and reduced by `base * price * (1 + liq_fee) * quote_init_liab_weight`
         let quote_liab_weight = I80F48::ONE;
         let health_per_lot = cm!(price_per_lot
-            * (perp_market.init_liab_weight - quote_liab_weight + perp_market.liquidation_fee));
+            * (perp_market.init_liab_weight * (I80F48::ONE + perp_market.liquidation_fee)
+                - quote_liab_weight));
 
         // (negative) number of lots to transfer to bring health to zero, rounded away from zero
         let base_transfer_for_zero: i64 = cm!(liqee_init_health / health_per_lot)
