@@ -184,7 +184,6 @@ describe('mango-v4', () => {
       0,
       'BTC-PERP',
       0.1,
-      1,
       6,
       1,
       10,
@@ -196,9 +195,15 @@ describe('mango-v4', () => {
       0.012,
       0.0002,
       0.0,
+      0,
       0.05,
       0.05,
       100,
+      true,
+      true,
+      0,
+      0,
+      0,
     );
     await group.reloadAll(envClient);
   });

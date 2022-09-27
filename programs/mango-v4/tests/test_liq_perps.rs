@@ -249,6 +249,9 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
         0,
     )
     .await;
+    let settler =
+        create_funded_account(&solana, group, owner, 251, &context.users[1], &[], 0, 0).await;
+    let settler_owner = owner.clone();
 
     //
     // TEST: Create a perp market
@@ -512,11 +515,12 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     send_tx(
         solana,
         PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
             account_a: liqor,
             account_b: account_1,
             perp_market,
             quote_bank: tokens[0].bank,
-            max_settle_amount: u64::MAX,
         },
     )
     .await
