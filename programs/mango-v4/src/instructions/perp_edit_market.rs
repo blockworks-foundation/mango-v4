@@ -35,6 +35,7 @@ pub fn perp_edit_market(
     impact_quantity_opt: Option<i64>,
     group_insurance_fund_opt: Option<bool>,
     trusted_market_opt: Option<bool>,
+    fee_penalty_opt: Option<f32>,
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
@@ -90,6 +91,9 @@ pub fn perp_edit_market(
     }
     if let Some(impact_quantity) = impact_quantity_opt {
         perp_market.impact_quantity = impact_quantity;
+    }
+    if let Some(fee_penalty) = fee_penalty_opt {
+        perp_market.fee_penalty = fee_penalty;
     }
 
     // unchanged -

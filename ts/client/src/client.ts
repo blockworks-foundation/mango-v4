@@ -1330,6 +1330,7 @@ export class MangoClient {
     liquidationFee: number,
     makerFee: number,
     takerFee: number,
+    feePenalty: number,
     minFunding: number,
     maxFunding: number,
     impactQuantity: number,
@@ -1364,6 +1365,7 @@ export class MangoClient {
         new BN(impactQuantity),
         groupInsuranceFund,
         trustedMarket,
+        feePenalty
       )
       .accounts({
         group: group.publicKey,
@@ -1430,6 +1432,7 @@ export class MangoClient {
     liquidationFee: number,
     makerFee: number,
     takerFee: number,
+    feePenalty: number,
     minFunding: number,
     maxFunding: number,
     impactQuantity: number,
@@ -1459,6 +1462,7 @@ export class MangoClient {
         new BN(impactQuantity),
         groupInsuranceFund,
         trustedMarket,
+        feePenalty
       )
       .accounts({
         group: group.publicKey,
