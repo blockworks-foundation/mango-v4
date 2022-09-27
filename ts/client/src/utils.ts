@@ -1,12 +1,17 @@
+import { AnchorProvider } from '@project-serum/anchor';
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import {
   AccountMeta,
+  AddressLookupTableAccount,
+  MessageV0,
   PublicKey,
+  Signer,
   SystemProgram,
   TransactionInstruction,
+  VersionedTransaction,
 } from '@solana/web3.js';
 import BN from 'bn.js';
 import { Bank, QUOTE_DECIMALS } from './accounts/bank';
@@ -187,4 +192,25 @@ export function toU64(amount: number, decimals: number): BN {
 
 export function nativeI80F48ToUi(amount: I80F48, decimals: number): I80F48 {
   return amount.div(I80F48.fromNumber(Math.pow(10, decimals)));
+}
+
+export async function buildVersionedTx(
+  provider: AnchorProvider,
+  ix: TransactionInstruction[],
+  additionalSigners: Signer[] = [],
+  alts: AddressLookupTableAccount[] = [],
+): Promise<VersionedTransaction> {
+  const message = MessageV0.compile({
+    payerKey: (provider as AnchorProvider).wallet.publicKey,
+    instructions: ix,
+    recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash,
+    addressLookupTableAccounts: alts,
+  });
+  const vTx = new VersionedTransaction(message);
+  // TODO: remove use of any when possible in future
+  vTx.sign([
+    ((provider as AnchorProvider).wallet as any).payer as Signer,
+    ...additionalSigners,
+  ]);
+  return vTx;
 }
