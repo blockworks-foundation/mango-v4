@@ -315,8 +315,7 @@ impl MangoClient {
     pub fn derive_liquidation_health_check_remaining_account_metas(
         &self,
         liqee: &MangoAccountValue,
-        asset_token_index: TokenIndex,
-        liab_token_index: TokenIndex,
+        writable_banks: &[TokenIndex],
     ) -> anyhow::Result<Vec<AccountMeta>> {
         // figure out all the banks/oracles that need to be passed for the health check
         let mut banks = vec![];
@@ -331,7 +330,7 @@ impl MangoClient {
 
         for token_index in token_indexes {
             let mint_info = self.context.mint_info(token_index);
-            let writable_bank = token_index == asset_token_index || token_index == liab_token_index;
+            let writable_bank = writable_banks.iter().contains(&token_index);
             banks.push((mint_info.first_bank(), writable_bank));
             oracles.push(mint_info.oracle);
         }
@@ -928,8 +927,7 @@ impl MangoClient {
         let perp = self.context.perp(market_index);
 
         let health_remaining_ams = self
-            .context
-            .derive_health_check_remaining_account_metas(liqee.1, vec![], false)
+            .derive_liquidation_health_check_remaining_account_metas(liqee.1, &[])
             .unwrap();
 
         self.program()
@@ -960,6 +958,57 @@ impl MangoClient {
             .map_err(prettify_client_error)
     }
 
+    pub fn perp_liq_bankruptcy(
+        &self,
+        liqee: (&Pubkey, &MangoAccountValue),
+        market_index: PerpMarketIndex,
+        max_liab_transfer: u64,
+    ) -> anyhow::Result<Signature> {
+        let quote_token_index = 0;
+        let quote_info = self.context.token(quote_token_index);
+
+        let group = account_fetcher_fetch_anchor_account::<Group>(
+            &*self.account_fetcher,
+            &self.context.group,
+        )?;
+
+        let perp = self.context.perp(market_index);
+
+        let health_remaining_ams = self
+            .derive_liquidation_health_check_remaining_account_metas(liqee.1, &[])
+            .unwrap();
+
+        self.program()
+            .request()
+            .instruction(Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        &mango_v4::accounts::PerpLiqBankruptcy {
+                            group: self.group(),
+                            perp_market: perp.address,
+                            liqor: self.mango_account_address,
+                            liqor_owner: self.owner(),
+                            liqee: *liqee.0,
+                            quote_bank: quote_info.mint_info.first_bank(),
+                            quote_vault: quote_info.mint_info.first_vault(),
+                            insurance_vault: group.insurance_vault,
+                            token_program: Token::id(),
+                        },
+                        None,
+                    );
+                    ams.extend(health_remaining_ams.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(
+                    &mango_v4::instruction::PerpLiqBankruptcy { max_liab_transfer },
+                ),
+            })
+            .signer(&self.owner)
+            .send()
+            .map_err(prettify_client_error)
+    }
+
     //
     // Liquidation
     //
@@ -974,8 +1023,7 @@ impl MangoClient {
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
-                asset_token_index,
-                liab_token_index,
+                &[asset_token_index, liab_token_index],
             )
             .unwrap();
 
@@ -1030,8 +1078,7 @@ impl MangoClient {
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(
                 liqee.1,
-                quote_token_index,
-                liab_token_index,
+                &[quote_token_index, liab_token_index],
             )
             .unwrap();
 

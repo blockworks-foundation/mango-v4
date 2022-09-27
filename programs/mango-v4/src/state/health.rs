@@ -792,7 +792,7 @@ impl HealthCache {
             // can use perp_liq_base_position
             p.base != 0
             // can use perp_settle_pnl
-            || p.quote > ONE_NATIVE_USDC_IN_USD
+            || p.quote > ONE_NATIVE_USDC_IN_USD // TODO: we're not guaranteed to be able to settle positive perp pnl!
             // can use perp_liq_force_cancel_orders
             || p.has_open_orders
         });
