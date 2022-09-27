@@ -166,6 +166,14 @@ export class Bank extends BankForHealth {
     public mintDecimals: number,
     public bankNum: number,
   ) {
+    super(
+      tokenIndex,
+      I80F48.from(maintAssetWeight),
+      I80F48.from(initAssetWeight),
+      I80F48.from(maintLiabWeight),
+      I80F48.from(initLiabWeight),
+      undefined,
+    );
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.depositIndex = I80F48.from(depositIndex);
     this.borrowIndex = I80F48.from(borrowIndex);
@@ -183,13 +191,8 @@ export class Bank extends BankForHealth {
     this.collectedFeesNative = I80F48.from(collectedFeesNative);
     this.loanFeeRate = I80F48.from(loanFeeRate);
     this.loanOriginationFeeRate = I80F48.from(loanOriginationFeeRate);
-    this.maintAssetWeight = I80F48.from(maintAssetWeight);
-    this.initAssetWeight = I80F48.from(initAssetWeight);
-    this.maintLiabWeight = I80F48.from(maintLiabWeight);
-    this.initLiabWeight = I80F48.from(initLiabWeight);
     this.liquidationFee = I80F48.from(liquidationFee);
     this.dust = I80F48.from(dust);
-    this.price = undefined;
     this.uiPrice = undefined;
   }
 
