@@ -1,8 +1,14 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import {
+  AddressLookupTableProgram,
+  Connection,
+  Keypair,
+  PublicKey,
+} from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
+import { buildVersionedTx } from '../utils';
 
 //
 // An example for admins based on high level api i.e. the client
@@ -506,6 +512,78 @@ async function main() {
     } catch (error) {
       throw error;
     }
+  }
+
+  if (
+    // true
+    group.addressLookupTables[0].equals(PublicKey.default)
+  ) {
+    try {
+      console.log(`ALT: Creating`);
+      const createIx = AddressLookupTableProgram.createLookupTable({
+        authority: admin.publicKey,
+        payer: admin.publicKey,
+        recentSlot: await connection.getSlot('finalized'),
+      });
+      const createTx = await buildVersionedTx(
+        client.program.provider as AnchorProvider,
+        [createIx[0]],
+      );
+      let sig = await connection.sendTransaction(createTx);
+      console.log(
+        `...created ALT ${createIx[1]} https://explorer.solana.com/tx/${sig}?cluster=devnet`,
+      );
+
+      console.log(`ALT: set at index 0 for group...`);
+      sig = await client.altSet(
+        group,
+        new PublicKey('EmN5RjHUFsoag7tZ2AyBL2N8JrhV7nLMKgNbpCfzC81D'),
+        0,
+      );
+      console.log(`...https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+
+      // Extend using a mango v4 program ix
+      // Throws > Instruction references an unknown account 11111111111111111111111111111111 atm
+      //
+      console.log(
+        `ALT: extending using mango v4 program with bank publick keys and oracles`,
+      );
+      // let sig = await client.altExtend(
+      //   group,
+      //   new PublicKey('EmN5RjHUFsoag7tZ2AyBL2N8JrhV7nLMKgNbpCfzC81D'),
+      //   0,
+      //   Array.from(group.banksMapByMint.values())
+      //     .flat()
+      //     .map((bank) => [bank.publicKey, bank.oracle])
+      //     .flat(),
+      // );
+      // console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+
+      // TODO decide on what keys should go in
+      console.log(`ALT: extending manually with bank publick keys and oracles`);
+      const extendIx = AddressLookupTableProgram.extendLookupTable({
+        lookupTable: createIx[1],
+        payer: admin.publicKey,
+        authority: admin.publicKey,
+        addresses: Array.from(group.banksMapByMint.values())
+          .flat()
+          .map((bank) => [bank.publicKey, bank.oracle])
+          .flat(),
+      });
+      const extendTx = await buildVersionedTx(
+        client.program.provider as AnchorProvider,
+        [extendIx],
+      );
+      sig = await client.program.provider.connection.sendTransaction(extendTx);
+      console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  try {
+  } catch (error) {
+    console.log(error);
   }
 
   process.exit();

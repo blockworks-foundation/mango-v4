@@ -7,7 +7,11 @@ import {
   Orderbook,
 } from '@project-serum/serum';
 import { parsePriceData, PriceData } from '@pythnetwork/client';
-import { AccountInfo, PublicKey } from '@solana/web3.js';
+import {
+  AccountInfo,
+  AddressLookupTableAccount,
+  PublicKey,
+} from '@solana/web3.js';
 import BN from 'bn.js';
 import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
@@ -35,6 +39,7 @@ export class Group {
       insuranceVault: PublicKey;
       testing: number;
       version: number;
+      addressLookupTables: PublicKey[];
     },
   ): Group {
     return new Group(
@@ -47,6 +52,8 @@ export class Group {
       obj.insuranceVault,
       obj.testing,
       obj.version,
+      obj.addressLookupTables,
+      [], // addressLookupTablesList
       new Map(), // banksMapByName
       new Map(), // banksMapByMint
       new Map(), // banksMapByTokenIndex
@@ -70,6 +77,8 @@ export class Group {
     public insuranceVault: PublicKey,
     public testing: number,
     public version: number,
+    public addressLookupTables: PublicKey[],
+    public addressLookupTablesList: AddressLookupTableAccount[],
     public banksMapByName: Map<string, Bank[]>,
     public banksMapByMint: Map<string, Bank[]>,
     public banksMapByTokenIndex: Map<number, Bank[]>,
@@ -96,6 +105,7 @@ export class Group {
 
     // console.time('group.reload');
     await Promise.all([
+      this.reloadAlts(client),
       this.reloadBanks(client, ids).then(() =>
         Promise.all([
           this.reloadBankOraclePrices(client),
@@ -111,6 +121,22 @@ export class Group {
       ),
     ]);
     // console.timeEnd('group.reload');
+  }
+
+  public async reloadAlts(client: MangoClient) {
+    const alts = await Promise.all(
+      this.addressLookupTables
+        .filter((alt) => !alt.equals(PublicKey.default))
+        .map((alt) =>
+          client.program.provider.connection.getAddressLookupTable(alt),
+        ),
+    );
+    this.addressLookupTablesList = alts.map((res, i) => {
+      if (!res || !res.value) {
+        throw new Error(`Error in getting ALT ${this.addressLookupTables[i]}`);
+      }
+      return res.value;
+    });
   }
 
   public async reloadBanks(client: MangoClient, ids?: Id) {

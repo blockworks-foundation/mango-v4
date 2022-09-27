@@ -2,7 +2,7 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { HealthType } from '../accounts/mangoAccount';
-import { BookSide, PerpOrderType, Side } from '../accounts/perp';
+import { BookSide, PerpOrderSide, PerpOrderType } from '../accounts/perp';
 import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
@@ -117,7 +117,7 @@ async function main() {
   }
 
   // deposit and withdraw
-  if (false) {
+  if (true) {
     try {
       console.log(`...depositing 50 USDC, 1 SOL, 1 MNGO`);
       await client.tokenDeposit(
@@ -169,7 +169,7 @@ async function main() {
     }
   }
 
-  if (false) {
+  if (true) {
     // serum3
     const serum3Market = group.serum3MarketsMapByExternal.get(
       DEVNET_SERUM3_MARKETS.get('BTC/USDC')?.toBase58()!,
@@ -282,7 +282,7 @@ async function main() {
     );
   }
 
-  if (false) {
+  if (true) {
     // serum3 market
     const serum3Market = group.serum3MarketsMapByExternal.get(
       DEVNET_SERUM3_MARKETS.get('BTC/USDC')!.toBase58(),
@@ -290,7 +290,7 @@ async function main() {
     console.log(await serum3Market?.logOb(client, group));
   }
 
-  if (false) {
+  if (true) {
     await mangoAccount.reload(client, group);
     console.log(
       '...mangoAccount.getEquity() ' +
@@ -333,7 +333,7 @@ async function main() {
     );
   }
 
-  if (false) {
+  if (true) {
     const asks = await group.loadSerum3AsksForMarket(
       client,
       DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
@@ -434,7 +434,7 @@ async function main() {
         group,
         mangoAccount,
         'BTC-PERP',
-        Side.bid,
+        PerpOrderSide.bid,
         price,
         baseQty,
         quoteQty,
@@ -467,7 +467,7 @@ async function main() {
         group,
         mangoAccount,
         'BTC-PERP',
-        Side.bid,
+        PerpOrderSide.bid,
         price,
         baseQty,
         quoteQty,
@@ -496,7 +496,7 @@ async function main() {
         group,
         mangoAccount,
         'BTC-PERP',
-        Side.ask,
+        PerpOrderSide.ask,
         price,
         baseQty,
         quoteQty,
@@ -526,7 +526,7 @@ async function main() {
         group,
         mangoAccount,
         'BTC-PERP',
-        Side.ask,
+        PerpOrderSide.ask,
         price,
         baseQty,
         quoteQty,
@@ -554,7 +554,7 @@ async function main() {
     //     group,
     //     mangoAccount,
     //     'BTC-PERP',
-    //     Side.bid,
+    //     PerpOrderSide.bid,
     //     price,
     //     0.01,
     //     price * 0.01,
@@ -575,7 +575,7 @@ async function main() {
     //     group,
     //     mangoAccount,
     //     'BTC-PERP',
-    //     Side.ask,
+    //     PerpOrderSide.ask,
     //     price,
     //     0.01,
     //     price * 0.011,
@@ -593,7 +593,7 @@ async function main() {
     // // sig = await client.perpCancelAllOrders(group, mangoAccount, 'BTC-PERP', 10);
     // // console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
-    const perpMarket = group.perpMarketsMap.get('BTC-PERP');
+    const perpMarket = group.perpMarketsMap.get('BTC-PERP')!;
 
     const bids: BookSide = await perpMarket?.loadBids(client)!;
     console.log(`bids - ${Array.from(bids.items())}`);
@@ -601,7 +601,7 @@ async function main() {
     console.log(`asks - ${Array.from(asks.items())}`);
 
     await perpMarket?.loadEventQueue(client)!;
-    const fr = await perpMarket?.getCurrentFundingRate(
+    const fr = perpMarket?.getCurrentFundingRate(
       await perpMarket.loadBids(client),
       await perpMarket.loadAsks(client),
     );
