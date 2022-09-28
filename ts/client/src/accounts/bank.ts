@@ -207,9 +207,9 @@ export class Bank implements BankForHealth {
       '\n oracle - ' +
       this.oracle.toBase58() +
       '\n price - ' +
-      this.price?.toNumber() +
+      this._price?.toNumber() +
       '\n uiPrice - ' +
-      this.uiPrice +
+      this._uiPrice +
       '\n deposit index - ' +
       this.depositIndex.toNumber() +
       '\n borrow index - ' +

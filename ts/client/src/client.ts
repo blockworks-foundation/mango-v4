@@ -29,9 +29,8 @@ import { Group } from './accounts/group';
 import { I80F48 } from './accounts/I80F48';
 import {
   MangoAccount,
-  MangoAccountData,
-  TokenPosition,
   PerpPosition,
+  TokenPosition,
 } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
 import {
@@ -59,7 +58,6 @@ import {
   I64_MAX_BN,
   toNativeDecimals,
 } from './utils';
-import { simulate } from './utils/anchor';
 import { sendTransaction } from './utils/rpc';
 
 enum AccountRetriever {
@@ -753,52 +751,6 @@ export class MangoClient {
     );
   }
 
-  public async computeAccountData(
-    group: Group,
-    mangoAccount: MangoAccount,
-  ): Promise<MangoAccountData | undefined> {
-    const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
-        group,
-        [mangoAccount],
-        [],
-        [],
-      );
-
-    // Use our custom simulate fn in utils/anchor.ts so signing the tx is not required
-    this.program.provider.simulate = simulate;
-
-    const res = await this.program.methods
-      .computeAccountData()
-      .accounts({
-        group: group.publicKey,
-        account: mangoAccount.publicKey,
-      })
-      .remainingAccounts(
-        healthRemainingAccounts.map(
-          (pk) =>
-            ({
-              pubkey: pk,
-              isWritable: false,
-              isSigner: false,
-            } as AccountMeta),
-        ),
-      )
-      .simulate();
-
-    if (res.events) {
-      const accountDataEvent = res?.events.find(
-        (event) => (event.name = 'MangoAccountData'),
-      );
-      return accountDataEvent
-        ? MangoAccountData.from(accountDataEvent.data as any)
-        : undefined;
-    } else {
-      return undefined;
-    }
-  }
-
   public async tokenDeposit(
     group: Group,
     mangoAccount: MangoAccount,
@@ -1158,7 +1110,7 @@ export class MangoClient {
         mangoAccount,
         serum3Market.serumMarketExternal,
       );
-      await mangoAccount.reload(this, group);
+      await mangoAccount.reload(this);
     }
     const serum3MarketExternal = group.serum3MarketExternalsMap.get(
       externalMarketPk.toBase58(),

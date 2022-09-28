@@ -2,6 +2,7 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Cluster, Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { Group } from '../accounts/group';
+import { HealthCache } from '../accounts/healthCache';
 import { HealthType, MangoAccount } from '../accounts/mangoAccount';
 import { PerpMarket } from '../accounts/perp';
 import { Serum3Market } from '../accounts/serum3';
@@ -26,7 +27,7 @@ async function debugUser(
 ) {
   console.log(mangoAccount.toString(group));
 
-  await mangoAccount.reload(client, group);
+  await mangoAccount.reload(client);
 
   console.log(
     'buildFixedAccountRetrieverHealthAccounts ' +
@@ -45,42 +46,52 @@ async function debugUser(
   );
   console.log(
     'mangoAccount.getEquity() ' +
-      toUiDecimalsForQuote(mangoAccount.getEquity()!.toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getEquity(group)!.toNumber()),
   );
   console.log(
     'mangoAccount.getHealth(HealthType.init) ' +
-      toUiDecimalsForQuote(mangoAccount.getHealth(HealthType.init)!.toNumber()),
+      toUiDecimalsForQuote(
+        mangoAccount.getHealth(group, HealthType.init)!.toNumber(),
+      ),
+  );
+  console.log(
+    'HealthCache.fromMangoAccount(group,mangoAccount).health(HealthType.init) ' +
+      toUiDecimalsForQuote(
+        HealthCache.fromMangoAccount(group, mangoAccount)
+          .health(HealthType.init)
+          .toNumber(),
+      ),
   );
   console.log(
     'mangoAccount.getHealthRatio(HealthType.init) ' +
-      mangoAccount.getHealthRatio(HealthType.init)!.toNumber(),
+      mangoAccount.getHealthRatio(group, HealthType.init)!.toNumber(),
   );
   console.log(
     'mangoAccount.getHealthRatioUi(HealthType.init) ' +
-      mangoAccount.getHealthRatioUi(HealthType.init),
+      mangoAccount.getHealthRatioUi(group, HealthType.init),
   );
   console.log(
     'mangoAccount.getHealthRatio(HealthType.maint) ' +
-      mangoAccount.getHealthRatio(HealthType.maint)!.toNumber(),
+      mangoAccount.getHealthRatio(group, HealthType.maint)!.toNumber(),
   );
   console.log(
     'mangoAccount.getHealthRatioUi(HealthType.maint) ' +
-      mangoAccount.getHealthRatioUi(HealthType.maint),
+      mangoAccount.getHealthRatioUi(group, HealthType.maint),
   );
   console.log(
     'mangoAccount.getCollateralValue() ' +
-      toUiDecimalsForQuote(mangoAccount.getCollateralValue()!.toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getCollateralValue(group)!.toNumber()),
   );
   console.log(
     'mangoAccount.getAssetsValue() ' +
       toUiDecimalsForQuote(
-        mangoAccount.getAssetsValue(HealthType.init)!.toNumber(),
+        mangoAccount.getAssetsValue(group, HealthType.init)!.toNumber(),
       ),
   );
   console.log(
     'mangoAccount.getLiabsValue() ' +
       toUiDecimalsForQuote(
-        mangoAccount.getLiabsValue(HealthType.init)!.toNumber(),
+        mangoAccount.getLiabsValue(group, HealthType.init)!.toNumber(),
       ),
   );
 
@@ -223,9 +234,9 @@ async function main() {
 
     for (const mangoAccount of mangoAccounts) {
       console.log(`MangoAccount ${mangoAccount.publicKey}`);
-      // if (mangoAccount.name === 'PnL Test') {
-      await debugUser(client, group, mangoAccount);
-      // }
+      if (mangoAccount.name === 'PnL Test') {
+        await debugUser(client, group, mangoAccount);
+      }
     }
   }
 
