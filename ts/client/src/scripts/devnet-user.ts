@@ -78,10 +78,10 @@ async function main() {
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString(group));
 
-  await mangoAccount.reload(client, group);
+  await mangoAccount.reload(client);
 
   // set delegate, and change name
-  if (false) {
+  if (true) {
     console.log(`...changing mango account name, and setting a delegate`);
     const randomKey = new PublicKey(
       '4ZkS7ZZkxfsC3GtvvsHP3DFcUeByU9zzZELS4r8HCELo',
@@ -93,7 +93,7 @@ async function main() {
       'my_changed_name',
       randomKey,
     );
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
     console.log(mangoAccount.toString());
 
     console.log(`...resetting mango account name, and re-setting a delegate`);
@@ -103,7 +103,7 @@ async function main() {
       'my_mango_account',
       PublicKey.default,
     );
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
     console.log(mangoAccount.toString());
   }
 
@@ -113,7 +113,7 @@ async function main() {
       `...expanding mango account to have serum3 and perp position slots`,
     );
     await client.expandMangoAccount(group, mangoAccount, 8, 8, 8, 8);
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
   }
 
   // deposit and withdraw
@@ -126,7 +126,7 @@ async function main() {
         new PublicKey(DEVNET_MINTS.get('USDC')!),
         50,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       await client.tokenDeposit(
         group,
@@ -134,7 +134,7 @@ async function main() {
         new PublicKey(DEVNET_MINTS.get('SOL')!),
         1,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       await client.tokenDeposit(
         group,
@@ -142,7 +142,7 @@ async function main() {
         new PublicKey(DEVNET_MINTS.get('MNGO')!),
         1,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       console.log(`...withdrawing 1 USDC`);
       await client.tokenWithdraw(
@@ -152,7 +152,7 @@ async function main() {
         1,
         true,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       console.log(`...depositing 0.0005 BTC`);
       await client.tokenDeposit(
@@ -161,7 +161,7 @@ async function main() {
         new PublicKey(DEVNET_MINTS.get('BTC')!),
         0.0005,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       console.log(mangoAccount.toString(group));
     } catch (error) {
@@ -205,7 +205,7 @@ async function main() {
       Date.now(),
       10,
     );
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
 
     price = lowestAsk.price + lowestAsk.price / 2;
     qty = 0.0001;
@@ -224,7 +224,7 @@ async function main() {
       Date.now(),
       10,
     );
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
 
     price = highestBid.price - highestBid.price / 2;
     qty = 0.0001;
@@ -291,33 +291,27 @@ async function main() {
   }
 
   if (true) {
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
     console.log(
       '...mangoAccount.getEquity() ' +
-        toUiDecimalsForQuote(mangoAccount.getEquity()!.toNumber()),
+        toUiDecimalsForQuote(mangoAccount.getEquity(group)!.toNumber()),
     );
     console.log(
       '...mangoAccount.getCollateralValue() ' +
-        toUiDecimalsForQuote(mangoAccount.getCollateralValue()!.toNumber()),
-    );
-    console.log(
-      '...mangoAccount.accountData["healthCache"].health(HealthType.init) ' +
         toUiDecimalsForQuote(
-          mangoAccount
-            .accountData!['healthCache'].health(HealthType.init)
-            .toNumber(),
+          mangoAccount.getCollateralValue(group)!.toNumber(),
         ),
     );
     console.log(
       '...mangoAccount.getAssetsVal() ' +
         toUiDecimalsForQuote(
-          mangoAccount.getAssetsValue(HealthType.init)!.toNumber(),
+          mangoAccount.getAssetsValue(group, HealthType.init)!.toNumber(),
         ),
     );
     console.log(
       '...mangoAccount.getLiabsVal() ' +
         toUiDecimalsForQuote(
-          mangoAccount.getLiabsValue(HealthType.init)!.toNumber(),
+          mangoAccount.getLiabsValue(group, HealthType.init)!.toNumber(),
         ),
     );
     console.log(
@@ -554,7 +548,7 @@ async function main() {
     //     group,
     //     mangoAccount,
     //     'BTC-PERP',
-    //     PerpOrderSide.bid,
+    //    PerpOrderSide.bid,
     //     price,
     //     0.01,
     //     price * 0.01,
@@ -575,7 +569,7 @@ async function main() {
     //     group,
     //     mangoAccount,
     //     'BTC-PERP',
-    //     PerpOrderSide.ask,
+    //    PerpOrderSide.ask,
     //     price,
     //     0.01,
     //     price * 0.011,
@@ -615,7 +609,7 @@ async function main() {
 
     // make+take orders should have cancelled each other, and if keeper has already cranked, then should not appear in position
     await group.reloadAll(client);
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
     console.log(`${mangoAccount.toString(group)}`);
   }
 
