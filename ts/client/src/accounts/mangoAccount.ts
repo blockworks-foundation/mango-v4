@@ -241,7 +241,7 @@ export class MangoAccount {
    * @param healthType
    * @returns raw health number, in native quote
    */
-  getHealth(group: Group, healthType: HealthType): I80F48 | undefined {
+  getHealth(group: Group, healthType: HealthType): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc.health(healthType);
   }
@@ -252,7 +252,7 @@ export class MangoAccount {
    * @param healthType
    * @returns health ratio, in percentage form
    */
-  getHealthRatio(group: Group, healthType: HealthType): I80F48 | undefined {
+  getHealthRatio(group: Group, healthType: HealthType): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc.healthRatio(healthType);
   }
@@ -263,7 +263,7 @@ export class MangoAccount {
    * @returns health ratio, in percentage form, capped to 100
    */
   getHealthRatioUi(group: Group, healthType: HealthType): number | undefined {
-    const ratio = this.getHealthRatio(group, healthType)?.toNumber();
+    const ratio = this.getHealthRatio(group, healthType).toNumber();
     if (ratio) {
       return ratio > 100 ? 100 : Math.trunc(ratio);
     } else {
@@ -322,7 +322,7 @@ export class MangoAccount {
    * The amount of native quote you could withdraw against your existing assets.
    * @returns collateral value, in native quote
    */
-  getCollateralValue(group: Group): I80F48 | undefined {
+  getCollateralValue(group: Group): I80F48 {
     return this.getHealth(group, HealthType.init);
   }
 
@@ -330,7 +330,7 @@ export class MangoAccount {
    * Sum of all positive assets.
    * @returns assets, in native quote
    */
-  getAssetsValue(group: Group, healthType: HealthType): I80F48 | undefined {
+  getAssetsValue(group: Group, healthType: HealthType): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc.assets(healthType);
   }
@@ -339,7 +339,7 @@ export class MangoAccount {
    * Sum of all negative assets.
    * @returns liabs, in native quote
    */
-  getLiabsValue(group: Group, healthType: HealthType): I80F48 | undefined {
+  getLiabsValue(group: Group, healthType: HealthType): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc.liabs(healthType);
   }
@@ -349,7 +349,7 @@ export class MangoAccount {
    * PNL is defined here as spot value + serum3 open orders value + perp value - net deposits value (evaluated at native quote price at the time of the deposit/withdraw)
    * spot value + serum3 open orders value + perp value is returned by getEquity (open orders values are added to spot token values implicitly)
    */
-  getPnl(group: Group): I80F48 | undefined {
+  getPnl(group: Group): I80F48 {
     return this.getEquity(group)?.add(
       I80F48.fromI64(this.netDeposits).mul(I80F48.fromNumber(-1)),
     );

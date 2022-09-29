@@ -442,16 +442,22 @@ export class Group {
     return toUiDecimals(vaultBalance, mintDecimals);
   }
 
-  public getSerum3MarketByMarketIndex(
-    marketIndex: MarketIndex,
-  ): Serum3Market | undefined {
-    return this.serum3MarketsMapByMarketIndex.get(marketIndex);
+  public getSerum3MarketByMarketIndex(marketIndex: MarketIndex): Serum3Market {
+    const serum3Market = this.serum3MarketsMapByMarketIndex.get(marketIndex);
+    if (!serum3Market) {
+      throw new Error(`No serum3Market found for marketIndex ${marketIndex}!`);
+    }
+    return serum3Market;
   }
 
-  public getSerum3MarketByName(name: string): Serum3Market | undefined {
-    return Array.from(this.serum3MarketsMapByExternal.values()).find(
-      (serum3Market) => serum3Market.name === name,
-    );
+  public getSerum3MarketByName(name: string): Serum3Market {
+    const serum3Market = Array.from(
+      this.serum3MarketsMapByExternal.values(),
+    ).find((serum3Market) => serum3Market.name === name);
+    if (!serum3Market) {
+      throw new Error(`No serum3Market found by name ${name}!`);
+    }
+    return serum3Market;
   }
 
   public getSerum3MarketByExternalMarket(
@@ -505,10 +511,16 @@ export class Group {
     return maker ? rates.maker : rates.taker;
   }
 
-  public findPerpMarket(marketIndex: PerpMarketIndex): PerpMarket | undefined {
-    return Array.from(this.perpMarketsMapByName.values()).find(
+  public findPerpMarket(marketIndex: PerpMarketIndex): PerpMarket {
+    const perpMarket = Array.from(this.perpMarketsMapByName.values()).find(
       (perpMarket) => perpMarket.perpMarketIndex === marketIndex,
     );
+    if (!perpMarket) {
+      throw new Error(
+        `No perpMarket found for perpMarketIndex ${marketIndex}!`,
+      );
+    }
+    return perpMarket;
   }
 
   public getPerpMarketByOracle(oracle: PublicKey): PerpMarket {
