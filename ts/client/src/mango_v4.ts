@@ -2319,6 +2319,18 @@ export type MangoV4 = {
         {
           "name": "feePenalty",
           "type": "f32"
+        },
+        {
+          "name": "settleFeeFlat",
+          "type": "f32"
+        },
+        {
+          "name": "settleFeeAmountThreshold",
+          "type": "f32"
+        },
+        {
+          "name": "settleFeeFractionLowHealth",
+          "type": "f32"
         }
       ]
     },
@@ -2436,6 +2448,24 @@ export type MangoV4 = {
         },
         {
           "name": "feePenaltyOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "settleFeeFlatOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "settleFeeAmountThresholdOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "settleFeeFractionLowHealthOpt",
           "type": {
             "option": "f32"
           }
@@ -2835,6 +2865,16 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "settler",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settlerOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "perpMarket",
           "isMut": false,
           "isSigner": false
@@ -2860,12 +2900,7 @@ export type MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "maxSettleAmount",
-          "type": "u64"
-        }
-      ]
+      "args": []
     },
     {
       "name": "perpSettleFees",
@@ -4029,11 +4064,33 @@ export type MangoV4 = {
             "type": "f32"
           },
           {
+            "name": "settleFeeFlat",
+            "docs": [
+              "In native units of settlement token, given to each settle call above the",
+              "settle_fee_amount_threshold."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "settleFeeAmountThreshold",
+            "docs": [
+              "Pnl settlement amount needed to be eligible for fees."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "settleFeeFractionLowHealth",
+            "docs": [
+              "Fraction of pnl to pay out as fee if +pnl account has low health."
+            ],
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                108
+                92
               ]
             }
           }
@@ -4405,6 +4462,10 @@ export type MangoV4 = {
           {
             "name": "hasOpenOrders",
             "type": "bool"
+          },
+          {
+            "name": "trustedMarket",
+            "type": "bool"
           }
         ]
       }
@@ -4487,9 +4548,23 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                40
+                16
               ]
             }
+          },
+          {
+            "name": "previousIndex",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "cumulativeDepositInterest",
+            "type": "f32"
+          },
+          {
+            "name": "cumulativeBorrowInterest",
+            "type": "f32"
           }
         ]
       }
@@ -5975,6 +6050,36 @@ export type MangoV4 = {
         {
           "name": "socializedLoss",
           "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "DeactivateTokenPositionLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "cumulativeDepositInterest",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "cumulativeBorrowInterest",
+          "type": "f32",
           "index": false
         }
       ]
@@ -8420,6 +8525,18 @@ export const IDL: MangoV4 = {
         {
           "name": "feePenalty",
           "type": "f32"
+        },
+        {
+          "name": "settleFeeFlat",
+          "type": "f32"
+        },
+        {
+          "name": "settleFeeAmountThreshold",
+          "type": "f32"
+        },
+        {
+          "name": "settleFeeFractionLowHealth",
+          "type": "f32"
         }
       ]
     },
@@ -8537,6 +8654,24 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "feePenaltyOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "settleFeeFlatOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "settleFeeAmountThresholdOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "settleFeeFractionLowHealthOpt",
           "type": {
             "option": "f32"
           }
@@ -8936,6 +9071,16 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "settler",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settlerOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "perpMarket",
           "isMut": false,
           "isSigner": false
@@ -8961,12 +9106,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "maxSettleAmount",
-          "type": "u64"
-        }
-      ]
+      "args": []
     },
     {
       "name": "perpSettleFees",
@@ -10130,11 +10270,33 @@ export const IDL: MangoV4 = {
             "type": "f32"
           },
           {
+            "name": "settleFeeFlat",
+            "docs": [
+              "In native units of settlement token, given to each settle call above the",
+              "settle_fee_amount_threshold."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "settleFeeAmountThreshold",
+            "docs": [
+              "Pnl settlement amount needed to be eligible for fees."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "settleFeeFractionLowHealth",
+            "docs": [
+              "Fraction of pnl to pay out as fee if +pnl account has low health."
+            ],
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                108
+                92
               ]
             }
           }
@@ -10506,6 +10668,10 @@ export const IDL: MangoV4 = {
           {
             "name": "hasOpenOrders",
             "type": "bool"
+          },
+          {
+            "name": "trustedMarket",
+            "type": "bool"
           }
         ]
       }
@@ -10588,9 +10754,23 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                40
+                16
               ]
             }
+          },
+          {
+            "name": "previousIndex",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "cumulativeDepositInterest",
+            "type": "f32"
+          },
+          {
+            "name": "cumulativeBorrowInterest",
+            "type": "f32"
           }
         ]
       }
@@ -12076,6 +12256,36 @@ export const IDL: MangoV4 = {
         {
           "name": "socializedLoss",
           "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "DeactivateTokenPositionLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "cumulativeDepositInterest",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "cumulativeBorrowInterest",
+          "type": "f32",
           "index": false
         }
       ]

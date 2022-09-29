@@ -1,20 +1,21 @@
 import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
-import { Order, Orderbook } from '@project-serum/serum/lib/market';
+import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
+import { SERUM3_PROGRAM_ID } from '../constants';
 import {
   nativeI80F48ToUi,
   toNative,
   toUiDecimals,
   toUiDecimalsForQuote,
 } from '../utils';
-import { Bank } from './bank';
+import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
-import { HealthCache, HealthCacheDto } from './healthCache';
+import { HealthCache } from './healthCache';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from './I80F48';
-import { PerpOrder, PerpOrderSide } from './perp';
-import { Serum3Side } from './serum3';
+import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
+import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
   public tokens: TokenPosition[];
   public serum3: Serum3Orders[];
@@ -58,7 +59,7 @@ export class MangoAccount {
       obj.serum3 as Serum3PositionDto[],
       obj.perps as PerpPositionDto[],
       obj.perpOpenOrders as PerpOoDto[],
-      {} as any,
+      new Map(), // serum3OosMapByMarketIndex
     );
   }
 
@@ -78,39 +79,56 @@ export class MangoAccount {
     serum3: Serum3PositionDto[],
     perps: PerpPositionDto[],
     perpOpenOrders: PerpOoDto[],
-    public accountData: undefined | MangoAccountData,
+    public serum3OosMapByMarketIndex: Map<number, OpenOrders>,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.tokens = tokens.map((dto) => TokenPosition.from(dto));
     this.serum3 = serum3.map((dto) => Serum3Orders.from(dto));
     this.perps = perps.map((dto) => PerpPosition.from(dto));
     this.perpOpenOrders = perpOpenOrders.map((dto) => PerpOo.from(dto));
-    this.accountData = undefined;
     this.netDeposits = netDeposits;
   }
 
-  async reload(client: MangoClient, group: Group): Promise<MangoAccount> {
+  async reload(client: MangoClient): Promise<MangoAccount> {
     const mangoAccount = await client.getMangoAccount(this);
-    await mangoAccount.reloadAccountData(client, group);
+    await mangoAccount.reloadAccountData(client);
     Object.assign(this, mangoAccount);
     return mangoAccount;
   }
 
   async reloadWithSlot(
     client: MangoClient,
-    group: Group,
   ): Promise<{ value: MangoAccount; slot: number }> {
     const resp = await client.getMangoAccountWithSlot(this.publicKey);
-    await resp?.value.reloadAccountData(client, group);
+    await resp?.value.reloadAccountData(client);
     Object.assign(this, resp?.value);
     return { value: resp!.value, slot: resp!.slot };
   }
 
-  async reloadAccountData(
-    client: MangoClient,
-    group: Group,
-  ): Promise<MangoAccount> {
-    this.accountData = await client.computeAccountData(group, this);
+  async reloadAccountData(client: MangoClient): Promise<MangoAccount> {
+    const serum3Active = this.serum3Active();
+    const ais =
+      await client.program.provider.connection.getMultipleAccountsInfo(
+        serum3Active.map((serum3) => serum3.openOrders),
+      );
+    this.serum3OosMapByMarketIndex = new Map(
+      Array.from(
+        ais.map((ai, i) => {
+          if (!ai) {
+            throw new Error(
+              `Undefined AI for open orders ${serum3Active[i].openOrders} and market ${serum3Active[i].marketIndex}!`,
+            );
+          }
+          const oo = OpenOrders.fromAccountInfo(
+            serum3Active[i].openOrders,
+            ai,
+            SERUM3_PROGRAM_ID[client.cluster],
+          );
+          return [serum3Active[i].marketIndex, oo];
+        }),
+      ),
+    );
+
     return this;
   }
 
@@ -132,12 +150,24 @@ export class MangoAccount {
     );
   }
 
-  findToken(tokenIndex: number): TokenPosition | undefined {
+  getToken(tokenIndex: TokenIndex): TokenPosition | undefined {
     return this.tokens.find((ta) => ta.tokenIndex == tokenIndex);
   }
 
-  findSerum3Account(marketIndex: number): Serum3Orders | undefined {
+  getSerum3Account(marketIndex: MarketIndex): Serum3Orders | undefined {
     return this.serum3.find((sa) => sa.marketIndex == marketIndex);
+  }
+
+  getSerum3OoAccount(marketIndex: MarketIndex): OpenOrders {
+    const oo: OpenOrders | undefined =
+      this.serum3OosMapByMarketIndex.get(marketIndex);
+
+    if (!oo) {
+      throw new Error(
+        `Open orders account not loaded for market with marketIndex ${marketIndex}!`,
+      );
+    }
+    return oo;
   }
 
   // How to navigate
@@ -152,7 +182,7 @@ export class MangoAccount {
    * @returns native balance for a token, is signed
    */
   getTokenBalance(bank: Bank): I80F48 {
-    const tp = this.findToken(bank.tokenIndex);
+    const tp = this.getToken(bank.tokenIndex);
     return tp ? tp.balance(bank) : ZERO_I80F48();
   }
 
@@ -162,7 +192,7 @@ export class MangoAccount {
    * @returns native deposits for a token, 0 if position has borrows
    */
   getTokenDeposits(bank: Bank): I80F48 {
-    const tp = this.findToken(bank.tokenIndex);
+    const tp = this.getToken(bank.tokenIndex);
     return tp ? tp.deposits(bank) : ZERO_I80F48();
   }
 
@@ -172,7 +202,7 @@ export class MangoAccount {
    * @returns native borrows for a token, 0 if position has deposits
    */
   getTokenBorrows(bank: Bank): I80F48 {
-    const tp = this.findToken(bank.tokenIndex);
+    const tp = this.getToken(bank.tokenIndex);
     return tp ? tp.borrows(bank) : ZERO_I80F48();
   }
 
@@ -182,7 +212,7 @@ export class MangoAccount {
    * @returns UI balance for a token, is signed
    */
   getTokenBalanceUi(bank: Bank): number {
-    const tp = this.findToken(bank.tokenIndex);
+    const tp = this.getToken(bank.tokenIndex);
     return tp ? tp.balanceUi(bank) : 0;
   }
 
@@ -192,7 +222,7 @@ export class MangoAccount {
    * @returns UI deposits for a token, 0 or more
    */
   getTokenDepositsUi(bank: Bank): number {
-    const ta = this.findToken(bank.tokenIndex);
+    const ta = this.getToken(bank.tokenIndex);
     return ta ? ta.depositsUi(bank) : 0;
   }
 
@@ -202,7 +232,7 @@ export class MangoAccount {
    * @returns UI borrows for a token, 0 or less
    */
   getTokenBorrowsUi(bank: Bank): number {
-    const ta = this.findToken(bank.tokenIndex);
+    const ta = this.getToken(bank.tokenIndex);
     return ta ? ta.borrowsUi(bank) : 0;
   }
 
@@ -211,10 +241,9 @@ export class MangoAccount {
    * @param healthType
    * @returns raw health number, in native quote
    */
-  getHealth(healthType: HealthType): I80F48 | undefined {
-    return healthType == HealthType.init
-      ? this.accountData?.initHealth
-      : this.accountData?.maintHealth;
+  getHealth(group: Group, healthType: HealthType): I80F48 {
+    const hc = HealthCache.fromMangoAccount(group, this);
+    return hc.health(healthType);
   }
 
   /**
@@ -223,8 +252,9 @@ export class MangoAccount {
    * @param healthType
    * @returns health ratio, in percentage form
    */
-  getHealthRatio(healthType: HealthType): I80F48 | undefined {
-    return this.accountData?.healthCache.healthRatio(healthType);
+  getHealthRatio(group: Group, healthType: HealthType): I80F48 {
+    const hc = HealthCache.fromMangoAccount(group, this);
+    return hc.healthRatio(healthType);
   }
 
   /**
@@ -232,8 +262,8 @@ export class MangoAccount {
    * @param healthType
    * @returns health ratio, in percentage form, capped to 100
    */
-  getHealthRatioUi(healthType: HealthType): number | undefined {
-    const ratio = this.getHealthRatio(healthType)?.toNumber();
+  getHealthRatioUi(group: Group, healthType: HealthType): number | undefined {
+    const ratio = this.getHealthRatio(group, healthType).toNumber();
     if (ratio) {
       return ratio > 100 ? 100 : Math.trunc(ratio);
     } else {
@@ -245,40 +275,73 @@ export class MangoAccount {
    * Sum of all the assets i.e. token deposits, borrows, total assets in spot open orders, (perps positions is todo) in terms of quote value.
    * @returns equity, in native quote
    */
-  getEquity(): I80F48 | undefined {
-    if (this.accountData) {
-      const equity = this.accountData.equity;
-      const total_equity = equity.tokens.reduce(
-        (a, b) => a.add(b.value),
-        ZERO_I80F48(),
-      );
-      return total_equity;
+  getEquity(group: Group): I80F48 {
+    const tokensMap = new Map<number, I80F48>();
+    for (const tp of this.tokensActive()) {
+      const bank = group.getFirstBankByTokenIndex(tp.tokenIndex);
+      tokensMap.set(tp.tokenIndex, tp.balance(bank).mul(bank.price));
     }
-    return undefined;
+
+    for (const sp of this.serum3Active()) {
+      const oo = this.getSerum3OoAccount(sp.marketIndex);
+      const baseBank = group.getFirstBankByTokenIndex(sp.baseTokenIndex);
+      tokensMap
+        .get(baseBank.tokenIndex)!
+        .iadd(
+          I80F48.fromString(oo.baseTokenTotal.toString()).mul(baseBank.price),
+        );
+      const quoteBank = group.getFirstBankByTokenIndex(sp.quoteTokenIndex);
+      // NOTE: referrerRebatesAccrued is not declared on oo class, but the layout
+      // is aware of it
+      tokensMap
+        .get(baseBank.tokenIndex)!
+        .iadd(
+          I80F48.fromString(
+            oo.quoteTokenTotal
+              .add((oo as any).referrerRebatesAccrued)
+              .toString(),
+          ).mul(quoteBank.price),
+        );
+    }
+
+    const tokenEquity = Array.from(tokensMap.values()).reduce(
+      (a, b) => a.add(b),
+      ZERO_I80F48(),
+    );
+
+    const perpEquity = this.perpActive().reduce(
+      (a, b) =>
+        a.add(b.getEquity(group.getPerpMarketByMarketIndex(b.marketIndex))),
+      ZERO_I80F48(),
+    );
+
+    return tokenEquity.add(perpEquity);
   }
 
   /**
    * The amount of native quote you could withdraw against your existing assets.
    * @returns collateral value, in native quote
    */
-  getCollateralValue(): I80F48 | undefined {
-    return this.getHealth(HealthType.init);
+  getCollateralValue(group: Group): I80F48 {
+    return this.getHealth(group, HealthType.init);
   }
 
   /**
    * Sum of all positive assets.
    * @returns assets, in native quote
    */
-  getAssetsValue(healthType: HealthType): I80F48 | undefined {
-    return this.accountData?.healthCache.assets(healthType);
+  getAssetsValue(group: Group, healthType: HealthType): I80F48 {
+    const hc = HealthCache.fromMangoAccount(group, this);
+    return hc.assets(healthType);
   }
 
   /**
    * Sum of all negative assets.
    * @returns liabs, in native quote
    */
-  getLiabsValue(healthType: HealthType): I80F48 | undefined {
-    return this.accountData?.healthCache.liabs(healthType);
+  getLiabsValue(group: Group, healthType: HealthType): I80F48 {
+    const hc = HealthCache.fromMangoAccount(group, this);
+    return hc.liabs(healthType);
   }
 
   /**
@@ -286,8 +349,8 @@ export class MangoAccount {
    * PNL is defined here as spot value + serum3 open orders value + perp value - net deposits value (evaluated at native quote price at the time of the deposit/withdraw)
    * spot value + serum3 open orders value + perp value is returned by getEquity (open orders values are added to spot token values implicitly)
    */
-  getPnl(): I80F48 | undefined {
-    return this.getEquity()?.add(
+  getPnl(group: Group): I80F48 {
+    return this.getEquity(group)?.add(
       I80F48.fromI64(this.netDeposits).mul(I80F48.fromNumber(-1)),
     );
   }
@@ -301,7 +364,7 @@ export class MangoAccount {
     mintPk: PublicKey,
   ): I80F48 | undefined {
     const tokenBank: Bank = group.getFirstBankByMint(mintPk);
-    const initHealth = this.accountData?.initHealth;
+    const initHealth = this.getHealth(group, HealthType.init);
 
     if (!initHealth) return undefined;
 
@@ -314,8 +377,7 @@ export class MangoAccount {
     // Deposits need special treatment since they would neither count towards liabilities
     // nor would be charged loanOriginationFeeRate when withdrawn
 
-    const tp = this.findToken(tokenBank.tokenIndex);
-    if (!tokenBank.price) return undefined;
+    const tp = this.getToken(tokenBank.tokenIndex);
     const existingTokenDeposits = tp ? tp.deposits(tokenBank) : ZERO_I80F48();
     let existingPositionHealthContrib = ZERO_I80F48();
     if (existingTokenDeposits.gt(ZERO_I80F48())) {
@@ -377,18 +439,14 @@ export class MangoAccount {
     targetMintPk: PublicKey,
     priceFactor: number,
   ): number | undefined {
-    if (!this.accountData) {
-      throw new Error(
-        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
-      );
-    }
     if (sourceMintPk.equals(targetMintPk)) {
       return 0;
     }
-    const maxSource = this.accountData.healthCache.getMaxSourceForTokenSwap(
+    const hc = HealthCache.fromMangoAccount(group, this);
+    const maxSource = hc.getMaxSourceForTokenSwap(
       group.getFirstBankByMint(sourceMintPk),
       group.getFirstBankByMint(targetMintPk),
-      ONE_I80F48(), // target 1% health
+      I80F48.fromNumber(2), // target 2% health
       I80F48.fromNumber(priceFactor),
     );
     maxSource.idiv(
@@ -426,7 +484,8 @@ export class MangoAccount {
         mintPk: tokenChange.mintPk,
       };
     });
-    return this.accountData?.healthCache
+    const hc = HealthCache.fromMangoAccount(group, this);
+    return hc
       .simHealthRatioWithTokenPositionChanges(
         group,
         nativeTokenChanges,
@@ -440,14 +499,8 @@ export class MangoAccount {
     group: Group,
     externalMarketPk: PublicKey,
   ): Promise<Order[]> {
-    const serum3Market = group.serum3MarketsMapByExternal.get(
-      externalMarketPk.toBase58(),
-    );
-    if (!serum3Market) {
-      throw new Error(
-        `Unable to find mint serum3Market for ${externalMarketPk.toString()}`,
-      );
-    }
+    const serum3Market =
+      group.getSerum3MarketByExternalMarket(externalMarketPk);
     const serum3OO = this.serum3Active().find(
       (s) => s.marketIndex === serum3Market.marketIndex,
     );
@@ -455,7 +508,7 @@ export class MangoAccount {
       throw new Error(`No open orders account found for ${externalMarketPk}`);
     }
 
-    const serum3MarketExternal = group.serum3MarketExternalsMap.get(
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     )!;
     const [bidsInfo, asksInfo] =
@@ -463,9 +516,14 @@ export class MangoAccount {
         serum3MarketExternal.bidsAddress,
         serum3MarketExternal.asksAddress,
       ]);
-    if (!bidsInfo || !asksInfo) {
+    if (!bidsInfo) {
       throw new Error(
-        `bids and asks ai were not fetched for ${externalMarketPk.toString()}`,
+        `Undefined bidsInfo for serum3Market with externalMarket ${externalMarketPk.toString()!}`,
+      );
+    }
+    if (!asksInfo) {
+      throw new Error(
+        `Undefined asksInfo for serum3Market with externalMarket ${externalMarketPk.toString()!}`,
       );
     }
     const bids = Orderbook.decode(serum3MarketExternal, bidsInfo.data);
@@ -476,7 +534,6 @@ export class MangoAccount {
   }
 
   /**
-   * TODO priceFactor
    * @param group
    * @param externalMarketPk
    * @returns maximum ui quote which can be traded for base token given current health
@@ -485,26 +542,28 @@ export class MangoAccount {
     group: Group,
     externalMarketPk: PublicKey,
   ): number {
-    const serum3Market = group.serum3MarketsMapByExternal.get(
-      externalMarketPk.toBase58(),
+    const serum3Market =
+      group.getSerum3MarketByExternalMarket(externalMarketPk);
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
     );
-    if (!serum3Market) {
-      throw new Error(
-        `Unable to find mint serum3Market for ${externalMarketPk.toString()}`,
-      );
-    }
-    if (!this.accountData) {
-      throw new Error(
-        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
-      );
-    }
-    const nativeAmount =
-      this.accountData.healthCache.getMaxSerum3OrderForHealthRatio(
-        group,
-        serum3Market,
-        Serum3Side.bid,
-        I80F48.fromNumber(1),
-      );
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+    const hc = HealthCache.fromMangoAccount(group, this);
+    let nativeAmount = hc.getMaxSerum3OrderForHealthRatio(
+      baseBank,
+      quoteBank,
+      serum3Market,
+      Serum3Side.bid,
+      I80F48.fromNumber(2),
+    );
+    // If its a bid then the reserved fund and potential loan is in base
+    // also keep some buffer for fees, use taker fees for worst case simulation.
+    nativeAmount = nativeAmount
+      .div(quoteBank.price)
+      .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
+      .div(ONE_I80F48().add(I80F48.fromNumber(group.getSerum3FeeRates(false))));
     return toUiDecimals(
       nativeAmount,
       group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex).mintDecimals,
@@ -512,7 +571,6 @@ export class MangoAccount {
   }
 
   /**
-   * TODO priceFactor
    * @param group
    * @param externalMarketPk
    * @returns maximum ui base which can be traded for quote token given current health
@@ -521,26 +579,28 @@ export class MangoAccount {
     group: Group,
     externalMarketPk: PublicKey,
   ): number {
-    const serum3Market = group.serum3MarketsMapByExternal.get(
-      externalMarketPk.toBase58(),
+    const serum3Market =
+      group.getSerum3MarketByExternalMarket(externalMarketPk);
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
     );
-    if (!serum3Market) {
-      throw new Error(
-        `Unable to find mint serum3Market for ${externalMarketPk.toString()}`,
-      );
-    }
-    if (!this.accountData) {
-      throw new Error(
-        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
-      );
-    }
-    const nativeAmount =
-      this.accountData.healthCache.getMaxSerum3OrderForHealthRatio(
-        group,
-        serum3Market,
-        Serum3Side.ask,
-        I80F48.fromNumber(1),
-      );
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+    const hc = HealthCache.fromMangoAccount(group, this);
+    let nativeAmount = hc.getMaxSerum3OrderForHealthRatio(
+      baseBank,
+      quoteBank,
+      serum3Market,
+      Serum3Side.ask,
+      I80F48.fromNumber(2),
+    );
+    // If its a ask then the reserved fund and potential loan is in base
+    // also keep some buffer for fees, use taker fees for worst case simulation.
+    nativeAmount = nativeAmount
+      .div(baseBank.price)
+      .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
+      .div(ONE_I80F48().add(I80F48.fromNumber(group.getSerum3FeeRates(false))));
     return toUiDecimals(
       nativeAmount,
       group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex).mintDecimals,
@@ -561,22 +621,19 @@ export class MangoAccount {
     externalMarketPk: PublicKey,
     healthType: HealthType = HealthType.init,
   ): number {
-    const serum3Market = group.serum3MarketsMapByExternal.get(
-      externalMarketPk.toBase58(),
+    const serum3Market =
+      group.getSerum3MarketByExternalMarket(externalMarketPk);
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
     );
-    if (!serum3Market) {
-      throw new Error(
-        `Unable to find mint serum3Market for ${externalMarketPk.toString()}`,
-      );
-    }
-    if (!this.accountData) {
-      throw new Error(
-        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
-      );
-    }
-    return this.accountData.healthCache
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+    const hc = HealthCache.fromMangoAccount(group, this);
+    return hc
       .simHealthRatioWithSerum3BidChanges(
-        group,
+        baseBank,
+        quoteBank,
         toNative(
           uiQuoteAmount,
           group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
@@ -602,22 +659,19 @@ export class MangoAccount {
     externalMarketPk: PublicKey,
     healthType: HealthType = HealthType.init,
   ): number {
-    const serum3Market = group.serum3MarketsMapByExternal.get(
-      externalMarketPk.toBase58(),
+    const serum3Market =
+      group.getSerum3MarketByExternalMarket(externalMarketPk);
+    const baseBank = group.getFirstBankByTokenIndex(
+      serum3Market.baseTokenIndex,
     );
-    if (!serum3Market) {
-      throw new Error(
-        `Unable to find mint serum3Market for ${externalMarketPk.toString()}`,
-      );
-    }
-    if (!this.accountData) {
-      throw new Error(
-        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
-      );
-    }
-    return this.accountData.healthCache
+    const quoteBank = group.getFirstBankByTokenIndex(
+      serum3Market.quoteTokenIndex,
+    );
+    const hc = HealthCache.fromMangoAccount(group, this);
+    return hc
       .simHealthRatioWithSerum3AskChanges(
-        group,
+        baseBank,
+        quoteBank,
         toNative(
           uiBaseAmount,
           group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
@@ -638,28 +692,21 @@ export class MangoAccount {
    */
   public getMaxQuoteForPerpBidUi(
     group: Group,
-    perpMarketName: string,
+    perpMarketIndex: PerpMarketIndex,
     uiPrice: number,
   ): number {
-    const perpMarket = group.perpMarketsMap.get(perpMarketName);
-    if (!perpMarket) {
-      throw new Error(`PerpMarket for ${perpMarketName} not found!`);
-    }
-    if (!this.accountData) {
-      throw new Error(
-        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
-      );
-    }
-    const baseLots = this.accountData.healthCache.getMaxPerpForHealthRatio(
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const hc = HealthCache.fromMangoAccount(group, this);
+    const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
       PerpOrderSide.bid,
-      I80F48.fromNumber(1),
+      I80F48.fromNumber(2),
       group.toNativePrice(uiPrice, perpMarket.baseDecimals),
     );
     const nativeBase = baseLots.mul(
       I80F48.fromString(perpMarket.baseLotSize.toString()),
     );
-    const nativeQuote = nativeBase.mul(I80F48.fromNumber(perpMarket.price));
+    const nativeQuote = nativeBase.mul(perpMarket.price);
     return toUiDecimalsForQuote(nativeQuote.toNumber());
   }
 
@@ -672,22 +719,15 @@ export class MangoAccount {
    */
   public getMaxBaseForPerpAskUi(
     group: Group,
-    perpMarketName: string,
+    perpMarketIndex: PerpMarketIndex,
     uiPrice: number,
   ): number {
-    const perpMarket = group.perpMarketsMap.get(perpMarketName);
-    if (!perpMarket) {
-      throw new Error(`PerpMarket for ${perpMarketName} not found!`);
-    }
-    if (!this.accountData) {
-      throw new Error(
-        `accountData not loaded on MangoAccount, try reloading MangoAccount`,
-      );
-    }
-    const baseLots = this.accountData.healthCache.getMaxPerpForHealthRatio(
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const hc = HealthCache.fromMangoAccount(group, this);
+    const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
       PerpOrderSide.ask,
-      I80F48.fromNumber(1),
+      I80F48.fromNumber(2),
       group.toNativePrice(uiPrice, perpMarket.baseDecimals),
     );
     return perpMarket.baseLotsToUi(new BN(baseLots.toString()));
@@ -696,12 +736,9 @@ export class MangoAccount {
   public async loadPerpOpenOrdersForMarket(
     client: MangoClient,
     group: Group,
-    perpMarketName: string,
+    perpMarketIndex: PerpMarketIndex,
   ): Promise<PerpOrder[]> {
-    const perpMarket = group.perpMarketsMap.get(perpMarketName);
-    if (!perpMarket) {
-      throw new Error(`Perp Market ${perpMarketName} not found!`);
-    }
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const [bids, asks] = await Promise.all([
       perpMarket.loadBids(client),
       perpMarket.loadAsks(client),
@@ -759,17 +796,17 @@ export class MangoAccount {
 
 export class TokenPosition {
   static TokenIndexUnset = 65535;
-  static from(dto: TokenPositionDto) {
+  static from(dto: TokenPositionDto): TokenPosition {
     return new TokenPosition(
       I80F48.from(dto.indexedPosition),
-      dto.tokenIndex,
+      dto.tokenIndex as TokenIndex,
       dto.inUseCount,
     );
   }
 
   constructor(
     public indexedPosition: I80F48,
-    public tokenIndex: number,
+    public tokenIndex: TokenIndex,
     public inUseCount: number,
   ) {}
 
@@ -877,17 +914,17 @@ export class Serum3Orders {
   static from(dto: Serum3PositionDto): Serum3Orders {
     return new Serum3Orders(
       dto.openOrders,
-      dto.marketIndex,
-      dto.baseTokenIndex,
-      dto.quoteTokenIndex,
+      dto.marketIndex as MarketIndex,
+      dto.baseTokenIndex as TokenIndex,
+      dto.quoteTokenIndex as TokenIndex,
     );
   }
 
   constructor(
     public openOrders: PublicKey,
-    public marketIndex: number,
-    public baseTokenIndex: number,
-    public quoteTokenIndex: number,
+    public marketIndex: MarketIndex,
+    public baseTokenIndex: TokenIndex,
+    public quoteTokenIndex: TokenIndex,
   ) {}
 
   public isActive(): boolean {
@@ -907,30 +944,76 @@ export class Serum3PositionDto {
 
 export class PerpPosition {
   static PerpMarketIndexUnset = 65535;
-  static from(dto: PerpPositionDto) {
+  static from(dto: PerpPositionDto): PerpPosition {
     return new PerpPosition(
-      dto.marketIndex,
+      dto.marketIndex as PerpMarketIndex,
       dto.basePositionLots.toNumber(),
-      dto.quotePositionNative.val,
+      I80F48.from(dto.quotePositionNative),
       dto.bidsBaseLots.toNumber(),
       dto.asksBaseLots.toNumber(),
       dto.takerBaseLots.toNumber(),
       dto.takerQuoteLots.toNumber(),
+      I80F48.from(dto.longSettledFunding),
+      I80F48.from(dto.shortSettledFunding),
     );
   }
 
   constructor(
-    public marketIndex: number,
+    public marketIndex: PerpMarketIndex,
     public basePositionLots: number,
-    public quotePositionNative: BN,
+    public quotePositionNative: I80F48,
     public bidsBaseLots: number,
     public asksBaseLots: number,
     public takerBaseLots: number,
     public takerQuoteLots: number,
+    public longSettledFunding: I80F48,
+    public shortSettledFunding: I80F48,
   ) {}
 
   isActive(): boolean {
     return this.marketIndex != PerpPosition.PerpMarketIndexUnset;
+  }
+
+  public unsettledFunding(perpMarket: PerpMarket): I80F48 {
+    if (this.basePositionLots > 0) {
+      return perpMarket.longFunding
+        .sub(this.longSettledFunding)
+        .mul(I80F48.fromString(this.basePositionLots.toString()));
+    } else if (this.basePositionLots < 0) {
+      return perpMarket.shortFunding
+        .sub(this.shortSettledFunding)
+        .mul(I80F48.fromString(this.basePositionLots.toString()));
+    }
+    return ZERO_I80F48();
+  }
+
+  public getEquity(perpMarket: PerpMarket): I80F48 {
+    const lotsToQuote = I80F48.fromString(
+      perpMarket.baseLotSize.toString(),
+    ).mul(perpMarket.price);
+
+    const baseLots = I80F48.fromNumber(
+      this.basePositionLots + this.takerBaseLots,
+    );
+
+    const unsettledFunding = this.unsettledFunding(perpMarket);
+    const takerQuote = I80F48.fromString(
+      new BN(this.takerQuoteLots).mul(perpMarket.quoteLotSize).toString(),
+    );
+    const quoteCurrent = I80F48.fromString(this.quotePositionNative.toString())
+      .sub(unsettledFunding)
+      .add(takerQuote);
+
+    return baseLots.mul(lotsToQuote).add(quoteCurrent);
+  }
+
+  public hasOpenOrders(): boolean {
+    return (
+      this.asksBaseLots != 0 ||
+      this.bidsBaseLots != 0 ||
+      this.takerBaseLots != 0 ||
+      this.takerQuoteLots != 0
+    );
   }
 }
 
@@ -944,12 +1027,14 @@ export class PerpPositionDto {
     public asksBaseLots: BN,
     public takerBaseLots: BN,
     public takerQuoteLots: BN,
+    public longSettledFunding: I80F48Dto,
+    public shortSettledFunding: I80F48Dto,
   ) {}
 }
 
 export class PerpOo {
   static OrderMarketUnset = 65535;
-  static from(dto: PerpOoDto) {
+  static from(dto: PerpOoDto): PerpOo {
     return new PerpOo(
       dto.orderSide,
       dto.orderMarket,
@@ -977,67 +1062,4 @@ export class PerpOoDto {
 export class HealthType {
   static maint = { maint: {} };
   static init = { init: {} };
-}
-
-export class MangoAccountData {
-  constructor(
-    public healthCache: HealthCache,
-    public initHealth: I80F48,
-    public maintHealth: I80F48,
-    public equity: Equity,
-  ) {}
-
-  static from(event: {
-    healthCache: HealthCacheDto;
-    initHealth: I80F48Dto;
-    maintHealth: I80F48Dto;
-    equity: {
-      tokens: [{ tokenIndex: number; value: I80F48Dto }];
-      perps: [{ perpMarketIndex: number; value: I80F48Dto }];
-    };
-    initHealthLiabs: I80F48Dto;
-    tokenAssets: any;
-  }) {
-    return new MangoAccountData(
-      HealthCache.fromDto(event.healthCache),
-      I80F48.from(event.initHealth),
-      I80F48.from(event.maintHealth),
-      Equity.from(event.equity),
-    );
-  }
-}
-
-export class Equity {
-  public constructor(
-    public tokens: TokenEquity[],
-    public perps: PerpEquity[],
-  ) {}
-
-  static from(dto: EquityDto): Equity {
-    return new Equity(
-      dto.tokens.map(
-        (token) => new TokenEquity(token.tokenIndex, I80F48.from(token.value)),
-      ),
-      dto.perps.map(
-        (perpAccount) =>
-          new PerpEquity(
-            perpAccount.perpMarketIndex,
-            I80F48.from(perpAccount.value),
-          ),
-      ),
-    );
-  }
-}
-
-export class TokenEquity {
-  public constructor(public tokenIndex: number, public value: I80F48) {}
-}
-
-export class PerpEquity {
-  public constructor(public perpMarketIndex: number, public value: I80F48) {}
-}
-
-export class EquityDto {
-  tokens: { tokenIndex: number; value: I80F48Dto }[];
-  perps: { perpMarketIndex: number; value: I80F48Dto }[];
 }

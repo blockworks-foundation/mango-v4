@@ -526,6 +526,7 @@ pub struct PerpInfo {
     pub quote: I80F48,
     pub oracle_price: I80F48,
     pub has_open_orders: bool,
+    pub trusted_market: bool,
 }
 
 impl PerpInfo {
@@ -612,13 +613,14 @@ impl PerpInfo {
             quote,
             oracle_price,
             has_open_orders: perp_position.has_open_orders(),
+            trusted_market: perp_market.trusted_market(),
         })
     }
 
     /// Total health contribution from perp balances
     ///
     /// Due to isolation of perp markets, users may never borrow against perp
-    /// positions without settling first: perp health is capped at zero.
+    /// positions in untrusted without settling first: perp health is capped at zero.
     ///
     /// Users need to settle their perp pnl with other perp market participants
     /// in order to realize their gains if they want to use them as collateral.
@@ -631,9 +633,11 @@ impl PerpInfo {
     fn health_contribution(&self, health_type: HealthType) -> I80F48 {
         let c = self.uncapped_health_contribution(health_type);
 
-        // FUTURE: Allow v3-style "reliable" markets where we can return
-        // `self.quote + weight * self.base` here
-        c.min(I80F48::ZERO)
+        if self.trusted_market {
+            c
+        } else {
+            c.min(I80F48::ZERO)
+        }
     }
 
     #[inline(always)]
@@ -792,7 +796,7 @@ impl HealthCache {
             // can use perp_liq_base_position
             p.base != 0
             // can use perp_settle_pnl
-            || p.quote > ONE_NATIVE_USDC_IN_USD
+            || p.quote > ONE_NATIVE_USDC_IN_USD // TODO: we're not guaranteed to be able to settle positive perp pnl!
             // can use perp_liq_force_cancel_orders
             || p.has_open_orders
         });
@@ -837,7 +841,18 @@ impl HealthCache {
         }
     }
 
-    pub fn spot_health(&self, health_type: HealthType) -> I80F48 {
+    /// Compute the health when it comes to settling perp pnl
+    ///
+    /// Examples:
+    /// - An account may have maint_health < 0, but settling perp pnl could still be allowed.
+    ///   (+100 USDC health, -50 USDT health, -50 perp health -> allow settling 50 health worth)
+    /// - Positive health from trusted pnl markets counts
+    /// - If overall health is 0 with two trusted perp pnl < 0, settling may still be possible.
+    ///   (+100 USDC health, -150 perp1 health, -150 perp2 health -> allow settling 100 health worth)
+    /// - Positive trusted perp pnl can enable settling.
+    ///   (+100 trusted perp1 health, -100 perp2 health -> allow settling of 100 health worth)
+    pub fn perp_settle_health(&self) -> I80F48 {
+        let health_type = HealthType::Maint;
         let mut health = I80F48::ZERO;
         for token_info in self.token_infos.iter() {
             let contrib = token_info.health_contribution(health_type);
@@ -846,6 +861,12 @@ impl HealthCache {
         for serum3_info in self.serum3_infos.iter() {
             let contrib = serum3_info.health_contribution(health_type, &self.token_infos);
             cm!(health += contrib);
+        }
+        for perp_info in self.perp_infos.iter() {
+            if perp_info.trusted_market {
+                let positive_contrib = perp_info.health_contribution(health_type).max(I80F48::ZERO);
+                cm!(health += positive_contrib);
+            }
         }
         health
     }
@@ -1988,6 +2009,7 @@ mod tests {
             quote: I80F48::ZERO,
             oracle_price: I80F48::from_num(2.0),
             has_open_orders: false,
+            trusted_market: false,
         };
 
         let health_cache = HealthCache {

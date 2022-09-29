@@ -64,9 +64,13 @@
     "@project-serum/serum": "^0.13.65",
     "@pythnetwork/client": "^2.7.0",
     "@solana/spl-token": "^0.1.8",
+    "@solana/web3.js": "^1.63.1",
     "@switchboard-xyz/switchboard-v2": "^0.0.129",
     "big.js": "^6.1.1",
     "bs58": "^5.0.0"
+  },
+  "resolutions": {
+    "@project-serum/anchor/@solana/web3.js": "1.63.1"
   },
   "peerDependencies": {
     "@solana/spl-token-swap": "^0.2.0"

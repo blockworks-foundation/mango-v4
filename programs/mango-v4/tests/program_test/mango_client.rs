@@ -2144,6 +2144,9 @@ pub struct PerpCreateMarketInstruction {
     pub group_insurance_fund: bool,
     pub trusted_market: bool,
     pub fee_penalty: f32,
+    pub settle_fee_flat: f32,
+    pub settle_fee_amount_threshold: f32,
+    pub settle_fee_fraction_low_health: f32,
 }
 impl PerpCreateMarketInstruction {
     pub async fn with_new_book_and_queue(
@@ -2197,6 +2200,9 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             group_insurance_fund: self.group_insurance_fund,
             trusted_market: self.trusted_market,
             fee_penalty: self.fee_penalty,
+            settle_fee_flat: self.settle_fee_flat,
+            settle_fee_amount_threshold: self.settle_fee_amount_threshold,
+            settle_fee_fraction_low_health: self.settle_fee_fraction_low_health,
         };
 
         let perp_market = Pubkey::find_program_address(
@@ -2554,11 +2560,12 @@ impl ClientInstruction for PerpUpdateFundingInstruction {
 }
 
 pub struct PerpSettlePnlInstruction {
+    pub settler: Pubkey,
+    pub settler_owner: TestKeypair,
     pub account_a: Pubkey,
     pub account_b: Pubkey,
     pub perp_market: Pubkey,
     pub quote_bank: Pubkey,
-    pub max_settle_amount: u64,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpSettlePnlInstruction {
@@ -2569,26 +2576,32 @@ impl ClientInstruction for PerpSettlePnlInstruction {
         account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction {
-            max_settle_amount: self.max_settle_amount,
-        };
+        let instruction = Self::Instruction {};
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+        let account_a = account_loader
+            .load_mango_account(&self.account_a)
+            .await
+            .unwrap();
         let account_b = account_loader
             .load_mango_account(&self.account_b)
             .await
             .unwrap();
-        let health_check_metas = derive_health_check_remaining_account_metas(
+        let health_check_metas = derive_liquidation_remaining_account_metas(
             &account_loader,
+            &account_a,
             &account_b,
-            None,
-            false,
-            Some(perp_market.perp_market_index),
+            TokenIndex::MAX,
+            0,
+            TokenIndex::MAX,
+            0,
         )
         .await;
 
         let accounts = Self::Accounts {
             group: perp_market.group,
+            settler: self.settler,
+            settler_owner: self.settler_owner.pubkey(),
             perp_market: self.perp_market,
             account_a: self.account_a,
             account_b: self.account_b,
@@ -2603,7 +2616,7 @@ impl ClientInstruction for PerpSettlePnlInstruction {
     }
 
     fn signers(&self) -> Vec<TestKeypair> {
-        vec![]
+        vec![self.settler_owner]
     }
 }
 

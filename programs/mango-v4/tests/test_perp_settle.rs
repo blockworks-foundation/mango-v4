@@ -18,11 +18,8 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     let owner = context.users[0].key;
     let payer = context.users[1].key;
     let mints = &context.mints[0..=2];
-    let payer_mint_accounts = &context.users[1].token_accounts[0..=2];
 
-    let initial_token_deposit0 = 10_000;
-    // only deposited because perps currently require the base token position to be active
-    let initial_token_deposit1 = 1;
+    let initial_token_deposit = 10_000;
 
     //
     // SETUP: Create a group and an account
@@ -37,98 +34,32 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
-    let account_0 = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 0,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
+    let settler =
+        create_funded_account(&solana, group, owner, 251, &context.users[1], &[], 0, 0).await;
+    let settler_owner = owner.clone();
+
+    let account_0 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        &mints[0..1],
+        initial_token_deposit,
+        0,
     )
-    .await
-    .unwrap()
-    .account;
-
-    let account_1 = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 1,
-            token_count: 16,
-            serum3_count: 8,
-            perp_count: 8,
-            perp_oo_count: 8,
-            group,
-            owner,
-            payer,
-        },
+    .await;
+    let account_1 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        &mints[0..1],
+        initial_token_deposit,
+        0,
     )
-    .await
-    .unwrap()
-    .account;
-
-    //
-    // SETUP: Deposit user funds
-    //
-    {
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: initial_token_deposit0,
-                account: account_0,
-                token_account: payer_mint_accounts[0],
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: initial_token_deposit1,
-                account: account_0,
-                token_account: payer_mint_accounts[1],
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-    }
-
-    {
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: initial_token_deposit0,
-                account: account_1,
-                token_account: payer_mint_accounts[0],
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: initial_token_deposit1,
-                account: account_1,
-                token_account: payer_mint_accounts[1],
-                token_authority: payer.clone(),
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-    }
+    .await;
 
     //
     // TEST: Create a perp market
@@ -264,11 +195,12 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
             account_a: account_1,
             account_b: account_0,
             perp_market,
             quote_bank: tokens[1].bank,
-            max_settle_amount: u64::MAX,
         },
     )
     .await;
@@ -283,11 +215,12 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
             account_a: account_0,
             account_b: account_0,
             perp_market,
             quote_bank: tokens[0].bank,
-            max_settle_amount: u64::MAX,
         },
     )
     .await;
@@ -302,11 +235,12 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
             account_a: account_0,
             account_b: account_1,
             perp_market: perp_market_2,
             quote_bank: tokens[0].bank,
-            max_settle_amount: u64::MAX,
         },
     )
     .await;
@@ -317,25 +251,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         "Cannot settle a position that does not exist".to_string(),
     );
 
-    // max_settle_amount must be greater than zero
-    let result = send_tx(
-        solana,
-        PerpSettlePnlInstruction {
-            account_a: account_0,
-            account_b: account_1,
-            perp_market: perp_market,
-            quote_bank: tokens[0].bank,
-            max_settle_amount: 0,
-        },
-    )
-    .await;
-
-    assert_mango_error(
-        &result,
-        MangoError::MaxSettleAmountMustBeGreaterThanZero.into(),
-        "max_settle_amount must be greater than zero".to_string(),
-    );
-
     // TODO: Test funding settlement
 
     {
@@ -344,12 +259,12 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         let bank = solana.get_account::<Bank>(tokens[0].bank).await;
         assert_eq!(
             mango_account_0.tokens[0].native(&bank).round(),
-            initial_token_deposit0,
+            initial_token_deposit,
             "account 0 has expected amount of tokens"
         );
         assert_eq!(
             mango_account_1.tokens[0].native(&bank).round(),
-            initial_token_deposit0,
+            initial_token_deposit,
             "account 1 has expected amount of tokens"
         );
     }
@@ -372,11 +287,12 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
             account_a: account_1,
             account_b: account_0,
             perp_market,
             quote_bank: tokens[0].bank,
-            max_settle_amount: u64::MAX,
         },
     )
     .await;
@@ -418,70 +334,6 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         );
     }
 
-    // Partially execute the settle
-    let partial_settle_amount = 200;
-    send_tx(
-        solana,
-        PerpSettlePnlInstruction {
-            account_a: account_0,
-            account_b: account_1,
-            perp_market,
-            quote_bank: tokens[0].bank,
-            max_settle_amount: partial_settle_amount,
-        },
-    )
-    .await
-    .unwrap();
-
-    {
-        let bank = solana.get_account::<Bank>(tokens[0].bank).await;
-        let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
-        let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
-
-        assert_eq!(
-            mango_account_0.perps[0].base_position_lots(),
-            1,
-            "base position unchanged for account 0"
-        );
-        assert_eq!(
-            mango_account_1.perps[0].base_position_lots(),
-            -1,
-            "base position unchanged for account 1"
-        );
-
-        assert_eq!(
-            mango_account_0.perps[0].quote_position_native().round(),
-            I80F48::from(-100_020) - I80F48::from(partial_settle_amount),
-            "quote position reduced for profitable position by max_settle_amount"
-        );
-        assert_eq!(
-            mango_account_1.perps[0].quote_position_native().round(),
-            I80F48::from(100_000 + partial_settle_amount),
-            "quote position increased for losing position by opposite of first account"
-        );
-
-        assert_eq!(
-            mango_account_0.tokens[0].native(&bank).round(),
-            I80F48::from(initial_token_deposit0 + partial_settle_amount),
-            "account 0 token native position increased (profit) by max_settle_amount"
-        );
-        assert_eq!(
-            mango_account_1.tokens[0].native(&bank).round(),
-            I80F48::from(initial_token_deposit0) - I80F48::from(partial_settle_amount),
-            "account 1 token native position decreased (loss) by max_settle_amount"
-        );
-
-        assert_eq!(
-            mango_account_0.net_settled, partial_settle_amount as i64,
-            "net_settled on account 0 updated with profit from settlement"
-        );
-        assert_eq!(
-            mango_account_1.net_settled,
-            -(partial_settle_amount as i64),
-            "net_settled on account 1 updated with loss from settlement"
-        );
-    }
-
     // Change the oracle to a very high price, such that the pnl exceeds the account funding
     send_tx(
         solana,
@@ -496,8 +348,8 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    let expected_pnl_0 = I80F48::from(50000 - 20 - partial_settle_amount as i64);
-    let expected_pnl_1 = I80F48::from(-50000 + partial_settle_amount as i64);
+    let expected_pnl_0 = I80F48::from(50000 - 20);
+    let expected_pnl_1 = I80F48::from(-50000);
 
     {
         let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
@@ -514,16 +366,17 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     }
 
     // Settle as much PNL as account_1's health allows
-    let account_1_health_non_perp = I80F48::from(9040); // 0.8 * (10000-200+1*1500)
-    let expected_total_settle = I80F48::from(partial_settle_amount) + account_1_health_non_perp;
+    let account_1_health_non_perp = I80F48::from_num(0.8 * 10000.0);
+    let expected_total_settle = account_1_health_non_perp;
     send_tx(
         solana,
         PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
             account_a: account_0,
             account_b: account_1,
             perp_market,
             quote_bank: tokens[0].bank,
-            max_settle_amount: u64::MAX,
         },
     )
     .await
@@ -558,12 +411,12 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
 
         assert_eq!(
             mango_account_0.tokens[0].native(&bank).round(),
-            I80F48::from(initial_token_deposit0) + expected_total_settle,
+            I80F48::from(initial_token_deposit) + expected_total_settle,
             "account 0 token native position increased (profit)"
         );
         assert_eq!(
             mango_account_1.tokens[0].native(&bank).round(),
-            I80F48::from(initial_token_deposit0) - expected_total_settle,
+            I80F48::from(initial_token_deposit) - expected_total_settle,
             "account 1 token native position decreased (loss)"
         );
 
@@ -591,8 +444,8 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    let expected_pnl_0 = I80F48::from(-9760);
-    let expected_pnl_1 = I80F48::from(9740);
+    let expected_pnl_0 = I80F48::from(-8520);
+    let expected_pnl_1 = I80F48::from(8500);
 
     {
         let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
@@ -613,11 +466,12 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
             account_a: account_1,
             account_b: account_0,
             perp_market,
             quote_bank: tokens[0].bank,
-            max_settle_amount: u64::MAX,
         },
     )
     .await
@@ -653,12 +507,12 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         // 480 was previous settlement
         assert_eq!(
             mango_account_0.tokens[0].native(&bank).round(),
-            I80F48::from(initial_token_deposit0) + expected_total_settle,
+            I80F48::from(initial_token_deposit) + expected_total_settle,
             "account 0 token native position decreased (loss)"
         );
         assert_eq!(
             mango_account_1.tokens[0].native(&bank).round(),
-            I80F48::from(initial_token_deposit0) - expected_total_settle,
+            I80F48::from(initial_token_deposit) - expected_total_settle,
             "account 1 token native position increased (profit)"
         );
 
@@ -684,6 +538,334 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
         assert_eq!(
             get_pnl_native(&mango_account_1.perps[0], &perp_market, I80F48::from(995)).round(),
             0
+        );
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..=2];
+
+    let initial_token_deposit = 10_000;
+
+    //
+    // SETUP: Create a group and accounts
+    //
+
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        zero_token_is_quote: true,
+        ..GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+    let quote_bank = tokens[0].bank;
+
+    // ensure vaults are not empty
+    create_funded_account(
+        &solana,
+        group,
+        owner,
+        250,
+        &context.users[1],
+        mints,
+        100_000,
+        0,
+    )
+    .await;
+
+    let settler =
+        create_funded_account(&solana, group, owner, 251, &context.users[1], &[], 0, 0).await;
+    let settler_owner = owner.clone();
+
+    let account_0 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        &mints[0..1],
+        initial_token_deposit,
+        0,
+    )
+    .await;
+    let account_1 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        &mints[0..1],
+        initial_token_deposit,
+        0,
+    )
+    .await;
+
+    //
+    // SETUP: Create a perp market
+    //
+    let flat_fee = 1000;
+    let fee_low_health = 0.05;
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
+        solana,
+        PerpCreateMarketInstruction {
+            group,
+            admin,
+            payer,
+            perp_market_index: 0,
+            quote_lot_size: 10,
+            base_lot_size: 100,
+            maint_asset_weight: 1.0,
+            init_asset_weight: 1.0,
+            maint_liab_weight: 1.0,
+            init_liab_weight: 1.0,
+            liquidation_fee: 0.0,
+            maker_fee: 0.0,
+            taker_fee: 0.0,
+            settle_fee_flat: flat_fee as f32,
+            settle_fee_amount_threshold: 2000.0,
+            settle_fee_fraction_low_health: fee_low_health,
+            ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
+        },
+    )
+    .await
+    .unwrap();
+
+    let price_lots = {
+        let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
+        perp_market.native_price_to_lot(I80F48::from(1000))
+    };
+
+    // Set the initial oracle price
+    send_tx(
+        solana,
+        StubOracleSetInstruction {
+            group,
+            admin,
+            mint: mints[1].pubkey,
+            payer,
+            price: "1000.0",
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // SETUP: Create a perp base position
+    //
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+            side: Side::Bid,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            side: Side::Ask,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        PerpConsumeEventsInstruction {
+            perp_market,
+            mango_accounts: vec![account_0, account_1],
+        },
+    )
+    .await
+    .unwrap();
+
+    {
+        let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+        let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+
+        assert_eq!(mango_account_0.perps[0].base_position_lots(), 1);
+        assert_eq!(mango_account_1.perps[0].base_position_lots(), -1);
+        assert_eq!(
+            mango_account_0.perps[0].quote_position_native().round(),
+            -100_000
+        );
+        assert_eq!(mango_account_1.perps[0].quote_position_native(), 100_000);
+    }
+
+    //
+    // TEST: Settle (health is high)
+    //
+    send_tx(
+        solana,
+        StubOracleSetInstruction {
+            group,
+            admin,
+            mint: mints[1].pubkey,
+            payer,
+            price: "1050.0",
+        },
+    )
+    .await
+    .unwrap();
+
+    let expected_pnl = 5000;
+
+    send_tx(
+        solana,
+        PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
+            account_a: account_0,
+            account_b: account_1,
+            perp_market,
+            quote_bank,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mut total_settled_pnl = expected_pnl;
+    let mut total_fees_paid = flat_fee;
+    {
+        let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+        let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+        assert_eq!(
+            mango_account_0.perps[0].quote_position_native().round(),
+            I80F48::from(-100_000 - total_settled_pnl)
+        );
+        assert_eq!(
+            mango_account_1.perps[0].quote_position_native().round(),
+            I80F48::from(100_000 + total_settled_pnl),
+        );
+        assert_eq!(
+            account_position(solana, account_0, quote_bank).await,
+            initial_token_deposit as i64 + total_settled_pnl - total_fees_paid
+        );
+        assert_eq!(
+            account_position(solana, account_1, quote_bank).await,
+            initial_token_deposit as i64 - total_settled_pnl
+        );
+        assert_eq!(
+            account_position(solana, settler, quote_bank).await,
+            total_fees_paid
+        );
+    }
+
+    //
+    // Bring account_0 health low, specifically to
+    // init_health = 14000 - 1.4 * 1 * 10700 = -980
+    // maint_health = 14000 - 1.2 * 1 * 10700 = 1160
+    //
+    send_tx(
+        solana,
+        TokenWithdrawInstruction {
+            account: account_0,
+            owner,
+            token_account: context.users[1].token_accounts[2],
+            amount: 1,
+            allow_borrow: true,
+            bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        StubOracleSetInstruction {
+            group,
+            admin,
+            mint: mints[2].pubkey,
+            payer,
+            price: "10700.0",
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: Settle (health is low)
+    //
+    send_tx(
+        solana,
+        StubOracleSetInstruction {
+            group,
+            admin,
+            mint: mints[1].pubkey,
+            payer,
+            price: "1100.0",
+        },
+    )
+    .await
+    .unwrap();
+
+    let expected_pnl = 5000;
+
+    send_tx(
+        solana,
+        PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
+            account_a: account_0,
+            account_b: account_1,
+            perp_market,
+            quote_bank,
+        },
+    )
+    .await
+    .unwrap();
+
+    total_settled_pnl += expected_pnl;
+    total_fees_paid += flat_fee
+        + (expected_pnl as f64 * fee_low_health as f64 * 980.0 / (1160.0 + 980.0)) as i64
+        + 1;
+    {
+        let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+        let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+        assert_eq!(
+            mango_account_0.perps[0].quote_position_native().round(),
+            I80F48::from(-100_000 - total_settled_pnl)
+        );
+        assert_eq!(
+            mango_account_1.perps[0].quote_position_native().round(),
+            I80F48::from(100_000 + total_settled_pnl),
+        );
+        assert_eq!(
+            account_position(solana, account_0, quote_bank).await,
+            initial_token_deposit as i64 + total_settled_pnl - total_fees_paid
+        );
+        assert_eq!(
+            account_position(solana, account_1, quote_bank).await,
+            initial_token_deposit as i64 - total_settled_pnl
+        );
+        assert_eq!(
+            account_position(solana, settler, quote_bank).await,
+            total_fees_paid
         );
     }
 

@@ -24,6 +24,7 @@ use super::TokenIndex;
 use super::FREE_ORDER_SLOT;
 use super::{HealthCache, HealthType};
 use super::{PerpPosition, Serum3Orders, TokenPosition};
+use crate::logs::DeactivateTokenPositionLog;
 use checked_math as cm;
 
 type BorshVecLength = u32;
@@ -72,10 +73,12 @@ pub struct MangoAccount {
 
     pub padding: [u8; 1],
 
+    // (Display only)
     // Cumulative (deposits - withdraws)
     // using USD prices at the time of the deposit/withdraw
     // in USD units with 6 decimals
     pub net_deposits: i64,
+    // (Display only)
     // Cumulative settles on perp positions
     // TODO: unimplemented
     pub net_settled: i64,
@@ -616,8 +619,11 @@ impl<
                     indexed_position: I80F48::ZERO,
                     token_index,
                     in_use_count: 0,
+                    cumulative_deposit_interest: 0.0,
+                    cumulative_borrow_interest: 0.0,
+                    previous_index: I80F48::ZERO,
                     padding: Default::default(),
-                    reserved: [0; 40],
+                    reserved: [0; 16],
                 };
             }
             Ok((v, raw_index, bank_index))
@@ -629,6 +635,24 @@ impl<
 
     pub fn deactivate_token_position(&mut self, raw_index: usize) {
         assert!(self.token_position_mut_by_raw_index(raw_index).in_use_count == 0);
+        self.token_position_mut_by_raw_index(raw_index).token_index = TokenIndex::MAX;
+    }
+
+    pub fn deactivate_token_position_and_log(
+        &mut self,
+        raw_index: usize,
+        mango_account_pubkey: Pubkey,
+    ) {
+        let mango_group = self.fixed.deref_or_borrow().group;
+        let token_position = self.token_position_mut_by_raw_index(raw_index);
+        assert!(token_position.in_use_count == 0);
+        emit!(DeactivateTokenPositionLog {
+            mango_group: mango_group,
+            mango_account: mango_account_pubkey,
+            token_index: token_position.token_index,
+            cumulative_deposit_interest: token_position.cumulative_deposit_interest,
+            cumulative_borrow_interest: token_position.cumulative_borrow_interest,
+        });
         self.token_position_mut_by_raw_index(raw_index).token_index = TokenIndex::MAX;
     }
 

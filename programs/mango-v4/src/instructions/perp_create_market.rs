@@ -65,6 +65,9 @@ pub fn perp_create_market(
     group_insurance_fund: bool,
     trusted_market: bool,
     fee_penalty: f32,
+    settle_fee_flat: f32,
+    settle_fee_amount_threshold: f32,
+    settle_fee_fraction_low_health: f32,
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_init()?;
     *perp_market = PerpMarket {
@@ -94,7 +97,6 @@ pub fn perp_create_market(
         seq_num: 0,
         fees_accrued: I80F48::ZERO,
         fees_settled: I80F48::ZERO,
-        // Why optional - Perp could be based purely on an oracle
         bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
         base_decimals,
         perp_market_index,
@@ -105,7 +107,10 @@ pub fn perp_create_market(
         padding1: Default::default(),
         padding2: Default::default(),
         fee_penalty,
-        reserved: [0; 108],
+        settle_fee_flat,
+        settle_fee_amount_threshold,
+        settle_fee_fraction_low_health,
+        reserved: [0; 92],
     };
 
     let mut bids = ctx.accounts.bids.load_init()?;

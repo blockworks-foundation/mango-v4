@@ -170,7 +170,16 @@ pub fn token_liq_bankruptcy(
             let (liqor_quote, liqor_quote_raw_token_index, _) =
                 liqor.ensure_token_position(QUOTE_TOKEN_INDEX)?;
             let liqor_quote_active = quote_bank.deposit(liqor_quote, insurance_transfer_i80f48)?;
-            let liqor_quote_indexed_position = liqor_quote.indexed_position;
+
+            // liqor quote
+            emit!(TokenBalanceLog {
+                mango_group: ctx.accounts.group.key(),
+                mango_account: ctx.accounts.liqor.key(),
+                token_index: QUOTE_TOKEN_INDEX,
+                indexed_position: liqor_quote.indexed_position.to_bits(),
+                deposit_index: quote_deposit_index.to_bits(),
+                borrow_index: quote_borrow_index.to_bits(),
+            });
 
             // transfer liab from liqee to liqor
             let (liqor_liab, liqor_liab_raw_token_index, _) =
@@ -178,22 +187,22 @@ pub fn token_liq_bankruptcy(
             let (liqor_liab_active, loan_origination_fee) =
                 liab_bank.withdraw_with_fee(liqor_liab, liab_transfer)?;
 
+            // liqor liab
+            emit!(TokenBalanceLog {
+                mango_group: ctx.accounts.group.key(),
+                mango_account: ctx.accounts.liqor.key(),
+                token_index: liab_token_index,
+                indexed_position: liqor_liab.indexed_position.to_bits(),
+                deposit_index: liab_deposit_index.to_bits(),
+                borrow_index: liab_borrow_index.to_bits(),
+            });
+
             // Check liqor's health
             if !liqor.fixed.is_in_health_region() {
                 let liqor_health =
                     compute_health(&liqor.borrow(), HealthType::Init, &account_retriever)?;
                 require!(liqor_health >= 0, MangoError::HealthMustBePositive);
             }
-
-            // liqor quote
-            emit!(TokenBalanceLog {
-                mango_group: ctx.accounts.group.key(),
-                mango_account: ctx.accounts.liqor.key(),
-                token_index: QUOTE_TOKEN_INDEX,
-                indexed_position: liqor_quote_indexed_position.to_bits(),
-                deposit_index: quote_deposit_index.to_bits(),
-                borrow_index: quote_borrow_index.to_bits(),
-            });
 
             if loan_origination_fee.is_positive() {
                 emit!(WithdrawLoanOriginationFeeLog {
@@ -206,10 +215,16 @@ pub fn token_liq_bankruptcy(
             }
 
             if !liqor_quote_active {
-                liqor.deactivate_token_position(liqor_quote_raw_token_index);
+                liqor.deactivate_token_position_and_log(
+                    liqor_quote_raw_token_index,
+                    ctx.accounts.liqor.key(),
+                );
             }
             if !liqor_liab_active {
-                liqor.deactivate_token_position(liqor_liab_raw_token_index);
+                liqor.deactivate_token_position_and_log(
+                    liqor_liab_raw_token_index,
+                    ctx.accounts.liqor.key(),
+                );
             }
         } else {
             // For liab_token_index == QUOTE_TOKEN_INDEX: the insurance fund deposits directly into liqee,
@@ -265,16 +280,6 @@ pub fn token_liq_bankruptcy(
         require_eq!(liqee_liab.indexed_position, I80F48::ZERO);
     }
 
-    // liqor liab
-    emit!(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.liqor.key(),
-        token_index: liab_token_index,
-        indexed_position: liqee_liab.indexed_position.to_bits(),
-        deposit_index: liab_deposit_index.to_bits(),
-        borrow_index: liab_borrow_index.to_bits(),
-    });
-
     // liqee liab
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
@@ -297,7 +302,7 @@ pub fn token_liq_bankruptcy(
         .maybe_recover_from_being_liquidated(liqee_init_health);
 
     if !liqee_liab_active {
-        liqee.deactivate_token_position(liqee_raw_token_index);
+        liqee.deactivate_token_position_and_log(liqee_raw_token_index, ctx.accounts.liqee.key());
     }
 
     emit!(LiquidateTokenBankruptcyLog {

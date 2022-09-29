@@ -3,9 +3,11 @@ import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import Big from 'big.js';
 import { MangoClient } from '../client';
-import { U64_MAX_BN } from '../utils';
+import { As, U64_MAX_BN } from '../utils';
 import { OracleConfig, QUOTE_DECIMALS } from './bank';
 import { I80F48, I80F48Dto } from './I80F48';
+
+export type PerpMarketIndex = number & As<'perp-market-index'>;
 
 export class PerpMarket {
   public name: string;
@@ -18,21 +20,23 @@ export class PerpMarket {
   public takerFee: I80F48;
   public minFunding: I80F48;
   public maxFunding: I80F48;
+  public longFunding: I80F48;
+  public shortFunding: I80F48;
   public openInterest: number;
   public seqNum: number;
   public feesAccrued: I80F48;
   priceLotsToUiConverter: number;
   baseLotsToUiConverter: number;
   quoteLotsToUiConverter: number;
-  public price: number;
-  public uiPrice: number;
+  public _price: I80F48;
+  public _uiPrice: number;
 
   static from(
     publicKey: PublicKey,
     obj: {
       group: PublicKey;
-      quoteTokenIndex: number;
       perpMarketIndex: number;
+      trustedMarket: number;
       name: number[];
       oracle: PublicKey;
       oracleConfig: OracleConfig;
@@ -55,7 +59,7 @@ export class PerpMarket {
       shortFunding: I80F48Dto;
       fundingLastUpdated: BN;
       openInterest: BN;
-      seqNum: any; // TODO: ts complains that this is unknown for whatever reason
+      seqNum: BN;
       feesAccrued: I80F48Dto;
       bump: number;
       baseDecimals: number;
@@ -65,8 +69,8 @@ export class PerpMarket {
     return new PerpMarket(
       publicKey,
       obj.group,
-      obj.quoteTokenIndex,
-      obj.perpMarketIndex,
+      obj.perpMarketIndex as PerpMarketIndex,
+      obj.trustedMarket == 1,
       obj.name,
       obj.oracle,
       obj.oracleConfig,
@@ -100,8 +104,8 @@ export class PerpMarket {
   constructor(
     public publicKey: PublicKey,
     public group: PublicKey,
-    public quoteTokenIndex: number,
-    public perpMarketIndex: number,
+    public perpMarketIndex: PerpMarketIndex, // TODO rename to marketIndex?
+    public trustedMarket: boolean,
     name: number[],
     public oracle: PublicKey,
     oracleConfig: OracleConfig,
@@ -140,6 +144,8 @@ export class PerpMarket {
     this.takerFee = I80F48.from(takerFee);
     this.minFunding = I80F48.from(minFunding);
     this.maxFunding = I80F48.from(maxFunding);
+    this.longFunding = I80F48.from(longFunding);
+    this.shortFunding = I80F48.from(shortFunding);
     this.openInterest = openInterest.toNumber();
     this.seqNum = seqNum.toNumber();
     this.feesAccrued = I80F48.from(feesAccrued);
@@ -159,6 +165,23 @@ export class PerpMarket {
       .toNumber();
   }
 
+  get price(): I80F48 {
+    if (!this._price) {
+      throw new Error(
+        `Undefined price for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
+      );
+    }
+    return this._price;
+  }
+
+  get uiPrice(): number {
+    if (!this._uiPrice) {
+      throw new Error(
+        `Undefined price for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
+      );
+    }
+    return this._uiPrice;
+  }
   public async loadAsks(client: MangoClient): Promise<BookSide> {
     const asks = await client.program.account.bookSide.fetch(this.asks);
     return BookSide.from(client, this, BookSideType.asks, asks);
@@ -176,7 +199,10 @@ export class PerpMarket {
     return new PerpEventQueue(client, eventQueue.header, eventQueue.buf);
   }
 
-  public async loadFills(client: MangoClient, lastSeqNum: BN) {
+  public async loadFills(
+    client: MangoClient,
+    lastSeqNum: BN,
+  ): Promise<(OutEvent | FillEvent | LiquidateEvent)[]> {
     const eventQueue = await this.loadEventQueue(client);
     return eventQueue
       .eventsSince(lastSeqNum)
@@ -189,13 +215,13 @@ export class PerpMarket {
    * @param asks
    * @returns returns funding rate per hour
    */
-  public getCurrentFundingRate(bids: BookSide, asks: BookSide) {
+  public getCurrentFundingRate(bids: BookSide, asks: BookSide): number {
     const MIN_FUNDING = this.minFunding.toNumber();
     const MAX_FUNDING = this.maxFunding.toNumber();
 
     const bid = bids.getImpactPriceUi(new BN(this.impactQuantity));
     const ask = asks.getImpactPriceUi(new BN(this.impactQuantity));
-    const indexPrice = this.uiPrice;
+    const indexPrice = this._uiPrice;
 
     let funding;
     if (bid !== undefined && ask !== undefined) {
@@ -284,7 +310,7 @@ export class BookSide {
       leafCount: number;
       nodes: unknown;
     },
-  ) {
+  ): BookSide {
     return new BookSide(
       client,
       perpMarket,
@@ -311,7 +337,6 @@ export class BookSide {
     public includeExpired = false,
     maxBookDelay?: number,
   ) {
-    // TODO why? Ask Daffy
     // Determine the maxTimestamp found on the book to use for tif
     // If maxBookDelay is not provided, use 3600 as a very large number
     maxBookDelay = maxBookDelay === undefined ? 3600 : maxBookDelay;
@@ -329,7 +354,7 @@ export class BookSide {
     this.now = maxTimestamp;
   }
 
-  static getPriceFromKey(key: BN) {
+  static getPriceFromKey(key: BN): BN {
     return key.ushrn(64);
   }
 
@@ -456,7 +481,7 @@ export class LeafNode {
   ) {}
 }
 export class InnerNode {
-  static from(obj: { children: [number] }) {
+  static from(obj: { children: [number] }): InnerNode {
     return new InnerNode(obj.children);
   }
 
@@ -477,7 +502,11 @@ export class PerpOrderType {
 }
 
 export class PerpOrder {
-  static from(perpMarket: PerpMarket, leafNode: LeafNode, type: BookSideType) {
+  static from(
+    perpMarket: PerpMarket,
+    leafNode: LeafNode,
+    type: BookSideType,
+  ): PerpOrder {
     const side =
       type == BookSideType.bids ? PerpOrderSide.bid : PerpOrderSide.ask;
     const price = BookSide.getPriceFromKey(leafNode.key);
@@ -533,7 +562,7 @@ export class PerpEventQueue {
     this.head = header.head;
     this.count = header.count;
     this.seqNum = header.seqNum;
-    this.rawEvents = buf.slice(this.head, this.count).map((event) => {
+    this.rawEvents = buf.map((event) => {
       if (event.eventType === PerpEventQueue.FILL_EVENT_TYPE) {
         return (client.program as any)._coder.types.typeLayouts
           .get('FillEvent')
@@ -555,7 +584,7 @@ export class PerpEventQueue {
             ),
           );
       }
-      throw new Error(`Unknown event with eventType ${event.eventType}`);
+      throw new Error(`Unknown event with eventType ${event.eventType}!`);
     });
   }
 
