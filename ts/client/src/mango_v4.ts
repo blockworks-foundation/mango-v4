@@ -4462,6 +4462,10 @@ export type MangoV4 = {
           {
             "name": "hasOpenOrders",
             "type": "bool"
+          },
+          {
+            "name": "trustedMarket",
+            "type": "bool"
           }
         ]
       }
@@ -4544,7 +4548,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                8
+                16
               ]
             }
           },
@@ -4556,11 +4560,11 @@ export type MangoV4 = {
           },
           {
             "name": "cumulativeDepositInterest",
-            "type": "i64"
+            "type": "f32"
           },
           {
             "name": "cumulativeBorrowInterest",
-            "type": "i64"
+            "type": "f32"
           }
         ]
       }
@@ -6070,12 +6074,12 @@ export type MangoV4 = {
         },
         {
           "name": "cumulativeDepositInterest",
-          "type": "i64",
+          "type": "f32",
           "index": false
         },
         {
           "name": "cumulativeBorrowInterest",
-          "type": "i64",
+          "type": "f32",
           "index": false
         }
       ]
@@ -10664,6 +10668,10 @@ export const IDL: MangoV4 = {
           {
             "name": "hasOpenOrders",
             "type": "bool"
+          },
+          {
+            "name": "trustedMarket",
+            "type": "bool"
           }
         ]
       }
@@ -10746,7 +10754,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                8
+                16
               ]
             }
           },
@@ -10758,11 +10766,11 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "cumulativeDepositInterest",
-            "type": "i64"
+            "type": "f32"
           },
           {
             "name": "cumulativeBorrowInterest",
-            "type": "i64"
+            "type": "f32"
           }
         ]
       }
@@ -12272,12 +12280,12 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "cumulativeDepositInterest",
-          "type": "i64",
+          "type": "f32",
           "index": false
         },
         {
           "name": "cumulativeBorrowInterest",
-          "type": "i64",
+          "type": "f32",
           "index": false
         }
       ]

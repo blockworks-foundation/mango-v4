@@ -526,8 +526,8 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     .await
     .unwrap();
 
-    let liqee_spot_health_before = 1000.0 + 1.0 * 2.0 * 0.8;
-    let remaining_pnl = 20.0 * 100.0 - liq_amount_2 + liqee_spot_health_before;
+    let liqee_settle_health_before = 1000.0 + 1.0 * 2.0 * 0.8;
+    let remaining_pnl = 20.0 * 100.0 - liq_amount_2 + liqee_settle_health_before;
     assert!(remaining_pnl < 0.0);
     let liqee_data = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(liqee_data.perps[0].base_position_lots(), 0);

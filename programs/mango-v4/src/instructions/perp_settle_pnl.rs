@@ -66,13 +66,12 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
 
     let a_init_health;
     let a_maint_health;
-    let b_spot_health;
+    let b_settle_health;
     {
         let retriever =
             ScanningAccountRetriever::new(ctx.remaining_accounts, &ctx.accounts.group.key())
                 .context("create account retriever")?;
-        b_spot_health =
-            new_health_cache(&account_b.borrow(), &retriever)?.spot_health(HealthType::Maint);
+        b_settle_health = new_health_cache(&account_b.borrow(), &retriever)?.perp_settle_health();
         let a_cache = new_health_cache(&account_a.borrow(), &retriever)?;
         a_init_health = a_cache.health(HealthType::Init);
         a_maint_health = a_cache.health(HealthType::Maint);
@@ -83,7 +82,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Example: With +100 USDC and -2 SOL (-80 USD) and -500 USD PNL the account may still settle
     //   100 - 1.1*80 = 12 USD perp pnl, even though the overall health is already negative.
     //   Further settlement would convert perp-losses into token-losses and isn't allowed.
-    require!(b_spot_health >= 0, MangoError::HealthMustBePositive);
+    require!(b_settle_health >= 0, MangoError::HealthMustBePositive);
 
     let mut bank = ctx.accounts.quote_bank.load_mut()?;
     let perp_market = ctx.accounts.perp_market.load()?;
@@ -117,8 +116,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     require!(a_pnl.is_positive(), MangoError::ProfitabilityMismatch);
     require!(b_pnl.is_negative(), MangoError::ProfitabilityMismatch);
 
-    // Settle for the maximum possible capped to b's spot health
-    let settlement = a_pnl.abs().min(b_pnl.abs()).min(b_spot_health);
+    // Settle for the maximum possible capped to b's settle health
+    let settlement = a_pnl.abs().min(b_pnl.abs()).min(b_settle_health);
     a_perp_position.change_quote_position(-settlement);
     b_perp_position.change_quote_position(settlement);
 

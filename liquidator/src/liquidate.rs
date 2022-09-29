@@ -226,7 +226,7 @@ impl<'a> LiquidateHelper<'a> {
     }
 
     fn perp_settle_pnl(&self) -> anyhow::Result<Option<Signature>> {
-        let spot_health = self.health_cache.spot_health(HealthType::Maint);
+        let perp_settle_health = self.health_cache.perp_settle_health();
         let mut perp_settleable_pnl = self
             .liqee
             .active_perp_positions()
@@ -237,8 +237,8 @@ impl<'a> LiquidateHelper<'a> {
                 let pnl = pp.quote_position_native();
                 let settleable_pnl = if pnl > 0 {
                     pnl
-                } else if pnl < 0 && spot_health > 0 {
-                    pnl.max(-spot_health)
+                } else if pnl < 0 && perp_settle_health > 0 {
+                    pnl.max(-perp_settle_health)
                 } else {
                     return None;
                 };
