@@ -10,7 +10,7 @@ export async function sendTransaction(
   ixs: TransactionInstruction[],
   alts: AddressLookupTableAccount[],
   opts: any = {},
-) {
+): Promise<string> {
   const connection = provider.connection;
   const latestBlockhash = await connection.getLatestBlockhash(
     opts.preflightCommitment,

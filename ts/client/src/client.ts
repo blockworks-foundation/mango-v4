@@ -647,21 +647,27 @@ export class MangoClient {
     );
   }
 
-  public async getMangoAccount(mangoAccount: MangoAccount) {
+  public async getMangoAccount(
+    mangoAccount: MangoAccount,
+  ): Promise<MangoAccount> {
     return MangoAccount.from(
       mangoAccount.publicKey,
       await this.program.account.mangoAccount.fetch(mangoAccount.publicKey),
     );
   }
 
-  public async getMangoAccountForPublicKey(mangoAccountPk: PublicKey) {
+  public async getMangoAccountForPublicKey(
+    mangoAccountPk: PublicKey,
+  ): Promise<MangoAccount> {
     return MangoAccount.from(
       mangoAccountPk,
       await this.program.account.mangoAccount.fetch(mangoAccountPk),
     );
   }
 
-  public async getMangoAccountWithSlot(mangoAccountPk: PublicKey) {
+  public async getMangoAccountWithSlot(
+    mangoAccountPk: PublicKey,
+  ): Promise<{ slot: number; value: MangoAccount } | undefined> {
     const resp =
       await this.program.provider.connection.getAccountInfoAndContext(
         mangoAccountPk,
@@ -772,7 +778,7 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
     nativeAmount: number,
-  ) {
+  ): Promise<TransactionSignature> {
     const bank = group.getFirstBankByMint(mintPk);
 
     const tokenAccountPk = await getAssociatedTokenAddress(
@@ -1100,7 +1106,7 @@ export class MangoClient {
     orderType: Serum3OrderType,
     clientOrderId: number,
     limit: number,
-  ) {
+  ): Promise<TransactionSignature> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
@@ -1144,7 +1150,7 @@ export class MangoClient {
           .baseSizeNumberToLots(size)
           .mul(serum3MarketExternal.priceNumberToLots(price)),
       );
-    const payerTokenIndex = (() => {
+    const payerTokenIndex = ((): number => {
       if (side == Serum3Side.bid) {
         return serum3Market.quoteTokenIndex;
       } else {
@@ -1205,7 +1211,7 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
     limit: number,
-  ) {
+  ): Promise<TransactionSignature> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
@@ -1898,12 +1904,15 @@ export class MangoClient {
     );
   }
 
-  async updateIndexAndRate(group: Group, mintPk: PublicKey) {
+  async updateIndexAndRate(
+    group: Group,
+    mintPk: PublicKey,
+  ): Promise<TransactionSignature> {
     // TODO: handle updating multiple banks
     const bank = group.getFirstBankByMint(mintPk);
     const mintInfo = group.mintInfosMapByMint.get(mintPk.toString())!;
 
-    await this.program.methods
+    return await this.program.methods
       .tokenUpdateIndexAndRate()
       .accounts({
         group: group.publicKey,
@@ -1930,7 +1939,7 @@ export class MangoClient {
     assetMintPk: PublicKey,
     liabMintPk: PublicKey,
     maxLiabTransfer: number,
-  ) {
+  ): Promise<TransactionSignature> {
     const assetBank: Bank = group.getFirstBankByMint(assetMintPk);
     const liabBank: Bank = group.getFirstBankByMint(liabMintPk);
 
@@ -1978,7 +1987,11 @@ export class MangoClient {
     );
   }
 
-  async altSet(group: Group, addressLookupTable: PublicKey, index: number) {
+  async altSet(
+    group: Group,
+    addressLookupTable: PublicKey,
+    index: number,
+  ): Promise<TransactionSignature> {
     const ix = await this.program.methods
       .altSet(index)
       .accounts({
@@ -2003,7 +2016,7 @@ export class MangoClient {
     addressLookupTable: PublicKey,
     index: number,
     pks: PublicKey[],
-  ) {
+  ): Promise<TransactionSignature> {
     return await this.program.methods
       .altExtend(index, pks)
       .accounts({

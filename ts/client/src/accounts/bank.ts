@@ -85,7 +85,7 @@ export class Bank implements BankForHealth {
       mintDecimals: number;
       bankNum: number;
     },
-  ) {
+  ): Bank {
     return new Bank(
       publicKey,
       obj.name,
@@ -388,7 +388,7 @@ export class MintInfo {
       registrationTime: BN;
       groupInsuranceFund: number;
     },
-  ) {
+  ): MintInfo {
     return new MintInfo(
       publicKey,
       obj.group,

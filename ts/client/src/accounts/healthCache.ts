@@ -47,7 +47,10 @@ export class HealthCache {
     public perpInfos: PerpInfo[],
   ) {}
 
-  static fromMangoAccount(group: Group, mangoAccount: MangoAccount) {
+  static fromMangoAccount(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): HealthCache {
     // token contribution from token accounts
     const tokenInfos = mangoAccount.tokensActive().map((tokenPosition) => {
       const bank = group.getFirstBankByTokenIndex(tokenPosition.tokenIndex);
@@ -100,7 +103,7 @@ export class HealthCache {
     return new HealthCache(tokenInfos, serum3Infos, perpInfos);
   }
 
-  static fromDto(dto) {
+  static fromDto(dto): HealthCache {
     return new HealthCache(
       dto.tokenInfos.map((dto) => TokenInfo.fromDto(dto)),
       dto.serum3Infos.map((dto) => Serum3Info.fromDto(dto)),
@@ -271,7 +274,7 @@ export class HealthCache {
     freeBaseChange: I80F48,
     reservedQuoteChange: I80F48,
     freeQuoteChange: I80F48,
-  ) {
+  ): void {
     const baseEntryIndex = this.getOrCreateTokenInfoIndex(baseBank);
     const quoteEntryIndex = this.getOrCreateTokenInfoIndex(quoteBank);
 
@@ -311,7 +314,7 @@ export class HealthCache {
     return this.findPerpInfoIndex(perpMarket.perpMarketIndex);
   }
 
-  public static logHealthCache(debug: string, healthCache: HealthCache) {
+  public static logHealthCache(debug: string, healthCache: HealthCache): void {
     if (debug) console.log(debug);
     for (const token of healthCache.tokenInfos) {
       console.log(` ${token.toString()}`);
@@ -426,7 +429,7 @@ export class HealthCache {
     rightRatio: I80F48,
     targetRatio: I80F48,
     healthRatioAfterActionFn: (I80F48) => I80F48,
-  ) {
+  ): I80F48 {
     const maxIterations = 40;
     // TODO: make relative to health ratio decimals? Might be over engineering
     const targetError = I80F48.fromNumber(0.001);
@@ -443,6 +446,7 @@ export class HealthCache {
     }
 
     let newAmount;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     for (const key of Array(maxIterations).fill(0).keys()) {
       newAmount = left.add(right).mul(I80F48.fromNumber(0.5));
       const newAmountRatio = healthRatioAfterActionFn(newAmount);
@@ -487,6 +491,7 @@ export class HealthCache {
     // - be careful about finding the minRatio point: the function isn't convex
 
     const initialRatio = this.healthRatio(HealthType.init);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const initialHealth = this.health(HealthType.init);
     if (initialRatio.lte(ZERO_I80F48())) {
       return ZERO_I80F48();
@@ -514,7 +519,7 @@ export class HealthCache {
     // negative.
     // The maximum will be at one of these points (ignoring serum3 effects).
 
-    function cacheAfterSwap(amount: I80F48) {
+    function cacheAfterSwap(amount: I80F48): HealthCache {
       const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
       // HealthCache.logHealthCache('beforeSwap', adjustedCache);
       adjustedCache.tokenInfos[sourceIndex].balance.isub(amount);
@@ -616,7 +621,7 @@ export class HealthCache {
     serum3Market: Serum3Market,
     side: Serum3Side,
     minRatio: I80F48,
-  ) {
+  ): I80F48 {
     const healthCacheClone: HealthCache = _.cloneDeep(this);
 
     const baseIndex = healthCacheClone.getOrCreateTokenInfoIndex(baseBank);
@@ -673,10 +678,11 @@ export class HealthCache {
     }
 
     const cache = cacheAfterPlacingOrder(zeroAmount);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const zeroAmountHealth = cache.health(HealthType.init);
     const zeroAmountRatio = cache.healthRatio(HealthType.init);
 
-    function cacheAfterPlacingOrder(amount: I80F48) {
+    function cacheAfterPlacingOrder(amount: I80F48): HealthCache {
       const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
 
       side === Serum3Side.ask
@@ -887,7 +893,7 @@ export class TokenInfo {
     ).mul(this.balance);
   }
 
-  toString() {
+  toString(): string {
     return `  tokenIndex: ${this.tokenIndex}, balance: ${
       this.balance
     }, serum3MaxReserved: ${
@@ -904,7 +910,7 @@ export class Serum3Info {
     public marketIndex: number,
   ) {}
 
-  static fromDto(dto: Serum3InfoDto) {
+  static fromDto(dto: Serum3InfoDto): Serum3Info {
     return new Serum3Info(
       I80F48.from(dto.reserved),
       dto.baseIndex,
@@ -917,7 +923,7 @@ export class Serum3Info {
     serum3Market: Serum3Market,
     baseEntryIndex: number,
     quoteEntryIndex: number,
-  ) {
+  ): Serum3Info {
     return new Serum3Info(
       ZERO_I80F48(),
       baseEntryIndex,
@@ -933,7 +939,7 @@ export class Serum3Info {
     quoteInfo: TokenInfo,
     marketIndex: number,
     oo: OpenOrders,
-  ) {
+  ): Serum3Info {
     // add the amounts that are freely settleable
     const baseFree = I80F48.fromString(oo.baseTokenFree.toString());
     // NOTE: referrerRebatesAccrued is not declared on oo class, but the layout
@@ -974,7 +980,7 @@ export class Serum3Info {
 
     // How much the health would increase if the reserved balance were applied to the passed
     // token info?
-    const computeHealthEffect = function (tokenInfo: TokenInfo) {
+    const computeHealthEffect = function (tokenInfo: TokenInfo): I80F48 {
       // This balance includes all possible reserved funds from markets that relate to the
       // token, including this market itself: `reserved` is already included in `max_balance`.
       const maxBalance = tokenInfo.balance.add(tokenInfo.serum3MaxReserved);
@@ -1012,7 +1018,7 @@ export class Serum3Info {
     return reservedAsBase.min(reservedAsQuote);
   }
 
-  toString(tokenInfos: TokenInfo[]) {
+  toString(tokenInfos: TokenInfo[]): string {
     return `  marketIndex: ${this.marketIndex}, baseIndex: ${
       this.baseIndex
     }, quoteIndex: ${this.quoteIndex}, reserved: ${
@@ -1034,7 +1040,7 @@ export class PerpInfo {
     public hasOpenOrders: boolean,
   ) {}
 
-  static fromDto(dto: PerpInfoDto) {
+  static fromDto(dto: PerpInfoDto): PerpInfo {
     return new PerpInfo(
       dto.perpMarketIndex,
       I80F48.from(dto.maintAssetWeight),
@@ -1048,7 +1054,10 @@ export class PerpInfo {
     );
   }
 
-  static fromPerpPosition(perpMarket: PerpMarket, perpPosition: PerpPosition) {
+  static fromPerpPosition(
+    perpMarket: PerpMarket,
+    perpPosition: PerpPosition,
+  ): PerpInfo {
     const baseLotSize = I80F48.fromString(perpMarket.baseLotSize.toString());
     const baseLots = I80F48.fromNumber(
       perpPosition.basePositionLots + perpPosition.takerBaseLots,
@@ -1190,7 +1199,7 @@ export class PerpInfo {
     );
   }
 
-  toString() {
+  toString(): string {
     return `  perpMarketIndex: ${this.perpMarketIndex}, base: ${
       this.base
     }, quote: ${this.quote}, oraclePrice: ${

@@ -95,7 +95,7 @@ export class Group {
     public vaultAmountsMap: Map<string, number>,
   ) {}
 
-  public async reloadAll(client: MangoClient) {
+  public async reloadAll(client: MangoClient): Promise<void> {
     let ids: Id | undefined = undefined;
 
     if (client.idsSource === 'api') {
@@ -117,7 +117,7 @@ export class Group {
       ),
       this.reloadMintInfos(client, ids),
       this.reloadSerum3Markets(client, ids).then(() =>
-        this.reloadSerum3ExternalMarkets(client, ids),
+        this.reloadSerum3ExternalMarkets(client),
       ),
       this.reloadPerpMarkets(client, ids).then(() =>
         this.reloadPerpMarketOraclePrices(client),
@@ -126,7 +126,7 @@ export class Group {
     // console.timeEnd('group.reload');
   }
 
-  public async reloadAlts(client: MangoClient) {
+  public async reloadAlts(client: MangoClient): Promise<void> {
     const alts = await Promise.all(
       this.addressLookupTables
         .filter((alt) => !alt.equals(PublicKey.default))
@@ -142,7 +142,7 @@ export class Group {
     });
   }
 
-  public async reloadBanks(client: MangoClient, ids?: Id) {
+  public async reloadBanks(client: MangoClient, ids?: Id): Promise<void> {
     let banks: Bank[];
 
     if (ids && ids.getBanks().length) {
@@ -172,7 +172,7 @@ export class Group {
     }
   }
 
-  public async reloadMintInfos(client: MangoClient, ids?: Id) {
+  public async reloadMintInfos(client: MangoClient, ids?: Id): Promise<void> {
     let mintInfos: MintInfo[];
     if (ids && ids.getMintInfos().length) {
       mintInfos = (
@@ -197,7 +197,10 @@ export class Group {
     );
   }
 
-  public async reloadSerum3Markets(client: MangoClient, ids?: Id) {
+  public async reloadSerum3Markets(
+    client: MangoClient,
+    ids?: Id,
+  ): Promise<void> {
     let serum3Markets: Serum3Market[];
     if (ids && ids.getSerum3Markets().length) {
       serum3Markets = (
@@ -225,7 +228,7 @@ export class Group {
     );
   }
 
-  public async reloadSerum3ExternalMarkets(client: MangoClient, ids?: Id) {
+  public async reloadSerum3ExternalMarkets(client: MangoClient): Promise<void> {
     const externalMarkets = await Promise.all(
       Array.from(this.serum3MarketsMapByExternal.values()).map((serum3Market) =>
         Market.load(
@@ -247,7 +250,7 @@ export class Group {
     );
   }
 
-  public async reloadPerpMarkets(client: MangoClient, ids?: Id) {
+  public async reloadPerpMarkets(client: MangoClient, ids?: Id): Promise<void> {
     let perpMarkets: PerpMarket[];
     if (ids && ids.getPerpMarkets().length) {
       perpMarkets = (
@@ -365,7 +368,7 @@ export class Group {
     return { price, uiPrice };
   }
 
-  public async reloadVaults(client: MangoClient, ids?: Id): Promise<void> {
+  public async reloadVaults(client: MangoClient): Promise<void> {
     const vaultPks = Array.from(this.banksMapByMint.values())
       .flat()
       .map((bank) => bank.vault);
@@ -495,7 +498,7 @@ export class Group {
     return await serum3Market.loadAsks(client, this);
   }
 
-  public getSerum3FeeRates(maker = true) {
+  public getSerum3FeeRates(maker = true): number {
     // TODO: fetch msrm/srm vault balance
     const feeTier = getFeeTier(0, 0);
     const rates = getFeeRates(feeTier);
@@ -551,7 +554,7 @@ export class Group {
     return await perpMarket.loadAsks(client);
   }
 
-  public consoleLogBanks() {
+  public consoleLogBanks(): void {
     for (const mintBanks of this.banksMapByMint.values()) {
       for (const bank of mintBanks) {
         console.log(bank.toString());

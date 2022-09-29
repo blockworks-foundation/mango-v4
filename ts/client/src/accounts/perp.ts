@@ -197,7 +197,10 @@ export class PerpMarket {
     return new PerpEventQueue(client, eventQueue.header, eventQueue.buf);
   }
 
-  public async loadFills(client: MangoClient, lastSeqNum: BN) {
+  public async loadFills(
+    client: MangoClient,
+    lastSeqNum: BN,
+  ): Promise<(OutEvent | FillEvent | LiquidateEvent)[]> {
     const eventQueue = await this.loadEventQueue(client);
     return eventQueue
       .eventsSince(lastSeqNum)
@@ -210,7 +213,7 @@ export class PerpMarket {
    * @param asks
    * @returns returns funding rate per hour
    */
-  public getCurrentFundingRate(bids: BookSide, asks: BookSide) {
+  public getCurrentFundingRate(bids: BookSide, asks: BookSide): number {
     const MIN_FUNDING = this.minFunding.toNumber();
     const MAX_FUNDING = this.maxFunding.toNumber();
 
@@ -305,7 +308,7 @@ export class BookSide {
       leafCount: number;
       nodes: unknown;
     },
-  ) {
+  ): BookSide {
     return new BookSide(
       client,
       perpMarket,
@@ -350,7 +353,7 @@ export class BookSide {
     this.now = maxTimestamp;
   }
 
-  static getPriceFromKey(key: BN) {
+  static getPriceFromKey(key: BN): BN {
     return key.ushrn(64);
   }
 
@@ -477,7 +480,7 @@ export class LeafNode {
   ) {}
 }
 export class InnerNode {
-  static from(obj: { children: [number] }) {
+  static from(obj: { children: [number] }): InnerNode {
     return new InnerNode(obj.children);
   }
 
@@ -498,7 +501,11 @@ export class PerpOrderType {
 }
 
 export class PerpOrder {
-  static from(perpMarket: PerpMarket, leafNode: LeafNode, type: BookSideType) {
+  static from(
+    perpMarket: PerpMarket,
+    leafNode: LeafNode,
+    type: BookSideType,
+  ): PerpOrder {
     const side =
       type == BookSideType.bids ? PerpOrderSide.bid : PerpOrderSide.ask;
     const price = BookSide.getPriceFromKey(leafNode.key);

@@ -12,7 +12,7 @@ import {
 } from '../utils';
 import { Bank } from './bank';
 import { Group } from './group';
-import { HealthCache, HealthCacheDto } from './healthCache';
+import { HealthCache } from './healthCache';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from './I80F48';
 import { PerpMarket, PerpOrder, PerpOrderSide } from './perp';
 import { Serum3Side } from './serum3';
@@ -719,7 +719,7 @@ export class MangoAccount {
     const nativeBase = baseLots.mul(
       I80F48.fromString(perpMarket.baseLotSize.toString()),
     );
-    const nativeQuote = nativeBase.mul(I80F48.fromNumber(perpMarket._price));
+    const nativeQuote = nativeBase.mul(perpMarket.price);
     return toUiDecimalsForQuote(nativeQuote.toNumber());
   }
 
@@ -809,7 +809,7 @@ export class MangoAccount {
 
 export class TokenPosition {
   static TokenIndexUnset = 65535;
-  static from(dto: TokenPositionDto) {
+  static from(dto: TokenPositionDto): TokenPosition {
     return new TokenPosition(
       I80F48.from(dto.indexedPosition),
       dto.tokenIndex,
@@ -957,7 +957,7 @@ export class Serum3PositionDto {
 
 export class PerpPosition {
   static PerpMarketIndexUnset = 65535;
-  static from(dto: PerpPositionDto) {
+  static from(dto: PerpPositionDto): PerpPosition {
     return new PerpPosition(
       dto.marketIndex,
       dto.basePositionLots.toNumber(),
@@ -1027,7 +1027,7 @@ export class PerpPositionDto {
 
 export class PerpOo {
   static OrderMarketUnset = 65535;
-  static from(dto: PerpOoDto) {
+  static from(dto: PerpOoDto): PerpOo {
     return new PerpOo(
       dto.orderSide,
       dto.orderMarket,
@@ -1055,34 +1055,6 @@ export class PerpOoDto {
 export class HealthType {
   static maint = { maint: {} };
   static init = { init: {} };
-}
-
-export class MangoAccountData {
-  constructor(
-    public healthCache: HealthCache,
-    public initHealth: I80F48,
-    public maintHealth: I80F48,
-    public equity: Equity,
-  ) {}
-
-  static from(event: {
-    healthCache: HealthCacheDto;
-    initHealth: I80F48Dto;
-    maintHealth: I80F48Dto;
-    equity: {
-      tokens: [{ tokenIndex: number; value: I80F48Dto }];
-      perps: [{ perpMarketIndex: number; value: I80F48Dto }];
-    };
-    initHealthLiabs: I80F48Dto;
-    tokenAssets: any;
-  }) {
-    return new MangoAccountData(
-      HealthCache.fromDto(event.healthCache),
-      I80F48.from(event.initHealth),
-      I80F48.from(event.maintHealth),
-      Equity.from(event.equity),
-    );
-  }
 }
 
 export class Equity {
