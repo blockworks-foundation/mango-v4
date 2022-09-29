@@ -130,6 +130,10 @@ impl PerpMarket {
         self.group_insurance_fund = if v { 1 } else { 0 };
     }
 
+    pub fn trusted_market(&self) -> bool {
+        self.trusted_market == 1
+    }
+
     pub fn gen_order_id(&mut self, side: Side, price: i64) -> i128 {
         self.seq_num += 1;
 

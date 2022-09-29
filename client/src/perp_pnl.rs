@@ -66,7 +66,7 @@ pub fn fetch_top(
         }
     }
 
-    // Negative pnl needs to be limited by spot_health.
+    // Negative pnl needs to be limited by perp_settle_health.
     // We're doing it in a second step, because it's pretty expensive and we don't
     // want to run this for all accounts.
     if direction == Direction::MaxNegative {
@@ -78,10 +78,10 @@ pub fn fetch_top(
             } else {
                 I80F48::ZERO
             };
-            let spot_health = crate::health_cache::new(context, account_fetcher, &acc)?
-                .spot_health(HealthType::Maint);
-            let settleable_pnl = if spot_health > 0 && !acc.being_liquidated() {
-                (*pnl).max(-spot_health)
+            let perp_settle_health =
+                crate::health_cache::new(context, account_fetcher, &acc)?.perp_settle_health();
+            let settleable_pnl = if perp_settle_health > 0 && !acc.being_liquidated() {
+                (*pnl).max(-perp_settle_health)
             } else {
                 I80F48::ZERO
             };
