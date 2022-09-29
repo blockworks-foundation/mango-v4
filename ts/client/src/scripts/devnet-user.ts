@@ -68,10 +68,7 @@ async function main() {
 
   // create + fetch account
   console.log(`Creating mangoaccount...`);
-  let mangoAccount = (await client.getOrCreateMangoAccount(
-    group,
-    user.publicKey,
-  ))!;
+  let mangoAccount = (await client.getOrCreateMangoAccount(group))!;
   if (!mangoAccount) {
     throw new Error(`MangoAccount not found for user ${user.publicKey}`);
   }
