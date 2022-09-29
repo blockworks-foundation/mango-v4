@@ -3,9 +3,11 @@ import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import Big from 'big.js';
 import { MangoClient } from '../client';
-import { U64_MAX_BN } from '../utils';
+import { As, U64_MAX_BN } from '../utils';
 import { OracleConfig, QUOTE_DECIMALS } from './bank';
 import { I80F48, I80F48Dto } from './I80F48';
+
+export type PerpMarketIndex = number & As<'perp-market-index'>;
 
 export class PerpMarket {
   public name: string;
@@ -33,7 +35,6 @@ export class PerpMarket {
     publicKey: PublicKey,
     obj: {
       group: PublicKey;
-      quoteTokenIndex: number;
       perpMarketIndex: number;
       name: number[];
       oracle: PublicKey;
@@ -67,8 +68,7 @@ export class PerpMarket {
     return new PerpMarket(
       publicKey,
       obj.group,
-      obj.quoteTokenIndex,
-      obj.perpMarketIndex,
+      obj.perpMarketIndex as PerpMarketIndex,
       obj.name,
       obj.oracle,
       obj.oracleConfig,
@@ -102,8 +102,7 @@ export class PerpMarket {
   constructor(
     public publicKey: PublicKey,
     public group: PublicKey,
-    public quoteTokenIndex: number,
-    public perpMarketIndex: number, // TODO rename to marketIndex?
+    public perpMarketIndex: PerpMarketIndex, // TODO rename to marketIndex?
     name: number[],
     public oracle: PublicKey,
     oracleConfig: OracleConfig,

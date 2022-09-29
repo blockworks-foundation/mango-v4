@@ -10,12 +10,12 @@ import {
   toUiDecimals,
   toUiDecimalsForQuote,
 } from '../utils';
-import { Bank } from './bank';
+import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from './I80F48';
-import { PerpMarket, PerpOrder, PerpOrderSide } from './perp';
-import { Serum3Side } from './serum3';
+import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
+import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
   public tokens: TokenPosition[];
   public serum3: Serum3Orders[];
@@ -150,15 +150,15 @@ export class MangoAccount {
     );
   }
 
-  getToken(tokenIndex: number): TokenPosition | undefined {
+  getToken(tokenIndex: TokenIndex): TokenPosition | undefined {
     return this.tokens.find((ta) => ta.tokenIndex == tokenIndex);
   }
 
-  getSerum3Account(marketIndex: number): Serum3Orders | undefined {
+  getSerum3Account(marketIndex: MarketIndex): Serum3Orders | undefined {
     return this.serum3.find((sa) => sa.marketIndex == marketIndex);
   }
 
-  getSerum3OoAccount(marketIndex: number): OpenOrders {
+  getSerum3OoAccount(marketIndex: MarketIndex): OpenOrders {
     const oo: OpenOrders | undefined =
       this.serum3OosMapByMarketIndex.get(marketIndex);
 
@@ -692,7 +692,7 @@ export class MangoAccount {
    */
   public getMaxQuoteForPerpBidUi(
     group: Group,
-    perpMarketIndex: number,
+    perpMarketIndex: PerpMarketIndex,
     uiPrice: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
@@ -719,7 +719,7 @@ export class MangoAccount {
    */
   public getMaxBaseForPerpAskUi(
     group: Group,
-    perpMarketIndex: number,
+    perpMarketIndex: PerpMarketIndex,
     uiPrice: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
@@ -736,7 +736,7 @@ export class MangoAccount {
   public async loadPerpOpenOrdersForMarket(
     client: MangoClient,
     group: Group,
-    perpMarketIndex: number,
+    perpMarketIndex: PerpMarketIndex,
   ): Promise<PerpOrder[]> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const [bids, asks] = await Promise.all([
@@ -799,14 +799,14 @@ export class TokenPosition {
   static from(dto: TokenPositionDto): TokenPosition {
     return new TokenPosition(
       I80F48.from(dto.indexedPosition),
-      dto.tokenIndex,
+      dto.tokenIndex as TokenIndex,
       dto.inUseCount,
     );
   }
 
   constructor(
     public indexedPosition: I80F48,
-    public tokenIndex: number,
+    public tokenIndex: TokenIndex,
     public inUseCount: number,
   ) {}
 
@@ -914,17 +914,17 @@ export class Serum3Orders {
   static from(dto: Serum3PositionDto): Serum3Orders {
     return new Serum3Orders(
       dto.openOrders,
-      dto.marketIndex,
-      dto.baseTokenIndex,
-      dto.quoteTokenIndex,
+      dto.marketIndex as MarketIndex,
+      dto.baseTokenIndex as TokenIndex,
+      dto.quoteTokenIndex as TokenIndex,
     );
   }
 
   constructor(
     public openOrders: PublicKey,
-    public marketIndex: number,
-    public baseTokenIndex: number,
-    public quoteTokenIndex: number,
+    public marketIndex: MarketIndex,
+    public baseTokenIndex: TokenIndex,
+    public quoteTokenIndex: TokenIndex,
   ) {}
 
   public isActive(): boolean {
@@ -946,7 +946,7 @@ export class PerpPosition {
   static PerpMarketIndexUnset = 65535;
   static from(dto: PerpPositionDto): PerpPosition {
     return new PerpPosition(
-      dto.marketIndex,
+      dto.marketIndex as PerpMarketIndex,
       dto.basePositionLots.toNumber(),
       I80F48.from(dto.quotePositionNative),
       dto.bidsBaseLots.toNumber(),
@@ -959,7 +959,7 @@ export class PerpPosition {
   }
 
   constructor(
-    public marketIndex: number,
+    public marketIndex: PerpMarketIndex,
     public basePositionLots: number,
     public quotePositionNative: I80F48,
     public bidsBaseLots: number,
@@ -1062,39 +1062,4 @@ export class PerpOoDto {
 export class HealthType {
   static maint = { maint: {} };
   static init = { init: {} };
-}
-
-export class Equity {
-  public constructor(
-    public tokens: TokenEquity[],
-    public perps: PerpEquity[],
-  ) {}
-
-  static from(dto: EquityDto): Equity {
-    return new Equity(
-      dto.tokens.map(
-        (token) => new TokenEquity(token.tokenIndex, I80F48.from(token.value)),
-      ),
-      dto.perps.map(
-        (perpAccount) =>
-          new PerpEquity(
-            perpAccount.perpMarketIndex,
-            I80F48.from(perpAccount.value),
-          ),
-      ),
-    );
-  }
-}
-
-export class TokenEquity {
-  public constructor(public tokenIndex: number, public value: I80F48) {}
-}
-
-export class PerpEquity {
-  public constructor(public perpMarketIndex: number, public value: I80F48) {}
-}
-
-export class EquityDto {
-  tokens: { tokenIndex: number; value: I80F48Dto }[];
-  perps: { perpMarketIndex: number; value: I80F48Dto }[];
 }

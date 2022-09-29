@@ -2,14 +2,15 @@ import { BN } from '@project-serum/anchor';
 import { OpenOrders } from '@project-serum/serum';
 import { expect } from 'chai';
 import { toUiDecimalsForQuote } from '../utils';
-import { BankForHealth } from './bank';
+import { BankForHealth, TokenIndex } from './bank';
 import { HealthCache, PerpInfo, Serum3Info, TokenInfo } from './healthCache';
 import { I80F48, ZERO_I80F48 } from './I80F48';
 import { HealthType, PerpPosition } from './mangoAccount';
 import { PerpMarket } from './perp';
+import { MarketIndex } from './serum3';
 
 function mockBankAndOracle(
-  tokenIndex: number,
+  tokenIndex: TokenIndex,
   maintWeight: number,
   initWeight: number,
   price: number,
@@ -46,19 +47,36 @@ function mockPerpMarket(
 
 describe('Health Cache', () => {
   it('test_health0', () => {
-    const sourceBank: BankForHealth = mockBankAndOracle(1, 0.1, 0.2, 1);
-    const targetBank: BankForHealth = mockBankAndOracle(4, 0.3, 0.5, 5);
+    const sourceBank: BankForHealth = mockBankAndOracle(
+      1 as TokenIndex,
+      0.1,
+      0.2,
+      1,
+    );
+    const targetBank: BankForHealth = mockBankAndOracle(
+      4 as TokenIndex,
+      0.3,
+      0.5,
+      5,
+    );
 
     const ti1 = TokenInfo.fromBank(sourceBank, I80F48.fromNumber(100));
     const ti2 = TokenInfo.fromBank(targetBank, I80F48.fromNumber(-10));
 
-    const si1 = Serum3Info.fromOoModifyingTokenInfos(1, ti2, 0, ti1, 2, {
-      quoteTokenTotal: new BN(21),
-      baseTokenTotal: new BN(18),
-      quoteTokenFree: new BN(1),
-      baseTokenFree: new BN(3),
-      referrerRebatesAccrued: new BN(2),
-    } as any as OpenOrders);
+    const si1 = Serum3Info.fromOoModifyingTokenInfos(
+      1,
+      ti2,
+      0,
+      ti1,
+      2 as MarketIndex,
+      {
+        quoteTokenTotal: new BN(21),
+        baseTokenTotal: new BN(18),
+        quoteTokenFree: new BN(1),
+        baseTokenFree: new BN(3),
+        referrerRebatesAccrued: new BN(2),
+      } as any as OpenOrders,
+    );
 
     const pM = mockPerpMarket(9, 0.1, 0.2, targetBank.price);
     const pp = new PerpPosition(
@@ -107,30 +125,59 @@ describe('Health Cache', () => {
       oo13: [number, number];
       perp1: [number, number, number, number];
       expectedHealth: number;
-    }) {
-      const bank1: BankForHealth = mockBankAndOracle(1, 0.1, 0.2, 1);
-      const bank2: BankForHealth = mockBankAndOracle(4, 0.3, 0.5, 5);
-      const bank3: BankForHealth = mockBankAndOracle(5, 0.3, 0.5, 10);
+    }): void {
+      const bank1: BankForHealth = mockBankAndOracle(
+        1 as TokenIndex,
+        0.1,
+        0.2,
+        1,
+      );
+      const bank2: BankForHealth = mockBankAndOracle(
+        4 as TokenIndex,
+        0.3,
+        0.5,
+        5,
+      );
+      const bank3: BankForHealth = mockBankAndOracle(
+        5 as TokenIndex,
+        0.3,
+        0.5,
+        10,
+      );
 
       const ti1 = TokenInfo.fromBank(bank1, I80F48.fromNumber(fixture.token1));
       const ti2 = TokenInfo.fromBank(bank2, I80F48.fromNumber(fixture.token2));
       const ti3 = TokenInfo.fromBank(bank3, I80F48.fromNumber(fixture.token3));
 
-      const si1 = Serum3Info.fromOoModifyingTokenInfos(1, ti2, 0, ti1, 2, {
-        quoteTokenTotal: new BN(fixture.oo12[0]),
-        baseTokenTotal: new BN(fixture.oo12[1]),
-        quoteTokenFree: new BN(0),
-        baseTokenFree: new BN(0),
-        referrerRebatesAccrued: new BN(0),
-      } as any as OpenOrders);
+      const si1 = Serum3Info.fromOoModifyingTokenInfos(
+        1,
+        ti2,
+        0,
+        ti1,
+        2 as MarketIndex,
+        {
+          quoteTokenTotal: new BN(fixture.oo12[0]),
+          baseTokenTotal: new BN(fixture.oo12[1]),
+          quoteTokenFree: new BN(0),
+          baseTokenFree: new BN(0),
+          referrerRebatesAccrued: new BN(0),
+        } as any as OpenOrders,
+      );
 
-      const si2 = Serum3Info.fromOoModifyingTokenInfos(2, ti3, 0, ti1, 2, {
-        quoteTokenTotal: new BN(fixture.oo13[0]),
-        baseTokenTotal: new BN(fixture.oo13[1]),
-        quoteTokenFree: new BN(0),
-        baseTokenFree: new BN(0),
-        referrerRebatesAccrued: new BN(0),
-      } as any as OpenOrders);
+      const si2 = Serum3Info.fromOoModifyingTokenInfos(
+        2,
+        ti3,
+        0,
+        ti1,
+        2 as MarketIndex,
+        {
+          quoteTokenTotal: new BN(fixture.oo13[0]),
+          baseTokenTotal: new BN(fixture.oo13[1]),
+          quoteTokenFree: new BN(0),
+          baseTokenFree: new BN(0),
+          referrerRebatesAccrued: new BN(0),
+        } as any as OpenOrders,
+      );
 
       const pM = mockPerpMarket(9, 0.1, 0.2, bank2.price);
       const pp = new PerpPosition(
@@ -318,7 +365,7 @@ describe('Health Cache', () => {
   it('max swap tokens for min ratio', () => {
     // USDC like
     const sourceBank: BankForHealth = {
-      tokenIndex: 0,
+      tokenIndex: 0 as TokenIndex,
       maintAssetWeight: I80F48.fromNumber(1),
       initAssetWeight: I80F48.fromNumber(1),
       maintLiabWeight: I80F48.fromNumber(1),
@@ -327,7 +374,7 @@ describe('Health Cache', () => {
     };
     // BTC like
     const targetBank: BankForHealth = {
-      tokenIndex: 1,
+      tokenIndex: 1 as TokenIndex,
       maintAssetWeight: I80F48.fromNumber(0.9),
       initAssetWeight: I80F48.fromNumber(0.8),
       maintLiabWeight: I80F48.fromNumber(1.1),
@@ -338,7 +385,7 @@ describe('Health Cache', () => {
     const hc = new HealthCache(
       [
         new TokenInfo(
-          0,
+          0 as TokenIndex,
           sourceBank.maintAssetWeight,
           sourceBank.initAssetWeight,
           sourceBank.maintLiabWeight,
@@ -349,7 +396,7 @@ describe('Health Cache', () => {
         ),
 
         new TokenInfo(
-          1,
+          1 as TokenIndex,
           targetBank.maintAssetWeight,
           targetBank.initAssetWeight,
           targetBank.maintLiabWeight,

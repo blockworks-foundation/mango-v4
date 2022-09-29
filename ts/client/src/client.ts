@@ -24,7 +24,7 @@ import {
   TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { Bank, MintInfo } from './accounts/bank';
+import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
 import { I80F48 } from './accounts/I80F48';
 import {
@@ -38,6 +38,7 @@ import {
   OutEvent,
   PerpEventQueue,
   PerpMarket,
+  PerpMarketIndex,
   PerpOrderSide,
   PerpOrderType,
 } from './accounts/perp';
@@ -402,7 +403,7 @@ export class MangoClient {
 
   public async getMintInfoForTokenIndex(
     group: Group,
-    tokenIndex: number,
+    tokenIndex: TokenIndex,
   ): Promise<MintInfo[]> {
     const tokenIndexBuf = Buffer.alloc(2);
     tokenIndexBuf.writeUInt16LE(tokenIndex);
@@ -1149,7 +1150,7 @@ export class MangoClient {
           .baseSizeNumberToLots(size)
           .mul(serum3MarketExternal.priceNumberToLots(price)),
       );
-    const payerTokenIndex = ((): number => {
+    const payerTokenIndex = ((): TokenIndex => {
       if (side == Serum3Side.bid) {
         return serum3Market.quoteTokenIndex;
       } else {
@@ -1456,7 +1457,7 @@ export class MangoClient {
 
   async perpEditMarket(
     group: Group,
-    perpMarketIndex: number,
+    perpMarketIndex: PerpMarketIndex,
     oracle: PublicKey,
     oracleConfFilter: number,
     baseDecimals: number,
@@ -1515,7 +1516,7 @@ export class MangoClient {
 
   async perpCloseMarket(
     group: Group,
-    perpMarketIndex: number,
+    perpMarketIndex: PerpMarketIndex,
   ): Promise<TransactionSignature> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
 
@@ -1555,7 +1556,7 @@ export class MangoClient {
   async perpDeactivatePosition(
     group: Group,
     mangoAccount: MangoAccount,
-    perpMarketIndex: number,
+    perpMarketIndex: PerpMarketIndex,
   ): Promise<TransactionSignature> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
@@ -1586,7 +1587,7 @@ export class MangoClient {
   async perpPlaceOrder(
     group: Group,
     mangoAccount: MangoAccount,
-    perpMarketIndex: number,
+    perpMarketIndex: PerpMarketIndex,
     side: PerpOrderSide,
     price: number,
     quantity: number,
@@ -1603,7 +1604,7 @@ export class MangoClient {
         group,
         [mangoAccount],
         // Settlement token bank, because a position for it may be created
-        [group.getFirstBankByTokenIndex(0)],
+        [group.getFirstBankByTokenIndex(0 as TokenIndex)],
         [perpMarket],
       );
     const ix = await this.program.methods
@@ -1650,7 +1651,7 @@ export class MangoClient {
   async perpCancelAllOrders(
     group: Group,
     mangoAccount: MangoAccount,
-    perpMarketIndex: number,
+    perpMarketIndex: PerpMarketIndex,
     limit: number,
   ): Promise<TransactionSignature> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
@@ -1678,7 +1679,7 @@ export class MangoClient {
 
   async perpConsumeEvents(
     group: Group,
-    perpMarketIndex: number,
+    perpMarketIndex: PerpMarketIndex,
     accounts: PublicKey[],
     limit: number,
   ): Promise<TransactionSignature> {
@@ -1701,7 +1702,7 @@ export class MangoClient {
 
   async perpConsumeAllEvents(
     group: Group,
-    perpMarketIndex: number,
+    perpMarketIndex: PerpMarketIndex,
   ): Promise<void> {
     const limit = 8;
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
@@ -2176,7 +2177,7 @@ export class MangoClient {
   ): PublicKey[] {
     const healthRemainingAccounts: PublicKey[] = [];
 
-    let tokenIndices: number[] = [];
+    let tokenIndices: TokenIndex[] = [];
     for (const mangoAccount of mangoAccounts) {
       tokenIndices.push(
         ...mangoAccount.tokens
@@ -2201,7 +2202,7 @@ export class MangoClient {
       ...mintInfos.map((mintInfo) => mintInfo.oracle),
     );
 
-    const perpIndices: number[] = [];
+    const perpIndices: PerpMarketIndex[] = [];
     for (const mangoAccount of mangoAccounts) {
       perpIndices.push(
         ...mangoAccount.perps

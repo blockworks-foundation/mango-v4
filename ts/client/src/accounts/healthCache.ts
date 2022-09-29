@@ -2,7 +2,7 @@ import { BN } from '@project-serum/anchor';
 import { OpenOrders } from '@project-serum/serum';
 import { PublicKey } from '@solana/web3.js';
 import _ from 'lodash';
-import { Bank, BankForHealth } from './bank';
+import { Bank, BankForHealth, TokenIndex } from './bank';
 import { Group } from './group';
 import {
   HUNDRED_I80F48,
@@ -14,7 +14,7 @@ import {
 
 import { HealthType, MangoAccount, PerpPosition } from './mangoAccount';
 import { PerpMarket, PerpOrderSide } from './perp';
-import { Serum3Market, Serum3Side } from './serum3';
+import { MarketIndex, Serum3Market, Serum3Side } from './serum3';
 
 //               ░░░░
 //
@@ -225,9 +225,9 @@ export class HealthCache {
     }
   }
 
-  findTokenInfoIndex(tokenIndex: number): number {
+  findTokenInfoIndex(tokenIndex: TokenIndex): number {
     return this.tokenInfos.findIndex(
-      (tokenInfo) => tokenInfo.tokenIndex == tokenIndex,
+      (tokenInfo) => tokenInfo.tokenIndex === tokenIndex,
     );
   }
 
@@ -239,7 +239,7 @@ export class HealthCache {
     return this.findTokenInfoIndex(bank.tokenIndex);
   }
 
-  findSerum3InfoIndex(marketIndex: number): number {
+  findSerum3InfoIndex(marketIndex: MarketIndex): number {
     return this.serum3Infos.findIndex(
       (serum3Info) => serum3Info.marketIndex === marketIndex,
     );
@@ -830,7 +830,7 @@ export class HealthCache {
 
 export class TokenInfo {
   constructor(
-    public tokenIndex: number,
+    public tokenIndex: TokenIndex,
     public maintAssetWeight: I80F48,
     public initAssetWeight: I80F48,
     public maintLiabWeight: I80F48,
@@ -845,7 +845,7 @@ export class TokenInfo {
 
   static fromDto(dto: TokenInfoDto): TokenInfo {
     return new TokenInfo(
-      dto.tokenIndex,
+      dto.tokenIndex as TokenIndex,
       I80F48.from(dto.maintAssetWeight),
       I80F48.from(dto.initAssetWeight),
       I80F48.from(dto.maintLiabWeight),
@@ -907,7 +907,7 @@ export class Serum3Info {
     public reserved: I80F48,
     public baseIndex: number,
     public quoteIndex: number,
-    public marketIndex: number,
+    public marketIndex: MarketIndex,
   ) {}
 
   static fromDto(dto: Serum3InfoDto): Serum3Info {
@@ -915,7 +915,7 @@ export class Serum3Info {
       I80F48.from(dto.reserved),
       dto.baseIndex,
       dto.quoteIndex,
-      dto.marketIndex,
+      dto.marketIndex as MarketIndex,
     );
   }
 
@@ -937,7 +937,7 @@ export class Serum3Info {
     baseInfo: TokenInfo,
     quoteIndex: number,
     quoteInfo: TokenInfo,
-    marketIndex: number,
+    marketIndex: MarketIndex,
     oo: OpenOrders,
   ): Serum3Info {
     // add the amounts that are freely settleable

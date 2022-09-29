@@ -4,8 +4,12 @@ import { Cluster, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
+import { As } from '../utils';
+import { TokenIndex } from './bank';
 import { Group } from './group';
 import { MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from './I80F48';
+
+export type MarketIndex = number & As<'market-index'>;
 
 export class Serum3Market {
   public name: string;
@@ -26,12 +30,12 @@ export class Serum3Market {
     return new Serum3Market(
       publicKey,
       obj.group,
-      obj.baseTokenIndex,
-      obj.quoteTokenIndex,
+      obj.baseTokenIndex as TokenIndex,
+      obj.quoteTokenIndex as TokenIndex,
       obj.name,
       obj.serumProgram,
       obj.serumMarketExternal,
-      obj.marketIndex,
+      obj.marketIndex as MarketIndex,
       obj.registrationTime,
     );
   }
@@ -39,12 +43,12 @@ export class Serum3Market {
   constructor(
     public publicKey: PublicKey,
     public group: PublicKey,
-    public baseTokenIndex: number,
-    public quoteTokenIndex: number,
+    public baseTokenIndex: TokenIndex,
+    public quoteTokenIndex: TokenIndex,
     name: number[],
     public serumProgram: PublicKey,
     public serumMarketExternal: PublicKey,
-    public marketIndex: number,
+    public marketIndex: MarketIndex,
     public registrationTime: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];

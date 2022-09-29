@@ -17,15 +17,15 @@ import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
 import { toNativeDecimals, toUiDecimals } from '../utils';
-import { Bank, MintInfo } from './bank';
+import { Bank, MintInfo, TokenIndex } from './bank';
 import { I80F48, ONE_I80F48 } from './I80F48';
 import {
   isPythOracle,
   isSwitchboardOracle,
   parseSwitchboardOracle,
 } from './oracle';
-import { BookSide, PerpMarket } from './perp';
-import { Serum3Market } from './serum3';
+import { BookSide, PerpMarket, PerpMarketIndex } from './perp';
+import { MarketIndex, Serum3Market } from './serum3';
 
 export class Group {
   static from(
@@ -83,14 +83,14 @@ export class Group {
     public addressLookupTablesList: AddressLookupTableAccount[],
     public banksMapByName: Map<string, Bank[]>,
     public banksMapByMint: Map<string, Bank[]>,
-    public banksMapByTokenIndex: Map<number, Bank[]>,
+    public banksMapByTokenIndex: Map<TokenIndex, Bank[]>,
     public serum3MarketsMapByExternal: Map<string, Serum3Market>,
-    public serum3MarketsMapByMarketIndex: Map<number, Serum3Market>,
+    public serum3MarketsMapByMarketIndex: Map<MarketIndex, Serum3Market>,
     public serum3ExternalMarketsMap: Map<string, Market>,
     public perpMarketsMapByOracle: Map<string, PerpMarket>,
-    public perpMarketsMapByMarketIndex: Map<number, PerpMarket>,
+    public perpMarketsMapByMarketIndex: Map<PerpMarketIndex, PerpMarket>,
     public perpMarketsMapByName: Map<string, PerpMarket>,
-    public mintInfosMapByTokenIndex: Map<number, MintInfo>,
+    public mintInfosMapByTokenIndex: Map<TokenIndex, MintInfo>,
     public mintInfosMapByMint: Map<string, MintInfo>,
     public vaultAmountsMap: Map<string, number>,
   ) {}
@@ -406,7 +406,7 @@ export class Group {
     return banks[0];
   }
 
-  public getFirstBankByTokenIndex(tokenIndex: number): Bank {
+  public getFirstBankByTokenIndex(tokenIndex: TokenIndex): Bank {
     const banks = this.banksMapByTokenIndex.get(tokenIndex);
     if (!banks) throw new Error(`No bank found for tokenIndex ${tokenIndex}!`);
     return banks[0];
@@ -443,7 +443,7 @@ export class Group {
   }
 
   public getSerum3MarketByMarketIndex(
-    marketIndex: number,
+    marketIndex: MarketIndex,
   ): Serum3Market | undefined {
     return this.serum3MarketsMapByMarketIndex.get(marketIndex);
   }
@@ -505,7 +505,7 @@ export class Group {
     return maker ? rates.maker : rates.taker;
   }
 
-  public findPerpMarket(marketIndex: number): PerpMarket | undefined {
+  public findPerpMarket(marketIndex: PerpMarketIndex): PerpMarket | undefined {
     return Array.from(this.perpMarketsMapByName.values()).find(
       (perpMarket) => perpMarket.perpMarketIndex === marketIndex,
     );
@@ -519,7 +519,7 @@ export class Group {
     return perpMarket;
   }
 
-  public getPerpMarketByMarketIndex(marketIndex: number): PerpMarket {
+  public getPerpMarketByMarketIndex(marketIndex: PerpMarketIndex): PerpMarket {
     const perpMarket = this.perpMarketsMapByMarketIndex.get(marketIndex);
     if (!perpMarket) {
       throw new Error(`No PerpMarket found with marketIndex ${marketIndex}!`);
@@ -539,7 +539,7 @@ export class Group {
 
   public async loadPerpBidsForMarket(
     client: MangoClient,
-    perpMarketIndex: number,
+    perpMarketIndex: PerpMarketIndex,
   ): Promise<BookSide> {
     const perpMarket = this.getPerpMarketByMarketIndex(perpMarketIndex);
     return await perpMarket.loadBids(client);
@@ -548,7 +548,7 @@ export class Group {
   public async loadPerpAsksForMarket(
     client: MangoClient,
     group: Group,
-    perpMarketIndex: number,
+    perpMarketIndex: PerpMarketIndex,
   ): Promise<BookSide> {
     const perpMarket = this.getPerpMarketByMarketIndex(perpMarketIndex);
     return await perpMarket.loadAsks(client);
