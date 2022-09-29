@@ -13,7 +13,6 @@ use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use std::collections::HashSet;
 
-pub mod account_shared_data;
 pub mod liquidate;
 pub mod metrics;
 pub mod rebalance;
