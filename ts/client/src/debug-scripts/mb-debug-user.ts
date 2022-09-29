@@ -30,21 +30,6 @@ async function debugUser(
   await mangoAccount.reload(client);
 
   console.log(
-    'buildFixedAccountRetrieverHealthAccounts ' +
-      client
-        .buildFixedAccountRetrieverHealthAccounts(
-          group,
-          mangoAccount,
-          [
-            group.banksMapByName.get('BTC')![0],
-            group.banksMapByName.get('USDC')![0],
-          ],
-          [],
-        )
-        .map((pk) => pk.toBase58())
-        .join(', '),
-  );
-  console.log(
     'mangoAccount.getEquity() ' +
       toUiDecimalsForQuote(mangoAccount.getEquity(group)!.toNumber()),
   );
@@ -146,23 +131,25 @@ async function debugUser(
 
   function getMaxForPerpWrapper(perpMarket: PerpMarket) {
     console.log(
-      `getMaxQuoteForPerpBidUi ${perpMarket.name} ` +
+      `getMaxQuoteForPerpBidUi ${perpMarket.perpMarketIndex} ` +
         mangoAccount.getMaxQuoteForPerpBidUi(
           group,
-          perpMarket.name,
-          perpMarket.price,
+          perpMarket.perpMarketIndex,
+          perpMarket.price.toNumber(),
         ),
     );
     console.log(
-      `getMaxBaseForPerpAskUi ${perpMarket.name} ` +
+      `getMaxBaseForPerpAskUi ${perpMarket.perpMarketIndex} ` +
         mangoAccount.getMaxBaseForPerpAskUi(
           group,
-          perpMarket.name,
-          perpMarket.price,
+          perpMarket.perpMarketIndex,
+          perpMarket.price.toNumber(),
         ),
     );
   }
-  for (const perpMarket of Array.from(group.perpMarketsMap.values())) {
+  for (const perpMarket of Array.from(
+    group.perpMarketsMapByMarketIndex.values(),
+  )) {
     getMaxForPerpWrapper(perpMarket);
   }
 
