@@ -584,7 +584,7 @@ export class MangoAccount {
     nativeAmount = nativeAmount
       .div(quoteBank.price)
       .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
-      .div(ONE_I80F48().add(I80F48.fromNumber(group.getFeeRate(false))));
+      .div(ONE_I80F48().add(I80F48.fromNumber(group.getSerum3FeeRates(false))));
     return toUiDecimals(
       nativeAmount,
       group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex).mintDecimals,
@@ -634,7 +634,7 @@ export class MangoAccount {
     nativeAmount = nativeAmount
       .div(baseBank.price)
       .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
-      .div(ONE_I80F48().add(I80F48.fromNumber(group.getFeeRate(false))));
+      .div(ONE_I80F48().add(I80F48.fromNumber(group.getSerum3FeeRates(false))));
     return toUiDecimals(
       nativeAmount,
       group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex).mintDecimals,
@@ -750,13 +750,10 @@ export class MangoAccount {
    */
   public getMaxQuoteForPerpBidUi(
     group: Group,
-    perpMarketName: string,
+    perpMarketIndex: number,
     uiPrice: number,
   ): number {
-    const perpMarket = group.perpMarketsMap.get(perpMarketName);
-    if (!perpMarket) {
-      throw new Error(`PerpMarket for ${perpMarketName} not found!`);
-    }
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
@@ -780,13 +777,10 @@ export class MangoAccount {
    */
   public getMaxBaseForPerpAskUi(
     group: Group,
-    perpMarketName: string,
+    perpMarketIndex: number,
     uiPrice: number,
   ): number {
-    const perpMarket = group.perpMarketsMap.get(perpMarketName);
-    if (!perpMarket) {
-      throw new Error(`PerpMarket for ${perpMarketName} not found!`);
-    }
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
@@ -800,12 +794,9 @@ export class MangoAccount {
   public async loadPerpOpenOrdersForMarket(
     client: MangoClient,
     group: Group,
-    perpMarketName: string,
+    perpMarketIndex: number,
   ): Promise<PerpOrder[]> {
-    const perpMarket = group.perpMarketsMap.get(perpMarketName);
-    if (!perpMarket) {
-      throw new Error(`Perp Market ${perpMarketName} not found!`);
-    }
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const [bids, asks] = await Promise.all([
       perpMarket.loadBids(client),
       perpMarket.loadAsks(client),

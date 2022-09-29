@@ -1134,7 +1134,11 @@ export class MangoClient {
     const limitPrice = serum3MarketExternal.priceNumberToLots(price);
     const maxBaseQuantity = serum3MarketExternal.baseSizeNumberToLots(size);
     const maxQuoteQuantity = serum3MarketExternal.decoded.quoteLotSize
-      .mul(new BN(1 + group.getFeeRate(orderType === Serum3OrderType.postOnly)))
+      .mul(
+        new BN(
+          1 + group.getSerum3FeeRates(orderType === Serum3OrderType.postOnly),
+        ),
+      )
       .mul(
         serum3MarketExternal
           .baseSizeNumberToLots(size)
@@ -1447,7 +1451,7 @@ export class MangoClient {
 
   async perpEditMarket(
     group: Group,
-    perpMarketName: string,
+    perpMarketIndex: number,
     oracle: PublicKey,
     oracleConfFilter: number,
     baseDecimals: number,
@@ -1468,7 +1472,7 @@ export class MangoClient {
     settleFeeAmountThreshold: number,
     settleFeeFractionLowHealth: number,
   ): Promise<TransactionSignature> {
-    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
 
     return await this.program.methods
       .perpEditMarket(
@@ -1506,9 +1510,9 @@ export class MangoClient {
 
   async perpCloseMarket(
     group: Group,
-    perpMarketName: string,
+    perpMarketIndex: number,
   ): Promise<TransactionSignature> {
-    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
 
     return await this.program.methods
       .perpCloseMarket()
@@ -1546,9 +1550,9 @@ export class MangoClient {
   async perpDeactivatePosition(
     group: Group,
     mangoAccount: MangoAccount,
-    perpMarketName: string,
+    perpMarketIndex: number,
   ): Promise<TransactionSignature> {
-    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
         AccountRetriever.Fixed,
@@ -1577,7 +1581,7 @@ export class MangoClient {
   async perpPlaceOrder(
     group: Group,
     mangoAccount: MangoAccount,
-    perpMarketName: string,
+    perpMarketIndex: number,
     side: PerpOrderSide,
     price: number,
     quantity: number,
@@ -1587,7 +1591,7 @@ export class MangoClient {
     expiryTimestamp: number,
     limit: number,
   ): Promise<TransactionSignature> {
-    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
         AccountRetriever.Fixed,
@@ -1641,10 +1645,10 @@ export class MangoClient {
   async perpCancelAllOrders(
     group: Group,
     mangoAccount: MangoAccount,
-    perpMarketName: string,
+    perpMarketIndex: number,
     limit: number,
   ): Promise<TransactionSignature> {
-    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const ix = await this.program.methods
       .perpCancelAllOrders(limit)
       .accounts({
@@ -1669,11 +1673,11 @@ export class MangoClient {
 
   async perpConsumeEvents(
     group: Group,
-    perpMarketName: string,
+    perpMarketIndex: number,
     accounts: PublicKey[],
     limit: number,
   ): Promise<TransactionSignature> {
-    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     return await this.program.methods
       .perpConsumeEvents(new BN(limit))
       .accounts({
@@ -1692,10 +1696,10 @@ export class MangoClient {
 
   async perpConsumeAllEvents(
     group: Group,
-    perpMarketName: string,
+    perpMarketIndex: number,
   ): Promise<void> {
     const limit = 8;
-    const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const eventQueue = await perpMarket.loadEventQueue(this);
     const unconsumedEvents = eventQueue.getUnconsumedEvents();
     while (unconsumedEvents.length > 0) {
@@ -1719,7 +1723,7 @@ export class MangoClient {
         })
         .flat();
 
-      await this.perpConsumeEvents(group, perpMarketName, accounts, limit);
+      await this.perpConsumeEvents(group, perpMarketIndex, accounts, limit);
     }
   }
 

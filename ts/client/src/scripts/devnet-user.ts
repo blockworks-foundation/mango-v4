@@ -587,7 +587,7 @@ async function main() {
     // // sig = await client.perpCancelAllOrders(group, mangoAccount, 'BTC-PERP', 10);
     // // console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
-    const perpMarket = group.perpMarketsMap.get('BTC-PERP')!;
+    const perpMarket = group.perpMarketsMapByName.get('BTC-PERP')!;
 
     const bids: BookSide = await perpMarket?.loadBids(client)!;
     console.log(`bids - ${Array.from(bids.items())}`);

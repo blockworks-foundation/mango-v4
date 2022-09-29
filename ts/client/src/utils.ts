@@ -66,10 +66,12 @@ export function debugHealthAccounts(
     }),
   );
   const perps = new Map(
-    Array.from(group.perpMarketsMap.values()).map((perpMarket: PerpMarket) => [
-      perpMarket.publicKey.toBase58(),
-      `${perpMarket.name} perp market`,
-    ]),
+    Array.from(group.perpMarketsMapByName.values()).map(
+      (perpMarket: PerpMarket) => [
+        perpMarket.publicKey.toBase58(),
+        `${perpMarket.name} perp market`,
+      ],
+    ),
   );
 
   publicKeys.map((pk) => {
