@@ -392,7 +392,7 @@ async fn test_perp() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            quote_bank: tokens[0].bank,
+            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -402,7 +402,7 @@ async fn test_perp() -> Result<(), TransportError> {
         PerpSettleFeesInstruction {
             account: account_1,
             perp_market,
-            quote_bank: tokens[0].bank,
+            settle_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },
     )

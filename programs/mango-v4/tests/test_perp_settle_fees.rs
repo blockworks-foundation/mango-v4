@@ -270,7 +270,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
         PerpSettleFeesInstruction {
             account: account_0,
             perp_market,
-            quote_bank: tokens[1].bank,
+            settle_bank: tokens[1].bank,
             max_settle_amount: u64::MAX,
         },
     )
@@ -288,7 +288,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
         PerpSettleFeesInstruction {
             account: account_1,
             perp_market: perp_market_2,
-            quote_bank: tokens[0].bank,
+            settle_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },
     )
@@ -306,7 +306,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
         PerpSettleFeesInstruction {
             account: account_1,
             perp_market: perp_market,
-            quote_bank: tokens[0].bank,
+            settle_bank: tokens[0].bank,
             max_settle_amount: 0,
         },
     )
@@ -354,7 +354,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
         PerpSettleFeesInstruction {
             account: account_0,
             perp_market,
-            quote_bank: tokens[0].bank,
+            settle_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },
     )
@@ -374,7 +374,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     //         account: account_1,
     //         perp_market,
     //         oracle: tokens[0].oracle,
-    //         quote_bank: tokens[0].bank,
+    //         settle_bank: tokens[0].bank,
     //         max_settle_amount: I80F48::MAX,
     //     },
     // )
@@ -438,7 +438,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
         PerpSettleFeesInstruction {
             account: account_1,
             perp_market,
-            quote_bank: tokens[0].bank,
+            settle_bank: tokens[0].bank,
             max_settle_amount: partial_settle_amount,
         },
     )
@@ -492,7 +492,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
         PerpSettleFeesInstruction {
             account: account_1,
             perp_market,
-            quote_bank: tokens[0].bank,
+            settle_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },
     )
