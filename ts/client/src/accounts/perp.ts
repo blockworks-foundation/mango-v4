@@ -36,6 +36,7 @@ export class PerpMarket {
     obj: {
       group: PublicKey;
       perpMarketIndex: number;
+      trustedMarket: number;
       name: number[];
       oracle: PublicKey;
       oracleConfig: OracleConfig;
@@ -69,6 +70,7 @@ export class PerpMarket {
       publicKey,
       obj.group,
       obj.perpMarketIndex as PerpMarketIndex,
+      obj.trustedMarket == 1,
       obj.name,
       obj.oracle,
       obj.oracleConfig,
@@ -103,6 +105,7 @@ export class PerpMarket {
     public publicKey: PublicKey,
     public group: PublicKey,
     public perpMarketIndex: PerpMarketIndex, // TODO rename to marketIndex?
+    public trustedMarket: boolean,
     name: number[],
     public oracle: PublicKey,
     oracleConfig: OracleConfig,

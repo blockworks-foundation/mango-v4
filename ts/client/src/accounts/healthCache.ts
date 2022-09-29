@@ -1038,6 +1038,7 @@ export class PerpInfo {
     public quote: I80F48,
     public oraclePrice: I80F48,
     public hasOpenOrders: boolean,
+    public trustedMarket: boolean,
   ) {}
 
   static fromDto(dto: PerpInfoDto): PerpInfo {
@@ -1051,6 +1052,7 @@ export class PerpInfo {
       I80F48.from(dto.quote),
       I80F48.from(dto.oraclePrice),
       dto.hasOpenOrders,
+      dto.trustedMarket,
     );
   }
 
@@ -1157,6 +1159,7 @@ export class PerpInfo {
       quote,
       perpMarket.price,
       perpPosition.hasOpenOrders(),
+      perpMarket.trustedMarket,
     );
   }
 
@@ -1180,9 +1183,12 @@ export class PerpInfo {
     // console.log(`this.quote ${this.quote}`);
     // console.log(`this.base ${this.base}`);
 
-    // FUTURE: Allow v3-style "reliable" markets where we can return
-    // `self.quote + weight * self.base` here
-    return this.quote.add(weight.mul(this.base)).min(ZERO_I80F48());
+    const uncappedHealthContribution = this.quote.add(weight.mul(this.base));
+    if (this.trustedMarket) {
+      return uncappedHealthContribution;
+    } else {
+      return uncappedHealthContribution.min(ZERO_I80F48());
+    }
   }
 
   static emptyFromPerpMarket(perpMarket: PerpMarket): PerpInfo {
@@ -1196,6 +1202,7 @@ export class PerpInfo {
       ZERO_I80F48(),
       perpMarket.price,
       false,
+      perpMarket.trustedMarket,
     );
   }
 
@@ -1269,4 +1276,5 @@ export class PerpInfoDto {
   quote: I80F48Dto;
   oraclePrice: I80F48Dto;
   hasOpenOrders: boolean;
+  trustedMarket: boolean;
 }
