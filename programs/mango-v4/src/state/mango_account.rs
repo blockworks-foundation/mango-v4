@@ -813,6 +813,8 @@ impl<
         let quote_change_native = cm!(quote - fees);
         pa.change_base_and_quote_positions(perp_market, base_change, quote_change_native);
 
+        cm!(pa.maker_volume += quote.to_num::<i64>());
+
         if fill.maker_out {
             self.remove_perp_order(fill.maker_slot as usize, base_change.abs())
         } else {
@@ -843,6 +845,8 @@ impl<
         let quote_change_native =
             cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
         pa.change_base_and_quote_positions(perp_market, base_change, quote_change_native);
+
+        cm!(pa.taker_volume += quote_change_native.to_num::<i64>());
 
         Ok(())
     }

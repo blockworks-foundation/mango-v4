@@ -179,7 +179,26 @@ pub struct PerpPosition {
     pub taker_quote_lots: i64,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 64],
+    pub reserved: [u8; 16],
+
+    // bookkeeping variable for onchain funding calculation
+    // either short funding index or long funding index at last base position change
+    pub previous_funding_index: I80F48,
+    // (Display only)
+    // Cumulative long funding in base native units
+    pub cumulative_long_funding: f32,
+    // (Display only)
+    // Cumulative short funding in base native units
+    pub cumulative_short_funding: f32,
+    // (Display only)
+    // Cumulative maker volume in quote native units
+    pub maker_volume: i64,
+    // (Display only)
+    // Cumulative maker volume in quote native units
+    pub taker_volume: i64,
+    // (Display only)
+    // Cumulative realized pnl in quote native units
+    pub realized_pnl: i64,
 }
 const_assert_eq!(size_of::<PerpPosition>(), 8 + 7 * 8 + 3 * 16 + 64);
 const_assert_eq!(size_of::<PerpPosition>() % 8, 0);
@@ -199,10 +218,16 @@ impl Default for PerpPosition {
             asks_base_lots: 0,
             taker_base_lots: 0,
             taker_quote_lots: 0,
-            reserved: [0; 64],
+            reserved: [0; 16],
             long_settled_funding: I80F48::ZERO,
             short_settled_funding: I80F48::ZERO,
             padding: Default::default(),
+            previous_funding_index: I80F48::ZERO,
+            cumulative_long_funding: 0.0,
+            cumulative_short_funding: 0.0,
+            maker_volume: 0,
+            taker_volume: 0,
+            realized_pnl: 0,
         }
     }
 }
