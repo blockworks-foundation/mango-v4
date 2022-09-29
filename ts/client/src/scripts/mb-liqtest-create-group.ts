@@ -204,7 +204,6 @@ async function main() {
       'MNGO-PERP',
       0.1,
       9,
-      0,
       10,
       100000, // base lots
       0.9,
@@ -220,6 +219,7 @@ async function main() {
       10,
       false,
       false,
+      0,
       0,
       0,
       0,

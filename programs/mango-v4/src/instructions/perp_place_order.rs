@@ -5,7 +5,7 @@ use crate::error::*;
 use crate::state::MangoAccount;
 use crate::state::{
     new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, Book, BookSide,
-    EventQueue, Group, OrderType, PerpMarket, Side, QUOTE_TOKEN_INDEX,
+    EventQueue, Group, OrderType, PerpMarket, Side,
 };
 
 #[derive(Accounts)]
@@ -83,12 +83,18 @@ pub fn perp_place_order(
 
     let account_pk = ctx.accounts.account.key();
 
-    let perp_market_index = ctx.accounts.perp_market.load()?.perp_market_index;
+    let (perp_market_index, settle_token_index) = {
+        let perp_market = ctx.accounts.perp_market.load()?;
+        (
+            perp_market.perp_market_index,
+            perp_market.settle_token_index,
+        )
+    };
 
     //
     // Create the perp position if needed
     //
-    account.ensure_perp_position(perp_market_index, QUOTE_TOKEN_INDEX)?;
+    account.ensure_perp_position(perp_market_index, settle_token_index)?;
 
     //
     // Pre-health computation, _after_ perp position is created

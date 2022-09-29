@@ -520,7 +520,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
             account_a: liqor,
             account_b: account_1,
             perp_market,
-            quote_bank: tokens[0].bank,
+            settle_bank: tokens[0].bank,
         },
     )
     .await

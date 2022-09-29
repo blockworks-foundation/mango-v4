@@ -9,7 +9,6 @@ use crate::state::Bank;
 use crate::state::HealthType;
 use crate::state::MangoAccount;
 use crate::state::ScanningAccountRetriever;
-use crate::state::QUOTE_TOKEN_INDEX;
 use crate::state::{AccountLoaderDynamic, Group, PerpMarket};
 
 #[derive(Accounts)]
@@ -38,7 +37,11 @@ pub struct PerpSettlePnl<'info> {
     pub oracle: UncheckedAccount<'info>,
 
     #[account(mut, has_one = group)]
-    pub quote_bank: AccountLoader<'info, Bank>,
+    pub settle_bank: AccountLoader<'info, Bank>,
+
+    /// CHECK: Oracle can have different account types
+    #[account(address = settle_bank.load()?.oracle)]
+    pub settle_oracle: UncheckedAccount<'info>,
 }
 
 pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
@@ -48,9 +51,12 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         MangoError::CannotSettleWithSelf
     );
 
-    let perp_market_index = {
+    let (perp_market_index, settle_token_index) = {
         let perp_market = ctx.accounts.perp_market.load()?;
-        perp_market.perp_market_index
+        (
+            perp_market.perp_market_index,
+            perp_market.settle_token_index,
+        )
     };
 
     let mut account_a = ctx.accounts.account_a.load_mut()?;
@@ -59,9 +65,9 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // check positions exist, for nicer error messages
     {
         account_a.perp_position(perp_market_index)?;
-        account_a.token_position(QUOTE_TOKEN_INDEX)?;
+        account_a.token_position(settle_token_index)?;
         account_b.perp_position(perp_market_index)?;
-        account_b.token_position(QUOTE_TOKEN_INDEX)?;
+        account_b.token_position(settle_token_index)?;
     }
 
     let a_init_health;
@@ -85,12 +91,12 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     //   Further settlement would convert perp-losses into token-losses and isn't allowed.
     require!(b_spot_health >= 0, MangoError::HealthMustBePositive);
 
-    let mut bank = ctx.accounts.quote_bank.load_mut()?;
+    let mut bank = ctx.accounts.settle_bank.load_mut()?;
     let perp_market = ctx.accounts.perp_market.load()?;
 
     // Verify that the bank is the quote currency bank
     require!(
-        bank.token_index == QUOTE_TOKEN_INDEX,
+        bank.token_index == settle_token_index,
         MangoError::InvalidBank
     );
 
@@ -154,8 +160,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
 
     // Transfer token balances
     // The fee is paid by the account with positive unsettled pnl
-    let a_token_position = account_a.token_position_mut(QUOTE_TOKEN_INDEX)?.0;
-    let b_token_position = account_b.token_position_mut(QUOTE_TOKEN_INDEX)?.0;
+    let a_token_position = account_a.token_position_mut(settle_token_index)?.0;
+    let b_token_position = account_b.token_position_mut(settle_token_index)?.0;
     bank.deposit(a_token_position, cm!(settlement - fee))?;
     bank.withdraw_with_fee(b_token_position, settlement)?;
 
@@ -173,7 +179,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     );
 
     let (settler_token_position, settler_token_raw_index, _) =
-        settler.ensure_token_position(QUOTE_TOKEN_INDEX)?;
+        settler.ensure_token_position(settle_token_index)?;
     if !bank.deposit(settler_token_position, fee)? {
         settler.deactivate_token_position(settler_token_raw_index);
     }

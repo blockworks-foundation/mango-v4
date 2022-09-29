@@ -810,7 +810,7 @@ impl MangoClient {
         account_b: (&Pubkey, &MangoAccountValue),
     ) -> anyhow::Result<Signature> {
         let perp = self.context.perp(market_index);
-        let settlement_token = self.context.token(0);
+        let settlement_token = self.context.token(perp.market.settle_token_index);
 
         let health_remaining_ams = self
             .context
@@ -831,7 +831,8 @@ impl MangoClient {
                             account_a: *account_a.0,
                             account_b: *account_b.0,
                             oracle: perp.market.oracle,
-                            quote_bank: settlement_token.mint_info.first_bank(),
+                            settle_bank: settlement_token.mint_info.first_bank(),
+                            settle_oracle: settlement_token.mint_info.oracle,
                         },
                         None,
                     );
@@ -930,15 +931,13 @@ impl MangoClient {
         market_index: PerpMarketIndex,
         max_liab_transfer: u64,
     ) -> anyhow::Result<Signature> {
-        let quote_token_index = 0;
-        let quote_info = self.context.token(quote_token_index);
-
         let group = account_fetcher_fetch_anchor_account::<Group>(
             &*self.account_fetcher,
             &self.context.group,
         )?;
 
         let perp = self.context.perp(market_index);
+        let settle_token_info = self.context.token(perp.market.settle_token_index);
 
         let health_remaining_ams = self
             .derive_liquidation_health_check_remaining_account_metas(liqee.1, &[])
@@ -956,8 +955,9 @@ impl MangoClient {
                             liqor: self.mango_account_address,
                             liqor_owner: self.owner(),
                             liqee: *liqee.0,
-                            quote_bank: quote_info.mint_info.first_bank(),
-                            quote_vault: quote_info.mint_info.first_vault(),
+                            settle_bank: settle_token_info.mint_info.first_bank(),
+                            settle_vault: settle_token_info.mint_info.first_vault(),
+                            settle_oracle: settle_token_info.mint_info.oracle,
                             insurance_vault: group.insurance_vault,
                             token_program: Token::id(),
                         },
