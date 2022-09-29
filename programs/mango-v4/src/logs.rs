@@ -117,7 +117,7 @@ pub struct FillLog {
 }
 
 #[event]
-pub struct UpdateFundingLog {
+pub struct PerpUpdateFundingLog {
     pub mango_group: Pubkey,
     pub market_index: u16,
     pub long_funding: i128,  // I80F48
@@ -147,7 +147,7 @@ pub struct UpdateRateLog {
 }
 
 #[event]
-pub struct LiquidateTokenAndTokenLog {
+pub struct TokenLiqWithTokenLog {
     pub mango_group: Pubkey,
     pub liqee: Pubkey,
     pub liqor: Pubkey,
@@ -196,7 +196,7 @@ pub struct WithdrawLoanOriginationFeeLog {
 }
 
 #[event]
-pub struct LiquidateTokenBankruptcyLog {
+pub struct TokenLiqBankruptcyLog {
     pub mango_group: Pubkey,
     pub liqee: Pubkey,
     pub liqor: Pubkey,
