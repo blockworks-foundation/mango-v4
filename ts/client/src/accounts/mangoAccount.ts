@@ -275,7 +275,7 @@ export class MangoAccount {
    * Sum of all the assets i.e. token deposits, borrows, total assets in spot open orders, (perps positions is todo) in terms of quote value.
    * @returns equity, in native quote
    */
-  getEquity(group: Group): I80F48 | undefined {
+  getEquity(group: Group): I80F48 {
     const tokensMap = new Map<number, I80F48>();
     for (const tp of this.tokensActive()) {
       const bank = group.getFirstBankByTokenIndex(tp.tokenIndex);
@@ -291,42 +291,31 @@ export class MangoAccount {
           I80F48.fromString(oo.baseTokenTotal.toString()).mul(baseBank.price),
         );
       const quoteBank = group.getFirstBankByTokenIndex(sp.quoteTokenIndex);
+      // NOTE: referrerRebatesAccrued is not declared on oo class, but the layout
+      // is aware of it
       tokensMap
         .get(baseBank.tokenIndex)!
         .iadd(
-          I80F48.fromString(oo.quoteTokenTotal.toString()).mul(quoteBank.price),
+          I80F48.fromString(
+            oo.quoteTokenTotal
+              .add((oo as any).referrerRebatesAccrued)
+              .toString(),
+          ).mul(quoteBank.price),
         );
     }
 
-    const perpEquity = ZERO_I80F48();
-    for (const pp of this.perpActive()) {
-      const perpMarket = group.getPerpMarketByMarketIndex(pp.marketIndex);
+    const tokenEquity = Array.from(tokensMap.values()).reduce(
+      (a, b) => a.add(b),
+      ZERO_I80F48(),
+    );
 
-      const lotsToQuote = I80F48.fromString(
-        perpMarket.baseLotSize.toString(),
-      ).mul(perpMarket.price);
-      const baseLots = I80F48.fromNumber(
-        pp.basePositionLots + pp.takerBaseLots,
-      );
+    const perpEquity = this.perpActive().reduce(
+      (a, b) =>
+        a.add(b.getEquity(group.getPerpMarketByMarketIndex(b.marketIndex))),
+      ZERO_I80F48(),
+    );
 
-      const unsettledFunding = pp.unsettledFunding(perpMarket);
-      const takerQuote = I80F48.fromString(
-        new BN(pp.takerQuoteLots).mul(perpMarket.quoteLotSize).toString(),
-      );
-      const quoteCurrent = I80F48.fromString(pp.quotePositionNative.toString())
-        .sub(unsettledFunding)
-        .add(takerQuote);
-
-      perpEquity.iadd(baseLots.mul(lotsToQuote).add(quoteCurrent));
-    }
-
-    const totalEquity = Array.from(tokensMap.values())
-      .reduce((a, b) => {
-        return a.add(b);
-      }, ZERO_I80F48())
-      .iadd(perpEquity);
-
-    return totalEquity;
+    return tokenEquity.add(perpEquity);
   }
 
   /**
@@ -996,6 +985,26 @@ export class PerpPosition {
         .mul(I80F48.fromString(this.basePositionLots.toString()));
     }
     return ZERO_I80F48();
+  }
+
+  public getEquity(perpMarket: PerpMarket): I80F48 {
+    const lotsToQuote = I80F48.fromString(
+      perpMarket.baseLotSize.toString(),
+    ).mul(perpMarket.price);
+
+    const baseLots = I80F48.fromNumber(
+      this.basePositionLots + this.takerBaseLots,
+    );
+
+    const unsettledFunding = this.unsettledFunding(perpMarket);
+    const takerQuote = I80F48.fromString(
+      new BN(this.takerQuoteLots).mul(perpMarket.quoteLotSize).toString(),
+    );
+    const quoteCurrent = I80F48.fromString(this.quotePositionNative.toString())
+      .sub(unsettledFunding)
+      .add(takerQuote);
+
+    return baseLots.mul(lotsToQuote).add(quoteCurrent);
   }
 
   public hasOpenOrders(): boolean {

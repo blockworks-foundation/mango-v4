@@ -82,7 +82,7 @@ export class HealthCache {
         );
       }
 
-      return Serum3Info.fromOo(
+      return Serum3Info.fromOoModifyingTokenInfos(
         baseIndex,
         baseInfo,
         quoteIndex,
@@ -932,7 +932,7 @@ export class Serum3Info {
     );
   }
 
-  static fromOo(
+  static fromOoModifyingTokenInfos(
     baseIndex: number,
     baseInfo: TokenInfo,
     quoteIndex: number,

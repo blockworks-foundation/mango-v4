@@ -52,7 +52,7 @@ describe('Health Cache', () => {
     const ti1 = TokenInfo.fromBank(sourceBank, I80F48.fromNumber(100));
     const ti2 = TokenInfo.fromBank(targetBank, I80F48.fromNumber(-10));
 
-    const si1 = Serum3Info.fromOo(1, ti2, 0, ti1, 2, {
+    const si1 = Serum3Info.fromOoModifyingTokenInfos(1, ti2, 0, ti1, 2, {
       quoteTokenTotal: new BN(21),
       baseTokenTotal: new BN(18),
       quoteTokenFree: new BN(1),
@@ -116,7 +116,7 @@ describe('Health Cache', () => {
       const ti2 = TokenInfo.fromBank(bank2, I80F48.fromNumber(fixture.token2));
       const ti3 = TokenInfo.fromBank(bank3, I80F48.fromNumber(fixture.token3));
 
-      const si1 = Serum3Info.fromOo(1, ti2, 0, ti1, 2, {
+      const si1 = Serum3Info.fromOoModifyingTokenInfos(1, ti2, 0, ti1, 2, {
         quoteTokenTotal: new BN(fixture.oo12[0]),
         baseTokenTotal: new BN(fixture.oo12[1]),
         quoteTokenFree: new BN(0),
@@ -124,7 +124,7 @@ describe('Health Cache', () => {
         referrerRebatesAccrued: new BN(0),
       } as any as OpenOrders);
 
-      const si2 = Serum3Info.fromOo(2, ti3, 0, ti1, 2, {
+      const si2 = Serum3Info.fromOoModifyingTokenInfos(2, ti3, 0, ti1, 2, {
         quoteTokenTotal: new BN(fixture.oo13[0]),
         baseTokenTotal: new BN(fixture.oo13[1]),
         quoteTokenFree: new BN(0),
