@@ -7,6 +7,8 @@ use crate::instructions::INDEX_START;
 use crate::state::*;
 use crate::util::fill_from_str;
 
+use crate::logs::TokenRegisterLog;
+
 const FIRST_BANK_NUM: u32 = 0;
 
 #[derive(Accounts)]
@@ -130,6 +132,15 @@ pub fn token_register_trustless(
 
     mint_info.banks[0] = ctx.accounts.bank.key();
     mint_info.vaults[0] = ctx.accounts.vault.key();
+
+    emit!(TokenRegisterLog {
+        mango_group: ctx.accounts.group.key(),
+        mint: ctx.accounts.mint.key(),
+        token_index: token_index,
+        mint_decimals: ctx.accounts.mint.decimals,
+        oracle: ctx.accounts.oracle.key(),
+        mint_info: ctx.accounts.mint_info.key(),
+    });
 
     Ok(())
 }

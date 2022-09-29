@@ -216,3 +216,35 @@ pub struct DeactivateTokenPositionLog {
     pub cumulative_deposit_interest: f32,
     pub cumulative_borrow_interest: f32,
 }
+
+#[event]
+pub struct TokenRegisterLog {
+    pub mango_group: Pubkey,
+    pub mint: Pubkey,
+    pub token_index: u16,
+    pub mint_decimals: u8,
+    pub oracle: Pubkey,
+    pub mint_info: Pubkey,
+}
+
+#[event]
+pub struct PerpCreateMarketLog {
+    pub mango_group: Pubkey,
+    pub perp_market: Pubkey,
+    pub market_index: u16,
+    pub base_decimals: u8,
+    pub base_lot_size: i64,
+    pub quote_lot_size: i64,
+    pub oracle: Pubkey,
+}
+
+#[event]
+pub struct Serum3RegisterMarketLog {
+    pub mango_group: Pubkey,
+    pub serum_market: Pubkey,
+    pub market_index: u16,
+    pub base_token_index: u16,
+    pub quote_token_index: u16,
+    pub serum_program: Pubkey,
+    pub serum_program_external: Pubkey,
+}
