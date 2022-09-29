@@ -275,9 +275,9 @@ impl<'a> LiquidateHelper<'a> {
             let (counter_key, counter_acc, _) = counters.first().unwrap();
 
             let (account_a, account_b) = if pnl > 0 {
-                (self.pubkey, (counter_key, counter_acc))
+                ((self.pubkey, self.liqee), (counter_key, counter_acc))
             } else {
-                (counter_key, (self.pubkey, self.liqee))
+                ((counter_key, counter_acc), (self.pubkey, self.liqee))
             };
             let sig = self
                 .client

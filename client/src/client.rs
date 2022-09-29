@@ -14,6 +14,7 @@ use anchor_spl::token::Token;
 use bincode::Options;
 use fixed::types::I80F48;
 use itertools::Itertools;
+
 use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{
     Bank, Group, MangoAccountValue, PerpMarketIndex, Serum3MarketIndex, TokenIndex,
@@ -317,49 +318,13 @@ impl MangoClient {
         liqee: &MangoAccountValue,
         writable_banks: &[TokenIndex],
     ) -> anyhow::Result<Vec<AccountMeta>> {
-        // figure out all the banks/oracles that need to be passed for the health check
-        let mut banks = vec![];
-        let mut oracles = vec![];
         let account = self.mango_account()?;
-
-        let token_indexes = liqee
-            .active_token_positions()
-            .chain(account.active_token_positions())
-            .map(|ta| ta.token_index)
-            .unique();
-
-        for token_index in token_indexes {
-            let mint_info = self.context.mint_info(token_index);
-            let writable_bank = writable_banks.iter().contains(&token_index);
-            banks.push((mint_info.first_bank(), writable_bank));
-            oracles.push(mint_info.oracle);
-        }
-
-        let serum_oos = liqee
-            .active_serum3_orders()
-            .chain(account.active_serum3_orders())
-            .map(|&s| s.open_orders);
-        let perp_markets = liqee
-            .active_perp_positions()
-            .chain(account.active_perp_positions())
-            .map(|&pa| self.context.perp_market_address(pa.market_index));
-        let perp_oracles = liqee
-            .active_perp_positions()
-            .chain(account.active_perp_positions())
-            .map(|&pa| self.context.perp(pa.market_index).market.oracle);
-
-        Ok(banks
-            .iter()
-            .map(|(pubkey, is_writable)| AccountMeta {
-                pubkey: *pubkey,
-                is_writable: *is_writable,
-                is_signer: false,
-            })
-            .chain(oracles.into_iter().map(to_readonly_account_meta))
-            .chain(perp_markets.map(to_readonly_account_meta))
-            .chain(perp_oracles.map(to_readonly_account_meta))
-            .chain(serum_oos.map(to_readonly_account_meta))
-            .collect())
+        self.context
+            .derive_health_check_remaining_account_metas_two_accounts(
+                &account,
+                liqee,
+                writable_banks,
+            )
     }
 
     pub fn token_deposit(&self, mint: Pubkey, amount: u64) -> anyhow::Result<Signature> {
@@ -841,7 +806,7 @@ impl MangoClient {
     pub fn perp_settle_pnl(
         &self,
         market_index: PerpMarketIndex,
-        account_a: &Pubkey,
+        account_a: (&Pubkey, &MangoAccountValue),
         account_b: (&Pubkey, &MangoAccountValue),
     ) -> anyhow::Result<Signature> {
         let perp = self.context.perp(market_index);
@@ -849,7 +814,7 @@ impl MangoClient {
 
         let health_remaining_ams = self
             .context
-            .derive_health_check_remaining_account_metas(account_b.1, vec![], false)
+            .derive_health_check_remaining_account_metas_two_accounts(account_a.1, account_b.1, &[])
             .unwrap();
 
         self.program()
@@ -860,8 +825,10 @@ impl MangoClient {
                     let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
                         &mango_v4::accounts::PerpSettlePnl {
                             group: self.group(),
+                            settler: self.mango_account_address,
+                            settler_owner: self.owner(),
                             perp_market: perp.address,
-                            account_a: *account_a,
+                            account_a: *account_a.0,
                             account_b: *account_b.0,
                             oracle: perp.market.oracle,
                             quote_bank: settlement_token.mint_info.first_bank(),
@@ -871,10 +838,9 @@ impl MangoClient {
                     ams.extend(health_remaining_ams.into_iter());
                     ams
                 },
-                data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpSettlePnl {
-                    max_settle_amount: u64::MAX,
-                }),
+                data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpSettlePnl {}),
             })
+            .signer(&self.owner)
             .send()
             .map_err(prettify_client_error)
     }

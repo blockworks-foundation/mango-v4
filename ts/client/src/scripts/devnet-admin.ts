@@ -380,9 +380,9 @@ async function main() {
       100,
       true,
       true,
-      0,
-      0,
-      0,
+      1000,
+      1000000,
+      0.05,
     );
     console.log('done');
   } catch (error) {
@@ -510,9 +510,9 @@ async function main() {
         100,
         true,
         true,
-        0,
-        0,
-        0,
+        1000,
+        1000000,
+        0.05,
       );
       console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
       await group.reloadAll(client);

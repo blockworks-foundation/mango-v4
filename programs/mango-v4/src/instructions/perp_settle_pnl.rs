@@ -122,11 +122,6 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     a_perp_position.change_quote_position(-settlement);
     b_perp_position.change_quote_position(settlement);
 
-    // Update the account's net_settled with the new PnL
-    let settlement_i64 = settlement.checked_to_num::<i64>().unwrap();
-    cm!(account_a.fixed.net_settled += settlement_i64); // todo: adjust by fee!
-    cm!(account_b.fixed.net_settled -= settlement_i64);
-
     // A percentage fee is paid to the settler when account_a's health is low.
     // That's because the settlement could avoid it getting liquidated.
     let low_health_fee = if a_init_health < 0 {
@@ -149,6 +144,13 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     } else {
         I80F48::ZERO
     };
+
+    // Update the account's net_settled with the new PnL.
+    // Applying the fee here means that it decreases the displayed perp pnl.
+    let settlement_i64 = settlement.checked_to_num::<i64>().unwrap();
+    let fee_i64 = fee.checked_to_num::<i64>().unwrap();
+    cm!(account_a.fixed.net_settled += settlement_i64 - fee_i64);
+    cm!(account_b.fixed.net_settled -= settlement_i64);
 
     // Transfer token balances
     // The fee is paid by the account with positive unsettled pnl
