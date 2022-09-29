@@ -545,7 +545,6 @@ export class MangoAccount {
   }
 
   /**
-   * TODO priceFactor
    * @param group
    * @param externalMarketPk
    * @returns maximum ui quote which can be traded for base token given current health
@@ -583,7 +582,6 @@ export class MangoAccount {
   }
 
   /**
-   * TODO priceFactor
    * @param group
    * @param externalMarketPk
    * @returns maximum ui base which can be traded for quote token given current health

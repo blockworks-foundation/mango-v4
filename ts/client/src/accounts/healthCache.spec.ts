@@ -14,7 +14,6 @@ function mockBankAndOracle(
   initWeight: number,
   price: number,
 ): BankForHealth {
-  // todo remove bankforhealth, and force to bank using as
   return {
     tokenIndex,
     maintAssetWeight: I80F48.fromNumber(1 - maintWeight),

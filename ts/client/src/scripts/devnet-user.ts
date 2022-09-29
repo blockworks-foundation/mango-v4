@@ -171,12 +171,6 @@ async function main() {
 
   if (true) {
     // serum3
-    const serum3Market = group.serum3MarketsMapByExternal.get(
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')?.toBase58()!,
-    );
-    const serum3MarketExternal = group.serum3MarketExternalsMap.get(
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')?.toBase58()!,
-    );
     const asks = await group.loadSerum3AsksForMarket(
       client,
       DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
@@ -394,10 +388,11 @@ async function main() {
   // perps
   if (true) {
     let sig;
+    const perpMarket = group.getPerpMarketByName('BTC-PERP');
     const orders = await mangoAccount.loadPerpOpenOrdersForMarket(
       client,
       group,
-      'BTC-PERP',
+      perpMarket.perpMarketIndex,
     );
     for (const order of orders) {
       console.log(
@@ -405,7 +400,12 @@ async function main() {
       );
     }
     console.log(`...cancelling all perp orders`);
-    sig = await client.perpCancelAllOrders(group, mangoAccount, 'BTC-PERP', 10);
+    sig = await client.perpCancelAllOrders(
+      group,
+      mangoAccount,
+      perpMarket.perpMarketIndex,
+      10,
+    );
     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
     // scenario 1
@@ -417,7 +417,7 @@ async function main() {
         Math.floor(Math.random() * 100);
       const quoteQty = mangoAccount.getMaxQuoteForPerpBidUi(
         group,
-        'BTC-PERP',
+        perpMarket.perpMarketIndex,
         1,
       );
       const baseQty = quoteQty / price;
@@ -427,7 +427,7 @@ async function main() {
       const sig = await client.perpPlaceOrder(
         group,
         mangoAccount,
-        'BTC-PERP',
+        perpMarket.perpMarketIndex,
         PerpOrderSide.bid,
         price,
         baseQty,
@@ -442,7 +442,12 @@ async function main() {
       console.log(error);
     }
     console.log(`...cancelling all perp orders`);
-    sig = await client.perpCancelAllOrders(group, mangoAccount, 'BTC-PERP', 10);
+    sig = await client.perpCancelAllOrders(
+      group,
+      mangoAccount,
+      perpMarket.perpMarketIndex,
+      10,
+    );
     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
     // bid max perp + some
@@ -452,7 +457,11 @@ async function main() {
         group.banksMapByName.get('BTC')![0].uiPrice! -
         Math.floor(Math.random() * 100);
       const quoteQty =
-        mangoAccount.getMaxQuoteForPerpBidUi(group, 'BTC-PERP', 1) * 1.02;
+        mangoAccount.getMaxQuoteForPerpBidUi(
+          group,
+          perpMarket.perpMarketIndex,
+          1,
+        ) * 1.02;
       const baseQty = quoteQty / price;
       console.log(
         `...placing max qty * 1.02 perp bid clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
@@ -460,7 +469,7 @@ async function main() {
       const sig = await client.perpPlaceOrder(
         group,
         mangoAccount,
-        'BTC-PERP',
+        perpMarket.perpMarketIndex,
         PerpOrderSide.bid,
         price,
         baseQty,
@@ -481,7 +490,11 @@ async function main() {
       const price =
         group.banksMapByName.get('BTC')![0].uiPrice! +
         Math.floor(Math.random() * 100);
-      const baseQty = mangoAccount.getMaxBaseForPerpAskUi(group, 'BTC-PERP', 1);
+      const baseQty = mangoAccount.getMaxBaseForPerpAskUi(
+        group,
+        perpMarket.perpMarketIndex,
+        1,
+      );
       const quoteQty = baseQty * price;
       console.log(
         `...placing max qty perp ask clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
@@ -489,7 +502,7 @@ async function main() {
       const sig = await client.perpPlaceOrder(
         group,
         mangoAccount,
-        'BTC-PERP',
+        perpMarket.perpMarketIndex,
         PerpOrderSide.ask,
         price,
         baseQty,
@@ -511,7 +524,11 @@ async function main() {
         group.banksMapByName.get('BTC')![0].uiPrice! +
         Math.floor(Math.random() * 100);
       const baseQty =
-        mangoAccount.getMaxBaseForPerpAskUi(group, 'BTC-PERP', 1) * 1.02;
+        mangoAccount.getMaxBaseForPerpAskUi(
+          group,
+          perpMarket.perpMarketIndex,
+          1,
+        ) * 1.02;
       const quoteQty = baseQty * price;
       console.log(
         `...placing max qty perp ask * 1.02 clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
@@ -519,7 +536,7 @@ async function main() {
       const sig = await client.perpPlaceOrder(
         group,
         mangoAccount,
-        'BTC-PERP',
+        perpMarket.perpMarketIndex,
         PerpOrderSide.ask,
         price,
         baseQty,
@@ -535,7 +552,12 @@ async function main() {
     }
 
     console.log(`...cancelling all perp orders`);
-    sig = await client.perpCancelAllOrders(group, mangoAccount, 'BTC-PERP', 10);
+    sig = await client.perpCancelAllOrders(
+      group,
+      mangoAccount,
+      perpMarket.perpMarketIndex,
+      10,
+    );
     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
     // // scenario 2
@@ -547,7 +569,7 @@ async function main() {
     //   const sig = await client.perpPlaceOrder(
     //     group,
     //     mangoAccount,
-    //     'BTC-PERP',
+    //     perpMarket.perpMarketIndex,
     //    PerpOrderSide.bid,
     //     price,
     //     0.01,
@@ -568,7 +590,7 @@ async function main() {
     //   const sig = await client.perpPlaceOrder(
     //     group,
     //     mangoAccount,
-    //     'BTC-PERP',
+    //     perpMarket.perpMarketIndex,
     //    PerpOrderSide.ask,
     //     price,
     //     0.01,
@@ -584,10 +606,8 @@ async function main() {
     // }
     // // // should be able to cancel them : know bug
     // // console.log(`...cancelling all perp orders`);
-    // // sig = await client.perpCancelAllOrders(group, mangoAccount, 'BTC-PERP', 10);
+    // // sig = await client.perpCancelAllOrders(group, mangoAccount, perpMarket.perpMarketIndex, 10);
     // // console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-
-    const perpMarket = group.perpMarketsMapByName.get('BTC-PERP')!;
 
     const bids: BookSide = await perpMarket?.loadBids(client)!;
     console.log(`bids - ${Array.from(bids.items())}`);

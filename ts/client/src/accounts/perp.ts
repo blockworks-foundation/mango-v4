@@ -57,7 +57,7 @@ export class PerpMarket {
       shortFunding: I80F48Dto;
       fundingLastUpdated: BN;
       openInterest: BN;
-      seqNum: any; // TODO: ts complains that this is unknown for whatever reason
+      seqNum: BN;
       feesAccrued: I80F48Dto;
       bump: number;
       baseDecimals: number;

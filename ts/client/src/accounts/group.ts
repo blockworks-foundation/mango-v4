@@ -112,7 +112,7 @@ export class Group {
       this.reloadBanks(client, ids).then(() =>
         Promise.all([
           this.reloadBankOraclePrices(client),
-          this.reloadVaults(client, ids),
+          this.reloadVaults(client),
         ]),
       ),
       this.reloadMintInfos(client, ids),
@@ -527,7 +527,7 @@ export class Group {
     return perpMarket;
   }
 
-  public getPerpMarketByName(perpMarketName: string): PerpMarket | undefined {
+  public getPerpMarketByName(perpMarketName: string): PerpMarket {
     const perpMarket = Array.from(
       this.perpMarketsMapByMarketIndex.values(),
     ).find((perpMarket) => perpMarket.name === perpMarketName);

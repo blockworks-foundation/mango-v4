@@ -68,7 +68,6 @@ enum AccountRetriever {
 export type IdsSource = 'api' | 'static' | 'get-program-accounts';
 
 // TODO: replace ui values with native as input wherever possible
-// TODO: replace token/market names with token or market indices
 export class MangoClient {
   private postSendTxCallback?: ({ txid }) => void;
   private prioritizationFee: number;
@@ -2037,9 +2036,6 @@ export class MangoClient {
     opts: any = {},
     getIdsFromApi: IdsSource = 'api',
   ): MangoClient {
-    // TODO: use IDL on chain or in repository? decide...
-    // Alternatively we could fetch IDL from chain.
-    // const idl = await Program.fetchIdl(MANGO_V4_ID, provider);
     const idl = IDL;
 
     return new MangoClient(
@@ -2075,8 +2071,7 @@ export class MangoClient {
 
   /// private
 
-  // todo make private
-  public buildHealthRemainingAccounts(
+  private buildHealthRemainingAccounts(
     retriever: AccountRetriever,
     group: Group,
     mangoAccounts: MangoAccount[],
@@ -2100,8 +2095,7 @@ export class MangoClient {
     }
   }
 
-  // todo make private
-  public buildFixedAccountRetrieverHealthAccounts(
+  private buildFixedAccountRetrieverHealthAccounts(
     group: Group,
     mangoAccount: MangoAccount,
     // Banks and perpMarkets for whom positions don't exist on mango account,
@@ -2174,8 +2168,7 @@ export class MangoClient {
     return healthRemainingAccounts;
   }
 
-  // todo make private
-  public buildScanningAccountRetrieverHealthAccounts(
+  private buildScanningAccountRetrieverHealthAccounts(
     group: Group,
     mangoAccounts: MangoAccount[],
     banks: Bank[],
