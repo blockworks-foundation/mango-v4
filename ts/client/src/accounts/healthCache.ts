@@ -431,8 +431,7 @@ export class HealthCache {
     healthRatioAfterActionFn: (I80F48) => I80F48,
   ): I80F48 {
     const maxIterations = 40;
-    // TODO: make relative to health ratio decimals? Might be over engineering
-    const targetError = I80F48.fromNumber(0.001);
+    const targetError = I80F48.fromNumber(0.1);
 
     if (
       (leftRatio.sub(targetRatio).isPos() &&
