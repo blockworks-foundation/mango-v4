@@ -1404,6 +1404,9 @@ export class MangoClient {
     impactQuantity: number,
     groupInsuranceFund: boolean,
     trustedMarket: boolean,
+    settleFeeFlat: number,
+    settleFeeAmountThreshold: number,
+    settleFeeFractionLowHealth: number,
   ): Promise<TransactionSignature> {
     const bids = new Keypair();
     const asks = new Keypair();
@@ -1434,6 +1437,9 @@ export class MangoClient {
         groupInsuranceFund,
         trustedMarket,
         feePenalty,
+        settleFeeFlat,
+        settleFeeAmountThreshold,
+        settleFeeFractionLowHealth,
       )
       .accounts({
         group: group.publicKey,
@@ -1506,6 +1512,9 @@ export class MangoClient {
     impactQuantity: number,
     groupInsuranceFund: boolean,
     trustedMarket: boolean,
+    settleFeeFlat: number,
+    settleFeeAmountThreshold: number,
+    settleFeeFractionLowHealth: number,
   ): Promise<TransactionSignature> {
     const perpMarket = group.perpMarketsMap.get(perpMarketName)!;
 
@@ -1531,6 +1540,9 @@ export class MangoClient {
         groupInsuranceFund,
         trustedMarket,
         feePenalty,
+        settleFeeFlat,
+        settleFeeAmountThreshold,
+        settleFeeFractionLowHealth,
       )
       .accounts({
         group: group.publicKey,

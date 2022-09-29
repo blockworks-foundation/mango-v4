@@ -101,29 +101,18 @@ pub struct PerpMarket {
 
     pub fee_penalty: f32,
 
-    pub reserved: [u8; 108],
+    /// In native units of settlement token, given to each settle call above the
+    /// settle_fee_amount_threshold.
+    pub settle_fee_flat: f32,
+    /// Pnl settlement amount needed to be eligible for fees.
+    pub settle_fee_amount_threshold: f32,
+    /// Fraction of pnl to pay out as fee if +pnl account has low health.
+    pub settle_fee_fraction_low_health: f32,
+
+    pub reserved: [u8; 92],
 }
 
-const_assert_eq!(
-    size_of::<PerpMarket>(),
-    32 + 2
-        + 2
-        + 4
-        + 16
-        + 32
-        + 16
-        + 32 * 3
-        + 8 * 2
-        + 16 * 12
-        + 8 * 2
-        + 8 * 2
-        + 16
-        + 2
-        + 6
-        + 8
-        + 4
-        + 108
-);
+const_assert_eq!(size_of::<PerpMarket>(), 584);
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
 
 impl PerpMarket {
@@ -278,7 +267,7 @@ impl PerpMarket {
             fees_settled: I80F48::ZERO,
             bump: 0,
             base_decimals: 0,
-            reserved: [0; 108],
+            reserved: [0; 92],
             padding0: Default::default(),
             padding1: Default::default(),
             padding2: Default::default(),
@@ -286,6 +275,9 @@ impl PerpMarket {
             fee_penalty: 0.0,
             trusted_market: 0,
             group_insurance_fund: 0,
+            settle_fee_flat: 0.0,
+            settle_fee_amount_threshold: 0.0,
+            settle_fee_fraction_low_health: 0.0,
         }
     }
 }

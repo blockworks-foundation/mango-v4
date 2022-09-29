@@ -394,6 +394,9 @@ pub mod mango_v4 {
         group_insurance_fund: bool,
         trusted_market: bool,
         fee_penalty: f32,
+        settle_fee_flat: f32,
+        settle_fee_amount_threshold: f32,
+        settle_fee_fraction_low_health: f32,
     ) -> Result<()> {
         instructions::perp_create_market(
             ctx,
@@ -410,12 +413,15 @@ pub mod mango_v4 {
             liquidation_fee,
             maker_fee,
             taker_fee,
-            max_funding,
             min_funding,
+            max_funding,
             impact_quantity,
             group_insurance_fund,
             trusted_market,
             fee_penalty,
+            settle_fee_flat,
+            settle_fee_amount_threshold,
+            settle_fee_fraction_low_health,
         )
     }
 
@@ -438,6 +444,9 @@ pub mod mango_v4 {
         group_insurance_fund_opt: Option<bool>,
         trusted_market_opt: Option<bool>,
         fee_penalty_opt: Option<f32>,
+        settle_fee_flat_opt: Option<f32>,
+        settle_fee_amount_threshold_opt: Option<f32>,
+        settle_fee_fraction_low_health_opt: Option<f32>,
     ) -> Result<()> {
         instructions::perp_edit_market(
             ctx,
@@ -457,6 +466,9 @@ pub mod mango_v4 {
             group_insurance_fund_opt,
             trusted_market_opt,
             fee_penalty_opt,
+            settle_fee_flat_opt,
+            settle_fee_amount_threshold_opt,
+            settle_fee_fraction_low_health_opt,
         )
     }
 
@@ -526,8 +538,8 @@ pub mod mango_v4 {
         instructions::perp_update_funding(ctx)
     }
 
-    pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: u64) -> Result<()> {
-        instructions::perp_settle_pnl(ctx, max_settle_amount)
+    pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
+        instructions::perp_settle_pnl(ctx)
     }
 
     pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) -> Result<()> {

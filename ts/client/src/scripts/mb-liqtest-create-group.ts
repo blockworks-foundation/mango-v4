@@ -214,11 +214,15 @@ async function main() {
       0.05,
       -0.001,
       0.002,
+      0,
       -0.1,
       0.1,
       10,
       false,
       false,
+      0,
+      0,
+      0,
     );
   } catch (error) {
     console.log(error);
