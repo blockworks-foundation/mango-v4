@@ -26,8 +26,8 @@ export class PerpMarket {
   priceLotsToUiConverter: number;
   baseLotsToUiConverter: number;
   quoteLotsToUiConverter: number;
-  public price: number;
-  public uiPrice: number;
+  public _price: I80F48;
+  public _uiPrice: number;
 
   static from(
     publicKey: PublicKey,
@@ -163,6 +163,23 @@ export class PerpMarket {
       .toNumber();
   }
 
+  get price(): I80F48 {
+    if (!this._price) {
+      throw new Error(
+        `Undefined price for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
+      );
+    }
+    return this._price;
+  }
+
+  get uiPrice(): number {
+    if (!this._uiPrice) {
+      throw new Error(
+        `Undefined price for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
+      );
+    }
+    return this._uiPrice;
+  }
   public async loadAsks(client: MangoClient): Promise<BookSide> {
     const asks = await client.program.account.bookSide.fetch(this.asks);
     return BookSide.from(client, this, BookSideType.asks, asks);
@@ -199,7 +216,7 @@ export class PerpMarket {
 
     const bid = bids.getImpactPriceUi(new BN(this.impactQuantity));
     const ask = asks.getImpactPriceUi(new BN(this.impactQuantity));
-    const indexPrice = this.uiPrice;
+    const indexPrice = this._uiPrice;
 
     let funding;
     if (bid !== undefined && ask !== undefined) {
@@ -559,7 +576,7 @@ export class PerpEventQueue {
             ),
           );
       }
-      throw new Error(`Unknown event with eventType ${event.eventType}`);
+      throw new Error(`Unknown event with eventType ${event.eventType}!`);
     });
   }
 

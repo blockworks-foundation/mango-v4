@@ -268,7 +268,7 @@ export class Bank implements BankForHealth {
   get price(): I80F48 {
     if (!this._price) {
       throw new Error(
-        `Undefined price for bank ${this.publicKey}, tokenIndex ${this.tokenIndex}`,
+        `Undefined price for bank ${this.publicKey} with tokenIndex ${this.tokenIndex}!`,
       );
     }
     return this._price;
@@ -277,7 +277,7 @@ export class Bank implements BankForHealth {
   get uiPrice(): number {
     if (!this._uiPrice) {
       throw new Error(
-        `Undefined uiPrice for bank ${this.publicKey}, tokenIndex ${this.tokenIndex}`,
+        `Undefined uiPrice for bank ${this.publicKey} with tokenIndex ${this.tokenIndex}!`,
       );
     }
     return this._uiPrice;

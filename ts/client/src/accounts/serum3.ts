@@ -58,19 +58,7 @@ export class Serum3Market {
    */
   maxBidLeverage(group: Group): number {
     const baseBank = group.getFirstBankByTokenIndex(this.baseTokenIndex);
-    if (!baseBank) {
-      throw new Error(
-        `bank for base token with index ${this.baseTokenIndex} not found`,
-      );
-    }
-
     const quoteBank = group.getFirstBankByTokenIndex(this.quoteTokenIndex);
-    if (!quoteBank) {
-      throw new Error(
-        `bank for quote token with index ${this.quoteTokenIndex} not found`,
-      );
-    }
-
     if (
       quoteBank.initLiabWeight.sub(baseBank.initAssetWeight).lte(ZERO_I80F48())
     ) {
@@ -90,18 +78,7 @@ export class Serum3Market {
    */
   maxAskLeverage(group: Group): number {
     const baseBank = group.getFirstBankByTokenIndex(this.baseTokenIndex);
-    if (!baseBank) {
-      throw new Error(
-        `bank for base token with index ${this.baseTokenIndex} not found`,
-      );
-    }
-
     const quoteBank = group.getFirstBankByTokenIndex(this.quoteTokenIndex);
-    if (!quoteBank) {
-      throw new Error(
-        `bank for quote token with index ${this.quoteTokenIndex} not found`,
-      );
-    }
 
     if (
       baseBank.initLiabWeight.sub(quoteBank.initAssetWeight).lte(ZERO_I80F48())
@@ -115,28 +92,18 @@ export class Serum3Market {
   }
 
   public async loadBids(client: MangoClient, group: Group): Promise<Orderbook> {
-    const serum3MarketExternal = group.serum3MarketExternalsMap.get(
-      this.serumMarketExternal.toBase58(),
+    const serum3MarketExternal = group.getSerum3ExternalMarket(
+      this.serumMarketExternal,
     );
-    if (!serum3MarketExternal) {
-      throw new Error(
-        `Unable to find serum3MarketExternal for ${this.serumMarketExternal.toBase58()}`,
-      );
-    }
     return await serum3MarketExternal.loadBids(
       client.program.provider.connection,
     );
   }
 
   public async loadAsks(client: MangoClient, group: Group): Promise<Orderbook> {
-    const serum3MarketExternal = group.serum3MarketExternalsMap.get(
-      this.serumMarketExternal.toBase58(),
+    const serum3MarketExternal = group.getSerum3ExternalMarket(
+      this.serumMarketExternal,
     );
-    if (!serum3MarketExternal) {
-      throw new Error(
-        `Unable to find serum3MarketExternal for ${this.serumMarketExternal.toBase58()}`,
-      );
-    }
     return await serum3MarketExternal.loadAsks(
       client.program.provider.connection,
     );

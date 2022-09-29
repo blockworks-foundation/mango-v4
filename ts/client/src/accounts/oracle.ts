@@ -102,7 +102,7 @@ export async function parseSwitchboardOracle(
     return parseSwitcboardOracleV1(accountInfo);
   }
 
-  throw new Error(`Unable to parse switchboard oracle ${accountInfo.owner}`);
+  throw new Error(`Should not be reached!`);
 }
 
 export function isSwitchboardOracle(accountInfo: AccountInfo<Buffer>): boolean {

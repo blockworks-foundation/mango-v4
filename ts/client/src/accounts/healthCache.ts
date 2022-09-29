@@ -57,14 +57,7 @@ export class HealthCache {
     // Fill the TokenInfo balance with free funds in serum3 oo accounts, and fill
     // the serum3MaxReserved with their reserved funds. Also build Serum3Infos.
     const serum3Infos = mangoAccount.serum3Active().map((serum3) => {
-      const oo: OpenOrders | undefined =
-        mangoAccount.serum3OosMapByMarketIndex.get(serum3.marketIndex);
-
-      if (!oo) {
-        throw new Error(
-          `Open orders account not loaded for market ${serum3.marketIndex}!`,
-        );
-      }
+      const oo = mangoAccount.getSerum3OoAccount(serum3.marketIndex);
 
       // find the TokenInfos for the market's base and quote tokens
       const baseIndex = tokenInfos.findIndex(
@@ -72,14 +65,18 @@ export class HealthCache {
       );
       const baseInfo = tokenInfos[baseIndex];
       if (!baseInfo) {
-        throw new Error(`baseInfo not found for market ${serum3.marketIndex}`);
+        throw new Error(
+          `BaseInfo not found for market with marketIndex ${serum3.marketIndex}!`,
+        );
       }
       const quoteIndex = tokenInfos.findIndex(
         (tokenInfo) => tokenInfo.tokenIndex === serum3.quoteTokenIndex,
       );
       const quoteInfo = tokenInfos[quoteIndex];
       if (!quoteInfo) {
-        throw new Error(`quoteInfo not found for market ${serum3.marketIndex}`);
+        throw new Error(
+          `QuoteInfo not found for market with marketIndex ${serum3.marketIndex}!`,
+        );
       }
 
       return Serum3Info.fromOo(
@@ -94,14 +91,9 @@ export class HealthCache {
 
     // health contribution from perp accounts
     const perpInfos = mangoAccount.perpActive().map((perpPosition) => {
-      const perpMarket = group.findPerpMarket(perpPosition.marketIndex);
-
-      if (!perpMarket) {
-        throw new Error(
-          `PerpMarket not loaded for ${perpPosition.marketIndex}`,
-        );
-      }
-
+      const perpMarket = group.getPerpMarketByMarketIndex(
+        perpPosition.marketIndex,
+      );
       return PerpInfo.fromPerpPosition(perpMarket, perpPosition);
     });
 
@@ -446,7 +438,7 @@ export class HealthCache {
         rightRatio.sub(targetRatio).isNeg())
     ) {
       throw new Error(
-        `internal error: left ${leftRatio.toNumber()}  and right ${rightRatio.toNumber()} don't contain the target value ${targetRatio.toNumber()}`,
+        `Internal error: left ${leftRatio.toNumber()}  and right ${rightRatio.toNumber()} don't contain the target value ${targetRatio.toNumber()}, likely reason is the zeroAmount not been tight enough!`,
       );
     }
 
@@ -1123,7 +1115,7 @@ export class PerpInfo {
       I80F48.fromNumber(perpPosition.asksBaseLots),
     );
 
-    const lotsToQuote = baseLotSize.mul(I80F48.fromNumber(perpMarket.price));
+    const lotsToQuote = baseLotSize.mul(perpMarket.price);
 
     let base, quote;
     if (bidsNetLots.abs().gt(asksNetLots.abs())) {
@@ -1154,7 +1146,7 @@ export class PerpInfo {
       perpMarket.initLiabWeight,
       base,
       quote,
-      I80F48.fromNumber(perpMarket.price),
+      perpMarket.price,
       perpPosition.hasOpenOrders(),
     );
   }
@@ -1185,10 +1177,6 @@ export class PerpInfo {
   }
 
   static emptyFromPerpMarket(perpMarket: PerpMarket): PerpInfo {
-    if (!perpMarket.price)
-      throw new Error(
-        `Failed to create PerpInfo. Oracle price unavailable. ${perpMarket.oracle.toString()}`,
-      );
     return new PerpInfo(
       perpMarket.perpMarketIndex,
       perpMarket.maintAssetWeight,
@@ -1197,12 +1185,12 @@ export class PerpInfo {
       perpMarket.initLiabWeight,
       ZERO_I80F48(),
       ZERO_I80F48(),
-      I80F48.fromNumber(perpMarket.price),
+      perpMarket.price,
       false,
     );
   }
 
-  toString(tokenInfos: TokenInfo[]) {
+  toString() {
     return `  perpMarketIndex: ${this.perpMarketIndex}, base: ${
       this.base
     }, quote: ${this.quote}, oraclePrice: ${

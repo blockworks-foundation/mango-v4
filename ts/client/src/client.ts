@@ -1104,7 +1104,7 @@ export class MangoClient {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
-    if (!mangoAccount.findSerum3Account(serum3Market.marketIndex)) {
+    if (!mangoAccount.getSerum3Account(serum3Market.marketIndex)) {
       await this.serum3CreateOpenOrders(
         group,
         mangoAccount,
@@ -1112,7 +1112,7 @@ export class MangoClient {
       );
       await mangoAccount.reload(this);
     }
-    const serum3MarketExternal = group.serum3MarketExternalsMap.get(
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     )!;
     const serum3MarketExternalVaultSigner =
@@ -1167,7 +1167,7 @@ export class MangoClient {
         group: group.publicKey,
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        openOrders: mangoAccount.findSerum3Account(serum3Market.marketIndex)
+        openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
         serumProgram: SERUM3_PROGRAM_ID[this.cluster],
@@ -1210,7 +1210,7 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
 
-    const serum3MarketExternal = group.serum3MarketExternalsMap.get(
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     )!;
 
@@ -1220,7 +1220,7 @@ export class MangoClient {
         group: group.publicKey,
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        openOrders: mangoAccount.findSerum3Account(serum3Market.marketIndex)
+        openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
         serumProgram: SERUM3_PROGRAM_ID[this.cluster],
@@ -1249,7 +1249,7 @@ export class MangoClient {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
-    const serum3MarketExternal = group.serum3MarketExternalsMap.get(
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     )!;
     const serum3MarketExternalVaultSigner =
@@ -1265,7 +1265,7 @@ export class MangoClient {
         group: group.publicKey,
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        openOrders: mangoAccount.findSerum3Account(serum3Market.marketIndex)
+        openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
         serumProgram: SERUM3_PROGRAM_ID[this.cluster],
@@ -1305,7 +1305,7 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
 
-    const serum3MarketExternal = group.serum3MarketExternalsMap.get(
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     )!;
 
@@ -1314,7 +1314,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
-        openOrders: mangoAccount.findSerum3Account(serum3Market.marketIndex)
+        openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
         serumProgram: SERUM3_PROGRAM_ID[this.cluster],
@@ -1718,7 +1718,7 @@ export class MangoClient {
             case PerpEventQueue.LIQUIDATE_EVENT_TYPE:
               return [];
             default:
-              throw new Error(`Unknown event with eventType ${ev.eventType}`);
+              throw new Error(`Unknown event with eventType ${ev.eventType}!`);
           }
         })
         .flat();
@@ -1748,8 +1748,6 @@ export class MangoClient {
   }): Promise<TransactionSignature> {
     const inputBank: Bank = group.getFirstBankByMint(inputMintPk);
     const outputBank: Bank = group.getFirstBankByMint(outputMintPk);
-
-    if (!inputBank || !outputBank) throw new Error('Invalid token');
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
