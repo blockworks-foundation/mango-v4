@@ -4487,9 +4487,23 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                40
+                8
               ]
             }
+          },
+          {
+            "name": "previousIndex",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "cumulativeDepositInterest",
+            "type": "i64"
+          },
+          {
+            "name": "cumulativeBorrowInterest",
+            "type": "i64"
           }
         ]
       }
@@ -5975,6 +5989,36 @@ export type MangoV4 = {
         {
           "name": "socializedLoss",
           "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "DeactivateTokenPositionLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "cumulativeDepositInterest",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "cumulativeBorrowInterest",
+          "type": "i64",
           "index": false
         }
       ]
@@ -10588,9 +10632,23 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                40
+                8
               ]
             }
+          },
+          {
+            "name": "previousIndex",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "cumulativeDepositInterest",
+            "type": "i64"
+          },
+          {
+            "name": "cumulativeBorrowInterest",
+            "type": "i64"
           }
         ]
       }
@@ -12076,6 +12134,36 @@ export const IDL: MangoV4 = {
         {
           "name": "socializedLoss",
           "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "DeactivateTokenPositionLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "cumulativeDepositInterest",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "cumulativeBorrowInterest",
+          "type": "i64",
           "index": false
         }
       ]

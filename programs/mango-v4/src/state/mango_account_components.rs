@@ -32,13 +32,24 @@ pub struct TokenPosition {
     pub padding: [u8; 5],
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 40],
+    pub reserved: [u8; 16],
+
+    // bookkeeping variable for onchain interest calculation
+    // either deposit_index or borrow_index at last indexed_position change
+    pub previous_index: I80F48,
+
+    // (Display only)
+    // Cumulative deposit interest in token native units
+    pub cumulative_deposit_interest: f32,
+    // (Display only)
+    // Cumulative borrow interest in token native units
+    pub cumulative_borrow_interest: f32,
 }
 
 unsafe impl bytemuck::Pod for TokenPosition {}
 unsafe impl bytemuck::Zeroable for TokenPosition {}
 
-const_assert_eq!(size_of::<TokenPosition>(), 24 + 40);
+const_assert_eq!(size_of::<TokenPosition>(), 64);
 const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
 
 impl Default for TokenPosition {
@@ -47,8 +58,11 @@ impl Default for TokenPosition {
             indexed_position: I80F48::ZERO,
             token_index: TokenIndex::MAX,
             in_use_count: 0,
+            cumulative_deposit_interest: 0.0,
+            cumulative_borrow_interest: 0.0,
+            previous_index: I80F48::ZERO,
             padding: Default::default(),
-            reserved: [0; 40],
+            reserved: [0; 16],
         }
     }
 }
