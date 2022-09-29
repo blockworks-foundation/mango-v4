@@ -1,17 +1,19 @@
 import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
-import { nativeI80F48ToUi } from '../utils';
+import { As, nativeI80F48ToUi } from '../utils';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from './I80F48';
 
 export const QUOTE_DECIMALS = 6;
+
+export type TokenIndex = number & As<'token-index'>;
 
 export type OracleConfig = {
   confFilter: I80F48Dto;
 };
 
 export interface BankForHealth {
-  tokenIndex: number;
+  tokenIndex: TokenIndex;
   maintAssetWeight: I80F48;
   initAssetWeight: I80F48;
   maintLiabWeight: I80F48;
@@ -85,7 +87,7 @@ export class Bank implements BankForHealth {
       mintDecimals: number;
       bankNum: number;
     },
-  ) {
+  ): Bank {
     return new Bank(
       publicKey,
       obj.name,
@@ -120,7 +122,7 @@ export class Bank implements BankForHealth {
       obj.dust,
       obj.flashLoanTokenAccountInitial,
       obj.flashLoanApprovedAmount,
-      obj.tokenIndex,
+      obj.tokenIndex as TokenIndex,
       obj.mintDecimals,
       obj.bankNum,
     );
@@ -160,7 +162,7 @@ export class Bank implements BankForHealth {
     dust: I80F48Dto,
     flashLoanTokenAccountInitial: BN,
     flashLoanApprovedAmount: BN,
-    public tokenIndex: number,
+    public tokenIndex: TokenIndex,
     public mintDecimals: number,
     public bankNum: number,
   ) {
@@ -207,9 +209,9 @@ export class Bank implements BankForHealth {
       '\n oracle - ' +
       this.oracle.toBase58() +
       '\n price - ' +
-      this.price?.toNumber() +
+      this._price?.toNumber() +
       '\n uiPrice - ' +
-      this.uiPrice +
+      this._uiPrice +
       '\n deposit index - ' +
       this.depositIndex.toNumber() +
       '\n borrow index - ' +
@@ -268,7 +270,7 @@ export class Bank implements BankForHealth {
   get price(): I80F48 {
     if (!this._price) {
       throw new Error(
-        `Undefined price for bank ${this.publicKey}, tokenIndex ${this.tokenIndex}`,
+        `Undefined price for bank ${this.publicKey} with tokenIndex ${this.tokenIndex}!`,
       );
     }
     return this._price;
@@ -277,7 +279,7 @@ export class Bank implements BankForHealth {
   get uiPrice(): number {
     if (!this._uiPrice) {
       throw new Error(
-        `Undefined uiPrice for bank ${this.publicKey}, tokenIndex ${this.tokenIndex}`,
+        `Undefined uiPrice for bank ${this.publicKey} with tokenIndex ${this.tokenIndex}!`,
       );
     }
     return this._uiPrice;
@@ -388,11 +390,11 @@ export class MintInfo {
       registrationTime: BN;
       groupInsuranceFund: number;
     },
-  ) {
+  ): MintInfo {
     return new MintInfo(
       publicKey,
       obj.group,
-      obj.tokenIndex,
+      obj.tokenIndex as TokenIndex,
       obj.mint,
       obj.banks,
       obj.vaults,
@@ -405,7 +407,7 @@ export class MintInfo {
   constructor(
     public publicKey: PublicKey,
     public group: PublicKey,
-    public tokenIndex: number,
+    public tokenIndex: TokenIndex,
     public mint: PublicKey,
     public banks: PublicKey[],
     public vaults: PublicKey[],

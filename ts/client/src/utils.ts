@@ -23,7 +23,13 @@ import { PerpMarket } from './accounts/perp';
 export const U64_MAX_BN = new BN('18446744073709551615');
 export const I64_MAX_BN = new BN('9223372036854775807').toTwos(64);
 
-export function debugAccountMetas(ams: AccountMeta[]) {
+// https://stackoverflow.com/questions/70261755/user-defined-type-guard-function-and-type-narrowing-to-more-specific-type/70262876#70262876
+export declare abstract class As<Tag extends keyof never> {
+  private static readonly $as$: unique symbol;
+  private [As.$as$]: Record<Tag, true>;
+}
+
+export function debugAccountMetas(ams: AccountMeta[]): void {
   for (const am of ams) {
     console.log(
       `${am.pubkey.toBase58()}, isSigner: ${am.isSigner
@@ -39,7 +45,7 @@ export function debugHealthAccounts(
   group: Group,
   mangoAccount: MangoAccount,
   publicKeys: PublicKey[],
-) {
+): void {
   const banks = new Map(
     Array.from(group.banksMapByName.values()).map((banks: Bank[]) => [
       banks[0].publicKey.toBase58(),
@@ -66,10 +72,12 @@ export function debugHealthAccounts(
     }),
   );
   const perps = new Map(
-    Array.from(group.perpMarketsMap.values()).map((perpMarket: PerpMarket) => [
-      perpMarket.publicKey.toBase58(),
-      `${perpMarket.name} perp market`,
-    ]),
+    Array.from(group.perpMarketsMapByName.values()).map(
+      (perpMarket: PerpMarket) => [
+        perpMarket.publicKey.toBase58(),
+        `${perpMarket.name} perp market`,
+      ],
+    ),
   );
 
   publicKeys.map((pk) => {
@@ -126,7 +134,7 @@ export async function getAssociatedTokenAddress(
   associatedTokenProgramId = ASSOCIATED_TOKEN_PROGRAM_ID,
 ): Promise<PublicKey> {
   if (!allowOwnerOffCurve && !PublicKey.isOnCurve(owner.toBuffer()))
-    throw new Error('TokenOwnerOffCurve');
+    throw new Error('TokenOwnerOffCurve!');
 
   const [address] = await PublicKey.findProgramAddress(
     [owner.toBuffer(), programId.toBuffer(), mint.toBuffer()],

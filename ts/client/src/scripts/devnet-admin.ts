@@ -567,7 +567,6 @@ async function main() {
       // );
       // console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
-      // TODO decide on what keys should go in
       console.log(`ALT: extending manually with bank publick keys and oracles`);
       const extendIx = AddressLookupTableProgram.extendLookupTable({
         lookupTable: createIx[1],
