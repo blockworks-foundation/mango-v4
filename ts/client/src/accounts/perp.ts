@@ -335,7 +335,6 @@ export class BookSide {
     public includeExpired = false,
     maxBookDelay?: number,
   ) {
-    // TODO why? Ask Daffy
     // Determine the maxTimestamp found on the book to use for tif
     // If maxBookDelay is not provided, use 3600 as a very large number
     maxBookDelay = maxBookDelay === undefined ? 3600 : maxBookDelay;
