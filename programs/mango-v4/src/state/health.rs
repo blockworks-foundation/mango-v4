@@ -1158,7 +1158,7 @@ fn binary_search(
     fun: impl Fn(I80F48) -> I80F48,
 ) -> Result<I80F48> {
     let max_iterations = 20;
-    let target_error = I80F48!(0.01);
+    let target_error = I80F48!(0.1);
     require_msg!(
         (left_value - target_value).signum() * (right_value - target_value).signum() != I80F48::ONE,
         "internal error: left {} and right {} don't contain the target value {}",
