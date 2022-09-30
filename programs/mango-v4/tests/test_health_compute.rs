@@ -145,6 +145,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
             TokenDepositInstruction {
                 amount: 10,
                 account,
+                owner,
                 token_account: payer_mint_accounts[0],
                 token_authority: payer.clone(),
                 bank_index: 0,
@@ -264,6 +265,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
             TokenDepositInstruction {
                 amount: 10,
                 account,
+                owner,
                 token_account: payer_mint_accounts[0],
                 token_authority: payer.clone(),
                 bank_index: 0,

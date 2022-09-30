@@ -178,6 +178,7 @@ pub async fn create_funded_account(
             TokenDepositInstruction {
                 amount: amounts,
                 account,
+                owner,
                 token_account: payer.token_accounts[mint.index],
                 token_authority: payer.key,
                 bank_index,

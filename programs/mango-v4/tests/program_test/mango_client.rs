@@ -564,6 +564,7 @@ pub struct TokenDepositInstruction {
     pub amount: u64,
 
     pub account: Pubkey,
+    pub owner: TestKeypair,
     pub token_account: Pubkey,
     pub token_authority: TestKeypair,
     pub bank_index: usize,
@@ -572,6 +573,76 @@ pub struct TokenDepositInstruction {
 impl ClientInstruction for TokenDepositInstruction {
     type Accounts = mango_v4::accounts::TokenDeposit;
     type Instruction = mango_v4::instruction::TokenDeposit;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            amount: self.amount,
+        };
+
+        // load account so we know its mint
+        let token_account: TokenAccount = account_loader.load(&self.token_account).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let mint_info = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                account.fixed.group.as_ref(),
+                token_account.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let mint_info: MintInfo = account_loader.load(&mint_info).await.unwrap();
+
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            Some(mint_info.banks[self.bank_index]),
+            false,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            owner: self.owner.pubkey(),
+            bank: mint_info.banks[self.bank_index],
+            vault: mint_info.vaults[self.bank_index],
+            oracle: mint_info.oracle,
+            token_account: self.token_account,
+            token_authority: self.token_authority.pubkey(),
+            token_program: Token::id(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.token_authority, self.owner]
+    }
+}
+
+pub struct TokenDepositIntoExistingInstruction {
+    pub amount: u64,
+
+    pub account: Pubkey,
+    pub token_account: Pubkey,
+    pub token_authority: TestKeypair,
+    pub bank_index: usize,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenDepositIntoExistingInstruction {
+    type Accounts = mango_v4::accounts::TokenDepositIntoExisting;
+    type Instruction = mango_v4::instruction::TokenDepositIntoExisting;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,

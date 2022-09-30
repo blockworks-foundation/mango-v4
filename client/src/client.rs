@@ -344,6 +344,7 @@ impl MangoClient {
                         &mango_v4::accounts::TokenDeposit {
                             group: self.group(),
                             account: self.mango_account_address,
+                            owner: self.owner(),
                             bank: mint_info.first_bank(),
                             vault: mint_info.first_vault(),
                             oracle: mint_info.oracle,
