@@ -505,41 +505,18 @@ export class MangoClient {
 
   // MangoAccount
 
-  public async getOrCreateMangoAccount(
-    group: Group,
-    ownerPk: PublicKey,
-    accountNumber?: number,
-    name?: string,
-  ): Promise<MangoAccount | undefined> {
-    // TODO: this function discards accountSize and name when the account exists already!
-    // TODO: this function always creates accounts for this.program.owner, and not
-    //       ownerPk! It needs to get passed a keypair, and we need to add
-    //       createMangoAccountForOwner
-    if (accountNumber === undefined) {
-      // Get any MangoAccount
-      // TODO: should probably sort by accountNum for deterministic output!
-      let mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
-      if (mangoAccounts.length === 0) {
-        await this.createMangoAccount(group, accountNumber, name);
-        mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
-      }
-      return mangoAccounts[0];
-    } else {
-      let account = await this.getMangoAccountForOwner(
-        group,
-        ownerPk,
-        accountNumber,
-      );
-      if (account === undefined) {
-        await this.createMangoAccount(group, accountNumber, name);
-        account = await this.getMangoAccountForOwner(
-          group,
-          ownerPk,
-          accountNumber,
-        );
-      }
-      return account;
+  public async getOrCreateMangoAccount(group: Group): Promise<MangoAccount> {
+    const clientOwner = (this.program.provider as AnchorProvider).wallet
+      .publicKey;
+    let mangoAccounts = await this.getMangoAccountsForOwner(
+      group,
+      (this.program.provider as AnchorProvider).wallet.publicKey,
+    );
+    if (mangoAccounts.length === 0) {
+      await this.createMangoAccount(group);
+      mangoAccounts = await this.getMangoAccountsForOwner(group, clientOwner);
     }
+    return mangoAccounts.sort((a, b) => a.accountNum - b.accountNum)[0];
   }
 
   public async createMangoAccount(
