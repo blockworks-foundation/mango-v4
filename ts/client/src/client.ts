@@ -1355,7 +1355,7 @@ export class MangoClient {
       (this.program.account.bookSide as any)._idlAccount,
     );
     const eventQueueSize = (this.program as any)._coder.accounts.size(
-      (this.program.account.bookSide as any)._idlAccount,
+      (this.program.account.eventQueue as any)._idlAccount,
     );
 
     return await this.program.methods
