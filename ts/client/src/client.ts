@@ -1351,6 +1351,13 @@ export class MangoClient {
     const asks = new Keypair();
     const eventQueue = new Keypair();
 
+    const bookSideSize = (this.program as any)._coder.accounts.size(
+      (this.program.account.bookSide as any)._idlAccount,
+    );
+    const eventQueueSize = (this.program as any)._coder.accounts.size(
+      (this.program.account.eventQueue as any)._idlAccount,
+    );
+
     return await this.program.methods
       .perpCreateMarket(
         perpMarketIndex,
@@ -1390,15 +1397,13 @@ export class MangoClient {
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .preInstructions([
-        // TODO: try to pick up sizes of bookside and eventqueue from IDL, so we can stay in sync with program
-
         // book sides
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: 8 + 98584,
+          space: bookSideSize,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              8 + 98584,
+              bookSideSize,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,
@@ -1406,10 +1411,10 @@ export class MangoClient {
         }),
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: 8 + 98584,
+          space: bookSideSize,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              8 + 98584,
+              bookSideSize,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,
@@ -1418,10 +1423,10 @@ export class MangoClient {
         // event queue
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: 8 + 4 * 2 + 8 + 488 * 208,
+          space: eventQueueSize,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              8 + 4 * 2 + 8 + 488 * 208,
+              eventQueueSize,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,

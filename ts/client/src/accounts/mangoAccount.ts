@@ -272,7 +272,7 @@ export class MangoAccount {
   }
 
   /**
-   * Sum of all the assets i.e. token deposits, borrows, total assets in spot open orders, (perps positions is todo) in terms of quote value.
+   * Sum of all the assets i.e. token deposits, borrows, total assets in spot open orders, and perps positions.
    * @returns equity, in native quote
    */
   getEquity(group: Group): I80F48 {
