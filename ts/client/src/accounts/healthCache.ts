@@ -2,8 +2,6 @@ import { BN } from '@project-serum/anchor';
 import { OpenOrders } from '@project-serum/serum';
 import { PublicKey } from '@solana/web3.js';
 import _ from 'lodash';
-import { Bank, BankForHealth, TokenIndex } from './bank';
-import { Group } from './group';
 import {
   HUNDRED_I80F48,
   I80F48,
@@ -11,6 +9,8 @@ import {
   MAX_I80F48,
   ZERO_I80F48,
 } from '../numbers/I80F48';
+import { Bank, BankForHealth, TokenIndex } from './bank';
+import { Group } from './group';
 
 import { HealthType, MangoAccount, PerpPosition } from './mangoAccount';
 import { PerpMarket, PerpOrderSide } from './perp';

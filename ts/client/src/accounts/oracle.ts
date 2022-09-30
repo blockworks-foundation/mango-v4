@@ -20,7 +20,7 @@ let sbv2MainnetProgram;
 
 export class StubOracle {
   public price: I80F48;
-  public lastUpdated: number;
+  public lastUpdated: BN;
 
   static from(
     publicKey: PublicKey,
@@ -48,7 +48,7 @@ export class StubOracle {
     lastUpdated: BN,
   ) {
     this.price = I80F48.from(price);
-    this.lastUpdated = lastUpdated.toNumber();
+    this.lastUpdated = lastUpdated;
   }
 }
 

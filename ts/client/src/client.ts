@@ -57,7 +57,8 @@ import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
   I64_MAX_BN,
-  toNativeDecimals,
+  toNative,
+  toNativeBN,
 } from './utils';
 import { sendTransaction } from './utils/rpc';
 
@@ -741,7 +742,7 @@ export class MangoClient {
     amount: number,
   ): Promise<TransactionSignature> {
     const decimals = group.getMintDecimals(mintPk);
-    const nativeAmount = toNativeDecimals(amount, decimals).toNumber();
+    const nativeAmount = toNative(amount, decimals);
     return await this.tokenDepositNative(
       group,
       mangoAccount,
@@ -841,10 +842,7 @@ export class MangoClient {
     amount: number,
     allowBorrow: boolean,
   ): Promise<TransactionSignature> {
-    const nativeAmount = toNativeDecimals(
-      amount,
-      group.getMintDecimals(mintPk),
-    ).toNumber();
+    const nativeAmount = toNative(amount, group.getMintDecimals(mintPk));
     return await this.tokenWithdrawNative(
       group,
       mangoAccount,
@@ -1852,7 +1850,7 @@ export class MangoClient {
 
     const flashLoanBeginIx = await this.program.methods
       .flashLoanBegin([
-        toNativeDecimals(amountIn, inputBank.mintDecimals),
+        toNativeBN(amountIn, inputBank.mintDecimals),
         new BN(
           0,
         ) /* we don't care about borrowing the target amount, this is just a dummy */,

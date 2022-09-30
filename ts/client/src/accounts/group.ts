@@ -16,9 +16,9 @@ import BN from 'bn.js';
 import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
-import { toNativeDecimals, toUiDecimals } from '../utils';
-import { Bank, MintInfo, TokenIndex } from './bank';
 import { I80F48, ONE_I80F48 } from '../numbers/I80F48';
+import { toNativeBN, toNativeI80F48, toUiDecimals } from '../utils';
+import { Bank, MintInfo, TokenIndex } from './bank';
 import {
   isPythOracle,
   isSwitchboardOracle,
@@ -92,7 +92,7 @@ export class Group {
     public perpMarketsMapByName: Map<string, PerpMarket>,
     public mintInfosMapByTokenIndex: Map<TokenIndex, MintInfo>,
     public mintInfosMapByMint: Map<string, MintInfo>,
-    public vaultAmountsMap: Map<string, number>,
+    public vaultAmountsMap: Map<string, BN>,
   ) {}
 
   public async reloadAll(client: MangoClient): Promise<void> {
@@ -382,9 +382,10 @@ export class Group {
         if (!vaultAi) {
           throw new Error(`Undefined vaultAi for ${vaultPks[i]}`!);
         }
-        const vaultAmount = coder()
-          .accounts.decode('token', vaultAi.data)
-          .amount.toNumber();
+        const vaultAmount = coder().accounts.decode(
+          'token',
+          vaultAi.data,
+        ).amount;
         return [vaultPks[i].toBase58(), vaultAmount];
       }),
     );
@@ -415,31 +416,25 @@ export class Group {
   /**
    *
    * @param mintPk
-   * @returns sum of native balances of vaults for all banks for a token (fetched from vaultAmountsMap cache)
-   */
-  public getTokenVaultBalanceByMint(mintPk: PublicKey): I80F48 {
-    const banks = this.banksMapByMint.get(mintPk.toBase58());
-    if (!banks) throw new Error(`No bank found for mint ${mintPk}!`);
-    let totalAmount = 0;
-    for (const bank of banks) {
-      const amount = this.vaultAmountsMap.get(bank.vault.toBase58());
-      if (amount) {
-        totalAmount += amount;
-      }
-    }
-    return I80F48.fromNumber(totalAmount);
-  }
-
-  /**
-   *
-   * @param mintPk
    * @returns sum of ui balances of vaults for all banks for a token
    */
   public getTokenVaultBalanceByMintUi(mintPk: PublicKey): number {
-    const vaultBalance = this.getTokenVaultBalanceByMint(mintPk);
-    const mintDecimals = this.getMintDecimals(mintPk);
+    const banks = this.banksMapByMint.get(mintPk.toBase58());
+    if (!banks) {
+      throw new Error(`No bank found for mint ${mintPk}!`);
+    }
+    const totalAmount = new BN(0);
+    for (const bank of banks) {
+      const amount = this.vaultAmountsMap.get(bank.vault.toBase58());
+      if (!amount) {
+        throw new Error(
+          `Vault balance not found for bank ${bank.name} ${bank.bankNum}!`,
+        );
+      }
+      totalAmount.iadd(amount);
+    }
 
-    return toUiDecimals(vaultBalance, mintDecimals);
+    return toUiDecimals(totalAmount, this.getMintDecimals(mintPk));
   }
 
   public getSerum3MarketByMarketIndex(marketIndex: MarketIndex): Serum3Market {
@@ -575,31 +570,21 @@ export class Group {
   }
 
   public toUiPrice(price: I80F48, baseDecimals: number): number {
-    return price
-      .mul(
-        I80F48.fromNumber(
-          Math.pow(10, baseDecimals - this.getInsuranceMintDecimals()),
-        ),
-      )
-      .toNumber();
+    return toUiDecimals(price, baseDecimals - this.getInsuranceMintDecimals());
   }
 
   public toNativePrice(uiPrice: number, baseDecimals: number): I80F48 {
-    return I80F48.fromNumber(uiPrice).mul(
-      I80F48.fromNumber(
-        Math.pow(
-          10,
-          // note: our oracles are quoted in USD and our insurance mint is USD
-          // please update when these assumptions change
-          this.getInsuranceMintDecimals() - baseDecimals,
-        ),
-      ),
+    return toNativeI80F48(
+      uiPrice,
+      // note: our oracles are quoted in USD and our insurance mint is USD
+      // please update when these assumptions change
+      this.getInsuranceMintDecimals() - baseDecimals,
     );
   }
 
   public toNativeDecimals(uiAmount: number, mintPk: PublicKey): BN {
     const decimals = this.getMintDecimals(mintPk);
-    return toNativeDecimals(uiAmount, decimals);
+    return toNativeBN(uiAmount, decimals);
   }
 
   toString(): string {

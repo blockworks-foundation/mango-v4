@@ -3,9 +3,9 @@ import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import Big from 'big.js';
 import { MangoClient } from '../client';
-import { As, U64_MAX_BN } from '../utils';
-import { OracleConfig, QUOTE_DECIMALS } from './bank';
 import { I80F48, I80F48Dto } from '../numbers/I80F48';
+import { As, toNativeBN, U64_MAX_BN } from '../utils';
+import { OracleConfig, QUOTE_DECIMALS } from './bank';
 
 export type PerpMarketIndex = number & As<'perp-market-index'>;
 
@@ -22,8 +22,8 @@ export class PerpMarket {
   public maxFunding: I80F48;
   public longFunding: I80F48;
   public shortFunding: I80F48;
-  public openInterest: number;
-  public seqNum: number;
+  public openInterest: BN;
+  public seqNum: BN;
   public feesAccrued: I80F48;
   priceLotsToUiConverter: number;
   baseLotsToUiConverter: number;
@@ -146,8 +146,8 @@ export class PerpMarket {
     this.maxFunding = I80F48.from(maxFunding);
     this.longFunding = I80F48.from(longFunding);
     this.shortFunding = I80F48.from(shortFunding);
-    this.openInterest = openInterest.toNumber();
-    this.seqNum = seqNum.toNumber();
+    this.openInterest = openInterest;
+    this.seqNum = seqNum;
     this.feesAccrued = I80F48.from(feesAccrued);
 
     this.priceLotsToUiConverter = new Big(10)
@@ -241,21 +241,17 @@ export class PerpMarket {
   }
 
   public uiPriceToLots(price: number): BN {
-    return new BN(price * Math.pow(10, QUOTE_DECIMALS))
+    return toNativeBN(price, QUOTE_DECIMALS)
       .mul(this.baseLotSize)
       .div(this.quoteLotSize.mul(new BN(Math.pow(10, this.baseDecimals))));
   }
 
   public uiBaseToLots(quantity: number): BN {
-    return new BN(quantity * Math.pow(10, this.baseDecimals)).div(
-      this.baseLotSize,
-    );
+    return toNativeBN(quantity, this.baseDecimals).div(this.baseLotSize);
   }
 
   public uiQuoteToLots(uiQuote: number): BN {
-    return new BN(uiQuote * Math.pow(10, QUOTE_DECIMALS)).div(
-      this.quoteLotSize,
-    );
+    return toNativeBN(uiQuote, QUOTE_DECIMALS).div(this.quoteLotSize);
   }
 
   public priceLotsToUi(price: BN): number {

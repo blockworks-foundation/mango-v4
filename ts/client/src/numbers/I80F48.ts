@@ -241,5 +241,6 @@ export function HUNDRED_I80F48(): I80F48 {
 }
 
 export function MAX_I80F48(): I80F48 {
+  // TODO this is not correct, plug in the correct number here
   return new I80F48(I80F48.MAX_BN);
 }

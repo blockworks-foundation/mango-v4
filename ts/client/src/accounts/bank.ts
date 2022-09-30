@@ -2,7 +2,7 @@ import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
-import { As, nativeI80F48ToUi } from '../utils';
+import { As, toUiDecimals } from '../utils';
 
 export const QUOTE_DECIMALS = 6;
 
@@ -294,17 +294,17 @@ export class Bank implements BankForHealth {
   }
 
   uiDeposits(): number {
-    return nativeI80F48ToUi(
+    return toUiDecimals(
       this.indexedDeposits.mul(this.depositIndex),
       this.mintDecimals,
-    ).toNumber();
+    );
   }
 
   uiBorrows(): number {
-    return nativeI80F48ToUi(
+    return toUiDecimals(
       this.indexedBorrows.mul(this.borrowIndex),
       this.mintDecimals,
-    ).toNumber();
+    );
   }
 
   /**
