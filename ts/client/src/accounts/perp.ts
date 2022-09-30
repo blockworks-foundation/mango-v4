@@ -276,19 +276,19 @@ export class PerpMarket {
       '\n perpMarketIndex -' +
       this.perpMarketIndex +
       '\n maintAssetWeight -' +
-      this.maintAssetWeight.toNumber() +
+      this.maintAssetWeight.toString() +
       '\n initAssetWeight -' +
-      this.initAssetWeight.toNumber() +
+      this.initAssetWeight.toString() +
       '\n maintLiabWeight -' +
-      this.maintLiabWeight.toNumber() +
+      this.maintLiabWeight.toString() +
       '\n initLiabWeight -' +
-      this.initLiabWeight.toNumber() +
+      this.initLiabWeight.toString() +
       '\n liquidationFee -' +
-      this.liquidationFee.toNumber() +
+      this.liquidationFee.toString() +
       '\n makerFee -' +
-      this.makerFee.toNumber() +
+      this.makerFee.toString() +
       '\n takerFee -' +
-      this.takerFee.toNumber()
+      this.takerFee.toString()
     );
   }
 }
