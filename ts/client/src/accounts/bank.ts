@@ -225,9 +225,9 @@ export class Bank implements BankForHealth {
       '\n cachedIndexedTotalBorrows - ' +
       this.cachedIndexedTotalBorrows.toString() +
       '\n indexLastUpdated - ' +
-      new Date(this.indexLastUpdated.toString() * 1000) +
+      new Date(this.indexLastUpdated.toNumber() * 1000) +
       '\n bankRateLastUpdated - ' +
-      new Date(this.bankRateLastUpdated.toString() * 1000) +
+      new Date(this.bankRateLastUpdated.toNumber() * 1000) +
       '\n avgUtilization - ' +
       this.avgUtilization.toString() +
       '\n adjustmentFactor - ' +

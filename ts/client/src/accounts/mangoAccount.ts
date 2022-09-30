@@ -966,11 +966,11 @@ export class PerpPosition {
   }
 
   public unsettledFunding(perpMarket: PerpMarket): I80F48 {
-    if (this.basePositionLots > 0) {
+    if (this.basePositionLots.gt(new BN(0))) {
       return perpMarket.longFunding
         .sub(this.longSettledFunding)
         .mul(I80F48.fromString(this.basePositionLots.toString()));
-    } else if (this.basePositionLots < 0) {
+    } else if (this.basePositionLots.lt(new BN(0))) {
       return perpMarket.shortFunding
         .sub(this.shortSettledFunding)
         .mul(I80F48.fromString(this.basePositionLots.toString()));
@@ -983,8 +983,8 @@ export class PerpPosition {
       perpMarket.baseLotSize.toString(),
     ).mul(perpMarket.price);
 
-    const baseLots = I80F48.fromNumber(
-      this.basePositionLots + this.takerBaseLots,
+    const baseLots = I80F48.fromString(
+      this.basePositionLots.add(this.takerBaseLots).toString(),
     );
 
     const unsettledFunding = this.unsettledFunding(perpMarket);
@@ -999,11 +999,12 @@ export class PerpPosition {
   }
 
   public hasOpenOrders(): boolean {
+    const zero = new BN(0);
     return (
-      this.asksBaseLots != 0 ||
-      this.bidsBaseLots != 0 ||
-      this.takerBaseLots != 0 ||
-      this.takerQuoteLots != 0
+      !this.asksBaseLots.eq(zero) ||
+      !this.bidsBaseLots.eq(zero) ||
+      !this.takerBaseLots.eq(zero) ||
+      !this.takerQuoteLots.eq(zero)
     );
   }
 }

@@ -1,10 +1,10 @@
 import { BN } from '@project-serum/anchor';
 import { OpenOrders } from '@project-serum/serum';
 import { expect } from 'chai';
+import { I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { toUiDecimalsForQuote } from '../utils';
 import { BankForHealth, TokenIndex } from './bank';
 import { HealthCache, PerpInfo, Serum3Info, TokenInfo } from './healthCache';
-import { I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { HealthType, PerpPosition } from './mangoAccount';
 import { PerpMarket } from './perp';
 import { MarketIndex } from './serum3';
@@ -81,12 +81,12 @@ describe('Health Cache', () => {
     const pM = mockPerpMarket(9, 0.1, 0.2, targetBank.price);
     const pp = new PerpPosition(
       pM.perpMarketIndex,
-      3,
+      new BN(3),
       I80F48.fromNumber(-310),
-      7,
-      11,
-      1,
-      2,
+      new BN(7),
+      new BN(11),
+      new BN(1),
+      new BN(2),
       I80F48.fromNumber(0),
       I80F48.fromNumber(0),
     );
@@ -182,12 +182,12 @@ describe('Health Cache', () => {
       const pM = mockPerpMarket(9, 0.1, 0.2, bank2.price);
       const pp = new PerpPosition(
         pM.perpMarketIndex,
-        fixture.perp1[0],
+        new BN(fixture.perp1[0]),
         I80F48.fromNumber(fixture.perp1[1]),
-        fixture.perp1[2],
-        fixture.perp1[3],
-        0,
-        0,
+        new BN(fixture.perp1[2]),
+        new BN(fixture.perp1[3]),
+        new BN(0),
+        new BN(0),
         I80F48.fromNumber(0),
         I80F48.fromNumber(0),
       );

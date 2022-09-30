@@ -1060,8 +1060,8 @@ export class PerpInfo {
     perpPosition: PerpPosition,
   ): PerpInfo {
     const baseLotSize = I80F48.fromString(perpMarket.baseLotSize.toString());
-    const baseLots = I80F48.fromNumber(
-      perpPosition.basePositionLots + perpPosition.takerBaseLots,
+    const baseLots = I80F48.fromString(
+      perpPosition.basePositionLots.add(perpPosition.takerBaseLots).toString(),
     );
 
     const unsettledFunding = perpPosition.unsettledFunding(perpMarket);
@@ -1119,10 +1119,10 @@ export class PerpInfo {
     //   iff  abs(bidsNetLots) > abs(asksNetLots)
 
     const bidsNetLots = baseLots.add(
-      I80F48.fromNumber(perpPosition.bidsBaseLots),
+      I80F48.fromString(perpPosition.bidsBaseLots.toString()),
     );
     const asksNetLots = baseLots.sub(
-      I80F48.fromNumber(perpPosition.asksBaseLots),
+      I80F48.fromString(perpPosition.asksBaseLots.toString()),
     );
 
     const lotsToQuote = baseLotSize.mul(perpMarket.price);
