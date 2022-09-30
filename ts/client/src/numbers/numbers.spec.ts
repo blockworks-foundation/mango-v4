@@ -29,5 +29,6 @@ describe('Math', () => {
 
     // I80F48 constructor takes a BN, but it doesnt do what one might think it does
     expect(new I80F48(new BN(10)).toNumber()).not.equals(10);
+    expect(I80F48.fromI64(new BN(10)).toNumber()).equals(10);
   });
 });

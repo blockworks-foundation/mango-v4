@@ -735,7 +735,7 @@ export class HealthCache {
     const perpInfoIndex = this.getOrCreatePerpInfoIndex(perpMarket);
     const perpInfo = this.perpInfos[perpInfoIndex];
     const oraclePrice = perpInfo.oraclePrice;
-    const baseLotSize = I80F48.fromString(perpMarket.baseLotSize.toString());
+    const baseLotSize = I80F48.fromI64(perpMarket.baseLotSize);
 
     // If the price is sufficiently good then health will just increase from trading
     const finalHealthSlope =
@@ -940,21 +940,21 @@ export class Serum3Info {
     oo: OpenOrders,
   ): Serum3Info {
     // add the amounts that are freely settleable
-    const baseFree = I80F48.fromString(oo.baseTokenFree.toString());
+    const baseFree = I80F48.fromI64(oo.baseTokenFree);
     // NOTE: referrerRebatesAccrued is not declared on oo class, but the layout
     // is aware of it
-    const quoteFree = I80F48.fromString(
-      oo.quoteTokenFree.add((oo as any).referrerRebatesAccrued).toString(),
+    const quoteFree = I80F48.fromI64(
+      oo.quoteTokenFree.add((oo as any).referrerRebatesAccrued),
     );
     baseInfo.balance.iadd(baseFree.mul(baseInfo.oraclePrice));
     quoteInfo.balance.iadd(quoteFree.mul(quoteInfo.oraclePrice));
 
     // add the reserved amount to both sides, to have the worst-case covered
-    const reservedBase = I80F48.fromString(
-      oo.baseTokenTotal.sub(oo.baseTokenFree).toString(),
+    const reservedBase = I80F48.fromI64(
+      oo.baseTokenTotal.sub(oo.baseTokenFree),
     );
-    const reservedQuote = I80F48.fromString(
-      oo.quoteTokenTotal.sub(oo.quoteTokenFree).toString(),
+    const reservedQuote = I80F48.fromI64(
+      oo.quoteTokenTotal.sub(oo.quoteTokenFree),
     );
     const reservedBalance = reservedBase
       .mul(baseInfo.oraclePrice)
@@ -1059,21 +1059,17 @@ export class PerpInfo {
     perpMarket: PerpMarket,
     perpPosition: PerpPosition,
   ): PerpInfo {
-    const baseLotSize = I80F48.fromString(perpMarket.baseLotSize.toString());
-    const baseLots = I80F48.fromString(
-      perpPosition.basePositionLots.add(perpPosition.takerBaseLots).toString(),
+    const baseLotSize = I80F48.fromI64(perpMarket.baseLotSize);
+    const baseLots = I80F48.fromI64(
+      perpPosition.basePositionLots.add(perpPosition.takerBaseLots),
     );
 
     const unsettledFunding = perpPosition.unsettledFunding(perpMarket);
 
-    const takerQuote = I80F48.fromString(
-      new BN(perpPosition.takerQuoteLots)
-        .mul(perpMarket.quoteLotSize)
-        .toString(),
+    const takerQuote = I80F48.fromI64(
+      new BN(perpPosition.takerQuoteLots).mul(perpMarket.quoteLotSize),
     );
-    const quoteCurrent = I80F48.fromString(
-      perpPosition.quotePositionNative.toString(),
-    )
+    const quoteCurrent = perpPosition.quotePositionNative
       .sub(unsettledFunding)
       .add(takerQuote);
 
@@ -1118,26 +1114,18 @@ export class PerpInfo {
     //            scenario1 < scenario2
     //   iff  abs(bidsNetLots) > abs(asksNetLots)
 
-    const bidsNetLots = baseLots.add(
-      I80F48.fromString(perpPosition.bidsBaseLots.toString()),
-    );
-    const asksNetLots = baseLots.sub(
-      I80F48.fromString(perpPosition.asksBaseLots.toString()),
-    );
+    const bidsNetLots = baseLots.add(I80F48.fromI64(perpPosition.bidsBaseLots));
+    const asksNetLots = baseLots.sub(I80F48.fromI64(perpPosition.asksBaseLots));
 
     const lotsToQuote = baseLotSize.mul(perpMarket.price);
 
     let base, quote;
     if (bidsNetLots.abs().gt(asksNetLots.abs())) {
-      const bidsBaseLots = I80F48.fromString(
-        perpPosition.bidsBaseLots.toString(),
-      );
+      const bidsBaseLots = I80F48.fromI64(perpPosition.bidsBaseLots);
       base = bidsNetLots.mul(lotsToQuote);
       quote = quoteCurrent.sub(bidsBaseLots.mul(lotsToQuote));
     } else {
-      const asksBaseLots = I80F48.fromString(
-        perpPosition.asksBaseLots.toString(),
-      );
+      const asksBaseLots = I80F48.fromI64(perpPosition.asksBaseLots);
       base = asksNetLots.mul(lotsToQuote);
       quote = quoteCurrent.add(asksBaseLots.mul(lotsToQuote));
     }
