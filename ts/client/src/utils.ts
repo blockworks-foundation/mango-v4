@@ -23,9 +23,7 @@ export const U64_MAX_BN = new BN('18446744073709551615');
 export const I64_MAX_BN = new BN('9223372036854775807').toTwos(64);
 
 export function toNativeI80F48(uiAmount: number, decimals: number): I80F48 {
-  return I80F48.fromNumber(uiAmount)
-    .mul(I80F48.fromNumber(Math.pow(10, decimals)))
-    .floor();
+  return I80F48.fromNumber(Math.trunc(uiAmount * Math.pow(10, decimals)));
 }
 
 export function toNative(uiAmount: number, decimals: number): BN {
