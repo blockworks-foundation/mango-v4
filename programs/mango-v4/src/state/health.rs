@@ -2096,7 +2096,7 @@ mod tests {
             println!(
                     "checking for price_factor: {price_factor}, target ratio {ratio}: actual ratio: {actual_ratio}, plus ratio: {plus_ratio}, base_lots: {base_lots}",
                 );
-            let max_binary_search_error = 0.01;
+            let max_binary_search_error = 0.1;
             assert!(ratio <= actual_ratio);
             assert!(plus_ratio - max_binary_search_error <= ratio);
         };
