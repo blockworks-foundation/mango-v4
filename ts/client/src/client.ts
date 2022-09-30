@@ -832,6 +832,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
+        owner: mangoAccount.owner,
         bank: bank.publicKey,
         vault: bank.vault,
         oracle: bank.oracle,

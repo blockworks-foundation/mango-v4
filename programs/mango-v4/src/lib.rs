@@ -211,6 +211,13 @@ pub mod mango_v4 {
         instructions::token_deposit(ctx, amount)
     }
 
+    pub fn token_deposit_into_existing(
+        ctx: Context<TokenDepositIntoExisting>,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::token_deposit_into_existing(ctx, amount)
+    }
+
     pub fn token_withdraw(
         ctx: Context<TokenWithdraw>,
         amount: u64,

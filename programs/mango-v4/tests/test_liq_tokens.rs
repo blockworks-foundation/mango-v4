@@ -233,6 +233,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
             TokenDepositInstruction {
                 amount: 100000,
                 account: vault_account,
+                owner,
                 token_account,
                 token_authority: payer.clone(),
                 bank_index: 0,
@@ -269,6 +270,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         TokenDepositInstruction {
             amount: deposit1_amount,
             account,
+            owner,
             token_account: payer_mint_accounts[2],
             token_authority: payer.clone(),
             bank_index: 0,
@@ -281,6 +283,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         TokenDepositInstruction {
             amount: deposit2_amount,
             account,
+            owner,
             token_account: payer_mint_accounts[3],
             token_authority: payer.clone(),
             bank_index: 0,
