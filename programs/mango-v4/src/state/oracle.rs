@@ -209,8 +209,6 @@ mod tests {
 
     #[test]
     pub fn test_oracles() -> Result<()> {
-        println!("{:?}", I80F48::MAX);
-
         // add ability to find fixtures
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/test");

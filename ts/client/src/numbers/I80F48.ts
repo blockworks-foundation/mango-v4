@@ -241,6 +241,6 @@ export function HUNDRED_I80F48(): I80F48 {
 }
 
 export function MAX_I80F48(): I80F48 {
-  // TODO this is not correct, plug in the correct number here
-  return new I80F48(I80F48.MAX_BN);
+  // Largest possible number which can freely convert to BN/I80F48 and back
+  return I80F48.fromNumber(0x1fffffffffffff);
 }

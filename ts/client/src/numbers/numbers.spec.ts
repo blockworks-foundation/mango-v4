@@ -13,7 +13,7 @@ describe('Math', () => {
       new BN(0x20000000000000);
     }).to.throw('Assertion failed');
 
-    // max BN cant be convert to a number
+    // max BN cant be converted to a number
     expect(function () {
       U64_MAX_BN.toNumber();
     }).to.throw('Number can only safely store up to 53 bits');

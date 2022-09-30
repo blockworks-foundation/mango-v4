@@ -430,6 +430,6 @@ describe('Health Cache', () => {
           I80F48.fromNumber(0.95),
         ),
       ).toFixed(3),
-    ).equals('90.477');
+    ).equals('90.176');
   });
 });
