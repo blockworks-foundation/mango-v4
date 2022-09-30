@@ -58,7 +58,6 @@ import {
   getAssociatedTokenAddress,
   I64_MAX_BN,
   toNative,
-  toNativeBN,
 } from './utils';
 import { sendTransaction } from './utils/rpc';
 
@@ -755,7 +754,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
-    nativeAmount: number,
+    nativeAmount: BN,
   ): Promise<TransactionSignature> {
     const bank = group.getFirstBankByMint(mintPk);
 
@@ -770,13 +769,13 @@ export class MangoClient {
     const additionalSigners: Signer[] = [];
     if (mintPk.equals(WRAPPED_SOL_MINT)) {
       wrappedSolAccount = new Keypair();
-      const lamports = nativeAmount + 1e7;
+      const lamports = nativeAmount.add(new BN(1e7));
 
       preInstructions = [
         SystemProgram.createAccount({
           fromPubkey: mangoAccount.owner,
           newAccountPubkey: wrappedSolAccount.publicKey,
-          lamports,
+          lamports: lamports.toNumber(),
           space: 165,
           programId: TOKEN_PROGRAM_ID,
         }),
@@ -856,7 +855,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
-    nativeAmount: number,
+    nativeAmount: BN,
     allowBorrow: boolean,
   ): Promise<TransactionSignature> {
     const bank = group.getFirstBankByMint(mintPk);
@@ -1850,7 +1849,7 @@ export class MangoClient {
 
     const flashLoanBeginIx = await this.program.methods
       .flashLoanBegin([
-        toNativeBN(amountIn, inputBank.mintDecimals),
+        toNative(amountIn, inputBank.mintDecimals),
         new BN(
           0,
         ) /* we don't care about borrowing the target amount, this is just a dummy */,

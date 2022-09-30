@@ -17,7 +17,7 @@ import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
 import { I80F48, ONE_I80F48 } from '../numbers/I80F48';
-import { toNativeBN, toNativeI80F48, toUiDecimals } from '../utils';
+import { toNative, toNativeI80F48, toUiDecimals } from '../utils';
 import { Bank, MintInfo, TokenIndex } from './bank';
 import {
   isPythOracle,
@@ -584,7 +584,7 @@ export class Group {
 
   public toNativeDecimals(uiAmount: number, mintPk: PublicKey): BN {
     const decimals = this.getMintDecimals(mintPk);
-    return toNativeBN(uiAmount, decimals);
+    return toNative(uiAmount, decimals);
   }
 
   toString(): string {

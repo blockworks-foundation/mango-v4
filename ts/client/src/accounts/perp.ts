@@ -4,7 +4,7 @@ import { PublicKey } from '@solana/web3.js';
 import Big from 'big.js';
 import { MangoClient } from '../client';
 import { I80F48, I80F48Dto } from '../numbers/I80F48';
-import { As, toNativeBN, U64_MAX_BN } from '../utils';
+import { As, toNative, U64_MAX_BN } from '../utils';
 import { OracleConfig, QUOTE_DECIMALS } from './bank';
 
 export type PerpMarketIndex = number & As<'perp-market-index'>;
@@ -241,17 +241,17 @@ export class PerpMarket {
   }
 
   public uiPriceToLots(price: number): BN {
-    return toNativeBN(price, QUOTE_DECIMALS)
+    return toNative(price, QUOTE_DECIMALS)
       .mul(this.baseLotSize)
       .div(this.quoteLotSize.mul(new BN(Math.pow(10, this.baseDecimals))));
   }
 
   public uiBaseToLots(quantity: number): BN {
-    return toNativeBN(quantity, this.baseDecimals).div(this.baseLotSize);
+    return toNative(quantity, this.baseDecimals).div(this.baseLotSize);
   }
 
   public uiQuoteToLots(uiQuote: number): BN {
-    return toNativeBN(uiQuote, QUOTE_DECIMALS).div(this.quoteLotSize);
+    return toNative(uiQuote, QUOTE_DECIMALS).div(this.quoteLotSize);
   }
 
   public priceLotsToUi(price: BN): number {

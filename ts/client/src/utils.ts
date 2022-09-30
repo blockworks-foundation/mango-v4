@@ -19,48 +19,37 @@ import { I80F48 } from './numbers/I80F48';
 ///
 /// numeric helpers
 ///
-
-// TODO double check if these are correct
 export const U64_MAX_BN = new BN('18446744073709551615');
 export const I64_MAX_BN = new BN('9223372036854775807').toTwos(64);
 
-/**
- * @throws when uiAmount * (10 ^ decimals) > 2^53 (i.e. 9007199254740992 which is ~10^16)
- */
 export function toNativeI80F48(uiAmount: number, decimals: number): I80F48 {
-  return I80F48.fromNumber(Math.trunc(uiAmount * Math.pow(10, decimals)));
+  return I80F48.fromNumber(uiAmount)
+    .mul(I80F48.fromNumber(Math.pow(10, decimals)))
+    .floor();
 }
 
-/**
- * @throws when uiAmount * (10 ^ decimals) > 2^53 (i.e. 9007199254740992 which is ~10^16)
- */
-export function toNativeBN(uiAmount: number, decimals: number): BN {
+export function toNative(uiAmount: number, decimals: number): BN {
   return new BN(Math.trunc(uiAmount * Math.pow(10, decimals)));
-}
-
-export function toNative(uiAmount: number, decimals: number): number {
-  return Math.trunc(uiAmount * Math.pow(10, decimals));
 }
 
 export function toUiDecimals(
   nativeAmount: BN | I80F48 | number,
   decimals: number,
 ): number {
-  nativeAmount =
-    nativeAmount instanceof BN || nativeAmount instanceof I80F48
-      ? nativeAmount.toNumber()
-      : nativeAmount;
+  if (nativeAmount instanceof BN) {
+    return nativeAmount.div(new BN(Math.pow(10, decimals))).toNumber();
+  } else if (nativeAmount instanceof I80F48) {
+    return nativeAmount
+      .div(I80F48.fromNumber(Math.pow(10, decimals)))
+      .toNumber();
+  }
   return nativeAmount / Math.pow(10, decimals);
 }
 
 export function toUiDecimalsForQuote(
   nativeAmount: BN | I80F48 | number,
 ): number {
-  nativeAmount =
-    nativeAmount instanceof BN || nativeAmount instanceof I80F48
-      ? nativeAmount.toNumber()
-      : nativeAmount;
-  return nativeAmount / Math.pow(10, QUOTE_DECIMALS);
+  return toUiDecimals(nativeAmount, QUOTE_DECIMALS);
 }
 
 export function toUiI80F48(nativeAmount: I80F48, decimals: number): I80F48 {
