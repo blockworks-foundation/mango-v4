@@ -4,16 +4,11 @@ import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
-import {
-  nativeI80F48ToUi,
-  toNative,
-  toUiDecimals,
-  toUiDecimalsForQuote,
-} from '../utils';
+import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
+import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
-import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from './I80F48';
 import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
@@ -262,13 +257,9 @@ export class MangoAccount {
    * @param healthType
    * @returns health ratio, in percentage form, capped to 100
    */
-  getHealthRatioUi(group: Group, healthType: HealthType): number | undefined {
+  getHealthRatioUi(group: Group, healthType: HealthType): number {
     const ratio = this.getHealthRatio(group, healthType).toNumber();
-    if (ratio) {
-      return ratio > 100 ? 100 : Math.trunc(ratio);
-    } else {
-      return undefined;
-    }
+    return ratio > 100 ? 100 : Math.trunc(ratio);
   }
 
   /**
@@ -287,19 +278,15 @@ export class MangoAccount {
       const baseBank = group.getFirstBankByTokenIndex(sp.baseTokenIndex);
       tokensMap
         .get(baseBank.tokenIndex)!
-        .iadd(
-          I80F48.fromString(oo.baseTokenTotal.toString()).mul(baseBank.price),
-        );
+        .iadd(I80F48.fromI64(oo.baseTokenTotal).mul(baseBank.price));
       const quoteBank = group.getFirstBankByTokenIndex(sp.quoteTokenIndex);
       // NOTE: referrerRebatesAccrued is not declared on oo class, but the layout
       // is aware of it
       tokensMap
         .get(baseBank.tokenIndex)!
         .iadd(
-          I80F48.fromString(
-            oo.quoteTokenTotal
-              .add((oo as any).referrerRebatesAccrued)
-              .toString(),
+          I80F48.fromI64(
+            oo.quoteTokenTotal.add((oo as any).referrerRebatesAccrued),
           ).mul(quoteBank.price),
         );
     }
@@ -477,7 +464,7 @@ export class MangoAccount {
   ): number | undefined {
     const nativeTokenChanges = uiTokenChanges.map((tokenChange) => {
       return {
-        nativeTokenAmount: toNative(
+        nativeTokenAmount: toNativeI80F48(
           tokenChange.uiTokenAmount,
           group.getMintDecimals(tokenChange.mintPk),
         ),
@@ -634,7 +621,7 @@ export class MangoAccount {
       .simHealthRatioWithSerum3BidChanges(
         baseBank,
         quoteBank,
-        toNative(
+        toNativeI80F48(
           uiQuoteAmount,
           group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
             .mintDecimals,
@@ -672,7 +659,7 @@ export class MangoAccount {
       .simHealthRatioWithSerum3AskChanges(
         baseBank,
         quoteBank,
-        toNative(
+        toNativeI80F48(
           uiBaseAmount,
           group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
             .mintDecimals,
@@ -703,11 +690,9 @@ export class MangoAccount {
       I80F48.fromNumber(2),
       group.toNativePrice(uiPrice, perpMarket.baseDecimals),
     );
-    const nativeBase = baseLots.mul(
-      I80F48.fromString(perpMarket.baseLotSize.toString()),
-    );
+    const nativeBase = baseLots.mul(I80F48.fromI64(perpMarket.baseLotSize));
     const nativeQuote = nativeBase.mul(perpMarket.price);
-    return toUiDecimalsForQuote(nativeQuote.toNumber());
+    return toUiDecimalsForQuote(nativeQuote);
   }
 
   /**
@@ -856,7 +841,7 @@ export class TokenPosition {
    * @returns UI balance, is signed
    */
   public balanceUi(bank: Bank): number {
-    return nativeI80F48ToUi(this.balance(bank), bank.mintDecimals).toNumber();
+    return toUiDecimals(this.balance(bank), bank.mintDecimals);
   }
 
   /**
@@ -864,7 +849,7 @@ export class TokenPosition {
    * @returns UI deposits, 0 if position has borrows
    */
   public depositsUi(bank: Bank): number {
-    return nativeI80F48ToUi(this.deposits(bank), bank.mintDecimals).toNumber();
+    return toUiDecimals(this.deposits(bank), bank.mintDecimals);
   }
 
   /**
@@ -872,7 +857,7 @@ export class TokenPosition {
    * @returns UI borrows, 0 if position has deposits
    */
   public borrowsUi(bank: Bank): number {
-    return nativeI80F48ToUi(this.borrows(bank), bank.mintDecimals).toNumber();
+    return toUiDecimals(this.borrows(bank), bank.mintDecimals);
   }
 
   public toString(group?: Group, index?: number): string {
@@ -947,12 +932,12 @@ export class PerpPosition {
   static from(dto: PerpPositionDto): PerpPosition {
     return new PerpPosition(
       dto.marketIndex as PerpMarketIndex,
-      dto.basePositionLots.toNumber(),
+      dto.basePositionLots,
       I80F48.from(dto.quotePositionNative),
-      dto.bidsBaseLots.toNumber(),
-      dto.asksBaseLots.toNumber(),
-      dto.takerBaseLots.toNumber(),
-      dto.takerQuoteLots.toNumber(),
+      dto.bidsBaseLots,
+      dto.asksBaseLots,
+      dto.takerBaseLots,
+      dto.takerQuoteLots,
       I80F48.from(dto.longSettledFunding),
       I80F48.from(dto.shortSettledFunding),
     );
@@ -960,12 +945,12 @@ export class PerpPosition {
 
   constructor(
     public marketIndex: PerpMarketIndex,
-    public basePositionLots: number,
+    public basePositionLots: BN,
     public quotePositionNative: I80F48,
-    public bidsBaseLots: number,
-    public asksBaseLots: number,
-    public takerBaseLots: number,
-    public takerQuoteLots: number,
+    public bidsBaseLots: BN,
+    public asksBaseLots: BN,
+    public takerBaseLots: BN,
+    public takerQuoteLots: BN,
     public longSettledFunding: I80F48,
     public shortSettledFunding: I80F48,
   ) {}
@@ -975,32 +960,32 @@ export class PerpPosition {
   }
 
   public unsettledFunding(perpMarket: PerpMarket): I80F48 {
-    if (this.basePositionLots > 0) {
+    if (this.basePositionLots.gt(new BN(0))) {
       return perpMarket.longFunding
         .sub(this.longSettledFunding)
-        .mul(I80F48.fromString(this.basePositionLots.toString()));
-    } else if (this.basePositionLots < 0) {
+        .mul(I80F48.fromI64(this.basePositionLots));
+    } else if (this.basePositionLots.lt(new BN(0))) {
       return perpMarket.shortFunding
         .sub(this.shortSettledFunding)
-        .mul(I80F48.fromString(this.basePositionLots.toString()));
+        .mul(I80F48.fromI64(this.basePositionLots));
     }
     return ZERO_I80F48();
   }
 
   public getEquity(perpMarket: PerpMarket): I80F48 {
-    const lotsToQuote = I80F48.fromString(
-      perpMarket.baseLotSize.toString(),
-    ).mul(perpMarket.price);
+    const lotsToQuote = I80F48.fromI64(perpMarket.baseLotSize).mul(
+      perpMarket.price,
+    );
 
-    const baseLots = I80F48.fromNumber(
-      this.basePositionLots + this.takerBaseLots,
+    const baseLots = I80F48.fromI64(
+      this.basePositionLots.add(this.takerBaseLots),
     );
 
     const unsettledFunding = this.unsettledFunding(perpMarket);
-    const takerQuote = I80F48.fromString(
-      new BN(this.takerQuoteLots).mul(perpMarket.quoteLotSize).toString(),
+    const takerQuote = I80F48.fromI64(
+      new BN(this.takerQuoteLots).mul(perpMarket.quoteLotSize),
     );
-    const quoteCurrent = I80F48.fromString(this.quotePositionNative.toString())
+    const quoteCurrent = this.quotePositionNative
       .sub(unsettledFunding)
       .add(takerQuote);
 
@@ -1008,11 +993,12 @@ export class PerpPosition {
   }
 
   public hasOpenOrders(): boolean {
+    const zero = new BN(0);
     return (
-      this.asksBaseLots != 0 ||
-      this.bidsBaseLots != 0 ||
-      this.takerBaseLots != 0 ||
-      this.takerQuoteLots != 0
+      !this.asksBaseLots.eq(zero) ||
+      !this.bidsBaseLots.eq(zero) ||
+      !this.takerBaseLots.eq(zero) ||
+      !this.takerQuoteLots.eq(zero)
     );
   }
 }
@@ -1038,7 +1024,7 @@ export class PerpOo {
     return new PerpOo(
       dto.orderSide,
       dto.orderMarket,
-      dto.clientOrderId.toNumber(),
+      dto.clientOrderId,
       dto.orderId,
     );
   }
@@ -1046,7 +1032,7 @@ export class PerpOo {
   constructor(
     public orderSide: any,
     public orderMarket: 0,
-    public clientOrderId: number,
+    public clientOrderId: BN,
     public orderId: BN,
   ) {}
 }

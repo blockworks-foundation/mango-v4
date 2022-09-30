@@ -26,7 +26,6 @@ import {
 import bs58 from 'bs58';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
-import { I80F48 } from './accounts/I80F48';
 import {
   MangoAccount,
   PerpPosition,
@@ -52,12 +51,13 @@ import {
 import { SERUM3_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
+import { I80F48 } from './numbers/I80F48';
 import { FlashLoanType, InterestRateParams } from './types';
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
   I64_MAX_BN,
-  toNativeDecimals,
+  toNative,
 } from './utils';
 import { sendTransaction } from './utils/rpc';
 
@@ -741,7 +741,7 @@ export class MangoClient {
     amount: number,
   ): Promise<TransactionSignature> {
     const decimals = group.getMintDecimals(mintPk);
-    const nativeAmount = toNativeDecimals(amount, decimals).toNumber();
+    const nativeAmount = toNative(amount, decimals);
     return await this.tokenDepositNative(
       group,
       mangoAccount,
@@ -754,7 +754,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
-    nativeAmount: number,
+    nativeAmount: BN,
   ): Promise<TransactionSignature> {
     const bank = group.getFirstBankByMint(mintPk);
 
@@ -769,13 +769,13 @@ export class MangoClient {
     const additionalSigners: Signer[] = [];
     if (mintPk.equals(WRAPPED_SOL_MINT)) {
       wrappedSolAccount = new Keypair();
-      const lamports = nativeAmount + 1e7;
+      const lamports = nativeAmount.add(new BN(1e7));
 
       preInstructions = [
         SystemProgram.createAccount({
           fromPubkey: mangoAccount.owner,
           newAccountPubkey: wrappedSolAccount.publicKey,
-          lamports,
+          lamports: lamports.toNumber(),
           space: 165,
           programId: TOKEN_PROGRAM_ID,
         }),
@@ -841,10 +841,7 @@ export class MangoClient {
     amount: number,
     allowBorrow: boolean,
   ): Promise<TransactionSignature> {
-    const nativeAmount = toNativeDecimals(
-      amount,
-      group.getMintDecimals(mintPk),
-    ).toNumber();
+    const nativeAmount = toNative(amount, group.getMintDecimals(mintPk));
     return await this.tokenWithdrawNative(
       group,
       mangoAccount,
@@ -858,7 +855,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
-    nativeAmount: number,
+    nativeAmount: BN,
     allowBorrow: boolean,
   ): Promise<TransactionSignature> {
     const bank = group.getFirstBankByMint(mintPk);
@@ -1852,7 +1849,7 @@ export class MangoClient {
 
     const flashLoanBeginIx = await this.program.methods
       .flashLoanBegin([
-        toNativeDecimals(amountIn, inputBank.mintDecimals),
+        toNative(amountIn, inputBank.mintDecimals),
         new BN(
           0,
         ) /* we don't care about borrowing the target amount, this is just a dummy */,
