@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import { toUiDecimalsForQuote } from '../utils';
 import { BankForHealth, TokenIndex } from './bank';
 import { HealthCache, PerpInfo, Serum3Info, TokenInfo } from './healthCache';
-import { I80F48, ZERO_I80F48 } from './I80F48';
+import { I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { HealthType, PerpPosition } from './mangoAccount';
 import { PerpMarket } from './perp';
 import { MarketIndex } from './serum3';

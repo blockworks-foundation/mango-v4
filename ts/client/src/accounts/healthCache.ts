@@ -10,7 +10,7 @@ import {
   I80F48Dto,
   MAX_I80F48,
   ZERO_I80F48,
-} from './I80F48';
+} from '../numbers/I80F48';
 
 import { HealthType, MangoAccount, PerpPosition } from './mangoAccount';
 import { PerpMarket, PerpOrderSide } from './perp';

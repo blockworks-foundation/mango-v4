@@ -5,7 +5,7 @@ import Big from 'big.js';
 import { MangoClient } from '../client';
 import { As, U64_MAX_BN } from '../utils';
 import { OracleConfig, QUOTE_DECIMALS } from './bank';
-import { I80F48, I80F48Dto } from './I80F48';
+import { I80F48, I80F48Dto } from '../numbers/I80F48';
 
 export type PerpMarketIndex = number & As<'perp-market-index'>;
 

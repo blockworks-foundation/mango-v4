@@ -18,7 +18,7 @@ import { SERUM3_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
 import { toNativeDecimals, toUiDecimals } from '../utils';
 import { Bank, MintInfo, TokenIndex } from './bank';
-import { I80F48, ONE_I80F48 } from './I80F48';
+import { I80F48, ONE_I80F48 } from '../numbers/I80F48';
 import {
   isPythOracle,
   isSwitchboardOracle,

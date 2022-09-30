@@ -26,7 +26,6 @@ import {
 import bs58 from 'bs58';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
-import { I80F48 } from './accounts/I80F48';
 import {
   MangoAccount,
   PerpPosition,
@@ -52,6 +51,7 @@ import {
 import { SERUM3_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
+import { I80F48 } from './numbers/I80F48';
 import { FlashLoanType, InterestRateParams } from './types';
 import {
   createAssociatedTokenAccountIdempotentInstruction,

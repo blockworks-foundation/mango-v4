@@ -2,7 +2,7 @@ import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import { As, nativeI80F48ToUi } from '../utils';
-import { I80F48, I80F48Dto, ZERO_I80F48 } from './I80F48';
+import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
 
 export const QUOTE_DECIMALS = 6;
 
