@@ -1158,7 +1158,7 @@ fn binary_search(
     fun: impl Fn(I80F48) -> I80F48,
 ) -> Result<I80F48> {
     let max_iterations = 20;
-    let target_error = I80F48!(0.01);
+    let target_error = I80F48!(0.1);
     require_msg!(
         (left_value - target_value).signum() * (right_value - target_value).signum() != I80F48::ONE,
         "internal error: left {} and right {} don't contain the target value {}",
@@ -2096,7 +2096,7 @@ mod tests {
             println!(
                     "checking for price_factor: {price_factor}, target ratio {ratio}: actual ratio: {actual_ratio}, plus ratio: {plus_ratio}, base_lots: {base_lots}",
                 );
-            let max_binary_search_error = 0.01;
+            let max_binary_search_error = 0.1;
             assert!(ratio <= actual_ratio);
             assert!(plus_ratio - max_binary_search_error <= ratio);
         };

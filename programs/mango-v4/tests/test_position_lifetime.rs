@@ -71,14 +71,30 @@ async fn test_position_lifetime() -> Result<()> {
     {
         let start_balance = solana.token_account_balance(payer_mint_accounts[0]).await;
 
-        // this activates the positions
         let deposit_amount = 100;
+
+        // cannot deposit_into_existing if no token deposit exists
+        assert!(send_tx(
+            solana,
+            TokenDepositIntoExistingInstruction {
+                amount: deposit_amount,
+                account,
+                token_account: payer_mint_accounts[0],
+                token_authority: payer,
+                bank_index: 0,
+            }
+        )
+        .await
+        .is_err());
+
+        // this activates the positions
         for &payer_token in payer_mint_accounts {
             send_tx(
                 solana,
                 TokenDepositInstruction {
                     amount: deposit_amount,
                     account,
+                    owner,
                     token_account: payer_token,
                     token_authority: payer.clone(),
                     bank_index: 0,
@@ -87,6 +103,20 @@ async fn test_position_lifetime() -> Result<()> {
             .await
             .unwrap();
         }
+
+        // now depositing into an active account works
+        send_tx(
+            solana,
+            TokenDepositIntoExistingInstruction {
+                amount: deposit_amount,
+                account,
+                token_account: payer_mint_accounts[0],
+                token_authority: payer,
+                bank_index: 0,
+            },
+        )
+        .await
+        .unwrap();
 
         // this closes the positions
         for &payer_token in payer_mint_accounts {
@@ -131,6 +161,7 @@ async fn test_position_lifetime() -> Result<()> {
             TokenDepositInstruction {
                 amount: collateral_amount,
                 account,
+                owner,
                 token_account: payer_mint_accounts[0],
                 token_authority: payer.clone(),
                 bank_index: 0,
@@ -167,6 +198,7 @@ async fn test_position_lifetime() -> Result<()> {
                     // deposit withdraw amount + some more to cover loan origination fees
                     amount: borrow_amount + 2,
                     account,
+                    owner,
                     token_account: payer_mint_accounts[1],
                     token_authority: payer.clone(),
                     bank_index: 0,

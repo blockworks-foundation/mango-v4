@@ -94,6 +94,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
         TokenDepositInstruction {
             amount: 1,
             account,
+            owner,
             token_account: payer_mint_accounts[1],
             token_authority: payer,
             bank_index: 0,
@@ -307,6 +308,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
             TokenDepositInstruction {
                 amount: 1,
                 account,
+                owner,
                 token_account: payer_mint_accounts[1],
                 token_authority: payer,
                 bank_index: 0,

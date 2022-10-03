@@ -7,7 +7,7 @@ import { SERUM3_PROGRAM_ID } from '../constants';
 import { As } from '../utils';
 import { TokenIndex } from './bank';
 import { Group } from './group';
-import { MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from './I80F48';
+import { MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 
 export type MarketIndex = number & As<'market-index'>;
 

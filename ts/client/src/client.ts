@@ -26,7 +26,6 @@ import {
 import bs58 from 'bs58';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
-import { I80F48 } from './accounts/I80F48';
 import {
   MangoAccount,
   PerpPosition,
@@ -52,12 +51,13 @@ import {
 import { SERUM3_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
+import { I80F48 } from './numbers/I80F48';
 import { FlashLoanType, InterestRateParams } from './types';
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
   I64_MAX_BN,
-  toNativeDecimals,
+  toNative,
 } from './utils';
 import { sendTransaction } from './utils/rpc';
 
@@ -505,41 +505,18 @@ export class MangoClient {
 
   // MangoAccount
 
-  public async getOrCreateMangoAccount(
-    group: Group,
-    ownerPk: PublicKey,
-    accountNumber?: number,
-    name?: string,
-  ): Promise<MangoAccount | undefined> {
-    // TODO: this function discards accountSize and name when the account exists already!
-    // TODO: this function always creates accounts for this.program.owner, and not
-    //       ownerPk! It needs to get passed a keypair, and we need to add
-    //       createMangoAccountForOwner
-    if (accountNumber === undefined) {
-      // Get any MangoAccount
-      // TODO: should probably sort by accountNum for deterministic output!
-      let mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
-      if (mangoAccounts.length === 0) {
-        await this.createMangoAccount(group, accountNumber, name);
-        mangoAccounts = await this.getMangoAccountsForOwner(group, ownerPk);
-      }
-      return mangoAccounts[0];
-    } else {
-      let account = await this.getMangoAccountForOwner(
-        group,
-        ownerPk,
-        accountNumber,
-      );
-      if (account === undefined) {
-        await this.createMangoAccount(group, accountNumber, name);
-        account = await this.getMangoAccountForOwner(
-          group,
-          ownerPk,
-          accountNumber,
-        );
-      }
-      return account;
+  public async getOrCreateMangoAccount(group: Group): Promise<MangoAccount> {
+    const clientOwner = (this.program.provider as AnchorProvider).wallet
+      .publicKey;
+    let mangoAccounts = await this.getMangoAccountsForOwner(
+      group,
+      (this.program.provider as AnchorProvider).wallet.publicKey,
+    );
+    if (mangoAccounts.length === 0) {
+      await this.createMangoAccount(group);
+      mangoAccounts = await this.getMangoAccountsForOwner(group, clientOwner);
     }
+    return mangoAccounts.sort((a, b) => a.accountNum - b.accountNum)[0];
   }
 
   public async createMangoAccount(
@@ -764,7 +741,7 @@ export class MangoClient {
     amount: number,
   ): Promise<TransactionSignature> {
     const decimals = group.getMintDecimals(mintPk);
-    const nativeAmount = toNativeDecimals(amount, decimals).toNumber();
+    const nativeAmount = toNative(amount, decimals);
     return await this.tokenDepositNative(
       group,
       mangoAccount,
@@ -777,7 +754,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
-    nativeAmount: number,
+    nativeAmount: BN,
   ): Promise<TransactionSignature> {
     const bank = group.getFirstBankByMint(mintPk);
 
@@ -792,13 +769,13 @@ export class MangoClient {
     const additionalSigners: Signer[] = [];
     if (mintPk.equals(WRAPPED_SOL_MINT)) {
       wrappedSolAccount = new Keypair();
-      const lamports = nativeAmount + 1e7;
+      const lamports = nativeAmount.add(new BN(1e7));
 
       preInstructions = [
         SystemProgram.createAccount({
           fromPubkey: mangoAccount.owner,
           newAccountPubkey: wrappedSolAccount.publicKey,
-          lamports,
+          lamports: lamports.toNumber(),
           space: 165,
           programId: TOKEN_PROGRAM_ID,
         }),
@@ -832,6 +809,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
+        owner: mangoAccount.owner,
         bank: bank.publicKey,
         vault: bank.vault,
         oracle: bank.oracle,
@@ -864,10 +842,7 @@ export class MangoClient {
     amount: number,
     allowBorrow: boolean,
   ): Promise<TransactionSignature> {
-    const nativeAmount = toNativeDecimals(
-      amount,
-      group.getMintDecimals(mintPk),
-    ).toNumber();
+    const nativeAmount = toNative(amount, group.getMintDecimals(mintPk));
     return await this.tokenWithdrawNative(
       group,
       mangoAccount,
@@ -881,7 +856,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
-    nativeAmount: number,
+    nativeAmount: BN,
     allowBorrow: boolean,
   ): Promise<TransactionSignature> {
     const bank = group.getFirstBankByMint(mintPk);
@@ -1374,6 +1349,13 @@ export class MangoClient {
     const asks = new Keypair();
     const eventQueue = new Keypair();
 
+    const bookSideSize = (this.program as any)._coder.accounts.size(
+      (this.program.account.bookSide as any)._idlAccount,
+    );
+    const eventQueueSize = (this.program as any)._coder.accounts.size(
+      (this.program.account.eventQueue as any)._idlAccount,
+    );
+
     return await this.program.methods
       .perpCreateMarket(
         perpMarketIndex,
@@ -1413,15 +1395,13 @@ export class MangoClient {
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .preInstructions([
-        // TODO: try to pick up sizes of bookside and eventqueue from IDL, so we can stay in sync with program
-
         // book sides
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: 8 + 98584,
+          space: bookSideSize,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              8 + 98584,
+              bookSideSize,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,
@@ -1429,10 +1409,10 @@ export class MangoClient {
         }),
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: 8 + 98584,
+          space: bookSideSize,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              8 + 98584,
+              bookSideSize,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,
@@ -1441,10 +1421,10 @@ export class MangoClient {
         // event queue
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: 8 + 4 * 2 + 8 + 488 * 208,
+          space: eventQueueSize,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              8 + 4 * 2 + 8 + 488 * 208,
+              eventQueueSize,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,
@@ -1870,7 +1850,7 @@ export class MangoClient {
 
     const flashLoanBeginIx = await this.program.methods
       .flashLoanBegin([
-        toNativeDecimals(amountIn, inputBank.mintDecimals),
+        toNative(amountIn, inputBank.mintDecimals),
         new BN(
           0,
         ) /* we don't care about borrowing the target amount, this is just a dummy */,

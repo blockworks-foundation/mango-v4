@@ -80,6 +80,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             TokenDepositInstruction {
                 amount: deposit_amount,
                 account: account_0,
+                owner,
                 token_account: payer_mint_accounts[0],
                 token_authority: payer.clone(),
                 bank_index: 0,
@@ -93,6 +94,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             TokenDepositInstruction {
                 amount: deposit_amount,
                 account: account_0,
+                owner,
                 token_account: payer_mint_accounts[1],
                 token_authority: payer.clone(),
                 bank_index: 0,
@@ -110,6 +112,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             TokenDepositInstruction {
                 amount: deposit_amount,
                 account: account_1,
+                owner,
                 token_account: payer_mint_accounts[0],
                 token_authority: payer.clone(),
                 bank_index: 0,
@@ -123,6 +126,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             TokenDepositInstruction {
                 amount: deposit_amount,
                 account: account_1,
+                owner,
                 token_account: payer_mint_accounts[1],
                 token_authority: payer.clone(),
                 bank_index: 0,

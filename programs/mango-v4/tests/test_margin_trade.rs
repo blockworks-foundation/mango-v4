@@ -89,6 +89,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
             TokenDepositInstruction {
                 amount: deposit_amount_initial,
                 account,
+                owner,
                 token_account: payer_mint0_account,
                 token_authority: payer.clone(),
                 bank_index: 0,
