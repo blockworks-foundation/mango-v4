@@ -3,6 +3,7 @@ use fixed::types::I80F48;
 #[macro_use]
 pub mod util;
 
+extern crate core;
 extern crate static_assertions;
 
 use anchor_lang::prelude::*;
