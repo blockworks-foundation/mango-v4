@@ -137,11 +137,18 @@ impl PerpMarket {
     pub fn gen_order_id(&mut self, side: Side, price: i64) -> i128 {
         self.seq_num += 1;
 
+        // The seqnum ensures that later orders at the same price are placed below earlier orders.
+        //
+        // That means it should increase for asks with positive price, but decrease for
+        // bids with positive price etc.
+        let seq_num = if (price < 0) ^ (side == Side::Bid) {
+            !self.seq_num
+        } else {
+            self.seq_num
+        };
+
         let upper = (price as i128) << 64;
-        match side {
-            Side::Bid => upper | (!self.seq_num as i128),
-            Side::Ask => upper | (self.seq_num as i128),
-        }
+        upper | (seq_num as i128)
     }
 
     pub fn oracle_price(&self, oracle_acc: &impl KeyedAccountReader) -> Result<I80F48> {

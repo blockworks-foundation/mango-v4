@@ -39,6 +39,10 @@ impl<'a> BookSideIter<'a> {
         iter
     }
 
+    pub fn is_bids(&self) -> bool {
+        self.left == 1
+    }
+
     pub fn peek(&self) -> Option<(NodeHandle, &'a LeafNode)> {
         self.next_leaf
     }
@@ -98,9 +102,9 @@ impl<'a> Iterator for BookSideIter<'a> {
 }
 
 pub struct BookSide2IterItem<'a> {
-    handle: BookSide2NodeHandle,
-    node: &'a LeafNode,
-    price_lots: i64,
+    pub handle: BookSide2NodeHandle,
+    pub node: &'a LeafNode,
+    pub price_lots: i64,
 }
 
 pub struct BookSide2Iter<'a> {
@@ -124,16 +128,66 @@ impl<'a> Iterator for BookSide2Iter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match (self.direct_iter.peek(), self.oracle_pegged_iter.peek()) {
-            (Some(direct), Some(oracle_pegged)) => {}
-            (None, Some(oracle_pegged)) => {}
-            (Some((direct_handle, direct_node)), None) => Some(Self::Item {
-                handle: BookSide2NodeHandle {
-                    component: BookSide2Component::Direct,
-                    node: direct_handle,
-                },
-                node: direct_node,
-                price_lots: direct_node.price(),
-            }),
+            (Some((d_handle, d_node)), Some((o_handle, o_node))) => {
+                let is_better = if self.direct_iter.is_bids() {
+                    |a, b| a > b
+                } else {
+                    |a, b| a < b
+                };
+
+                let o_price_maybe = self.oracle_price_lots.checked_add(o_node.value());
+                if o_price_maybe.is_none()
+                    || is_better(d_node.key, o_node.key_with_price(o_price_maybe.unwrap()))
+                {
+                    self.direct_iter.next();
+                    Some(Self::Item {
+                        handle: BookSide2NodeHandle {
+                            component: BookSide2Component::Direct,
+                            node: d_handle,
+                        },
+                        node: d_node,
+                        price_lots: d_node.value(),
+                    })
+                } else {
+                    self.oracle_pegged_iter.next();
+                    Some(Self::Item {
+                        handle: BookSide2NodeHandle {
+                            component: BookSide2Component::OraclePegged,
+                            node: o_handle,
+                        },
+                        node: o_node,
+                        price_lots: o_price_maybe.unwrap(),
+                    })
+                }
+            }
+            (None, Some((handle, node))) => {
+                self.oracle_pegged_iter.next();
+                let price_lots = match self.oracle_price_lots.checked_add(node.value()) {
+                    Some(v) => v,
+                    None => {
+                        return None;
+                    }
+                };
+                Some(Self::Item {
+                    handle: BookSide2NodeHandle {
+                        component: BookSide2Component::OraclePegged,
+                        node: handle,
+                    },
+                    node,
+                    price_lots,
+                })
+            }
+            (Some((handle, node)), None) => {
+                self.direct_iter.next();
+                Some(Self::Item {
+                    handle: BookSide2NodeHandle {
+                        component: BookSide2Component::Direct,
+                        node: handle,
+                    },
+                    node,
+                    price_lots: node.value(),
+                })
+            }
             (None, None) => None,
         }
     }

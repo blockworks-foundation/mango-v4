@@ -5,7 +5,7 @@ use crate::state::MangoAccountRefMut;
 use crate::{
     error::*,
     state::{
-        orderbook::{bookside::BookSide, nodes::LeafNode},
+        orderbook::{bookside::*, nodes::*},
         EventQueue, PerpMarket, FREE_ORDER_SLOT,
     },
 };
@@ -48,83 +48,29 @@ pub struct Book2<'a> {
 }
 
 impl<'a> Book2<'a> {
-    pub fn new_limit_bid(
-        &mut self,
-        now_ts: u64,
-        oracle_price: i64,
-        price: i64,
-        quantity: i64,
-    ) -> std::result::Result<(), Error> {
-        /*
-        1. get an iterator for oracle asks and asks
-        2. whichever is smaller of the two execute against that one first
-         */
-
-        // TODO: when price moves, iterate against the tokens first
-        //
-        let asks = &mut self.asks;
-        let oracle_asks = &mut self.oracle_peg_asks;
-
-        // TODO: make it so peg asks can go invalid after certain number of seconds of no update from Pyth
-        let mut oracle_peg_asks_iter = self.oracle_peg_asks.iter_valid(now_ts);
-        let mut asks_iter = self.asks.iter_valid(now_ts);
-
-        let mut curr_peg = oracle_peg_asks_iter.next();
-        let mut curr_ask = asks_iter.next();
-
-        let mut rem_quantity = 0;
-        match (curr_ask, curr_peg) {
-            (Some((limit_handle, limit_order)), Some((peg_handle, peg_order))) => {
-                // TODO peg_order.price() should return the oracle adjusted price
-                if limit_order.price() <= peg_order.price() {
-                    if price >= limit_order.price() {
-                        // take the limit order
-                        // if there is still quantity left to execute, ask iter next
-                        let match_quantity = 0;
-                        rem_quantity -= match_quantity;
-                        if rem_quantity > 0 {
-                            curr_ask = asks_iter.next();
-                        } else {
-                            // break
-                        }
-                    } else {
-                        // post on book then exit iteration
-                    }
-                } else {
-                    if price >= peg_order.price() {
-                        let match_quantity = 0;
-                        rem_quantity -= match_quantity;
-                        // take the peg order
-                        // if there is still quantity left to execute, peg iter next
-                        if rem_quantity > 0 {
-                            curr_peg = oracle_peg_asks_iter.next();
-                        } else {
-                            // break
-                        }
-                    } else {
-                        // break
-                    }
-                }
-            }
-            (Some((limit_handle, limit_order)), None) => {
-                // No peg orders
-                unimplemented!()
-            }
-            (None, Some((peg_handle, peg_order))) => {
-                // No orders
-                unimplemented!()
-            }
-            (None, None) => {
-                // No orders at all. Post on book
-                unimplemented!()
-            }
+    pub fn bookside_mut(&mut self, side: Side) -> &mut BookSide2<'a> {
+        match side {
+            Side::Bid => &mut self.bids,
+            Side::Ask => &mut self.asks,
         }
-
-        Ok(())
     }
 
-    /// oracle pegged order
-    /// Let users place a bid or an ask
+    pub fn bookside(&self, side: Side) -> &BookSide2<'a> {
+        match side {
+            Side::Bid => &self.bids,
+            Side::Ask => &self.asks,
+        }
+    }
+
+    pub fn best_price(&self, now_ts: u64, oracle_price_lots: i64, side: Side) -> Option<i64> {
+        Some(
+            self.bookside(side)
+                .iter_valid(now_ts, oracle_price_lots)
+                .next()?
+                .price_lots,
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new_order(
         &mut self,
@@ -132,7 +78,7 @@ impl<'a> Book2<'a> {
         perp_market: &mut PerpMarket,
         event_queue: &mut EventQueue,
         oracle_price: I80F48,
-        mango_account_perps: &mut MangoAccountPerps,
+        mango_account: &mut MangoAccountRefMut,
         mango_account_pk: &Pubkey,
         price_lots: i64,
         max_base_lots: i64,
@@ -145,13 +91,15 @@ impl<'a> Book2<'a> {
     ) -> std::result::Result<(), Error> {
         let other_side = side.invert_side();
         let market = perp_market;
+        let oracle_price_lots = market.native_price_to_lot(oracle_price);
         let (post_only, mut post_allowed, price_lots) = match order_type {
             OrderType::Limit => (false, true, price_lots),
             OrderType::ImmediateOrCancel => (false, false, price_lots),
             OrderType::PostOnly => (true, true, price_lots),
             OrderType::Market => (false, false, market_order_limit_for_side(side)),
             OrderType::PostOnlySlide => {
-                let price = if let Some(best_other_price) = self.get_best_price(now_ts, other_side)
+                let price = if let Some(best_other_price) =
+                    self.best_price(now_ts, oracle_price_lots, other_side)
                 {
                     post_only_slide_limit(side, best_other_price, price_lots)
                 } else {
@@ -179,31 +127,31 @@ impl<'a> Book2<'a> {
         // matched_changes/matched_deletes and then applied after this loop.
         let mut remaining_base_lots = max_base_lots;
         let mut remaining_quote_lots = max_quote_lots;
-        let mut matched_order_changes: Vec<(NodeHandle, i64)> = vec![];
-        let mut matched_order_deletes: Vec<i128> = vec![];
+        let mut matched_order_changes: Vec<(BookSide2NodeHandle, i64)> = vec![];
+        let mut matched_order_deletes: Vec<(BookSide2Component, i128)> = vec![];
         let mut number_of_dropped_expired_orders = 0;
-        let opposing_bookside = self.get_bookside(other_side);
-
-        for (best_opposing_h, best_opposing) in opposing_bookside.iter_all_including_invalid() {
-            if !best_opposing.is_valid(now_ts) {
+        let opposing_bookside = self.bookside_mut(other_side);
+        for best_opposing in opposing_bookside.iter_all_including_invalid(oracle_price_lots) {
+            if !best_opposing.node.is_valid(now_ts) {
                 // Remove the order from the book unless we've done that enough
                 if number_of_dropped_expired_orders < DROP_EXPIRED_ORDER_LIMIT {
                     number_of_dropped_expired_orders += 1;
                     let event = OutEvent::new(
                         other_side,
-                        best_opposing.owner_slot,
+                        best_opposing.node.owner_slot,
                         now_ts,
                         event_queue.header.seq_num,
-                        best_opposing.owner,
-                        best_opposing.quantity,
+                        best_opposing.node.owner,
+                        best_opposing.node.quantity,
                     );
                     event_queue.push_back(cast(event)).unwrap();
-                    matched_order_deletes.push(best_opposing.key);
+                    matched_order_deletes
+                        .push((best_opposing.handle.component, best_opposing.node.key));
                 }
                 continue;
             }
 
-            let best_opposing_price = best_opposing.price();
+            let best_opposing_price = best_opposing.price_lots;
 
             if !side.is_price_within_limit(best_opposing_price, price_lots) {
                 break;
@@ -219,41 +167,40 @@ impl<'a> Book2<'a> {
 
             let max_match_by_quote = remaining_quote_lots / best_opposing_price;
             let match_base_lots = remaining_base_lots
-                .min(best_opposing.quantity)
+                .min(best_opposing.node.quantity)
                 .min(max_match_by_quote);
             let done =
                 match_base_lots == max_match_by_quote || match_base_lots == remaining_base_lots;
 
             let match_quote_lots = cm!(match_base_lots * best_opposing_price);
-            remaining_base_lots = cm!(remaining_base_lots - match_base_lots);
-            remaining_quote_lots = cm!(remaining_quote_lots - match_quote_lots);
+            cm!(remaining_base_lots -= match_base_lots);
+            cm!(remaining_quote_lots -= match_quote_lots);
 
-            let new_best_opposing_quantity = cm!(best_opposing.quantity - match_base_lots);
+            let new_best_opposing_quantity = cm!(best_opposing.node.quantity - match_base_lots);
             let maker_out = new_best_opposing_quantity == 0;
             if maker_out {
-                matched_order_deletes.push(best_opposing.key);
+                matched_order_deletes
+                    .push((best_opposing.handle.component, best_opposing.node.key));
             } else {
-                matched_order_changes.push((best_opposing_h, new_best_opposing_quantity));
+                matched_order_changes.push((best_opposing.handle, new_best_opposing_quantity));
             }
 
             // Record the taker trade in the account already, even though it will only be
             // realized when the fill event gets executed
-            let perp_account = mango_account_perps
-                .get_account_mut_or_create(market.perp_market_index)?
-                .0;
+            let perp_account = mango_account.perp_position_mut(market.perp_market_index)?;
             perp_account.add_taker_trade(side, match_base_lots, match_quote_lots);
 
             let fill = FillEvent::new(
                 side,
                 maker_out,
-                best_opposing.owner_slot,
+                best_opposing.node.owner_slot,
                 now_ts,
                 event_queue.header.seq_num,
-                best_opposing.owner,
-                best_opposing.key,
-                best_opposing.client_order_id,
+                best_opposing.node.owner,
+                best_opposing.node.key,
+                best_opposing.node.client_order_id,
                 market.maker_fee,
-                best_opposing.timestamp,
+                best_opposing.node.timestamp,
                 *mango_account_pk,
                 order_id,
                 client_order_id,
@@ -273,21 +220,24 @@ impl<'a> Book2<'a> {
         // Apply changes to matched asks (handles invalidate on delete!)
         for (handle, new_quantity) in matched_order_changes {
             opposing_bookside
-                .get_mut(handle)
+                .node_mut(handle)
                 .unwrap()
                 .as_leaf_mut()
                 .unwrap()
                 .quantity = new_quantity;
         }
-        for key in matched_order_deletes {
-            let _removed_leaf = opposing_bookside.remove_by_key(key).unwrap();
+        for (component, key) in matched_order_deletes {
+            let _removed_leaf = opposing_bookside.remove_by_key(component, key).unwrap();
         }
 
         // If there are still quantity unmatched, place on the book
         let book_base_quantity = remaining_base_lots.min(remaining_quote_lots / price_lots);
+        msg!("{:?}", post_allowed);
         if post_allowed && book_base_quantity > 0 {
             // Drop an expired order if possible
-            let bookside = self.get_bookside(side);
+            let bookside = self
+                .bookside_mut(side)
+                .component_mut(BookSide2Component::Direct);
             if let Some(expired_order) = bookside.remove_one_expired(now_ts) {
                 let event = OutEvent::new(
                     side,
@@ -319,9 +269,7 @@ impl<'a> Book2<'a> {
                 event_queue.push_back(cast(event)).unwrap();
             }
 
-            let owner_slot = mango_account_perps
-                .next_order_slot()
-                .ok_or_else(|| error!(MangoError::SomeError))?;
+            let owner_slot = mango_account.perp_next_order_slot()?;
             let new_order = LeafNode::new(
                 owner_slot as u8,
                 order_id,
@@ -346,13 +294,18 @@ impl<'a> Book2<'a> {
                 price_lots
             );
 
-            mango_account_perps.add_order(market.perp_market_index, side, &new_order)?;
+            mango_account.add_perp_order(market.perp_market_index, side, &new_order)?;
         }
 
         // if there were matched taker quote apply ref fees
         // we know ref_fee_rate is not None if total_quote_taken > 0
         if total_quote_lots_taken > 0 {
-            apply_fees(market, mango_account_perps, total_quote_lots_taken)?;
+            apply_fees(market, mango_account, total_quote_lots_taken)?;
+        }
+
+        // IOC orders have a fee penalty applied regardless of match
+        if order_type == OrderType::ImmediateOrCancel {
+            apply_penalty(market, mango_account)?;
         }
 
         Ok(())
@@ -382,28 +335,22 @@ impl<'a> Book<'a> {
         ))
     }
 
-    pub fn bookside(&mut self, side: Side) -> &mut BookSide {
+    pub fn bookside_mut(&mut self, side: Side) -> &mut BookSide {
         match side {
             Side::Bid => &mut self.bids,
             Side::Ask => &mut self.asks,
         }
     }
 
-    /// Returns best valid bid
-    pub fn best_bid_price(&self, now_ts: u64) -> Option<i64> {
-        Some(self.bids.iter_valid(now_ts).next()?.1.price())
-    }
-
-    /// Returns best valid ask
-    pub fn best_ask_price(&self, now_ts: u64) -> Option<i64> {
-        Some(self.asks.iter_valid(now_ts).next()?.1.price())
+    pub fn bookside(&self, side: Side) -> &BookSide {
+        match side {
+            Side::Bid => &self.bids,
+            Side::Ask => &self.asks,
+        }
     }
 
     pub fn best_price(&self, now_ts: u64, side: Side) -> Option<i64> {
-        match side {
-            Side::Bid => self.best_bid_price(now_ts),
-            Side::Ask => self.best_ask_price(now_ts),
-        }
+        Some(self.bookside(side).iter_valid(now_ts).next()?.1.price())
     }
 
     /// Get the quantity of valid bids above and including the price
@@ -526,7 +473,7 @@ impl<'a> Book<'a> {
         let mut matched_order_changes: Vec<(NodeHandle, i64)> = vec![];
         let mut matched_order_deletes: Vec<i128> = vec![];
         let mut number_of_dropped_expired_orders = 0;
-        let opposing_bookside = self.bookside(other_side);
+        let opposing_bookside = self.bookside_mut(other_side);
         for (best_opposing_h, best_opposing) in opposing_bookside.iter_all_including_invalid() {
             if !best_opposing.is_valid(now_ts) {
                 // Remove the order from the book unless we've done that enough
@@ -629,7 +576,7 @@ impl<'a> Book<'a> {
         msg!("{:?}", post_allowed);
         if post_allowed && book_base_quantity > 0 {
             // Drop an expired order if possible
-            let bookside = self.bookside(side);
+            let bookside = self.bookside_mut(side);
             if let Some(expired_order) = bookside.remove_one_expired(now_ts) {
                 let event = OutEvent::new(
                     side,

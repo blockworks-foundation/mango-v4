@@ -5,7 +5,7 @@ use std::cell::RefMut;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 
-use crate::state::orderbook::bookside_iterator::BookSideIter;
+use crate::state::orderbook::bookside_iterator::*;
 
 use crate::error::MangoError;
 use crate::state::orderbook::nodes::{
@@ -433,8 +433,8 @@ pub enum BookSide2Component {
 
 // Which bookside, and then the handle
 pub struct BookSide2NodeHandle {
-    component: BookSide2Component,
-    node: NodeHandle,
+    pub component: BookSide2Component,
+    pub node: NodeHandle,
 }
 
 impl<'a> BookSide2<'a> {
@@ -451,14 +451,14 @@ impl<'a> BookSide2<'a> {
         BookSide2Iter::new(self, 0, oracle_price_lots)
     }
 
-    fn component(&self, component: BookSide2Component) -> &BookSide {
+    pub fn component(&self, component: BookSide2Component) -> &BookSide {
         match component {
             BookSide2Component::Direct => &self.direct,
             BookSide2Component::OraclePegged => &self.oracle_pegged,
         }
     }
 
-    fn component_mut(&mut self, component: BookSide2Component) -> &mut BookSide {
+    pub fn component_mut(&mut self, component: BookSide2Component) -> &mut BookSide {
         match component {
             BookSide2Component::Direct => &mut self.direct,
             BookSide2Component::OraclePegged => &mut self.oracle_pegged,
@@ -495,6 +495,10 @@ impl<'a> BookSide2<'a> {
 
     pub fn remove(&mut self, key: BookSide2NodeHandle) -> Option<AnyNode> {
         self.component_mut(key.component).remove(key.node)
+    }
+
+    pub fn is_full(&self, component: BookSide2Component) -> bool {
+        self.component(component).is_full()
     }
 }
 

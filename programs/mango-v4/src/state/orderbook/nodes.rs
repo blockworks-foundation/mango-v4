@@ -107,11 +107,6 @@ pub struct LeafNode {
 const_assert_eq!(size_of::<LeafNode>() % 8, 0);
 const_assert_eq!(size_of::<LeafNode>(), NODE_SIZE);
 
-#[inline(always)]
-fn key_to_price(key: i128) -> i64 {
-    (key >> 64) as i64
-}
-
 impl LeafNode {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -139,9 +134,20 @@ impl LeafNode {
         }
     }
 
+    // TODO: remove, it's not always the price
     #[inline(always)]
     pub fn price(&self) -> i64 {
-        key_to_price(self.key)
+        self.value()
+    }
+
+    #[inline(always)]
+    pub fn value(&self) -> i64 {
+        (self.key >> 64) as i64
+    }
+
+    #[inline(always)]
+    pub fn key_with_price(&self, price: i64) -> i128 {
+        ((price as i128) << 64) | ((self.key as u64) as i128)
     }
 
     /// Time at which this order will expire, u64::MAX if never
