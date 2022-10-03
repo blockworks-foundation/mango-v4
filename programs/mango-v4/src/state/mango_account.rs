@@ -974,7 +974,7 @@ impl<
         // expand dynamic components by first moving existing positions, and then setting new ones to defaults
 
         // perp oo
-        if new_header.perp_oo_count() > old_header.perp_oo_count() {
+        if old_header.perp_oo_count() > 0 {
             unsafe {
                 sol_memmove(
                     &mut dynamic[new_header.perp_oo_offset(0)],
@@ -982,14 +982,14 @@ impl<
                     size_of::<PerpOpenOrder>() * old_header.perp_oo_count(),
                 );
             }
-            for i in old_header.perp_oo_count..new_perp_oo_count {
-                *get_helper_mut(dynamic, new_header.perp_oo_offset(i.into())) =
-                    PerpOpenOrder::default();
-            }
+        }
+        for i in old_header.perp_oo_count..new_perp_oo_count {
+            *get_helper_mut(dynamic, new_header.perp_oo_offset(i.into())) =
+                PerpOpenOrder::default();
         }
 
         // perp positions
-        if new_header.perp_count() > old_header.perp_count() {
+        if old_header.perp_count() > 0 {
             unsafe {
                 sol_memmove(
                     &mut dynamic[new_header.perp_offset(0)],
@@ -997,14 +997,13 @@ impl<
                     size_of::<PerpPosition>() * old_header.perp_count(),
                 );
             }
-            for i in old_header.perp_count..new_perp_count {
-                *get_helper_mut(dynamic, new_header.perp_offset(i.into())) =
-                    PerpPosition::default();
-            }
+        }
+        for i in old_header.perp_count..new_perp_count {
+            *get_helper_mut(dynamic, new_header.perp_offset(i.into())) = PerpPosition::default();
         }
 
         // serum3 positions
-        if new_header.serum3_count() > old_header.serum3_count() {
+        if old_header.serum3_count() > 0 {
             unsafe {
                 sol_memmove(
                     &mut dynamic[new_header.serum3_offset(0)],
@@ -1012,14 +1011,13 @@ impl<
                     size_of::<Serum3Orders>() * old_header.serum3_count(),
                 );
             }
-            for i in old_header.serum3_count..new_serum3_count {
-                *get_helper_mut(dynamic, new_header.serum3_offset(i.into())) =
-                    Serum3Orders::default();
-            }
+        }
+        for i in old_header.serum3_count..new_serum3_count {
+            *get_helper_mut(dynamic, new_header.serum3_offset(i.into())) = Serum3Orders::default();
         }
 
         // token positions
-        if new_header.token_count() > old_header.token_count() {
+        if old_header.token_count() > 0 {
             unsafe {
                 sol_memmove(
                     &mut dynamic[new_header.token_offset(0)],
@@ -1027,10 +1025,9 @@ impl<
                     size_of::<TokenPosition>() * old_header.token_count(),
                 );
             }
-            for i in old_header.token_count..new_token_count {
-                *get_helper_mut(dynamic, new_header.token_offset(i.into())) =
-                    TokenPosition::default();
-            }
+        }
+        for i in old_header.token_count..new_token_count {
+            *get_helper_mut(dynamic, new_header.token_offset(i.into())) = TokenPosition::default();
         }
 
         // update the already-parsed header

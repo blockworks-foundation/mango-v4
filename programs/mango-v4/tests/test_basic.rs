@@ -43,7 +43,7 @@ async fn test_basic() -> Result<(), TransportError> {
         AccountCreateInstruction {
             account_num: 0,
             token_count: 8,
-            serum3_count: 0,
+            serum3_count: 7,
             perp_count: 0,
             perp_oo_count: 0,
             group,
@@ -54,6 +54,17 @@ async fn test_basic() -> Result<(), TransportError> {
     .await
     .unwrap()
     .account;
+    let account_data: MangoAccount = solana.get_account(account).await;
+    assert_eq!(account_data.tokens.len(), 8);
+    assert_eq!(
+        account_data.tokens.iter().filter(|t| t.is_active()).count(),
+        0
+    );
+    assert_eq!(account_data.serum3.len(), 7);
+    assert_eq!(
+        account_data.serum3.iter().filter(|s| s.is_active()).count(),
+        0
+    );
 
     send_tx(
         solana,
@@ -71,6 +82,17 @@ async fn test_basic() -> Result<(), TransportError> {
     .await
     .unwrap()
     .account;
+    let account_data: MangoAccount = solana.get_account(account).await;
+    assert_eq!(account_data.tokens.len(), 16);
+    assert_eq!(
+        account_data.tokens.iter().filter(|t| t.is_active()).count(),
+        0
+    );
+    assert_eq!(account_data.serum3.len(), 8);
+    assert_eq!(
+        account_data.serum3.iter().filter(|s| s.is_active()).count(),
+        0
+    );
 
     //
     // TEST: Deposit funds
