@@ -9,6 +9,8 @@ use crate::state::ScanningAccountRetriever;
 use crate::state::*;
 use crate::util::checked_math as cm;
 
+use crate::logs::{emit_perp_balances, PerpLiqBankruptcyLog};
+
 // Remaining accounts:
 // - merged health accounts for liqor+liqee
 #[derive(Accounts)]
@@ -162,10 +164,12 @@ pub fn perp_liq_bankruptcy(ctx: Context<PerpLiqBankruptcy>, max_liab_transfer: u
 
     // Socialize loss if the insurance fund is exhausted
     let remaining_liab = liab_transfer - insurance_liab_transfer;
+    let mut socialized_loss = I80F48::ZERO;
     if insurance_fund_exhausted && remaining_liab.is_positive() {
         perp_market.socialize_loss(-remaining_liab)?;
         liqee_perp_position.change_quote_position(remaining_liab);
         require_eq!(liqee_perp_position.quote_position_native(), 0);
+        socialized_loss = remaining_liab;
     }
 
     // Check liqee health again
@@ -174,6 +178,31 @@ pub fn perp_liq_bankruptcy(ctx: Context<PerpLiqBankruptcy>, max_liab_transfer: u
     liqee
         .fixed
         .maybe_recover_from_being_liquidated(liqee_init_health);
+
+    emit!(PerpLiqBankruptcyLog {
+        mango_group: ctx.accounts.group.key(),
+        liqee: ctx.accounts.liqee.key(),
+        liqor: ctx.accounts.liqor.key(),
+        market_index: perp_market.perp_market_index,
+        insurance_transfer: insurance_transfer_i80f48.to_bits(),
+        socialized_loss: socialized_loss.to_bits()
+    });
+
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.liqor.key(),
+        perp_market.perp_market_index,
+        liqor.perp_position(perp_market.perp_market_index).unwrap(),
+        &perp_market,
+    );
+
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.liqee.key(),
+        perp_market.perp_market_index,
+        liqee.perp_position(perp_market.perp_market_index).unwrap(),
+        &perp_market,
+    );
 
     drop(perp_market);
 

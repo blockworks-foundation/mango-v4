@@ -12,6 +12,8 @@ use crate::state::MangoAccount;
 use crate::state::QUOTE_TOKEN_INDEX;
 use crate::state::{AccountLoaderDynamic, Group, PerpMarket};
 
+use crate::logs::{emit_perp_balances, PerpSettleFeesLog, TokenBalanceLog};
+
 #[derive(Accounts)]
 pub struct PerpSettleFees<'info> {
     pub group: AccountLoader<'info, Group>,
@@ -86,6 +88,32 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     bank.withdraw_with_fee(token_position, settlement)?;
     // Update the settled balance on the market itself
     perp_market.fees_settled = cm!(perp_market.fees_settled + settlement);
+
+    emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account.key(),
+        token_index: QUOTE_TOKEN_INDEX,
+        indexed_position: token_position.indexed_position.to_bits(),
+        deposit_index: bank.deposit_index.to_bits(),
+        borrow_index: bank.borrow_index.to_bits(),
+    });
+
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.account.key(),
+        perp_market.perp_market_index,
+        account
+            .perp_position(perp_market.perp_market_index)
+            .unwrap(),
+        &perp_market,
+    );
+
+    emit!(PerpSettleFeesLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account.key(),
+        market_index: perp_market.perp_market_index,
+        settlement: settlement.to_bits(),
+    });
 
     // Bank & perp_market are dropped to prevent re-borrow from remaining_accounts
     drop(bank);

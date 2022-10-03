@@ -5,11 +5,10 @@ use crate::{
 use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 
-/// Warning: This function needs 512+ bytes free on the stack
 pub fn emit_perp_balances(
     mango_group: Pubkey,
     mango_account: Pubkey,
-    market_index: u64,
+    market_index: u16,
     pp: &PerpPosition,
     pm: &PerpMarket,
 ) {
@@ -30,7 +29,7 @@ pub fn emit_perp_balances(
 pub struct PerpBalanceLog {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
-    pub market_index: u64, // IDL doesn't support usize
+    pub market_index: u16,
     pub base_position: i64,
     pub quote_position: i128,        // I80F48
     pub long_settled_funding: i128,  // I80F48
@@ -247,4 +246,44 @@ pub struct Serum3RegisterMarketLog {
     pub quote_token_index: u16,
     pub serum_program: Pubkey,
     pub serum_program_external: Pubkey,
+}
+
+#[event]
+pub struct PerpLiqBasePositionLog {
+    pub mango_group: Pubkey,
+    pub market_index: u16,
+    pub liqor: Pubkey,
+    pub liqee: Pubkey,
+    pub base_transfer: i64,
+    pub quote_transfer: i128,
+    pub price: i128,
+}
+
+#[event]
+pub struct PerpLiqBankruptcyLog {
+    pub mango_group: Pubkey,
+    pub liqee: Pubkey,
+    pub liqor: Pubkey,
+    pub market_index: u16,
+    pub insurance_transfer: i128,
+    pub socialized_loss: i128,
+}
+
+#[event]
+pub struct PerpSettlePnlLog {
+    pub mango_group: Pubkey,
+    pub mango_account_a: Pubkey,
+    pub mango_account_b: Pubkey,
+    pub market_index: u16,
+    pub settlement: i128,
+    pub settler: Pubkey,
+    pub fee: i128,
+}
+
+#[event]
+pub struct PerpSettleFeesLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub market_index: u16,
+    pub settlement: i128,
 }

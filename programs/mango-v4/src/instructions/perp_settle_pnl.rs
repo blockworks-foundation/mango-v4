@@ -12,6 +12,8 @@ use crate::state::ScanningAccountRetriever;
 use crate::state::QUOTE_TOKEN_INDEX;
 use crate::state::{AccountLoaderDynamic, Group, PerpMarket};
 
+use crate::logs::{emit_perp_balances, PerpSettlePnlLog, TokenBalanceLog};
+
 #[derive(Accounts)]
 pub struct PerpSettlePnl<'info> {
     pub group: AccountLoader<'info, Group>,
@@ -158,6 +160,44 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     bank.deposit(a_token_position, cm!(settlement - fee))?;
     bank.withdraw_with_fee(b_token_position, settlement)?;
 
+    emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.settler.key(),
+        token_index: QUOTE_TOKEN_INDEX,
+        indexed_position: a_token_position.indexed_position.to_bits(),
+        deposit_index: bank.deposit_index.to_bits(),
+        borrow_index: bank.borrow_index.to_bits(),
+    });
+
+    emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.settler.key(),
+        token_index: QUOTE_TOKEN_INDEX,
+        indexed_position: b_token_position.indexed_position.to_bits(),
+        deposit_index: bank.deposit_index.to_bits(),
+        borrow_index: bank.borrow_index.to_bits(),
+    });
+
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.account_a.key(),
+        perp_market.perp_market_index,
+        account_a
+            .perp_position(perp_market.perp_market_index)
+            .unwrap(),
+        &perp_market,
+    );
+
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.account_b.key(),
+        perp_market.perp_market_index,
+        account_b
+            .perp_position(perp_market.perp_market_index)
+            .unwrap(),
+        &perp_market,
+    );
+
     // settler might be the same as account a or b
     drop(account_a);
     drop(account_b);
@@ -173,9 +213,31 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
 
     let (settler_token_position, settler_token_raw_index, _) =
         settler.ensure_token_position(QUOTE_TOKEN_INDEX)?;
-    if !bank.deposit(settler_token_position, fee)? {
-        settler.deactivate_token_position(settler_token_raw_index);
+    let settler_token_position_active = bank.deposit(settler_token_position, fee)?;
+
+    emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.settler.key(),
+        token_index: settler_token_position.token_index,
+        indexed_position: settler_token_position.indexed_position.to_bits(),
+        deposit_index: bank.deposit_index.to_bits(),
+        borrow_index: bank.borrow_index.to_bits(),
+    });
+
+    if !settler_token_position_active {
+        settler
+            .deactivate_token_position_and_log(settler_token_raw_index, ctx.accounts.settler.key());
     }
+
+    emit!(PerpSettlePnlLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account_a: ctx.accounts.account_a.key(),
+        mango_account_b: ctx.accounts.account_b.key(),
+        market_index: perp_market_index,
+        settlement: settlement.to_bits(),
+        settler: ctx.accounts.settler.key(),
+        fee: fee.to_bits(),
+    });
 
     msg!("settled pnl = {}, fee = {}", settlement, fee);
     Ok(())
