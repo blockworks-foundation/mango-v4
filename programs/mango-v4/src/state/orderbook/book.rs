@@ -42,14 +42,12 @@ fn post_only_slide_limit(side: Side, best_other_side: i64, limit: i64) -> i64 {
 }
 
 /// TODO: what if oracle is stale for a while
-pub struct OraclePeggedBook<'a> {
-    pub bids: RefMut<'a, BookSide>,
-    pub asks: RefMut<'a, BookSide>,
-    pub oracle_peg_bids: RefMut<'a, BookSide>,
-    pub oracle_peg_asks: RefMut<'a, BookSide>,
+pub struct Book2<'a> {
+    pub bids: BookSide2<'a>,
+    pub asks: BookSide2<'a>,
 }
 
-impl<'a> OraclePeggedBook<'a> {
+impl<'a> Book2<'a> {
     pub fn new_limit_bid(
         &mut self,
         now_ts: u64,

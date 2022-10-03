@@ -1,5 +1,5 @@
-use crate::state::orderbook::bookside::{BookSide, BookSideType};
-use crate::state::orderbook::nodes::{InnerNode, LeafNode, NodeHandle, NodeRef};
+use crate::state::orderbook::bookside::*;
+use crate::state::orderbook::nodes::*;
 
 /// Iterate over orders in order (bids=descending, asks=ascending)
 pub struct BookSideIter<'a> {
@@ -39,6 +39,10 @@ impl<'a> BookSideIter<'a> {
         iter
     }
 
+    pub fn peek(&self) -> Option<(NodeHandle, &'a LeafNode)> {
+        self.next_leaf
+    }
+
     fn find_leftmost_valid_leaf(
         &mut self,
         start: NodeHandle,
@@ -73,8 +77,10 @@ impl<'a> Iterator for BookSideIter<'a> {
     type Item = (NodeHandle, &'a LeafNode);
 
     fn next(&mut self) -> Option<Self::Item> {
-        // if next leaf is None just return it
-        self.next_leaf?;
+        // no next leaf? done
+        if self.next_leaf.is_none() {
+            return None;
+        }
 
         // start popping from stack and get the other child
         let current_leaf = self.next_leaf;
@@ -88,5 +94,47 @@ impl<'a> Iterator for BookSideIter<'a> {
         };
 
         current_leaf
+    }
+}
+
+pub struct BookSide2IterItem<'a> {
+    handle: BookSide2NodeHandle,
+    node: &'a LeafNode,
+    price_lots: i64,
+}
+
+pub struct BookSide2Iter<'a> {
+    direct_iter: BookSideIter<'a>,
+    oracle_pegged_iter: BookSideIter<'a>,
+    oracle_price_lots: i64,
+}
+
+impl<'a> BookSide2Iter<'a> {
+    pub fn new(book_side: &'a BookSide2, now_ts: u64, oracle_price_lots: i64) -> Self {
+        Self {
+            direct_iter: book_side.direct.iter_valid(now_ts),
+            oracle_pegged_iter: book_side.oracle_pegged.iter_valid(now_ts),
+            oracle_price_lots,
+        }
+    }
+}
+
+impl<'a> Iterator for BookSide2Iter<'a> {
+    type Item = BookSide2IterItem<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match (self.direct_iter.peek(), self.oracle_pegged_iter.peek()) {
+            (Some(direct), Some(oracle_pegged)) => {}
+            (None, Some(oracle_pegged)) => {}
+            (Some((direct_handle, direct_node)), None) => Some(Self::Item {
+                handle: BookSide2NodeHandle {
+                    component: BookSide2Component::Direct,
+                    node: direct_handle,
+                },
+                node: direct_node,
+                price_lots: direct_node.price(),
+            }),
+            (None, None) => None,
+        }
     }
 }

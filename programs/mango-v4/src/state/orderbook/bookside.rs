@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use bytemuck::{cast, cast_mut, cast_ref};
+use std::cell::RefMut;
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
@@ -417,6 +418,83 @@ impl BookSide {
                 }
             };
         }
+    }
+}
+
+pub struct BookSide2<'a> {
+    pub direct: RefMut<'a, BookSide>,
+    pub oracle_pegged: RefMut<'a, BookSide>,
+}
+
+pub enum BookSide2Component {
+    Direct,
+    OraclePegged,
+}
+
+// Which bookside, and then the handle
+pub struct BookSide2NodeHandle {
+    component: BookSide2Component,
+    node: NodeHandle,
+}
+
+impl<'a> BookSide2<'a> {
+    /// Iterate over all entries in the book filtering out invalid orders
+    ///
+    /// smallest to highest for asks
+    /// highest to smallest for bids
+    pub fn iter_valid(&self, now_ts: u64, oracle_price_lots: i64) -> BookSide2Iter {
+        BookSide2Iter::new(self, now_ts, oracle_price_lots)
+    }
+
+    /// Iterate over all entries, including invalid orders
+    pub fn iter_all_including_invalid(&self, oracle_price_lots: i64) -> BookSide2Iter {
+        BookSide2Iter::new(self, 0, oracle_price_lots)
+    }
+
+    fn component(&self, component: BookSide2Component) -> &BookSide {
+        match component {
+            BookSide2Component::Direct => &self.direct,
+            BookSide2Component::OraclePegged => &self.oracle_pegged,
+        }
+    }
+
+    fn component_mut(&mut self, component: BookSide2Component) -> &mut BookSide {
+        match component {
+            BookSide2Component::Direct => &mut self.direct,
+            BookSide2Component::OraclePegged => &mut self.oracle_pegged,
+        }
+    }
+
+    pub fn node_mut(&mut self, key: BookSide2NodeHandle) -> Option<&mut AnyNode> {
+        self.component_mut(key.component).node_mut(key.node)
+    }
+    pub fn node(&self, key: BookSide2NodeHandle) -> Option<&AnyNode> {
+        self.component(key.component).node(key.node)
+    }
+
+    pub fn remove_worst(&mut self, component: BookSide2Component) -> Option<LeafNode> {
+        self.component_mut(component).remove_worst()
+    }
+
+    /// Remove the order with the lowest expiry timestamp, if that's < now_ts.
+    pub fn remove_one_expired(
+        &mut self,
+        component: BookSide2Component,
+        now_ts: u64,
+    ) -> Option<LeafNode> {
+        self.component_mut(component).remove_one_expired(now_ts)
+    }
+
+    pub fn remove_by_key(
+        &mut self,
+        component: BookSide2Component,
+        search_key: i128,
+    ) -> Option<LeafNode> {
+        self.component_mut(component).remove_by_key(search_key)
+    }
+
+    pub fn remove(&mut self, key: BookSide2NodeHandle) -> Option<AnyNode> {
+        self.component_mut(key.component).remove(key.node)
     }
 }
 
