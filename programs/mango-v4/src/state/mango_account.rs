@@ -24,7 +24,7 @@ use super::TokenIndex;
 use super::FREE_ORDER_SLOT;
 use super::{HealthCache, HealthType};
 use super::{PerpPosition, Serum3Orders, TokenPosition};
-use crate::logs::DeactivateTokenPositionLog;
+use crate::logs::{DeactivatePerpPositionLog, DeactivateTokenPositionLog};
 use checked_math as cm;
 
 type BorshVecLength = u32;
@@ -79,9 +79,8 @@ pub struct MangoAccount {
     // in USD units with 6 decimals
     pub net_deposits: i64,
     // (Display only)
-    // Cumulative settles on perp positions
-    // TODO: unimplemented
-    pub net_settled: i64,
+    // Cumulative transfers from perp to spot positions
+    pub perp_spot_transfers: i64,
 
     /// Init health as calculated during HealthReginBegin, rounded up.
     pub health_region_pre_init_health: i64,
@@ -119,7 +118,7 @@ impl MangoAccount {
             bump: 0,
             padding: Default::default(),
             net_deposits: 0,
-            net_settled: 0,
+            perp_spot_transfers: 0,
             health_region_pre_init_health: 0,
             reserved: [0; 240],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
@@ -199,7 +198,7 @@ pub struct MangoAccountFixed {
     pub bump: u8,
     pub padding: [u8; 1],
     pub net_deposits: i64,
-    pub net_settled: i64,
+    pub perp_spot_transfers: i64,
     pub health_region_begin_init_health: i64,
     pub reserved: [u8; 240],
 }
@@ -765,6 +764,34 @@ impl<
         Ok(())
     }
 
+    pub fn deactivate_perp_position_and_log(
+        &mut self,
+        perp_market_index: PerpMarketIndex,
+        settle_token_index: TokenIndex,
+        mango_account_pubkey: Pubkey,
+    ) -> Result<()> {
+        let mango_group = self.fixed.deref_or_borrow().group;
+        let perp_position = self.perp_position_mut(perp_market_index)?;
+
+        emit!(DeactivatePerpPositionLog {
+            mango_group: mango_group,
+            mango_account: mango_account_pubkey,
+            market_index: perp_market_index,
+            cumulative_long_funding: perp_position.cumulative_long_funding,
+            cumulative_short_funding: perp_position.cumulative_long_funding,
+            maker_volume: perp_position.maker_volume,
+            taker_volume: perp_position.taker_volume,
+            realized_pnl: perp_position.realized_pnl,
+        });
+
+        perp_position.market_index = PerpMarketIndex::MAX;
+
+        let mut settle_token_position = self.token_position_mut(settle_token_index)?.0;
+        cm!(settle_token_position.in_use_count -= 1);
+
+        Ok(())
+    }
+
     pub fn add_perp_order(
         &mut self,
         perp_market_index: PerpMarketIndex,
@@ -1071,7 +1098,7 @@ mod tests {
         account.in_health_region = 3;
         account.bump = 4;
         account.net_deposits = 5;
-        account.net_settled = 6;
+        account.perp_spot_transfers = 6;
         account.health_region_pre_init_health = 7;
         account.tokens.resize(8, TokenPosition::default());
         account.tokens[0].token_index = 8;
@@ -1096,7 +1123,10 @@ mod tests {
         assert_eq!(account.in_health_region, account2.fixed.in_health_region);
         assert_eq!(account.bump, account2.fixed.bump);
         assert_eq!(account.net_deposits, account2.fixed.net_deposits);
-        assert_eq!(account.net_settled, account2.fixed.net_settled);
+        assert_eq!(
+            account.perp_spot_transfers,
+            account2.fixed.perp_spot_transfers
+        );
         assert_eq!(
             account.health_region_pre_init_health,
             account2.fixed.health_region_begin_init_health

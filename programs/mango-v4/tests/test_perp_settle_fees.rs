@@ -465,9 +465,9 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
         );
 
         assert_eq!(
-            mango_account_1.net_settled,
+            mango_account_1.perp_spot_transfers,
             -(partial_settle_amount as i64),
-            "net_settled on account 1 updated with loss from settlement"
+            "perp_spot_transfers on account 1 updated with loss from settlement"
         );
 
         assert_eq!(
@@ -519,8 +519,8 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
         );
 
         assert_eq!(
-            mango_account_1.net_settled, -initial_fees,
-            "net_settled on account 1 updated with loss from settlement"
+            mango_account_1.perp_spot_transfers, -initial_fees,
+            "perp_spot_transfers on account 1 updated with loss from settlement"
         );
 
         assert_eq!(

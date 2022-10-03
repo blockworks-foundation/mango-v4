@@ -217,6 +217,18 @@ pub struct DeactivateTokenPositionLog {
 }
 
 #[event]
+pub struct DeactivatePerpPositionLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub market_index: u16,
+    pub cumulative_long_funding: f32,
+    pub cumulative_short_funding: f32,
+    pub maker_volume: i64,
+    pub taker_volume: i64,
+    pub realized_pnl: i64,
+}
+
+#[event]
 pub struct TokenRegisterLog {
     pub mango_group: Pubkey,
     pub mint: Pubkey,

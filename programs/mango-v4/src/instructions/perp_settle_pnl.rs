@@ -150,8 +150,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Applying the fee here means that it decreases the displayed perp pnl.
     let settlement_i64 = settlement.checked_to_num::<i64>().unwrap();
     let fee_i64 = fee.checked_to_num::<i64>().unwrap();
-    cm!(account_a.fixed.net_settled += settlement_i64 - fee_i64);
-    cm!(account_b.fixed.net_settled -= settlement_i64);
+    cm!(account_a.fixed.perp_spot_transfers += settlement_i64 - fee_i64);
+    cm!(account_b.fixed.perp_spot_transfers -= settlement_i64);
 
     // Transfer token balances
     // The fee is paid by the account with positive unsettled pnl

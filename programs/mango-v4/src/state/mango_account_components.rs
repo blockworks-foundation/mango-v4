@@ -37,7 +37,6 @@ pub struct TokenPosition {
     // bookkeeping variable for onchain interest calculation
     // either deposit_index or borrow_index at last indexed_position change
     pub previous_index: I80F48,
-
     // (Display only)
     // Cumulative deposit interest in token native units
     pub cumulative_deposit_interest: f32,
@@ -292,6 +291,8 @@ impl PerpPosition {
         let start = self.base_position_lots;
         self.base_position_lots += base_change;
         perp_market.open_interest += self.base_position_lots.abs() - start.abs();
+
+        self.update_cumulative_funding(start, perp_market)
     }
 
     /// The amount of funding this account still needs to pay, in native quote
@@ -363,6 +364,30 @@ impl PerpPosition {
 
     pub fn change_quote_position(&mut self, quote_change_native: I80F48) {
         cm!(self.quote_position_native += quote_change_native);
+    }
+
+    pub fn update_cumulative_funding(
+        &mut self,
+        opening_base_position_lots: i64,
+        perp_market: &PerpMarket,
+    ) {
+        if opening_base_position_lots.is_positive() {
+            let funding = cm!((perp_market.long_funding - self.previous_funding_index)
+                * I80F48::from(opening_base_position_lots))
+            .to_num::<f32>();
+            self.cumulative_long_funding += funding;
+        } else {
+            let funding = cm!((perp_market.short_funding - self.previous_funding_index)
+                * I80F48::from(opening_base_position_lots))
+            .to_num::<f32>();
+            self.cumulative_short_funding += funding;
+        }
+
+        if opening_base_position_lots.is_positive() {
+            self.previous_funding_index = perp_market.long_funding
+        } else {
+            self.previous_funding_index = perp_market.short_funding
+        }
     }
 
     /// Does the perp position have any open orders or fill events?

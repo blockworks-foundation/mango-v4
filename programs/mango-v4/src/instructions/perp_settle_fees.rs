@@ -78,9 +78,9 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     perp_position.change_quote_position(settlement);
     perp_market.fees_accrued = cm!(perp_market.fees_accrued - settlement);
 
-    // Update the account's net_settled with the new PnL
+    // Update the account's perp_spot_transfers with the new PnL
     let settlement_i64 = settlement.round().checked_to_num::<i64>().unwrap();
-    account.fixed.net_settled = cm!(account.fixed.net_settled - settlement_i64);
+    account.fixed.perp_spot_transfers = cm!(account.fixed.perp_spot_transfers - settlement_i64);
 
     // Transfer token balances
     // TODO: Need to guarantee that QUOTE_TOKEN_INDEX token exists at this point. I.E. create it when placing perp order.
