@@ -44,7 +44,9 @@ pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
         market_index: perp_market.perp_market_index,
         long_funding: perp_market.long_funding.to_bits(),
         short_funding: perp_market.long_funding.to_bits(),
-        price: oracle_price.to_bits()
+        price: oracle_price.to_bits(),
+        fees_accrued: perp_market.fees_accrued.to_bits(),
+        open_interest: perp_market.open_interest,
     });
 
     Ok(())

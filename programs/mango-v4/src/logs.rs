@@ -119,9 +119,11 @@ pub struct FillLog {
 pub struct PerpUpdateFundingLog {
     pub mango_group: Pubkey,
     pub market_index: u16,
-    pub long_funding: i128,  // I80F48
-    pub short_funding: i128, // I80F48
-    pub price: i128,         // I80F48
+    pub long_funding: i128,
+    pub short_funding: i128,
+    pub price: i128,
+    pub fees_accrued: i128,
+    pub open_interest: i64,
 }
 
 #[event]
@@ -134,6 +136,8 @@ pub struct UpdateIndexLog {
     pub price: i128,           // I80F48
     pub collected_fees: i128,  // I80F48
     pub loan_fee_rate: i128,   // I80F48
+    pub total_borrows: i128,
+    pub total_deposits: i128,
 }
 
 #[event]
