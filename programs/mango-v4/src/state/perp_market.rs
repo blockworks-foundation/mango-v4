@@ -40,8 +40,8 @@ pub struct PerpMarket {
 
     pub oracle_config: OracleConfig,
 
-    pub bids: Pubkey,
-    pub asks: Pubkey,
+    pub bids_direct: Pubkey,
+    pub asks_direct: Pubkey,
 
     pub event_queue: Pubkey,
 
@@ -109,7 +109,10 @@ pub struct PerpMarket {
     /// Fraction of pnl to pay out as fee if +pnl account has low health.
     pub settle_fee_fraction_low_health: f32,
 
-    pub reserved: [u8; 92],
+    pub bids_oracle_pegged: Pubkey,
+    pub asks_oracle_pegged: Pubkey,
+
+    pub reserved: [u8; 28],
 }
 
 const_assert_eq!(size_of::<PerpMarket>(), 584);
@@ -254,8 +257,10 @@ impl PerpMarket {
             oracle_config: OracleConfig {
                 conf_filter: I80F48::ZERO,
             },
-            bids: Pubkey::new_unique(),
-            asks: Pubkey::new_unique(),
+            bids_direct: Pubkey::new_unique(),
+            asks_direct: Pubkey::new_unique(),
+            bids_oracle_pegged: Pubkey::new_unique(),
+            asks_oracle_pegged: Pubkey::new_unique(),
             event_queue: Pubkey::new_unique(),
             quote_lot_size: 1,
             base_lot_size: 1,

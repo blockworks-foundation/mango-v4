@@ -4,8 +4,8 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::state::MangoAccount;
 use crate::state::{
-    new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, Book, BookSide,
-    EventQueue, Group, OrderType, PerpMarket, Side, QUOTE_TOKEN_INDEX,
+    new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, Book, Book2,
+    BookSide, BookSide2, EventQueue, Group, Order2, OrderType, PerpMarket, Side, QUOTE_TOKEN_INDEX,
 };
 
 #[derive(Accounts)]
@@ -19,16 +19,22 @@ pub struct PerpPlaceOrder<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = bids,
-        has_one = asks,
+        has_one = bids_direct,
+        has_one = asks_direct,
+        has_one = bids_oracle_pegged,
+        has_one = asks_oracle_pegged,
         has_one = event_queue,
         has_one = oracle,
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]
-    pub asks: AccountLoader<'info, BookSide>,
+    pub asks_direct: AccountLoader<'info, BookSide>,
     #[account(mut)]
-    pub bids: AccountLoader<'info, BookSide>,
+    pub bids_direct: AccountLoader<'info, BookSide>,
+    #[account(mut)]
+    pub asks_oracle_pegged: AccountLoader<'info, BookSide>,
+    #[account(mut)]
+    pub bids_oracle_pegged: AccountLoader<'info, BookSide>,
     #[account(mut)]
     pub event_queue: AccountLoader<'info, EventQueue>,
 
@@ -105,9 +111,12 @@ pub fn perp_place_order(
     };
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
-    let bids = ctx.accounts.bids.load_mut()?;
-    let asks = ctx.accounts.asks.load_mut()?;
-    let mut book = Book::new(bids, asks);
+    let mut book = Book2::load_mut(
+        &ctx.accounts.bids_direct,
+        &ctx.accounts.asks_direct,
+        &ctx.accounts.bids_oracle_pegged,
+        &ctx.accounts.asks_oracle_pegged,
+    )?;
 
     let mut event_queue = ctx.accounts.event_queue.load_mut()?;
 
@@ -133,15 +142,17 @@ pub fn perp_place_order(
 
     book.new_order(
         side,
+        Order2::Direct {
+            order_type,
+            price_lots,
+        },
         &mut perp_market,
         &mut event_queue,
         oracle_price,
         &mut account.borrow_mut(),
         &account_pk,
-        price_lots,
         max_base_lots,
         max_quote_lots,
-        order_type,
         time_in_force,
         client_order_id,
         now_ts,

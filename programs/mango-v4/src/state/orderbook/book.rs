@@ -61,28 +61,19 @@ pub struct Book2<'a> {
 
 impl<'a> Book2<'a> {
     pub fn load_mut(
-        bids_direct_ai: &'a AccountInfo,
-        bids_oracle_pegged_ai: &'a AccountInfo,
-        asks_direct_ai: &'a AccountInfo,
-        asks_oracle_pegged_ai: &'a AccountInfo,
-        perp_market: &PerpMarket,
+        bids_direct_ai: &AccountLoader<BookSide>,
+        bids_oracle_pegged_ai: &AccountLoader<BookSide>,
+        asks_direct_ai: &AccountLoader<BookSide>,
+        asks_oracle_pegged_ai: &AccountLoader<BookSide>,
     ) -> std::result::Result<Self, Error> {
-        require!(
-            bids_direct_ai.key == &perp_market.bids,
-            MangoError::SomeError
-        );
-        require!(
-            asks_direct_ai.key == &perp_market.asks,
-            MangoError::SomeError
-        );
         Ok(Self {
             bids: BookSide2 {
-                direct: bids_direct_ai.load_mut::<BookSide>()?,
-                oracle_pegged: bids_oracle_pegged_ai.load_mut::<BookSide>()?,
+                direct: bids_direct_ai.load_mut()?,
+                oracle_pegged: bids_oracle_pegged_ai.load_mut()?,
             },
             asks: BookSide2 {
-                direct: asks_direct_ai.load_mut::<BookSide>()?,
-                oracle_pegged: asks_oracle_pegged_ai.load_mut::<BookSide>()?,
+                direct: asks_direct_ai.load_mut()?,
+                oracle_pegged: asks_oracle_pegged_ai.load_mut()?,
             },
         })
     }
@@ -442,8 +433,14 @@ impl<'a> Book<'a> {
         asks_ai: &'a AccountInfo,
         perp_market: &PerpMarket,
     ) -> std::result::Result<Self, Error> {
-        require!(bids_ai.key == &perp_market.bids, MangoError::SomeError);
-        require!(asks_ai.key == &perp_market.asks, MangoError::SomeError);
+        require!(
+            bids_ai.key == &perp_market.bids_direct,
+            MangoError::SomeError
+        );
+        require!(
+            asks_ai.key == &perp_market.asks_direct,
+            MangoError::SomeError
+        );
         Ok(Self::new(
             bids_ai.load_mut::<BookSide>()?,
             asks_ai.load_mut::<BookSide>()?,

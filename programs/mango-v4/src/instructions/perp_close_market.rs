@@ -15,8 +15,10 @@ pub struct PerpCloseMarket<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = bids,
-        has_one = asks,
+        has_one = bids_direct,
+        has_one = asks_direct,
+        has_one = bids_oracle_pegged,
+        has_one = asks_oracle_pegged,
         has_one = event_queue,
         close = sol_destination
     )]
@@ -26,13 +28,25 @@ pub struct PerpCloseMarket<'info> {
         mut,
         close = sol_destination
     )]
-    pub bids: AccountLoader<'info, BookSide>,
+    pub bids_direct: AccountLoader<'info, BookSide>,
 
     #[account(
         mut,
         close = sol_destination
     )]
-    pub asks: AccountLoader<'info, BookSide>,
+    pub asks_direct: AccountLoader<'info, BookSide>,
+
+    #[account(
+        mut,
+        close = sol_destination
+    )]
+    pub bids_oracle_pegged: AccountLoader<'info, BookSide>,
+
+    #[account(
+        mut,
+        close = sol_destination
+    )]
+    pub asks_oracle_pegged: AccountLoader<'info, BookSide>,
 
     #[account(
         mut,
