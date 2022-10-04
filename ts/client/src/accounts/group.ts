@@ -455,6 +455,16 @@ export class Group {
     return serum3Market;
   }
 
+  public getSerum3MarketByPk(pk: PublicKey): Serum3Market | undefined {
+    const serum3Market = Array.from(
+      this.serum3MarketsMapByExternal.values(),
+    ).find((serum3Market) => serum3Market.serumMarketExternal.equals(pk));
+    if (!serum3Market) {
+      throw new Error(`No serum3Market found by public key ${pk}!`);
+    }
+    return serum3Market;
+  }
+
   public getSerum3MarketByExternalMarket(
     externalMarketPk: PublicKey,
   ): Serum3Market {
