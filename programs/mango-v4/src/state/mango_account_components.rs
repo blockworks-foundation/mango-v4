@@ -368,8 +368,8 @@ impl PerpPosition {
 #[zero_copy]
 #[derive(AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct PerpOpenOrder {
-    pub order_side: Side, // TODO: storing enums isn't POD
-    pub padding1: [u8; 1],
+    pub order_side: Side,                   // TODO: storing enums isn't POD
+    pub book_component: BookSide2Component, // TODO: store this along with side? use the enum?
     pub order_market: PerpMarketIndex,
     pub padding2: [u8; 4],
     pub client_order_id: u64,
@@ -381,7 +381,7 @@ impl Default for PerpOpenOrder {
     fn default() -> Self {
         Self {
             order_side: Side::Bid,
-            padding1: Default::default(),
+            book_component: BookSide2Component::Direct,
             order_market: FREE_ORDER_SLOT,
             padding2: Default::default(),
             client_order_id: 0,

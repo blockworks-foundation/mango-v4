@@ -509,23 +509,23 @@ impl<
         &self,
         market_index: PerpMarketIndex,
         client_order_id: u64,
-    ) -> Option<(i128, Side)> {
+    ) -> Option<&PerpOpenOrder> {
         for oo in self.all_perp_orders() {
             if oo.order_market == market_index && oo.client_order_id == client_order_id {
-                return Some((oo.order_id, oo.order_side));
+                return Some(&oo);
             }
         }
         None
     }
 
-    pub fn perp_find_order_side(
+    pub fn perp_find_order_with_order_id(
         &self,
         market_index: PerpMarketIndex,
         order_id: i128,
-    ) -> Option<Side> {
+    ) -> Option<&PerpOpenOrder> {
         for oo in self.all_perp_orders() {
             if oo.order_market == market_index && oo.order_id == order_id {
-                return Some(oo.order_side);
+                return Some(&oo);
             }
         }
         None

@@ -416,6 +416,63 @@ impl<'a> Book2<'a> {
 
         Ok(())
     }
+
+    /// Cancels up to `limit` orders that are listed on the mango account for the given perp market.
+    /// Optionally filters by `side_to_cancel_option`.
+    /// The orders are removed from the book and from the mango account open order list.
+    pub fn cancel_all_orders(
+        &mut self,
+        mango_account: &mut MangoAccountRefMut,
+        perp_market: &mut PerpMarket,
+        mut limit: u8,
+        side_to_cancel_option: Option<Side>,
+    ) -> Result<()> {
+        for i in 0..mango_account.header.perp_oo_count() {
+            let oo = mango_account.perp_order_by_raw_index(i);
+            if oo.order_market == FREE_ORDER_SLOT
+                || oo.order_market != perp_market.perp_market_index
+            {
+                continue;
+            }
+
+            let order_side = oo.order_side;
+            if let Some(side_to_cancel) = side_to_cancel_option {
+                if side_to_cancel != order_side {
+                    continue;
+                }
+            }
+
+            let order_id = oo.order_id;
+            self.cancel_order(mango_account, order_id, order_side, oo.book_component, None)?;
+
+            limit -= 1;
+            if limit == 0 {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Cancels an order on a side, removing it from the book and the mango account orders list
+    pub fn cancel_order(
+        &mut self,
+        mango_account: &mut MangoAccountRefMut,
+        order_id: i128,
+        side: Side,
+        book_component: BookSide2Component,
+        expected_owner: Option<Pubkey>,
+    ) -> Result<LeafNode> {
+        let leaf_node = self.bookside_mut(side).component_mut(book_component).
+        remove_by_key(order_id).ok_or_else(|| {
+                    error_msg!("invalid perp order id {order_id} for side {side:?} and component {book_component:?}")
+                })?;
+        if let Some(owner) = expected_owner {
+            require_keys_eq!(leaf_node.owner, owner);
+        }
+        mango_account.remove_perp_order(leaf_node.owner_slot as usize, leaf_node.quantity)?;
+        Ok(leaf_node)
+    }
 }
 
 pub struct Book<'a> {

@@ -48,14 +48,15 @@ pub fn perp_cancel_order_by_client_order_id(
         &ctx.accounts.asks_oracle_pegged,
     )?;
 
-    let (order_id, side) = account
+    let oo = account
         .perp_find_order_with_client_order_id(perp_market.perp_market_index, client_order_id)
         .ok_or_else(|| error_msg!("could not find perp order with client order id {client_order_id} in perp order books"))?;
 
     book.cancel_order(
         &mut account.borrow_mut(),
-        order_id,
-        side,
+        oo.order_id,
+        oo.order_side,
+        oo.book_component,
         Some(ctx.accounts.account.key()),
     )?;
 

@@ -426,6 +426,18 @@ pub struct BookSide2<'a> {
     pub oracle_pegged: RefMut<'a, BookSide>,
 }
 
+#[derive(
+    Eq,
+    PartialEq,
+    Copy,
+    Clone,
+    TryFromPrimitive,
+    IntoPrimitive,
+    Debug,
+    AnchorSerialize,
+    AnchorDeserialize,
+)]
+#[repr(u8)]
 pub enum BookSide2Component {
     Direct,
     OraclePegged,

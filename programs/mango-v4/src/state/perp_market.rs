@@ -283,7 +283,7 @@ impl PerpMarket {
             fees_settled: I80F48::ZERO,
             bump: 0,
             base_decimals: 0,
-            reserved: [0; 92],
+            reserved: [0; 28],
             padding0: Default::default(),
             padding1: Default::default(),
             padding2: Default::default(),
