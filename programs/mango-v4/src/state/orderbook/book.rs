@@ -60,11 +60,11 @@ pub struct Book2<'a> {
 }
 
 impl<'a> Book2<'a> {
-    pub fn load_mut(
-        bids_direct_ai: &AccountLoader<BookSide>,
-        bids_oracle_pegged_ai: &AccountLoader<BookSide>,
-        asks_direct_ai: &AccountLoader<BookSide>,
-        asks_oracle_pegged_ai: &AccountLoader<BookSide>,
+    pub fn load_mut<'b: 'a>(
+        bids_direct_ai: &'a AccountLoader<'b, BookSide>,
+        bids_oracle_pegged_ai: &'a AccountLoader<'b, BookSide>,
+        asks_direct_ai: &'a AccountLoader<'b, BookSide>,
+        asks_oracle_pegged_ai: &'a AccountLoader<'b, BookSide>,
     ) -> std::result::Result<Self, Error> {
         Ok(Self {
             bids: BookSide2 {
@@ -99,6 +99,26 @@ impl<'a> Book2<'a> {
                 .next()?
                 .price_lots,
         )
+    }
+
+    /// Walk up the book `quantity` units and return the price at that level. If `quantity` units
+    /// not on book, return None
+    pub fn impact_price(
+        &self,
+        side: Side,
+        quantity: i64,
+        now_ts: u64,
+        oracle_price_lots: i64,
+    ) -> Option<i64> {
+        let mut sum: i64 = 0;
+        let iter = self.bookside(side).iter_valid(now_ts, oracle_price_lots);
+        for order in iter {
+            cm!(sum += order.node.quantity);
+            if sum >= quantity {
+                return Some(order.price_lots);
+            }
+        }
+        None
     }
 
     fn eval_order_type_helper(
@@ -443,7 +463,10 @@ impl<'a> Book2<'a> {
             }
 
             let order_id = oo.order_id;
-            self.cancel_order(mango_account, order_id, order_side, oo.book_component, None)?;
+            let book_component = oo.book_component;
+            drop(oo);
+
+            self.cancel_order(mango_account, order_id, order_side, book_component, None)?;
 
             limit -= 1;
             if limit == 0 {

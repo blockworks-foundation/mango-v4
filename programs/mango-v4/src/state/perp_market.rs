@@ -10,7 +10,7 @@ use crate::state::oracle;
 use crate::state::orderbook::order_type::Side;
 use crate::util::checked_math as cm;
 
-use super::{Book, OracleConfig, DAY_I80F48};
+use super::{Book2, OracleConfig, DAY_I80F48};
 
 pub type PerpMarketIndex = u16;
 
@@ -164,12 +164,18 @@ impl PerpMarket {
     }
 
     /// Use current order book price and index price to update the instantaneous funding
-    pub fn update_funding(&mut self, book: &Book, oracle_price: I80F48, now_ts: u64) -> Result<()> {
+    pub fn update_funding(
+        &mut self,
+        book: &Book2,
+        oracle_price: I80F48,
+        now_ts: u64,
+    ) -> Result<()> {
         let index_price = oracle_price;
+        let oracle_price_lots = self.native_price_to_lot(oracle_price);
 
         // Get current book price & compare it to index price
-        let bid = book.impact_price(Side::Bid, self.impact_quantity, now_ts);
-        let ask = book.impact_price(Side::Ask, self.impact_quantity, now_ts);
+        let bid = book.impact_price(Side::Bid, self.impact_quantity, now_ts, oracle_price_lots);
+        let ask = book.impact_price(Side::Ask, self.impact_quantity, now_ts, oracle_price_lots);
 
         let diff_price = match (bid, ask) {
             (Some(bid), Some(ask)) => {

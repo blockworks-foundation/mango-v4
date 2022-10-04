@@ -34,7 +34,7 @@ pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
     let now_ts = Clock::get()?.unix_timestamp;
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
-    let mut book = Book2::load_mut(
+    let book = Book2::load_mut(
         &ctx.accounts.bids_direct,
         &ctx.accounts.asks_direct,
         &ctx.accounts.bids_oracle_pegged,
