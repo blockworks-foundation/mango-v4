@@ -278,9 +278,6 @@ export class HealthCache {
     const baseEntryIndex = this.getOrCreateTokenInfoIndex(baseBank);
     const quoteEntryIndex = this.getOrCreateTokenInfoIndex(quoteBank);
 
-    const baseEntryIndex = this.getOrCreateTokenInfoIndex(baseBank);
-    const quoteEntryIndex = this.getOrCreateTokenInfoIndex(quoteBank);
-
     const baseEntry = this.tokenInfos[baseEntryIndex];
     const reservedAmount = reservedBaseChange.mul(baseEntry.oraclePrice);
 
