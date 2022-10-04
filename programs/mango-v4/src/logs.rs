@@ -225,7 +225,7 @@ pub struct DeactivatePerpPositionLog {
     pub cumulative_short_funding: f32,
     pub maker_volume: i64,
     pub taker_volume: i64,
-    pub realized_pnl: i64,
+    pub perp_spot_transfers: i64,
 }
 
 #[event]

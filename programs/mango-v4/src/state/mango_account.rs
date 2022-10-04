@@ -781,7 +781,7 @@ impl<
             cumulative_short_funding: perp_position.cumulative_long_funding,
             maker_volume: perp_position.maker_volume,
             taker_volume: perp_position.taker_volume,
-            realized_pnl: perp_position.realized_pnl,
+            perp_spot_transfers: perp_position.perp_spot_transfers,
         });
 
         perp_position.market_index = PerpMarketIndex::MAX;

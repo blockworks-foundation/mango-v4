@@ -211,7 +211,7 @@ pub struct PerpPosition {
     pub taker_volume: i64,
     // (Display only)
     // Cumulative realized pnl in quote native units
-    pub realized_pnl: i64,
+    pub perp_spot_transfers: i64,
 }
 const_assert_eq!(size_of::<PerpPosition>(), 8 + 7 * 8 + 3 * 16 + 64);
 const_assert_eq!(size_of::<PerpPosition>() % 8, 0);
@@ -240,7 +240,7 @@ impl Default for PerpPosition {
             cumulative_short_funding: 0.0,
             maker_volume: 0,
             taker_volume: 0,
-            realized_pnl: 0,
+            perp_spot_transfers: 0,
         }
     }
 }

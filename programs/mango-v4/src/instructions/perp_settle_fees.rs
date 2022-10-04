@@ -80,7 +80,8 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
 
     // Update the account's perp_spot_transfers with the new PnL
     let settlement_i64 = settlement.round().checked_to_num::<i64>().unwrap();
-    account.fixed.perp_spot_transfers = cm!(account.fixed.perp_spot_transfers - settlement_i64);
+    cm!(perp_position.perp_spot_transfers += perp_position.perp_spot_transfers - settlement_i64);
+    cm!(account.fixed.perp_spot_transfers += account.fixed.perp_spot_transfers - settlement_i64);
 
     // Transfer token balances
     // TODO: Need to guarantee that QUOTE_TOKEN_INDEX token exists at this point. I.E. create it when placing perp order.

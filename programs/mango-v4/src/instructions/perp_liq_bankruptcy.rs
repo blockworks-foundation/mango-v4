@@ -9,7 +9,7 @@ use crate::state::ScanningAccountRetriever;
 use crate::state::*;
 use crate::util::checked_math as cm;
 
-use crate::logs::{emit_perp_balances, PerpLiqBankruptcyLog};
+use crate::logs::{emit_perp_balances, PerpLiqBankruptcyLog, TokenBalanceLog};
 
 // Remaining accounts:
 // - merged health accounts for liqor+liqee
@@ -153,6 +153,15 @@ pub fn perp_liq_bankruptcy(ctx: Context<PerpLiqBankruptcy>, max_liab_transfer: u
         // credit the liqor with quote tokens
         let (liqor_quote, _, _) = liqor.ensure_token_position(QUOTE_TOKEN_INDEX)?;
         quote_bank.deposit(liqor_quote, insurance_transfer_i80f48)?;
+
+        emit!(TokenBalanceLog {
+            mango_group: ctx.accounts.group.key(),
+            mango_account: ctx.accounts.liqor.key(),
+            token_index: QUOTE_TOKEN_INDEX,
+            indexed_position: liqor_quote.indexed_position.to_bits(),
+            deposit_index: quote_bank.deposit_index.to_bits(),
+            borrow_index: quote_bank.borrow_index.to_bits(),
+        });
 
         // transfer perp quote loss from the liqee to the liqor
         let liqor_perp_position = liqor
