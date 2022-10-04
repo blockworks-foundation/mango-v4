@@ -63,7 +63,7 @@ impl Side {
     }
 
     /// Is `lhs` is a better order for `side` than `rhs`?
-    pub fn is_price_better(self: &Side, lhs: i64, rhs: i64) -> bool {
+    pub fn is_order_better(self: &Side, lhs: i64, rhs: i64) -> bool {
         match self {
             Side::Bid => lhs > rhs,
             Side::Ask => lhs < rhs,

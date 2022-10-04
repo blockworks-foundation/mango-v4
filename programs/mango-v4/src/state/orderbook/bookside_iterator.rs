@@ -135,9 +135,9 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                     |a, b| a < b
                 };
 
-                let o_price_maybe = self.oracle_price_lots.checked_add(o_node.value());
+                let o_price_maybe = self.oracle_price_lots.checked_add(o_node.data());
                 if o_price_maybe.is_none()
-                    || is_better(d_node.key, o_node.key_with_price(o_price_maybe.unwrap()))
+                    || is_better(d_node.key, o_node.key_with_data(o_price_maybe.unwrap()))
                 {
                     self.direct_iter.next();
                     Some(Self::Item {
@@ -146,7 +146,7 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                             node: d_handle,
                         },
                         node: d_node,
-                        price_lots: d_node.value(),
+                        price_lots: d_node.data(),
                     })
                 } else {
                     self.oracle_pegged_iter.next();
@@ -162,7 +162,7 @@ impl<'a> Iterator for BookSide2Iter<'a> {
             }
             (None, Some((handle, node))) => {
                 self.oracle_pegged_iter.next();
-                let price_lots = match self.oracle_price_lots.checked_add(node.value()) {
+                let price_lots = match self.oracle_price_lots.checked_add(node.data()) {
                     Some(v) => v,
                     None => {
                         return None;
@@ -185,7 +185,7 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                         node: handle,
                     },
                     node,
-                    price_lots: node.value(),
+                    price_lots: node.data(),
                 })
             }
             (None, None) => None,

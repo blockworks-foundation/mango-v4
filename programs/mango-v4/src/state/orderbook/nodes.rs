@@ -137,16 +137,16 @@ impl LeafNode {
     // TODO: remove, it's not always the price
     #[inline(always)]
     pub fn price(&self) -> i64 {
-        self.value()
+        self.data()
     }
 
     #[inline(always)]
-    pub fn value(&self) -> i64 {
+    pub fn data(&self) -> i64 {
         (self.key >> 64) as i64
     }
 
     #[inline(always)]
-    pub fn key_with_price(&self, price: i64) -> i128 {
+    pub fn key_with_data(&self, price: i64) -> i128 {
         ((price as i128) << 64) | ((self.key as u64) as i128)
     }
 

@@ -1,4 +1,4 @@
-use std::cell::{Ref, RefMut};
+use std::cell::RefMut;
 
 use crate::accounts_zerocopy::*;
 use crate::state::MangoAccountRefMut;
@@ -41,6 +41,18 @@ fn post_only_slide_limit(side: Side, best_other_side: i64, limit: i64) -> i64 {
     }
 }
 
+pub enum Order2 {
+    Market,
+    Direct {
+        order_type: OrderType,
+        price_lots: i64,
+    },
+    OraclePegged {
+        order_type: OrderType,
+        price_offset_lots: i64,
+    },
+}
+
 /// TODO: what if oracle is stale for a while
 pub struct Book2<'a> {
     pub bids: BookSide2<'a>,
@@ -48,6 +60,33 @@ pub struct Book2<'a> {
 }
 
 impl<'a> Book2<'a> {
+    pub fn load_mut(
+        bids_direct_ai: &'a AccountInfo,
+        bids_oracle_pegged_ai: &'a AccountInfo,
+        asks_direct_ai: &'a AccountInfo,
+        asks_oracle_pegged_ai: &'a AccountInfo,
+        perp_market: &PerpMarket,
+    ) -> std::result::Result<Self, Error> {
+        require!(
+            bids_direct_ai.key == &perp_market.bids,
+            MangoError::SomeError
+        );
+        require!(
+            asks_direct_ai.key == &perp_market.asks,
+            MangoError::SomeError
+        );
+        Ok(Self {
+            bids: BookSide2 {
+                direct: bids_direct_ai.load_mut::<BookSide>()?,
+                oracle_pegged: bids_oracle_pegged_ai.load_mut::<BookSide>()?,
+            },
+            asks: BookSide2 {
+                direct: asks_direct_ai.load_mut::<BookSide>()?,
+                oracle_pegged: asks_oracle_pegged_ai.load_mut::<BookSide>()?,
+            },
+        })
+    }
+
     pub fn bookside_mut(&mut self, side: Side) -> &mut BookSide2<'a> {
         match side {
             Side::Bid => &mut self.bids,
@@ -71,19 +110,98 @@ impl<'a> Book2<'a> {
         )
     }
 
+    fn eval_order_type_helper(
+        &self,
+        side: Side,
+        order_type: OrderType,
+        price_lots: i64,
+        oracle_price_lots: i64,
+        now_ts: u64,
+    ) -> (bool, bool, i64) {
+        match order_type {
+            OrderType::Limit => (false, true, price_lots),
+            OrderType::ImmediateOrCancel => (false, false, price_lots),
+            OrderType::PostOnly => (true, true, price_lots),
+            OrderType::Market => (false, false, market_order_limit_for_side(side)),
+            OrderType::PostOnlySlide => {
+                let price = if let Some(best_other_price) =
+                    self.best_price(now_ts, oracle_price_lots, side.invert_side())
+                {
+                    post_only_slide_limit(side, best_other_price, price_lots)
+                } else {
+                    price_lots
+                };
+                (true, true, price)
+            }
+        }
+    }
+
+    fn eval_order_params(
+        &self,
+        side: Side,
+        order: &Order2,
+        oracle_price_lots: i64,
+        now_ts: u64,
+    ) -> (bool, Option<BookSide2Component>, i64, i64) {
+        match order {
+            Order2::Market => {
+                let price_lots = market_order_limit_for_side(side);
+                (false, None, price_lots, price_lots)
+            }
+            Order2::Direct {
+                order_type,
+                price_lots,
+            } => {
+                let (post_only, post_allowed, price_lots) = self.eval_order_type_helper(
+                    side,
+                    *order_type,
+                    *price_lots,
+                    oracle_price_lots,
+                    now_ts,
+                );
+                (
+                    post_only,
+                    post_allowed.then(|| BookSide2Component::Direct),
+                    price_lots,
+                    price_lots,
+                )
+            }
+            Order2::OraclePegged {
+                order_type,
+                price_offset_lots,
+            } => {
+                let price_offset_lots = *price_offset_lots;
+                let price_lots = cm!(oracle_price_lots + price_offset_lots);
+                let (post_only, post_allowed, price_lots) = self.eval_order_type_helper(
+                    side,
+                    *order_type,
+                    price_lots,
+                    oracle_price_lots,
+                    now_ts,
+                );
+                let price_offset_lots = cm!(price_lots - oracle_price_lots);
+                (
+                    post_only,
+                    post_allowed.then(|| BookSide2Component::OraclePegged),
+                    price_lots,
+                    price_offset_lots,
+                )
+            }
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new_order(
         &mut self,
         side: Side,
+        order: Order2,
         perp_market: &mut PerpMarket,
         event_queue: &mut EventQueue,
         oracle_price: I80F48,
         mango_account: &mut MangoAccountRefMut,
         mango_account_pk: &Pubkey,
-        price_lots: i64,
         max_base_lots: i64,
         max_quote_lots: i64,
-        order_type: OrderType,
         time_in_force: u8,
         client_order_id: u64,
         now_ts: u64,
@@ -92,34 +210,20 @@ impl<'a> Book2<'a> {
         let other_side = side.invert_side();
         let market = perp_market;
         let oracle_price_lots = market.native_price_to_lot(oracle_price);
-        let (post_only, mut post_allowed, price_lots) = match order_type {
-            OrderType::Limit => (false, true, price_lots),
-            OrderType::ImmediateOrCancel => (false, false, price_lots),
-            OrderType::PostOnly => (true, true, price_lots),
-            OrderType::Market => (false, false, market_order_limit_for_side(side)),
-            OrderType::PostOnlySlide => {
-                let price = if let Some(best_other_price) =
-                    self.best_price(now_ts, oracle_price_lots, other_side)
-                {
-                    post_only_slide_limit(side, best_other_price, price_lots)
-                } else {
-                    price_lots
-                };
-                (true, true, price)
-            }
-        };
+        let (post_only, mut post_allowed, price_lots, order_data) =
+            self.eval_order_params(side, &order, oracle_price_lots, now_ts);
 
-        if post_allowed {
+        if post_allowed.is_some() {
             // price limit check computed lazily to save CU on average
             let native_price = market.lot_to_native_price(price_lots);
             if !market.inside_price_limit(side, native_price, oracle_price) {
                 msg!("Posting on book disallowed due to price limits");
-                post_allowed = false;
+                post_allowed = None;
             }
         }
 
         // generate new order id
-        let order_id = market.gen_order_id(side, price_lots);
+        let order_id = market.gen_order_id(side, order_data);
 
         // Iterate through book and match against this new order.
         //
@@ -157,11 +261,11 @@ impl<'a> Book2<'a> {
                 break;
             } else if post_only {
                 msg!("Order could not be placed due to PostOnly");
-                post_allowed = false;
+                post_allowed = None;
                 break; // return silently to not fail other instructions in tx
             } else if limit == 0 {
                 msg!("Order matching limit reached");
-                post_allowed = false;
+                post_allowed = None;
                 break;
             }
 
@@ -232,12 +336,13 @@ impl<'a> Book2<'a> {
 
         // If there are still quantity unmatched, place on the book
         let book_base_quantity = remaining_base_lots.min(remaining_quote_lots / price_lots);
-        msg!("{:?}", post_allowed);
-        if post_allowed && book_base_quantity > 0 {
+        if book_base_quantity <= 0 {
+            post_allowed = None;
+        }
+        if let Some(book_component) = post_allowed {
+            let bookside = self.bookside_mut(side).component_mut(book_component);
+
             // Drop an expired order if possible
-            let bookside = self
-                .bookside_mut(side)
-                .component_mut(BookSide2Component::Direct);
             if let Some(expired_order) = bookside.remove_one_expired(now_ts) {
                 let event = OutEvent::new(
                     side,
@@ -255,7 +360,7 @@ impl<'a> Book2<'a> {
                 let worst_order = bookside.remove_worst().unwrap();
                 // MangoErrorCode::OutOfSpace
                 require!(
-                    side.is_price_better(price_lots, worst_order.price()),
+                    side.is_order_better(order_data, worst_order.data()),
                     MangoError::SomeError
                 );
                 let event = OutEvent::new(
@@ -277,7 +382,7 @@ impl<'a> Book2<'a> {
                 book_base_quantity,
                 client_order_id,
                 now_ts,
-                order_type,
+                OrderType::Limit, // TODO: Support order types? needed?
                 time_in_force,
             );
             let _result = bookside.insert_leaf(&new_order)?;
@@ -304,8 +409,18 @@ impl<'a> Book2<'a> {
         }
 
         // IOC orders have a fee penalty applied regardless of match
-        if order_type == OrderType::ImmediateOrCancel {
-            apply_penalty(market, mango_account)?;
+        match order {
+            Order2::Direct {
+                order_type: OrderType::ImmediateOrCancel,
+                ..
+            }
+            | Order2::OraclePegged {
+                order_type: OrderType::ImmediateOrCancel,
+                ..
+            } => {
+                apply_penalty(market, mango_account)?;
+            }
+            _ => {}
         }
 
         Ok(())
@@ -594,7 +709,7 @@ impl<'a> Book<'a> {
                 let worst_order = bookside.remove_worst().unwrap();
                 // MangoErrorCode::OutOfSpace
                 require!(
-                    side.is_price_better(price_lots, worst_order.price()),
+                    side.is_order_better(price_lots, worst_order.price()),
                     MangoError::SomeError
                 );
                 let event = OutEvent::new(
