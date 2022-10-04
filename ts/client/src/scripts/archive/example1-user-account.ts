@@ -43,10 +43,7 @@ async function main() {
 
   // create + fetch account
   console.log(`Creating mangoaccount...`);
-  const mangoAccount = await client.getOrCreateMangoAccount(
-    group,
-    user.publicKey,
-  );
+  const mangoAccount = await client.getOrCreateMangoAccount(group);
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
 
   // log users tokens

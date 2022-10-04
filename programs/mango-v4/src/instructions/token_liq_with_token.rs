@@ -143,24 +143,24 @@ pub fn token_liq_with_token(
     // Apply the balance changes to the liqor and liqee accounts
     let liqee_liab_position = liqee.token_position_mut_by_raw_index(liqee_liab_raw_index);
     let liqee_liab_active = liab_bank.deposit_with_dusting(liqee_liab_position, liab_transfer)?;
-    let liqee_liab_position_indexed = liqee_liab_position.indexed_position;
+    let liqee_liab_indexed_position = liqee_liab_position.indexed_position;
 
     let (liqor_liab_position, liqor_liab_raw_index, _) =
         liqor.ensure_token_position(liab_token_index)?;
     let (liqor_liab_active, loan_origination_fee) =
         liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer)?;
-    let liqor_liab_position_indexed = liqor_liab_position.indexed_position;
+    let liqor_liab_indexed_position = liqor_liab_position.indexed_position;
     let liqee_liab_native_after = liqee_liab_position.native(liab_bank);
 
     let (liqor_asset_position, liqor_asset_raw_index, _) =
         liqor.ensure_token_position(asset_token_index)?;
     let liqor_asset_active = asset_bank.deposit(liqor_asset_position, asset_transfer)?;
-    let liqor_asset_position_indexed = liqor_asset_position.indexed_position;
+    let liqor_asset_indexed_position = liqor_asset_position.indexed_position;
 
     let liqee_asset_position = liqee.token_position_mut_by_raw_index(liqee_asset_raw_index);
     let liqee_asset_active =
         asset_bank.withdraw_without_fee_with_dusting(liqee_asset_position, asset_transfer)?;
-    let liqee_asset_position_indexed = liqee_asset_position.indexed_position;
+    let liqee_asset_indexed_position = liqee_asset_position.indexed_position;
     let liqee_assets_native_after = liqee_asset_position.native(asset_bank);
 
     // Update the health cache
@@ -184,40 +184,36 @@ pub fn token_liq_with_token(
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.liqee.key(),
         token_index: asset_token_index,
-        indexed_position: liqee_asset_position_indexed.to_bits(),
+        indexed_position: liqee_asset_indexed_position.to_bits(),
         deposit_index: asset_bank.deposit_index.to_bits(),
         borrow_index: asset_bank.borrow_index.to_bits(),
-        price: asset_price.to_bits(),
     });
     // liqee liab
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.liqee.key(),
         token_index: liab_token_index,
-        indexed_position: liqee_liab_position_indexed.to_bits(),
+        indexed_position: liqee_liab_indexed_position.to_bits(),
         deposit_index: liab_bank.deposit_index.to_bits(),
         borrow_index: liab_bank.borrow_index.to_bits(),
-        price: liab_price.to_bits(),
     });
     // liqor asset
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.liqor.key(),
         token_index: asset_token_index,
-        indexed_position: liqor_asset_position_indexed.to_bits(),
+        indexed_position: liqor_asset_indexed_position.to_bits(),
         deposit_index: asset_bank.deposit_index.to_bits(),
         borrow_index: asset_bank.borrow_index.to_bits(),
-        price: asset_price.to_bits(),
     });
     // liqor liab
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.liqor.key(),
         token_index: liab_token_index,
-        indexed_position: liqor_liab_position_indexed.to_bits(),
+        indexed_position: liqor_liab_indexed_position.to_bits(),
         deposit_index: liab_bank.deposit_index.to_bits(),
         borrow_index: liab_bank.borrow_index.to_bits(),
-        price: liab_price.to_bits(),
     });
 
     if loan_origination_fee.is_positive() {
@@ -232,16 +228,16 @@ pub fn token_liq_with_token(
 
     // Since we use a scanning account retriever, it's safe to deactivate inactive token positions
     if !liqee_asset_active {
-        liqee.deactivate_token_position(liqee_asset_raw_index);
+        liqee.deactivate_token_position_and_log(liqee_asset_raw_index, ctx.accounts.liqee.key());
     }
     if !liqee_liab_active {
-        liqee.deactivate_token_position(liqee_liab_raw_index);
+        liqee.deactivate_token_position_and_log(liqee_liab_raw_index, ctx.accounts.liqee.key());
     }
     if !liqor_asset_active {
-        liqor.deactivate_token_position(liqor_asset_raw_index);
+        liqor.deactivate_token_position_and_log(liqor_asset_raw_index, ctx.accounts.liqor.key());
     }
     if !liqor_liab_active {
-        liqor.deactivate_token_position(liqor_liab_raw_index)
+        liqor.deactivate_token_position_and_log(liqor_liab_raw_index, ctx.accounts.liqor.key())
     }
 
     // Check liqee health again

@@ -1,106 +1,62 @@
+import { AnchorProvider } from '@project-serum/anchor';
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import {
-  AccountMeta,
+  AddressLookupTableAccount,
+  MessageV0,
   PublicKey,
+  Signer,
   SystemProgram,
   TransactionInstruction,
+  VersionedTransaction,
 } from '@solana/web3.js';
 import BN from 'bn.js';
-import { Bank, QUOTE_DECIMALS } from './accounts/bank';
-import { Group } from './accounts/group';
-import { I80F48 } from './accounts/I80F48';
-import { MangoAccount, Serum3Orders } from './accounts/mangoAccount';
-import { PerpMarket } from './accounts/perp';
+import { QUOTE_DECIMALS } from './accounts/bank';
+import { I80F48 } from './numbers/I80F48';
 
+///
+/// numeric helpers
+///
 export const U64_MAX_BN = new BN('18446744073709551615');
 export const I64_MAX_BN = new BN('9223372036854775807').toTwos(64);
 
-export function debugAccountMetas(ams: AccountMeta[]) {
-  for (const am of ams) {
-    console.log(
-      `${am.pubkey.toBase58()}, isSigner: ${am.isSigner
-        .toString()
-        .padStart(5, ' ')}, isWritable - ${am.isWritable
-        .toString()
-        .padStart(5, ' ')}`,
-    );
+export function toNativeI80F48(uiAmount: number, decimals: number): I80F48 {
+  return I80F48.fromNumber(uiAmount * Math.pow(10, decimals));
+}
+
+export function toNative(uiAmount: number, decimals: number): BN {
+  return new BN((uiAmount * Math.pow(10, decimals)).toFixed(0));
+}
+
+export function toUiDecimals(
+  nativeAmount: BN | I80F48 | number,
+  decimals: number,
+): number {
+  if (nativeAmount instanceof BN) {
+    return nativeAmount.div(new BN(Math.pow(10, decimals))).toNumber();
+  } else if (nativeAmount instanceof I80F48) {
+    return nativeAmount
+      .div(I80F48.fromNumber(Math.pow(10, decimals)))
+      .toNumber();
   }
+  return nativeAmount / Math.pow(10, decimals);
 }
 
-export function debugHealthAccounts(
-  group: Group,
-  mangoAccount: MangoAccount,
-  publicKeys: PublicKey[],
-) {
-  const banks = new Map(
-    Array.from(group.banksMapByName.values()).map((banks: Bank[]) => [
-      banks[0].publicKey.toBase58(),
-      `${banks[0].name} bank`,
-    ]),
-  );
-  const oracles = new Map(
-    Array.from(group.banksMapByName.values()).map((banks: Bank[]) => [
-      banks[0].oracle.toBase58(),
-      `${banks[0].name} oracle`,
-    ]),
-  );
-  const serum3 = new Map(
-    mangoAccount.serum3Active().map((serum3: Serum3Orders) => {
-      const serum3Market = Array.from(
-        group.serum3MarketsMapByExternal.values(),
-      ).find((serum3Market) => serum3Market.marketIndex === serum3.marketIndex);
-      if (!serum3Market) {
-        throw new Error(
-          `Serum3Orders for non existent market with market index ${serum3.marketIndex}`,
-        );
-      }
-      return [serum3.openOrders.toBase58(), `${serum3Market.name} spot oo`];
-    }),
-  );
-  const perps = new Map(
-    Array.from(group.perpMarketsMap.values()).map((perpMarket: PerpMarket) => [
-      perpMarket.publicKey.toBase58(),
-      `${perpMarket.name} perp market`,
-    ]),
-  );
-
-  publicKeys.map((pk) => {
-    if (banks.get(pk.toBase58())) {
-      console.log(banks.get(pk.toBase58()));
-    }
-    if (oracles.get(pk.toBase58())) {
-      console.log(oracles.get(pk.toBase58()));
-    }
-    if (serum3.get(pk.toBase58())) {
-      console.log(serum3.get(pk.toBase58()));
-    }
-    if (perps.get(pk.toBase58())) {
-      console.log(perps.get(pk.toBase58()));
-    }
-  });
+export function toUiDecimalsForQuote(
+  nativeAmount: BN | I80F48 | number,
+): number {
+  return toUiDecimals(nativeAmount, QUOTE_DECIMALS);
 }
 
-export async function findOrCreate<T>(
-  entityName: string,
-  findMethod: (...x: any) => any,
-  findArgs: any[],
-  createMethod: (...x: any) => any,
-  createArgs: any[],
-): Promise<T> {
-  let many: T[] = await findMethod(...findArgs);
-  let one: T;
-  if (many.length > 0) {
-    one = many[0];
-    return one;
-  }
-  await createMethod(...createArgs);
-  many = await findMethod(...findArgs);
-  one = many[0];
-  return one;
+export function toUiI80F48(nativeAmount: I80F48, decimals: number): I80F48 {
+  return nativeAmount.div(I80F48.fromNumber(Math.pow(10, decimals)));
 }
+
+///
+/// web3js extensions
+///
 
 /**
  * Get the address of the associated token account for a given mint and owner
@@ -121,7 +77,7 @@ export async function getAssociatedTokenAddress(
   associatedTokenProgramId = ASSOCIATED_TOKEN_PROGRAM_ID,
 ): Promise<PublicKey> {
   if (!allowOwnerOffCurve && !PublicKey.isOnCurve(owner.toBuffer()))
-    throw new Error('TokenOwnerOffCurve');
+    throw new Error('TokenOwnerOffCurve!');
 
   const [address] = await PublicKey.findProgramAddress(
     [owner.toBuffer(), programId.toBuffer(), mint.toBuffer()],
@@ -155,36 +111,33 @@ export async function createAssociatedTokenAccountIdempotentInstruction(
   });
 }
 
-export function toNative(uiAmount: number, decimals: number): I80F48 {
-  return I80F48.fromNumber(uiAmount).mul(
-    I80F48.fromNumber(Math.pow(10, decimals)),
-  );
+export async function buildVersionedTx(
+  provider: AnchorProvider,
+  ix: TransactionInstruction[],
+  additionalSigners: Signer[] = [],
+  alts: AddressLookupTableAccount[] = [],
+): Promise<VersionedTransaction> {
+  const message = MessageV0.compile({
+    payerKey: (provider as AnchorProvider).wallet.publicKey,
+    instructions: ix,
+    recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash,
+    addressLookupTableAccounts: alts,
+  });
+  const vTx = new VersionedTransaction(message);
+  // TODO: remove use of any when possible in future
+  vTx.sign([
+    ((provider as AnchorProvider).wallet as any).payer as Signer,
+    ...additionalSigners,
+  ]);
+  return vTx;
 }
 
-export function toNativeDecimals(amount: number, decimals: number): BN {
-  return new BN(Math.trunc(amount * Math.pow(10, decimals)));
-}
+///
+/// ts extension
+///
 
-export function toUiDecimals(
-  amount: I80F48 | number,
-  decimals: number,
-): number {
-  amount = amount instanceof I80F48 ? amount.toNumber() : amount;
-  return amount / Math.pow(10, decimals);
-}
-
-export function toUiDecimalsForQuote(amount: I80F48 | number): number {
-  amount = amount instanceof I80F48 ? amount.toNumber() : amount;
-  return amount / Math.pow(10, QUOTE_DECIMALS);
-}
-
-export function toU64(amount: number, decimals: number): BN {
-  const bn = toNativeDecimals(amount, decimals).toString();
-  console.log('bn', bn);
-
-  return new BN(bn);
-}
-
-export function nativeI80F48ToUi(amount: I80F48, decimals: number): I80F48 {
-  return amount.div(I80F48.fromNumber(Math.pow(10, decimals)));
+// https://stackoverflow.com/questions/70261755/user-defined-type-guard-function-and-type-narrowing-to-more-specific-type/70262876#70262876
+export declare abstract class As<Tag extends keyof never> {
+  private static readonly $as$: unique symbol;
+  private [As.$as$]: Record<Tag, true>;
 }

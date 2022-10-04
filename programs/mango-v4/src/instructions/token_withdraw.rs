@@ -131,7 +131,6 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         indexed_position: position.indexed_position.to_bits(),
         deposit_index: bank.deposit_index.to_bits(),
         borrow_index: bank.borrow_index.to_bits(),
-        price: oracle_price.to_bits(),
     });
 
     // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
@@ -153,7 +152,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     // deactivated.
     //
     if !position_is_active {
-        account.deactivate_token_position(raw_token_index);
+        account.deactivate_token_position_and_log(raw_token_index, ctx.accounts.account.key());
     }
 
     emit!(WithdrawLog {

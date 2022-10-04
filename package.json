@@ -19,6 +19,7 @@
     "build": "npm run build:esm; npm run build:cjs",
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
+    "test": "ts-mocha ts/client/**/*.spec.ts",
     "clean": "rm -rf dist",
     "example1-user": "ts-node ts/client/src/scripts/example1-user.ts",
     "example1-admin": "ts-node ts/client/src/scripts/example1-admin.ts",
@@ -63,9 +64,13 @@
     "@project-serum/serum": "^0.13.65",
     "@pythnetwork/client": "^2.7.0",
     "@solana/spl-token": "^0.1.8",
+    "@solana/web3.js": "^1.63.1",
     "@switchboard-xyz/switchboard-v2": "^0.0.129",
     "big.js": "^6.1.1",
     "bs58": "^5.0.0"
+  },
+  "resolutions": {
+    "@project-serum/anchor/@solana/web3.js": "1.63.1"
   },
   "peerDependencies": {
     "@solana/spl-token-swap": "^0.2.0"

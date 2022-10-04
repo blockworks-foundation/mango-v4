@@ -64,7 +64,6 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                 ctx.accounts.group.key(),
                                 fill.maker,
                                 perp_market.perp_market_index as u64,
-                                fill.price,
                                 ma.perp_position(perp_market.perp_market_index).unwrap(),
                                 &perp_market,
                             );
@@ -105,7 +104,6 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                         ctx.accounts.group.key(),
                                         fill.maker,
                                         perp_market.perp_market_index as u64,
-                                        fill.price,
                                         maker.perp_position(perp_market.perp_market_index).unwrap(),
                                         &perp_market,
                                     );
@@ -113,7 +111,6 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                         ctx.accounts.group.key(),
                                         fill.taker,
                                         perp_market.perp_market_index as u64,
-                                        fill.price,
                                         taker.perp_position(perp_market.perp_market_index).unwrap(),
                                         &perp_market,
                                     );

@@ -45,7 +45,7 @@ export class I80F48 {
   }
   static fromNumber(x: number): I80F48 {
     const int_part = Math.trunc(x);
-    const v = new BN(int_part).iushln(48);
+    const v = new BN(int_part.toFixed(0)).iushln(48);
     v.iadd(new BN((x - int_part) * I80F48.MULTIPLIER_NUMBER));
     return new I80F48(v);
   }

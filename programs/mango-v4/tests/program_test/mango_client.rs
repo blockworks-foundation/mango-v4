@@ -564,6 +564,7 @@ pub struct TokenDepositInstruction {
     pub amount: u64,
 
     pub account: Pubkey,
+    pub owner: TestKeypair,
     pub token_account: Pubkey,
     pub token_authority: TestKeypair,
     pub bank_index: usize,
@@ -572,6 +573,76 @@ pub struct TokenDepositInstruction {
 impl ClientInstruction for TokenDepositInstruction {
     type Accounts = mango_v4::accounts::TokenDeposit;
     type Instruction = mango_v4::instruction::TokenDeposit;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            amount: self.amount,
+        };
+
+        // load account so we know its mint
+        let token_account: TokenAccount = account_loader.load(&self.token_account).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let mint_info = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                account.fixed.group.as_ref(),
+                token_account.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let mint_info: MintInfo = account_loader.load(&mint_info).await.unwrap();
+
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            Some(mint_info.banks[self.bank_index]),
+            false,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            owner: self.owner.pubkey(),
+            bank: mint_info.banks[self.bank_index],
+            vault: mint_info.vaults[self.bank_index],
+            oracle: mint_info.oracle,
+            token_account: self.token_account,
+            token_authority: self.token_authority.pubkey(),
+            token_program: Token::id(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.token_authority, self.owner]
+    }
+}
+
+pub struct TokenDepositIntoExistingInstruction {
+    pub amount: u64,
+
+    pub account: Pubkey,
+    pub token_account: Pubkey,
+    pub token_authority: TestKeypair,
+    pub bank_index: usize,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenDepositIntoExistingInstruction {
+    type Accounts = mango_v4::accounts::TokenDepositIntoExisting;
+    type Instruction = mango_v4::instruction::TokenDepositIntoExisting;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -2143,6 +2214,10 @@ pub struct PerpCreateMarketInstruction {
     pub taker_fee: f32,
     pub group_insurance_fund: bool,
     pub trusted_market: bool,
+    pub fee_penalty: f32,
+    pub settle_fee_flat: f32,
+    pub settle_fee_amount_threshold: f32,
+    pub settle_fee_fraction_low_health: f32,
 }
 impl PerpCreateMarketInstruction {
     pub async fn with_new_book_and_queue(
@@ -2195,6 +2270,10 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             base_decimals: self.base_decimals,
             group_insurance_fund: self.group_insurance_fund,
             trusted_market: self.trusted_market,
+            fee_penalty: self.fee_penalty,
+            settle_fee_flat: self.settle_fee_flat,
+            settle_fee_amount_threshold: self.settle_fee_amount_threshold,
+            settle_fee_fraction_low_health: self.settle_fee_fraction_low_health,
         };
 
         let perp_market = Pubkey::find_program_address(
@@ -2552,11 +2631,12 @@ impl ClientInstruction for PerpUpdateFundingInstruction {
 }
 
 pub struct PerpSettlePnlInstruction {
+    pub settler: Pubkey,
+    pub settler_owner: TestKeypair,
     pub account_a: Pubkey,
     pub account_b: Pubkey,
     pub perp_market: Pubkey,
     pub quote_bank: Pubkey,
-    pub max_settle_amount: u64,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpSettlePnlInstruction {
@@ -2567,26 +2647,32 @@ impl ClientInstruction for PerpSettlePnlInstruction {
         account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction {
-            max_settle_amount: self.max_settle_amount,
-        };
+        let instruction = Self::Instruction {};
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+        let account_a = account_loader
+            .load_mango_account(&self.account_a)
+            .await
+            .unwrap();
         let account_b = account_loader
             .load_mango_account(&self.account_b)
             .await
             .unwrap();
-        let health_check_metas = derive_health_check_remaining_account_metas(
+        let health_check_metas = derive_liquidation_remaining_account_metas(
             &account_loader,
+            &account_a,
             &account_b,
-            None,
-            false,
-            Some(perp_market.perp_market_index),
+            TokenIndex::MAX,
+            0,
+            TokenIndex::MAX,
+            0,
         )
         .await;
 
         let accounts = Self::Accounts {
             group: perp_market.group,
+            settler: self.settler,
+            settler_owner: self.settler_owner.pubkey(),
             perp_market: self.perp_market,
             account_a: self.account_a,
             account_b: self.account_b,
@@ -2601,7 +2687,7 @@ impl ClientInstruction for PerpSettlePnlInstruction {
     }
 
     fn signers(&self) -> Vec<TestKeypair> {
-        vec![]
+        vec![self.settler_owner]
     }
 }
 

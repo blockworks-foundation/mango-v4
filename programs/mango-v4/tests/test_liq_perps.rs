@@ -94,6 +94,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
         TokenDepositInstruction {
             amount: 1,
             account,
+            owner,
             token_account: payer_mint_accounts[1],
             token_authority: payer,
             bank_index: 0,
@@ -249,6 +250,9 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
         0,
     )
     .await;
+    let settler =
+        create_funded_account(&solana, group, owner, 251, &context.users[1], &[], 0, 0).await;
+    let settler_owner = owner.clone();
 
     //
     // TEST: Create a perp market
@@ -304,6 +308,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
             TokenDepositInstruction {
                 amount: 1,
                 account,
+                owner,
                 token_account: payer_mint_accounts[1],
                 token_authority: payer,
                 bank_index: 0,
@@ -512,18 +517,19 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     send_tx(
         solana,
         PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
             account_a: liqor,
             account_b: account_1,
             perp_market,
             quote_bank: tokens[0].bank,
-            max_settle_amount: u64::MAX,
         },
     )
     .await
     .unwrap();
 
-    let liqee_spot_health_before = 1000.0 + 1.0 * 2.0 * 0.8;
-    let remaining_pnl = 20.0 * 100.0 - liq_amount_2 + liqee_spot_health_before;
+    let liqee_settle_health_before = 1000.0 + 1.0 * 2.0 * 0.8;
+    let remaining_pnl = 20.0 * 100.0 - liq_amount_2 + liqee_settle_health_before;
     assert!(remaining_pnl < 0.0);
     let liqee_data = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(liqee_data.perps[0].base_position_lots(), 0);

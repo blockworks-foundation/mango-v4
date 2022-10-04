@@ -99,13 +99,20 @@ pub struct PerpMarket {
     /// Fees settled in native quote currency
     pub fees_settled: I80F48,
 
-    pub reserved: [u8; 112],
+    pub fee_penalty: f32,
+
+    /// In native units of settlement token, given to each settle call above the
+    /// settle_fee_amount_threshold.
+    pub settle_fee_flat: f32,
+    /// Pnl settlement amount needed to be eligible for fees.
+    pub settle_fee_amount_threshold: f32,
+    /// Fraction of pnl to pay out as fee if +pnl account has low health.
+    pub settle_fee_fraction_low_health: f32,
+
+    pub reserved: [u8; 92],
 }
 
-const_assert_eq!(
-    size_of::<PerpMarket>(),
-    32 + 2 + 2 + 4 + 16 + 32 + 16 + 32 * 3 + 8 * 2 + 16 * 12 + 8 * 2 + 8 * 2 + 16 + 2 + 6 + 8 + 112
-);
+const_assert_eq!(size_of::<PerpMarket>(), 584);
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
 
 impl PerpMarket {
@@ -121,6 +128,10 @@ impl PerpMarket {
 
     pub fn set_elligible_for_group_insurance_fund(&mut self, v: bool) {
         self.group_insurance_fund = if v { 1 } else { 0 };
+    }
+
+    pub fn trusted_market(&self) -> bool {
+        self.trusted_market == 1
     }
 
     pub fn gen_order_id(&mut self, side: Side, price: i64) -> i128 {
@@ -224,5 +235,53 @@ impl PerpMarket {
         self.long_funding -= socialized_loss;
         self.short_funding += socialized_loss;
         Ok(socialized_loss)
+    }
+
+    /// Creates default market for tests
+    pub fn default_for_tests() -> PerpMarket {
+        PerpMarket {
+            group: Pubkey::new_unique(),
+            perp_market_index: 0,
+            name: Default::default(),
+            oracle: Pubkey::new_unique(),
+            oracle_config: OracleConfig {
+                conf_filter: I80F48::ZERO,
+            },
+            bids: Pubkey::new_unique(),
+            asks: Pubkey::new_unique(),
+            event_queue: Pubkey::new_unique(),
+            quote_lot_size: 1,
+            base_lot_size: 1,
+            maint_asset_weight: I80F48::from(1),
+            init_asset_weight: I80F48::from(1),
+            maint_liab_weight: I80F48::from(1),
+            init_liab_weight: I80F48::from(1),
+            liquidation_fee: I80F48::ZERO,
+            maker_fee: I80F48::ZERO,
+            taker_fee: I80F48::ZERO,
+            min_funding: I80F48::ZERO,
+            max_funding: I80F48::ZERO,
+            impact_quantity: 0,
+            long_funding: I80F48::ZERO,
+            short_funding: I80F48::ZERO,
+            funding_last_updated: 0,
+            open_interest: 0,
+            seq_num: 0,
+            fees_accrued: I80F48::ZERO,
+            fees_settled: I80F48::ZERO,
+            bump: 0,
+            base_decimals: 0,
+            reserved: [0; 92],
+            padding0: Default::default(),
+            padding1: Default::default(),
+            padding2: Default::default(),
+            registration_time: 0,
+            fee_penalty: 0.0,
+            trusted_market: 0,
+            group_insurance_fund: 0,
+            settle_fee_flat: 0.0,
+            settle_fee_amount_threshold: 0.0,
+            settle_fee_fraction_low_health: 0.0,
+        }
     }
 }

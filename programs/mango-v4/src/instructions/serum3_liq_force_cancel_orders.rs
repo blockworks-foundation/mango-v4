@@ -4,8 +4,10 @@ use fixed::types::I80F48;
 
 use crate::error::*;
 use crate::instructions::{
-    apply_vault_difference, charge_loan_origination_fees, OODifference, OpenOrdersSlim,
+    apply_vault_difference, charge_loan_origination_fees, OODifference, OpenOrdersAmounts,
+    OpenOrdersSlim,
 };
+use crate::logs::Serum3OpenOrdersBalanceLog;
 use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
 
@@ -178,6 +180,19 @@ pub fn serum3_liq_force_cancel_orders(
         let oo_ai = &ctx.accounts.open_orders.as_ref();
         let open_orders = load_open_orders_ref(oo_ai)?;
         let after_oo = OpenOrdersSlim::from_oo(&open_orders);
+
+        emit!(Serum3OpenOrdersBalanceLog {
+            mango_group: ctx.accounts.group.key(),
+            mango_account: ctx.accounts.account.key(),
+            base_token_index: serum_market.base_token_index,
+            quote_token_index: serum_market.quote_token_index,
+            base_total: after_oo.native_base_total(),
+            base_free: after_oo.native_base_free(),
+            quote_total: after_oo.native_quote_total(),
+            quote_free: after_oo.native_quote_free(),
+            referrer_rebates_accrued: after_oo.native_rebates(),
+        });
+
         OODifference::new(&before_oo, &after_oo)
             .adjust_health_cache(&mut health_cache, &serum_market)?;
     };
@@ -196,6 +211,7 @@ pub fn serum3_liq_force_cancel_orders(
     let mut base_bank = ctx.accounts.base_bank.load_mut()?;
     let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
     apply_vault_difference(
+        ctx.accounts.account.key(),
         &mut account.borrow_mut(),
         serum_market.market_index,
         &mut base_bank,
@@ -204,6 +220,7 @@ pub fn serum3_liq_force_cancel_orders(
     )?
     .adjust_health_cache(&mut health_cache)?;
     apply_vault_difference(
+        ctx.accounts.account.key(),
         &mut account.borrow_mut(),
         serum_market.market_index,
         &mut quote_bank,

@@ -4,8 +4,12 @@ import { Cluster, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
+import { As } from '../utils';
+import { TokenIndex } from './bank';
 import { Group } from './group';
-import { MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from './I80F48';
+import { MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
+
+export type MarketIndex = number & As<'market-index'>;
 
 export class Serum3Market {
   public name: string;
@@ -26,12 +30,12 @@ export class Serum3Market {
     return new Serum3Market(
       publicKey,
       obj.group,
-      obj.baseTokenIndex,
-      obj.quoteTokenIndex,
+      obj.baseTokenIndex as TokenIndex,
+      obj.quoteTokenIndex as TokenIndex,
       obj.name,
       obj.serumProgram,
       obj.serumMarketExternal,
-      obj.marketIndex,
+      obj.marketIndex as MarketIndex,
       obj.registrationTime,
     );
   }
@@ -39,12 +43,12 @@ export class Serum3Market {
   constructor(
     public publicKey: PublicKey,
     public group: PublicKey,
-    public baseTokenIndex: number,
-    public quoteTokenIndex: number,
+    public baseTokenIndex: TokenIndex,
+    public quoteTokenIndex: TokenIndex,
     name: number[],
     public serumProgram: PublicKey,
     public serumMarketExternal: PublicKey,
-    public marketIndex: number,
+    public marketIndex: MarketIndex,
     public registrationTime: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
@@ -58,19 +62,7 @@ export class Serum3Market {
    */
   maxBidLeverage(group: Group): number {
     const baseBank = group.getFirstBankByTokenIndex(this.baseTokenIndex);
-    if (!baseBank) {
-      throw new Error(
-        `bank for base token with index ${this.baseTokenIndex} not found`,
-      );
-    }
-
     const quoteBank = group.getFirstBankByTokenIndex(this.quoteTokenIndex);
-    if (!quoteBank) {
-      throw new Error(
-        `bank for quote token with index ${this.quoteTokenIndex} not found`,
-      );
-    }
-
     if (
       quoteBank.initLiabWeight.sub(baseBank.initAssetWeight).lte(ZERO_I80F48())
     ) {
@@ -90,18 +82,7 @@ export class Serum3Market {
    */
   maxAskLeverage(group: Group): number {
     const baseBank = group.getFirstBankByTokenIndex(this.baseTokenIndex);
-    if (!baseBank) {
-      throw new Error(
-        `bank for base token with index ${this.baseTokenIndex} not found`,
-      );
-    }
-
     const quoteBank = group.getFirstBankByTokenIndex(this.quoteTokenIndex);
-    if (!quoteBank) {
-      throw new Error(
-        `bank for quote token with index ${this.quoteTokenIndex} not found`,
-      );
-    }
 
     if (
       baseBank.initLiabWeight.sub(quoteBank.initAssetWeight).lte(ZERO_I80F48())
@@ -121,28 +102,18 @@ export class Serum3Market {
   }
 
   public async loadBids(client: MangoClient, group: Group): Promise<Orderbook> {
-    const serum3MarketExternal = group.serum3MarketExternalsMap.get(
-      this.serumMarketExternal.toBase58(),
+    const serum3MarketExternal = group.getSerum3ExternalMarket(
+      this.serumMarketExternal,
     );
-    if (!serum3MarketExternal) {
-      throw new Error(
-        `Unable to find serum3MarketExternal for ${this.serumMarketExternal.toBase58()}`,
-      );
-    }
     return await serum3MarketExternal.loadBids(
       client.program.provider.connection,
     );
   }
 
   public async loadAsks(client: MangoClient, group: Group): Promise<Orderbook> {
-    const serum3MarketExternal = group.serum3MarketExternalsMap.get(
-      this.serumMarketExternal.toBase58(),
+    const serum3MarketExternal = group.getSerum3ExternalMarket(
+      this.serumMarketExternal,
     );
-    if (!serum3MarketExternal) {
-      throw new Error(
-        `Unable to find serum3MarketExternal for ${this.serumMarketExternal.toBase58()}`,
-      );
-    }
     return await serum3MarketExternal.loadAsks(
       client.program.provider.connection,
     );

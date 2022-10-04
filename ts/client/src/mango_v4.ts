@@ -1088,6 +1088,62 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "tokenDepositIntoExisting",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "bank",
           "isMut": true,
           "isSigner": false
@@ -2315,6 +2371,22 @@ export type MangoV4 = {
         {
           "name": "trustedMarket",
           "type": "bool"
+        },
+        {
+          "name": "feePenalty",
+          "type": "f32"
+        },
+        {
+          "name": "settleFeeFlat",
+          "type": "f32"
+        },
+        {
+          "name": "settleFeeAmountThreshold",
+          "type": "f32"
+        },
+        {
+          "name": "settleFeeFractionLowHealth",
+          "type": "f32"
         }
       ]
     },
@@ -2428,6 +2500,30 @@ export type MangoV4 = {
           "name": "trustedMarketOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "feePenaltyOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "settleFeeFlatOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "settleFeeAmountThresholdOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "settleFeeFractionLowHealthOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -2825,6 +2921,16 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "settler",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settlerOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "perpMarket",
           "isMut": false,
           "isSigner": false
@@ -2850,12 +2956,7 @@ export type MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "maxSettleAmount",
-          "type": "u64"
-        }
-      ]
+      "args": []
     },
     {
       "name": "perpSettleFees",
@@ -4015,11 +4116,37 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "feePenalty",
+            "type": "f32"
+          },
+          {
+            "name": "settleFeeFlat",
+            "docs": [
+              "In native units of settlement token, given to each settle call above the",
+              "settle_fee_amount_threshold."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "settleFeeAmountThreshold",
+            "docs": [
+              "Pnl settlement amount needed to be eligible for fees."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "settleFeeFractionLowHealth",
+            "docs": [
+              "Fraction of pnl to pay out as fee if +pnl account has low health."
+            ],
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                112
+                92
               ]
             }
           }
@@ -4391,6 +4518,10 @@ export type MangoV4 = {
           {
             "name": "hasOpenOrders",
             "type": "bool"
+          },
+          {
+            "name": "trustedMarket",
+            "type": "bool"
           }
         ]
       }
@@ -4473,9 +4604,23 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                40
+                16
               ]
             }
+          },
+          {
+            "name": "previousIndex",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "cumulativeDepositInterest",
+            "type": "f32"
+          },
+          {
+            "name": "cumulativeBorrowInterest",
+            "type": "f32"
           }
         ]
       }
@@ -5426,11 +5571,6 @@ export type MangoV4 = {
           "index": false
         },
         {
-          "name": "price",
-          "type": "i64",
-          "index": false
-        },
-        {
           "name": "longFunding",
           "type": "i128",
           "index": false
@@ -5472,11 +5612,6 @@ export type MangoV4 = {
         },
         {
           "name": "borrowIndex",
-          "type": "i128",
-          "index": false
-        },
-        {
-          "name": "price",
           "type": "i128",
           "index": false
         }
@@ -5844,7 +5979,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "OpenOrdersBalanceLog",
+      "name": "Serum3OpenOrdersBalanceLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -5857,7 +5992,12 @@ export type MangoV4 = {
           "index": false
         },
         {
-          "name": "marketIndex",
+          "name": "baseTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quoteTokenIndex",
           "type": "u16",
           "index": false
         },
@@ -5884,11 +6024,6 @@ export type MangoV4 = {
         {
           "name": "referrerRebatesAccrued",
           "type": "u64",
-          "index": false
-        },
-        {
-          "name": "price",
-          "type": "i128",
           "index": false
         }
       ]
@@ -5971,6 +6106,36 @@ export type MangoV4 = {
         {
           "name": "socializedLoss",
           "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "DeactivateTokenPositionLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "cumulativeDepositInterest",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "cumulativeBorrowInterest",
+          "type": "f32",
           "index": false
         }
       ]
@@ -7185,6 +7350,62 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "tokenDepositIntoExisting",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "bank",
           "isMut": true,
           "isSigner": false
@@ -8412,6 +8633,22 @@ export const IDL: MangoV4 = {
         {
           "name": "trustedMarket",
           "type": "bool"
+        },
+        {
+          "name": "feePenalty",
+          "type": "f32"
+        },
+        {
+          "name": "settleFeeFlat",
+          "type": "f32"
+        },
+        {
+          "name": "settleFeeAmountThreshold",
+          "type": "f32"
+        },
+        {
+          "name": "settleFeeFractionLowHealth",
+          "type": "f32"
         }
       ]
     },
@@ -8525,6 +8762,30 @@ export const IDL: MangoV4 = {
           "name": "trustedMarketOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "feePenaltyOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "settleFeeFlatOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "settleFeeAmountThresholdOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "settleFeeFractionLowHealthOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -8922,6 +9183,16 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "settler",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settlerOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "perpMarket",
           "isMut": false,
           "isSigner": false
@@ -8947,12 +9218,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "maxSettleAmount",
-          "type": "u64"
-        }
-      ]
+      "args": []
     },
     {
       "name": "perpSettleFees",
@@ -10112,11 +10378,37 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "feePenalty",
+            "type": "f32"
+          },
+          {
+            "name": "settleFeeFlat",
+            "docs": [
+              "In native units of settlement token, given to each settle call above the",
+              "settle_fee_amount_threshold."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "settleFeeAmountThreshold",
+            "docs": [
+              "Pnl settlement amount needed to be eligible for fees."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "settleFeeFractionLowHealth",
+            "docs": [
+              "Fraction of pnl to pay out as fee if +pnl account has low health."
+            ],
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                112
+                92
               ]
             }
           }
@@ -10488,6 +10780,10 @@ export const IDL: MangoV4 = {
           {
             "name": "hasOpenOrders",
             "type": "bool"
+          },
+          {
+            "name": "trustedMarket",
+            "type": "bool"
           }
         ]
       }
@@ -10570,9 +10866,23 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                40
+                16
               ]
             }
+          },
+          {
+            "name": "previousIndex",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "cumulativeDepositInterest",
+            "type": "f32"
+          },
+          {
+            "name": "cumulativeBorrowInterest",
+            "type": "f32"
           }
         ]
       }
@@ -11523,11 +11833,6 @@ export const IDL: MangoV4 = {
           "index": false
         },
         {
-          "name": "price",
-          "type": "i64",
-          "index": false
-        },
-        {
           "name": "longFunding",
           "type": "i128",
           "index": false
@@ -11569,11 +11874,6 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "borrowIndex",
-          "type": "i128",
-          "index": false
-        },
-        {
-          "name": "price",
           "type": "i128",
           "index": false
         }
@@ -11941,7 +12241,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "OpenOrdersBalanceLog",
+      "name": "Serum3OpenOrdersBalanceLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -11954,7 +12254,12 @@ export const IDL: MangoV4 = {
           "index": false
         },
         {
-          "name": "marketIndex",
+          "name": "baseTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quoteTokenIndex",
           "type": "u16",
           "index": false
         },
@@ -11981,11 +12286,6 @@ export const IDL: MangoV4 = {
         {
           "name": "referrerRebatesAccrued",
           "type": "u64",
-          "index": false
-        },
-        {
-          "name": "price",
-          "type": "i128",
           "index": false
         }
       ]
@@ -12068,6 +12368,36 @@ export const IDL: MangoV4 = {
         {
           "name": "socializedLoss",
           "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "DeactivateTokenPositionLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "cumulativeDepositInterest",
+          "type": "f32",
+          "index": false
+        },
+        {
+          "name": "cumulativeBorrowInterest",
+          "type": "f32",
           "index": false
         }
       ]

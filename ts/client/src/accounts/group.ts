@@ -6,22 +6,26 @@ import {
   Market,
   Orderbook,
 } from '@project-serum/serum';
-import { parsePriceData, PriceData } from '@pythnetwork/client';
-import { AccountInfo, PublicKey } from '@solana/web3.js';
+import { parsePriceData } from '@pythnetwork/client';
+import {
+  AccountInfo,
+  AddressLookupTableAccount,
+  PublicKey,
+} from '@solana/web3.js';
 import BN from 'bn.js';
 import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
-import { toNativeDecimals, toUiDecimals } from '../utils';
-import { Bank, MintInfo } from './bank';
-import { I80F48, ONE_I80F48 } from './I80F48';
+import { I80F48, ONE_I80F48 } from '../numbers/I80F48';
+import { toNative, toNativeI80F48, toUiDecimals } from '../utils';
+import { Bank, MintInfo, TokenIndex } from './bank';
 import {
   isPythOracle,
   isSwitchboardOracle,
   parseSwitchboardOracle,
 } from './oracle';
-import { BookSide, PerpMarket } from './perp';
-import { Serum3Market } from './serum3';
+import { BookSide, PerpMarket, PerpMarketIndex } from './perp';
+import { MarketIndex, Serum3Market } from './serum3';
 
 export class Group {
   static from(
@@ -35,6 +39,7 @@ export class Group {
       insuranceVault: PublicKey;
       testing: number;
       version: number;
+      addressLookupTables: PublicKey[];
     },
   ): Group {
     return new Group(
@@ -47,15 +52,19 @@ export class Group {
       obj.insuranceVault,
       obj.testing,
       obj.version,
+      obj.addressLookupTables,
+      [], // addressLookupTablesList
       new Map(), // banksMapByName
       new Map(), // banksMapByMint
       new Map(), // banksMapByTokenIndex
-      new Map(), // serum3MarketsMap
+      new Map(), // serum3MarketsMapByExternal
+      new Map(), // serum3MarketsMapByMarketIndex
       new Map(), // serum3MarketExternalsMap
-      new Map(), // perpMarketsMap
+      new Map(), // perpMarketsMapByOracle
+      new Map(), // perpMarketsMapByMarketIndex
+      new Map(), // perpMarketsMapByName
       new Map(), // mintInfosMapByTokenIndex
       new Map(), // mintInfosMapByMint
-      new Map(), // oraclesMap
       new Map(), // vaultAmountsMap
     );
   }
@@ -70,20 +79,23 @@ export class Group {
     public insuranceVault: PublicKey,
     public testing: number,
     public version: number,
+    public addressLookupTables: PublicKey[],
+    public addressLookupTablesList: AddressLookupTableAccount[],
     public banksMapByName: Map<string, Bank[]>,
     public banksMapByMint: Map<string, Bank[]>,
-    public banksMapByTokenIndex: Map<number, Bank[]>,
+    public banksMapByTokenIndex: Map<TokenIndex, Bank[]>,
     public serum3MarketsMapByExternal: Map<string, Serum3Market>,
-    public serum3MarketExternalsMap: Map<string, Market>,
-    // TODO rethink key
-    public perpMarketsMap: Map<string, PerpMarket>,
-    public mintInfosMapByTokenIndex: Map<number, MintInfo>,
+    public serum3MarketsMapByMarketIndex: Map<MarketIndex, Serum3Market>,
+    public serum3ExternalMarketsMap: Map<string, Market>,
+    public perpMarketsMapByOracle: Map<string, PerpMarket>,
+    public perpMarketsMapByMarketIndex: Map<PerpMarketIndex, PerpMarket>,
+    public perpMarketsMapByName: Map<string, PerpMarket>,
+    public mintInfosMapByTokenIndex: Map<TokenIndex, MintInfo>,
     public mintInfosMapByMint: Map<string, MintInfo>,
-    private oraclesMap: Map<string, PriceData>, // UNUSED
-    public vaultAmountsMap: Map<string, number>,
+    public vaultAmountsMap: Map<string, BN>,
   ) {}
 
-  public async reloadAll(client: MangoClient) {
+  public async reloadAll(client: MangoClient): Promise<void> {
     let ids: Id | undefined = undefined;
 
     if (client.idsSource === 'api') {
@@ -96,15 +108,16 @@ export class Group {
 
     // console.time('group.reload');
     await Promise.all([
+      this.reloadAlts(client),
       this.reloadBanks(client, ids).then(() =>
         Promise.all([
           this.reloadBankOraclePrices(client),
-          this.reloadVaults(client, ids),
+          this.reloadVaults(client),
         ]),
       ),
       this.reloadMintInfos(client, ids),
       this.reloadSerum3Markets(client, ids).then(() =>
-        this.reloadSerum3ExternalMarkets(client, ids),
+        this.reloadSerum3ExternalMarkets(client),
       ),
       this.reloadPerpMarkets(client, ids).then(() =>
         this.reloadPerpMarketOraclePrices(client),
@@ -113,7 +126,23 @@ export class Group {
     // console.timeEnd('group.reload');
   }
 
-  public async reloadBanks(client: MangoClient, ids?: Id) {
+  public async reloadAlts(client: MangoClient): Promise<void> {
+    const alts = await Promise.all(
+      this.addressLookupTables
+        .filter((alt) => !alt.equals(PublicKey.default))
+        .map((alt) =>
+          client.program.provider.connection.getAddressLookupTable(alt),
+        ),
+    );
+    this.addressLookupTablesList = alts.map((res, i) => {
+      if (!res || !res.value) {
+        throw new Error(`Undefined ALT ${this.addressLookupTables[i]}!`);
+      }
+      return res.value;
+    });
+  }
+
+  public async reloadBanks(client: MangoClient, ids?: Id): Promise<void> {
     let banks: Bank[];
 
     if (ids && ids.getBanks().length) {
@@ -143,7 +172,7 @@ export class Group {
     }
   }
 
-  public async reloadMintInfos(client: MangoClient, ids?: Id) {
+  public async reloadMintInfos(client: MangoClient, ids?: Id): Promise<void> {
     let mintInfos: MintInfo[];
     if (ids && ids.getMintInfos().length) {
       mintInfos = (
@@ -168,7 +197,10 @@ export class Group {
     );
   }
 
-  public async reloadSerum3Markets(client: MangoClient, ids?: Id) {
+  public async reloadSerum3Markets(
+    client: MangoClient,
+    ids?: Id,
+  ): Promise<void> {
     let serum3Markets: Serum3Market[];
     if (ids && ids.getSerum3Markets().length) {
       serum3Markets = (
@@ -188,9 +220,15 @@ export class Group {
         serum3Market,
       ]),
     );
+    this.serum3MarketsMapByMarketIndex = new Map(
+      serum3Markets.map((serum3Market) => [
+        serum3Market.marketIndex,
+        serum3Market,
+      ]),
+    );
   }
 
-  public async reloadSerum3ExternalMarkets(client: MangoClient, ids?: Id) {
+  public async reloadSerum3ExternalMarkets(client: MangoClient): Promise<void> {
     const externalMarkets = await Promise.all(
       Array.from(this.serum3MarketsMapByExternal.values()).map((serum3Market) =>
         Market.load(
@@ -202,7 +240,7 @@ export class Group {
       ),
     );
 
-    this.serum3MarketExternalsMap = new Map(
+    this.serum3ExternalMarketsMap = new Map(
       Array.from(this.serum3MarketsMapByExternal.values()).map(
         (serum3Market, index) => [
           serum3Market.serumMarketExternal.toBase58(),
@@ -212,7 +250,7 @@ export class Group {
     );
   }
 
-  public async reloadPerpMarkets(client: MangoClient, ids?: Id) {
+  public async reloadPerpMarkets(client: MangoClient, ids?: Id): Promise<void> {
     let perpMarkets: PerpMarket[];
     if (ids && ids.getPerpMarkets().length) {
       perpMarkets = (
@@ -226,8 +264,17 @@ export class Group {
       perpMarkets = await client.perpGetMarkets(this);
     }
 
-    this.perpMarketsMap = new Map(
+    this.perpMarketsMapByName = new Map(
       perpMarkets.map((perpMarket) => [perpMarket.name, perpMarket]),
+    );
+    this.perpMarketsMapByOracle = new Map(
+      perpMarkets.map((perpMarket) => [
+        perpMarket.oracle.toBase58(),
+        perpMarket,
+      ]),
+    );
+    this.perpMarketsMapByMarketIndex = new Map(
+      perpMarkets.map((perpMarket) => [perpMarket.perpMarketIndex, perpMarket]),
     );
   }
 
@@ -244,8 +291,8 @@ export class Group {
     for (const [index, ai] of ais.entries()) {
       for (const bank of banks[index]) {
         if (bank.name === 'USDC') {
-          bank.price = ONE_I80F48();
-          bank.uiPrice = 1;
+          bank._price = ONE_I80F48();
+          bank._uiPrice = 1;
         } else {
           if (!ai)
             throw new Error(
@@ -256,10 +303,9 @@ export class Group {
             bank.oracle,
             ai,
             this.getMintDecimals(bank.mint),
-            this.getMintDecimals(this.insuranceMint),
           );
-          bank.price = price;
-          bank.uiPrice = uiPrice;
+          bank._price = price;
+          bank._uiPrice = uiPrice;
         }
       }
     }
@@ -268,7 +314,9 @@ export class Group {
   public async reloadPerpMarketOraclePrices(
     client: MangoClient,
   ): Promise<void> {
-    const perpMarkets: PerpMarket[] = Array.from(this.perpMarketsMap.values());
+    const perpMarkets: PerpMarket[] = Array.from(
+      this.perpMarketsMapByName.values(),
+    );
     const oracles = perpMarkets.map((b) => b.oracle);
     const ais =
       await client.program.provider.connection.getMultipleAccountsInfo(oracles);
@@ -277,16 +325,17 @@ export class Group {
     ais.forEach(async (ai, i) => {
       const perpMarket = perpMarkets[i];
       if (!ai)
-        throw new Error('Undefined ai object in reloadPerpMarketOraclePrices!');
+        throw new Error(
+          `Undefined ai object in reloadPerpMarketOraclePrices for ${perpMarket.oracle}!`,
+        );
       const { price, uiPrice } = await this.decodePriceFromOracleAi(
         coder,
         perpMarket.oracle,
         ai,
         perpMarket.baseDecimals,
-        this.getMintDecimals(this.insuranceMint),
       );
-      perpMarket.price = price;
-      perpMarket.uiPrice = uiPrice;
+      perpMarket._price = price;
+      perpMarket._uiPrice = uiPrice;
     });
   }
 
@@ -295,8 +344,7 @@ export class Group {
     oracle: PublicKey,
     ai: AccountInfo<Buffer>,
     baseDecimals: number,
-    quoteDecimals: number,
-  ) {
+  ): Promise<{ price: I80F48; uiPrice: number }> {
     let price, uiPrice;
     if (
       !BorshAccountsCoder.accountDiscriminator('stubOracle').compare(
@@ -305,22 +353,22 @@ export class Group {
     ) {
       const stubOracle = coder.decode('stubOracle', ai.data);
       price = new I80F48(stubOracle.price.val);
-      uiPrice = this?.toUiPrice(price, baseDecimals, quoteDecimals);
+      uiPrice = this?.toUiPrice(price, baseDecimals);
     } else if (isPythOracle(ai)) {
       uiPrice = parsePriceData(ai.data).previousPrice;
-      price = this?.toNativePrice(uiPrice, baseDecimals, quoteDecimals);
+      price = this?.toNativePrice(uiPrice, baseDecimals);
     } else if (isSwitchboardOracle(ai)) {
       uiPrice = await parseSwitchboardOracle(ai);
-      price = this?.toNativePrice(uiPrice, baseDecimals, quoteDecimals);
+      price = this?.toNativePrice(uiPrice, baseDecimals);
     } else {
       throw new Error(
-        `Unknown oracle provider for oracle ${oracle}, with owner ${ai.owner}`,
+        `Unknown oracle provider (parsing not implemented) for oracle ${oracle}, with owner ${ai.owner}!`,
       );
     }
     return { price, uiPrice };
   }
 
-  public async reloadVaults(client: MangoClient, ids?: Id): Promise<void> {
+  public async reloadVaults(client: MangoClient): Promise<void> {
     const vaultPks = Array.from(this.banksMapByMint.values())
       .flat()
       .map((bank) => bank.vault);
@@ -331,10 +379,13 @@ export class Group {
 
     this.vaultAmountsMap = new Map(
       vaultAccounts.map((vaultAi, i) => {
-        if (!vaultAi) throw new Error('Missing vault account info');
-        const vaultAmount = coder()
-          .accounts.decode('token', vaultAi.data)
-          .amount.toNumber();
+        if (!vaultAi) {
+          throw new Error(`Undefined vaultAi for ${vaultPks[i]}`!);
+        }
+        const vaultAmount = coder().accounts.decode(
+          'token',
+          vaultAi.data,
+        ).amount;
         return [vaultPks[i].toBase58(), vaultAmount];
       }),
     );
@@ -342,120 +393,24 @@ export class Group {
 
   public getMintDecimals(mintPk: PublicKey): number {
     const banks = this.banksMapByMint.get(mintPk.toString());
-    if (!banks)
-      throw new Error(`Unable to find mint decimals for ${mintPk.toString()}`);
+    if (!banks) throw new Error(`No bank found for mint ${mintPk}!`);
     return banks[0].mintDecimals;
+  }
+
+  public getInsuranceMintDecimals(): number {
+    return this.getMintDecimals(this.insuranceMint);
   }
 
   public getFirstBankByMint(mintPk: PublicKey): Bank {
     const banks = this.banksMapByMint.get(mintPk.toString());
-    if (!banks) throw new Error(`Unable to find bank for ${mintPk.toString()}`);
+    if (!banks) throw new Error(`No bank found for mint ${mintPk}!`);
     return banks[0];
   }
 
-  public getFirstBankByTokenIndex(tokenIndex: number): Bank {
+  public getFirstBankByTokenIndex(tokenIndex: TokenIndex): Bank {
     const banks = this.banksMapByTokenIndex.get(tokenIndex);
-    if (!banks)
-      throw new Error(`Unable to find banks for tokenIndex ${tokenIndex}`);
+    if (!banks) throw new Error(`No bank found for tokenIndex ${tokenIndex}!`);
     return banks[0];
-  }
-
-  /**
-   *
-   * @param mintPk
-   * @returns sum of native balances of vaults for all banks for a token (fetched from vaultAmountsMap cache)
-   */
-  public getTokenVaultBalanceByMint(mintPk: PublicKey): I80F48 {
-    const banks = this.banksMapByMint.get(mintPk.toBase58());
-    if (!banks)
-      throw new Error(
-        `Mint does not exist in getTokenVaultBalanceByMint ${mintPk.toString()}`,
-      );
-    let totalAmount = 0;
-    for (const bank of banks) {
-      const amount = this.vaultAmountsMap.get(bank.vault.toBase58());
-      if (amount) {
-        totalAmount += amount;
-      }
-    }
-    return I80F48.fromNumber(totalAmount);
-  }
-
-  public getSerum3MarketByPk(pk: PublicKey): Serum3Market | undefined {
-    return Array.from(this.serum3MarketsMapByExternal.values()).find(
-      (serum3Market) => serum3Market.serumMarketExternal.equals(pk),
-    );
-  }
-
-  public getSerum3MarketByIndex(marketIndex: number): Serum3Market | undefined {
-    return Array.from(this.serum3MarketsMapByExternal.values()).find(
-      (serum3Market) => serum3Market.marketIndex === marketIndex,
-    );
-  }
-
-  public getSerum3MarketByName(name: string): Serum3Market | undefined {
-    return Array.from(this.serum3MarketsMapByExternal.values()).find(
-      (serum3Market) => serum3Market.name === name,
-    );
-  }
-
-  public async loadSerum3BidsForMarket(
-    client: MangoClient,
-    externalMarketPk: PublicKey,
-  ): Promise<Orderbook> {
-    const serum3Market = this.serum3MarketsMapByExternal.get(
-      externalMarketPk.toBase58(),
-    );
-    if (!serum3Market) {
-      throw new Error(
-        `Unable to find mint serum3Market for ${externalMarketPk.toString()}`,
-      );
-    }
-    return await serum3Market.loadBids(client, this);
-  }
-
-  public async loadSerum3AsksForMarket(
-    client: MangoClient,
-    externalMarketPk: PublicKey,
-  ): Promise<Orderbook> {
-    const serum3Market = this.serum3MarketsMapByExternal.get(
-      externalMarketPk.toBase58(),
-    );
-    if (!serum3Market) {
-      throw new Error(
-        `Unable to find mint serum3Market for ${externalMarketPk.toString()}`,
-      );
-    }
-    return await serum3Market.loadAsks(client, this);
-  }
-
-  public getFeeRate(maker = true) {
-    // TODO: fetch msrm/srm vault balance
-    const feeTier = getFeeTier(0, 0);
-    const rates = getFeeRates(feeTier);
-    return maker ? rates.maker : rates.taker;
-  }
-
-  public async loadPerpBidsForMarket(
-    client: MangoClient,
-    marketName: string,
-  ): Promise<BookSide> {
-    const perpMarket = this.perpMarketsMap.get(marketName);
-    if (!perpMarket) {
-      throw new Error(`Perp Market ${marketName} not found!`);
-    }
-    return await perpMarket.loadBids(client);
-  }
-
-  public async loadPerpAsksForMarket(
-    client: MangoClient,
-    marketName: string,
-  ): Promise<BookSide> {
-    const perpMarket = this.perpMarketsMap.get(marketName);
-    if (!perpMarket) {
-      throw new Error(`Perp Market ${marketName} not found!`);
-    }
-    return await perpMarket.loadAsks(client);
   }
 
   /**
@@ -464,13 +419,149 @@ export class Group {
    * @returns sum of ui balances of vaults for all banks for a token
    */
   public getTokenVaultBalanceByMintUi(mintPk: PublicKey): number {
-    const vaultBalance = this.getTokenVaultBalanceByMint(mintPk);
-    const mintDecimals = this.getMintDecimals(mintPk);
+    const banks = this.banksMapByMint.get(mintPk.toBase58());
+    if (!banks) {
+      throw new Error(`No bank found for mint ${mintPk}!`);
+    }
+    const totalAmount = new BN(0);
+    for (const bank of banks) {
+      const amount = this.vaultAmountsMap.get(bank.vault.toBase58());
+      if (!amount) {
+        throw new Error(
+          `Vault balance not found for bank ${bank.name} ${bank.bankNum}!`,
+        );
+      }
+      totalAmount.iadd(amount);
+    }
 
-    return toUiDecimals(vaultBalance, mintDecimals);
+    return toUiDecimals(totalAmount, this.getMintDecimals(mintPk));
   }
 
-  public consoleLogBanks() {
+  public getSerum3MarketByMarketIndex(marketIndex: MarketIndex): Serum3Market {
+    const serum3Market = this.serum3MarketsMapByMarketIndex.get(marketIndex);
+    if (!serum3Market) {
+      throw new Error(`No serum3Market found for marketIndex ${marketIndex}!`);
+    }
+    return serum3Market;
+  }
+
+  public getSerum3MarketByName(name: string): Serum3Market {
+    const serum3Market = Array.from(
+      this.serum3MarketsMapByExternal.values(),
+    ).find((serum3Market) => serum3Market.name === name);
+    if (!serum3Market) {
+      throw new Error(`No serum3Market found by name ${name}!`);
+    }
+    return serum3Market;
+  }
+
+  public getSerum3MarketByExternalMarket(
+    externalMarketPk: PublicKey,
+  ): Serum3Market {
+    const serum3Market = Array.from(
+      this.serum3MarketsMapByExternal.values(),
+    ).find((serum3Market) =>
+      serum3Market.serumMarketExternal.equals(externalMarketPk),
+    );
+    if (!serum3Market) {
+      throw new Error(
+        `No serum3Market found for external serum3 market ${externalMarketPk.toString()}!`,
+      );
+    }
+    return serum3Market;
+  }
+
+  public getSerum3ExternalMarket(externalMarketPk: PublicKey): Market {
+    const market = this.serum3ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    );
+    if (!market) {
+      throw new Error(
+        `No external market found for pk ${externalMarketPk.toString()}!`,
+      );
+    }
+    return market;
+  }
+
+  public async loadSerum3BidsForMarket(
+    client: MangoClient,
+    externalMarketPk: PublicKey,
+  ): Promise<Orderbook> {
+    const serum3Market = this.getSerum3MarketByExternalMarket(externalMarketPk);
+    return await serum3Market.loadBids(client, this);
+  }
+
+  public async loadSerum3AsksForMarket(
+    client: MangoClient,
+    externalMarketPk: PublicKey,
+  ): Promise<Orderbook> {
+    const serum3Market = this.getSerum3MarketByExternalMarket(externalMarketPk);
+    return await serum3Market.loadAsks(client, this);
+  }
+
+  public getSerum3FeeRates(maker = true): number {
+    // TODO: fetch msrm/srm vault balance
+    const feeTier = getFeeTier(0, 0);
+    const rates = getFeeRates(feeTier);
+    return maker ? rates.maker : rates.taker;
+  }
+
+  public findPerpMarket(marketIndex: PerpMarketIndex): PerpMarket {
+    const perpMarket = Array.from(this.perpMarketsMapByName.values()).find(
+      (perpMarket) => perpMarket.perpMarketIndex === marketIndex,
+    );
+    if (!perpMarket) {
+      throw new Error(
+        `No perpMarket found for perpMarketIndex ${marketIndex}!`,
+      );
+    }
+    return perpMarket;
+  }
+
+  public getPerpMarketByOracle(oracle: PublicKey): PerpMarket {
+    const perpMarket = this.perpMarketsMapByOracle.get(oracle.toBase58());
+    if (!perpMarket) {
+      throw new Error(`No PerpMarket found for oracle ${oracle}!`);
+    }
+    return perpMarket;
+  }
+
+  public getPerpMarketByMarketIndex(marketIndex: PerpMarketIndex): PerpMarket {
+    const perpMarket = this.perpMarketsMapByMarketIndex.get(marketIndex);
+    if (!perpMarket) {
+      throw new Error(`No PerpMarket found with marketIndex ${marketIndex}!`);
+    }
+    return perpMarket;
+  }
+
+  public getPerpMarketByName(perpMarketName: string): PerpMarket {
+    const perpMarket = Array.from(
+      this.perpMarketsMapByMarketIndex.values(),
+    ).find((perpMarket) => perpMarket.name === perpMarketName);
+    if (!perpMarket) {
+      throw new Error(`No PerpMarket found by name ${perpMarketName}!`);
+    }
+    return perpMarket;
+  }
+
+  public async loadPerpBidsForMarket(
+    client: MangoClient,
+    perpMarketIndex: PerpMarketIndex,
+  ): Promise<BookSide> {
+    const perpMarket = this.getPerpMarketByMarketIndex(perpMarketIndex);
+    return await perpMarket.loadBids(client);
+  }
+
+  public async loadPerpAsksForMarket(
+    client: MangoClient,
+    group: Group,
+    perpMarketIndex: PerpMarketIndex,
+  ): Promise<BookSide> {
+    const perpMarket = this.getPerpMarketByMarketIndex(perpMarketIndex);
+    return await perpMarket.loadAsks(client);
+  }
+
+  public consoleLogBanks(): void {
     for (const mintBanks of this.banksMapByMint.values()) {
       for (const bank of mintBanks) {
         console.log(bank.toString());
@@ -478,29 +569,22 @@ export class Group {
     }
   }
 
-  public toUiPrice(
-    price: I80F48,
-    baseDecimals: number,
-    quoteDecimals: number,
-  ): number {
-    return price
-      .mul(I80F48.fromNumber(Math.pow(10, baseDecimals - quoteDecimals)))
-      .toNumber();
+  public toUiPrice(price: I80F48, baseDecimals: number): number {
+    return toUiDecimals(price, baseDecimals - this.getInsuranceMintDecimals());
   }
 
-  public toNativePrice(
-    uiPrice: number,
-    baseDecimals: number,
-    quoteDecimals: number,
-  ): I80F48 {
-    return I80F48.fromNumber(uiPrice).mul(
-      I80F48.fromNumber(Math.pow(10, quoteDecimals - baseDecimals)),
+  public toNativePrice(uiPrice: number, baseDecimals: number): I80F48 {
+    return toNativeI80F48(
+      uiPrice,
+      // note: our oracles are quoted in USD and our insurance mint is USD
+      // please update when these assumptions change
+      this.getInsuranceMintDecimals() - baseDecimals,
     );
   }
 
   public toNativeDecimals(uiAmount: number, mintPk: PublicKey): BN {
     const decimals = this.getMintDecimals(mintPk);
-    return toNativeDecimals(uiAmount, decimals);
+    return toNative(uiAmount, decimals);
   }
 
   toString(): string {

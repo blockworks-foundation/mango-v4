@@ -35,6 +35,10 @@ pub fn perp_edit_market(
     impact_quantity_opt: Option<i64>,
     group_insurance_fund_opt: Option<bool>,
     trusted_market_opt: Option<bool>,
+    fee_penalty_opt: Option<f32>,
+    settle_fee_flat_opt: Option<f32>,
+    settle_fee_amount_threshold_opt: Option<f32>,
+    settle_fee_fraction_low_health_opt: Option<f32>,
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
@@ -91,6 +95,9 @@ pub fn perp_edit_market(
     if let Some(impact_quantity) = impact_quantity_opt {
         perp_market.impact_quantity = impact_quantity;
     }
+    if let Some(fee_penalty) = fee_penalty_opt {
+        perp_market.fee_penalty = fee_penalty;
+    }
 
     // unchanged -
     // long_funding
@@ -116,6 +123,16 @@ pub fn perp_edit_market(
     }
     if let Some(trusted_market) = trusted_market_opt {
         perp_market.trusted_market = if trusted_market { 1 } else { 0 };
+    }
+
+    if let Some(settle_fee_flat) = settle_fee_flat_opt {
+        perp_market.settle_fee_flat = settle_fee_flat;
+    }
+    if let Some(settle_fee_amount_threshold) = settle_fee_amount_threshold_opt {
+        perp_market.settle_fee_amount_threshold = settle_fee_amount_threshold;
+    }
+    if let Some(settle_fee_fraction_low_health) = settle_fee_fraction_low_health_opt {
+        perp_market.settle_fee_fraction_low_health = settle_fee_fraction_low_health;
     }
 
     Ok(())

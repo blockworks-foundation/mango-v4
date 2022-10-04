@@ -7,7 +7,7 @@ import {
   SwitchboardDecimal,
 } from '@switchboard-xyz/switchboard-v2';
 import BN from 'bn.js';
-import { I80F48, I80F48Dto } from './I80F48';
+import { I80F48, I80F48Dto } from '../numbers/I80F48';
 
 const SBV1_DEVNET_PID = new PublicKey(
   '7azgmy1pFXHikv36q1zZASvFq5vFa39TT9NweVugKKTU',
@@ -20,7 +20,7 @@ let sbv2MainnetProgram;
 
 export class StubOracle {
   public price: I80F48;
-  public lastUpdated: number;
+  public lastUpdated: BN;
 
   static from(
     publicKey: PublicKey,
@@ -48,7 +48,7 @@ export class StubOracle {
     lastUpdated: BN,
   ) {
     this.price = I80F48.from(price);
-    this.lastUpdated = lastUpdated.toNumber();
+    this.lastUpdated = lastUpdated;
   }
 }
 
@@ -102,7 +102,7 @@ export async function parseSwitchboardOracle(
     return parseSwitcboardOracleV1(accountInfo);
   }
 
-  throw new Error(`Unable to parse switchboard oracle ${accountInfo.owner}`);
+  throw new Error(`Should not be reached!`);
 }
 
 export function isSwitchboardOracle(accountInfo: AccountInfo<Buffer>): boolean {
