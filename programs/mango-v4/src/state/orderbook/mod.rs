@@ -129,7 +129,7 @@ mod tests {
                     u8::MAX,
                 )
                 .unwrap();
-                account.perp_order_by_raw_index(0).order_id
+                account.perp_order_by_raw_index(0).id
             };
 
         // insert bids until book side is full
@@ -236,19 +236,19 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            maker.perp_order_mut_by_raw_index(0).order_market,
+            maker.perp_order_mut_by_raw_index(0).market,
             market.perp_market_index
         );
+        assert_eq!(maker.perp_order_mut_by_raw_index(1).market, FREE_ORDER_SLOT);
+        assert_ne!(maker.perp_order_mut_by_raw_index(0).id, 0);
+        assert_eq!(maker.perp_order_mut_by_raw_index(0).client_id, 42);
         assert_eq!(
-            maker.perp_order_mut_by_raw_index(1).order_market,
-            FREE_ORDER_SLOT
+            maker.perp_order_mut_by_raw_index(0).side_and_component,
+            SideAndComponent::BidDirect
         );
-        assert_ne!(maker.perp_order_mut_by_raw_index(0).order_id, 0);
-        assert_eq!(maker.perp_order_mut_by_raw_index(0).client_order_id, 42);
-        assert_eq!(maker.perp_order_mut_by_raw_index(0).order_side, Side::Bid);
         assert!(bookside_contains_key(
             &book.bids,
-            maker.perp_order_mut_by_raw_index(0).order_id
+            maker.perp_order_mut_by_raw_index(0).id
         ));
         assert!(bookside_contains_price(&book.bids, price));
         assert_eq!(
@@ -289,8 +289,7 @@ mod tests {
         .unwrap();
         // the remainder of the maker order is still on the book
         // (the maker account is unchanged: it was not even passed in)
-        let order =
-            bookside_leaf_by_key(&book.bids, maker.perp_order_by_raw_index(0).order_id).unwrap();
+        let order = bookside_leaf_by_key(&book.bids, maker.perp_order_by_raw_index(0).id).unwrap();
         assert_eq!(order.price(), price);
         assert_eq!(order.quantity, bid_quantity - match_quantity);
 
@@ -302,10 +301,7 @@ mod tests {
         );
 
         // the taker account is updated
-        assert_eq!(
-            taker.perp_order_by_raw_index(0).order_market,
-            FREE_ORDER_SLOT
-        );
+        assert_eq!(taker.perp_order_by_raw_index(0).market, FREE_ORDER_SLOT);
         assert_eq!(taker.perp_position_by_raw_index(0).bids_base_lots, 0);
         assert_eq!(taker.perp_position_by_raw_index(0).asks_base_lots, 0);
         assert_eq!(
@@ -345,7 +341,7 @@ mod tests {
             .unwrap();
         assert_eq!(market.open_interest, 2 * match_quantity);
 
-        assert_eq!(maker.perp_order_by_raw_index(0).order_market, 0);
+        assert_eq!(maker.perp_order_by_raw_index(0).market, 0);
         assert_eq!(
             maker.perp_position_by_raw_index(0).bids_base_lots,
             bid_quantity - match_quantity

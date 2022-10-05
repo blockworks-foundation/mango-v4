@@ -19,11 +19,11 @@ use super::PerpMarket;
 use super::PerpMarketIndex;
 use super::PerpOpenOrder;
 use super::Serum3MarketIndex;
-use super::Side;
 use super::TokenIndex;
 use super::FREE_ORDER_SLOT;
 use super::{HealthCache, HealthType};
 use super::{PerpPosition, Serum3Orders, TokenPosition};
+use super::{Side, SideAndComponent};
 use crate::logs::DeactivateTokenPositionLog;
 use checked_math as cm;
 
@@ -501,7 +501,7 @@ impl<
 
     pub fn perp_next_order_slot(&self) -> Result<usize> {
         self.all_perp_orders()
-            .position(|&oo| oo.order_market == FREE_ORDER_SLOT)
+            .position(|&oo| oo.market == FREE_ORDER_SLOT)
             .ok_or_else(|| error_msg!("no free perp order index"))
     }
 
@@ -511,7 +511,7 @@ impl<
         client_order_id: u64,
     ) -> Option<&PerpOpenOrder> {
         for oo in self.all_perp_orders() {
-            if oo.order_market == market_index && oo.client_order_id == client_order_id {
+            if oo.market == market_index && oo.client_id == client_order_id {
                 return Some(&oo);
             }
         }
@@ -524,7 +524,7 @@ impl<
         order_id: i128,
     ) -> Option<&PerpOpenOrder> {
         for oo in self.all_perp_orders() {
-            if oo.order_market == market_index && oo.order_id == order_id {
+            if oo.market == market_index && oo.id == order_id {
                 return Some(&oo);
             }
         }
@@ -768,11 +768,11 @@ impl<
     pub fn add_perp_order(
         &mut self,
         perp_market_index: PerpMarketIndex,
-        side: Side,
+        side_and_component: SideAndComponent,
         order: &LeafNode,
     ) -> Result<()> {
         let mut perp_account = self.perp_position_mut(perp_market_index)?;
-        match side {
+        match side_and_component.side() {
             Side::Bid => {
                 cm!(perp_account.bids_base_lots += order.quantity);
             }
@@ -783,19 +783,19 @@ impl<
         let slot = order.owner_slot as usize;
 
         let mut oo = self.perp_order_mut_by_raw_index(slot);
-        oo.order_market = perp_market_index;
-        oo.order_side = side;
-        oo.order_id = order.key;
-        oo.client_order_id = order.client_order_id;
+        oo.market = perp_market_index;
+        oo.side_and_component = side_and_component;
+        oo.id = order.key;
+        oo.client_id = order.client_order_id;
         Ok(())
     }
 
     pub fn remove_perp_order(&mut self, slot: usize, quantity: i64) -> Result<()> {
         {
             let oo = self.perp_order_mut_by_raw_index(slot);
-            require_neq!(oo.order_market, FREE_ORDER_SLOT);
-            let order_side = oo.order_side;
-            let perp_market_index = oo.order_market;
+            require_neq!(oo.market, FREE_ORDER_SLOT);
+            let order_side = oo.side_and_component.side();
+            let perp_market_index = oo.market;
             let perp_account = self.perp_position_mut(perp_market_index)?;
 
             // accounting
@@ -811,10 +811,10 @@ impl<
 
         // release space
         let oo = self.perp_order_mut_by_raw_index(slot);
-        oo.order_market = FREE_ORDER_SLOT;
-        oo.order_side = Side::Bid;
-        oo.order_id = 0i128;
-        oo.client_order_id = 0u64;
+        oo.market = FREE_ORDER_SLOT;
+        oo.side_and_component = SideAndComponent::BidDirect;
+        oo.id = 0i128;
+        oo.client_id = 0u64;
         Ok(())
     }
 

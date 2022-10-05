@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
+use crate::state::BookSide2Component;
+
 #[derive(
     Eq,
     PartialEq,
@@ -75,6 +77,41 @@ impl Side {
         match self {
             Side::Bid => price <= limit,
             Side::Ask => price >= limit,
+        }
+    }
+}
+
+#[derive(
+    Eq,
+    PartialEq,
+    Copy,
+    Clone,
+    TryFromPrimitive,
+    IntoPrimitive,
+    Debug,
+    AnchorSerialize,
+    AnchorDeserialize,
+)]
+#[repr(u8)]
+pub enum SideAndComponent {
+    BidDirect = 0,
+    AskDirect = 1,
+    BidOraclePegged = 2,
+    AskOraclePegged = 3,
+}
+
+impl SideAndComponent {
+    pub fn side(&self) -> Side {
+        match self {
+            Self::BidDirect | Self::BidOraclePegged => Side::Bid,
+            Self::AskDirect | Self::AskOraclePegged => Side::Ask,
+        }
+    }
+
+    pub fn component(&self) -> BookSide2Component {
+        match self {
+            Self::BidDirect | Self::AskDirect => BookSide2Component::Direct,
+            Self::BidOraclePegged | Self::AskOraclePegged => BookSide2Component::OraclePegged,
         }
     }
 }

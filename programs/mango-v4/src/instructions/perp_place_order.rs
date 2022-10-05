@@ -2,10 +2,11 @@ use anchor_lang::prelude::*;
 
 use crate::accounts_zerocopy::*;
 use crate::error::*;
+use crate::state::BookSide2Component;
 use crate::state::MangoAccount;
 use crate::state::{
     new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, Book2, BookSide,
-    EventQueue, Group, Order2, OrderType, PerpMarket, Side, QUOTE_TOKEN_INDEX,
+    EventQueue, Group, Order2, OrderType, PerpMarket, SideAndComponent, QUOTE_TOKEN_INDEX,
 };
 
 #[derive(Accounts)]
@@ -46,16 +47,19 @@ pub struct PerpPlaceOrder<'info> {
 #[allow(clippy::too_many_arguments)]
 pub fn perp_place_order(
     ctx: Context<PerpPlaceOrder>,
-    side: Side,
+    side_and_component: SideAndComponent,
 
-    // Price in quote lots per base lots.
+    // Price information, effect is based on order type and component.
     //
-    // Effect is based on order type, it's usually
+    // For Direct orders it's a literal price in lots
     // - fill orders on the book up to this price or
     // - place an order on the book at this price.
+    // - ignored for Market orders and potentially adjusted for PostOnlySlide orders.
     //
-    // Ignored for Market orders and potentially adjusted for PostOnlySlide orders.
-    price_lots: i64,
+    // For OraclePegged orders its the adjustment from the oracle price, and
+    // - orders on the book may be filled at oracle + adjustment (depends on order type)
+    // - if an order is placed on the book, it'll be in the oracle-pegged book
+    price_data_lots: i64,
 
     // Max base lots to buy/sell.
     max_base_lots: i64,
@@ -140,12 +144,24 @@ pub fn perp_place_order(
 
     // TODO reduce_only based on event queue
 
+    let order = if order_type == OrderType::Market {
+        Order2::Market
+    } else {
+        match side_and_component.component() {
+            BookSide2Component::Direct => Order2::Direct {
+                order_type,
+                price_lots: price_data_lots,
+            },
+            BookSide2Component::OraclePegged => Order2::OraclePegged {
+                order_type,
+                price_offset_lots: price_data_lots,
+            },
+        }
+    };
+
     book.new_order(
-        side,
-        Order2::Direct {
-            order_type,
-            price_lots,
-        },
+        side_and_component,
+        order,
         &mut perp_market,
         &mut event_queue,
         oracle_price,

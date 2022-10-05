@@ -101,8 +101,8 @@ async fn test_perp() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side: Side::Bid,
-            price_lots,
+            side_and_component: SideAndComponent::BidDirect,
+            price_data_lots: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 0,
@@ -116,7 +116,7 @@ async fn test_perp() -> Result<(), TransportError> {
         .get_account::<MangoAccount>(account_0)
         .await
         .perp_open_orders[0]
-        .order_id;
+        .id;
     send_tx(
         solana,
         PerpCancelOrderInstruction {
@@ -140,8 +140,8 @@ async fn test_perp() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side: Side::Bid,
-            price_lots,
+            side_and_component: SideAndComponent::BidDirect,
+            price_data_lots: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 1,
@@ -174,8 +174,8 @@ async fn test_perp() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side: Side::Bid,
-            price_lots,
+            side_and_component: SideAndComponent::BidDirect,
+            price_data_lots: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 2,
@@ -190,8 +190,8 @@ async fn test_perp() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side: Side::Bid,
-            price_lots,
+            side_and_component: SideAndComponent::BidDirect,
+            price_data_lots: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 3,
@@ -206,8 +206,8 @@ async fn test_perp() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side: Side::Bid,
-            price_lots,
+            side_and_component: SideAndComponent::BidDirect,
+            price_data_lots: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 4,
@@ -239,8 +239,8 @@ async fn test_perp() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side: Side::Bid,
-            price_lots,
+            side_and_component: SideAndComponent::BidDirect,
+            price_data_lots: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 5,
@@ -256,8 +256,8 @@ async fn test_perp() -> Result<(), TransportError> {
             account: account_1,
             perp_market,
             owner,
-            side: Side::Ask,
-            price_lots,
+            side_and_component: SideAndComponent::AskDirect,
+            price_data_lots: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 6,
@@ -317,8 +317,8 @@ async fn test_perp() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side: Side::Ask,
-            price_lots,
+            side_and_component: SideAndComponent::AskDirect,
+            price_data_lots: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 7,
@@ -334,8 +334,8 @@ async fn test_perp() -> Result<(), TransportError> {
             account: account_1,
             perp_market,
             owner,
-            side: Side::Bid,
-            price_lots,
+            side_and_component: SideAndComponent::BidDirect,
+            price_data_lots: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 8,
@@ -448,9 +448,9 @@ async fn assert_no_perp_orders(solana: &SolanaCookie, account_0: Pubkey) {
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
 
     for oo in mango_account_0.perp_open_orders.iter() {
-        assert!(oo.order_id == 0);
-        assert!(oo.order_side == Side::Bid);
-        assert!(oo.client_order_id == 0);
-        assert!(oo.order_market == FREE_ORDER_SLOT);
+        assert!(oo.id == 0);
+        assert!(oo.side_and_component == SideAndComponent::BidDirect);
+        assert!(oo.client_id == 0);
+        assert!(oo.market == FREE_ORDER_SLOT);
     }
 }

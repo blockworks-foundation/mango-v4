@@ -15,7 +15,7 @@ use fixed::types::I80F48;
 
 use super::{
     nodes::NodeHandle,
-    order_type::{OrderType, Side},
+    order_type::{OrderType, Side, SideAndComponent},
     FillEvent, OutEvent,
 };
 use crate::util::checked_math as cm;
@@ -204,7 +204,7 @@ impl<'a> Book2<'a> {
     #[allow(clippy::too_many_arguments)]
     pub fn new_order(
         &mut self,
-        side: Side,
+        side_and_component: SideAndComponent,
         order: Order2,
         perp_market: &mut PerpMarket,
         event_queue: &mut EventQueue,
@@ -218,6 +218,7 @@ impl<'a> Book2<'a> {
         now_ts: u64,
         mut limit: u8,
     ) -> std::result::Result<(), Error> {
+        let side = side_and_component.side();
         let other_side = side.invert_side();
         let market = perp_market;
         let oracle_price_lots = market.native_price_to_lot(oracle_price);
@@ -410,7 +411,11 @@ impl<'a> Book2<'a> {
                 price_lots
             );
 
-            mango_account.add_perp_order(market.perp_market_index, side, &new_order)?;
+            mango_account.add_perp_order(
+                market.perp_market_index,
+                side_and_component,
+                &new_order,
+            )?;
         }
 
         // if there were matched taker quote apply ref fees
@@ -449,24 +454,21 @@ impl<'a> Book2<'a> {
     ) -> Result<()> {
         for i in 0..mango_account.header.perp_oo_count() {
             let oo = mango_account.perp_order_by_raw_index(i);
-            if oo.order_market == FREE_ORDER_SLOT
-                || oo.order_market != perp_market.perp_market_index
-            {
+            if oo.market == FREE_ORDER_SLOT || oo.market != perp_market.perp_market_index {
                 continue;
             }
 
-            let order_side = oo.order_side;
+            let order_side_and_component = oo.side_and_component;
             if let Some(side_to_cancel) = side_to_cancel_option {
-                if side_to_cancel != order_side {
+                if side_to_cancel != order_side_and_component.side() {
                     continue;
                 }
             }
 
-            let order_id = oo.order_id;
-            let book_component = oo.book_component;
+            let order_id = oo.id;
             drop(oo);
 
-            self.cancel_order(mango_account, order_id, order_side, book_component, None)?;
+            self.cancel_order(mango_account, order_id, order_side_and_component, None)?;
 
             limit -= 1;
             if limit == 0 {
@@ -482,10 +484,11 @@ impl<'a> Book2<'a> {
         &mut self,
         mango_account: &mut MangoAccountRefMut,
         order_id: i128,
-        side: Side,
-        book_component: BookSide2Component,
+        side_and_component: SideAndComponent,
         expected_owner: Option<Pubkey>,
     ) -> Result<LeafNode> {
+        let side = side_and_component.side();
+        let book_component = side_and_component.component();
         let leaf_node = self.bookside_mut(side).component_mut(book_component).
         remove_by_key(order_id).ok_or_else(|| {
                     error_msg!("invalid perp order id {order_id} for side {side:?} and component {book_component:?}")
@@ -825,7 +828,14 @@ impl<'a> Book<'a> {
                 price_lots
             );
 
-            mango_account.add_perp_order(market.perp_market_index, side, &new_order)?;
+            mango_account.add_perp_order(
+                market.perp_market_index,
+                match side {
+                    Side::Bid => SideAndComponent::BidDirect,
+                    Side::Ask => SideAndComponent::AskDirect,
+                },
+                &new_order,
+            )?;
         }
 
         // if there were matched taker quote apply ref fees
@@ -854,20 +864,18 @@ impl<'a> Book<'a> {
     ) -> Result<()> {
         for i in 0..mango_account.header.perp_oo_count() {
             let oo = mango_account.perp_order_by_raw_index(i);
-            if oo.order_market == FREE_ORDER_SLOT
-                || oo.order_market != perp_market.perp_market_index
-            {
+            if oo.market == FREE_ORDER_SLOT || oo.market != perp_market.perp_market_index {
                 continue;
             }
 
-            let order_side = oo.order_side;
+            let order_side = oo.side_and_component.side();
             if let Some(side_to_cancel) = side_to_cancel_option {
                 if side_to_cancel != order_side {
                     continue;
                 }
             }
 
-            let order_id = oo.order_id;
+            let order_id = oo.id;
             self.cancel_order(mango_account, order_id, order_side, None)?;
 
             limit -= 1;

@@ -51,16 +51,14 @@ pub fn perp_cancel_order_by_client_order_id(
     let oo = account
         .perp_find_order_with_client_order_id(perp_market.perp_market_index, client_order_id)
         .ok_or_else(|| error_msg!("could not find perp order with client order id {client_order_id} in perp order books"))?;
-    let order_id = oo.order_id;
-    let order_side = oo.order_side;
-    let book_component = oo.book_component;
+    let order_id = oo.id;
+    let order_side_and_component = oo.side_and_component;
     drop(oo);
 
     book.cancel_order(
         &mut account.borrow_mut(),
         order_id,
-        order_side,
-        book_component,
+        order_side_and_component,
         Some(ctx.accounts.account.key()),
     )?;
 

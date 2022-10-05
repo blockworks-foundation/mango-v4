@@ -2393,8 +2393,8 @@ pub struct PerpPlaceOrderInstruction {
     pub account: Pubkey,
     pub perp_market: Pubkey,
     pub owner: TestKeypair,
-    pub side: Side,
-    pub price_lots: i64,
+    pub side_and_component: SideAndComponent,
+    pub price_data_lots: i64,
     pub max_base_lots: i64,
     pub max_quote_lots: i64,
     pub client_order_id: u64,
@@ -2409,8 +2409,8 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            side: self.side,
-            price_lots: self.price_lots,
+            side_and_component: self.side_and_component,
+            price_data_lots: self.price_data_lots,
             max_base_lots: self.max_base_lots,
             max_quote_lots: self.max_quote_lots,
             client_order_id: self.client_order_id,
