@@ -2197,8 +2197,10 @@ pub struct PerpCreateMarketInstruction {
     pub group: Pubkey,
     pub admin: TestKeypair,
     pub oracle: Pubkey,
-    pub asks: Pubkey,
-    pub bids: Pubkey,
+    pub asks_direct: Pubkey,
+    pub bids_direct: Pubkey,
+    pub asks_oracle_pegged: Pubkey,
+    pub bids_oracle_pegged: Pubkey,
     pub event_queue: Pubkey,
     pub payer: TestKeypair,
     pub perp_market_index: PerpMarketIndex,
@@ -2225,10 +2227,16 @@ impl PerpCreateMarketInstruction {
         base: &crate::mango_setup::Token,
     ) -> Self {
         PerpCreateMarketInstruction {
-            asks: solana
+            asks_direct: solana
                 .create_account_for_type::<BookSide>(&mango_v4::id())
                 .await,
-            bids: solana
+            bids_direct: solana
+                .create_account_for_type::<BookSide>(&mango_v4::id())
+                .await,
+            asks_oracle_pegged: solana
+                .create_account_for_type::<BookSide>(&mango_v4::id())
+                .await,
+            bids_oracle_pegged: solana
                 .create_account_for_type::<BookSide>(&mango_v4::id())
                 .await,
             event_queue: solana
@@ -2291,8 +2299,10 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             admin: self.admin.pubkey(),
             oracle: self.oracle,
             perp_market,
-            asks: self.asks,
-            bids: self.bids,
+            asks_direct: self.asks_direct,
+            bids_direct: self.bids_direct,
+            asks_oracle_pegged: self.asks_oracle_pegged,
+            bids_oracle_pegged: self.bids_oracle_pegged,
             event_queue: self.event_queue,
             payer: self.payer.pubkey(),
             system_program: System::id(),
@@ -2308,12 +2318,8 @@ impl ClientInstruction for PerpCreateMarketInstruction {
 }
 
 pub struct PerpCloseMarketInstruction {
-    pub group: Pubkey,
     pub admin: TestKeypair,
     pub perp_market: Pubkey,
-    pub asks: Pubkey,
-    pub bids: Pubkey,
-    pub event_queue: Pubkey,
     pub sol_destination: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
@@ -2322,18 +2328,21 @@ impl ClientInstruction for PerpCloseMarketInstruction {
     type Instruction = mango_v4::instruction::PerpCloseMarket;
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
 
         let accounts = Self::Accounts {
-            group: self.group,
+            group: perp_market.group,
             admin: self.admin.pubkey(),
             perp_market: self.perp_market,
-            asks: self.asks,
-            bids: self.bids,
-            event_queue: self.event_queue,
+            asks_direct: perp_market.asks_direct,
+            bids_direct: perp_market.bids_direct,
+            asks_oracle_pegged: perp_market.asks_oracle_pegged,
+            bids_oracle_pegged: perp_market.bids_oracle_pegged,
+            event_queue: perp_market.event_queue,
             token_program: Token::id(),
             sol_destination: self.sol_destination,
         };
@@ -2428,8 +2437,10 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
             group: account.fixed.group,
             account: self.account,
             perp_market: self.perp_market,
-            asks: perp_market.asks,
-            bids: perp_market.bids,
+            asks_direct: perp_market.asks_direct,
+            bids_direct: perp_market.bids_direct,
+            asks_oracle_pegged: perp_market.asks_oracle_pegged,
+            bids_oracle_pegged: perp_market.bids_oracle_pegged,
             event_queue: perp_market.event_queue,
             oracle: perp_market.oracle,
             owner: self.owner.pubkey(),
@@ -2446,11 +2457,8 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
 }
 
 pub struct PerpCancelOrderInstruction {
-    pub group: Pubkey,
     pub account: Pubkey,
     pub perp_market: Pubkey,
-    pub asks: Pubkey,
-    pub bids: Pubkey,
     pub owner: TestKeypair,
     pub order_id: i128,
 }
@@ -2460,18 +2468,21 @@ impl ClientInstruction for PerpCancelOrderInstruction {
     type Instruction = mango_v4::instruction::PerpCancelOrder;
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             order_id: self.order_id,
         };
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
         let accounts = Self::Accounts {
-            group: self.group,
+            group: perp_market.group,
             account: self.account,
             perp_market: self.perp_market,
-            asks: self.asks,
-            bids: self.bids,
+            asks_direct: perp_market.asks_direct,
+            bids_direct: perp_market.bids_direct,
+            asks_oracle_pegged: perp_market.asks_oracle_pegged,
+            bids_oracle_pegged: perp_market.bids_oracle_pegged,
             owner: self.owner.pubkey(),
         };
 
@@ -2485,11 +2496,8 @@ impl ClientInstruction for PerpCancelOrderInstruction {
 }
 
 pub struct PerpCancelOrderByClientOrderIdInstruction {
-    pub group: Pubkey,
     pub account: Pubkey,
     pub perp_market: Pubkey,
-    pub asks: Pubkey,
-    pub bids: Pubkey,
     pub owner: TestKeypair,
     pub client_order_id: u64,
 }
@@ -2499,18 +2507,21 @@ impl ClientInstruction for PerpCancelOrderByClientOrderIdInstruction {
     type Instruction = mango_v4::instruction::PerpCancelOrderByClientOrderId;
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             client_order_id: self.client_order_id,
         };
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
         let accounts = Self::Accounts {
-            group: self.group,
+            group: perp_market.group,
             account: self.account,
             perp_market: self.perp_market,
-            asks: self.asks,
-            bids: self.bids,
+            asks_direct: perp_market.asks_direct,
+            bids_direct: perp_market.bids_direct,
+            asks_oracle_pegged: perp_market.asks_oracle_pegged,
+            bids_oracle_pegged: perp_market.bids_oracle_pegged,
             owner: self.owner.pubkey(),
         };
 
@@ -2543,8 +2554,10 @@ impl ClientInstruction for PerpCancelAllOrdersInstruction {
             group: perp_market.group,
             account: self.account,
             perp_market: self.perp_market,
-            asks: perp_market.asks,
-            bids: perp_market.bids,
+            asks_direct: perp_market.asks_direct,
+            bids_direct: perp_market.bids_direct,
+            asks_oracle_pegged: perp_market.asks_oracle_pegged,
+            bids_oracle_pegged: perp_market.bids_oracle_pegged,
             owner: self.owner.pubkey(),
         };
 
@@ -2596,10 +2609,7 @@ impl ClientInstruction for PerpConsumeEventsInstruction {
 }
 
 pub struct PerpUpdateFundingInstruction {
-    pub group: Pubkey,
     pub perp_market: Pubkey,
-    pub bids: Pubkey,
-    pub asks: Pubkey,
     pub bank: Pubkey,
     pub oracle: Pubkey,
 }
@@ -2609,15 +2619,18 @@ impl ClientInstruction for PerpUpdateFundingInstruction {
     type Instruction = mango_v4::instruction::PerpUpdateFunding;
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
         let accounts = Self::Accounts {
-            group: self.group,
+            group: perp_market.group,
             perp_market: self.perp_market,
-            bids: self.bids,
-            asks: self.asks,
+            asks_direct: perp_market.asks_direct,
+            bids_direct: perp_market.bids_direct,
+            asks_oracle_pegged: perp_market.asks_oracle_pegged,
+            bids_oracle_pegged: perp_market.bids_oracle_pegged,
             oracle: self.oracle,
         };
 
@@ -2775,8 +2788,10 @@ impl ClientInstruction for PerpLiqForceCancelOrdersInstruction {
             group: account.fixed.group,
             perp_market: self.perp_market,
             account: self.account,
-            bids: perp_market.bids,
-            asks: perp_market.asks,
+            asks_direct: perp_market.asks_direct,
+            bids_direct: perp_market.bids_direct,
+            asks_oracle_pegged: perp_market.asks_oracle_pegged,
+            bids_oracle_pegged: perp_market.bids_oracle_pegged,
             oracle: perp_market.oracle,
         };
         let mut instruction = make_instruction(program_id, &accounts, instruction);

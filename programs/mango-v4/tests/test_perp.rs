@@ -65,13 +65,7 @@ async fn test_perp() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket {
-        perp_market,
-        asks,
-        bids,
-        event_queue,
-        ..
-    } = send_tx(
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -126,11 +120,8 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpCancelOrderInstruction {
-            group,
             account: account_0,
             perp_market,
-            asks,
-            bids,
             owner,
             order_id: order_id_to_cancel,
         },
@@ -163,11 +154,8 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpCancelOrderByClientOrderIdInstruction {
-            group,
             account: account_0,
             perp_market,
-            asks,
-            bids,
             owner,
             client_order_id: 1,
         },
@@ -445,12 +433,8 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpCloseMarketInstruction {
-            group,
             admin,
             perp_market,
-            asks,
-            bids,
-            event_queue,
             sol_destination: payer.pubkey(),
         },
     )
