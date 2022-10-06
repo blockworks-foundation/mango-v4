@@ -52,7 +52,7 @@ pub fn perp_deactivate_position(ctx: Context<PerpDeactivatePosition>) -> Result<
 
     account.deactivate_perp_position_and_log(
         perp_market.perp_market_index,
-        QUOTE_TOKEN_INDEX,
+        perp_market.settle_token_index,
         ctx.accounts.account.key(),
     )?;
 

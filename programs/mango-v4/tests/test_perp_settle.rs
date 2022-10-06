@@ -200,7 +200,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_1,
             account_b: account_0,
             perp_market,
-            quote_bank: tokens[1].bank,
+            settle_bank: tokens[1].bank,
         },
     )
     .await;
@@ -220,7 +220,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_0,
             perp_market,
-            quote_bank: tokens[0].bank,
+            settle_bank: tokens[0].bank,
         },
     )
     .await;
@@ -240,7 +240,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market: perp_market_2,
-            quote_bank: tokens[0].bank,
+            settle_bank: tokens[0].bank,
         },
     )
     .await;
@@ -292,7 +292,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_1,
             account_b: account_0,
             perp_market,
-            quote_bank: tokens[0].bank,
+            settle_bank: tokens[0].bank,
         },
     )
     .await;
@@ -376,7 +376,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            quote_bank: tokens[0].bank,
+            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -471,7 +471,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             account_a: account_1,
             account_b: account_0,
             perp_market,
-            quote_bank: tokens[0].bank,
+            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -569,7 +569,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     }
     .create(solana)
     .await;
-    let quote_bank = tokens[0].bank;
+    let settle_bank = tokens[0].bank;
 
     // ensure vaults are not empty
     create_funded_account(
@@ -744,7 +744,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            quote_bank,
+            settle_bank,
         },
     )
     .await
@@ -764,15 +764,15 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             I80F48::from(100_000 + total_settled_pnl),
         );
         assert_eq!(
-            account_position(solana, account_0, quote_bank).await,
+            account_position(solana, account_0, settle_bank).await,
             initial_token_deposit as i64 + total_settled_pnl - total_fees_paid
         );
         assert_eq!(
-            account_position(solana, account_1, quote_bank).await,
+            account_position(solana, account_1, settle_bank).await,
             initial_token_deposit as i64 - total_settled_pnl
         );
         assert_eq!(
-            account_position(solana, settler, quote_bank).await,
+            account_position(solana, settler, settle_bank).await,
             total_fees_paid
         );
     }
@@ -834,7 +834,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            quote_bank,
+            settle_bank,
         },
     )
     .await
@@ -856,15 +856,15 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             I80F48::from(100_000 + total_settled_pnl),
         );
         assert_eq!(
-            account_position(solana, account_0, quote_bank).await,
+            account_position(solana, account_0, settle_bank).await,
             initial_token_deposit as i64 + total_settled_pnl - total_fees_paid
         );
         assert_eq!(
-            account_position(solana, account_1, quote_bank).await,
+            account_position(solana, account_1, settle_bank).await,
             initial_token_deposit as i64 - total_settled_pnl
         );
         assert_eq!(
-            account_position(solana, settler, quote_bank).await,
+            account_position(solana, settler, settle_bank).await,
             total_fees_paid
         );
     }

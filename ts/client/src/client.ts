@@ -1327,7 +1327,6 @@ export class MangoClient {
     name: string,
     oracleConfFilter: number,
     baseDecimals: number,
-    quoteTokenIndex: number,
     quoteLotSize: number,
     baseLotSize: number,
     maintAssetWeight: number,
@@ -1346,6 +1345,7 @@ export class MangoClient {
     settleFeeFlat: number,
     settleFeeAmountThreshold: number,
     settleFeeFractionLowHealth: number,
+    settleTokenIndex: number,
   ): Promise<TransactionSignature> {
     const bids = new Keypair();
     const asks = new Keypair();
@@ -1386,6 +1386,7 @@ export class MangoClient {
         settleFeeFlat,
         settleFeeAmountThreshold,
         settleFeeFractionLowHealth,
+        settleTokenIndex,
       )
       .accounts({
         group: group.publicKey,

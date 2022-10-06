@@ -9,7 +9,6 @@ use crate::state::new_fixed_order_account_retriever;
 use crate::state::Bank;
 use crate::state::HealthType;
 use crate::state::MangoAccount;
-use crate::state::QUOTE_TOKEN_INDEX;
 use crate::state::{AccountLoaderDynamic, Group, PerpMarket};
 
 use crate::logs::{emit_perp_balances, PerpSettleFeesLog, TokenBalanceLog};
@@ -29,7 +28,11 @@ pub struct PerpSettleFees<'info> {
     pub oracle: UncheckedAccount<'info>,
 
     #[account(mut, has_one = group)]
-    pub quote_bank: AccountLoader<'info, Bank>,
+    pub settle_bank: AccountLoader<'info, Bank>,
+
+    /// CHECK: Oracle can have different account types
+    #[account(address = settle_bank.load()?.oracle)]
+    pub settle_oracle: UncheckedAccount<'info>,
 }
 
 pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) -> Result<()> {
@@ -40,12 +43,13 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     );
 
     let mut account = ctx.accounts.account.load_mut()?;
-    let mut bank = ctx.accounts.quote_bank.load_mut()?;
+    let mut bank = ctx.accounts.settle_bank.load_mut()?;
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
     // Verify that the bank is the quote currency bank
-    require!(
-        bank.token_index == QUOTE_TOKEN_INDEX,
+    require_eq!(
+        bank.token_index,
+        perp_market.settle_token_index,
         MangoError::InvalidBank
     );
 
@@ -84,8 +88,9 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     cm!(account.fixed.perp_spot_transfers -= settlement_i64);
 
     // Transfer token balances
-    // TODO: Need to guarantee that QUOTE_TOKEN_INDEX token exists at this point. I.E. create it when placing perp order.
-    let token_position = account.ensure_token_position(QUOTE_TOKEN_INDEX)?.0;
+    let token_position = account
+        .token_position_mut(perp_market.settle_token_index)?
+        .0;
     bank.withdraw_with_fee(token_position, settlement)?;
     // Update the settled balance on the market itself
     perp_market.fees_settled = cm!(perp_market.fees_settled + settlement);
@@ -93,7 +98,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
-        token_index: QUOTE_TOKEN_INDEX,
+        token_index: perp_market.settle_token_index,
         indexed_position: token_position.indexed_position.to_bits(),
         deposit_index: bank.deposit_index.to_bits(),
         borrow_index: bank.borrow_index.to_bits(),

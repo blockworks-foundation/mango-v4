@@ -364,7 +364,6 @@ async function main() {
       'BTC-PERP',
       0.1,
       6,
-      1,
       10,
       100,
       0.975,
@@ -383,6 +382,7 @@ async function main() {
       1000,
       1000000,
       0.05,
+      0,
     );
     console.log('done');
   } catch (error) {
