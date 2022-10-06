@@ -754,7 +754,7 @@ mod tests {
 
         // add 100 random leaves to each BookSide
         let mut keys = vec![];
-        for _ in 0..100 {
+        while oracle_pegged.leaf_count < 100 {
             let price_data: u64 = oracle_peg_price_data(rng.gen_range(-20..20));
             let seq_num: u64 = rng.gen_range(0..1000);
             let key = new_node_key(side, price_data, seq_num);
@@ -763,7 +763,9 @@ mod tests {
             }
             keys.push(key);
             oracle_pegged.insert_leaf(&new_leaf(key)).unwrap();
+        }
 
+        while direct.leaf_count < 100 {
             let price_data: u64 = rng.gen_range(1..50);
             let seq_num: u64 = rng.gen_range(0..1000);
             let key = new_node_key(side, price_data, seq_num);
