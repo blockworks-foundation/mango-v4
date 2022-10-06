@@ -496,7 +496,7 @@ pub mod mango_v4 {
     pub fn perp_place_order(
         ctx: Context<PerpPlaceOrder>,
         side_and_component: SideAndComponent,
-        price_data_lots: i64,
+        price_data: i64,
         max_base_lots: i64,
         max_quote_lots: i64,
         client_order_id: u64,
@@ -507,7 +507,7 @@ pub mod mango_v4 {
         instructions::perp_place_order(
             ctx,
             side_and_component,
-            price_data_lots,
+            price_data,
             max_base_lots,
             max_quote_lots,
             client_order_id,

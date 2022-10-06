@@ -2,11 +2,10 @@ use anchor_lang::prelude::*;
 
 use crate::accounts_zerocopy::*;
 use crate::error::*;
-use crate::state::BookSide2Component;
 use crate::state::MangoAccount;
 use crate::state::{
     new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, Book2, BookSide,
-    EventQueue, Group, Order2, OrderType, PerpMarket, SideAndComponent, QUOTE_TOKEN_INDEX,
+    EventQueue, Group, OrderType, PerpMarket, SideAndComponent, QUOTE_TOKEN_INDEX,
 };
 
 #[derive(Accounts)]
@@ -59,7 +58,7 @@ pub fn perp_place_order(
     // For OraclePegged orders its the adjustment from the oracle price, and
     // - orders on the book may be filled at oracle + adjustment (depends on order type)
     // - if an order is placed on the book, it'll be in the oracle-pegged book
-    price_data_lots: i64,
+    price_data: i64,
 
     // Max base lots to buy/sell.
     max_base_lots: i64,
@@ -144,31 +143,17 @@ pub fn perp_place_order(
 
     // TODO reduce_only based on event queue
 
-    let order = if order_type == OrderType::Market {
-        Order2::Market
-    } else {
-        match side_and_component.component() {
-            BookSide2Component::Direct => Order2::Direct {
-                order_type,
-                price_lots: price_data_lots,
-            },
-            BookSide2Component::OraclePegged => Order2::OraclePegged {
-                order_type,
-                price_offset_lots: price_data_lots,
-            },
-        }
-    };
-
     book.new_order(
         side_and_component,
-        order,
         &mut perp_market,
         &mut event_queue,
         oracle_price,
         &mut account.borrow_mut(),
         &account_pk,
+        price_data,
         max_base_lots,
         max_quote_lots,
+        order_type,
         time_in_force,
         client_order_id,
         now_ts,

@@ -245,7 +245,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 perp_market,
                 owner,
                 side_and_component: SideAndComponent::BidDirect,
-                price_data_lots: price_lots,
+                price_data: price_lots,
                 max_base_lots: 1,
                 max_quote_lots: i64::MAX,
                 client_order_id: 0,

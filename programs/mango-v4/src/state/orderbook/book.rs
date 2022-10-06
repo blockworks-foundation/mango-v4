@@ -41,18 +41,6 @@ fn post_only_slide_limit(side: Side, best_other_side: i64, limit: i64) -> i64 {
     }
 }
 
-pub enum Order2 {
-    Market,
-    Direct {
-        order_type: OrderType,
-        price_lots: i64,
-    },
-    OraclePegged {
-        order_type: OrderType,
-        price_offset_lots: i64,
-    },
-}
-
 /// TODO: what if oracle is stale for a while
 pub struct Book2<'a> {
     pub bids: BookSide2<'a>,
@@ -121,15 +109,25 @@ impl<'a> Book2<'a> {
         None
     }
 
-    fn eval_order_type_helper(
+    fn eval_order_params(
         &self,
-        side: Side,
+        side_and_component: SideAndComponent,
+        price_data: i64,
         order_type: OrderType,
-        price_lots: i64,
         oracle_price_lots: i64,
         now_ts: u64,
-    ) -> (bool, bool, i64) {
-        match order_type {
+    ) -> (bool, Option<BookSide2Component>, i64, i64) {
+        let side = side_and_component.side();
+        let component = side_and_component.component();
+        if order_type == OrderType::Market {
+            let price_lots = market_order_limit_for_side(side);
+            return (false, None, price_lots, price_lots);
+        }
+        let price_lots = match component {
+            BookSide2Component::Direct => price_data,
+            BookSide2Component::OraclePegged => cm!(oracle_price_lots + price_data),
+        };
+        let (post_only, post_allowed, price_lots) = match order_type {
             OrderType::Limit => (false, true, price_lots),
             OrderType::ImmediateOrCancel => (false, false, price_lots),
             OrderType::PostOnly => (true, true, price_lots),
@@ -144,75 +142,32 @@ impl<'a> Book2<'a> {
                 };
                 (true, true, price)
             }
-        }
-    }
-
-    fn eval_order_params(
-        &self,
-        side: Side,
-        order: &Order2,
-        oracle_price_lots: i64,
-        now_ts: u64,
-    ) -> (bool, Option<BookSide2Component>, i64, i64) {
-        match order {
-            Order2::Market => {
-                let price_lots = market_order_limit_for_side(side);
-                (false, None, price_lots, price_lots)
-            }
-            Order2::Direct {
-                order_type,
-                price_lots,
-            } => {
-                let (post_only, post_allowed, price_lots) = self.eval_order_type_helper(
-                    side,
-                    *order_type,
-                    *price_lots,
-                    oracle_price_lots,
-                    now_ts,
-                );
-                (
-                    post_only,
-                    post_allowed.then(|| BookSide2Component::Direct),
-                    price_lots,
-                    price_lots,
-                )
-            }
-            Order2::OraclePegged {
-                order_type,
-                price_offset_lots,
-            } => {
-                let price_offset_lots = *price_offset_lots;
-                let price_lots = cm!(oracle_price_lots + price_offset_lots);
-                let (post_only, post_allowed, price_lots) = self.eval_order_type_helper(
-                    side,
-                    *order_type,
-                    price_lots,
-                    oracle_price_lots,
-                    now_ts,
-                );
-                let price_offset_lots = cm!(price_lots - oracle_price_lots);
-                (
-                    post_only,
-                    post_allowed.then(|| BookSide2Component::OraclePegged),
-                    price_lots,
-                    price_offset_lots,
-                )
-            }
-        }
+        };
+        let price_data = match component {
+            BookSide2Component::Direct => price_lots,
+            BookSide2Component::OraclePegged => cm!(price_lots - oracle_price_lots),
+        };
+        (
+            post_only,
+            post_allowed.then(|| component),
+            price_lots,
+            price_data,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
     pub fn new_order(
         &mut self,
         side_and_component: SideAndComponent,
-        order: Order2,
         perp_market: &mut PerpMarket,
         event_queue: &mut EventQueue,
         oracle_price: I80F48,
         mango_account: &mut MangoAccountRefMut,
         mango_account_pk: &Pubkey,
+        price_data: i64,
         max_base_lots: i64,
         max_quote_lots: i64,
+        order_type: OrderType,
         time_in_force: u8,
         client_order_id: u64,
         now_ts: u64,
@@ -222,8 +177,13 @@ impl<'a> Book2<'a> {
         let other_side = side.invert_side();
         let market = perp_market;
         let oracle_price_lots = market.native_price_to_lot(oracle_price);
-        let (post_only, mut post_allowed, price_lots, order_data) =
-            self.eval_order_params(side, &order, oracle_price_lots, now_ts);
+        let (post_only, mut post_allowed, price_lots, price_data) = self.eval_order_params(
+            side_and_component,
+            price_data,
+            order_type,
+            oracle_price_lots,
+            now_ts,
+        );
 
         if post_allowed.is_some() {
             // price limit check computed lazily to save CU on average
@@ -235,7 +195,7 @@ impl<'a> Book2<'a> {
         }
 
         // generate new order id
-        let order_id = market.gen_order_id(side, order_data);
+        let order_id = market.gen_order_id(side, price_data);
 
         // Iterate through book and match against this new order.
         //
@@ -372,7 +332,7 @@ impl<'a> Book2<'a> {
                 let worst_order = bookside.remove_worst().unwrap();
                 // MangoErrorCode::OutOfSpace
                 require!(
-                    side.is_order_better(order_data, worst_order.data()),
+                    side.is_order_better(price_data, worst_order.data()),
                     MangoError::SomeError
                 );
                 let event = OutEvent::new(
@@ -425,18 +385,8 @@ impl<'a> Book2<'a> {
         }
 
         // IOC orders have a fee penalty applied regardless of match
-        match order {
-            Order2::Direct {
-                order_type: OrderType::ImmediateOrCancel,
-                ..
-            }
-            | Order2::OraclePegged {
-                order_type: OrderType::ImmediateOrCancel,
-                ..
-            } => {
-                apply_penalty(market, mango_account)?;
-            }
-            _ => {}
+        if order_type == OrderType::ImmediateOrCancel {
+            apply_penalty(market, mango_account)?;
         }
 
         Ok(())
