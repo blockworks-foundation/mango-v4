@@ -153,6 +153,19 @@ export class MangoAccount {
     return this.serum3.find((sa) => sa.marketIndex == marketIndex);
   }
 
+  getPerpPosition(perpMarketIndex: PerpMarketIndex): PerpPosition | undefined {
+    return this.perps.find((pp) => pp.marketIndex == perpMarketIndex);
+  }
+
+  getPerpPositionUi(group: Group, perpMarketIndex: PerpMarketIndex): number {
+    const pp = this.perps.find((pp) => pp.marketIndex == perpMarketIndex);
+    if (!pp) {
+      throw new Error(`No position found for PerpMarket ${perpMarketIndex}!`);
+    }
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    return pp.getBasePositionUi(perpMarket);
+  }
+
   getSerum3OoAccount(marketIndex: MarketIndex): OpenOrders {
     const oo: OpenOrders | undefined =
       this.serum3OosMapByMarketIndex.get(marketIndex);
@@ -523,7 +536,7 @@ export class MangoAccount {
   /**
    * @param group
    * @param externalMarketPk
-   * @returns maximum ui quote which can be traded for base token given current health
+   * @returns maximum ui quote which can be traded at oracle price for base token given current health
    */
   public getMaxQuoteForSerum3BidUi(
     group: Group,
@@ -560,7 +573,7 @@ export class MangoAccount {
   /**
    * @param group
    * @param externalMarketPk
-   * @returns maximum ui base which can be traded for quote token given current health
+   * @returns maximum ui base which can be traded at oracle price for quote token given current health
    */
   public getMaxBaseForSerum3AskUi(
     group: Group,
@@ -674,21 +687,22 @@ export class MangoAccount {
    *
    * @param group
    * @param perpMarketName
-   * @param uiPrice ui price at which bid would be placed at
-   * @returns max ui quote bid
+   * @returns maximum ui quote which can be traded at oracle price for quote token given current health
    */
   public getMaxQuoteForPerpBidUi(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
-    uiPrice: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
+      pp
+        ? pp
+        : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
       PerpOrderSide.bid,
       I80F48.fromNumber(2),
-      group.toNativePrice(uiPrice, perpMarket.baseDecimals),
     );
     const nativeBase = baseLots.mul(I80F48.fromI64(perpMarket.baseLotSize));
     const nativeQuote = nativeBase.mul(perpMarket.price);
@@ -705,17 +719,61 @@ export class MangoAccount {
   public getMaxBaseForPerpAskUi(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
-    uiPrice: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
+      pp
+        ? pp
+        : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
       PerpOrderSide.ask,
       I80F48.fromNumber(2),
-      group.toNativePrice(uiPrice, perpMarket.baseDecimals),
     );
     return perpMarket.baseLotsToUi(new BN(baseLots.toString()));
+  }
+
+  public simHealthRatioWithPerpBidUiChanges(
+    group: Group,
+    perpMarketIndex: PerpMarketIndex,
+    size: number,
+  ): number {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
+    const hc = HealthCache.fromMangoAccount(group, this);
+    return hc
+      .simHealthRatioWithPerpChanges(
+        perpMarket,
+        pp
+          ? pp
+          : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
+        I80F48.fromI64(perpMarket.uiBaseToLots(size)),
+        PerpOrderSide.bid,
+        HealthType.init,
+      )
+      .toNumber();
+  }
+
+  public simHealthRatioWithPerpAskUiChanges(
+    group: Group,
+    perpMarketIndex: PerpMarketIndex,
+    size: number,
+  ): number {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
+    const hc = HealthCache.fromMangoAccount(group, this);
+    return hc
+      .simHealthRatioWithPerpChanges(
+        perpMarket,
+        pp
+          ? pp
+          : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
+        I80F48.fromI64(perpMarket.uiBaseToLots(size)),
+        PerpOrderSide.ask,
+        HealthType.init,
+      )
+      .toNumber();
   }
 
   public async loadPerpOpenOrdersForMarket(
@@ -943,6 +1001,22 @@ export class PerpPosition {
     );
   }
 
+  static emptyFromPerpMarketIndex(
+    perpMarketIndex: PerpMarketIndex,
+  ): PerpPosition {
+    return new PerpPosition(
+      perpMarketIndex,
+      new BN(0),
+      ZERO_I80F48(),
+      new BN(0),
+      new BN(0),
+      new BN(0),
+      new BN(0),
+      ZERO_I80F48(),
+      ZERO_I80F48(),
+    );
+  }
+
   constructor(
     public marketIndex: PerpMarketIndex,
     public basePositionLots: BN,
@@ -959,7 +1033,11 @@ export class PerpPosition {
     return this.marketIndex != PerpPosition.PerpMarketIndexUnset;
   }
 
-  public unsettledFunding(perpMarket: PerpMarket): I80F48 {
+  public getBasePositionUi(perpMarket: PerpMarket): number {
+    return perpMarket.baseLotsToUi(this.basePositionLots);
+  }
+
+  public getUnsettledFunding(perpMarket: PerpMarket): I80F48 {
     if (this.basePositionLots.gt(new BN(0))) {
       return perpMarket.longFunding
         .sub(this.longSettledFunding)
@@ -981,7 +1059,7 @@ export class PerpPosition {
       this.basePositionLots.add(this.takerBaseLots),
     );
 
-    const unsettledFunding = this.unsettledFunding(perpMarket);
+    const unsettledFunding = this.getUnsettledFunding(perpMarket);
     const takerQuote = I80F48.fromI64(
       new BN(this.takerQuoteLots).mul(perpMarket.quoteLotSize),
     );

@@ -493,7 +493,7 @@ async function main() {
     try {
       let sig = await client.perpEditMarket(
         group,
-        'BTC-PERP',
+        group.getPerpMarketByName('BTC-PERP').perpMarketIndex,
         btcDevnetOracle,
         0.1,
         6,

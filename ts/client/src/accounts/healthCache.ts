@@ -239,6 +239,27 @@ export class HealthCache {
     return this.findTokenInfoIndex(bank.tokenIndex);
   }
 
+  simHealthRatioWithTokenPositionChanges(
+    group: Group,
+    nativeTokenChanges: {
+      nativeTokenAmount: I80F48;
+      mintPk: PublicKey;
+    }[],
+    healthType: HealthType = HealthType.init,
+  ): I80F48 {
+    const adjustedCache: HealthCache = _.cloneDeep(this);
+    // HealthCache.logHealthCache('beforeChange', adjustedCache);
+    for (const change of nativeTokenChanges) {
+      const bank: Bank = group.getFirstBankByMint(change.mintPk);
+      const changeIndex = adjustedCache.getOrCreateTokenInfoIndex(bank);
+      adjustedCache.tokenInfos[changeIndex].balance.iadd(
+        change.nativeTokenAmount.mul(bank.price),
+      );
+    }
+    // HealthCache.logHealthCache('afterChange', adjustedCache);
+    return adjustedCache.healthRatio(healthType);
+  }
+
   findSerum3InfoIndex(marketIndex: MarketIndex): number {
     return this.serum3Infos.findIndex(
       (serum3Info) => serum3Info.marketIndex === marketIndex,
@@ -266,7 +287,6 @@ export class HealthCache {
   }
 
   adjustSerum3Reserved(
-    // todo change indices to types from numbers
     baseBank: BankForHealth,
     quoteBank: BankForHealth,
     serum3Market: Serum3Market,
@@ -298,64 +318,6 @@ export class HealthCache {
     );
     const serum3Info = this.serum3Infos[index];
     serum3Info.reserved = serum3Info.reserved.add(reservedAmount);
-  }
-
-  findPerpInfoIndex(perpMarketIndex: number): number {
-    return this.perpInfos.findIndex(
-      (perpInfo) => perpInfo.perpMarketIndex === perpMarketIndex,
-    );
-  }
-
-  getOrCreatePerpInfoIndex(perpMarket: PerpMarket): number {
-    const index = this.findPerpInfoIndex(perpMarket.perpMarketIndex);
-    if (index == -1) {
-      this.perpInfos.push(PerpInfo.emptyFromPerpMarket(perpMarket));
-    }
-    return this.findPerpInfoIndex(perpMarket.perpMarketIndex);
-  }
-
-  public static logHealthCache(debug: string, healthCache: HealthCache): void {
-    if (debug) console.log(debug);
-    for (const token of healthCache.tokenInfos) {
-      console.log(` ${token.toString()}`);
-    }
-    for (const serum3Info of healthCache.serum3Infos) {
-      console.log(` ${serum3Info.toString(healthCache.tokenInfos)}`);
-    }
-    console.log(
-      ` assets ${healthCache.assets(
-        HealthType.init,
-      )}, liabs ${healthCache.liabs(HealthType.init)}, `,
-    );
-    console.log(
-      ` health(HealthType.init) ${healthCache.health(HealthType.init)}`,
-    );
-    console.log(
-      ` healthRatio(HealthType.init) ${healthCache.healthRatio(
-        HealthType.init,
-      )}`,
-    );
-  }
-
-  simHealthRatioWithTokenPositionChanges(
-    group: Group,
-    nativeTokenChanges: {
-      nativeTokenAmount: I80F48;
-      mintPk: PublicKey;
-    }[],
-    healthType: HealthType = HealthType.init,
-  ): I80F48 {
-    const adjustedCache: HealthCache = _.cloneDeep(this);
-    // HealthCache.logHealthCache('beforeChange', adjustedCache);
-    for (const change of nativeTokenChanges) {
-      const bank: Bank = group.getFirstBankByMint(change.mintPk);
-      const changeIndex = adjustedCache.getOrCreateTokenInfoIndex(bank);
-      adjustedCache.tokenInfos[changeIndex].balance.iadd(
-        change.nativeTokenAmount.mul(bank.price),
-      );
-    }
-    // HealthCache.logHealthCache('afterChange', adjustedCache);
-    return adjustedCache.healthRatio(healthType);
   }
 
   simHealthRatioWithSerum3BidChanges(
@@ -420,6 +382,87 @@ export class HealthCache {
       ZERO_I80F48(),
     );
     return adjustedCache.healthRatio(healthType);
+  }
+
+  findPerpInfoIndex(perpMarketIndex: number): number {
+    return this.perpInfos.findIndex(
+      (perpInfo) => perpInfo.perpMarketIndex === perpMarketIndex,
+    );
+  }
+
+  getOrCreatePerpInfoIndex(perpMarket: PerpMarket): number {
+    const index = this.findPerpInfoIndex(perpMarket.perpMarketIndex);
+    if (index == -1) {
+      this.perpInfos.push(PerpInfo.emptyFromPerpMarket(perpMarket));
+    }
+    return this.findPerpInfoIndex(perpMarket.perpMarketIndex);
+  }
+
+  recomputePerpInfo(
+    perpMarket: PerpMarket,
+    perpInfoIndex: number,
+    clonedExistingPerpPosition: PerpPosition,
+    side: PerpOrderSide,
+    newOrderBaseLots: I80F48,
+  ): void {
+    if (side == PerpOrderSide.bid) {
+      clonedExistingPerpPosition.bidsBaseLots.iadd(
+        new BN(newOrderBaseLots.toNumber()),
+      );
+    } else {
+      clonedExistingPerpPosition.asksBaseLots.iadd(
+        new BN(newOrderBaseLots.toNumber()),
+      );
+    }
+    this.perpInfos[perpInfoIndex] = PerpInfo.fromPerpPosition(
+      perpMarket,
+      clonedExistingPerpPosition,
+    );
+  }
+
+  simHealthRatioWithPerpChanges(
+    perpMarket: PerpMarket,
+    existingPerpPosition: PerpPosition,
+    baseLots: I80F48,
+    side: PerpOrderSide,
+    healthType: HealthType = HealthType.init,
+  ): I80F48 {
+    const clonedHealthCache: HealthCache = _.cloneDeep(this);
+    const clonedExistingPosition: PerpPosition =
+      _.cloneDeep(existingPerpPosition);
+    const perpInfoIndex =
+      clonedHealthCache.getOrCreatePerpInfoIndex(perpMarket);
+    clonedHealthCache.recomputePerpInfo(
+      perpMarket,
+      perpInfoIndex,
+      clonedExistingPosition,
+      side,
+      baseLots,
+    );
+    return clonedHealthCache.healthRatio(healthType);
+  }
+
+  public static logHealthCache(debug: string, healthCache: HealthCache): void {
+    if (debug) console.log(debug);
+    for (const token of healthCache.tokenInfos) {
+      console.log(` ${token.toString()}`);
+    }
+    for (const serum3Info of healthCache.serum3Infos) {
+      console.log(` ${serum3Info.toString(healthCache.tokenInfos)}`);
+    }
+    console.log(
+      ` assets ${healthCache.assets(
+        HealthType.init,
+      )}, liabs ${healthCache.liabs(HealthType.init)}, `,
+    );
+    console.log(
+      ` health(HealthType.init) ${healthCache.health(HealthType.init)}`,
+    );
+    console.log(
+      ` healthRatio(HealthType.init) ${healthCache.healthRatio(
+        HealthType.init,
+      )}`,
+    );
   }
 
   private static binaryApproximationSearch(
@@ -719,9 +762,9 @@ export class HealthCache {
 
   getMaxPerpForHealthRatio(
     perpMarket: PerpMarket,
+    existingPerpPosition: PerpPosition,
     side: PerpOrderSide,
     minRatio: I80F48,
-    price: I80F48,
   ): I80F48 {
     const healthCacheClone: HealthCache = _.cloneDeep(this);
 
@@ -732,37 +775,39 @@ export class HealthCache {
 
     const direction = side == PerpOrderSide.bid ? 1 : -1;
 
-    const perpInfoIndex = this.getOrCreatePerpInfoIndex(perpMarket);
-    const perpInfo = this.perpInfos[perpInfoIndex];
+    const perpInfoIndex = healthCacheClone.getOrCreatePerpInfoIndex(perpMarket);
+    const perpInfo = healthCacheClone.perpInfos[perpInfoIndex];
     const oraclePrice = perpInfo.oraclePrice;
     const baseLotSize = I80F48.fromI64(perpMarket.baseLotSize);
 
     // If the price is sufficiently good then health will just increase from trading
     const finalHealthSlope =
       direction == 1
-        ? perpInfo.initAssetWeight.mul(oraclePrice).sub(price)
-        : price.sub(perpInfo.initLiabWeight.mul(oraclePrice));
+        ? perpInfo.initAssetWeight.mul(oraclePrice).sub(oraclePrice)
+        : oraclePrice.sub(perpInfo.initLiabWeight.mul(oraclePrice));
     if (finalHealthSlope.gte(ZERO_I80F48())) {
       return MAX_I80F48();
     }
 
-    function cacheAfterTrade(baseLots: I80F48): HealthCache {
+    function cacheAfterPlaceOrder(baseLots: I80F48): HealthCache {
       const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
-      const d = I80F48.fromNumber(direction);
-      adjustedCache.perpInfos[perpInfoIndex].base.iadd(
-        d.mul(baseLots.mul(baseLotSize.mul(oraclePrice))),
-      );
-      adjustedCache.perpInfos[perpInfoIndex].quote.isub(
-        d.mul(baseLots.mul(baseLotSize.mul(price))),
+      const adjustedExistingPerpPosition: PerpPosition =
+        _.cloneDeep(existingPerpPosition);
+      adjustedCache.recomputePerpInfo(
+        perpMarket,
+        perpInfoIndex,
+        adjustedExistingPerpPosition,
+        side,
+        baseLots,
       );
       return adjustedCache;
     }
 
     function healthAfterTrade(baseLots: I80F48): I80F48 {
-      return cacheAfterTrade(baseLots).health(HealthType.init);
+      return cacheAfterPlaceOrder(baseLots).health(HealthType.init);
     }
     function healthRatioAfterTrade(baseLots: I80F48): I80F48 {
-      return cacheAfterTrade(baseLots).healthRatio(HealthType.init);
+      return cacheAfterPlaceOrder(baseLots).healthRatio(HealthType.init);
     }
 
     const initialBaseLots = perpInfo.base
@@ -1064,7 +1109,7 @@ export class PerpInfo {
       perpPosition.basePositionLots.add(perpPosition.takerBaseLots),
     );
 
-    const unsettledFunding = perpPosition.unsettledFunding(perpMarket);
+    const unsettledFunding = perpPosition.getUnsettledFunding(perpMarket);
 
     const takerQuote = I80F48.fromI64(
       new BN(perpPosition.takerQuoteLots).mul(perpMarket.quoteLotSize),
@@ -1164,13 +1209,13 @@ export class PerpInfo {
       weight = this.maintAssetWeight;
     }
 
-    // console.log(`initLiabWeight ${this.initLiabWeight}`);
-    // console.log(`initAssetWeight ${this.initAssetWeight}`);
-    // console.log(`weight ${weight}`);
-    // console.log(`this.quote ${this.quote}`);
-    // console.log(`this.base ${this.base}`);
+    // console.log(` - this.quote ${this.quote}`);
+    // console.log(` - weight ${weight}`);
+    // console.log(` - this.base ${this.base}`);
+    // console.log(` - weight.mul(this.base) ${weight.mul(this.base)}`);
 
     const uncappedHealthContribution = this.quote.add(weight.mul(this.base));
+    // console.log(` - uncappedHealthContribution ${uncappedHealthContribution}`);
     if (this.trustedMarket) {
       return uncappedHealthContribution;
     } else {

@@ -39,6 +39,7 @@ export async function sendTransaction(
     latestBlockhash.blockhash != null &&
     latestBlockhash.lastValidBlockHeight != null
   ) {
+    // TODO: tyler, can we remove these?
     console.log('confirming via blockhash');
     status = (
       await connection.confirmTransaction(
@@ -51,6 +52,7 @@ export async function sendTransaction(
       )
     ).value;
   } else {
+    // TODO: tyler, can we remove these?
     console.log('confirming via timeout');
     status = (await connection.confirmTransaction(signature, 'processed'))
       .value;
