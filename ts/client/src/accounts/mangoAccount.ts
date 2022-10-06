@@ -1,7 +1,7 @@
 import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, TransactionSignature } from '@solana/web3.js';
 import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
@@ -492,6 +492,40 @@ export class MangoAccount {
         healthType,
       )
       .toNumber();
+  }
+
+  public async serum3SettleFundsForAllMarkets(
+    client: MangoClient,
+    group: Group,
+  ): Promise<TransactionSignature[]> {
+    // Future: collect ixs, batch them, and send them in fewer txs
+    return await Promise.all(
+      this.serum3Active().map((s) => {
+        const serum3Market = group.getSerum3MarketByMarketIndex(s.marketIndex);
+        return client.serum3SettleFunds(
+          group,
+          this,
+          serum3Market.serumMarketExternal,
+        );
+      }),
+    );
+  }
+
+  public async serum3CancelAllOrdersForAllMarkets(
+    client: MangoClient,
+    group: Group,
+  ): Promise<TransactionSignature[]> {
+    // Future: collect ixs, batch them, and send them in in fewer txs
+    return await Promise.all(
+      this.serum3Active().map((s) => {
+        const serum3Market = group.getSerum3MarketByMarketIndex(s.marketIndex);
+        return client.serum3CancelAllOrders(
+          group,
+          this,
+          serum3Market.serumMarketExternal,
+        );
+      }),
+    );
   }
 
   public async loadSerum3OpenOrdersForMarket(
