@@ -30,15 +30,25 @@ pub enum NodeTag {
 /// The `seq_num` that's passed should monotonically. It's used to choose
 /// the ordering number such that orders placed later for the same price data
 /// are ordered after earlier orders.
-pub fn new_node_key(side: Side, price_data: i64, seq_num: u64) -> i128 {
-    let seq_num = if (price_data < 0) ^ (side == Side::Bid) {
-        !seq_num
-    } else {
-        seq_num
-    };
+pub fn new_node_key(side: Side, price_data: u64, seq_num: u64) -> u128 {
+    let seq_num = if side == Side::Bid { !seq_num } else { seq_num };
 
-    let upper = (price_data as i128) << 64;
-    upper | (seq_num as i128)
+    let upper = (price_data as u128) << 64;
+    upper | (seq_num as u128)
+}
+
+pub fn oracle_peg_price_data(price_offset_lots: i64) -> u64 {
+    let shift = u64::MAX / 2;
+    if price_offset_lots >= 0 {
+        shift + price_offset_lots as u64
+    } else {
+        shift - (-price_offset_lots) as u64
+    }
+}
+
+pub fn direct_price_data(price_lots: i64) -> Result<u64> {
+    require_gte!(price_lots, 1);
+    Ok(price_lots as u64)
 }
 
 /// InnerNodes and LeafNodes compose the binary tree of orders.
@@ -55,7 +65,7 @@ pub struct InnerNode {
     pub prefix_len: u32,
 
     /// only the top `prefix_len` bits of `key` are relevant
-    pub key: i128,
+    pub key: u128,
 
     /// indexes into `BookSide::nodes`
     pub children: [NodeHandle; 2],
@@ -72,7 +82,7 @@ const_assert_eq!(size_of::<InnerNode>() % 8, 0);
 const_assert_eq!(size_of::<InnerNode>(), NODE_SIZE);
 
 impl InnerNode {
-    pub fn new(prefix_len: u32, key: i128) -> Self {
+    pub fn new(prefix_len: u32, key: u128) -> Self {
         Self {
             tag: NodeTag::InnerNode.into(),
             prefix_len,
@@ -85,8 +95,8 @@ impl InnerNode {
 
     /// Returns the handle of the child that may contain the search key
     /// and 0 or 1 depending on which child it was.
-    pub(crate) fn walk_down(&self, search_key: i128) -> (NodeHandle, bool) {
-        let crit_bit_mask = 1i128 << (127 - self.prefix_len);
+    pub(crate) fn walk_down(&self, search_key: u128) -> (NodeHandle, bool) {
+        let crit_bit_mask = 1u128 << (127 - self.prefix_len);
         let crit_bit = (search_key & crit_bit_mask) != 0;
         (self.children[crit_bit as usize], crit_bit)
     }
@@ -113,7 +123,7 @@ pub struct LeafNode {
     pub time_in_force: u8,
 
     /// The binary tree key
-    pub key: i128,
+    pub key: u128,
 
     pub owner: Pubkey,
     pub quantity: i64,
@@ -131,7 +141,7 @@ impl LeafNode {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         owner_slot: u8,
-        key: i128,
+        key: u128,
         owner: Pubkey,
         quantity: i64,
         client_order_id: u64,
@@ -157,24 +167,12 @@ impl LeafNode {
     // TODO: remove, it's not always the price
     #[inline(always)]
     pub fn price(&self) -> i64 {
-        self.price_data()
+        self.price_data() as i64
     }
 
     #[inline(always)]
-    pub fn price_data(&self) -> i64 {
-        (self.key >> 64) as i64
-    }
-
-    #[inline(always)]
-    pub fn key_with_price_data(&self, price: i64) -> i128 {
-        let upper = (price as i128) << 64;
-        // the seqnum gets inverted if we change the sign
-        let lower = if (price < 0) ^ (self.key < 0) {
-            (!(self.key as u64)) as i128
-        } else {
-            (self.key as u64) as i128
-        };
-        upper | lower
+    pub fn price_data(&self) -> u64 {
+        (self.key >> 64) as u64
     }
 
     /// Time at which this order will expire, u64::MAX if never
@@ -224,7 +222,7 @@ pub(crate) enum NodeRefMut<'a> {
 }
 
 impl AnyNode {
-    pub fn key(&self) -> Option<i128> {
+    pub fn key(&self) -> Option<u128> {
         match self.case()? {
             NodeRef::Inner(inner) => Some(inner.key),
             NodeRef::Leaf(leaf) => Some(leaf.key),

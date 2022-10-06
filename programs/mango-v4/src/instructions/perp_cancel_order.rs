@@ -30,7 +30,7 @@ pub struct PerpCancelOrder<'info> {
     pub bids_oracle_pegged: AccountLoader<'info, BookSide>,
 }
 
-pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: i128) -> Result<()> {
+pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: u128) -> Result<()> {
     let mut account = ctx.accounts.account.load_mut()?;
     require!(
         account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),

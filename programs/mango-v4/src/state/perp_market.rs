@@ -137,7 +137,7 @@ impl PerpMarket {
         self.trusted_market == 1
     }
 
-    pub fn gen_order_id(&mut self, side: Side, price_data: i64) -> i128 {
+    pub fn gen_order_id(&mut self, side: Side, price_data: u64) -> u128 {
         self.seq_num += 1;
         orderbook::nodes::new_node_key(side, price_data, self.seq_num)
     }

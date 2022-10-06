@@ -373,7 +373,7 @@ pub struct PerpOpenOrder {
     pub market: PerpMarketIndex,
     pub padding2: [u8; 4],
     pub client_id: u64,
-    pub id: i128,
+    pub id: u128,
     pub reserved: [u8; 64],
 }
 

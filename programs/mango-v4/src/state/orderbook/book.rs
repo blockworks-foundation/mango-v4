@@ -112,21 +112,22 @@ impl<'a> Book2<'a> {
     fn eval_order_params(
         &self,
         side_and_component: SideAndComponent,
-        price_data: i64,
+        price_input: i64,
         order_type: OrderType,
         oracle_price_lots: i64,
         now_ts: u64,
-    ) -> (bool, Option<BookSide2Component>, i64, i64) {
+    ) -> Result<(bool, Option<BookSide2Component>, i64, u64)> {
         let side = side_and_component.side();
         let component = side_and_component.component();
         if order_type == OrderType::Market {
             let price_lots = market_order_limit_for_side(side);
-            return (false, None, price_lots, price_lots);
+            return Ok((false, None, price_lots, price_lots as u64));
         }
         let price_lots = match component {
-            BookSide2Component::Direct => price_data,
-            BookSide2Component::OraclePegged => cm!(oracle_price_lots + price_data),
+            BookSide2Component::Direct => price_input,
+            BookSide2Component::OraclePegged => cm!(oracle_price_lots + price_input),
         };
+        require_gte!(price_lots, 1);
         let (post_only, post_allowed, price_lots) = match order_type {
             OrderType::Limit => (false, true, price_lots),
             OrderType::ImmediateOrCancel => (false, false, price_lots),
@@ -143,16 +144,25 @@ impl<'a> Book2<'a> {
                 (true, true, price)
             }
         };
+        require_gte!(price_lots, 1);
         let price_data = match component {
-            BookSide2Component::Direct => price_lots,
-            BookSide2Component::OraclePegged => cm!(price_lots - oracle_price_lots),
+            BookSide2Component::Direct => price_lots as u64,
+            BookSide2Component::OraclePegged => {
+                let shift = u64::MAX / 2;
+                let diff = cm!(price_lots - oracle_price_lots);
+                if diff >= 0 {
+                    shift + (diff as u64)
+                } else {
+                    shift - ((-diff) as u64)
+                }
+            }
         };
-        (
+        Ok((
             post_only,
             post_allowed.then(|| component),
             price_lots,
             price_data,
-        )
+        ))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -164,7 +174,7 @@ impl<'a> Book2<'a> {
         oracle_price: I80F48,
         mango_account: &mut MangoAccountRefMut,
         mango_account_pk: &Pubkey,
-        price_data: i64,
+        price_input: i64,
         max_base_lots: i64,
         max_quote_lots: i64,
         order_type: OrderType,
@@ -173,17 +183,20 @@ impl<'a> Book2<'a> {
         now_ts: u64,
         mut limit: u8,
     ) -> std::result::Result<(), Error> {
+        require_gte!(max_base_lots, 0);
+        require_gte!(max_quote_lots, 0);
+
         let side = side_and_component.side();
         let other_side = side.invert_side();
         let market = perp_market;
         let oracle_price_lots = market.native_price_to_lot(oracle_price);
         let (post_only, mut post_allowed, price_lots, price_data) = self.eval_order_params(
             side_and_component,
-            price_data,
+            price_input,
             order_type,
             oracle_price_lots,
             now_ts,
-        );
+        )?;
 
         if post_allowed.is_some() {
             // price limit check computed lazily to save CU on average
@@ -204,7 +217,7 @@ impl<'a> Book2<'a> {
         let mut remaining_base_lots = max_base_lots;
         let mut remaining_quote_lots = max_quote_lots;
         let mut matched_order_changes: Vec<(BookSide2NodeHandle, i64)> = vec![];
-        let mut matched_order_deletes: Vec<(BookSide2Component, i128)> = vec![];
+        let mut matched_order_deletes: Vec<(BookSide2Component, u128)> = vec![];
         let mut number_of_dropped_expired_orders = 0;
         let opposing_bookside = self.bookside_mut(other_side);
         for best_opposing in opposing_bookside.iter_all_including_invalid(oracle_price_lots) {
@@ -332,7 +345,7 @@ impl<'a> Book2<'a> {
                 let worst_order = bookside.remove_worst().unwrap();
                 // MangoErrorCode::OutOfSpace
                 require!(
-                    side.is_order_better(price_data, worst_order.price_data()),
+                    side.is_price_data_better(price_data, worst_order.price_data()),
                     MangoError::SomeError
                 );
                 let event = OutEvent::new(
@@ -433,7 +446,7 @@ impl<'a> Book2<'a> {
     pub fn cancel_order(
         &mut self,
         mango_account: &mut MangoAccountRefMut,
-        order_id: i128,
+        order_id: u128,
         side_and_component: SideAndComponent,
         expected_owner: Option<Pubkey>,
     ) -> Result<LeafNode> {
@@ -539,7 +552,7 @@ impl<'a> Book<'a> {
         s.min(max_depth)
     }
     /// Get the quantity of valid bids above this order id. Will return full size of book if order id not found
-    pub fn bids_size_above_order(&self, order_id: i128, max_depth: i64, now_ts: u64) -> i64 {
+    pub fn bids_size_above_order(&self, order_id: u128, max_depth: i64, now_ts: u64) -> i64 {
         let mut s = 0;
         for (_, bid) in self.bids.iter_valid(now_ts) {
             if bid.key == order_id || s >= max_depth {
@@ -551,7 +564,7 @@ impl<'a> Book<'a> {
     }
 
     /// Get the quantity of valid asks above this order id. Will return full size of book if order id not found
-    pub fn asks_size_below_order(&self, order_id: i128, max_depth: i64, now_ts: u64) -> i64 {
+    pub fn asks_size_below_order(&self, order_id: u128, max_depth: i64, now_ts: u64) -> i64 {
         let mut s = 0;
         for (_, ask) in self.asks.iter_valid(now_ts) {
             if ask.key == order_id || s >= max_depth {
@@ -607,7 +620,7 @@ impl<'a> Book<'a> {
         }
 
         // generate new order id
-        let order_id = market.gen_order_id(side, price_lots);
+        let order_id = market.gen_order_id(side, price_lots as u64);
 
         // Iterate through book and match against this new order.
         //
@@ -616,7 +629,7 @@ impl<'a> Book<'a> {
         let mut remaining_base_lots = max_base_lots;
         let mut remaining_quote_lots = max_quote_lots;
         let mut matched_order_changes: Vec<(NodeHandle, i64)> = vec![];
-        let mut matched_order_deletes: Vec<i128> = vec![];
+        let mut matched_order_deletes: Vec<u128> = vec![];
         let mut number_of_dropped_expired_orders = 0;
         let opposing_bookside = self.bookside_mut(other_side);
         for (best_opposing_h, best_opposing) in opposing_bookside.iter_all_including_invalid() {
@@ -739,7 +752,7 @@ impl<'a> Book<'a> {
                 let worst_order = bookside.remove_worst().unwrap();
                 // MangoErrorCode::OutOfSpace
                 require!(
-                    side.is_order_better(price_lots, worst_order.price()),
+                    side.is_price_better(price_lots, worst_order.price()),
                     MangoError::SomeError
                 );
                 let event = OutEvent::new(
@@ -841,7 +854,7 @@ impl<'a> Book<'a> {
     pub fn cancel_order(
         &mut self,
         mango_account: &mut MangoAccountRefMut,
-        order_id: i128,
+        order_id: u128,
         side: Side,
         expected_owner: Option<Pubkey>,
     ) -> Result<LeafNode> {

@@ -521,7 +521,7 @@ impl<
     pub fn perp_find_order_with_order_id(
         &self,
         market_index: PerpMarketIndex,
-        order_id: i128,
+        order_id: u128,
     ) -> Option<&PerpOpenOrder> {
         for oo in self.all_perp_orders() {
             if oo.market == market_index && oo.id == order_id {
@@ -813,8 +813,8 @@ impl<
         let oo = self.perp_order_mut_by_raw_index(slot);
         oo.market = FREE_ORDER_SLOT;
         oo.side_and_component = SideAndComponent::BidDirect;
-        oo.id = 0i128;
-        oo.client_id = 0u64;
+        oo.id = 0;
+        oo.client_id = 0;
         Ok(())
     }
 

@@ -2460,7 +2460,7 @@ pub struct PerpCancelOrderInstruction {
     pub account: Pubkey,
     pub perp_market: Pubkey,
     pub owner: TestKeypair,
-    pub order_id: i128,
+    pub order_id: u128,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpCancelOrderInstruction {

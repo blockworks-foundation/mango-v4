@@ -38,7 +38,7 @@ mod tests {
         }
     }
 
-    fn bookside_leaf_by_key(bookside: &BookSide, key: i128) -> Option<&LeafNode> {
+    fn bookside_leaf_by_key(bookside: &BookSide, key: u128) -> Option<&LeafNode> {
         for (_, leaf) in bookside.iter_all_including_invalid() {
             if leaf.key == key {
                 return Some(leaf);
@@ -47,7 +47,7 @@ mod tests {
         None
     }
 
-    fn bookside_contains_key(bookside: &BookSide, key: i128) -> bool {
+    fn bookside_contains_key(bookside: &BookSide, key: u128) -> bool {
         for (_, leaf) in bookside.iter_all_including_invalid() {
             if leaf.key == key {
                 return true;
@@ -56,9 +56,9 @@ mod tests {
         false
     }
 
-    fn bookside_contains_price(bookside: &BookSide, price: i64) -> bool {
+    fn bookside_contains_price(bookside: &BookSide, price_data: u64) -> bool {
         for (_, leaf) in bookside.iter_all_including_invalid() {
-            if leaf.price() == price {
+            if leaf.price_data() == price_data {
                 return true;
             }
         }
@@ -102,7 +102,7 @@ mod tests {
         };
 
         let mut new_order =
-            |book: &mut Book, event_queue: &mut EventQueue, side, price, now_ts| -> i128 {
+            |book: &mut Book, event_queue: &mut EventQueue, side, price, now_ts| -> u128 {
                 let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
                 let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
                 account
@@ -173,7 +173,7 @@ mod tests {
         assert_eq!(event_queue.len(), 2);
 
         // adding an ask will wipe up to three expired bids at the top of the book
-        let bids_max = book.bids.max_leaf().unwrap().price();
+        let bids_max = book.bids.max_leaf().unwrap().price_data();
         let bids_count = book.bids.leaf_count;
         new_order(&mut book, &mut event_queue, Side::Ask, 6000, 1500000);
         assert_eq!(book.bids.leaf_count, bids_count - 5);
@@ -250,7 +250,7 @@ mod tests {
             &book.bids,
             maker.perp_order_mut_by_raw_index(0).id
         ));
-        assert!(bookside_contains_price(&book.bids, price));
+        assert!(bookside_contains_price(&book.bids, price as u64));
         assert_eq!(
             maker.perp_position_by_raw_index(0).bids_base_lots,
             bid_quantity

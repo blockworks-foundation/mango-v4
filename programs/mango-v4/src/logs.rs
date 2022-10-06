@@ -100,7 +100,7 @@ pub struct FillLog {
     pub seq_num: u64, // note: usize same as u64
 
     pub maker: Pubkey,
-    pub maker_order_id: i128,
+    pub maker_order_id: u128,
     pub maker_client_order_id: u64,
     pub maker_fee: i128,
 
@@ -108,7 +108,7 @@ pub struct FillLog {
     pub maker_timestamp: u64,
 
     pub taker: Pubkey,
-    pub taker_order_id: i128,
+    pub taker_order_id: u128,
     pub taker_client_order_id: u64,
     pub taker_fee: i128,
 

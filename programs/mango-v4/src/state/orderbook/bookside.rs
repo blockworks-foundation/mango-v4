@@ -176,7 +176,7 @@ impl BookSide {
         }
     }
 
-    pub fn remove_by_key(&mut self, search_key: i128) -> Option<LeafNode> {
+    pub fn remove_by_key(&mut self, search_key: u128) -> Option<LeafNode> {
         // path of InnerNode handles that lead to the removed leaf
         let mut stack: Vec<(NodeHandle, bool)> = vec![];
 
@@ -336,7 +336,7 @@ impl BookSide {
             // we'll replace root with a new InnerNode that has new_leaf and root as children
 
             // change the root in place to represent the LCA of [new_leaf] and [root]
-            let crit_bit_mask: i128 = 1i128 << (127 - shared_prefix_len);
+            let crit_bit_mask: u128 = 1u128 << (127 - shared_prefix_len);
             let new_leaf_crit_bit = (crit_bit_mask & new_leaf.key) != 0;
             let old_root_crit_bit = !new_leaf_crit_bit;
 
@@ -500,7 +500,7 @@ impl<'a> BookSide2<'a> {
     pub fn remove_by_key(
         &mut self,
         component: BookSide2Component,
-        search_key: i128,
+        search_key: u128,
     ) -> Option<LeafNode> {
         self.component_mut(component).remove_by_key(search_key)
     }
@@ -559,7 +559,7 @@ mod tests {
                     assert!((inner.key ^ right).leading_zeros() >= inner.prefix_len);
 
                     // the left and right node key have the critbit unset and set respectively
-                    let crit_bit_mask: i128 = 1i128 << (127 - inner.prefix_len);
+                    let crit_bit_mask: u128 = 1u128 << (127 - inner.prefix_len);
                     assert!(left & crit_bit_mask == 0);
                     assert!(right & crit_bit_mask != 0);
 
@@ -576,7 +576,7 @@ mod tests {
     fn verify_bookside_iteration(bookside: &BookSide) {
         let mut total = 0;
         let ascending = bookside.book_side_type == BookSideType::Asks;
-        let mut last_key = if ascending { 0 } else { i128::MAX };
+        let mut last_key = if ascending { 0 } else { u128::MAX };
         for (_, node) in bookside.iter_all_including_invalid() {
             let key = node.key;
             if ascending {
@@ -619,7 +619,7 @@ mod tests {
     #[test]
     fn bookside_expiry_manual() {
         let mut bids = new_bookside(BookSideType::Bids);
-        let new_expiring_leaf = |key: i128, expiry: u64| {
+        let new_expiring_leaf = |key: u128, expiry: u64| {
             LeafNode::new(
                 0,
                 key,
@@ -698,7 +698,7 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         let mut bids = new_bookside(BookSideType::Bids);
-        let new_expiring_leaf = |key: i128, expiry: u64| {
+        let new_expiring_leaf = |key: u128, expiry: u64| {
             LeafNode::new(
                 0,
                 key,
@@ -714,7 +714,7 @@ mod tests {
         // add 200 random leaves
         let mut keys = vec![];
         for _ in 0..200 {
-            let key: i128 = rng.gen_range(0..10000); // overlap in key bits
+            let key: u128 = rng.gen_range(0..10000); // overlap in key bits
             if keys.contains(&key) {
                 continue;
             }
@@ -746,23 +746,23 @@ mod tests {
         let mut bids_direct = bids_direct_cell.borrow_mut();
         let mut bids_oracle_pegged = bids_oracle_pegged_cell.borrow_mut();
         let new_leaf =
-            |key: i128| LeafNode::new(0, key, Pubkey::default(), 0, 0, 1, OrderType::Limit, 0);
+            |key: u128| LeafNode::new(0, key, Pubkey::default(), 0, 0, 1, OrderType::Limit, 0);
 
         // add 100 random leaves to each BookSide
         let mut keys = vec![];
         for _ in 0..100 {
-            let price: i64 = rng.gen_range(-20..20);
+            let price_data: u64 = oracle_peg_price_data(rng.gen_range(-20..20));
             let seq_num: u64 = rng.gen_range(0..1000);
-            let key = new_node_key(Side::Bid, price, seq_num);
+            let key = new_node_key(Side::Bid, price_data, seq_num);
             if keys.contains(&key) {
                 continue;
             }
             keys.push(key);
             bids_oracle_pegged.insert_leaf(&new_leaf(key)).unwrap();
 
-            let price: i64 = rng.gen_range(1..50);
+            let price_data: u64 = rng.gen_range(1..50);
             let seq_num: u64 = rng.gen_range(0..1000);
-            let key = new_node_key(Side::Bid, price, seq_num);
+            let key = new_node_key(Side::Bid, price_data, seq_num);
             if keys.contains(&key) {
                 continue;
             }

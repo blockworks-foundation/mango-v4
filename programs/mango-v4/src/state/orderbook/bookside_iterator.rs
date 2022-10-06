@@ -123,13 +123,34 @@ impl<'a> BookSide2Iter<'a> {
     }
 }
 
-fn oracle_pegged_price(oracle_price_lots: i64, price_data: i64) -> Option<i64> {
-    if let Some(price) = oracle_price_lots.checked_add(price_data) {
+fn oracle_pegged_price(oracle_price_lots: i64, price_data: u64) -> Option<i64> {
+    let shift = u64::MAX / 2;
+    let price_offset = if price_data >= shift {
+        (price_data - shift) as i64
+    } else {
+        -((shift - price_data) as i64)
+    };
+    if let Some(price) = oracle_price_lots.checked_add(price_offset) {
         if price >= 1 {
             return Some(price);
         }
     }
     None
+}
+
+fn direct_price(price_data: u64) -> i64 {
+    // TODO: prices should be unsigned from the start!
+    assert!(price_data <= i64::MAX as u64);
+    price_data as i64
+}
+
+fn key_for_price(key: u128, price_lots: i64) -> u128 {
+    // We know this can never fail, because oracle pegged price will always be >= 1
+    assert!(price_lots >= 1);
+    let price_data = direct_price_data(price_lots).unwrap();
+    let upper = (price_data as u128) << 64;
+    let lower = (key as u64) as u128;
+    upper | lower
 }
 
 impl<'a> Iterator for BookSide2Iter<'a> {
@@ -149,7 +170,7 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                 if o_price_maybe.is_none()
                     || is_better(
                         d_node.key,
-                        o_node.key_with_price_data(o_price_maybe.unwrap()),
+                        key_for_price(o_node.key, o_price_maybe.unwrap()),
                     )
                 {
                     self.direct_iter.next();
@@ -159,7 +180,7 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                             node: d_handle,
                         },
                         node: d_node,
-                        price_lots: d_node.price_data(),
+                        price_lots: direct_price(d_node.price_data()),
                     })
                 } else {
                     self.oracle_pegged_iter.next();
@@ -199,7 +220,7 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                         node: handle,
                     },
                     node,
-                    price_lots: node.price_data(),
+                    price_lots: direct_price(node.price_data()),
                 })
             }
             (None, None) => None,

@@ -517,7 +517,7 @@ pub mod mango_v4 {
         )
     }
 
-    pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: i128) -> Result<()> {
+    pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: u128) -> Result<()> {
         instructions::perp_cancel_order(ctx, order_id)
     }
 

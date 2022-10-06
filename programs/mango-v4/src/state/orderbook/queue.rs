@@ -187,7 +187,7 @@ pub struct FillEvent {
     pub seq_num: u64,
 
     pub maker: Pubkey,
-    pub maker_order_id: i128,
+    pub maker_order_id: u128,
     pub maker_client_order_id: u64,
     pub maker_fee: I80F48,
 
@@ -195,7 +195,7 @@ pub struct FillEvent {
     pub maker_timestamp: u64,
 
     pub taker: Pubkey,
-    pub taker_order_id: i128,
+    pub taker_order_id: u128,
     pub taker_client_order_id: u64,
     pub taker_fee: I80F48,
 
@@ -215,13 +215,13 @@ impl FillEvent {
         timestamp: u64,
         seq_num: u64,
         maker: Pubkey,
-        maker_order_id: i128,
+        maker_order_id: u128,
         maker_client_order_id: u64,
         maker_fee: I80F48,
         maker_timestamp: u64,
 
         taker: Pubkey,
-        taker_order_id: i128,
+        taker_order_id: u128,
         taker_client_order_id: u64,
         taker_fee: I80F48,
         price: i64,
