@@ -10,7 +10,7 @@ use crate::state::oracle;
 use crate::state::orderbook::order_type::Side;
 use crate::util::checked_math as cm;
 
-use super::{Book2, OracleConfig, DAY_I80F48};
+use super::{orderbook, Book2, OracleConfig, DAY_I80F48};
 
 pub type PerpMarketIndex = u16;
 
@@ -137,21 +137,9 @@ impl PerpMarket {
         self.trusted_market == 1
     }
 
-    pub fn gen_order_id(&mut self, side: Side, price: i64) -> i128 {
+    pub fn gen_order_id(&mut self, side: Side, price_data: i64) -> i128 {
         self.seq_num += 1;
-
-        // The seqnum ensures that later orders at the same price are placed below earlier orders.
-        //
-        // That means it should increase for asks with positive price, but decrease for
-        // bids with positive price etc.
-        let seq_num = if (price < 0) ^ (side == Side::Bid) {
-            !self.seq_num
-        } else {
-            self.seq_num
-        };
-
-        let upper = (price as i128) << 64;
-        upper | (seq_num as i128)
+        orderbook::nodes::new_node_key(side, price_data, self.seq_num)
     }
 
     pub fn oracle_price(&self, oracle_acc: &impl KeyedAccountReader) -> Result<I80F48> {

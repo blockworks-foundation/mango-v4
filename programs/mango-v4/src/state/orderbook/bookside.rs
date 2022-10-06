@@ -516,9 +516,10 @@ impl<'a> BookSide2<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::order_type::OrderType;
+    use super::super::*;
     use super::*;
     use bytemuck::Zeroable;
+    use std::cell::RefCell;
 
     fn new_bookside(book_side_type: BookSideType) -> BookSide {
         BookSide {
@@ -732,6 +733,69 @@ mod tests {
             bids.remove_by_key(k).unwrap();
             keys.retain(|v| *v != k);
             verify_bookside(&bids);
+        }
+    }
+
+    #[test]
+    fn bookside2_iteration_random() {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        let bids_direct_cell = RefCell::new(new_bookside(BookSideType::Bids));
+        let bids_oracle_pegged_cell = RefCell::new(new_bookside(BookSideType::Bids));
+        let mut bids_direct = bids_direct_cell.borrow_mut();
+        let mut bids_oracle_pegged = bids_oracle_pegged_cell.borrow_mut();
+        let new_leaf =
+            |key: i128| LeafNode::new(0, key, Pubkey::default(), 0, 0, 1, OrderType::Limit, 0);
+
+        // add 100 random leaves to each BookSide
+        let mut keys = vec![];
+        for _ in 0..100 {
+            let price: i64 = rng.gen_range(-20..20);
+            let seq_num: u64 = rng.gen_range(0..1000);
+            let key = new_node_key(Side::Bid, price, seq_num);
+            if keys.contains(&key) {
+                continue;
+            }
+            keys.push(key);
+            bids_oracle_pegged.insert_leaf(&new_leaf(key)).unwrap();
+
+            let price: i64 = rng.gen_range(1..50);
+            let seq_num: u64 = rng.gen_range(0..1000);
+            let key = new_node_key(Side::Bid, price, seq_num);
+            if keys.contains(&key) {
+                continue;
+            }
+            keys.push(key);
+            bids_direct.insert_leaf(&new_leaf(key)).unwrap();
+        }
+
+        let bookside = BookSide2 {
+            direct: bids_direct,
+            oracle_pegged: bids_oracle_pegged,
+        };
+
+        // verify iteration order for different oracle prices
+        for oracle_price_lots in 1..40 {
+            println!("oracle {oracle_price_lots}");
+            let mut total = 0;
+            let ascending = bookside.direct.book_side_type == BookSideType::Asks;
+            let mut last_price = if ascending { 0 } else { i64::MAX };
+            for order in bookside.iter_all_including_invalid(oracle_price_lots) {
+                let price = order.price_lots;
+                println!("{} {:?} {price}", order.node.key, order.handle.component);
+                if ascending {
+                    assert!(price >= last_price);
+                } else {
+                    assert!(price <= last_price);
+                }
+                last_price = price;
+                total += 1;
+            }
+            assert!(total >= 100); // some oracle peg orders would be skipped
+            if oracle_price_lots > 20 {
+                assert!(total == 200);
+            }
         }
     }
 }

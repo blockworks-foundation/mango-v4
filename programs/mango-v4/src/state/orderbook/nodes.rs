@@ -6,7 +6,7 @@ use mango_macro::Pod;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 
-use super::order_type::OrderType;
+use super::order_type::{OrderType, Side};
 
 pub type NodeHandle = u32;
 const NODE_SIZE: usize = 96;
@@ -19,6 +19,26 @@ pub enum NodeTag {
     LeafNode = 2,
     FreeNode = 3,
     LastFreeNode = 4,
+}
+
+/// Creates a binary tree node key.
+///
+/// It's used for sorting nodes (ascending for asks, descending for bids)
+/// and encodes price data in the top 64 bits followed by an ordering number
+/// in the lower bits.
+///
+/// The `seq_num` that's passed should monotonically. It's used to choose
+/// the ordering number such that orders placed later for the same price data
+/// are ordered after earlier orders.
+pub fn new_node_key(side: Side, price_data: i64, seq_num: u64) -> i128 {
+    let seq_num = if (price_data < 0) ^ (side == Side::Bid) {
+        !seq_num
+    } else {
+        seq_num
+    };
+
+    let upper = (price_data as i128) << 64;
+    upper | (seq_num as i128)
 }
 
 /// InnerNodes and LeafNodes compose the binary tree of orders.
@@ -137,17 +157,24 @@ impl LeafNode {
     // TODO: remove, it's not always the price
     #[inline(always)]
     pub fn price(&self) -> i64 {
-        self.data()
+        self.price_data()
     }
 
     #[inline(always)]
-    pub fn data(&self) -> i64 {
+    pub fn price_data(&self) -> i64 {
         (self.key >> 64) as i64
     }
 
     #[inline(always)]
-    pub fn key_with_data(&self, price: i64) -> i128 {
-        ((price as i128) << 64) | ((self.key as u64) as i128)
+    pub fn key_with_price_data(&self, price: i64) -> i128 {
+        let upper = (price as i128) << 64;
+        // the seqnum gets inverted if we change the sign
+        let lower = if (price < 0) ^ (self.key < 0) {
+            (!(self.key as u64)) as i128
+        } else {
+            (self.key as u64) as i128
+        };
+        upper | lower
     }
 
     /// Time at which this order will expire, u64::MAX if never

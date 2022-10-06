@@ -332,7 +332,7 @@ impl<'a> Book2<'a> {
                 let worst_order = bookside.remove_worst().unwrap();
                 // MangoErrorCode::OutOfSpace
                 require!(
-                    side.is_order_better(price_data, worst_order.data()),
+                    side.is_order_better(price_data, worst_order.price_data()),
                     MangoError::SomeError
                 );
                 let event = OutEvent::new(

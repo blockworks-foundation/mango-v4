@@ -123,6 +123,15 @@ impl<'a> BookSide2Iter<'a> {
     }
 }
 
+fn oracle_pegged_price(oracle_price_lots: i64, price_data: i64) -> Option<i64> {
+    if let Some(price) = oracle_price_lots.checked_add(price_data) {
+        if price >= 1 {
+            return Some(price);
+        }
+    }
+    None
+}
+
 impl<'a> Iterator for BookSide2Iter<'a> {
     type Item = BookSide2IterItem<'a>;
 
@@ -135,9 +144,13 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                     |a, b| a < b
                 };
 
-                let o_price_maybe = self.oracle_price_lots.checked_add(o_node.data());
+                let o_price_maybe =
+                    oracle_pegged_price(self.oracle_price_lots, o_node.price_data());
                 if o_price_maybe.is_none()
-                    || is_better(d_node.key, o_node.key_with_data(o_price_maybe.unwrap()))
+                    || is_better(
+                        d_node.key,
+                        o_node.key_with_price_data(o_price_maybe.unwrap()),
+                    )
                 {
                     self.direct_iter.next();
                     Some(Self::Item {
@@ -146,7 +159,7 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                             node: d_handle,
                         },
                         node: d_node,
-                        price_lots: d_node.data(),
+                        price_lots: d_node.price_data(),
                     })
                 } else {
                     self.oracle_pegged_iter.next();
@@ -162,12 +175,13 @@ impl<'a> Iterator for BookSide2Iter<'a> {
             }
             (None, Some((handle, node))) => {
                 self.oracle_pegged_iter.next();
-                let price_lots = match self.oracle_price_lots.checked_add(node.data()) {
-                    Some(v) => v,
-                    None => {
-                        return None;
-                    }
-                };
+                let price_lots =
+                    match oracle_pegged_price(self.oracle_price_lots, node.price_data()) {
+                        Some(v) => v,
+                        None => {
+                            return None;
+                        }
+                    };
                 Some(Self::Item {
                     handle: BookSide2NodeHandle {
                         component: BookSide2Component::OraclePegged,
@@ -185,7 +199,7 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                         node: handle,
                     },
                     node,
-                    price_lots: node.data(),
+                    price_lots: node.price_data(),
                 })
             }
             (None, None) => None,
