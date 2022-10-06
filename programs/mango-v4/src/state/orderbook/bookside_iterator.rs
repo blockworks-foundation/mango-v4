@@ -151,7 +151,18 @@ impl<'a> Iterator for BookSide2Iter<'a> {
     type Item = BookSide2IterItem<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match (self.direct_iter.peek(), self.oracle_pegged_iter.peek()) {
+        // Skip all the oracle pegged orders that aren't representable with the current oracle
+        // price. Example: iterating asks, but the best ask is at offset -100 with the oracle at 50.
+        // We need to skip asks until we find the first that has a price >= 1.
+        let mut o_peek = self.oracle_pegged_iter.peek();
+        while let Some((_, o_node)) = o_peek {
+            if oracle_pegged_price(self.oracle_price_lots, o_node.price_data()).is_some() {
+                break;
+            }
+            o_peek = self.oracle_pegged_iter.next();
+        }
+
+        match (self.direct_iter.peek(), o_peek) {
             (Some((d_handle, d_node)), Some((o_handle, o_node))) => {
                 let is_better = if self.direct_iter.is_bids() {
                     |a, b| a > b
@@ -159,14 +170,9 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                     |a, b| a < b
                 };
 
-                let o_price_maybe =
-                    oracle_pegged_price(self.oracle_price_lots, o_node.price_data());
-                if o_price_maybe.is_none()
-                    || is_better(
-                        d_node.key,
-                        key_for_price(o_node.key, o_price_maybe.unwrap()),
-                    )
-                {
+                let o_price =
+                    oracle_pegged_price(self.oracle_price_lots, o_node.price_data()).unwrap();
+                if is_better(d_node.key, key_for_price(o_node.key, o_price)) {
                     self.direct_iter.next();
                     Some(Self::Item {
                         handle: BookSide2NodeHandle {
@@ -184,19 +190,14 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                             node: o_handle,
                         },
                         node: o_node,
-                        price_lots: o_price_maybe.unwrap(),
+                        price_lots: o_price,
                     })
                 }
             }
             (None, Some((handle, node))) => {
                 self.oracle_pegged_iter.next();
                 let price_lots =
-                    match oracle_pegged_price(self.oracle_price_lots, node.price_data()) {
-                        Some(v) => v,
-                        None => {
-                            return None;
-                        }
-                    };
+                    oracle_pegged_price(self.oracle_price_lots, node.price_data()).unwrap();
                 Some(Self::Item {
                     handle: BookSide2NodeHandle {
                         component: BookSide2Component::OraclePegged,

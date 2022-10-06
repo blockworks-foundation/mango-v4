@@ -752,8 +752,14 @@ mod tests {
         let new_leaf =
             |key: u128| LeafNode::new(0, key, Pubkey::default(), 0, 0, 1, OrderType::Limit, 0);
 
-        // add 100 random leaves to each BookSide
+        // add 100 leaves to each BookSide, mostly random
         let mut keys = vec![];
+
+        // ensure at least one oracle pegged order visible even at oracle price 1
+        let key = new_node_key(side, oracle_peg_price_data(20), 0);
+        keys.push(key);
+        oracle_pegged.insert_leaf(&new_leaf(key)).unwrap();
+
         while oracle_pegged.leaf_count < 100 {
             let price_data: u64 = oracle_peg_price_data(rng.gen_range(-20..20));
             let seq_num: u64 = rng.gen_range(0..1000);
@@ -798,9 +804,9 @@ mod tests {
                 last_price = price;
                 total += 1;
             }
-            assert!(total >= 100); // some oracle peg orders would be skipped
+            assert!(total >= 101); // some oracle peg orders could be skipped
             if oracle_price_lots > 20 {
-                assert!(total == 200);
+                assert_eq!(total, 200);
             }
         }
     }
