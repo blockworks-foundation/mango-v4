@@ -178,18 +178,11 @@ pub fn perp_liq_base_position(
         quote_transfer,
     );
 
-    // Check liqee health again
-    liqee_health_cache.recompute_perp_info(liqee_perp_position, &perp_market)?;
-    let liqee_init_health = liqee_health_cache.health(HealthType::Init);
-    liqee
-        .fixed
-        .maybe_recover_from_being_liquidated(liqee_init_health);
-
     emit_perp_balances(
         ctx.accounts.group.key(),
         ctx.accounts.liqor.key(),
         perp_market.perp_market_index,
-        liqor.perp_position(perp_market.perp_market_index).unwrap(),
+        liqor_perp_position,
         &perp_market,
     );
 
@@ -197,19 +190,26 @@ pub fn perp_liq_base_position(
         ctx.accounts.group.key(),
         ctx.accounts.liqee.key(),
         perp_market.perp_market_index,
-        liqee.perp_position(perp_market.perp_market_index).unwrap(),
+        liqee_perp_position,
         &perp_market,
     );
 
     emit!(PerpLiqBasePositionLog {
         mango_group: ctx.accounts.group.key(),
-        market_index: perp_market.perp_market_index,
+        perp_market_index: perp_market.perp_market_index,
         liqor: ctx.accounts.liqor.key(),
         liqee: ctx.accounts.liqee.key(),
         base_transfer: base_transfer,
         quote_transfer: quote_transfer.to_bits(),
         price: oracle_price.to_bits(),
     });
+
+    // Check liqee health again
+    liqee_health_cache.recompute_perp_info(liqee_perp_position, &perp_market)?;
+    let liqee_init_health = liqee_health_cache.health(HealthType::Init);
+    liqee
+        .fixed
+        .maybe_recover_from_being_liquidated(liqee_init_health);
 
     drop(perp_market);
 

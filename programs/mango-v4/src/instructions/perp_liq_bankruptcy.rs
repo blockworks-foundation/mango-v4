@@ -164,7 +164,7 @@ pub fn perp_liq_bankruptcy(ctx: Context<PerpLiqBankruptcy>, max_liab_transfer: u
         emit!(TokenBalanceLog {
             mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.liqor.key(),
-            token_index: QUOTE_TOKEN_INDEX,
+            token_index: settle_token_index,
             indexed_position: liqor_quote.indexed_position.to_bits(),
             deposit_index: settle_bank.deposit_index.to_bits(),
             borrow_index: settle_bank.borrow_index.to_bits(),
@@ -176,6 +176,14 @@ pub fn perp_liq_bankruptcy(ctx: Context<PerpLiqBankruptcy>, max_liab_transfer: u
             .0;
         liqee_perp_position.change_quote_position(insurance_liab_transfer);
         liqor_perp_position.change_quote_position(-insurance_liab_transfer);
+
+        emit_perp_balances(
+            ctx.accounts.group.key(),
+            ctx.accounts.liqor.key(),
+            perp_market.perp_market_index,
+            liqor_perp_position,
+            &perp_market,
+        );
     }
 
     // Socialize loss if the insurance fund is exhausted
@@ -188,37 +196,29 @@ pub fn perp_liq_bankruptcy(ctx: Context<PerpLiqBankruptcy>, max_liab_transfer: u
         socialized_loss = remaining_liab;
     }
 
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.liqee.key(),
+        perp_market.perp_market_index,
+        liqee_perp_position,
+        &perp_market,
+    );
+
+    emit!(PerpLiqBankruptcyLog {
+        mango_group: ctx.accounts.group.key(),
+        liqee: ctx.accounts.liqee.key(),
+        liqor: ctx.accounts.liqor.key(),
+        perp_market_index: perp_market.perp_market_index,
+        insurance_transfer: insurance_transfer_i80f48.to_bits(),
+        socialized_loss: socialized_loss.to_bits()
+    });
+
     // Check liqee health again
     liqee_health_cache.recompute_perp_info(liqee_perp_position, &perp_market)?;
     let liqee_init_health = liqee_health_cache.health(HealthType::Init);
     liqee
         .fixed
         .maybe_recover_from_being_liquidated(liqee_init_health);
-
-    emit!(PerpLiqBankruptcyLog {
-        mango_group: ctx.accounts.group.key(),
-        liqee: ctx.accounts.liqee.key(),
-        liqor: ctx.accounts.liqor.key(),
-        market_index: perp_market.perp_market_index,
-        insurance_transfer: insurance_transfer_i80f48.to_bits(),
-        socialized_loss: socialized_loss.to_bits()
-    });
-
-    emit_perp_balances(
-        ctx.accounts.group.key(),
-        ctx.accounts.liqor.key(),
-        perp_market.perp_market_index,
-        liqor.perp_position(perp_market.perp_market_index).unwrap(),
-        &perp_market,
-    );
-
-    emit_perp_balances(
-        ctx.accounts.group.key(),
-        ctx.accounts.liqee.key(),
-        perp_market.perp_market_index,
-        liqee.perp_position(perp_market.perp_market_index).unwrap(),
-        &perp_market,
-    );
 
     drop(perp_market);
 

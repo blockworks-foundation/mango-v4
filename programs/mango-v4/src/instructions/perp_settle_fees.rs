@@ -82,6 +82,14 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     perp_position.change_quote_position(settlement);
     perp_market.fees_accrued = cm!(perp_market.fees_accrued - settlement);
 
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.account.key(),
+        perp_market.perp_market_index,
+        perp_position,
+        &perp_market,
+    );
+
     // Update the account's perp_spot_transfers with the new PnL
     let settlement_i64 = settlement.round().checked_to_num::<i64>().unwrap();
     cm!(perp_position.perp_spot_transfers -= settlement_i64);
@@ -104,20 +112,10 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         borrow_index: bank.borrow_index.to_bits(),
     });
 
-    emit_perp_balances(
-        ctx.accounts.group.key(),
-        ctx.accounts.account.key(),
-        perp_market.perp_market_index,
-        account
-            .perp_position(perp_market.perp_market_index)
-            .unwrap(),
-        &perp_market,
-    );
-
     emit!(PerpSettleFeesLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
-        market_index: perp_market.perp_market_index,
+        perp_market_index: perp_market.perp_market_index,
         settlement: settlement.to_bits(),
     });
 

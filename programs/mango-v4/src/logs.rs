@@ -225,15 +225,15 @@ pub struct DeactivatePerpPositionLog {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
     pub market_index: u16,
-    pub cumulative_long_funding: f32,
-    pub cumulative_short_funding: f32,
-    pub maker_volume: i64,
-    pub taker_volume: i64,
+    pub cumulative_long_funding: f64,
+    pub cumulative_short_funding: f64,
+    pub maker_volume: u64,
+    pub taker_volume: u64,
     pub perp_spot_transfers: i64,
 }
 
 #[event]
-pub struct TokenRegisterLog {
+pub struct TokenMetaDataLog {
     pub mango_group: Pubkey,
     pub mint: Pubkey,
     pub token_index: u16,
@@ -243,10 +243,10 @@ pub struct TokenRegisterLog {
 }
 
 #[event]
-pub struct PerpCreateMarketLog {
+pub struct PerpMarketMetaDataLog {
     pub mango_group: Pubkey,
     pub perp_market: Pubkey,
-    pub market_index: u16,
+    pub perp_market_index: u16,
     pub base_decimals: u8,
     pub base_lot_size: i64,
     pub quote_lot_size: i64,
@@ -267,7 +267,7 @@ pub struct Serum3RegisterMarketLog {
 #[event]
 pub struct PerpLiqBasePositionLog {
     pub mango_group: Pubkey,
-    pub market_index: u16,
+    pub perp_market_index: u16,
     pub liqor: Pubkey,
     pub liqee: Pubkey,
     pub base_transfer: i64,
@@ -280,7 +280,7 @@ pub struct PerpLiqBankruptcyLog {
     pub mango_group: Pubkey,
     pub liqee: Pubkey,
     pub liqor: Pubkey,
-    pub market_index: u16,
+    pub perp_market_index: u16,
     pub insurance_transfer: i128,
     pub socialized_loss: i128,
 }
@@ -290,7 +290,7 @@ pub struct PerpSettlePnlLog {
     pub mango_group: Pubkey,
     pub mango_account_a: Pubkey,
     pub mango_account_b: Pubkey,
-    pub market_index: u16,
+    pub perp_market_index: u16,
     pub settlement: i128,
     pub settler: Pubkey,
     pub fee: i128,
@@ -300,6 +300,6 @@ pub struct PerpSettlePnlLog {
 pub struct PerpSettleFeesLog {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
-    pub market_index: u16,
+    pub perp_market_index: u16,
     pub settlement: i128,
 }

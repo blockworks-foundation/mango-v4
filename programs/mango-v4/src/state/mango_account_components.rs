@@ -192,23 +192,20 @@ pub struct PerpPosition {
     pub taker_quote_lots: i64,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 16],
+    pub reserved: [u8; 24],
 
-    // bookkeeping variable for onchain funding calculation
-    // either short funding index or long funding index at last base position change
-    pub previous_funding_index: I80F48,
     // (Display only)
     // Cumulative long funding in base native units
-    pub cumulative_long_funding: f32,
+    pub cumulative_long_funding: f64,
     // (Display only)
     // Cumulative short funding in base native units
-    pub cumulative_short_funding: f32,
+    pub cumulative_short_funding: f64,
     // (Display only)
     // Cumulative maker volume in quote native units
-    pub maker_volume: i64,
+    pub maker_volume: u64,
     // (Display only)
-    // Cumulative maker volume in quote native units
-    pub taker_volume: i64,
+    // Cumulative taker volume in quote native units
+    pub taker_volume: u64,
     // (Display only)
     // Cumulative realized pnl in quote native units
     pub perp_spot_transfers: i64,
@@ -231,11 +228,10 @@ impl Default for PerpPosition {
             asks_base_lots: 0,
             taker_base_lots: 0,
             taker_quote_lots: 0,
-            reserved: [0; 16],
+            reserved: [0; 24],
             long_settled_funding: I80F48::ZERO,
             short_settled_funding: I80F48::ZERO,
             padding: Default::default(),
-            previous_funding_index: I80F48::ZERO,
             cumulative_long_funding: 0.0,
             cumulative_short_funding: 0.0,
             maker_volume: 0,
@@ -291,8 +287,6 @@ impl PerpPosition {
         let start = self.base_position_lots;
         self.base_position_lots += base_change;
         perp_market.open_interest += self.base_position_lots.abs() - start.abs();
-
-        self.update_cumulative_funding(start, perp_market)
     }
 
     /// The amount of funding this account still needs to pay, in native quote
@@ -314,6 +308,13 @@ impl PerpPosition {
     pub fn settle_funding(&mut self, perp_market: &PerpMarket) {
         let funding = self.unsettled_funding(perp_market);
         cm!(self.quote_position_native -= funding);
+
+        if self.base_position_lots.is_positive() {
+            self.cumulative_long_funding += funding.to_num::<f64>();
+        } else {
+            self.cumulative_short_funding -= funding.to_num::<f64>();
+        }
+
         self.long_settled_funding = perp_market.long_funding;
         self.short_settled_funding = perp_market.short_funding;
     }
@@ -364,30 +365,6 @@ impl PerpPosition {
 
     pub fn change_quote_position(&mut self, quote_change_native: I80F48) {
         cm!(self.quote_position_native += quote_change_native);
-    }
-
-    pub fn update_cumulative_funding(
-        &mut self,
-        opening_base_position_lots: i64,
-        perp_market: &PerpMarket,
-    ) {
-        if opening_base_position_lots.is_positive() {
-            let funding = cm!((perp_market.long_funding - self.previous_funding_index)
-                * I80F48::from(opening_base_position_lots))
-            .to_num::<f32>();
-            self.cumulative_long_funding += funding;
-        } else {
-            let funding = cm!((perp_market.short_funding - self.previous_funding_index)
-                * I80F48::from(opening_base_position_lots))
-            .to_num::<f32>();
-            self.cumulative_short_funding += funding;
-        }
-
-        if opening_base_position_lots.is_positive() {
-            self.previous_funding_index = perp_market.long_funding
-        } else {
-            self.previous_funding_index = perp_market.short_funding
-        }
     }
 
     /// Does the perp position have any open orders or fill events?

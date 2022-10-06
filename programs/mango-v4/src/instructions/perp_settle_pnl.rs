@@ -128,6 +128,22 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     a_perp_position.change_quote_position(-settlement);
     b_perp_position.change_quote_position(settlement);
 
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.account_a.key(),
+        perp_market.perp_market_index,
+        a_perp_position,
+        &perp_market,
+    );
+
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.account_b.key(),
+        perp_market.perp_market_index,
+        b_perp_position,
+        &perp_market,
+    );
+
     // A percentage fee is paid to the settler when account_a's health is low.
     // That's because the settlement could avoid it getting liquidated.
     let low_health_fee = if a_init_health < 0 {
@@ -185,26 +201,6 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         borrow_index: bank.borrow_index.to_bits(),
     });
 
-    emit_perp_balances(
-        ctx.accounts.group.key(),
-        ctx.accounts.account_a.key(),
-        perp_market.perp_market_index,
-        account_a
-            .perp_position(perp_market.perp_market_index)
-            .unwrap(),
-        &perp_market,
-    );
-
-    emit_perp_balances(
-        ctx.accounts.group.key(),
-        ctx.accounts.account_b.key(),
-        perp_market.perp_market_index,
-        account_b
-            .perp_position(perp_market.perp_market_index)
-            .unwrap(),
-        &perp_market,
-    );
-
     // settler might be the same as account a or b
     drop(account_a);
     drop(account_b);
@@ -240,7 +236,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         mango_group: ctx.accounts.group.key(),
         mango_account_a: ctx.accounts.account_a.key(),
         mango_account_b: ctx.accounts.account_b.key(),
-        market_index: perp_market_index,
+        perp_market_index: perp_market_index,
         settlement: settlement.to_bits(),
         settler: ctx.accounts.settler.key(),
         fee: fee.to_bits(),

@@ -423,7 +423,7 @@ impl Bank {
             let interest =
                 cm!((self.borrow_index - position.previous_index) * opening_indexed_position)
                     .to_num::<f32>();
-            position.cumulative_borrow_interest += interest;
+            position.cumulative_borrow_interest -= interest;
         }
 
         if position.indexed_position.is_positive() {
