@@ -132,7 +132,7 @@ impl<'a> Book2<'a> {
             OrderType::Limit => (false, true, price_lots),
             OrderType::ImmediateOrCancel => (false, false, price_lots),
             OrderType::PostOnly => (true, true, price_lots),
-            OrderType::Market => (false, false, market_order_limit_for_side(side)),
+            OrderType::Market => unreachable!(),
             OrderType::PostOnlySlide => {
                 let price = if let Some(best_other_price) =
                     self.best_price(now_ts, oracle_price_lots, side.invert_side())
@@ -146,15 +146,9 @@ impl<'a> Book2<'a> {
         };
         require_gte!(price_lots, 1);
         let price_data = match component {
-            BookSide2Component::Direct => price_lots as u64,
+            BookSide2Component::Direct => direct_price_data(price_lots).unwrap(),
             BookSide2Component::OraclePegged => {
-                let shift = u64::MAX / 2;
-                let diff = cm!(price_lots - oracle_price_lots);
-                if diff >= 0 {
-                    shift + (diff as u64)
-                } else {
-                    shift - ((-diff) as u64)
-                }
+                oracle_peg_price_data(cm!(price_lots - oracle_price_lots))
             }
         };
         Ok((

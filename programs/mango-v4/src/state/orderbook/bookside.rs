@@ -736,15 +736,19 @@ mod tests {
         }
     }
 
-    #[test]
-    fn bookside2_iteration_random() {
+    fn bookside2_iteration_random_helper(side: Side) {
         use rand::Rng;
         let mut rng = rand::thread_rng();
 
-        let bids_direct_cell = RefCell::new(new_bookside(BookSideType::Bids));
-        let bids_oracle_pegged_cell = RefCell::new(new_bookside(BookSideType::Bids));
-        let mut bids_direct = bids_direct_cell.borrow_mut();
-        let mut bids_oracle_pegged = bids_oracle_pegged_cell.borrow_mut();
+        let book_side_type = match side {
+            Side::Bid => BookSideType::Bids,
+            Side::Ask => BookSideType::Asks,
+        };
+
+        let direct_cell = RefCell::new(new_bookside(book_side_type));
+        let oracle_pegged_cell = RefCell::new(new_bookside(book_side_type));
+        let mut direct = direct_cell.borrow_mut();
+        let mut oracle_pegged = oracle_pegged_cell.borrow_mut();
         let new_leaf =
             |key: u128| LeafNode::new(0, key, Pubkey::default(), 0, 0, 1, OrderType::Limit, 0);
 
@@ -753,33 +757,33 @@ mod tests {
         for _ in 0..100 {
             let price_data: u64 = oracle_peg_price_data(rng.gen_range(-20..20));
             let seq_num: u64 = rng.gen_range(0..1000);
-            let key = new_node_key(Side::Bid, price_data, seq_num);
+            let key = new_node_key(side, price_data, seq_num);
             if keys.contains(&key) {
                 continue;
             }
             keys.push(key);
-            bids_oracle_pegged.insert_leaf(&new_leaf(key)).unwrap();
+            oracle_pegged.insert_leaf(&new_leaf(key)).unwrap();
 
             let price_data: u64 = rng.gen_range(1..50);
             let seq_num: u64 = rng.gen_range(0..1000);
-            let key = new_node_key(Side::Bid, price_data, seq_num);
+            let key = new_node_key(side, price_data, seq_num);
             if keys.contains(&key) {
                 continue;
             }
             keys.push(key);
-            bids_direct.insert_leaf(&new_leaf(key)).unwrap();
+            direct.insert_leaf(&new_leaf(key)).unwrap();
         }
 
         let bookside = BookSide2 {
-            direct: bids_direct,
-            oracle_pegged: bids_oracle_pegged,
+            direct,
+            oracle_pegged,
         };
 
         // verify iteration order for different oracle prices
         for oracle_price_lots in 1..40 {
             println!("oracle {oracle_price_lots}");
             let mut total = 0;
-            let ascending = bookside.direct.book_side_type == BookSideType::Asks;
+            let ascending = book_side_type == BookSideType::Asks;
             let mut last_price = if ascending { 0 } else { i64::MAX };
             for order in bookside.iter_all_including_invalid(oracle_price_lots) {
                 let price = order.price_lots;
@@ -797,5 +801,11 @@ mod tests {
                 assert!(total == 200);
             }
         }
+    }
+
+    #[test]
+    fn bookside2_iteration_random() {
+        bookside2_iteration_random_helper(Side::Bid);
+        bookside2_iteration_random_helper(Side::Ask);
     }
 }

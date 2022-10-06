@@ -38,12 +38,8 @@ pub fn new_node_key(side: Side, price_data: u64, seq_num: u64) -> u128 {
 }
 
 pub fn oracle_peg_price_data(price_offset_lots: i64) -> u64 {
-    let shift = u64::MAX / 2;
-    if price_offset_lots >= 0 {
-        shift + price_offset_lots as u64
-    } else {
-        shift - (-price_offset_lots) as u64
-    }
+    // Map i64::MIN to be 0 and i64::MAX to u64::MAX, so u64 comparisons will be correct
+    (price_offset_lots as u64).wrapping_add(u64::MAX / 2 + 1)
 }
 
 pub fn direct_price_data(price_lots: i64) -> Result<u64> {

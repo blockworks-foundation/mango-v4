@@ -124,12 +124,7 @@ impl<'a> BookSide2Iter<'a> {
 }
 
 fn oracle_pegged_price(oracle_price_lots: i64, price_data: u64) -> Option<i64> {
-    let shift = u64::MAX / 2;
-    let price_offset = if price_data >= shift {
-        (price_data - shift) as i64
-    } else {
-        -((shift - price_data) as i64)
-    };
+    let price_offset = price_data.wrapping_sub(u64::MAX / 2 + 1) as i64;
     if let Some(price) = oracle_price_lots.checked_add(price_offset) {
         if price >= 1 {
             return Some(price);
@@ -139,7 +134,6 @@ fn oracle_pegged_price(oracle_price_lots: i64, price_data: u64) -> Option<i64> {
 }
 
 fn direct_price(price_data: u64) -> i64 {
-    // TODO: prices should be unsigned from the start!
     assert!(price_data <= i64::MAX as u64);
     price_data as i64
 }
