@@ -2197,10 +2197,7 @@ pub struct PerpCreateMarketInstruction {
     pub group: Pubkey,
     pub admin: TestKeypair,
     pub oracle: Pubkey,
-    pub asks_direct: Pubkey,
-    pub bids_direct: Pubkey,
-    pub asks_oracle_pegged: Pubkey,
-    pub bids_oracle_pegged: Pubkey,
+    pub orderbook: Pubkey,
     pub event_queue: Pubkey,
     pub payer: TestKeypair,
     pub perp_market_index: PerpMarketIndex,
@@ -2227,17 +2224,8 @@ impl PerpCreateMarketInstruction {
         base: &crate::mango_setup::Token,
     ) -> Self {
         PerpCreateMarketInstruction {
-            asks_direct: solana
-                .create_account_for_type::<BookSide>(&mango_v4::id())
-                .await,
-            bids_direct: solana
-                .create_account_for_type::<BookSide>(&mango_v4::id())
-                .await,
-            asks_oracle_pegged: solana
-                .create_account_for_type::<BookSide>(&mango_v4::id())
-                .await,
-            bids_oracle_pegged: solana
-                .create_account_for_type::<BookSide>(&mango_v4::id())
+            orderbook: solana
+                .create_account_for_type::<OrderBook>(&mango_v4::id())
                 .await,
             event_queue: solana
                 .create_account_for_type::<EventQueue>(&mango_v4::id())
@@ -2299,10 +2287,7 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             admin: self.admin.pubkey(),
             oracle: self.oracle,
             perp_market,
-            asks_direct: self.asks_direct,
-            bids_direct: self.bids_direct,
-            asks_oracle_pegged: self.asks_oracle_pegged,
-            bids_oracle_pegged: self.bids_oracle_pegged,
+            orderbook: self.orderbook,
             event_queue: self.event_queue,
             payer: self.payer.pubkey(),
             system_program: System::id(),
@@ -2338,10 +2323,7 @@ impl ClientInstruction for PerpCloseMarketInstruction {
             group: perp_market.group,
             admin: self.admin.pubkey(),
             perp_market: self.perp_market,
-            asks_direct: perp_market.asks_direct,
-            bids_direct: perp_market.bids_direct,
-            asks_oracle_pegged: perp_market.asks_oracle_pegged,
-            bids_oracle_pegged: perp_market.bids_oracle_pegged,
+            orderbook: perp_market.orderbook,
             event_queue: perp_market.event_queue,
             token_program: Token::id(),
             sol_destination: self.sol_destination,
@@ -2437,10 +2419,7 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
             group: account.fixed.group,
             account: self.account,
             perp_market: self.perp_market,
-            asks_direct: perp_market.asks_direct,
-            bids_direct: perp_market.bids_direct,
-            asks_oracle_pegged: perp_market.asks_oracle_pegged,
-            bids_oracle_pegged: perp_market.bids_oracle_pegged,
+            orderbook: perp_market.orderbook,
             event_queue: perp_market.event_queue,
             oracle: perp_market.oracle,
             owner: self.owner.pubkey(),
@@ -2479,10 +2458,7 @@ impl ClientInstruction for PerpCancelOrderInstruction {
             group: perp_market.group,
             account: self.account,
             perp_market: self.perp_market,
-            asks_direct: perp_market.asks_direct,
-            bids_direct: perp_market.bids_direct,
-            asks_oracle_pegged: perp_market.asks_oracle_pegged,
-            bids_oracle_pegged: perp_market.bids_oracle_pegged,
+            orderbook: perp_market.orderbook,
             owner: self.owner.pubkey(),
         };
 
@@ -2518,10 +2494,7 @@ impl ClientInstruction for PerpCancelOrderByClientOrderIdInstruction {
             group: perp_market.group,
             account: self.account,
             perp_market: self.perp_market,
-            asks_direct: perp_market.asks_direct,
-            bids_direct: perp_market.bids_direct,
-            asks_oracle_pegged: perp_market.asks_oracle_pegged,
-            bids_oracle_pegged: perp_market.bids_oracle_pegged,
+            orderbook: perp_market.orderbook,
             owner: self.owner.pubkey(),
         };
 
@@ -2554,10 +2527,7 @@ impl ClientInstruction for PerpCancelAllOrdersInstruction {
             group: perp_market.group,
             account: self.account,
             perp_market: self.perp_market,
-            asks_direct: perp_market.asks_direct,
-            bids_direct: perp_market.bids_direct,
-            asks_oracle_pegged: perp_market.asks_oracle_pegged,
-            bids_oracle_pegged: perp_market.bids_oracle_pegged,
+            orderbook: perp_market.orderbook,
             owner: self.owner.pubkey(),
         };
 
@@ -2627,10 +2597,7 @@ impl ClientInstruction for PerpUpdateFundingInstruction {
         let accounts = Self::Accounts {
             group: perp_market.group,
             perp_market: self.perp_market,
-            asks_direct: perp_market.asks_direct,
-            bids_direct: perp_market.bids_direct,
-            asks_oracle_pegged: perp_market.asks_oracle_pegged,
-            bids_oracle_pegged: perp_market.bids_oracle_pegged,
+            orderbook: perp_market.orderbook,
             oracle: self.oracle,
         };
 
@@ -2788,10 +2755,7 @@ impl ClientInstruction for PerpLiqForceCancelOrdersInstruction {
             group: account.fixed.group,
             perp_market: self.perp_market,
             account: self.account,
-            asks_direct: perp_market.asks_direct,
-            bids_direct: perp_market.bids_direct,
-            asks_oracle_pegged: perp_market.asks_oracle_pegged,
-            bids_oracle_pegged: perp_market.bids_oracle_pegged,
+            orderbook: perp_market.orderbook,
             oracle: perp_market.oracle,
         };
         let mut instruction = make_instruction(program_id, &accounts, instruction);

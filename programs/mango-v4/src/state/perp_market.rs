@@ -10,7 +10,7 @@ use crate::state::oracle;
 use crate::state::orderbook::order_type::Side;
 use crate::util::checked_math as cm;
 
-use super::{orderbook, Book2, OracleConfig, DAY_I80F48};
+use super::{orderbook, OracleConfig, OrderBook, DAY_I80F48};
 
 pub type PerpMarketIndex = u16;
 
@@ -40,8 +40,8 @@ pub struct PerpMarket {
 
     pub oracle_config: OracleConfig,
 
-    pub bids_direct: Pubkey,
-    pub asks_direct: Pubkey,
+    pub orderbook: Pubkey,
+    pub padding3: [u8; 32],
 
     pub event_queue: Pubkey,
 
@@ -109,10 +109,7 @@ pub struct PerpMarket {
     /// Fraction of pnl to pay out as fee if +pnl account has low health.
     pub settle_fee_fraction_low_health: f32,
 
-    pub bids_oracle_pegged: Pubkey,
-    pub asks_oracle_pegged: Pubkey,
-
-    pub reserved: [u8; 28],
+    pub reserved: [u8; 92],
 }
 
 const_assert_eq!(size_of::<PerpMarket>(), 584);
@@ -154,7 +151,7 @@ impl PerpMarket {
     /// Use current order book price and index price to update the instantaneous funding
     pub fn update_funding(
         &mut self,
-        book: &Book2,
+        book: &OrderBook,
         oracle_price: I80F48,
         now_ts: u64,
     ) -> Result<()> {
@@ -251,10 +248,7 @@ impl PerpMarket {
             oracle_config: OracleConfig {
                 conf_filter: I80F48::ZERO,
             },
-            bids_direct: Pubkey::new_unique(),
-            asks_direct: Pubkey::new_unique(),
-            bids_oracle_pegged: Pubkey::new_unique(),
-            asks_oracle_pegged: Pubkey::new_unique(),
+            orderbook: Pubkey::new_unique(),
             event_queue: Pubkey::new_unique(),
             quote_lot_size: 1,
             base_lot_size: 1,
@@ -277,10 +271,11 @@ impl PerpMarket {
             fees_settled: I80F48::ZERO,
             bump: 0,
             base_decimals: 0,
-            reserved: [0; 28],
+            reserved: [0; 92],
             padding0: Default::default(),
             padding1: Default::default(),
             padding2: Default::default(),
+            padding3: Default::default(),
             registration_time: 0,
             fee_penalty: 0.0,
             trusted_market: 0,

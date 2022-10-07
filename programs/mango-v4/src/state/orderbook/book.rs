@@ -1,6 +1,5 @@
 use std::cell::RefMut;
 
-use crate::accounts_zerocopy::*;
 use crate::state::MangoAccountRefMut;
 use crate::{
     error::*,
@@ -12,6 +11,7 @@ use crate::{
 use anchor_lang::prelude::*;
 use bytemuck::cast;
 use fixed::types::I80F48;
+use static_assertions::const_assert_eq;
 
 use super::{
     nodes::NodeHandle,
@@ -42,41 +42,44 @@ fn post_only_slide_limit(side: Side, best_other_side: i64, limit: i64) -> i64 {
 }
 
 /// TODO: what if oracle is stale for a while
-pub struct Book2<'a> {
-    pub bids: BookSide2<'a>,
-    pub asks: BookSide2<'a>,
+
+#[account(zero_copy)]
+pub struct OrderBook {
+    pub bids_direct: BookSide,
+    pub asks_direct: BookSide,
+    pub bids_oracle_pegged: BookSide,
+    pub asks_oracle_pegged: BookSide,
 }
+const_assert_eq!(
+    std::mem::size_of::<OrderBook>(),
+    4 * std::mem::size_of::<BookSide>()
+);
+const_assert_eq!(std::mem::size_of::<OrderBook>() % 8, 0);
 
-impl<'a> Book2<'a> {
-    pub fn load_mut<'b: 'a>(
-        bids_direct: &'a AccountLoader<'b, BookSide>,
-        asks_direct: &'a AccountLoader<'b, BookSide>,
-        bids_oracle_pegged: &'a AccountLoader<'b, BookSide>,
-        asks_oracle_pegged: &'a AccountLoader<'b, BookSide>,
-    ) -> std::result::Result<Self, Error> {
-        Ok(Self {
-            bids: BookSide2 {
-                direct: bids_direct.load_mut()?,
-                oracle_pegged: bids_oracle_pegged.load_mut()?,
-            },
-            asks: BookSide2 {
-                direct: asks_direct.load_mut()?,
-                oracle_pegged: asks_oracle_pegged.load_mut()?,
-            },
-        })
-    }
-
-    pub fn bookside_mut(&mut self, side: Side) -> &mut BookSide2<'a> {
+impl OrderBook {
+    pub fn bookside_mut(&mut self, side: Side) -> BookSide2RefMut {
         match side {
-            Side::Bid => &mut self.bids,
-            Side::Ask => &mut self.asks,
+            Side::Bid => BookSide2RefMut {
+                direct: &mut self.bids_direct,
+                oracle_pegged: &mut self.bids_oracle_pegged,
+            },
+            Side::Ask => BookSide2RefMut {
+                direct: &mut self.asks_direct,
+                oracle_pegged: &mut self.asks_oracle_pegged,
+            },
         }
     }
 
-    pub fn bookside(&self, side: Side) -> &BookSide2<'a> {
+    pub fn bookside(&self, side: Side) -> BookSide2Ref {
         match side {
-            Side::Bid => &self.bids,
-            Side::Ask => &self.asks,
+            Side::Bid => BookSide2Ref {
+                direct: &self.bids_direct,
+                oracle_pegged: &self.bids_oracle_pegged,
+            },
+            Side::Ask => BookSide2Ref {
+                direct: &self.asks_direct,
+                oracle_pegged: &self.asks_oracle_pegged,
+            },
         }
     }
 
@@ -99,7 +102,8 @@ impl<'a> Book2<'a> {
         oracle_price_lots: i64,
     ) -> Option<i64> {
         let mut sum: i64 = 0;
-        let iter = self.bookside(side).iter_valid(now_ts, oracle_price_lots);
+        let bookside = self.bookside(side);
+        let iter = bookside.iter_valid(now_ts, oracle_price_lots);
         for order in iter {
             cm!(sum += order.node.quantity);
             if sum >= quantity {
@@ -213,8 +217,11 @@ impl<'a> Book2<'a> {
         let mut matched_order_changes: Vec<(BookSide2NodeHandle, i64)> = vec![];
         let mut matched_order_deletes: Vec<(BookSide2Component, u128)> = vec![];
         let mut number_of_dropped_expired_orders = 0;
-        let opposing_bookside = self.bookside_mut(other_side);
-        for best_opposing in opposing_bookside.iter_all_including_invalid(oracle_price_lots) {
+        let mut opposing_bookside = self.bookside_mut(other_side);
+        for best_opposing in opposing_bookside
+            .non_mut()
+            .iter_all_including_invalid(oracle_price_lots)
+        {
             if !best_opposing.node.is_valid(now_ts) {
                 // Remove the order from the book unless we've done that enough
                 if number_of_dropped_expired_orders < DROP_EXPIRED_ORDER_LIMIT {
@@ -319,7 +326,8 @@ impl<'a> Book2<'a> {
             post_allowed = None;
         }
         if let Some(book_component) = post_allowed {
-            let bookside = self.bookside_mut(side).component_mut(book_component);
+            let mut full_bookside = self.bookside_mut(side);
+            let bookside = full_bookside.component_mut(book_component);
 
             // Drop an expired order if possible
             if let Some(expired_order) = bookside.remove_one_expired(now_ts) {
@@ -466,25 +474,6 @@ pub struct Book<'a> {
 impl<'a> Book<'a> {
     pub fn new(bids: RefMut<'a, BookSide>, asks: RefMut<'a, BookSide>) -> Self {
         Self { bids, asks }
-    }
-
-    pub fn load_mut(
-        bids_ai: &'a AccountInfo,
-        asks_ai: &'a AccountInfo,
-        perp_market: &PerpMarket,
-    ) -> std::result::Result<Self, Error> {
-        require!(
-            bids_ai.key == &perp_market.bids_direct,
-            MangoError::SomeError
-        );
-        require!(
-            asks_ai.key == &perp_market.asks_direct,
-            MangoError::SomeError
-        );
-        Ok(Self::new(
-            bids_ai.load_mut::<BookSide>()?,
-            asks_ai.load_mut::<BookSide>()?,
-        ))
     }
 
     pub fn bookside_mut(&mut self, side: Side) -> &mut BookSide {

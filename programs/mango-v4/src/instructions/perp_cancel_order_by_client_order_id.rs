@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::error::*;
-use crate::state::{AccountLoaderDynamic, Book2, BookSide, Group, MangoAccount, PerpMarket};
+use crate::state::{AccountLoaderDynamic, Group, MangoAccount, OrderBook, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpCancelOrderByClientOrderId<'info> {
@@ -14,20 +14,11 @@ pub struct PerpCancelOrderByClientOrderId<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = bids_direct,
-        has_one = asks_direct,
-        has_one = bids_oracle_pegged,
-        has_one = asks_oracle_pegged,
+        has_one = orderbook,
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]
-    pub asks_direct: AccountLoader<'info, BookSide>,
-    #[account(mut)]
-    pub bids_direct: AccountLoader<'info, BookSide>,
-    #[account(mut)]
-    pub asks_oracle_pegged: AccountLoader<'info, BookSide>,
-    #[account(mut)]
-    pub bids_oracle_pegged: AccountLoader<'info, BookSide>,
+    pub orderbook: AccountLoader<'info, OrderBook>,
 }
 
 pub fn perp_cancel_order_by_client_order_id(
@@ -41,12 +32,7 @@ pub fn perp_cancel_order_by_client_order_id(
     );
 
     let perp_market = ctx.accounts.perp_market.load_mut()?;
-    let mut book = Book2::load_mut(
-        &ctx.accounts.bids_direct,
-        &ctx.accounts.asks_direct,
-        &ctx.accounts.bids_oracle_pegged,
-        &ctx.accounts.asks_oracle_pegged,
-    )?;
+    let mut book = ctx.accounts.orderbook.load_mut()?;
 
     let oo = account
         .perp_find_order_with_client_order_id(perp_market.perp_market_index, client_order_id)

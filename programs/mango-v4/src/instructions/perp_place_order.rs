@@ -4,8 +4,8 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::state::MangoAccount;
 use crate::state::{
-    new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, Book2, BookSide,
-    EventQueue, Group, OrderType, PerpMarket, SideAndComponent, QUOTE_TOKEN_INDEX,
+    new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, EventQueue, Group,
+    OrderBook, OrderType, PerpMarket, SideAndComponent, QUOTE_TOKEN_INDEX,
 };
 
 #[derive(Accounts)]
@@ -19,22 +19,13 @@ pub struct PerpPlaceOrder<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = bids_direct,
-        has_one = asks_direct,
-        has_one = bids_oracle_pegged,
-        has_one = asks_oracle_pegged,
+        has_one = orderbook,
         has_one = event_queue,
         has_one = oracle,
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]
-    pub asks_direct: AccountLoader<'info, BookSide>,
-    #[account(mut)]
-    pub bids_direct: AccountLoader<'info, BookSide>,
-    #[account(mut)]
-    pub asks_oracle_pegged: AccountLoader<'info, BookSide>,
-    #[account(mut)]
-    pub bids_oracle_pegged: AccountLoader<'info, BookSide>,
+    pub orderbook: AccountLoader<'info, OrderBook>,
     #[account(mut)]
     pub event_queue: AccountLoader<'info, EventQueue>,
 
@@ -114,12 +105,7 @@ pub fn perp_place_order(
     };
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
-    let mut book = Book2::load_mut(
-        &ctx.accounts.bids_direct,
-        &ctx.accounts.asks_direct,
-        &ctx.accounts.bids_oracle_pegged,
-        &ctx.accounts.asks_oracle_pegged,
-    )?;
+    let mut book = ctx.accounts.orderbook.load_mut()?;
 
     let mut event_queue = ctx.accounts.event_queue.load_mut()?;
 

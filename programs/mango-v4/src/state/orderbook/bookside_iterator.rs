@@ -114,7 +114,7 @@ pub struct BookSide2Iter<'a> {
 }
 
 impl<'a> BookSide2Iter<'a> {
-    pub fn new(book_side: &'a BookSide2, now_ts: u64, oracle_price_lots: i64) -> Self {
+    pub fn new(book_side: BookSide2Ref<'a>, now_ts: u64, oracle_price_lots: i64) -> Self {
         Self {
             direct_iter: book_side.direct.iter_valid(now_ts),
             oracle_pegged_iter: book_side.oracle_pegged.iter_valid(now_ts),

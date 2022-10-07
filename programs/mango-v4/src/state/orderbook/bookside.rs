@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use bytemuck::{cast, cast_mut, cast_ref};
-use std::cell::RefMut;
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
@@ -421,11 +420,6 @@ impl BookSide {
     }
 }
 
-pub struct BookSide2<'a> {
-    pub direct: RefMut<'a, BookSide>,
-    pub oracle_pegged: RefMut<'a, BookSide>,
-}
-
 #[derive(
     Eq,
     PartialEq,
@@ -449,39 +443,64 @@ pub struct BookSide2NodeHandle {
     pub node: NodeHandle,
 }
 
-impl<'a> BookSide2<'a> {
+#[derive(Clone, Copy)]
+pub struct BookSide2Ref<'a> {
+    pub direct: &'a BookSide,
+    pub oracle_pegged: &'a BookSide,
+}
+
+pub struct BookSide2RefMut<'a> {
+    pub direct: &'a mut BookSide,
+    pub oracle_pegged: &'a mut BookSide,
+}
+
+impl<'a> BookSide2Ref<'a> {
     /// Iterate over all entries in the book filtering out invalid orders
     ///
     /// smallest to highest for asks
     /// highest to smallest for bids
     pub fn iter_valid(&self, now_ts: u64, oracle_price_lots: i64) -> BookSide2Iter {
-        BookSide2Iter::new(self, now_ts, oracle_price_lots)
+        BookSide2Iter::new(*self, now_ts, oracle_price_lots)
     }
 
     /// Iterate over all entries, including invalid orders
     pub fn iter_all_including_invalid(&self, oracle_price_lots: i64) -> BookSide2Iter {
-        BookSide2Iter::new(self, 0, oracle_price_lots)
+        BookSide2Iter::new(*self, 0, oracle_price_lots)
     }
 
     pub fn component(&self, component: BookSide2Component) -> &BookSide {
         match component {
-            BookSide2Component::Direct => &self.direct,
-            BookSide2Component::OraclePegged => &self.oracle_pegged,
+            BookSide2Component::Direct => self.direct,
+            BookSide2Component::OraclePegged => self.oracle_pegged,
+        }
+    }
+
+    pub fn node(&self, key: BookSide2NodeHandle) -> Option<&AnyNode> {
+        self.component(key.component).node(key.node)
+    }
+
+    pub fn is_full(&self, component: BookSide2Component) -> bool {
+        self.component(component).is_full()
+    }
+}
+
+impl<'a> BookSide2RefMut<'a> {
+    pub fn non_mut(&self) -> BookSide2Ref {
+        BookSide2Ref {
+            direct: self.direct,
+            oracle_pegged: self.oracle_pegged,
         }
     }
 
     pub fn component_mut(&mut self, component: BookSide2Component) -> &mut BookSide {
         match component {
-            BookSide2Component::Direct => &mut self.direct,
-            BookSide2Component::OraclePegged => &mut self.oracle_pegged,
+            BookSide2Component::Direct => self.direct,
+            BookSide2Component::OraclePegged => self.oracle_pegged,
         }
     }
 
     pub fn node_mut(&mut self, key: BookSide2NodeHandle) -> Option<&mut AnyNode> {
         self.component_mut(key.component).node_mut(key.node)
-    }
-    pub fn node(&self, key: BookSide2NodeHandle) -> Option<&AnyNode> {
-        self.component(key.component).node(key.node)
     }
 
     pub fn remove_worst(&mut self, component: BookSide2Component) -> Option<LeafNode> {
@@ -508,10 +527,6 @@ impl<'a> BookSide2<'a> {
     pub fn remove(&mut self, key: BookSide2NodeHandle) -> Option<AnyNode> {
         self.component_mut(key.component).remove(key.node)
     }
-
-    pub fn is_full(&self, component: BookSide2Component) -> bool {
-        self.component(component).is_full()
-    }
 }
 
 #[cfg(test)]
@@ -519,7 +534,6 @@ mod tests {
     use super::super::*;
     use super::*;
     use bytemuck::Zeroable;
-    use std::cell::RefCell;
 
     fn new_bookside(book_side_type: BookSideType) -> BookSide {
         BookSide {
@@ -745,10 +759,8 @@ mod tests {
             Side::Ask => BookSideType::Asks,
         };
 
-        let direct_cell = RefCell::new(new_bookside(book_side_type));
-        let oracle_pegged_cell = RefCell::new(new_bookside(book_side_type));
-        let mut direct = direct_cell.borrow_mut();
-        let mut oracle_pegged = oracle_pegged_cell.borrow_mut();
+        let mut direct = new_bookside(book_side_type);
+        let mut oracle_pegged = new_bookside(book_side_type);
         let new_leaf =
             |key: u128| LeafNode::new(0, key, Pubkey::default(), 0, 0, 1, OrderType::Limit, 0);
 
@@ -782,9 +794,9 @@ mod tests {
             direct.insert_leaf(&new_leaf(key)).unwrap();
         }
 
-        let bookside = BookSide2 {
-            direct,
-            oracle_pegged,
+        let bookside = BookSide2Ref {
+            direct: &direct,
+            oracle_pegged: &oracle_pegged,
         };
 
         // verify iteration order for different oracle prices

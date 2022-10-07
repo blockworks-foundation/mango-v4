@@ -31,13 +31,7 @@ pub struct PerpCreateMarket<'info> {
     /// Accounts are initialised by client,
     /// anchor discriminator is set first when ix exits,
     #[account(zero)]
-    pub bids_direct: AccountLoader<'info, BookSide>,
-    #[account(zero)]
-    pub asks_direct: AccountLoader<'info, BookSide>,
-    #[account(zero)]
-    pub bids_oracle_pegged: AccountLoader<'info, BookSide>,
-    #[account(zero)]
-    pub asks_oracle_pegged: AccountLoader<'info, BookSide>,
+    pub orderbook: AccountLoader<'info, OrderBook>,
     #[account(zero)]
     pub event_queue: AccountLoader<'info, EventQueue>,
 
@@ -79,10 +73,7 @@ pub fn perp_create_market(
         group: ctx.accounts.group.key(),
         oracle: ctx.accounts.oracle.key(),
         oracle_config,
-        bids_direct: ctx.accounts.bids_direct.key(),
-        asks_direct: ctx.accounts.asks_direct.key(),
-        bids_oracle_pegged: ctx.accounts.bids_oracle_pegged.key(),
-        asks_oracle_pegged: ctx.accounts.asks_oracle_pegged.key(),
+        orderbook: ctx.accounts.orderbook.key(),
         event_queue: ctx.accounts.event_queue.key(),
         quote_lot_size,
         base_lot_size,
@@ -112,24 +103,19 @@ pub fn perp_create_market(
         padding0: Default::default(),
         padding1: Default::default(),
         padding2: Default::default(),
+        padding3: Default::default(),
         fee_penalty,
         settle_fee_flat,
         settle_fee_amount_threshold,
         settle_fee_fraction_low_health,
-        reserved: [0; 28],
+        reserved: [0; 92],
     };
 
-    let mut bids_direct = ctx.accounts.bids_direct.load_init()?;
-    bids_direct.book_side_type = BookSideType::Bids;
-
-    let mut asks_direct = ctx.accounts.asks_direct.load_init()?;
-    asks_direct.book_side_type = BookSideType::Asks;
-
-    let mut bids_oracle_pegged = ctx.accounts.bids_oracle_pegged.load_init()?;
-    bids_oracle_pegged.book_side_type = BookSideType::Bids;
-
-    let mut asks_oracle_pegged = ctx.accounts.asks_oracle_pegged.load_init()?;
-    asks_oracle_pegged.book_side_type = BookSideType::Asks;
+    let mut orderbook = ctx.accounts.orderbook.load_init()?;
+    orderbook.bids_direct.book_side_type = BookSideType::Bids;
+    orderbook.asks_direct.book_side_type = BookSideType::Asks;
+    orderbook.bids_oracle_pegged.book_side_type = BookSideType::Bids;
+    orderbook.asks_oracle_pegged.book_side_type = BookSideType::Asks;
 
     Ok(())
 }
