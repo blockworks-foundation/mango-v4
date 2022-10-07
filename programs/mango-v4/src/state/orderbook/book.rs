@@ -49,19 +49,19 @@ pub struct Book2<'a> {
 
 impl<'a> Book2<'a> {
     pub fn load_mut<'b: 'a>(
-        bids_direct_ai: &'a AccountLoader<'b, BookSide>,
-        bids_oracle_pegged_ai: &'a AccountLoader<'b, BookSide>,
-        asks_direct_ai: &'a AccountLoader<'b, BookSide>,
-        asks_oracle_pegged_ai: &'a AccountLoader<'b, BookSide>,
+        bids_direct: &'a AccountLoader<'b, BookSide>,
+        asks_direct: &'a AccountLoader<'b, BookSide>,
+        bids_oracle_pegged: &'a AccountLoader<'b, BookSide>,
+        asks_oracle_pegged: &'a AccountLoader<'b, BookSide>,
     ) -> std::result::Result<Self, Error> {
         Ok(Self {
             bids: BookSide2 {
-                direct: bids_direct_ai.load_mut()?,
-                oracle_pegged: bids_oracle_pegged_ai.load_mut()?,
+                direct: bids_direct.load_mut()?,
+                oracle_pegged: bids_oracle_pegged.load_mut()?,
             },
             asks: BookSide2 {
-                direct: asks_direct_ai.load_mut()?,
-                oracle_pegged: asks_oracle_pegged_ai.load_mut()?,
+                direct: asks_direct.load_mut()?,
+                oracle_pegged: asks_oracle_pegged.load_mut()?,
             },
         })
     }

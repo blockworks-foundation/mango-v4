@@ -13,7 +13,7 @@ use utils::assert_equal_fixed_f64 as assert_equal;
 mod program_test;
 
 #[tokio::test]
-async fn test_perp() -> Result<(), TransportError> {
+async fn test_perp_direct() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
@@ -65,7 +65,11 @@ async fn test_perp() -> Result<(), TransportError> {
     //
     // TEST: Create a perp market
     //
-    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
+    let mango_v4::accounts::PerpCreateMarket {
+        perp_market,
+        bids_direct,
+        ..
+    } = send_tx(
         solana,
         PerpCreateMarketInstruction {
             group,
@@ -112,6 +116,8 @@ async fn test_perp() -> Result<(), TransportError> {
     .unwrap();
     check_prev_instruction_post_health(&solana, account_0).await;
 
+    let bids_direct_data = solana.get_account_boxed::<BookSide>(bids_direct).await;
+    assert_eq!(bids_direct_data.leaf_count, 1);
     let order_id_to_cancel = solana
         .get_account::<MangoAccount>(account_0)
         .await
@@ -190,8 +196,8 @@ async fn test_perp() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side_and_component: SideAndComponent::BidDirect,
-            price_data: price_lots,
+            side_and_component: SideAndComponent::BidOraclePegged,
+            price_data: -1,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 3,
@@ -440,6 +446,217 @@ async fn test_perp() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_perp_oracle_peg() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..2];
+
+    //
+    // SETUP: Create a group and an account
+    //
+
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let deposit_amount = 1000;
+    let account_0 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        mints,
+        deposit_amount,
+        0,
+    )
+    .await;
+    let account_1 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        mints,
+        deposit_amount,
+        0,
+    )
+    .await;
+
+    //
+    // TEST: Create a perp market
+    //
+    let mango_v4::accounts::PerpCreateMarket {
+        perp_market,
+        bids_oracle_pegged,
+        ..
+    } = send_tx(
+        solana,
+        PerpCreateMarketInstruction {
+            group,
+            admin,
+            payer,
+            perp_market_index: 0,
+            quote_lot_size: 10,
+            base_lot_size: 100,
+            maint_asset_weight: 0.975,
+            init_asset_weight: 0.95,
+            maint_liab_weight: 1.025,
+            init_liab_weight: 1.05,
+            liquidation_fee: 0.012,
+            maker_fee: -0.0001,
+            taker_fee: 0.0002,
+            ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[0]).await
+        },
+    )
+    .await
+    .unwrap();
+
+    let price_lots = {
+        let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
+        perp_market.native_price_to_lot(I80F48!(1))
+    };
+
+    //
+    // Place and cancel order with order_id
+    //
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+            side_and_component: SideAndComponent::BidOraclePegged,
+            price_data: -1,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 0,
+        },
+    )
+    .await
+    .unwrap();
+    check_prev_instruction_post_health(&solana, account_0).await;
+
+    let bids_oracle_pegged_data = solana
+        .get_account_boxed::<BookSide>(bids_oracle_pegged)
+        .await;
+    assert_eq!(bids_oracle_pegged_data.leaf_count, 1);
+    let perp_order = solana
+        .get_account::<MangoAccount>(account_0)
+        .await
+        .perp_open_orders[0];
+    assert_eq!(
+        perp_order.side_and_component,
+        SideAndComponent::BidOraclePegged
+    );
+    send_tx(
+        solana,
+        PerpCancelOrderInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+            order_id: perp_order.id,
+        },
+    )
+    .await
+    .unwrap();
+
+    assert_no_perp_orders(solana, account_0).await;
+    println!("ZZZ C");
+
+    //
+    // Place a pegged bid, take it with a direct and pegged ask, and consume events
+    //
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+            side_and_component: SideAndComponent::BidOraclePegged,
+            price_data: 0,
+            max_base_lots: 2,
+            max_quote_lots: i64::MAX,
+            client_order_id: 5,
+        },
+    )
+    .await
+    .unwrap();
+    check_prev_instruction_post_health(&solana, account_0).await;
+
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            side_and_component: SideAndComponent::AskDirect,
+            price_data: price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 6,
+        },
+    )
+    .await
+    .unwrap();
+    check_prev_instruction_post_health(&solana, account_1).await;
+
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            side_and_component: SideAndComponent::AskOraclePegged,
+            price_data: 0,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 7,
+        },
+    )
+    .await
+    .unwrap();
+    check_prev_instruction_post_health(&solana, account_1).await;
+
+    send_tx(
+        solana,
+        PerpConsumeEventsInstruction {
+            perp_market,
+            mango_accounts: vec![account_0, account_1],
+        },
+    )
+    .await
+    .unwrap();
+
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+    assert_eq!(mango_account_0.perps[0].base_position_lots(), 2);
+    assert!(assert_equal(
+        mango_account_0.perps[0].quote_position_native(),
+        -199.98,
+        0.001
+    ));
+
+    let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+    assert_eq!(mango_account_1.perps[0].base_position_lots(), -2);
+    assert!(assert_equal(
+        mango_account_1.perps[0].quote_position_native(),
+        199.96,
+        0.001
+    ));
 
     Ok(())
 }
