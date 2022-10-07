@@ -743,12 +743,12 @@ export class MangoAccount {
     const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc
-      .simHealthRatioWithPerpChanges(
+      .simHealthRatioWithPerpOrderChanges(
         perpMarket,
         pp
           ? pp
           : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
-        I80F48.fromI64(perpMarket.uiBaseToLots(size)),
+        perpMarket.uiBaseToLots(size),
         PerpOrderSide.bid,
         HealthType.init,
       )
@@ -764,12 +764,12 @@ export class MangoAccount {
     const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc
-      .simHealthRatioWithPerpChanges(
+      .simHealthRatioWithPerpOrderChanges(
         perpMarket,
         pp
           ? pp
           : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
-        I80F48.fromI64(perpMarket.uiBaseToLots(size)),
+        perpMarket.uiBaseToLots(size),
         PerpOrderSide.ask,
         HealthType.init,
       )

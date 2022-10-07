@@ -416,10 +416,10 @@ export class HealthCache {
     );
   }
 
-  simHealthRatioWithPerpChanges(
+  simHealthRatioWithPerpOrderChanges(
     perpMarket: PerpMarket,
     existingPerpPosition: PerpPosition,
-    baseLots: I80F48,
+    baseLots: BN,
     side: PerpOrderSide,
     healthType: HealthType = HealthType.init,
   ): I80F48 {
