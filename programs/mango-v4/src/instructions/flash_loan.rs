@@ -377,7 +377,6 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             indexed_position: position.indexed_position.to_bits(),
             deposit_index: bank.deposit_index.to_bits(),
             borrow_index: bank.borrow_index.to_bits(),
-            price: price.to_bits(),
         });
     }
 
@@ -395,7 +394,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
     // Deactivate inactive token accounts after health check
     for raw_token_index in deactivated_token_positions {
-        account.deactivate_token_position(raw_token_index);
+        account.deactivate_token_position_and_log(raw_token_index, ctx.accounts.account.key());
     }
 
     Ok(())

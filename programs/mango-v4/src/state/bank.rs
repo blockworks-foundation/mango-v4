@@ -210,6 +210,7 @@ impl Bank {
     ) -> Result<bool> {
         require_gte!(native_amount, 0);
         let native_position = position.native(self);
+        let opening_indexed_position = position.indexed_position;
 
         // Adding DELTA to amount/index helps because (amount/index)*index <= amount, but
         // we want to ensure that users can withdraw the same amount they have deposited, so
@@ -235,12 +236,14 @@ impl Bank {
                 // pay back borrows only, leaving a negative position
                 cm!(self.indexed_borrows -= indexed_change);
                 position.indexed_position = new_indexed_value;
+                self.update_cumulative_interest(position, opening_indexed_position);
                 return Ok(true);
             } else if new_native_position < I80F48::ONE && allow_dusting {
                 // if there's less than one token deposited, zero the position
                 cm!(self.dust += new_native_position);
                 cm!(self.indexed_borrows += position.indexed_position);
                 position.indexed_position = I80F48::ZERO;
+                self.update_cumulative_interest(position, opening_indexed_position);
                 return Ok(false);
             }
 
@@ -256,6 +259,7 @@ impl Bank {
         let indexed_change = div_rounding_up(native_amount, self.deposit_index);
         cm!(self.indexed_deposits += indexed_change);
         cm!(position.indexed_position += indexed_change);
+        self.update_cumulative_interest(position, opening_indexed_position);
 
         Ok(true)
     }
@@ -317,6 +321,7 @@ impl Bank {
     ) -> Result<(bool, I80F48)> {
         require_gte!(native_amount, 0);
         let native_position = position.native(self);
+        let opening_indexed_position = position.indexed_position;
 
         if native_position.is_positive() {
             let new_native_position = cm!(native_position - native_amount);
@@ -327,12 +332,14 @@ impl Bank {
                     cm!(self.dust += new_native_position);
                     cm!(self.indexed_deposits -= position.indexed_position);
                     position.indexed_position = I80F48::ZERO;
+                    self.update_cumulative_interest(position, opening_indexed_position);
                     return Ok((false, I80F48::ZERO));
                 } else {
                     // withdraw some deposits leaving a positive balance
                     let indexed_change = cm!(native_amount / self.deposit_index);
                     cm!(self.indexed_deposits -= indexed_change);
                     cm!(position.indexed_position -= indexed_change);
+                    self.update_cumulative_interest(position, opening_indexed_position);
                     return Ok((true, I80F48::ZERO));
                 }
             }
@@ -355,6 +362,7 @@ impl Bank {
         let indexed_change = cm!(native_amount / self.borrow_index);
         cm!(self.indexed_borrows += indexed_change);
         cm!(position.indexed_position -= indexed_change);
+        self.update_cumulative_interest(position, opening_indexed_position);
 
         Ok((true, loan_origination_fee))
     }
@@ -398,6 +406,30 @@ impl Bank {
             Ok((self.deposit(position, native_amount)?, I80F48::ZERO))
         } else {
             self.withdraw_with_fee(position, -native_amount)
+        }
+    }
+
+    pub fn update_cumulative_interest(
+        &self,
+        position: &mut TokenPosition,
+        opening_indexed_position: I80F48,
+    ) {
+        if opening_indexed_position.is_positive() {
+            let interest =
+                cm!((self.deposit_index - position.previous_index) * opening_indexed_position)
+                    .to_num::<f32>();
+            position.cumulative_deposit_interest += interest;
+        } else {
+            let interest =
+                cm!((self.borrow_index - position.previous_index) * opening_indexed_position)
+                    .to_num::<f32>();
+            position.cumulative_borrow_interest += interest;
+        }
+
+        if position.indexed_position.is_positive() {
+            position.previous_index = self.deposit_index
+        } else {
+            position.previous_index = self.borrow_index
         }
     }
 
@@ -634,8 +666,11 @@ mod tests {
                     indexed_position: I80F48::ZERO,
                     token_index: 0,
                     in_use_count: if is_in_use { 1 } else { 0 },
+                    cumulative_deposit_interest: 0.0,
+                    cumulative_borrow_interest: 0.0,
+                    previous_index: I80F48::ZERO,
                     padding: Default::default(),
-                    reserved: [0; 40],
+                    reserved: [0; 16],
                 };
 
                 account.indexed_position = indexed(I80F48::from_num(start), &bank);

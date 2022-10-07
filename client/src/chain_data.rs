@@ -224,6 +224,16 @@ impl ChainData {
             .ok_or_else(|| anyhow::anyhow!("account {} has no live data", pubkey))
     }
 
+    pub fn iter_accounts<'a>(&'a self) -> impl Iterator<Item = (&'a Pubkey, &'a AccountAndSlot)> {
+        self.accounts.iter().filter_map(|(pk, writes)| {
+            writes
+                .iter()
+                .rev()
+                .find(|w| self.is_account_write_live(w))
+                .map(|latest_write| (pk, latest_write))
+        })
+    }
+
     pub fn slots_count(&self) -> usize {
         self.slots.len()
     }

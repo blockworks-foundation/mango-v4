@@ -377,6 +377,11 @@ impl<'a> Book<'a> {
             apply_fees(market, mango_account, total_quote_lots_taken)?;
         }
 
+        // IOC orders have a fee penalty applied regardless of match
+        if order_type == OrderType::ImmediateOrCancel {
+            apply_penalty(market, mango_account)?;
+        }
+
         Ok(())
     }
 
@@ -460,12 +465,24 @@ fn apply_fees(
     // risks that fees_accrued is settled to 0 before they apply. It going negative
     // breaks assumptions.
     // The maker fees apply to the maker's account only when the fill event is consumed.
-    let maker_fees = taker_quote_native * market.maker_fee;
+    let maker_fees = cm!(taker_quote_native * market.maker_fee);
 
-    let taker_fees = taker_quote_native * market.taker_fee;
+    let taker_fees = cm!(taker_quote_native * market.taker_fee);
+
     let perp_account = mango_account.perp_position_mut(market.perp_market_index)?;
     perp_account.change_quote_position(-taker_fees);
-    market.fees_accrued += taker_fees + maker_fees;
+    cm!(market.fees_accrued += taker_fees + maker_fees);
+
+    Ok(())
+}
+
+/// Applies a fixed penalty fee to the account, and update the market's fees_accrued
+fn apply_penalty(market: &mut PerpMarket, mango_account: &mut MangoAccountRefMut) -> Result<()> {
+    let perp_account = mango_account.perp_position_mut(market.perp_market_index)?;
+    let fee_penalty = I80F48::from_num(market.fee_penalty);
+
+    perp_account.change_quote_position(-fee_penalty);
+    cm!(market.fees_accrued += fee_penalty);
 
     Ok(())
 }

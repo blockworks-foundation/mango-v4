@@ -38,13 +38,19 @@ pub struct PerpLiqBankruptcy<'info> {
     #[account(
         mut,
         has_one = group,
-        constraint = quote_bank.load()?.vault == quote_vault.key()
         // address is checked at #2
     )]
-    pub quote_bank: AccountLoader<'info, Bank>,
+    pub settle_bank: AccountLoader<'info, Bank>,
 
-    #[account(mut)]
-    pub quote_vault: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        address = settle_bank.load()?.vault
+    )]
+    pub settle_vault: Account<'info, TokenAccount>,
+
+    /// CHECK: Oracle can have different account types
+    #[account(address = settle_bank.load()?.oracle)]
+    pub settle_oracle: UncheckedAccount<'info>,
 
     // future: this would be an insurance fund vault specific to a
     // trustless token, separate from the shared one on the group
@@ -59,7 +65,7 @@ impl<'info> PerpLiqBankruptcy<'info> {
         let program = self.token_program.to_account_info();
         let accounts = token::Transfer {
             from: self.insurance_vault.to_account_info(),
-            to: self.quote_vault.to_account_info(),
+            to: self.settle_vault.to_account_info(),
             authority: self.group.to_account_info(),
         };
         CpiContext::new(program, accounts)
@@ -96,6 +102,7 @@ pub fn perp_liq_bankruptcy(ctx: Context<PerpLiqBankruptcy>, max_liab_transfer: u
 
     // Find bankrupt liab amount
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
+    let settle_token_index = perp_market.settle_token_index;
     let liqee_perp_position = liqee.perp_position_mut(perp_market.perp_market_index)?;
     require_msg!(
         liqee_perp_position.base_position_lots() == 0,
@@ -137,9 +144,9 @@ pub fn perp_liq_bankruptcy(ctx: Context<PerpLiqBankruptcy>, max_liab_transfer: u
 
     // Try using the insurance fund if possible
     if insurance_transfer > 0 {
-        let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-        require_eq!(quote_bank.token_index, QUOTE_TOKEN_INDEX);
-        require_keys_eq!(quote_bank.mint, ctx.accounts.insurance_vault.mint);
+        let mut settle_bank = ctx.accounts.settle_bank.load_mut()?;
+        require_eq!(settle_bank.token_index, settle_token_index);
+        require_keys_eq!(settle_bank.mint, ctx.accounts.insurance_vault.mint);
 
         // move insurance assets into quote bank
         let group_seeds = group_seeds!(group);
@@ -149,12 +156,12 @@ pub fn perp_liq_bankruptcy(ctx: Context<PerpLiqBankruptcy>, max_liab_transfer: u
         )?;
 
         // credit the liqor with quote tokens
-        let (liqor_quote, _, _) = liqor.ensure_token_position(QUOTE_TOKEN_INDEX)?;
-        quote_bank.deposit(liqor_quote, insurance_transfer_i80f48)?;
+        let (liqor_quote, _, _) = liqor.ensure_token_position(settle_token_index)?;
+        settle_bank.deposit(liqor_quote, insurance_transfer_i80f48)?;
 
         // transfer perp quote loss from the liqee to the liqor
         let liqor_perp_position = liqor
-            .ensure_perp_position(perp_market.perp_market_index, QUOTE_TOKEN_INDEX)?
+            .ensure_perp_position(perp_market.perp_market_index, settle_token_index)?
             .0;
         liqee_perp_position.change_quote_position(insurance_liab_transfer);
         liqor_perp_position.change_quote_position(-insurance_liab_transfer);

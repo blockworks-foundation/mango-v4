@@ -211,6 +211,13 @@ pub mod mango_v4 {
         instructions::token_deposit(ctx, amount)
     }
 
+    pub fn token_deposit_into_existing(
+        ctx: Context<TokenDepositIntoExisting>,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::token_deposit_into_existing(ctx, amount)
+    }
+
     pub fn token_withdraw(
         ctx: Context<TokenWithdraw>,
         amount: u64,
@@ -268,8 +275,6 @@ pub mod mango_v4 {
         instructions::serum3_deregister_market(ctx)
     }
 
-    // TODO serum3_change_spot_market_params
-
     pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result<()> {
         instructions::serum3_create_open_orders(ctx)
     }
@@ -325,8 +330,6 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::serum3_liq_force_cancel_orders(ctx, limit)
     }
-
-    // TODO serum3_cancel_all_spot_orders
 
     // DEPRECATED: use token_liq_with_token
     pub fn liq_token_with_token(
@@ -397,9 +400,15 @@ pub mod mango_v4 {
         impact_quantity: i64,
         group_insurance_fund: bool,
         trusted_market: bool,
+        fee_penalty: f32,
+        settle_fee_flat: f32,
+        settle_fee_amount_threshold: f32,
+        settle_fee_fraction_low_health: f32,
+        settle_token_index: TokenIndex,
     ) -> Result<()> {
         instructions::perp_create_market(
             ctx,
+            settle_token_index,
             perp_market_index,
             name,
             oracle_config,
@@ -413,11 +422,15 @@ pub mod mango_v4 {
             liquidation_fee,
             maker_fee,
             taker_fee,
-            max_funding,
             min_funding,
+            max_funding,
             impact_quantity,
             group_insurance_fund,
             trusted_market,
+            fee_penalty,
+            settle_fee_flat,
+            settle_fee_amount_threshold,
+            settle_fee_fraction_low_health,
         )
     }
 
@@ -439,6 +452,10 @@ pub mod mango_v4 {
         impact_quantity_opt: Option<i64>,
         group_insurance_fund_opt: Option<bool>,
         trusted_market_opt: Option<bool>,
+        fee_penalty_opt: Option<f32>,
+        settle_fee_flat_opt: Option<f32>,
+        settle_fee_amount_threshold_opt: Option<f32>,
+        settle_fee_fraction_low_health_opt: Option<f32>,
     ) -> Result<()> {
         instructions::perp_edit_market(
             ctx,
@@ -457,6 +474,10 @@ pub mod mango_v4 {
             impact_quantity_opt,
             group_insurance_fund_opt,
             trusted_market_opt,
+            fee_penalty_opt,
+            settle_fee_flat_opt,
+            settle_fee_amount_threshold_opt,
+            settle_fee_fraction_low_health_opt,
         )
     }
 
@@ -526,8 +547,8 @@ pub mod mango_v4 {
         instructions::perp_update_funding(ctx)
     }
 
-    pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>, max_settle_amount: u64) -> Result<()> {
-        instructions::perp_settle_pnl(ctx, max_settle_amount)
+    pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
+        instructions::perp_settle_pnl(ctx)
     }
 
     pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) -> Result<()> {

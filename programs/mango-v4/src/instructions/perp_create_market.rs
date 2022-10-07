@@ -1,8 +1,7 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
-use crate::error::MangoError;
-
+use crate::error::*;
 use crate::state::*;
 use crate::util::fill_from_str;
 
@@ -46,6 +45,7 @@ pub struct PerpCreateMarket<'info> {
 #[allow(clippy::too_many_arguments)]
 pub fn perp_create_market(
     ctx: Context<PerpCreateMarket>,
+    settle_token_index: TokenIndex,
     perp_market_index: PerpMarketIndex,
     name: String,
     oracle_config: OracleConfig,
@@ -64,11 +64,30 @@ pub fn perp_create_market(
     impact_quantity: i64,
     group_insurance_fund: bool,
     trusted_market: bool,
+    fee_penalty: f32,
+    settle_fee_flat: f32,
+    settle_fee_amount_threshold: f32,
+    settle_fee_fraction_low_health: f32,
 ) -> Result<()> {
+    // Settlement tokens that aren't USDC aren't fully implemented, the main missing steps are:
+    // - In health: the perp health needs to be adjusted by the settlement token weights.
+    //   Otherwise settling perp pnl could decrease health.
+    // - In settle pnl and settle fees: use the settle oracle to convert the pnl from USD to token.
+    // - In perp bankruptcy: fix the assumption that the insurance fund has the same mint as
+    //   the settlement token.
+    require_msg!(
+        settle_token_index == QUOTE_TOKEN_INDEX,
+        "settlement tokens != USDC are not fully implemented"
+    );
+
     let mut perp_market = ctx.accounts.perp_market.load_init()?;
     *perp_market = PerpMarket {
-        name: fill_from_str(&name)?,
         group: ctx.accounts.group.key(),
+        settle_token_index,
+        perp_market_index,
+        group_insurance_fund: if group_insurance_fund { 1 } else { 0 },
+        trusted_market: if trusted_market { 1 } else { 0 },
+        name: fill_from_str(&name)?,
         oracle: ctx.accounts.oracle.key(),
         oracle_config,
         bids: ctx.accounts.bids.key(),
@@ -93,17 +112,16 @@ pub fn perp_create_market(
         seq_num: 0,
         fees_accrued: I80F48::ZERO,
         fees_settled: I80F48::ZERO,
-        // Why optional - Perp could be based purely on an oracle
         bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
         base_decimals,
-        perp_market_index,
         registration_time: Clock::get()?.unix_timestamp,
-        group_insurance_fund: if group_insurance_fund { 1 } else { 0 },
-        trusted_market: if trusted_market { 1 } else { 0 },
-        padding0: Default::default(),
         padding1: Default::default(),
         padding2: Default::default(),
-        reserved: [0; 112],
+        fee_penalty,
+        settle_fee_flat,
+        settle_fee_amount_threshold,
+        settle_fee_fraction_low_health,
+        reserved: [0; 92],
     };
 
     let mut bids = ctx.accounts.bids.load_init()?;

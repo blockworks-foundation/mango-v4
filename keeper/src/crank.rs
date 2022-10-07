@@ -164,6 +164,7 @@ pub async fn loop_consume_events(
                 client.program().account(perp_market.event_queue).unwrap();
 
             let mut ams_ = vec![];
+            let mut num_of_events = 0;
 
             // TODO: future, choose better constant of how many max events to pack
             // TODO: future, choose better constant of how many max mango accounts to pack
@@ -197,6 +198,11 @@ pub async fn loop_consume_events(
                     EventType::Liquidate => {}
                 }
                 event_queue.pop_front()?;
+                num_of_events+=1;
+            }
+
+            if num_of_events == 0 {
+                return Ok(());
             }
 
             let pre = Instant::now();
@@ -229,7 +235,7 @@ pub async fn loop_consume_events(
                     "metricName=ConsumeEventsV4Failure market={} durationMs={} consumed={} error={}",
                     perp_market.name(),
                     pre.elapsed().as_millis(),
-                    ams_.len(),
+                    num_of_events,
                     e.to_string()
                 );
                 log::error!("{:?}", e)
@@ -238,7 +244,7 @@ pub async fn loop_consume_events(
                     "metricName=ConsumeEventsV4Success market={} durationMs={} consumed={}",
                     perp_market.name(),
                     pre.elapsed().as_millis(),
-                    ams_.len(),
+                    num_of_events,
                 );
                 log::info!("{:?}", sig_result);
             }
