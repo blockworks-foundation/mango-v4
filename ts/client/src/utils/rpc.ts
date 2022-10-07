@@ -4,7 +4,6 @@ import {
   Transaction,
   TransactionInstruction,
 } from '@solana/web3.js';
-import { buildVersionedTx } from '../utils';
 
 export async function sendTransaction(
   provider: AnchorProvider,
@@ -17,22 +16,17 @@ export async function sendTransaction(
     opts.preflightCommitment,
   );
 
-  let tx: Transaction = new Transaction();
-  const altsEnabled = false;
-  if (altsEnabled) {
-    tx = await buildVersionedTx(provider, ixs, opts.additionalSigners, alts);
-  } else {
-    const payer = (provider as AnchorProvider).wallet;
-    tx = new Transaction();
-    tx.recentBlockhash = latestBlockhash.blockhash;
-    tx.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
-    tx.feePayer = payer.publicKey;
-    tx.add(...ixs);
-    if (opts.additionalSigners?.length > 0) {
-      tx.partialSign(...opts.additionalSigners);
-    }
-    await payer.signTransaction(tx);
+  const payer = (provider as AnchorProvider).wallet;
+  // const tx = await buildVersionedTx(provider, ixs, opts.additionalSigners, alts);
+  const tx = new Transaction();
+  tx.recentBlockhash = latestBlockhash.blockhash;
+  tx.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
+  tx.feePayer = payer.publicKey;
+  tx.add(...ixs);
+  if (opts.additionalSigners?.length > 0) {
+    tx.partialSign(...opts.additionalSigners);
   }
+  await payer.signTransaction(tx);
 
   const signature = await connection.sendRawTransaction(tx.serialize(), {
     skipPreflight: true,
