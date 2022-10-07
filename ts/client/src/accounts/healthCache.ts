@@ -403,16 +403,12 @@ export class HealthCache {
     perpInfoIndex: number,
     clonedExistingPerpPosition: PerpPosition,
     side: PerpOrderSide,
-    newOrderBaseLots: I80F48,
+    newOrderBaseLots: BN,
   ): void {
     if (side == PerpOrderSide.bid) {
-      clonedExistingPerpPosition.bidsBaseLots.iadd(
-        new BN(newOrderBaseLots.toNumber()),
-      );
+      clonedExistingPerpPosition.bidsBaseLots.iadd(newOrderBaseLots);
     } else {
-      clonedExistingPerpPosition.asksBaseLots.iadd(
-        new BN(newOrderBaseLots.toNumber()),
-      );
+      clonedExistingPerpPosition.asksBaseLots.iadd(newOrderBaseLots);
     }
     this.perpInfos[perpInfoIndex] = PerpInfo.fromPerpPosition(
       perpMarket,
@@ -789,7 +785,7 @@ export class HealthCache {
       return MAX_I80F48();
     }
 
-    function cacheAfterPlaceOrder(baseLots: I80F48): HealthCache {
+    function cacheAfterPlaceOrder(baseLots: BN): HealthCache {
       const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
       const adjustedExistingPerpPosition: PerpPosition =
         _.cloneDeep(existingPerpPosition);
@@ -804,10 +800,14 @@ export class HealthCache {
     }
 
     function healthAfterTrade(baseLots: I80F48): I80F48 {
-      return cacheAfterPlaceOrder(baseLots).health(HealthType.init);
+      return cacheAfterPlaceOrder(new BN(baseLots.toNumber())).health(
+        HealthType.init,
+      );
     }
     function healthRatioAfterTrade(baseLots: I80F48): I80F48 {
-      return cacheAfterPlaceOrder(baseLots).healthRatio(HealthType.init);
+      return cacheAfterPlaceOrder(new BN(baseLots.toNumber())).healthRatio(
+        HealthType.init,
+      );
     }
 
     const initialBaseLots = perpInfo.base
