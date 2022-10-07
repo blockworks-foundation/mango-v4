@@ -756,12 +756,12 @@ mod tests {
         let mut keys = vec![];
 
         // ensure at least one oracle pegged order visible even at oracle price 1
-        let key = new_node_key(side, oracle_peg_price_data(20), 0);
+        let key = new_node_key(side, oracle_pegged_price_data(20), 0);
         keys.push(key);
         oracle_pegged.insert_leaf(&new_leaf(key)).unwrap();
 
         while oracle_pegged.leaf_count < 100 {
-            let price_data: u64 = oracle_peg_price_data(rng.gen_range(-20..20));
+            let price_data: u64 = oracle_pegged_price_data(rng.gen_range(-20..20));
             let seq_num: u64 = rng.gen_range(0..1000);
             let key = new_node_key(side, price_data, seq_num);
             if keys.contains(&key) {

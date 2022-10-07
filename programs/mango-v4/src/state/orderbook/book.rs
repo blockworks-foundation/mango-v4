@@ -148,7 +148,7 @@ impl<'a> Book2<'a> {
         let price_data = match component {
             BookSide2Component::Direct => direct_price_data(price_lots).unwrap(),
             BookSide2Component::OraclePegged => {
-                oracle_peg_price_data(cm!(price_lots - oracle_price_lots))
+                oracle_pegged_price_data(cm!(price_lots - oracle_price_lots))
             }
         };
         Ok((

@@ -124,18 +124,13 @@ impl<'a> BookSide2Iter<'a> {
 }
 
 fn oracle_pegged_price(oracle_price_lots: i64, price_data: u64) -> Option<i64> {
-    let price_offset = price_data.wrapping_sub(u64::MAX / 2 + 1) as i64;
+    let price_offset = oracle_pegged_price_offset(price_data);
     if let Some(price) = oracle_price_lots.checked_add(price_offset) {
         if price >= 1 {
             return Some(price);
         }
     }
     None
-}
-
-fn direct_price(price_data: u64) -> i64 {
-    assert!(price_data <= i64::MAX as u64);
-    price_data as i64
 }
 
 fn key_for_price(key: u128, price_lots: i64) -> u128 {
@@ -180,7 +175,7 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                             node: d_handle,
                         },
                         node: d_node,
-                        price_lots: direct_price(d_node.price_data()),
+                        price_lots: direct_price_lots(d_node.price_data()),
                     })
                 } else {
                     self.oracle_pegged_iter.next();
@@ -215,7 +210,7 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                         node: handle,
                     },
                     node,
-                    price_lots: direct_price(node.price_data()),
+                    price_lots: direct_price_lots(node.price_data()),
                 })
             }
             (None, None) => None,
