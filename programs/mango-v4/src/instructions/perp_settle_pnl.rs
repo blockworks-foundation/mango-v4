@@ -4,6 +4,7 @@ use fixed::types::I80F48;
 
 use crate::accounts_zerocopy::*;
 use crate::error::*;
+use crate::logs::{emit_perp_balances, PerpSettlePnlLog, TokenBalanceLog};
 use crate::state::new_health_cache;
 use crate::state::Bank;
 use crate::state::HealthType;
@@ -127,6 +128,22 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     a_perp_position.change_quote_position(-settlement);
     b_perp_position.change_quote_position(settlement);
 
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.account_a.key(),
+        perp_market.perp_market_index,
+        a_perp_position,
+        &perp_market,
+    );
+
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.account_b.key(),
+        perp_market.perp_market_index,
+        b_perp_position,
+        &perp_market,
+    );
+
     // A percentage fee is paid to the settler when account_a's health is low.
     // That's because the settlement could avoid it getting liquidated.
     let low_health_fee = if a_init_health < 0 {
@@ -154,8 +171,10 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Applying the fee here means that it decreases the displayed perp pnl.
     let settlement_i64 = settlement.checked_to_num::<i64>().unwrap();
     let fee_i64 = fee.checked_to_num::<i64>().unwrap();
-    cm!(account_a.fixed.net_settled += settlement_i64 - fee_i64);
-    cm!(account_b.fixed.net_settled -= settlement_i64);
+    cm!(a_perp_position.perp_spot_transfers += settlement_i64 - fee_i64);
+    cm!(b_perp_position.perp_spot_transfers -= settlement_i64);
+    cm!(account_a.fixed.perp_spot_transfers += settlement_i64 - fee_i64);
+    cm!(account_b.fixed.perp_spot_transfers -= settlement_i64);
 
     // Transfer token balances
     // The fee is paid by the account with positive unsettled pnl
@@ -163,6 +182,24 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     let b_token_position = account_b.token_position_mut(settle_token_index)?.0;
     bank.deposit(a_token_position, cm!(settlement - fee))?;
     bank.withdraw_with_fee(b_token_position, settlement)?;
+
+    emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.settler.key(),
+        token_index: settle_token_index,
+        indexed_position: a_token_position.indexed_position.to_bits(),
+        deposit_index: bank.deposit_index.to_bits(),
+        borrow_index: bank.borrow_index.to_bits(),
+    });
+
+    emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.settler.key(),
+        token_index: settle_token_index,
+        indexed_position: b_token_position.indexed_position.to_bits(),
+        deposit_index: bank.deposit_index.to_bits(),
+        borrow_index: bank.borrow_index.to_bits(),
+    });
 
     // settler might be the same as account a or b
     drop(account_a);
@@ -179,9 +216,31 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
 
     let (settler_token_position, settler_token_raw_index, _) =
         settler.ensure_token_position(settle_token_index)?;
-    if !bank.deposit(settler_token_position, fee)? {
-        settler.deactivate_token_position(settler_token_raw_index);
+    let settler_token_position_active = bank.deposit(settler_token_position, fee)?;
+
+    emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.settler.key(),
+        token_index: settler_token_position.token_index,
+        indexed_position: settler_token_position.indexed_position.to_bits(),
+        deposit_index: bank.deposit_index.to_bits(),
+        borrow_index: bank.borrow_index.to_bits(),
+    });
+
+    if !settler_token_position_active {
+        settler
+            .deactivate_token_position_and_log(settler_token_raw_index, ctx.accounts.settler.key());
     }
+
+    emit!(PerpSettlePnlLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account_a: ctx.accounts.account_a.key(),
+        mango_account_b: ctx.accounts.account_b.key(),
+        perp_market_index: perp_market_index,
+        settlement: settlement.to_bits(),
+        settler: ctx.accounts.settler.key(),
+        fee: fee.to_bits(),
+    });
 
     msg!("settled pnl = {}, fee = {}", settlement, fee);
     Ok(())

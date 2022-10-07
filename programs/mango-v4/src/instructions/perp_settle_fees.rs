@@ -11,6 +11,8 @@ use crate::state::HealthType;
 use crate::state::MangoAccount;
 use crate::state::{AccountLoaderDynamic, Group, PerpMarket};
 
+use crate::logs::{emit_perp_balances, PerpSettleFeesLog, TokenBalanceLog};
+
 #[derive(Accounts)]
 pub struct PerpSettleFees<'info> {
     pub group: AccountLoader<'info, Group>,
@@ -80,9 +82,18 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     perp_position.change_quote_position(settlement);
     perp_market.fees_accrued = cm!(perp_market.fees_accrued - settlement);
 
-    // Update the account's net_settled with the new PnL
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.account.key(),
+        perp_market.perp_market_index,
+        perp_position,
+        &perp_market,
+    );
+
+    // Update the account's perp_spot_transfers with the new PnL
     let settlement_i64 = settlement.round().checked_to_num::<i64>().unwrap();
-    account.fixed.net_settled = cm!(account.fixed.net_settled - settlement_i64);
+    cm!(perp_position.perp_spot_transfers -= settlement_i64);
+    cm!(account.fixed.perp_spot_transfers -= settlement_i64);
 
     // Transfer token balances
     let token_position = account
@@ -91,6 +102,22 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     bank.withdraw_with_fee(token_position, settlement)?;
     // Update the settled balance on the market itself
     perp_market.fees_settled = cm!(perp_market.fees_settled + settlement);
+
+    emit!(TokenBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account.key(),
+        token_index: perp_market.settle_token_index,
+        indexed_position: token_position.indexed_position.to_bits(),
+        deposit_index: bank.deposit_index.to_bits(),
+        borrow_index: bank.borrow_index.to_bits(),
+    });
+
+    emit!(PerpSettleFeesLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account.key(),
+        perp_market_index: perp_market.perp_market_index,
+        settlement: settlement.to_bits(),
+    });
 
     // Bank & perp_market are dropped to prevent re-borrow from remaining_accounts
     drop(bank);

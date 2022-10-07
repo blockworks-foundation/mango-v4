@@ -7,6 +7,8 @@ use crate::accounts_zerocopy::LoadMutZeroCopyRef;
 
 use crate::state::*;
 
+use crate::logs::TokenMetaDataLog;
+
 /// Changes a token's parameters.
 ///
 /// In addition to these accounts, all banks must be passed as remaining_accounts
@@ -124,6 +126,18 @@ pub fn token_edit(
         // bank_num
         // reserved
     }
+
+    // Assumes that there is at least one bank
+    let bank = ctx.remaining_accounts.first().unwrap().load_mut::<Bank>()?;
+
+    emit!(TokenMetaDataLog {
+        mango_group: ctx.accounts.group.key(),
+        mint: mint_info.mint.key(),
+        token_index: bank.token_index,
+        mint_decimals: bank.mint_decimals,
+        oracle: mint_info.oracle.key(),
+        mint_info: ctx.accounts.mint_info.key(),
+    });
 
     Ok(())
 }
