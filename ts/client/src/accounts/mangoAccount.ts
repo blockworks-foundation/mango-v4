@@ -359,14 +359,9 @@ export class MangoAccount {
    * The amount of given native token you can withdraw including borrows, considering all existing assets as collateral.
    * @returns amount of given native token you can borrow, considering all existing assets as collateral, in native token
    */
-  getMaxWithdrawWithBorrowForToken(
-    group: Group,
-    mintPk: PublicKey,
-  ): I80F48 | undefined {
+  getMaxWithdrawWithBorrowForToken(group: Group, mintPk: PublicKey): I80F48 {
     const tokenBank: Bank = group.getFirstBankByMint(mintPk);
     const initHealth = this.getHealth(group, HealthType.init);
-
-    if (!initHealth) return undefined;
 
     // Case 1:
     // Cannot withdraw if init health is below 0
@@ -408,19 +403,12 @@ export class MangoAccount {
     return maxBorrowNativeWithoutFees.add(existingTokenDeposits);
   }
 
-  getMaxWithdrawWithBorrowForTokenUi(
-    group: Group,
-    mintPk: PublicKey,
-  ): number | undefined {
+  getMaxWithdrawWithBorrowForTokenUi(group: Group, mintPk: PublicKey): number {
     const maxWithdrawWithBorrow = this.getMaxWithdrawWithBorrowForToken(
       group,
       mintPk,
     );
-    if (maxWithdrawWithBorrow) {
-      return toUiDecimals(maxWithdrawWithBorrow, group.getMintDecimals(mintPk));
-    } else {
-      return undefined;
-    }
+    return toUiDecimals(maxWithdrawWithBorrow, group.getMintDecimals(mintPk));
   }
 
   /**
@@ -438,7 +426,7 @@ export class MangoAccount {
     sourceMintPk: PublicKey,
     targetMintPk: PublicKey,
     priceFactor: number,
-  ): number | undefined {
+  ): number {
     if (sourceMintPk.equals(targetMintPk)) {
       return 0;
     }
@@ -454,9 +442,7 @@ export class MangoAccount {
         group.getFirstBankByMint(sourceMintPk).loanOriginationFeeRate,
       ),
     );
-    if (maxSource) {
-      return toUiDecimals(maxSource, group.getMintDecimals(sourceMintPk));
-    }
+    return toUiDecimals(maxSource, group.getMintDecimals(sourceMintPk));
   }
 
   /**
@@ -474,7 +460,7 @@ export class MangoAccount {
       mintPk: PublicKey;
     }[],
     healthType: HealthType = HealthType.init,
-  ): number | undefined {
+  ): number {
     const nativeTokenChanges = uiTokenChanges.map((tokenChange) => {
       return {
         nativeTokenAmount: toNativeI80F48(
