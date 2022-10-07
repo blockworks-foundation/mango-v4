@@ -216,8 +216,8 @@ pub struct DeactivateTokenPositionLog {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
     pub token_index: u16,
-    pub cumulative_deposit_interest: f32,
-    pub cumulative_borrow_interest: f32,
+    pub cumulative_deposit_interest: f64,
+    pub cumulative_borrow_interest: f64,
 }
 
 #[event]

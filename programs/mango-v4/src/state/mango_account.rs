@@ -622,7 +622,7 @@ impl<
                     cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,
                     padding: Default::default(),
-                    reserved: [0; 16],
+                    reserved: [0; 8],
                 };
             }
             Ok((v, raw_index, bank_index))
@@ -864,7 +864,7 @@ impl<
         let quote_change_native = cm!(quote - fees);
         pa.change_base_and_quote_positions(perp_market, base_change, quote_change_native);
 
-        cm!(pa.maker_volume += quote.to_num::<u64>());
+        cm!(pa.maker_volume += quote.abs().to_num::<u64>());
 
         if fill.maker_out {
             self.remove_perp_order(fill.maker_slot as usize, base_change.abs())
@@ -897,7 +897,7 @@ impl<
             cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
         pa.change_base_and_quote_positions(perp_market, base_change, quote_change_native);
 
-        cm!(pa.taker_volume += quote_change_native.to_num::<u64>());
+        cm!(pa.taker_volume += quote_change_native.abs().to_num::<u64>());
 
         Ok(())
     }
