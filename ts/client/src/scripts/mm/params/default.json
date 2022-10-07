@@ -1,0 +1,16 @@
+{
+  "interval": 1000,
+  "batch": 1,
+  "assets": {
+    "BTC": {
+      "perp": {
+        "sizePerc": 0.05,
+        "leanCoeff": 0.00025,
+        "bias": 0.0,
+        "requoteThresh": 0.0002,
+        "takeSpammers": true,
+        "spammerCharge": 2
+      }
+    }
+  }
+}

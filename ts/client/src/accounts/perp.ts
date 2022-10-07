@@ -209,6 +209,25 @@ export class PerpMarket {
       .filter((event) => event.eventType == PerpEventQueue.FILL_EVENT_TYPE);
   }
 
+  public async logOb(client: MangoClient): Promise<string> {
+    let res = ``;
+    res += `  ${this.name} OrderBook`;
+    let orders = await this?.loadAsks(client);
+    for (const order of orders!.items()) {
+      res += `\n  ${order.uiPrice.toFixed(5).padStart(10)}, ${order.uiSize
+        .toString()
+        .padStart(10)}`;
+    }
+    res += `\n  asks ↑ --------- ↓ bids`;
+    orders = await this?.loadBids(client);
+    for (const order of orders!.items()) {
+      res += `\n  ${order.uiPrice.toFixed(5).padStart(10)}, ${order.uiSize
+        .toString()
+        .padStart(10)}`;
+    }
+    return res;
+  }
+
   /**
    *
    * @param bids
@@ -380,6 +399,10 @@ export class BookSide {
     }
   }
 
+  public best(): PerpOrder | undefined {
+    return this.items().next().value;
+  }
+
   getImpactPriceUi(baseLots: BN): number | undefined {
     const s = new BN(0);
     for (const order of this.items()) {
@@ -491,10 +514,10 @@ export class PerpOrderSide {
 
 export class PerpOrderType {
   static limit = { limit: {} };
-  static immediateOrCancel = { immediateorcancel: {} };
-  static postOnly = { postonly: {} };
+  static immediateOrCancel = { immediateOrCancel: {} };
+  static postOnly = { postOnly: {} };
   static market = { market: {} };
-  static postOnlySlide = { postonlyslide: {} };
+  static postOnlySlide = { postOnlySlide: {} };
 }
 
 export class PerpOrder {
