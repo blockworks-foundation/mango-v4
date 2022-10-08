@@ -2,7 +2,7 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { HealthType } from '../accounts/mangoAccount';
-import { MangoClient, MANGO_V4_ID } from '../index';
+import { MangoClient, MANGO_V4_ID, toUiDecimalsForQuote } from '../index';
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
@@ -39,82 +39,94 @@ async function main() {
   console.log(mangoAccount.toString(group));
 
   if (true) {
-    console.log(`...depositing 10 USDC`);
-    await client.tokenDeposit(group, mangoAccount, 'USDC', 10);
-    await mangoAccount.reload(client, group);
+    console.log(`...depositing 0.0001 USDC`);
+    await client.tokenDeposit(
+      group,
+      mangoAccount,
+      group.banksMapByName.get('USDC')![0].mint,
+      10,
+    );
+    await mangoAccount.reload(client);
 
-    console.log(`...depositing 1 SOL`);
-    await client.tokenDeposit(group, mangoAccount, 'SOL', 1);
-    await mangoAccount.reload(client, group);
+    console.log(`...depositing 0.001 SOL`);
+    await client.tokenDeposit(
+      group,
+      mangoAccount,
+      group.banksMapByName.get('SOL')![0].mint,
+      1,
+    );
+    await mangoAccount.reload(client);
   }
 
-  await mangoAccount.reload(client, group);
+  await mangoAccount.reload(client);
   console.log(
     'mangoAccount.getEquity() ' +
-      toUiDecimalsForQuote(mangoAccount.getEquity().toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getEquity(group).toNumber()),
   );
   console.log(
     'mangoAccount.getHealth(HealthType.init) ' +
-      toUiDecimalsForQuote(mangoAccount.getHealth(HealthType.init).toNumber()),
+      toUiDecimalsForQuote(
+        mangoAccount.getHealth(group, HealthType.init).toNumber(),
+      ),
   );
   console.log(
     'mangoAccount.getHealthRatio(HealthType.init) ' +
-      mangoAccount.getHealthRatio(HealthType.init).toNumber(),
+      mangoAccount.getHealthRatio(group, HealthType.init).toNumber(),
   );
   console.log(
     'mangoAccount.getCollateralValue() ' +
-      toUiDecimalsForQuote(mangoAccount.getCollateralValue().toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getCollateralValue(group).toNumber()),
   );
   console.log(
     'mangoAccount.getAssetsVal() ' +
-      toUiDecimalsForQuote(mangoAccount.getAssetsVal().toNumber()),
+      toUiDecimalsForQuote(
+        mangoAccount.getAssetsValue(group, HealthType.init).toNumber(),
+      ),
   );
   console.log(
     'mangoAccount.getLiabsVal() ' +
-      toUiDecimalsForQuote(mangoAccount.getLiabsVal().toNumber()),
+      toUiDecimalsForQuote(
+        mangoAccount.getLiabsValue(group, HealthType.init).toNumber(),
+      ),
   );
 
   console.log(
     "mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL') " +
       toUiDecimalsForQuote(
         (
-          await mangoAccount.getMaxWithdrawWithBorrowForToken(group, 'SOL')
-        ).toNumber(),
-      ),
-  );
-
-  console.log(
-    "mangoAccount.getMaxSourceForTokenSwap(group, 'USDC', 'BTC') " +
-      toUiDecimalsForQuote(
-        (
-          await mangoAccount.getMaxSourceForTokenSwap(
+          await mangoAccount.getMaxWithdrawWithBorrowForToken(
             group,
-            'USDC',
-            'BTC',
-            0.94,
+            group.banksMapByName.get('SOL')![0].mint,
           )
         ).toNumber(),
       ),
   );
 
   console.log(
+    "mangoAccount.getMaxSourceForTokenSwap(group, 'USDC', 'BTC') " +
+      (await mangoAccount.getMaxSourceUiForTokenSwap(
+        group,
+        group.banksMapByName.get('USDC')![0].mint,
+        group.banksMapByName.get('BTC')![0].mint,
+        0.94,
+      )),
+  );
+
+  console.log(
     'mangoAccount.simHealthWithTokenPositionChanges ' +
       toUiDecimalsForQuote(
-        (
-          await mangoAccount.simHealthWithTokenPositionChanges(group, [
-            {
-              tokenName: 'USDC',
-              tokenAmount:
-                -20_000 *
-                Math.pow(10, group.banksMap.get('BTC')?.mintDecimals!),
-            },
-            {
-              tokenName: 'BTC',
-              tokenAmount:
-                1 * Math.pow(10, group.banksMap.get('BTC')?.mintDecimals!),
-            },
-          ])
-        ).toNumber(),
+        await mangoAccount.simHealthRatioWithTokenPositionUiChanges(group, [
+          {
+            mintPk: group.banksMapByName.get('USDC')![0].mint,
+            uiTokenAmount:
+              -20_000 * Math.pow(10, group.banksMap.get('BTC')?.mintDecimals!),
+          },
+          {
+            mintPk: group.banksMapByName.get('BTC')![0].mint,
+            uiTokenAmount:
+              1 * Math.pow(10, group.banksMap.get('BTC')?.mintDecimals!),
+          },
+        ]),
       ),
   );
 
