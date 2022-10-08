@@ -926,11 +926,11 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
+        owner: mangoAccount.owner,
         bank: bank.publicKey,
         vault: bank.vault,
         oracle: bank.oracle,
         tokenAccount: tokenAccountPk,
-        owner: mangoAccount.owner,
       })
       .remainingAccounts(
         healthRemainingAccounts.map(
@@ -1724,6 +1724,98 @@ export class MangoClient {
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
+  }
+
+  async perpSettlePnl(
+    group: Group,
+    profitableAccount: MangoAccount,
+    unprofitableAccount: MangoAccount,
+    settler: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+  ): Promise<TransactionSignature> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        AccountRetriever.Scanning,
+        group,
+        [profitableAccount, unprofitableAccount],
+        [group.getFirstBankByTokenIndex(0 as TokenIndex)],
+        [perpMarket],
+      );
+    const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0]
+    const ix = await this.program.methods
+      .perpSettlePnl()
+      .accounts({
+        group: group.publicKey,
+        accountA: profitableAccount.publicKey,
+        accountB: unprofitableAccount.publicKey,
+        perpMarket: perpMarket.publicKey,
+        oracle: perpMarket.oracle,
+        settleOracle: bank.oracle,
+        settleBank: bank.publicKey,
+        settler: settler.publicKey,
+        settlerOwner: this.program.provider.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
+
+      return await sendTransaction(
+        this.program.provider as AnchorProvider,
+        [ix],
+        group.addressLookupTablesList,
+        {
+          postSendTxCallback: this.postSendTxCallback,
+        },
+      );
+  }
+
+  async perpSettleFees(
+    group: Group,
+    account: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    maxSettleAmount: BN,
+  ): Promise<TransactionSignature> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        AccountRetriever.Fixed,
+        group,
+        [account], // Account must be unprofitable
+        [group.getFirstBankByTokenIndex(0 as TokenIndex)],
+        [perpMarket],
+      );
+    const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0]
+    const ix = await this.program.methods
+      .perpSettleFees(maxSettleAmount)
+      .accounts({
+        group: group.publicKey,
+        account: account.publicKey,
+        perpMarket: perpMarket.publicKey,
+        oracle: perpMarket.oracle,
+        settleOracle: bank.oracle,
+        settleBank: bank.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
+
+      return await sendTransaction(
+        this.program.provider as AnchorProvider,
+        [ix],
+        group.addressLookupTablesList,
+        {
+          postSendTxCallback: this.postSendTxCallback,
+        },
+      );
   }
 
   public async perpConsumeEvents(
