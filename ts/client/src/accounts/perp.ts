@@ -25,6 +25,7 @@ export class PerpMarket {
   public openInterest: BN;
   public seqNum: BN;
   public feesAccrued: I80F48;
+  public feesSettled: I80F48;
   priceLotsToUiConverter: number;
   baseLotsToUiConverter: number;
   quoteLotsToUiConverter: number;
@@ -61,6 +62,7 @@ export class PerpMarket {
       openInterest: BN;
       seqNum: BN;
       feesAccrued: I80F48Dto;
+      feesSettled: I80F48Dto;
       bump: number;
       baseDecimals: number;
       registrationTime: BN;
@@ -95,6 +97,7 @@ export class PerpMarket {
       obj.openInterest,
       obj.seqNum,
       obj.feesAccrued,
+      obj.feesSettled,
       obj.bump,
       obj.baseDecimals,
       obj.registrationTime,
@@ -130,6 +133,7 @@ export class PerpMarket {
     openInterest: BN,
     seqNum: BN,
     feesAccrued: I80F48Dto,
+    feesSettled: I80F48Dto,
     bump: number,
     public baseDecimals: number,
     public registrationTime: BN,
@@ -149,6 +153,7 @@ export class PerpMarket {
     this.openInterest = openInterest;
     this.seqNum = seqNum;
     this.feesAccrued = I80F48.from(feesAccrued);
+    this.feesSettled = I80F48.from(feesSettled);
 
     this.priceLotsToUiConverter = new Big(10)
       .pow(baseDecimals - QUOTE_DECIMALS)
