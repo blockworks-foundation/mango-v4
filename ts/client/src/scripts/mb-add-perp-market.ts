@@ -44,6 +44,8 @@ async function viewUnownedAccount(userKeypairFile: string) {
     adminProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
+    {},
+    'get-program-accounts',
   );
 
   // fetch group
@@ -54,27 +56,31 @@ async function viewUnownedAccount(userKeypairFile: string) {
   console.log(`Registering perp market...`);
   try {
     await client.perpCreateMarket(
-      group,
-      btcMainnetOracle,
-      0,
-      'BTC-PERP',
-      0.1,
-      6,
-      0,
-      1,
-      10,
-      0.975,
-      0.95,
-      1.025,
-      1.05,
-      0.012,
-      0.0002,
-      0.0,
-      0.05,
-      0.05,
-      100,
-      false,
-      true,
+      group, // group
+      btcMainnetOracle, // oracle
+      0, // perpMarketIndex
+      'BTC-PERP', // name
+      0.1, // oracleConfFilter
+      6, // baseDecimals
+      1, // quoteLotSize
+      10, // baseLotSize
+      0.975, // maintAssetWeight
+      0.95, // initAssetWeight
+      1.025, // maintLiabWeight
+      1.05, // initLiabWeight
+      0.012, // liquidationFee
+      0.0002, // makerFee
+      0.0, // takerFee
+      0, // feePenalty
+      0.05, // minFunding
+      0.05, // maxFunding
+      100, // impactQuantity
+      false, // groupInsuranceFund
+      true, // trustedMarket
+      0, // settleFeeFlat
+      0, // settleFeeAmountThreshold
+      0, // settleFeeFractionLowHealth
+      0, // settleTokenIndex
     );
     console.log('done');
   } catch (error) {

@@ -182,6 +182,15 @@ export class PerpMarket {
     }
     return this._uiPrice;
   }
+
+  get minOrderSize(): number {
+    return this.baseLotsToUiConverter;
+  }
+
+  get tickSize(): number {
+    return this.priceLotsToUiConverter;
+  }
+
   public async loadAsks(client: MangoClient): Promise<BookSide> {
     const asks = await client.program.account.bookSide.fetch(this.asks);
     return BookSide.from(client, this, BookSideType.asks, asks);
