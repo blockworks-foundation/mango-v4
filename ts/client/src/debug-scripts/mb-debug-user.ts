@@ -132,19 +132,11 @@ async function debugUser(
   function getMaxForPerpWrapper(perpMarket: PerpMarket) {
     console.log(
       `getMaxQuoteForPerpBidUi ${perpMarket.perpMarketIndex} ` +
-        mangoAccount.getMaxQuoteForPerpBidUi(
-          group,
-          perpMarket.perpMarketIndex,
-          perpMarket.price.toNumber(),
-        ),
+        mangoAccount.getMaxQuoteForPerpBidUi(group, perpMarket.perpMarketIndex),
     );
     console.log(
       `getMaxBaseForPerpAskUi ${perpMarket.perpMarketIndex} ` +
-        mangoAccount.getMaxBaseForPerpAskUi(
-          group,
-          perpMarket.perpMarketIndex,
-          perpMarket.price.toNumber(),
-        ),
+        mangoAccount.getMaxBaseForPerpAskUi(group, perpMarket.perpMarketIndex),
     );
   }
   for (const perpMarket of Array.from(
