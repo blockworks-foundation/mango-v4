@@ -22,7 +22,6 @@ mod tests {
     use bytemuck::Zeroable;
     use fixed::types::I80F48;
     use solana_program::pubkey::Pubkey;
-    use std::cell::RefCell;
 
     fn new_bookside(book_side_type: BookSideType) -> BookSide {
         BookSide {
@@ -65,17 +64,17 @@ mod tests {
         false
     }
 
-    fn test_setup(
-        price: f64,
-    ) -> (
-        PerpMarket,
-        I80F48,
-        EventQueue,
-        RefCell<BookSide>,
-        RefCell<BookSide>,
-    ) {
-        let bids = RefCell::new(new_bookside(BookSideType::Bids));
-        let asks = RefCell::new(new_bookside(BookSideType::Asks));
+    fn test_setup(price: f64) -> (PerpMarket, I80F48, EventQueue, Box<OrderBook>) {
+        let bids_direct = new_bookside(BookSideType::Bids);
+        let asks_direct = new_bookside(BookSideType::Asks);
+        let bids_oracle_pegged = new_bookside(BookSideType::Bids);
+        let asks_oracle_pegged = new_bookside(BookSideType::Asks);
+        let book = Box::new(OrderBook {
+            bids_direct,
+            asks_direct,
+            bids_oracle_pegged,
+            asks_oracle_pegged,
+        });
 
         let event_queue = EventQueue::zeroed();
 
@@ -89,20 +88,16 @@ mod tests {
         perp_market.init_asset_weight = I80F48::ONE;
         perp_market.init_liab_weight = I80F48::ONE;
 
-        (perp_market, oracle_price, event_queue, bids, asks)
+        (perp_market, oracle_price, event_queue, book)
     }
 
     // Check what happens when one side of the book fills up
     #[test]
     fn book_bids_full() {
-        let (mut perp_market, oracle_price, mut event_queue, bids, asks) = test_setup(5000.0);
-        let mut book = Book {
-            bids: bids.borrow_mut(),
-            asks: asks.borrow_mut(),
-        };
+        let (mut perp_market, oracle_price, mut event_queue, mut book) = test_setup(5000.0);
 
         let mut new_order =
-            |book: &mut Book, event_queue: &mut EventQueue, side, price, now_ts| -> u128 {
+            |book: &mut OrderBook, event_queue: &mut EventQueue, side, price, now_ts| -> u128 {
                 let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
                 let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
                 account
@@ -113,7 +108,11 @@ mod tests {
                 let tif = 100;
 
                 book.new_order(
-                    side,
+                    if side == Side::Bid {
+                        SideAndComponent::BidDirect
+                    } else {
+                        SideAndComponent::AskDirect
+                    },
                     &mut perp_market,
                     event_queue,
                     oracle_price,
@@ -150,50 +149,46 @@ mod tests {
                 1000 + i as i64,
                 1000011 as u64,
             );
-            if book.bids.is_full() {
+            if book.bids_direct.is_full() {
                 break;
             }
         }
-        assert!(book.bids.is_full());
-        assert_eq!(book.bids.min_leaf().unwrap().price(), 1001);
+        assert!(book.bids_direct.is_full());
+        assert_eq!(book.bids_direct.min_leaf().unwrap().price(), 1001);
         assert_eq!(
-            book.bids.max_leaf().unwrap().price(),
-            (1000 + book.bids.leaf_count) as i64
+            book.bids_direct.max_leaf().unwrap().price(),
+            (1000 + book.bids_direct.leaf_count) as i64
         );
 
         // add another bid at a higher price before expiry, replacing the lowest-price one (1001)
         new_order(&mut book, &mut event_queue, Side::Bid, 1005, 1000000 - 1);
-        assert_eq!(book.bids.min_leaf().unwrap().price(), 1002);
+        assert_eq!(book.bids_direct.min_leaf().unwrap().price(), 1002);
         assert_eq!(event_queue.len(), 1);
 
         // adding another bid after expiry removes the soonest-expiring order (1005)
         new_order(&mut book, &mut event_queue, Side::Bid, 999, 2000000);
-        assert_eq!(book.bids.min_leaf().unwrap().price(), 999);
-        assert!(!bookside_contains_key(&book.bids, 1005));
+        assert_eq!(book.bids_direct.min_leaf().unwrap().price(), 999);
+        assert!(!bookside_contains_key(&book.bids_direct, 1005));
         assert_eq!(event_queue.len(), 2);
 
         // adding an ask will wipe up to three expired bids at the top of the book
-        let bids_max = book.bids.max_leaf().unwrap().price_data();
-        let bids_count = book.bids.leaf_count;
+        let bids_max = book.bids_direct.max_leaf().unwrap().price_data();
+        let bids_count = book.bids_direct.leaf_count;
         new_order(&mut book, &mut event_queue, Side::Ask, 6000, 1500000);
-        assert_eq!(book.bids.leaf_count, bids_count - 5);
-        assert_eq!(book.asks.leaf_count, 1);
+        assert_eq!(book.bids_direct.leaf_count, bids_count - 5);
+        assert_eq!(book.asks_direct.leaf_count, 1);
         assert_eq!(event_queue.len(), 2 + 5);
-        assert!(!bookside_contains_price(&book.bids, bids_max));
-        assert!(!bookside_contains_price(&book.bids, bids_max - 1));
-        assert!(!bookside_contains_price(&book.bids, bids_max - 2));
-        assert!(!bookside_contains_price(&book.bids, bids_max - 3));
-        assert!(!bookside_contains_price(&book.bids, bids_max - 4));
-        assert!(bookside_contains_price(&book.bids, bids_max - 5));
+        assert!(!bookside_contains_price(&book.bids_direct, bids_max));
+        assert!(!bookside_contains_price(&book.bids_direct, bids_max - 1));
+        assert!(!bookside_contains_price(&book.bids_direct, bids_max - 2));
+        assert!(!bookside_contains_price(&book.bids_direct, bids_max - 3));
+        assert!(!bookside_contains_price(&book.bids_direct, bids_max - 4));
+        assert!(bookside_contains_price(&book.bids_direct, bids_max - 5));
     }
 
     #[test]
     fn book_new_order() {
-        let (mut market, oracle_price, mut event_queue, bids, asks) = test_setup(1000.0);
-        let mut book = Book {
-            bids: bids.borrow_mut(),
-            asks: asks.borrow_mut(),
-        };
+        let (mut market, oracle_price, mut event_queue, mut book) = test_setup(1000.0);
 
         // Add lots and fees to make sure to exercise unit conversion
         market.base_lot_size = 10;
@@ -219,7 +214,7 @@ mod tests {
         let price = 1000 * market.base_lot_size / market.quote_lot_size;
         let bid_quantity = 10;
         book.new_order(
-            Side::Bid,
+            SideAndComponent::BidDirect,
             &mut market,
             &mut event_queue,
             oracle_price,
@@ -247,10 +242,10 @@ mod tests {
             SideAndComponent::BidDirect
         );
         assert!(bookside_contains_key(
-            &book.bids,
+            &book.bids_direct,
             maker.perp_order_mut_by_raw_index(0).id
         ));
-        assert!(bookside_contains_price(&book.bids, price as u64));
+        assert!(bookside_contains_price(&book.bids_direct, price as u64));
         assert_eq!(
             maker.perp_position_by_raw_index(0).bids_base_lots,
             bid_quantity
@@ -271,7 +266,7 @@ mod tests {
         // Take the order partially
         let match_quantity = 5;
         book.new_order(
-            Side::Ask,
+            SideAndComponent::AskDirect,
             &mut market,
             &mut event_queue,
             oracle_price,
@@ -289,7 +284,8 @@ mod tests {
         .unwrap();
         // the remainder of the maker order is still on the book
         // (the maker account is unchanged: it was not even passed in)
-        let order = bookside_leaf_by_key(&book.bids, maker.perp_order_by_raw_index(0).id).unwrap();
+        let order =
+            bookside_leaf_by_key(&book.bids_direct, maker.perp_order_by_raw_index(0).id).unwrap();
         assert_eq!(order.price(), price);
         assert_eq!(order.quantity, bid_quantity - match_quantity);
 
@@ -374,11 +370,7 @@ mod tests {
 
     #[test]
     fn test_fee_penalty_applied_only_on_limit_order() -> Result<()> {
-        let (mut market, oracle_price, mut event_queue, bids, asks) = test_setup(1000.0);
-        let mut book = Book {
-            bids: bids.borrow_mut(),
-            asks: asks.borrow_mut(),
-        };
+        let (mut market, oracle_price, mut event_queue, mut book) = test_setup(1000.0);
 
         let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
         let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
@@ -393,7 +385,7 @@ mod tests {
 
         // Passive order
         book.new_order(
-            Side::Ask,
+            SideAndComponent::AskDirect,
             &mut market,
             &mut event_queue,
             oracle_price,
@@ -412,7 +404,7 @@ mod tests {
 
         // Partial taker
         book.new_order(
-            Side::Bid,
+            SideAndComponent::BidDirect,
             &mut market,
             &mut event_queue,
             oracle_price,
@@ -445,7 +437,7 @@ mod tests {
 
         // Full taker
         book.new_order(
-            Side::Bid,
+            SideAndComponent::BidDirect,
             &mut market,
             &mut event_queue,
             oracle_price,
