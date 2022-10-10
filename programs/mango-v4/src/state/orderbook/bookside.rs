@@ -432,100 +432,100 @@ impl OrderTree {
     AnchorDeserialize,
 )]
 #[repr(u8)]
-pub enum BookSidesComponent {
+pub enum BookSideOrderTree {
     Fixed,
     OraclePegged,
 }
 
 /// Reference to a node in a book side component
-pub struct BookSidesNodeHandle {
+pub struct BookSideOrderHandle {
     pub node: NodeHandle,
-    pub component: BookSidesComponent,
+    pub order_tree: BookSideOrderTree,
 }
 
 #[derive(Clone, Copy)]
-pub struct BookSidesRef<'a> {
+pub struct BookSideRef<'a> {
     pub fixed: &'a OrderTree,
     pub oracle_pegged: &'a OrderTree,
 }
 
-pub struct BookSidesRefMut<'a> {
+pub struct BookSideRefMut<'a> {
     pub fixed: &'a mut OrderTree,
     pub oracle_pegged: &'a mut OrderTree,
 }
 
-impl<'a> BookSidesRef<'a> {
+impl<'a> BookSideRef<'a> {
     /// Iterate over all entries in the book filtering out invalid orders
     ///
     /// smallest to highest for asks
     /// highest to smallest for bids
-    pub fn iter_valid(&self, now_ts: u64, oracle_price_lots: i64) -> BookSide2Iter {
-        BookSide2Iter::new(*self, now_ts, oracle_price_lots)
+    pub fn iter_valid(&self, now_ts: u64, oracle_price_lots: i64) -> BookSideIter {
+        BookSideIter::new(*self, now_ts, oracle_price_lots)
     }
 
     /// Iterate over all entries, including invalid orders
-    pub fn iter_all_including_invalid(&self, oracle_price_lots: i64) -> BookSide2Iter {
-        BookSide2Iter::new(*self, 0, oracle_price_lots)
+    pub fn iter_all_including_invalid(&self, oracle_price_lots: i64) -> BookSideIter {
+        BookSideIter::new(*self, 0, oracle_price_lots)
     }
 
-    pub fn component(&self, component: BookSidesComponent) -> &OrderTree {
+    pub fn orders(&self, component: BookSideOrderTree) -> &OrderTree {
         match component {
-            BookSidesComponent::Fixed => self.fixed,
-            BookSidesComponent::OraclePegged => self.oracle_pegged,
+            BookSideOrderTree::Fixed => self.fixed,
+            BookSideOrderTree::OraclePegged => self.oracle_pegged,
         }
     }
 
-    pub fn node(&self, key: BookSidesNodeHandle) -> Option<&AnyNode> {
-        self.component(key.component).node(key.node)
+    pub fn node(&self, key: BookSideOrderHandle) -> Option<&AnyNode> {
+        self.orders(key.order_tree).node(key.node)
     }
 
-    pub fn is_full(&self, component: BookSidesComponent) -> bool {
-        self.component(component).is_full()
+    pub fn is_full(&self, component: BookSideOrderTree) -> bool {
+        self.orders(component).is_full()
     }
 }
 
-impl<'a> BookSidesRefMut<'a> {
-    pub fn non_mut(&self) -> BookSidesRef {
-        BookSidesRef {
+impl<'a> BookSideRefMut<'a> {
+    pub fn non_mut(&self) -> BookSideRef {
+        BookSideRef {
             fixed: self.fixed,
             oracle_pegged: self.oracle_pegged,
         }
     }
 
-    pub fn component_mut(&mut self, component: BookSidesComponent) -> &mut OrderTree {
+    pub fn orders_mut(&mut self, component: BookSideOrderTree) -> &mut OrderTree {
         match component {
-            BookSidesComponent::Fixed => self.fixed,
-            BookSidesComponent::OraclePegged => self.oracle_pegged,
+            BookSideOrderTree::Fixed => self.fixed,
+            BookSideOrderTree::OraclePegged => self.oracle_pegged,
         }
     }
 
-    pub fn node_mut(&mut self, key: BookSidesNodeHandle) -> Option<&mut AnyNode> {
-        self.component_mut(key.component).node_mut(key.node)
+    pub fn node_mut(&mut self, key: BookSideOrderHandle) -> Option<&mut AnyNode> {
+        self.orders_mut(key.order_tree).node_mut(key.node)
     }
 
-    pub fn remove_worst(&mut self, component: BookSidesComponent) -> Option<LeafNode> {
-        self.component_mut(component).remove_worst()
+    pub fn remove_worst(&mut self, component: BookSideOrderTree) -> Option<LeafNode> {
+        self.orders_mut(component).remove_worst()
     }
 
     /// Remove the order with the lowest expiry timestamp, if that's < now_ts.
     pub fn remove_one_expired(
         &mut self,
-        component: BookSidesComponent,
+        component: BookSideOrderTree,
         now_ts: u64,
     ) -> Option<LeafNode> {
-        self.component_mut(component).remove_one_expired(now_ts)
+        self.orders_mut(component).remove_one_expired(now_ts)
     }
 
     pub fn remove_by_key(
         &mut self,
-        component: BookSidesComponent,
+        component: BookSideOrderTree,
         search_key: u128,
     ) -> Option<LeafNode> {
-        self.component_mut(component).remove_by_key(search_key)
+        self.orders_mut(component).remove_by_key(search_key)
     }
 
-    pub fn remove(&mut self, key: BookSidesNodeHandle) -> Option<AnyNode> {
-        self.component_mut(key.component).remove(key.node)
+    pub fn remove(&mut self, key: BookSideOrderHandle) -> Option<AnyNode> {
+        self.orders_mut(key.order_tree).remove(key.node)
     }
 }
 
@@ -800,7 +800,7 @@ mod tests {
             direct.insert_leaf(&new_leaf(key)).unwrap();
         }
 
-        let bookside = BookSidesRef {
+        let bookside = BookSideRef {
             fixed: &direct,
             oracle_pegged: &oracle_pegged,
         };
@@ -813,7 +813,7 @@ mod tests {
             let mut last_price = if ascending { 0 } else { i64::MAX };
             for order in bookside.iter_all_including_invalid(oracle_price_lots) {
                 let price = order.price_lots;
-                println!("{} {:?} {price}", order.node.key, order.handle.component);
+                println!("{} {:?} {price}", order.node.key, order.handle.order_tree);
                 if ascending {
                     assert!(price >= last_price);
                 } else {

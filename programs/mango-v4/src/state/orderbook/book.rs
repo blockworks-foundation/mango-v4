@@ -55,32 +55,32 @@ const_assert_eq!(std::mem::size_of::<OrderBook>() % 8, 0);
 
 struct OrderParams {
     post_only: bool,
-    post_target: Option<BookSidesComponent>,
+    post_target: Option<BookSideOrderTree>,
     price_lots: i64,
     price_data: u64,
 }
 
 impl OrderBook {
-    pub fn bookside_mut(&mut self, side: Side) -> BookSidesRefMut {
+    pub fn bookside_mut(&mut self, side: Side) -> BookSideRefMut {
         match side {
-            Side::Bid => BookSidesRefMut {
+            Side::Bid => BookSideRefMut {
                 fixed: &mut self.bids_fixed,
                 oracle_pegged: &mut self.bids_oracle_pegged,
             },
-            Side::Ask => BookSidesRefMut {
+            Side::Ask => BookSideRefMut {
                 fixed: &mut self.asks_fixed,
                 oracle_pegged: &mut self.asks_oracle_pegged,
             },
         }
     }
 
-    pub fn bookside(&self, side: Side) -> BookSidesRef {
+    pub fn bookside(&self, side: Side) -> BookSideRef {
         match side {
-            Side::Bid => BookSidesRef {
+            Side::Bid => BookSideRef {
                 fixed: &self.bids_fixed,
                 oracle_pegged: &self.bids_oracle_pegged,
             },
-            Side::Ask => BookSidesRef {
+            Side::Ask => BookSideRef {
                 fixed: &self.asks_fixed,
                 oracle_pegged: &self.asks_oracle_pegged,
             },
@@ -138,8 +138,8 @@ impl OrderBook {
             });
         }
         let price_lots = match component {
-            BookSidesComponent::Fixed => price_input,
-            BookSidesComponent::OraclePegged => cm!(oracle_price_lots + price_input),
+            BookSideOrderTree::Fixed => price_input,
+            BookSideOrderTree::OraclePegged => cm!(oracle_price_lots + price_input),
         };
         require_gte!(price_lots, 1);
         let (post_only, post_allowed, price_lots) = match order_type {
@@ -160,8 +160,8 @@ impl OrderBook {
         };
         require_gte!(price_lots, 1);
         let price_data = match component {
-            BookSidesComponent::Fixed => direct_price_data(price_lots).unwrap(),
-            BookSidesComponent::OraclePegged => {
+            BookSideOrderTree::Fixed => direct_price_data(price_lots).unwrap(),
+            BookSideOrderTree::OraclePegged => {
                 oracle_pegged_price_data(cm!(price_lots - oracle_price_lots))
             }
         };
@@ -229,8 +229,8 @@ impl OrderBook {
         // matched_changes/matched_deletes and then applied after this loop.
         let mut remaining_base_lots = max_base_lots;
         let mut remaining_quote_lots = max_quote_lots;
-        let mut matched_order_changes: Vec<(BookSidesNodeHandle, i64)> = vec![];
-        let mut matched_order_deletes: Vec<(BookSidesComponent, u128)> = vec![];
+        let mut matched_order_changes: Vec<(BookSideOrderHandle, i64)> = vec![];
+        let mut matched_order_deletes: Vec<(BookSideOrderTree, u128)> = vec![];
         let mut number_of_dropped_expired_orders = 0;
         let mut opposing_bookside = self.bookside_mut(other_side);
         for best_opposing in opposing_bookside
@@ -251,7 +251,7 @@ impl OrderBook {
                     );
                     event_queue.push_back(cast(event)).unwrap();
                     matched_order_deletes
-                        .push((best_opposing.handle.component, best_opposing.node.key));
+                        .push((best_opposing.handle.order_tree, best_opposing.node.key));
                 }
                 continue;
             }
@@ -285,7 +285,7 @@ impl OrderBook {
             let maker_out = new_best_opposing_quantity == 0;
             if maker_out {
                 matched_order_deletes
-                    .push((best_opposing.handle.component, best_opposing.node.key));
+                    .push((best_opposing.handle.order_tree, best_opposing.node.key));
             } else {
                 matched_order_changes.push((best_opposing.handle, new_best_opposing_quantity));
             }
@@ -342,7 +342,7 @@ impl OrderBook {
         }
         if let Some(book_component) = post_target {
             let mut full_bookside = self.bookside_mut(side);
-            let bookside = full_bookside.component_mut(book_component);
+            let bookside = full_bookside.orders_mut(book_component);
 
             // Drop an expired order if possible
             if let Some(expired_order) = bookside.remove_one_expired(now_ts) {
@@ -469,7 +469,7 @@ impl OrderBook {
     ) -> Result<LeafNode> {
         let side = side_and_component.side();
         let book_component = side_and_component.component();
-        let leaf_node = self.bookside_mut(side).component_mut(book_component).
+        let leaf_node = self.bookside_mut(side).orders_mut(book_component).
         remove_by_key(order_id).ok_or_else(|| {
                     error_msg!("invalid perp order id {order_id} for side {side:?} and component {book_component:?}")
                 })?;

@@ -101,20 +101,20 @@ impl<'a> Iterator for OrderTreeIter<'a> {
     }
 }
 
-pub struct BookSide2IterItem<'a> {
-    pub handle: BookSidesNodeHandle,
+pub struct BookSideIterItem<'a> {
+    pub handle: BookSideOrderHandle,
     pub node: &'a LeafNode,
     pub price_lots: i64,
 }
 
-pub struct BookSide2Iter<'a> {
+pub struct BookSideIter<'a> {
     direct_iter: OrderTreeIter<'a>,
     oracle_pegged_iter: OrderTreeIter<'a>,
     oracle_price_lots: i64,
 }
 
-impl<'a> BookSide2Iter<'a> {
-    pub fn new(book_side: BookSidesRef<'a>, now_ts: u64, oracle_price_lots: i64) -> Self {
+impl<'a> BookSideIter<'a> {
+    pub fn new(book_side: BookSideRef<'a>, now_ts: u64, oracle_price_lots: i64) -> Self {
         Self {
             direct_iter: book_side.fixed.iter_valid(now_ts),
             oracle_pegged_iter: book_side.oracle_pegged.iter_valid(now_ts),
@@ -142,8 +142,8 @@ fn key_for_price(key: u128, price_lots: i64) -> u128 {
     upper | lower
 }
 
-impl<'a> Iterator for BookSide2Iter<'a> {
-    type Item = BookSide2IterItem<'a>;
+impl<'a> Iterator for BookSideIter<'a> {
+    type Item = BookSideIterItem<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // Skip all the oracle pegged orders that aren't representable with the current oracle
@@ -170,8 +170,8 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                 if is_better(d_node.key, key_for_price(o_node.key, o_price)) {
                     self.direct_iter.next();
                     Some(Self::Item {
-                        handle: BookSidesNodeHandle {
-                            component: BookSidesComponent::Fixed,
+                        handle: BookSideOrderHandle {
+                            order_tree: BookSideOrderTree::Fixed,
                             node: d_handle,
                         },
                         node: d_node,
@@ -180,8 +180,8 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                 } else {
                     self.oracle_pegged_iter.next();
                     Some(Self::Item {
-                        handle: BookSidesNodeHandle {
-                            component: BookSidesComponent::OraclePegged,
+                        handle: BookSideOrderHandle {
+                            order_tree: BookSideOrderTree::OraclePegged,
                             node: o_handle,
                         },
                         node: o_node,
@@ -194,8 +194,8 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                 let price_lots =
                     oracle_pegged_price(self.oracle_price_lots, node.price_data()).unwrap();
                 Some(Self::Item {
-                    handle: BookSidesNodeHandle {
-                        component: BookSidesComponent::OraclePegged,
+                    handle: BookSideOrderHandle {
+                        order_tree: BookSideOrderTree::OraclePegged,
                         node: handle,
                     },
                     node,
@@ -205,8 +205,8 @@ impl<'a> Iterator for BookSide2Iter<'a> {
             (Some((handle, node)), None) => {
                 self.direct_iter.next();
                 Some(Self::Item {
-                    handle: BookSidesNodeHandle {
-                        component: BookSidesComponent::Fixed,
+                    handle: BookSideOrderHandle {
+                        order_tree: BookSideOrderTree::Fixed,
                         node: handle,
                     },
                     node,

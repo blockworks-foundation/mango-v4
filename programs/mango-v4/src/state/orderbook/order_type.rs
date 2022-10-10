@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-use crate::state::BookSidesComponent;
+use crate::state::BookSideOrderTree;
 
 #[derive(
     Eq,
@@ -116,10 +116,10 @@ impl SideAndComponent {
         }
     }
 
-    pub fn component(&self) -> BookSidesComponent {
+    pub fn component(&self) -> BookSideOrderTree {
         match self {
-            Self::BidDirect | Self::AskDirect => BookSidesComponent::Fixed,
-            Self::BidOraclePegged | Self::AskOraclePegged => BookSidesComponent::OraclePegged,
+            Self::BidDirect | Self::AskDirect => BookSideOrderTree::Fixed,
+            Self::BidOraclePegged | Self::AskOraclePegged => BookSideOrderTree::OraclePegged,
         }
     }
 }
