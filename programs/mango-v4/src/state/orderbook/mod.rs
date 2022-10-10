@@ -65,13 +65,13 @@ mod tests {
     }
 
     fn test_setup(price: f64) -> (PerpMarket, I80F48, EventQueue, Box<OrderBook>) {
-        let bids_direct = new_bookside(BookSideType::Bids);
-        let asks_direct = new_bookside(BookSideType::Asks);
+        let bids_fixed = new_bookside(BookSideType::Bids);
+        let asks_fixed = new_bookside(BookSideType::Asks);
         let bids_oracle_pegged = new_bookside(BookSideType::Bids);
         let asks_oracle_pegged = new_bookside(BookSideType::Asks);
         let book = Box::new(OrderBook {
-            bids_direct,
-            asks_direct,
+            bids_fixed: bids_fixed,
+            asks_fixed: asks_fixed,
             bids_oracle_pegged,
             asks_oracle_pegged,
         });
@@ -149,41 +149,41 @@ mod tests {
                 1000 + i as i64,
                 1000011 as u64,
             );
-            if book.bids_direct.is_full() {
+            if book.bids_fixed.is_full() {
                 break;
             }
         }
-        assert!(book.bids_direct.is_full());
-        assert_eq!(book.bids_direct.min_leaf().unwrap().price(), 1001);
+        assert!(book.bids_fixed.is_full());
+        assert_eq!(book.bids_fixed.min_leaf().unwrap().price(), 1001);
         assert_eq!(
-            book.bids_direct.max_leaf().unwrap().price(),
-            (1000 + book.bids_direct.leaf_count) as i64
+            book.bids_fixed.max_leaf().unwrap().price(),
+            (1000 + book.bids_fixed.leaf_count) as i64
         );
 
         // add another bid at a higher price before expiry, replacing the lowest-price one (1001)
         new_order(&mut book, &mut event_queue, Side::Bid, 1005, 1000000 - 1);
-        assert_eq!(book.bids_direct.min_leaf().unwrap().price(), 1002);
+        assert_eq!(book.bids_fixed.min_leaf().unwrap().price(), 1002);
         assert_eq!(event_queue.len(), 1);
 
         // adding another bid after expiry removes the soonest-expiring order (1005)
         new_order(&mut book, &mut event_queue, Side::Bid, 999, 2000000);
-        assert_eq!(book.bids_direct.min_leaf().unwrap().price(), 999);
-        assert!(!bookside_contains_key(&book.bids_direct, 1005));
+        assert_eq!(book.bids_fixed.min_leaf().unwrap().price(), 999);
+        assert!(!bookside_contains_key(&book.bids_fixed, 1005));
         assert_eq!(event_queue.len(), 2);
 
         // adding an ask will wipe up to three expired bids at the top of the book
-        let bids_max = book.bids_direct.max_leaf().unwrap().price_data();
-        let bids_count = book.bids_direct.leaf_count;
+        let bids_max = book.bids_fixed.max_leaf().unwrap().price_data();
+        let bids_count = book.bids_fixed.leaf_count;
         new_order(&mut book, &mut event_queue, Side::Ask, 6000, 1500000);
-        assert_eq!(book.bids_direct.leaf_count, bids_count - 5);
-        assert_eq!(book.asks_direct.leaf_count, 1);
+        assert_eq!(book.bids_fixed.leaf_count, bids_count - 5);
+        assert_eq!(book.asks_fixed.leaf_count, 1);
         assert_eq!(event_queue.len(), 2 + 5);
-        assert!(!bookside_contains_price(&book.bids_direct, bids_max));
-        assert!(!bookside_contains_price(&book.bids_direct, bids_max - 1));
-        assert!(!bookside_contains_price(&book.bids_direct, bids_max - 2));
-        assert!(!bookside_contains_price(&book.bids_direct, bids_max - 3));
-        assert!(!bookside_contains_price(&book.bids_direct, bids_max - 4));
-        assert!(bookside_contains_price(&book.bids_direct, bids_max - 5));
+        assert!(!bookside_contains_price(&book.bids_fixed, bids_max));
+        assert!(!bookside_contains_price(&book.bids_fixed, bids_max - 1));
+        assert!(!bookside_contains_price(&book.bids_fixed, bids_max - 2));
+        assert!(!bookside_contains_price(&book.bids_fixed, bids_max - 3));
+        assert!(!bookside_contains_price(&book.bids_fixed, bids_max - 4));
+        assert!(bookside_contains_price(&book.bids_fixed, bids_max - 5));
     }
 
     #[test]
@@ -242,10 +242,10 @@ mod tests {
             SideAndComponent::BidDirect
         );
         assert!(bookside_contains_key(
-            &book.bids_direct,
+            &book.bids_fixed,
             maker.perp_order_mut_by_raw_index(0).id
         ));
-        assert!(bookside_contains_price(&book.bids_direct, price as u64));
+        assert!(bookside_contains_price(&book.bids_fixed, price as u64));
         assert_eq!(
             maker.perp_position_by_raw_index(0).bids_base_lots,
             bid_quantity
@@ -285,7 +285,7 @@ mod tests {
         // the remainder of the maker order is still on the book
         // (the maker account is unchanged: it was not even passed in)
         let order =
-            bookside_leaf_by_key(&book.bids_direct, maker.perp_order_by_raw_index(0).id).unwrap();
+            bookside_leaf_by_key(&book.bids_fixed, maker.perp_order_by_raw_index(0).id).unwrap();
         assert_eq!(order.price(), price);
         assert_eq!(order.quantity, bid_quantity - match_quantity);
 

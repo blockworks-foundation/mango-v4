@@ -433,7 +433,7 @@ impl BookSide {
 )]
 #[repr(u8)]
 pub enum BookSide2Component {
-    Direct,
+    Fixed,
     OraclePegged,
 }
 
@@ -444,17 +444,17 @@ pub struct BookSide2NodeHandle {
 }
 
 #[derive(Clone, Copy)]
-pub struct BookSide2Ref<'a> {
-    pub direct: &'a BookSide,
+pub struct BookSidesRef<'a> {
+    pub fixed: &'a BookSide,
     pub oracle_pegged: &'a BookSide,
 }
 
-pub struct BookSide2RefMut<'a> {
-    pub direct: &'a mut BookSide,
+pub struct BookSidesRefMut<'a> {
+    pub fixed: &'a mut BookSide,
     pub oracle_pegged: &'a mut BookSide,
 }
 
-impl<'a> BookSide2Ref<'a> {
+impl<'a> BookSidesRef<'a> {
     /// Iterate over all entries in the book filtering out invalid orders
     ///
     /// smallest to highest for asks
@@ -470,7 +470,7 @@ impl<'a> BookSide2Ref<'a> {
 
     pub fn component(&self, component: BookSide2Component) -> &BookSide {
         match component {
-            BookSide2Component::Direct => self.direct,
+            BookSide2Component::Fixed => self.fixed,
             BookSide2Component::OraclePegged => self.oracle_pegged,
         }
     }
@@ -484,17 +484,17 @@ impl<'a> BookSide2Ref<'a> {
     }
 }
 
-impl<'a> BookSide2RefMut<'a> {
-    pub fn non_mut(&self) -> BookSide2Ref {
-        BookSide2Ref {
-            direct: self.direct,
+impl<'a> BookSidesRefMut<'a> {
+    pub fn non_mut(&self) -> BookSidesRef {
+        BookSidesRef {
+            fixed: self.fixed,
             oracle_pegged: self.oracle_pegged,
         }
     }
 
     pub fn component_mut(&mut self, component: BookSide2Component) -> &mut BookSide {
         match component {
-            BookSide2Component::Direct => self.direct,
+            BookSide2Component::Fixed => self.fixed,
             BookSide2Component::OraclePegged => self.oracle_pegged,
         }
     }
@@ -794,8 +794,8 @@ mod tests {
             direct.insert_leaf(&new_leaf(key)).unwrap();
         }
 
-        let bookside = BookSide2Ref {
-            direct: &direct,
+        let bookside = BookSidesRef {
+            fixed: &direct,
             oracle_pegged: &oracle_pegged,
         };
 

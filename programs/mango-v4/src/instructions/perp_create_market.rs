@@ -112,8 +112,8 @@ pub fn perp_create_market(
     };
 
     let mut orderbook = ctx.accounts.orderbook.load_init()?;
-    orderbook.bids_direct.book_side_type = BookSideType::Bids;
-    orderbook.asks_direct.book_side_type = BookSideType::Asks;
+    orderbook.bids_fixed.book_side_type = BookSideType::Bids;
+    orderbook.asks_fixed.book_side_type = BookSideType::Asks;
     orderbook.bids_oracle_pegged.book_side_type = BookSideType::Bids;
     orderbook.asks_oracle_pegged.book_side_type = BookSideType::Asks;
 

@@ -118,7 +118,7 @@ impl SideAndComponent {
 
     pub fn component(&self) -> BookSide2Component {
         match self {
-            Self::BidDirect | Self::AskDirect => BookSide2Component::Direct,
+            Self::BidDirect | Self::AskDirect => BookSide2Component::Fixed,
             Self::BidOraclePegged | Self::AskOraclePegged => BookSide2Component::OraclePegged,
         }
     }

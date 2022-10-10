@@ -114,9 +114,9 @@ pub struct BookSide2Iter<'a> {
 }
 
 impl<'a> BookSide2Iter<'a> {
-    pub fn new(book_side: BookSide2Ref<'a>, now_ts: u64, oracle_price_lots: i64) -> Self {
+    pub fn new(book_side: BookSidesRef<'a>, now_ts: u64, oracle_price_lots: i64) -> Self {
         Self {
-            direct_iter: book_side.direct.iter_valid(now_ts),
+            direct_iter: book_side.fixed.iter_valid(now_ts),
             oracle_pegged_iter: book_side.oracle_pegged.iter_valid(now_ts),
             oracle_price_lots,
         }
@@ -171,7 +171,7 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                     self.direct_iter.next();
                     Some(Self::Item {
                         handle: BookSide2NodeHandle {
-                            component: BookSide2Component::Direct,
+                            component: BookSide2Component::Fixed,
                             node: d_handle,
                         },
                         node: d_node,
@@ -206,7 +206,7 @@ impl<'a> Iterator for BookSide2Iter<'a> {
                 self.direct_iter.next();
                 Some(Self::Item {
                     handle: BookSide2NodeHandle {
-                        component: BookSide2Component::Direct,
+                        component: BookSide2Component::Fixed,
                         node: handle,
                     },
                     node,
