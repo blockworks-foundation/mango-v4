@@ -139,7 +139,9 @@ pub struct LeafNode {
     // The time the order was placed
     pub timestamp: u64,
 
-    pub reserved: [u8; 16],
+    pub peg_limit: i64,
+
+    pub reserved: [u8; 8],
 }
 const_assert_eq!(size_of::<LeafNode>() % 8, 0);
 const_assert_eq!(size_of::<LeafNode>(), NODE_SIZE);
@@ -155,6 +157,7 @@ impl LeafNode {
         timestamp: u64,
         order_type: OrderType,
         time_in_force: u8,
+        peg_limit: i64,
     ) -> Self {
         Self {
             tag: NodeTag::LeafNode.into(),
@@ -167,7 +170,8 @@ impl LeafNode {
             quantity,
             client_order_id,
             timestamp,
-            reserved: [0; 16],
+            peg_limit,
+            reserved: [0; 8],
         }
     }
 
@@ -193,7 +197,7 @@ impl LeafNode {
     }
 
     #[inline(always)]
-    pub fn is_valid(&self, now_ts: u64) -> bool {
+    pub fn is_not_expired(&self, now_ts: u64) -> bool {
         self.time_in_force == 0 || now_ts < self.timestamp + self.time_in_force as u64
     }
 }

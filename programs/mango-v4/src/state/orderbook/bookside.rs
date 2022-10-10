@@ -54,17 +54,12 @@ const_assert_eq!(
 const_assert_eq!(std::mem::size_of::<OrderTree>() % 8, 0);
 
 impl OrderTree {
-    /// Iterate over all entries in the book filtering out invalid orders
+    /// Iterate over all entries, including invalid orders
     ///
     /// smallest to highest for asks
     /// highest to smallest for bids
-    pub fn iter_valid(&self, now_ts: u64) -> OrderTreeIter {
-        OrderTreeIter::new(self, now_ts)
-    }
-
-    /// Iterate over all entries, including invalid orders
-    pub fn iter_all_including_invalid(&self) -> OrderTreeIter {
-        OrderTreeIter::new(self, 0)
+    pub fn iter(&self) -> OrderTreeIter {
+        OrderTreeIter::new(self)
     }
 
     pub fn node_mut(&mut self, key: NodeHandle) -> Option<&mut AnyNode> {
@@ -459,13 +454,17 @@ impl<'a> BookSideRef<'a> {
     ///
     /// smallest to highest for asks
     /// highest to smallest for bids
-    pub fn iter_valid(&self, now_ts: u64, oracle_price_lots: i64) -> BookSideIter {
-        BookSideIter::new(*self, now_ts, oracle_price_lots)
+    pub fn iter_valid(
+        &self,
+        now_ts: u64,
+        oracle_price_lots: i64,
+    ) -> impl Iterator<Item = BookSideIterItem> {
+        BookSideIter::new(*self, now_ts, oracle_price_lots).filter(|it| it.is_valid)
     }
 
     /// Iterate over all entries, including invalid orders
-    pub fn iter_all_including_invalid(&self, oracle_price_lots: i64) -> BookSideIter {
-        BookSideIter::new(*self, 0, oracle_price_lots)
+    pub fn iter_all_including_invalid(&self, now_ts: u64, oracle_price_lots: i64) -> BookSideIter {
+        BookSideIter::new(*self, now_ts, oracle_price_lots)
     }
 
     pub fn orders(&self, component: BookSideOrderTree) -> &OrderTree {
@@ -591,7 +590,7 @@ mod tests {
         let mut total = 0;
         let ascending = order_tree.order_tree_type == OrderTreeType::Asks;
         let mut last_key = if ascending { 0 } else { u128::MAX };
-        for (_, node) in order_tree.iter_all_including_invalid() {
+        for (_, node) in order_tree.iter() {
             let key = node.key;
             if ascending {
                 assert!(key >= last_key);
@@ -649,6 +648,7 @@ mod tests {
                 expiry - 1,
                 OrderType::Limit,
                 1,
+                0,
             )
         };
 
@@ -728,6 +728,7 @@ mod tests {
                 expiry - 1,
                 OrderType::Limit,
                 1,
+                0,
             )
         };
 
@@ -768,7 +769,7 @@ mod tests {
         let mut direct = new_order_tree(order_tree_type);
         let mut oracle_pegged = new_order_tree(order_tree_type);
         let new_leaf =
-            |key: u128| LeafNode::new(0, key, Pubkey::default(), 0, 0, 1, OrderType::Limit, 0);
+            |key: u128| LeafNode::new(0, key, Pubkey::default(), 0, 0, 1, OrderType::Limit, 0, 0);
 
         // add 100 leaves to each BookSide, mostly random
         let mut keys = vec![];
@@ -811,7 +812,7 @@ mod tests {
             let mut total = 0;
             let ascending = order_tree_type == OrderTreeType::Asks;
             let mut last_price = if ascending { 0 } else { i64::MAX };
-            for order in bookside.iter_all_including_invalid(oracle_price_lots) {
+            for order in bookside.iter_all_including_invalid(0, oracle_price_lots) {
                 let price = order.price_lots;
                 println!("{} {:?} {price}", order.node.key, order.handle.order_tree);
                 if ascending {

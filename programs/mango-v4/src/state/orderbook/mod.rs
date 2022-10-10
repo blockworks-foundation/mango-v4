@@ -38,7 +38,7 @@ mod tests {
     }
 
     fn order_tree_leaf_by_key(order_tree: &OrderTree, key: u128) -> Option<&LeafNode> {
-        for (_, leaf) in order_tree.iter_all_including_invalid() {
+        for (_, leaf) in order_tree.iter() {
             if leaf.key == key {
                 return Some(leaf);
             }
@@ -47,7 +47,7 @@ mod tests {
     }
 
     fn order_tree_contains_key(order_tree: &OrderTree, key: u128) -> bool {
-        for (_, leaf) in order_tree.iter_all_including_invalid() {
+        for (_, leaf) in order_tree.iter() {
             if leaf.key == key {
                 return true;
             }
@@ -56,7 +56,7 @@ mod tests {
     }
 
     fn order_tree_contains_price(order_tree: &OrderTree, price_data: u64) -> bool {
-        for (_, leaf) in order_tree.iter_all_including_invalid() {
+        for (_, leaf) in order_tree.iter() {
             if leaf.price_data() == price_data {
                 return true;
             }

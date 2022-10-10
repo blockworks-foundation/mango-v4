@@ -1,5 +1,6 @@
 use crate::state::orderbook::bookside::*;
 use crate::state::orderbook::nodes::*;
+use crate::state::orderbook::order_type::*;
 
 /// Iterate over orders in order (bids=descending, asks=ascending)
 pub struct OrderTreeIter<'a> {
@@ -12,12 +13,10 @@ pub struct OrderTreeIter<'a> {
     /// either 0, 1 to iterate low-to-high, or 1, 0 to iterate high-to-low
     left: usize,
     right: usize,
-
-    now_ts: u64,
 }
 
 impl<'a> OrderTreeIter<'a> {
-    pub fn new(order_tree: &'a OrderTree, now_ts: u64) -> Self {
+    pub fn new(order_tree: &'a OrderTree) -> Self {
         let (left, right) = if order_tree.order_tree_type == OrderTreeType::Bids {
             (1, 0)
         } else {
@@ -31,26 +30,26 @@ impl<'a> OrderTreeIter<'a> {
             next_leaf: None,
             left,
             right,
-            now_ts,
         };
         if order_tree.leaf_count != 0 {
-            iter.next_leaf = iter.find_leftmost_valid_leaf(order_tree.root_node);
+            iter.next_leaf = iter.find_leftmost_leaf(order_tree.root_node);
         }
         iter
     }
 
-    pub fn is_bids(&self) -> bool {
-        self.left == 1
+    pub fn side(&self) -> Side {
+        if self.left == 1 {
+            Side::Bid
+        } else {
+            Side::Ask
+        }
     }
 
     pub fn peek(&self) -> Option<(NodeHandle, &'a LeafNode)> {
         self.next_leaf
     }
 
-    fn find_leftmost_valid_leaf(
-        &mut self,
-        start: NodeHandle,
-    ) -> Option<(NodeHandle, &'a LeafNode)> {
+    fn find_leftmost_leaf(&mut self, start: NodeHandle) -> Option<(NodeHandle, &'a LeafNode)> {
         let mut current = start;
         loop {
             match self.order_tree.node(current).unwrap().case().unwrap() {
@@ -59,18 +58,7 @@ impl<'a> OrderTreeIter<'a> {
                     current = inner.children[self.left];
                 }
                 NodeRef::Leaf(leaf) => {
-                    if leaf.is_valid(self.now_ts) {
-                        return Some((current, leaf));
-                    } else {
-                        match self.stack.pop() {
-                            None => {
-                                return None;
-                            }
-                            Some(inner) => {
-                                current = inner.children[self.right];
-                            }
-                        }
-                    }
+                    return Some((current, leaf));
                 }
             }
         }
@@ -92,8 +80,8 @@ impl<'a> Iterator for OrderTreeIter<'a> {
             None => None,
             Some(inner) => {
                 let start = inner.children[self.right];
-                // go down the left branch as much as possible until reaching a valid leaf
-                self.find_leftmost_valid_leaf(start)
+                // go down the left branch as much as possible until reaching a leaf
+                self.find_leftmost_leaf(start)
             }
         };
 
@@ -105,32 +93,51 @@ pub struct BookSideIterItem<'a> {
     pub handle: BookSideOrderHandle,
     pub node: &'a LeafNode,
     pub price_lots: i64,
+    pub is_valid: bool,
 }
 
 pub struct BookSideIter<'a> {
-    direct_iter: OrderTreeIter<'a>,
+    fixed_iter: OrderTreeIter<'a>,
     oracle_pegged_iter: OrderTreeIter<'a>,
+    now_ts: u64,
     oracle_price_lots: i64,
 }
 
 impl<'a> BookSideIter<'a> {
     pub fn new(book_side: BookSideRef<'a>, now_ts: u64, oracle_price_lots: i64) -> Self {
         Self {
-            direct_iter: book_side.fixed.iter_valid(now_ts),
-            oracle_pegged_iter: book_side.oracle_pegged.iter_valid(now_ts),
+            fixed_iter: book_side.fixed.iter(),
+            oracle_pegged_iter: book_side.oracle_pegged.iter(),
+            now_ts,
             oracle_price_lots,
         }
     }
 }
 
-fn oracle_pegged_price(oracle_price_lots: i64, price_data: u64) -> Option<i64> {
+#[derive(Clone, Copy, PartialEq)]
+enum OrderState {
+    Valid,
+    Invalid,
+    Skipped,
+}
+
+fn oracle_pegged_price(
+    oracle_price_lots: i64,
+    node: &LeafNode,
+    side: Side,
+) -> (OrderState, Option<i64>) {
+    let price_data = node.price_data();
     let price_offset = oracle_pegged_price_offset(price_data);
     if let Some(price) = oracle_price_lots.checked_add(price_offset) {
         if price >= 1 {
-            return Some(price);
+            if side.is_price_better(price, node.peg_limit) {
+                return (OrderState::Invalid, Some(price));
+            } else {
+                return (OrderState::Valid, Some(price));
+            }
         }
     }
-    None
+    (OrderState::Skipped, None)
 }
 
 fn key_for_price(key: u128, price_lots: i64) -> u128 {
@@ -146,29 +153,32 @@ impl<'a> Iterator for BookSideIter<'a> {
     type Item = BookSideIterItem<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        let side = self.fixed_iter.side();
+
         // Skip all the oracle pegged orders that aren't representable with the current oracle
         // price. Example: iterating asks, but the best ask is at offset -100 with the oracle at 50.
         // We need to skip asks until we find the first that has a price >= 1.
         let mut o_peek = self.oracle_pegged_iter.peek();
         while let Some((_, o_node)) = o_peek {
-            if oracle_pegged_price(self.oracle_price_lots, o_node.price_data()).is_some() {
+            if oracle_pegged_price(self.oracle_price_lots, o_node, side).0 != OrderState::Skipped {
                 break;
             }
-            o_peek = self.oracle_pegged_iter.next();
+            o_peek = self.oracle_pegged_iter.next()
         }
 
-        match (self.direct_iter.peek(), o_peek) {
+        match (self.fixed_iter.peek(), o_peek) {
             (Some((d_handle, d_node)), Some((o_handle, o_node))) => {
-                let is_better = if self.direct_iter.is_bids() {
+                let is_better = if side == Side::Bid {
                     |a, b| a > b
                 } else {
                     |a, b| a < b
                 };
 
-                let o_price =
-                    oracle_pegged_price(self.oracle_price_lots, o_node.price_data()).unwrap();
+                let (o_valid, o_price_maybe) =
+                    oracle_pegged_price(self.oracle_price_lots, o_node, side);
+                let o_price = o_price_maybe.unwrap(); // Skipped orders are skipped above
                 if is_better(d_node.key, key_for_price(o_node.key, o_price)) {
-                    self.direct_iter.next();
+                    self.fixed_iter.next();
                     Some(Self::Item {
                         handle: BookSideOrderHandle {
                             order_tree: BookSideOrderTree::Fixed,
@@ -176,6 +186,7 @@ impl<'a> Iterator for BookSideIter<'a> {
                         },
                         node: d_node,
                         price_lots: direct_price_lots(d_node.price_data()),
+                        is_valid: d_node.is_not_expired(self.now_ts),
                     })
                 } else {
                     self.oracle_pegged_iter.next();
@@ -186,13 +197,15 @@ impl<'a> Iterator for BookSideIter<'a> {
                         },
                         node: o_node,
                         price_lots: o_price,
+                        is_valid: o_valid == OrderState::Valid
+                            && o_node.is_not_expired(self.now_ts),
                     })
                 }
             }
             (None, Some((handle, node))) => {
                 self.oracle_pegged_iter.next();
-                let price_lots =
-                    oracle_pegged_price(self.oracle_price_lots, node.price_data()).unwrap();
+                let (valid, price_maybe) = oracle_pegged_price(self.oracle_price_lots, node, side);
+                let price_lots = price_maybe.unwrap(); // Skipped orders are skipped above
                 Some(Self::Item {
                     handle: BookSideOrderHandle {
                         order_tree: BookSideOrderTree::OraclePegged,
@@ -200,10 +213,11 @@ impl<'a> Iterator for BookSideIter<'a> {
                     },
                     node,
                     price_lots,
+                    is_valid: valid == OrderState::Valid && node.is_not_expired(self.now_ts),
                 })
             }
             (Some((handle, node)), None) => {
-                self.direct_iter.next();
+                self.fixed_iter.next();
                 Some(Self::Item {
                     handle: BookSideOrderHandle {
                         order_tree: BookSideOrderTree::Fixed,
@@ -211,6 +225,7 @@ impl<'a> Iterator for BookSideIter<'a> {
                     },
                     node,
                     price_lots: direct_price_lots(node.price_data()),
+                    is_valid: node.is_not_expired(self.now_ts),
                 })
             }
             (None, None) => None,

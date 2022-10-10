@@ -235,9 +235,9 @@ impl OrderBook {
         let mut opposing_bookside = self.bookside_mut(other_side);
         for best_opposing in opposing_bookside
             .non_mut()
-            .iter_all_including_invalid(oracle_price_lots)
+            .iter_all_including_invalid(now_ts, oracle_price_lots)
         {
-            if !best_opposing.node.is_valid(now_ts) {
+            if !best_opposing.is_valid {
                 // Remove the order from the book unless we've done that enough
                 if number_of_dropped_expired_orders < DROP_EXPIRED_ORDER_LIMIT {
                     number_of_dropped_expired_orders += 1;
@@ -386,6 +386,7 @@ impl OrderBook {
                 now_ts,
                 OrderType::Limit, // TODO: Support order types? needed?
                 time_in_force,
+                0,
             );
             let _result = bookside.insert_leaf(&new_order)?;
 
