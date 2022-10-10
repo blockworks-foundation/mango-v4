@@ -319,7 +319,7 @@ mod tests {
     use itertools::Itertools;
 
     #[test]
-    fn bookside_price_data() {
+    fn order_tree_price_data() {
         for price in [1, 42, i64::MAX] {
             assert_eq!(price, direct_price_lots(direct_price_data(price).unwrap()));
         }
@@ -339,7 +339,7 @@ mod tests {
     }
 
     #[test]
-    fn bookside_key_ordering() {
+    fn order_tree_key_ordering() {
         let bid_seq: Vec<(i64, u64)> = vec![
             (-5, 15),
             (-5, 10),

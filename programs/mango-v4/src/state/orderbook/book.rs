@@ -42,16 +42,23 @@ fn post_only_slide_limit(side: Side, best_other_side: i64, limit: i64) -> i64 {
 
 #[account(zero_copy)]
 pub struct OrderBook {
-    pub bids_fixed: BookSide,
-    pub asks_fixed: BookSide,
-    pub bids_oracle_pegged: BookSide,
-    pub asks_oracle_pegged: BookSide,
+    pub bids_fixed: OrderTree,
+    pub asks_fixed: OrderTree,
+    pub bids_oracle_pegged: OrderTree,
+    pub asks_oracle_pegged: OrderTree,
 }
 const_assert_eq!(
     std::mem::size_of::<OrderBook>(),
-    4 * std::mem::size_of::<BookSide>()
+    4 * std::mem::size_of::<OrderTree>()
 );
 const_assert_eq!(std::mem::size_of::<OrderBook>() % 8, 0);
+
+struct OrderParams {
+    post_only: bool,
+    post_target: Option<BookSidesComponent>,
+    price_lots: i64,
+    price_data: u64,
+}
 
 impl OrderBook {
     pub fn bookside_mut(&mut self, side: Side) -> BookSidesRefMut {
@@ -110,6 +117,7 @@ impl OrderBook {
         None
     }
 
+    /// Determine order params based on user input
     fn eval_order_params(
         &self,
         side_and_component: SideAndComponent,
@@ -117,16 +125,21 @@ impl OrderBook {
         order_type: OrderType,
         oracle_price_lots: i64,
         now_ts: u64,
-    ) -> Result<(bool, Option<BookSide2Component>, i64, u64)> {
+    ) -> Result<OrderParams> {
         let side = side_and_component.side();
         let component = side_and_component.component();
         if order_type == OrderType::Market {
             let price_lots = market_order_limit_for_side(side);
-            return Ok((false, None, price_lots, price_lots as u64));
+            return Ok(OrderParams {
+                post_only: false,
+                post_target: None,
+                price_lots,
+                price_data: price_lots as u64,
+            });
         }
         let price_lots = match component {
-            BookSide2Component::Fixed => price_input,
-            BookSide2Component::OraclePegged => cm!(oracle_price_lots + price_input),
+            BookSidesComponent::Fixed => price_input,
+            BookSidesComponent::OraclePegged => cm!(oracle_price_lots + price_input),
         };
         require_gte!(price_lots, 1);
         let (post_only, post_allowed, price_lots) = match order_type {
@@ -147,17 +160,17 @@ impl OrderBook {
         };
         require_gte!(price_lots, 1);
         let price_data = match component {
-            BookSide2Component::Fixed => direct_price_data(price_lots).unwrap(),
-            BookSide2Component::OraclePegged => {
+            BookSidesComponent::Fixed => direct_price_data(price_lots).unwrap(),
+            BookSidesComponent::OraclePegged => {
                 oracle_pegged_price_data(cm!(price_lots - oracle_price_lots))
             }
         };
-        Ok((
+        Ok(OrderParams {
             post_only,
-            post_allowed.then(|| component),
+            post_target: post_allowed.then(|| component),
             price_lots,
             price_data,
-        ))
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -185,7 +198,12 @@ impl OrderBook {
         let other_side = side.invert_side();
         let market = perp_market;
         let oracle_price_lots = market.native_price_to_lot(oracle_price);
-        let (post_only, mut post_allowed, price_lots, price_data) = self.eval_order_params(
+        let OrderParams {
+            post_only,
+            mut post_target,
+            price_lots,
+            price_data,
+        } = self.eval_order_params(
             side_and_component,
             price_input,
             order_type,
@@ -193,12 +211,12 @@ impl OrderBook {
             now_ts,
         )?;
 
-        if post_allowed.is_some() {
+        if post_target.is_some() {
             // price limit check computed lazily to save CU on average
             let native_price = market.lot_to_native_price(price_lots);
             if !market.inside_price_limit(side, native_price, oracle_price) {
                 msg!("Posting on book disallowed due to price limits");
-                post_allowed = None;
+                post_target = None;
             }
         }
 
@@ -211,8 +229,8 @@ impl OrderBook {
         // matched_changes/matched_deletes and then applied after this loop.
         let mut remaining_base_lots = max_base_lots;
         let mut remaining_quote_lots = max_quote_lots;
-        let mut matched_order_changes: Vec<(BookSide2NodeHandle, i64)> = vec![];
-        let mut matched_order_deletes: Vec<(BookSide2Component, u128)> = vec![];
+        let mut matched_order_changes: Vec<(BookSidesNodeHandle, i64)> = vec![];
+        let mut matched_order_deletes: Vec<(BookSidesComponent, u128)> = vec![];
         let mut number_of_dropped_expired_orders = 0;
         let mut opposing_bookside = self.bookside_mut(other_side);
         for best_opposing in opposing_bookside
@@ -244,11 +262,11 @@ impl OrderBook {
                 break;
             } else if post_only {
                 msg!("Order could not be placed due to PostOnly");
-                post_allowed = None;
+                post_target = None;
                 break; // return silently to not fail other instructions in tx
             } else if limit == 0 {
                 msg!("Order matching limit reached");
-                post_allowed = None;
+                post_target = None;
                 break;
             }
 
@@ -320,9 +338,9 @@ impl OrderBook {
         // If there are still quantity unmatched, place on the book
         let book_base_quantity = remaining_base_lots.min(remaining_quote_lots / price_lots);
         if book_base_quantity <= 0 {
-            post_allowed = None;
+            post_target = None;
         }
-        if let Some(book_component) = post_allowed {
+        if let Some(book_component) = post_target {
             let mut full_bookside = self.bookside_mut(side);
             let bookside = full_bookside.component_mut(book_component);
 

@@ -23,9 +23,9 @@ mod tests {
     use fixed::types::I80F48;
     use solana_program::pubkey::Pubkey;
 
-    fn new_bookside(book_side_type: BookSideType) -> BookSide {
-        BookSide {
-            book_side_type,
+    fn new_order_tree(book_side_type: OrderTreeType) -> OrderTree {
+        OrderTree {
+            order_tree_type: book_side_type,
             padding: [0u8; 3],
             bump_index: 0,
             free_list_len: 0,
@@ -37,8 +37,8 @@ mod tests {
         }
     }
 
-    fn bookside_leaf_by_key(bookside: &BookSide, key: u128) -> Option<&LeafNode> {
-        for (_, leaf) in bookside.iter_all_including_invalid() {
+    fn order_tree_leaf_by_key(order_tree: &OrderTree, key: u128) -> Option<&LeafNode> {
+        for (_, leaf) in order_tree.iter_all_including_invalid() {
             if leaf.key == key {
                 return Some(leaf);
             }
@@ -46,8 +46,8 @@ mod tests {
         None
     }
 
-    fn bookside_contains_key(bookside: &BookSide, key: u128) -> bool {
-        for (_, leaf) in bookside.iter_all_including_invalid() {
+    fn order_tree_contains_key(order_tree: &OrderTree, key: u128) -> bool {
+        for (_, leaf) in order_tree.iter_all_including_invalid() {
             if leaf.key == key {
                 return true;
             }
@@ -55,8 +55,8 @@ mod tests {
         false
     }
 
-    fn bookside_contains_price(bookside: &BookSide, price_data: u64) -> bool {
-        for (_, leaf) in bookside.iter_all_including_invalid() {
+    fn order_tree_contains_price(order_tree: &OrderTree, price_data: u64) -> bool {
+        for (_, leaf) in order_tree.iter_all_including_invalid() {
             if leaf.price_data() == price_data {
                 return true;
             }
@@ -65,10 +65,10 @@ mod tests {
     }
 
     fn test_setup(price: f64) -> (PerpMarket, I80F48, EventQueue, Box<OrderBook>) {
-        let bids_fixed = new_bookside(BookSideType::Bids);
-        let asks_fixed = new_bookside(BookSideType::Asks);
-        let bids_oracle_pegged = new_bookside(BookSideType::Bids);
-        let asks_oracle_pegged = new_bookside(BookSideType::Asks);
+        let bids_fixed = new_order_tree(OrderTreeType::Bids);
+        let asks_fixed = new_order_tree(OrderTreeType::Asks);
+        let bids_oracle_pegged = new_order_tree(OrderTreeType::Bids);
+        let asks_oracle_pegged = new_order_tree(OrderTreeType::Asks);
         let book = Box::new(OrderBook {
             bids_fixed: bids_fixed,
             asks_fixed: asks_fixed,
@@ -168,7 +168,7 @@ mod tests {
         // adding another bid after expiry removes the soonest-expiring order (1005)
         new_order(&mut book, &mut event_queue, Side::Bid, 999, 2000000);
         assert_eq!(book.bids_fixed.min_leaf().unwrap().price(), 999);
-        assert!(!bookside_contains_key(&book.bids_fixed, 1005));
+        assert!(!order_tree_contains_key(&book.bids_fixed, 1005));
         assert_eq!(event_queue.len(), 2);
 
         // adding an ask will wipe up to three expired bids at the top of the book
@@ -178,12 +178,12 @@ mod tests {
         assert_eq!(book.bids_fixed.leaf_count, bids_count - 5);
         assert_eq!(book.asks_fixed.leaf_count, 1);
         assert_eq!(event_queue.len(), 2 + 5);
-        assert!(!bookside_contains_price(&book.bids_fixed, bids_max));
-        assert!(!bookside_contains_price(&book.bids_fixed, bids_max - 1));
-        assert!(!bookside_contains_price(&book.bids_fixed, bids_max - 2));
-        assert!(!bookside_contains_price(&book.bids_fixed, bids_max - 3));
-        assert!(!bookside_contains_price(&book.bids_fixed, bids_max - 4));
-        assert!(bookside_contains_price(&book.bids_fixed, bids_max - 5));
+        assert!(!order_tree_contains_price(&book.bids_fixed, bids_max));
+        assert!(!order_tree_contains_price(&book.bids_fixed, bids_max - 1));
+        assert!(!order_tree_contains_price(&book.bids_fixed, bids_max - 2));
+        assert!(!order_tree_contains_price(&book.bids_fixed, bids_max - 3));
+        assert!(!order_tree_contains_price(&book.bids_fixed, bids_max - 4));
+        assert!(order_tree_contains_price(&book.bids_fixed, bids_max - 5));
     }
 
     #[test]
@@ -241,11 +241,11 @@ mod tests {
             maker.perp_order_mut_by_raw_index(0).side_and_component,
             SideAndComponent::BidDirect
         );
-        assert!(bookside_contains_key(
+        assert!(order_tree_contains_key(
             &book.bids_fixed,
             maker.perp_order_mut_by_raw_index(0).id
         ));
-        assert!(bookside_contains_price(&book.bids_fixed, price as u64));
+        assert!(order_tree_contains_price(&book.bids_fixed, price as u64));
         assert_eq!(
             maker.perp_position_by_raw_index(0).bids_base_lots,
             bid_quantity
@@ -285,7 +285,7 @@ mod tests {
         // the remainder of the maker order is still on the book
         // (the maker account is unchanged: it was not even passed in)
         let order =
-            bookside_leaf_by_key(&book.bids_fixed, maker.perp_order_by_raw_index(0).id).unwrap();
+            order_tree_leaf_by_key(&book.bids_fixed, maker.perp_order_by_raw_index(0).id).unwrap();
         assert_eq!(order.price(), price);
         assert_eq!(order.quantity, bid_quantity - match_quantity);
 
@@ -377,8 +377,6 @@ mod tests {
         let taker_pk = Pubkey::new_unique();
         let now_ts = 1000000;
 
-        market.base_lot_size = 1;
-        market.quote_lot_size = 1;
         market.taker_fee = I80F48::from_num(0.01);
         market.fee_penalty = 5.0;
         account.ensure_perp_position(market.perp_market_index, 0)?;

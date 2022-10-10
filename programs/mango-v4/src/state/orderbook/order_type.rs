@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-use crate::state::BookSide2Component;
+use crate::state::BookSidesComponent;
 
 #[derive(
     Eq,
@@ -116,10 +116,10 @@ impl SideAndComponent {
         }
     }
 
-    pub fn component(&self) -> BookSide2Component {
+    pub fn component(&self) -> BookSidesComponent {
         match self {
-            Self::BidDirect | Self::AskDirect => BookSide2Component::Fixed,
-            Self::BidOraclePegged | Self::AskOraclePegged => BookSide2Component::OraclePegged,
+            Self::BidDirect | Self::AskDirect => BookSidesComponent::Fixed,
+            Self::BidOraclePegged | Self::AskOraclePegged => BookSidesComponent::OraclePegged,
         }
     }
 }

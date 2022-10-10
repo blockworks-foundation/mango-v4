@@ -25,7 +25,7 @@ pub const MAX_BOOK_NODES: usize = 1024;
     AnchorDeserialize,
 )]
 #[repr(u8)]
-pub enum BookSideType {
+pub enum OrderTreeType {
     Bids,
     Asks,
 }
@@ -34,10 +34,10 @@ pub enum BookSideType {
 ///
 /// The key encodes the price in the top 64 bits.
 #[account(zero_copy)]
-pub struct BookSide {
+pub struct OrderTree {
     // pub meta_data: MetaData,
     // todo: do we want this type at this level?
-    pub book_side_type: BookSideType,
+    pub order_tree_type: OrderTreeType,
     pub padding: [u8; 3],
     pub bump_index: u32,
     pub free_list_len: u32,
@@ -48,23 +48,23 @@ pub struct BookSide {
     pub reserved: [u8; 256],
 }
 const_assert_eq!(
-    std::mem::size_of::<BookSide>(),
+    std::mem::size_of::<OrderTree>(),
     1 + 3 + 4 * 2 + 4 + 4 + 4 + 96 * 1024 + 256 // 98584
 );
-const_assert_eq!(std::mem::size_of::<BookSide>() % 8, 0);
+const_assert_eq!(std::mem::size_of::<OrderTree>() % 8, 0);
 
-impl BookSide {
+impl OrderTree {
     /// Iterate over all entries in the book filtering out invalid orders
     ///
     /// smallest to highest for asks
     /// highest to smallest for bids
-    pub fn iter_valid(&self, now_ts: u64) -> BookSideIter {
-        BookSideIter::new(self, now_ts)
+    pub fn iter_valid(&self, now_ts: u64) -> OrderTreeIter {
+        OrderTreeIter::new(self, now_ts)
     }
 
     /// Iterate over all entries, including invalid orders
-    pub fn iter_all_including_invalid(&self) -> BookSideIter {
-        BookSideIter::new(self, 0)
+    pub fn iter_all_including_invalid(&self) -> OrderTreeIter {
+        OrderTreeIter::new(self, 0)
     }
 
     pub fn node_mut(&mut self, key: NodeHandle) -> Option<&mut AnyNode> {
@@ -93,9 +93,9 @@ impl BookSide {
     }
 
     pub fn remove_worst(&mut self) -> Option<LeafNode> {
-        match self.book_side_type {
-            BookSideType::Bids => self.remove_min(),
-            BookSideType::Asks => self.remove_max(),
+        match self.order_tree_type {
+            OrderTreeType::Bids => self.remove_min(),
+            OrderTreeType::Asks => self.remove_max(),
         }
     }
 
@@ -432,26 +432,26 @@ impl BookSide {
     AnchorDeserialize,
 )]
 #[repr(u8)]
-pub enum BookSide2Component {
+pub enum BookSidesComponent {
     Fixed,
     OraclePegged,
 }
 
-// Which bookside, and then the handle
-pub struct BookSide2NodeHandle {
-    pub component: BookSide2Component,
+/// Reference to a node in a book side component
+pub struct BookSidesNodeHandle {
     pub node: NodeHandle,
+    pub component: BookSidesComponent,
 }
 
 #[derive(Clone, Copy)]
 pub struct BookSidesRef<'a> {
-    pub fixed: &'a BookSide,
-    pub oracle_pegged: &'a BookSide,
+    pub fixed: &'a OrderTree,
+    pub oracle_pegged: &'a OrderTree,
 }
 
 pub struct BookSidesRefMut<'a> {
-    pub fixed: &'a mut BookSide,
-    pub oracle_pegged: &'a mut BookSide,
+    pub fixed: &'a mut OrderTree,
+    pub oracle_pegged: &'a mut OrderTree,
 }
 
 impl<'a> BookSidesRef<'a> {
@@ -468,18 +468,18 @@ impl<'a> BookSidesRef<'a> {
         BookSide2Iter::new(*self, 0, oracle_price_lots)
     }
 
-    pub fn component(&self, component: BookSide2Component) -> &BookSide {
+    pub fn component(&self, component: BookSidesComponent) -> &OrderTree {
         match component {
-            BookSide2Component::Fixed => self.fixed,
-            BookSide2Component::OraclePegged => self.oracle_pegged,
+            BookSidesComponent::Fixed => self.fixed,
+            BookSidesComponent::OraclePegged => self.oracle_pegged,
         }
     }
 
-    pub fn node(&self, key: BookSide2NodeHandle) -> Option<&AnyNode> {
+    pub fn node(&self, key: BookSidesNodeHandle) -> Option<&AnyNode> {
         self.component(key.component).node(key.node)
     }
 
-    pub fn is_full(&self, component: BookSide2Component) -> bool {
+    pub fn is_full(&self, component: BookSidesComponent) -> bool {
         self.component(component).is_full()
     }
 }
@@ -492,25 +492,25 @@ impl<'a> BookSidesRefMut<'a> {
         }
     }
 
-    pub fn component_mut(&mut self, component: BookSide2Component) -> &mut BookSide {
+    pub fn component_mut(&mut self, component: BookSidesComponent) -> &mut OrderTree {
         match component {
-            BookSide2Component::Fixed => self.fixed,
-            BookSide2Component::OraclePegged => self.oracle_pegged,
+            BookSidesComponent::Fixed => self.fixed,
+            BookSidesComponent::OraclePegged => self.oracle_pegged,
         }
     }
 
-    pub fn node_mut(&mut self, key: BookSide2NodeHandle) -> Option<&mut AnyNode> {
+    pub fn node_mut(&mut self, key: BookSidesNodeHandle) -> Option<&mut AnyNode> {
         self.component_mut(key.component).node_mut(key.node)
     }
 
-    pub fn remove_worst(&mut self, component: BookSide2Component) -> Option<LeafNode> {
+    pub fn remove_worst(&mut self, component: BookSidesComponent) -> Option<LeafNode> {
         self.component_mut(component).remove_worst()
     }
 
     /// Remove the order with the lowest expiry timestamp, if that's < now_ts.
     pub fn remove_one_expired(
         &mut self,
-        component: BookSide2Component,
+        component: BookSidesComponent,
         now_ts: u64,
     ) -> Option<LeafNode> {
         self.component_mut(component).remove_one_expired(now_ts)
@@ -518,13 +518,13 @@ impl<'a> BookSidesRefMut<'a> {
 
     pub fn remove_by_key(
         &mut self,
-        component: BookSide2Component,
+        component: BookSidesComponent,
         search_key: u128,
     ) -> Option<LeafNode> {
         self.component_mut(component).remove_by_key(search_key)
     }
 
-    pub fn remove(&mut self, key: BookSide2NodeHandle) -> Option<AnyNode> {
+    pub fn remove(&mut self, key: BookSidesNodeHandle) -> Option<AnyNode> {
         self.component_mut(key.component).remove(key.node)
     }
 }
@@ -535,9 +535,9 @@ mod tests {
     use super::*;
     use bytemuck::Zeroable;
 
-    fn new_bookside(book_side_type: BookSideType) -> BookSide {
-        BookSide {
-            book_side_type,
+    fn new_order_tree(order_tree_type: OrderTreeType) -> OrderTree {
+        OrderTree {
+            order_tree_type,
             padding: [0u8; 3],
             bump_index: 0,
             free_list_len: 0,
@@ -549,24 +549,24 @@ mod tests {
         }
     }
 
-    fn verify_bookside(bookside: &BookSide) {
-        verify_bookside_invariant(bookside);
-        verify_bookside_iteration(bookside);
-        verify_bookside_expiry(bookside);
+    fn verify_order_tree(order_tree: &OrderTree) {
+        verify_order_tree_invariant(order_tree);
+        verify_order_tree_iteration(order_tree);
+        verify_order_tree_expiry(order_tree);
     }
 
     // check that BookSide binary tree key invariant holds
-    fn verify_bookside_invariant(bookside: &BookSide) {
-        let r = match bookside.root() {
+    fn verify_order_tree_invariant(order_tree: &OrderTree) {
+        let r = match order_tree.root() {
             Some(h) => h,
             None => return,
         };
 
-        fn recursive_check(bookside: &BookSide, h: NodeHandle) {
-            match bookside.node(h).unwrap().case().unwrap() {
+        fn recursive_check(order_tree: &OrderTree, h: NodeHandle) {
+            match order_tree.node(h).unwrap().case().unwrap() {
                 NodeRef::Inner(&inner) => {
-                    let left = bookside.node(inner.children[0]).unwrap().key().unwrap();
-                    let right = bookside.node(inner.children[1]).unwrap().key().unwrap();
+                    let left = order_tree.node(inner.children[0]).unwrap().key().unwrap();
+                    let right = order_tree.node(inner.children[1]).unwrap().key().unwrap();
 
                     // the left and right keys share the InnerNode's prefix
                     assert!((inner.key ^ left).leading_zeros() >= inner.prefix_len);
@@ -577,21 +577,21 @@ mod tests {
                     assert!(left & crit_bit_mask == 0);
                     assert!(right & crit_bit_mask != 0);
 
-                    recursive_check(bookside, inner.children[0]);
-                    recursive_check(bookside, inner.children[1]);
+                    recursive_check(order_tree, inner.children[0]);
+                    recursive_check(order_tree, inner.children[1]);
                 }
                 _ => {}
             }
         }
-        recursive_check(bookside, r);
+        recursive_check(order_tree, r);
     }
 
-    // check that iteration of bookside has the right order and misses no leaves
-    fn verify_bookside_iteration(bookside: &BookSide) {
+    // check that iteration of order tree has the right order and misses no leaves
+    fn verify_order_tree_iteration(order_tree: &OrderTree) {
         let mut total = 0;
-        let ascending = bookside.book_side_type == BookSideType::Asks;
+        let ascending = order_tree.order_tree_type == OrderTreeType::Asks;
         let mut last_key = if ascending { 0 } else { u128::MAX };
-        for (_, node) in bookside.iter_all_including_invalid() {
+        for (_, node) in order_tree.iter_all_including_invalid() {
             let key = node.key;
             if ascending {
                 assert!(key >= last_key);
@@ -601,38 +601,44 @@ mod tests {
             last_key = key;
             total += 1;
         }
-        assert_eq!(bookside.leaf_count, total);
+        assert_eq!(order_tree.leaf_count, total);
     }
 
     // check that BookSide::child_expiry invariant holds
-    fn verify_bookside_expiry(bookside: &BookSide) {
-        let r = match bookside.root() {
+    fn verify_order_tree_expiry(order_tree: &OrderTree) {
+        let r = match order_tree.root() {
             Some(h) => h,
             None => return,
         };
 
-        fn recursive_check(bookside: &BookSide, h: NodeHandle) {
-            match bookside.node(h).unwrap().case().unwrap() {
+        fn recursive_check(order_tree: &OrderTree, h: NodeHandle) {
+            match order_tree.node(h).unwrap().case().unwrap() {
                 NodeRef::Inner(&inner) => {
-                    let left = bookside.node(inner.children[0]).unwrap().earliest_expiry();
-                    let right = bookside.node(inner.children[1]).unwrap().earliest_expiry();
+                    let left = order_tree
+                        .node(inner.children[0])
+                        .unwrap()
+                        .earliest_expiry();
+                    let right = order_tree
+                        .node(inner.children[1])
+                        .unwrap()
+                        .earliest_expiry();
 
                     // child_expiry must hold the expiry of the children
                     assert_eq!(inner.child_earliest_expiry[0], left);
                     assert_eq!(inner.child_earliest_expiry[1], right);
 
-                    recursive_check(bookside, inner.children[0]);
-                    recursive_check(bookside, inner.children[1]);
+                    recursive_check(order_tree, inner.children[0]);
+                    recursive_check(order_tree, inner.children[1]);
                 }
                 _ => {}
             }
         }
-        recursive_check(bookside, r);
+        recursive_check(order_tree, r);
     }
 
     #[test]
-    fn bookside_expiry_manual() {
-        let mut bids = new_bookside(BookSideType::Bids);
+    fn order_tree_expiry_manual() {
+        let mut bids = new_order_tree(OrderTreeType::Bids);
         let new_expiring_leaf = |key: u128, expiry: u64| {
             LeafNode::new(
                 0,
@@ -650,19 +656,19 @@ mod tests {
 
         bids.insert_leaf(&new_expiring_leaf(0, 5000)).unwrap();
         assert_eq!(bids.find_earliest_expiry().unwrap(), (bids.root_node, 5000));
-        verify_bookside(&bids);
+        verify_order_tree(&bids);
 
         let (new4000_h, _) = bids.insert_leaf(&new_expiring_leaf(1, 4000)).unwrap();
         assert_eq!(bids.find_earliest_expiry().unwrap(), (new4000_h, 4000));
-        verify_bookside(&bids);
+        verify_order_tree(&bids);
 
         let (_new4500_h, _) = bids.insert_leaf(&new_expiring_leaf(2, 4500)).unwrap();
         assert_eq!(bids.find_earliest_expiry().unwrap(), (new4000_h, 4000));
-        verify_bookside(&bids);
+        verify_order_tree(&bids);
 
         let (new3500_h, _) = bids.insert_leaf(&new_expiring_leaf(3, 3500)).unwrap();
         assert_eq!(bids.find_earliest_expiry().unwrap(), (new3500_h, 3500));
-        verify_bookside(&bids);
+        verify_order_tree(&bids);
         // the first two levels of the tree are innernodes, with 0;1 on one side and 2;3 on the other
         assert_eq!(
             bids.node_mut(bids.root_node)
@@ -674,7 +680,7 @@ mod tests {
         );
 
         bids.remove_by_key(3).unwrap();
-        verify_bookside(&bids);
+        verify_order_tree(&bids);
         assert_eq!(
             bids.node_mut(bids.root_node)
                 .unwrap()
@@ -686,7 +692,7 @@ mod tests {
         assert_eq!(bids.find_earliest_expiry().unwrap().1, 4000);
 
         bids.remove_by_key(0).unwrap();
-        verify_bookside(&bids);
+        verify_order_tree(&bids);
         assert_eq!(
             bids.node_mut(bids.root_node)
                 .unwrap()
@@ -698,20 +704,20 @@ mod tests {
         assert_eq!(bids.find_earliest_expiry().unwrap().1, 4000);
 
         bids.remove_by_key(1).unwrap();
-        verify_bookside(&bids);
+        verify_order_tree(&bids);
         assert_eq!(bids.find_earliest_expiry().unwrap().1, 4500);
 
         bids.remove_by_key(2).unwrap();
-        verify_bookside(&bids);
+        verify_order_tree(&bids);
         assert!(bids.find_earliest_expiry().is_none());
     }
 
     #[test]
-    fn bookside_expiry_random() {
+    fn order_tree_expiry_random() {
         use rand::Rng;
         let mut rng = rand::thread_rng();
 
-        let mut bids = new_bookside(BookSideType::Bids);
+        let mut bids = new_order_tree(OrderTreeType::Bids);
         let new_expiring_leaf = |key: u128, expiry: u64| {
             LeafNode::new(
                 0,
@@ -735,7 +741,7 @@ mod tests {
             let expiry = rng.gen_range(1..200); // give good chance of duplicate expiry times
             keys.push(key);
             bids.insert_leaf(&new_expiring_leaf(key, expiry)).unwrap();
-            verify_bookside(&bids);
+            verify_order_tree(&bids);
         }
 
         // remove 50 at random
@@ -746,7 +752,7 @@ mod tests {
             let k = keys[rng.gen_range(0..keys.len())];
             bids.remove_by_key(k).unwrap();
             keys.retain(|v| *v != k);
-            verify_bookside(&bids);
+            verify_order_tree(&bids);
         }
     }
 
@@ -754,13 +760,13 @@ mod tests {
         use rand::Rng;
         let mut rng = rand::thread_rng();
 
-        let book_side_type = match side {
-            Side::Bid => BookSideType::Bids,
-            Side::Ask => BookSideType::Asks,
+        let order_tree_type = match side {
+            Side::Bid => OrderTreeType::Bids,
+            Side::Ask => OrderTreeType::Asks,
         };
 
-        let mut direct = new_bookside(book_side_type);
-        let mut oracle_pegged = new_bookside(book_side_type);
+        let mut direct = new_order_tree(order_tree_type);
+        let mut oracle_pegged = new_order_tree(order_tree_type);
         let new_leaf =
             |key: u128| LeafNode::new(0, key, Pubkey::default(), 0, 0, 1, OrderType::Limit, 0);
 
@@ -803,7 +809,7 @@ mod tests {
         for oracle_price_lots in 1..40 {
             println!("oracle {oracle_price_lots}");
             let mut total = 0;
-            let ascending = book_side_type == BookSideType::Asks;
+            let ascending = order_tree_type == OrderTreeType::Asks;
             let mut last_price = if ascending { 0 } else { i64::MAX };
             for order in bookside.iter_all_including_invalid(oracle_price_lots) {
                 let price = order.price_lots;
