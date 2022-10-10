@@ -1,8 +1,7 @@
-import { BN, AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { AnchorProvider, Wallet } from '@project-serum/anchor';
+import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
-import { Side, PerpOrderType } from '../accounts/perp';
 import { MANGO_V4_ID } from '../constants';
 
 //
@@ -49,14 +48,14 @@ async function main() {
   let accounts = await client.getMangoAccountsForOwner(group, admin.publicKey);
   for (let account of accounts) {
     for (let serumOrders of account.serum3Active()) {
-      const serumMarket = group.getSerum3MarketByIndex(
+      const serumMarket = group.getSerum3MarketByMarketIndex(
         serumOrders.marketIndex,
       )!;
       const serumExternal = serumMarket.serumMarketExternal;
       console.log(
         `closing serum orders on: ${account} for market ${serumMarket.name}`,
       );
-      await client.serum3CancelAllorders(group, account, serumExternal, 10);
+      await client.serum3CancelAllOrders(group, account, serumExternal, 10);
       await client.serum3SettleFunds(group, account, serumExternal);
       await client.serum3CloseOpenOrders(group, account, serumExternal);
     }
@@ -66,7 +65,12 @@ async function main() {
       console.log(
         `closing perp orders on: ${account} for market ${perpMarket.name}`,
       );
-      await client.perpCancelAllOrders(group, account, perpMarket.name, 10);
+      await client.perpCancelAllOrders(
+        group,
+        account,
+        perpMarket.perpMarketIndex,
+        10,
+      );
     }
   }
 

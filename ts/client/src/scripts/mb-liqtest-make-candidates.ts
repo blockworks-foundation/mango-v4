@@ -1,13 +1,13 @@
-import { AnchorProvider, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, BN, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
+import { MangoAccount } from '../accounts/mangoAccount';
+import { PerpOrderSide, PerpOrderType } from '../accounts/perp';
 import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
   Serum3Side,
 } from '../accounts/serum3';
-import { Side, PerpOrderType } from '../accounts/perp';
-import { MangoAccount } from '../accounts/mangoAccount';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 
@@ -105,9 +105,9 @@ async function main() {
       group,
       mangoAccount,
       assetMint,
-      assetAmount,
+      new BN(assetAmount),
     );
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
 
     if (liabAmount > 0) {
       // temporarily drop the borrowed token value, so the borrow goes through
@@ -119,7 +119,7 @@ async function main() {
           group,
           mangoAccount,
           liabMint,
-          liabAmount,
+          new BN(liabAmount),
           true,
         );
       } finally {
@@ -139,12 +139,17 @@ async function main() {
       `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
     );
 
-    const market = group.getSerum3MarketByIndexByName('SOL/USDC')!;
+    const market = group.getSerum3MarketByName('SOL/USDC')!;
     const sellMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
     const buyMint = new PublicKey(MAINNET_MINTS.get('SOL')!);
 
-    await client.tokenDepositNative(group, mangoAccount, sellMint, 100000);
-    await mangoAccount.reload(client, group);
+    await client.tokenDepositNative(
+      group,
+      mangoAccount,
+      sellMint,
+      new BN(100000),
+    );
+    await mangoAccount.reload(client);
 
     // temporarily up the init asset weight of the bought token
     await client.tokenEdit(
@@ -215,9 +220,9 @@ async function main() {
       group,
       mangoAccount,
       collateralMint,
-      100000,
+      new BN(100000),
     ); // valued as $0.004 maint collateral
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
 
     await client.stubOracleSet(group, collateralOracle, PRICES['SOL'] * 4);
 
@@ -225,8 +230,8 @@ async function main() {
       await client.perpPlaceOrder(
         group,
         mangoAccount,
-        'MNGO-PERP',
-        Side.bid,
+        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+        PerpOrderSide.bid,
         1, // ui price that won't get hit
         0.0011, // ui base quantity, 11 base lots, $0.044
         0.044, // ui quote quantity
@@ -258,9 +263,9 @@ async function main() {
       group,
       mangoAccount,
       collateralMint,
-      100000,
+      new BN(100000),
     ); // valued as $0.004 maint collateral
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
 
     await client.stubOracleSet(group, collateralOracle, PRICES['SOL'] * 5);
 
@@ -268,8 +273,8 @@ async function main() {
       await client.perpPlaceOrder(
         group,
         fundingAccount,
-        'MNGO-PERP',
-        Side.ask,
+        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+        PerpOrderSide.ask,
         40,
         0.0011, // ui base quantity, 11 base lots, $0.044
         0.044, // ui quote quantity
@@ -282,8 +287,8 @@ async function main() {
       await client.perpPlaceOrder(
         group,
         mangoAccount,
-        'MNGO-PERP',
-        Side.bid,
+        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+        PerpOrderSide.bid,
         40,
         0.0011, // ui base quantity, 11 base lots, $0.044
         0.044, // ui quote quantity
@@ -293,7 +298,10 @@ async function main() {
         5,
       );
 
-      await client.perpConsumeAllEvents(group, 'MNGO-PERP');
+      await client.perpConsumeAllEvents(
+        group,
+        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+      );
     } finally {
       await client.stubOracleSet(group, collateralOracle, PRICES['SOL']);
     }
@@ -320,9 +328,9 @@ async function main() {
       group,
       mangoAccount,
       collateralMint,
-      100000,
+      new BN(100000),
     ); // valued as $0.004 maint collateral
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
 
     try {
       await client.stubOracleSet(group, collateralOracle, PRICES['SOL'] * 10);
@@ -332,18 +340,18 @@ async function main() {
         group,
         mangoAccount,
         liabMint,
-        -5000,
+        new BN(-5000),
         true,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       // Execute two trades that leave the account with +$0.022 positive pnl
       await client.stubOracleSet(group, baseOracle, PRICES['MNGO'] / 2);
       await client.perpPlaceOrder(
         group,
         fundingAccount,
-        'MNGO-PERP',
-        Side.ask,
+        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+        PerpOrderSide.ask,
         20,
         0.0011, // ui base quantity, 11 base lots, $0.022
         0.022, // ui quote quantity
@@ -355,8 +363,8 @@ async function main() {
       await client.perpPlaceOrder(
         group,
         mangoAccount,
-        'MNGO-PERP',
-        Side.bid,
+        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+        PerpOrderSide.bid,
         20,
         0.0011, // ui base quantity, 11 base lots, $0.022
         0.022, // ui quote quantity
@@ -365,15 +373,18 @@ async function main() {
         0,
         5,
       );
-      await client.perpConsumeAllEvents(group, 'MNGO-PERP');
+      await client.perpConsumeAllEvents(
+        group,
+        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+      );
 
       await client.stubOracleSet(group, baseOracle, PRICES['MNGO']);
 
       await client.perpPlaceOrder(
         group,
         fundingAccount,
-        'MNGO-PERP',
-        Side.bid,
+        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+        PerpOrderSide.bid,
         40,
         0.0011, // ui base quantity, 11 base lots, $0.044
         0.044, // ui quote quantity
@@ -385,8 +396,8 @@ async function main() {
       await client.perpPlaceOrder(
         group,
         mangoAccount,
-        'MNGO-PERP',
-        Side.ask,
+        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+        PerpOrderSide.ask,
         40,
         0.0011, // ui base quantity, 11 base lots, $0.044
         0.044, // ui quote quantity
@@ -395,7 +406,10 @@ async function main() {
         0,
         5,
       );
-      await client.perpConsumeAllEvents(group, 'MNGO-PERP');
+      await client.perpConsumeAllEvents(
+        group,
+        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+      );
     } finally {
       await client.stubOracleSet(group, collateralOracle, PRICES['SOL']);
       await client.stubOracleSet(group, baseOracle, PRICES['MNGO']);
