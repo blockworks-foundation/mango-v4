@@ -2077,6 +2077,69 @@ export class MangoClient {
       .rpc();
   }
 
+  public async healthRegionBeginIx(
+    group: Group,
+    account: MangoAccount,
+    banks: Bank[] = [],
+    perpMarkets: PerpMarket[] = [],
+  ): Promise<TransactionInstruction> {
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        AccountRetriever.Fixed,
+        group,
+        [account],
+        [...banks],
+        [...perpMarkets],
+      );
+    const parsedHealthAccounts = healthRemainingAccounts.map(
+      (pk) =>
+        ({
+          pubkey: pk,
+          isWritable: false,
+          isSigner: false,
+        } as AccountMeta),
+    );
+
+    return await this.program.methods
+      .healthRegionBegin()
+      .accounts({
+        account: account.publicKey,
+        instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
+      })
+      .remainingAccounts(parsedHealthAccounts)
+      .instruction();
+  }
+
+  public async healthRegionEndIx(
+    group: Group,
+    account: MangoAccount,
+    banks: Bank[] = [],
+    perpMarkets: PerpMarket[] = [],
+  ): Promise<TransactionInstruction> {
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        AccountRetriever.Fixed,
+        group,
+        [account],
+        [...banks],
+        [...perpMarkets],
+      );
+    const parsedHealthAccounts = healthRemainingAccounts.map(
+      (pk) =>
+        ({
+          pubkey: pk,
+          isWritable: false,
+          isSigner: false,
+        } as AccountMeta),
+    );
+
+    return await this.program.methods
+      .healthRegionEnd()
+      .accounts({ account: account.publicKey })
+      .remainingAccounts(parsedHealthAccounts)
+      .instruction();
+  }
+
   /// static
 
   static connect(
