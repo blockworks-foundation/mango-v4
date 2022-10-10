@@ -86,7 +86,7 @@ async function main() {
         new PublicKey(DEVNET_MINTS.get('USDC')!),
         1000,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       await client.tokenDeposit(
         group,
@@ -94,7 +94,7 @@ async function main() {
         new PublicKey(DEVNET_MINTS.get('MNGO')!),
         100,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       await client.tokenDeposit(
         group,
@@ -102,7 +102,7 @@ async function main() {
         new PublicKey(DEVNET_MINTS.get('ETH')!),
         500,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       await client.tokenDeposit(
         group,
@@ -110,7 +110,7 @@ async function main() {
         new PublicKey(DEVNET_MINTS.get('SRM')!),
         500,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       await client.tokenDeposit(
         group,
@@ -118,7 +118,7 @@ async function main() {
         new PublicKey(DEVNET_MINTS.get('BTC')!),
         1,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       console.log(mangoAccount.toString(group));
     } catch (error) {

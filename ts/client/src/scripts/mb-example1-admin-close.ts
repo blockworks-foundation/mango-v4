@@ -1,5 +1,5 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
@@ -65,8 +65,8 @@ async function main() {
     }
 
     // close all perp markets
-    for (const market of group.perpMarketsMap.values()) {
-      sig = await client.perpCloseMarket(group, market.name);
+    for (const market of group.perpMarketsMapByMarketIndex.values()) {
+      sig = await client.perpCloseMarket(group, market.perpMarketIndex);
       console.log(
         `Closed perp market ${market.name}, sig https://explorer.solana.com/tx/${sig}`,
       );

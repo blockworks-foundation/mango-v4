@@ -1,5 +1,5 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
@@ -59,15 +59,15 @@ async function main() {
   try {
     console.log(`...depositing 5 USDC`);
     await client.tokenDeposit(group, mangoAccount, usdcMint, 5);
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
 
     console.log(`...depositing 0.0002 BTC`);
     await client.tokenDeposit(group, mangoAccount, btcMint, 0.0002);
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
 
     console.log(`...depositing 0.15 SOL`);
     await client.tokenDeposit(group, mangoAccount, solMint, 0.15);
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
   } catch (error) {
     console.log(error);
   }
