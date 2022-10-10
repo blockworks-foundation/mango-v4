@@ -5,7 +5,7 @@ import Big from 'big.js';
 import { MangoClient } from '../client';
 import { I80F48, I80F48Dto } from '../numbers/I80F48';
 import { As, toNative, U64_MAX_BN } from '../utils';
-import { OracleConfig, QUOTE_DECIMALS } from './bank';
+import { OracleConfig, QUOTE_DECIMALS, TokenIndex } from './bank';
 
 export type PerpMarketIndex = number & As<'perp-market-index'>;
 
@@ -22,21 +22,24 @@ export class PerpMarket {
   public maxFunding: I80F48;
   public longFunding: I80F48;
   public shortFunding: I80F48;
-  public openInterest: BN;
-  public seqNum: BN;
   public feesAccrued: I80F48;
-  priceLotsToUiConverter: number;
-  baseLotsToUiConverter: number;
-  quoteLotsToUiConverter: number;
+  public feesSettled: I80F48;
+
   public _price: I80F48;
   public _uiPrice: number;
+
+  private priceLotsToUiConverter: number;
+  private baseLotsToUiConverter: number;
+  private quoteLotsToUiConverter: number;
 
   static from(
     publicKey: PublicKey,
     obj: {
       group: PublicKey;
+      settleTokenIndex: number;
       perpMarketIndex: number;
       trustedMarket: number;
+      groupInsuranceFund: number;
       name: number[];
       oracle: PublicKey;
       oracleConfig: OracleConfig;
@@ -61,16 +64,22 @@ export class PerpMarket {
       openInterest: BN;
       seqNum: BN;
       feesAccrued: I80F48Dto;
-      bump: number;
       baseDecimals: number;
       registrationTime: BN;
+      feesSettled: I80F48Dto;
+      feePenalty: number;
+      settleFeeFlat: number;
+      settleFeeAmountThreshold: number;
+      settleFeeFractionLowHealth: number;
     },
   ): PerpMarket {
     return new PerpMarket(
       publicKey,
       obj.group,
+      obj.settleTokenIndex as TokenIndex,
       obj.perpMarketIndex as PerpMarketIndex,
       obj.trustedMarket == 1,
+      obj.groupInsuranceFund == 1,
       obj.name,
       obj.oracle,
       obj.oracleConfig,
@@ -95,17 +104,23 @@ export class PerpMarket {
       obj.openInterest,
       obj.seqNum,
       obj.feesAccrued,
-      obj.bump,
       obj.baseDecimals,
       obj.registrationTime,
+      obj.feesSettled,
+      obj.feePenalty,
+      obj.settleFeeFlat,
+      obj.settleFeeAmountThreshold,
+      obj.settleFeeFractionLowHealth,
     );
   }
 
   constructor(
     public publicKey: PublicKey,
     public group: PublicKey,
+    public settleTokenIndex: TokenIndex,
     public perpMarketIndex: PerpMarketIndex, // TODO rename to marketIndex?
     public trustedMarket: boolean,
+    public groupInsuranceFund: boolean,
     name: number[],
     public oracle: PublicKey,
     oracleConfig: OracleConfig,
@@ -126,13 +141,17 @@ export class PerpMarket {
     public impactQuantity: BN,
     longFunding: I80F48Dto,
     shortFunding: I80F48Dto,
-    fundingLastUpdated: BN,
-    openInterest: BN,
-    seqNum: BN,
+    public fundingLastUpdated: BN,
+    public openInterest: BN,
+    public seqNum: BN,
     feesAccrued: I80F48Dto,
-    bump: number,
     public baseDecimals: number,
     public registrationTime: BN,
+    feesSettled: I80F48Dto,
+    public feePenalty: number,
+    public settleFeeFlat: number,
+    public settleFeeAmountThreshold: number,
+    public settleFeeFractionLowHealth: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.maintAssetWeight = I80F48.from(maintAssetWeight);
@@ -146,9 +165,8 @@ export class PerpMarket {
     this.maxFunding = I80F48.from(maxFunding);
     this.longFunding = I80F48.from(longFunding);
     this.shortFunding = I80F48.from(shortFunding);
-    this.openInterest = openInterest;
-    this.seqNum = seqNum;
     this.feesAccrued = I80F48.from(feesAccrued);
+    this.feesSettled = I80F48.from(feesSettled);
 
     this.priceLotsToUiConverter = new Big(10)
       .pow(baseDecimals - QUOTE_DECIMALS)
