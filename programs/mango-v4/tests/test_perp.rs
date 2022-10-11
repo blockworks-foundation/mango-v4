@@ -198,6 +198,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             owner,
             side: Side::Bid,
             price_offset: -1,
+            peg_limit: -1,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 3,
@@ -473,7 +474,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     .create(solana)
     .await;
 
-    let deposit_amount = 1000;
+    let deposit_amount = 100000;
     let account_0 = create_funded_account(
         &solana,
         group,
@@ -498,7 +499,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     .await;
 
     //
-    // TEST: Create a perp market
+    // SETUP: Create a perp market
     //
     let mango_v4::accounts::PerpCreateMarket {
         perp_market,
@@ -512,7 +513,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             payer,
             perp_market_index: 0,
             quote_lot_size: 10,
-            base_lot_size: 100,
+            base_lot_size: 10000,
             maint_asset_weight: 0.975,
             init_asset_weight: 0.95,
             maint_liab_weight: 1.025,
@@ -530,9 +531,10 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
         perp_market.native_price_to_lot(I80F48!(1))
     };
+    assert_eq!(price_lots, 1000);
 
     //
-    // Place and cancel order with order_id
+    // TEST: Place and cancel order with order_id
     //
     send_tx(
         solana,
@@ -542,6 +544,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             owner,
             side: Side::Bid,
             price_offset: -1,
+            peg_limit: -1,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 0,
@@ -573,7 +576,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     assert_no_perp_orders(solana, account_0).await;
 
     //
-    // Place a pegged bid, take it with a direct and pegged ask, and consume events
+    // TEST: Place a pegged bid, take it with a direct and pegged ask, and consume events
     //
     send_tx(
         solana,
@@ -583,6 +586,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             owner,
             side: Side::Bid,
             price_offset: 0,
+            peg_limit: -1,
             max_base_lots: 2,
             max_quote_lots: i64::MAX,
             client_order_id: 5,
@@ -617,6 +621,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             owner,
             side: Side::Ask,
             price_offset: 0,
+            peg_limit: -1,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             client_order_id: 7,
@@ -640,7 +645,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     assert_eq!(mango_account_0.perps[0].base_position_lots(), 2);
     assert!(assert_equal(
         mango_account_0.perps[0].quote_position_native(),
-        -199.98,
+        -19998.0,
         0.001
     ));
 
@@ -648,9 +653,220 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     assert_eq!(mango_account_1.perps[0].base_position_lots(), -2);
     assert!(assert_equal(
         mango_account_1.perps[0].quote_position_native(),
-        199.96,
+        19996.0,
         0.001
     ));
+
+    //
+    // TEST: Place a pegged order and check how it behaves with oracle changes
+    //
+    send_tx(
+        solana,
+        PerpPlaceOrderPeggedInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+            side: Side::Bid,
+            price_offset: -1,
+            peg_limit: -1,
+            max_base_lots: 2,
+            max_quote_lots: i64::MAX,
+            client_order_id: 5,
+        },
+    )
+    .await
+    .unwrap();
+
+    // TEST: an ask at current oracle price does not match
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            side: Side::Ask,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 60,
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        PerpCancelOrderByClientOrderIdInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            client_order_id: 60,
+        },
+    )
+    .await
+    .unwrap();
+
+    // TEST: Change the oracle, now the ask matches
+    send_tx(
+        solana,
+        StubOracleSetInstruction {
+            group,
+            admin,
+            mint: mints[0].pubkey,
+            payer,
+            price: "1.002",
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            side: Side::Ask,
+            price_lots,
+            max_base_lots: 2,
+            max_quote_lots: i64::MAX,
+            client_order_id: 61,
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        PerpConsumeEventsInstruction {
+            perp_market,
+            mango_accounts: vec![account_0, account_1],
+        },
+    )
+    .await
+    .unwrap();
+    assert_no_perp_orders(solana, account_0).await;
+
+    // restore the oracle to default
+    send_tx(
+        solana,
+        StubOracleSetInstruction {
+            group,
+            admin,
+            mint: mints[0].pubkey,
+            payer,
+            price: "1.0",
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: order is cancelled when the price exceeds the peg limit
+    //
+    send_tx(
+        solana,
+        PerpPlaceOrderPeggedInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+            side: Side::Bid,
+            price_offset: -1,
+            peg_limit: price_lots + 2,
+            max_base_lots: 2,
+            max_quote_lots: i64::MAX,
+            client_order_id: 5,
+        },
+    )
+    .await
+    .unwrap();
+
+    // order is still matchable when exactly at the peg limit
+    send_tx(
+        solana,
+        StubOracleSetInstruction {
+            group,
+            admin,
+            mint: mints[0].pubkey,
+            payer,
+            price: "1.003",
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            side: Side::Ask,
+            price_lots: price_lots + 2,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 62,
+        },
+    )
+    .await
+    .unwrap();
+    assert!(send_tx(
+        solana,
+        PerpCancelOrderByClientOrderIdInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            client_order_id: 62,
+        },
+    )
+    .await
+    .is_err());
+
+    // but once the adjusted price is > the peg limit, it's gone
+    send_tx(
+        solana,
+        StubOracleSetInstruction {
+            group,
+            admin,
+            mint: mints[0].pubkey,
+            payer,
+            price: "1.004",
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            side: Side::Ask,
+            price_lots: price_lots + 3,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 63,
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        PerpCancelOrderByClientOrderIdInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            client_order_id: 63,
+        },
+    )
+    .await
+    .unwrap();
+    send_tx(
+        solana,
+        PerpConsumeEventsInstruction {
+            perp_market,
+            mango_accounts: vec![account_0, account_1],
+        },
+    )
+    .await
+    .unwrap();
+    assert_no_perp_orders(solana, account_0).await;
 
     Ok(())
 }

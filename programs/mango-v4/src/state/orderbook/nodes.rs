@@ -139,6 +139,7 @@ pub struct LeafNode {
     // The time the order was placed
     pub timestamp: u64,
 
+    // Only applicable in the oracle_pegged OrderTree
     pub peg_limit: i64,
 
     pub reserved: [u8; 8],

@@ -143,6 +143,13 @@ impl Order {
         };
         Ok((price_lots, price_data))
     }
+
+    pub fn peg_limit(&self) -> i64 {
+        match self.params {
+            OrderParams::OraclePegged { peg_limit, .. } => peg_limit,
+            _ => -1,
+        }
+    }
 }
 
 #[account(zero_copy)]
@@ -417,7 +424,7 @@ impl OrderBook {
                 now_ts,
                 PostOrderType::Limit, // TODO: Support order types? needed?
                 time_in_force,
-                -1,
+                order.peg_limit(),
             );
             let _result = order_tree.insert_leaf(&new_order)?;
 

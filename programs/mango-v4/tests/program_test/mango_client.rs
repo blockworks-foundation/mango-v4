@@ -2400,7 +2400,7 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
             client_order_id: self.client_order_id,
             order_type: PlaceOrderType::Limit,
             expiry_timestamp: 0,
-            limit: 1,
+            limit: 10,
         };
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
@@ -2446,6 +2446,7 @@ pub struct PerpPlaceOrderPeggedInstruction {
     pub max_base_lots: i64,
     pub max_quote_lots: i64,
     pub client_order_id: u64,
+    pub peg_limit: i64,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpPlaceOrderPeggedInstruction {
@@ -2459,13 +2460,13 @@ impl ClientInstruction for PerpPlaceOrderPeggedInstruction {
         let instruction = Self::Instruction {
             side: self.side,
             price_offset: self.price_offset,
-            peg_limit: -1,
+            peg_limit: self.peg_limit,
             max_base_lots: self.max_base_lots,
             max_quote_lots: self.max_quote_lots,
             client_order_id: self.client_order_id,
             order_type: PlaceOrderType::Limit,
             expiry_timestamp: 0,
-            limit: 1,
+            limit: 10,
         };
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
