@@ -57,16 +57,19 @@ async function main() {
   group.consoleLogBanks();
 
   // deregister all serum markets
-  for (const market of group.serum3MarketsMap.values()) {
-    sig = await client.serum3deregisterMarket(group, market.name);
+  for (const market of group.serum3MarketsMapByExternal.values()) {
+    sig = await client.serum3deregisterMarket(
+      group,
+      market.serumMarketExternal,
+    );
     console.log(
       `Deregistered serum market ${market.name}, sig https://explorer.solana.com/tx/${sig}?cluster=devnet`,
     );
   }
 
   // close all perp markets
-  for (const market of group.perpMarketsMap.values()) {
-    sig = await client.perpCloseMarket(group, market.name);
+  for (const market of group.perpMarketsMapByMarketIndex.values()) {
+    sig = await client.perpCloseMarket(group, market.perpMarketIndex);
     console.log(
       `Closed perp market ${market.name}, sig https://explorer.solana.com/tx/${sig}?cluster=devnet`,
     );
