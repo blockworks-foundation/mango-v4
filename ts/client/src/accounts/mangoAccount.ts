@@ -12,12 +12,11 @@ import { HealthCache } from './healthCache';
 import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
+  public name: string;
   public tokens: TokenPosition[];
   public serum3: Serum3Orders[];
   public perps: PerpPosition[];
   public perpOpenOrders: PerpOo[];
-  public name: string;
-  public netDeposits: BN;
 
   static from(
     publicKey: PublicKey,
@@ -26,29 +25,31 @@ export class MangoAccount {
       owner: PublicKey;
       name: number[];
       delegate: PublicKey;
-      beingLiquidated: number;
       accountNum: number;
-      bump: number;
+      beingLiquidated: number;
+      inHealthRegion: number;
       netDeposits: BN;
       netSettled: BN;
+      healthRegionBeginInitHealth: BN;
       headerVersion: number;
       tokens: unknown;
       serum3: unknown;
       perps: unknown;
       perpOpenOrders: unknown;
     },
-  ) {
+  ): MangoAccount {
     return new MangoAccount(
       publicKey,
       obj.group,
       obj.owner,
       obj.name,
       obj.delegate,
-      obj.beingLiquidated,
       obj.accountNum,
-      obj.bump,
+      obj.beingLiquidated == 1,
+      obj.inHealthRegion == 1,
       obj.netDeposits,
       obj.netSettled,
+      obj.healthRegionBeginInitHealth,
       obj.headerVersion,
       obj.tokens as TokenPositionDto[],
       obj.serum3 as Serum3PositionDto[],
@@ -64,12 +65,13 @@ export class MangoAccount {
     public owner: PublicKey,
     name: number[],
     public delegate: PublicKey,
-    beingLiquidated: number,
     public accountNum: number,
-    bump: number,
-    netDeposits: BN,
-    netSettled: BN,
-    headerVersion: number,
+    public beingLiquidated: boolean,
+    public inHealthRegion: boolean,
+    public netDeposits: BN,
+    public netSettled: BN,
+    public healthRegionBeginInitHealth: BN,
+    public headerVersion: number,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
     perps: PerpPositionDto[],
@@ -81,7 +83,6 @@ export class MangoAccount {
     this.serum3 = serum3.map((dto) => Serum3Orders.from(dto));
     this.perps = perps.map((dto) => PerpPosition.from(dto));
     this.perpOpenOrders = perpOpenOrders.map((dto) => PerpOo.from(dto));
-    this.netDeposits = netDeposits;
   }
 
   async reload(client: MangoClient): Promise<MangoAccount> {
