@@ -105,7 +105,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side_and_tree: SideAndTree::BidFixed,
+            side_and_tree: SideAndOrderTree::BidFixed,
             price_data: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
@@ -146,7 +146,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side_and_tree: SideAndTree::BidFixed,
+            side_and_tree: SideAndOrderTree::BidFixed,
             price_data: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
@@ -180,7 +180,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side_and_tree: SideAndTree::BidFixed,
+            side_and_tree: SideAndOrderTree::BidFixed,
             price_data: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
@@ -196,7 +196,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side_and_tree: SideAndTree::BidOraclePegged,
+            side_and_tree: SideAndOrderTree::BidOraclePegged,
             price_data: -1,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
@@ -212,7 +212,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side_and_tree: SideAndTree::BidFixed,
+            side_and_tree: SideAndOrderTree::BidFixed,
             price_data: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
@@ -245,7 +245,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side_and_tree: SideAndTree::BidFixed,
+            side_and_tree: SideAndOrderTree::BidFixed,
             price_data: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
@@ -262,7 +262,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             account: account_1,
             perp_market,
             owner,
-            side_and_tree: SideAndTree::AskFixed,
+            side_and_tree: SideAndOrderTree::AskFixed,
             price_data: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
@@ -323,7 +323,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side_and_tree: SideAndTree::AskFixed,
+            side_and_tree: SideAndOrderTree::AskFixed,
             price_data: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
@@ -340,7 +340,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             account: account_1,
             perp_market,
             owner,
-            side_and_tree: SideAndTree::BidFixed,
+            side_and_tree: SideAndOrderTree::BidFixed,
             price_data: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
@@ -540,7 +540,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side_and_tree: SideAndTree::BidOraclePegged,
+            side_and_tree: SideAndOrderTree::BidOraclePegged,
             price_data: -1,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
@@ -557,7 +557,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
         .get_account::<MangoAccount>(account_0)
         .await
         .perp_open_orders[0];
-    assert_eq!(perp_order.side_and_tree, SideAndTree::BidOraclePegged);
+    assert_eq!(perp_order.side_and_tree, SideAndOrderTree::BidOraclePegged);
     send_tx(
         solana,
         PerpCancelOrderInstruction {
@@ -582,7 +582,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             account: account_0,
             perp_market,
             owner,
-            side_and_tree: SideAndTree::BidOraclePegged,
+            side_and_tree: SideAndOrderTree::BidOraclePegged,
             price_data: 0,
             max_base_lots: 2,
             max_quote_lots: i64::MAX,
@@ -599,7 +599,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             account: account_1,
             perp_market,
             owner,
-            side_and_tree: SideAndTree::AskFixed,
+            side_and_tree: SideAndOrderTree::AskFixed,
             price_data: price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
@@ -616,7 +616,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             account: account_1,
             perp_market,
             owner,
-            side_and_tree: SideAndTree::AskOraclePegged,
+            side_and_tree: SideAndOrderTree::AskOraclePegged,
             price_data: 0,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
@@ -661,7 +661,7 @@ async fn assert_no_perp_orders(solana: &SolanaCookie, account_0: Pubkey) {
 
     for oo in mango_account_0.perp_open_orders.iter() {
         assert!(oo.id == 0);
-        assert!(oo.side_and_tree == SideAndTree::BidFixed);
+        assert!(oo.side_and_tree == SideAndOrderTree::BidFixed);
         assert!(oo.client_id == 0);
         assert!(oo.market == FREE_ORDER_SLOT);
     }

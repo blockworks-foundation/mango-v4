@@ -37,6 +37,114 @@ fn post_only_slide_limit(side: Side, best_other_side: i64, limit: i64) -> i64 {
 
 /// TODO: what if oracle is stale for a while
 
+pub struct Order {
+    pub side: Side,
+    pub params: OrderParams,
+}
+
+pub enum OrderParams {
+    Market,
+    ImmediateOrCancel {
+        price_lots: i64,
+    },
+    Fixed {
+        price_lots: i64,
+        order_type: PostOrderType,
+    },
+    OraclePegged {
+        price_offset_lots: i64,
+        order_type: PostOrderType,
+        peg_limit: i64,
+    },
+}
+
+impl Order {
+    pub fn needs_penalty_fee(&self) -> bool {
+        matches!(self.params, OrderParams::ImmediateOrCancel { .. })
+    }
+
+    pub fn is_post_only(&self) -> bool {
+        let order_type = match self.params {
+            OrderParams::Fixed { order_type, .. } => order_type,
+            OrderParams::OraclePegged { order_type, .. } => order_type,
+            _ => return false,
+        };
+        order_type == PostOrderType::PostOnly || order_type == PostOrderType::PostOnlySlide
+    }
+
+    pub fn post_target(&self) -> Option<BookSideOrderTree> {
+        match self.params {
+            OrderParams::Fixed { .. } => Some(BookSideOrderTree::Fixed),
+            OrderParams::OraclePegged { .. } => Some(BookSideOrderTree::OraclePegged),
+            _ => None,
+        }
+    }
+
+    fn price_for_type(
+        &self,
+        now_ts: u64,
+        oracle_price_lots: i64,
+        price_lots: i64,
+        order_type: PostOrderType,
+        order_book: &OrderBook,
+    ) -> i64 {
+        if order_type == PostOrderType::PostOnlySlide {
+            return if let Some(best_other_price) =
+                order_book.best_price(now_ts, oracle_price_lots, self.side.invert_side())
+            {
+                post_only_slide_limit(self.side, best_other_price, price_lots)
+            } else {
+                price_lots
+            };
+        } else {
+            price_lots
+        }
+    }
+
+    pub fn price(
+        &self,
+        now_ts: u64,
+        oracle_price_lots: i64,
+        order_book: &OrderBook,
+    ) -> Result<(i64, u64)> {
+        let price_lots = match self.params {
+            OrderParams::Market => market_order_limit_for_side(self.side),
+            OrderParams::ImmediateOrCancel { price_lots } => price_lots,
+            OrderParams::Fixed {
+                price_lots,
+                order_type,
+            } => self.price_for_type(
+                now_ts,
+                oracle_price_lots,
+                price_lots,
+                order_type,
+                order_book,
+            ),
+            OrderParams::OraclePegged {
+                price_offset_lots,
+                order_type,
+                ..
+            } => {
+                let price_lots = cm!(oracle_price_lots + price_offset_lots);
+                self.price_for_type(
+                    now_ts,
+                    oracle_price_lots,
+                    price_lots,
+                    order_type,
+                    order_book,
+                )
+            }
+        };
+        let price_data = match self.params {
+            OrderParams::OraclePegged { .. } => {
+                oracle_pegged_price_data(cm!(price_lots - oracle_price_lots))
+            }
+            _ => fixed_price_data(price_lots)?,
+        };
+        Ok((price_lots, price_data))
+    }
+}
+
 #[account(zero_copy)]
 pub struct OrderBook {
     pub bids_fixed: OrderTree,
@@ -49,13 +157,6 @@ const_assert_eq!(
     4 * std::mem::size_of::<OrderTree>()
 );
 const_assert_eq!(std::mem::size_of::<OrderBook>() % 8, 0);
-
-struct OrderParams {
-    post_only: bool,
-    post_target: Option<BookSideOrderTree>,
-    price_lots: i64,
-    price_data: u64,
-}
 
 impl OrderBook {
     pub fn bookside_mut(&mut self, side: Side) -> BookSideRefMut {
@@ -114,75 +215,17 @@ impl OrderBook {
         None
     }
 
-    /// Determine order params based on user input
-    fn eval_order_params(
-        &self,
-        side_and_tree: SideAndTree,
-        price_input: i64,
-        order_type: OrderType,
-        oracle_price_lots: i64,
-        now_ts: u64,
-    ) -> Result<OrderParams> {
-        let side = side_and_tree.side();
-        let component = side_and_tree.order_tree();
-        if order_type == OrderType::Market {
-            let price_lots = market_order_limit_for_side(side);
-            return Ok(OrderParams {
-                post_only: false,
-                post_target: None,
-                price_lots,
-                price_data: price_lots as u64,
-            });
-        }
-        let price_lots = match component {
-            BookSideOrderTree::Fixed => price_input,
-            BookSideOrderTree::OraclePegged => cm!(oracle_price_lots + price_input),
-        };
-        require_gte!(price_lots, 1);
-        let (post_only, post_allowed, price_lots) = match order_type {
-            OrderType::Limit => (false, true, price_lots),
-            OrderType::ImmediateOrCancel => (false, false, price_lots),
-            OrderType::PostOnly => (true, true, price_lots),
-            OrderType::Market => unreachable!(),
-            OrderType::PostOnlySlide => {
-                let price = if let Some(best_other_price) =
-                    self.best_price(now_ts, oracle_price_lots, side.invert_side())
-                {
-                    post_only_slide_limit(side, best_other_price, price_lots)
-                } else {
-                    price_lots
-                };
-                (true, true, price)
-            }
-        };
-        require_gte!(price_lots, 1);
-        let price_data = match component {
-            BookSideOrderTree::Fixed => fixed_price_data(price_lots).unwrap(),
-            BookSideOrderTree::OraclePegged => {
-                oracle_pegged_price_data(cm!(price_lots - oracle_price_lots))
-            }
-        };
-        Ok(OrderParams {
-            post_only,
-            post_target: post_allowed.then(|| component),
-            price_lots,
-            price_data,
-        })
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub fn new_order(
         &mut self,
-        side_and_tree: SideAndTree,
+        order: Order,
         perp_market: &mut PerpMarket,
         event_queue: &mut EventQueue,
         oracle_price: I80F48,
         mango_account: &mut MangoAccountRefMut,
         mango_account_pk: &Pubkey,
-        price_input: i64,
         max_base_lots: i64,
         max_quote_lots: i64,
-        order_type: OrderType,
         time_in_force: u8,
         client_order_id: u64,
         now_ts: u64,
@@ -191,22 +234,13 @@ impl OrderBook {
         require_gte!(max_base_lots, 0);
         require_gte!(max_quote_lots, 0);
 
-        let side = side_and_tree.side();
+        let side = order.side;
         let other_side = side.invert_side();
         let market = perp_market;
         let oracle_price_lots = market.native_price_to_lot(oracle_price);
-        let OrderParams {
-            post_only,
-            mut post_target,
-            price_lots,
-            price_data,
-        } = self.eval_order_params(
-            side_and_tree,
-            price_input,
-            order_type,
-            oracle_price_lots,
-            now_ts,
-        )?;
+        let post_only = order.is_post_only();
+        let mut post_target = order.post_target();
+        let (price_lots, price_data) = order.price(now_ts, oracle_price_lots, self)?;
 
         if post_target.is_some() {
             // price limit check computed lazily to save CU on average
@@ -337,12 +371,12 @@ impl OrderBook {
         if book_base_quantity <= 0 {
             post_target = None;
         }
-        if let Some(book_component) = post_target {
-            let mut full_bookside = self.bookside_mut(side);
-            let bookside = full_bookside.orders_mut(book_component);
+        if let Some(order_tree_target) = post_target {
+            let mut bookside = self.bookside_mut(side);
+            let order_tree = bookside.orders_mut(order_tree_target);
 
             // Drop an expired order if possible
-            if let Some(expired_order) = bookside.remove_one_expired(now_ts) {
+            if let Some(expired_order) = order_tree.remove_one_expired(now_ts) {
                 let event = OutEvent::new(
                     side,
                     expired_order.owner_slot,
@@ -354,9 +388,9 @@ impl OrderBook {
                 event_queue.push_back(cast(event)).unwrap();
             }
 
-            if bookside.is_full() {
+            if order_tree.is_full() {
                 // If this bid is higher than lowest bid, boot that bid and insert this one
-                let worst_order = bookside.remove_worst().unwrap();
+                let worst_order = order_tree.remove_worst().unwrap();
                 // MangoErrorCode::OutOfSpace
                 require!(
                     side.is_price_data_better(price_data, worst_order.price_data()),
@@ -381,11 +415,11 @@ impl OrderBook {
                 book_base_quantity,
                 client_order_id,
                 now_ts,
-                OrderType::Limit, // TODO: Support order types? needed?
+                PostOrderType::Limit, // TODO: Support order types? needed?
                 time_in_force,
                 -1,
             );
-            let _result = bookside.insert_leaf(&new_order)?;
+            let _result = order_tree.insert_leaf(&new_order)?;
 
             // TODO OPT remove if PlacePerpOrder needs more compute
             msg!(
@@ -399,7 +433,12 @@ impl OrderBook {
                 price_lots
             );
 
-            mango_account.add_perp_order(market.perp_market_index, side_and_tree, &new_order)?;
+            mango_account.add_perp_order(
+                market.perp_market_index,
+                side,
+                order_tree_target,
+                &new_order,
+            )?;
         }
 
         // if there were matched taker quote apply ref fees
@@ -409,7 +448,7 @@ impl OrderBook {
         }
 
         // IOC orders have a fee penalty applied regardless of match
-        if order_type == OrderType::ImmediateOrCancel {
+        if order.needs_penalty_fee() {
             apply_penalty(market, mango_account)?;
         }
 
@@ -458,7 +497,7 @@ impl OrderBook {
         &mut self,
         mango_account: &mut MangoAccountRefMut,
         order_id: u128,
-        side_and_tree: SideAndTree,
+        side_and_tree: SideAndOrderTree,
         expected_owner: Option<Pubkey>,
     ) -> Result<LeafNode> {
         let side = side_and_tree.side();

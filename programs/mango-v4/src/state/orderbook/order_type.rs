@@ -1,7 +1,8 @@
 use anchor_lang::prelude::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-use crate::state::BookSideOrderTree;
+use crate::error::*;
+use crate::{error_msg, state::BookSideOrderTree};
 
 #[derive(
     Eq,
@@ -15,7 +16,7 @@ use crate::state::BookSideOrderTree;
     AnchorDeserialize,
 )]
 #[repr(u8)]
-pub enum OrderType {
+pub enum PlaceOrderType {
     /// Take existing orders up to price, max_base_quantity and max_quote_quantity.
     /// If any base_quantity or quote_quantity remains, place an order on the book
     Limit = 0,
@@ -33,6 +34,44 @@ pub enum OrderType {
     ///
     /// Equivalent to ImmediateOrCancel with price=i64::MAX.
     Market = 3,
+
+    /// If existing orders match with this order, adjust the price to just barely
+    /// not match. Always places an order on the book.
+    PostOnlySlide = 4,
+}
+
+impl PlaceOrderType {
+    pub fn to_post_order_type(&self) -> Result<PostOrderType> {
+        match *self {
+            Self::Market => Err(error_msg!("Market is not a PostOrderType")),
+            Self::ImmediateOrCancel => Err(error_msg!("ImmediateOrCancel is not a PostOrderType")),
+            Self::Limit => Ok(PostOrderType::Limit),
+            Self::PostOnly => Ok(PostOrderType::PostOnly),
+            Self::PostOnlySlide => Ok(PostOrderType::PostOnlySlide),
+        }
+    }
+}
+
+#[derive(
+    Eq,
+    PartialEq,
+    Copy,
+    Clone,
+    TryFromPrimitive,
+    IntoPrimitive,
+    Debug,
+    AnchorSerialize,
+    AnchorDeserialize,
+)]
+#[repr(u8)]
+pub enum PostOrderType {
+    /// Take existing orders up to price, max_base_quantity and max_quote_quantity.
+    /// If any base_quantity or quote_quantity remains, place an order on the book
+    Limit = 0,
+
+    /// Never take any existing orders, post the order on the book if possible.
+    /// If existing orders can match with this order, do nothing.
+    PostOnly = 2,
 
     /// If existing orders match with this order, adjust the price to just barely
     /// not match. Always places an order on the book.
@@ -101,14 +140,23 @@ impl Side {
     AnchorDeserialize,
 )]
 #[repr(u8)]
-pub enum SideAndTree {
+pub enum SideAndOrderTree {
     BidFixed = 0,
     AskFixed = 1,
     BidOraclePegged = 2,
     AskOraclePegged = 3,
 }
 
-impl SideAndTree {
+impl SideAndOrderTree {
+    pub fn new(side: Side, order_tree: BookSideOrderTree) -> Self {
+        match (side, order_tree) {
+            (Side::Bid, BookSideOrderTree::Fixed) => Self::BidFixed,
+            (Side::Ask, BookSideOrderTree::Fixed) => Self::AskFixed,
+            (Side::Bid, BookSideOrderTree::OraclePegged) => Self::BidOraclePegged,
+            (Side::Ask, BookSideOrderTree::OraclePegged) => Self::AskOraclePegged,
+        }
+    }
+
     pub fn side(&self) -> Side {
         match self {
             Self::BidFixed | Self::BidOraclePegged => Side::Bid,

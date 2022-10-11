@@ -6,7 +6,7 @@ use mango_macro::Pod;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 
-use super::order_type::{OrderType, Side};
+use super::order_type::{PostOrderType, Side};
 
 pub type NodeHandle = u32;
 const NODE_SIZE: usize = 96;
@@ -121,7 +121,7 @@ impl InnerNode {
 pub struct LeafNode {
     pub tag: u32,
     pub owner_slot: u8,
-    pub order_type: OrderType, // this was added for TradingView move order
+    pub order_type: PostOrderType, // this was added for TradingView move order
 
     pub padding: [u8; 1],
 
@@ -155,7 +155,7 @@ impl LeafNode {
         quantity: i64,
         client_order_id: u64,
         timestamp: u64,
-        order_type: OrderType,
+        order_type: PostOrderType,
         time_in_force: u8,
         peg_limit: i64,
     ) -> Self {

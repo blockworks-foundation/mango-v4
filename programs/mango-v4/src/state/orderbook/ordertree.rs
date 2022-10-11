@@ -529,7 +529,7 @@ mod tests {
                 0,
                 0,
                 expiry - 1,
-                OrderType::Limit,
+                PostOrderType::Limit,
                 1,
                 -1,
             )
@@ -609,7 +609,7 @@ mod tests {
                 0,
                 0,
                 expiry - 1,
-                OrderType::Limit,
+                PostOrderType::Limit,
                 1,
                 -1,
             )

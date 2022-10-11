@@ -13,6 +13,7 @@ use crate::error::MangoError;
 use crate::error_msg;
 
 use super::dynamic_account::*;
+use super::BookSideOrderTree;
 use super::FillEvent;
 use super::LeafNode;
 use super::PerpMarket;
@@ -23,7 +24,7 @@ use super::TokenIndex;
 use super::FREE_ORDER_SLOT;
 use super::{HealthCache, HealthType};
 use super::{PerpPosition, Serum3Orders, TokenPosition};
-use super::{Side, SideAndTree};
+use super::{Side, SideAndOrderTree};
 use crate::logs::DeactivateTokenPositionLog;
 use checked_math as cm;
 
@@ -768,11 +769,12 @@ impl<
     pub fn add_perp_order(
         &mut self,
         perp_market_index: PerpMarketIndex,
-        side_and_tree: SideAndTree,
+        side: Side,
+        order_tree: BookSideOrderTree,
         order: &LeafNode,
     ) -> Result<()> {
         let mut perp_account = self.perp_position_mut(perp_market_index)?;
-        match side_and_tree.side() {
+        match side {
             Side::Bid => {
                 cm!(perp_account.bids_base_lots += order.quantity);
             }
@@ -784,7 +786,7 @@ impl<
 
         let mut oo = self.perp_order_mut_by_raw_index(slot);
         oo.market = perp_market_index;
-        oo.side_and_tree = side_and_tree;
+        oo.side_and_tree = SideAndOrderTree::new(side, order_tree);
         oo.id = order.key;
         oo.client_id = order.client_order_id;
         Ok(())
@@ -812,7 +814,7 @@ impl<
         // release space
         let oo = self.perp_order_mut_by_raw_index(slot);
         oo.market = FREE_ORDER_SLOT;
-        oo.side_and_tree = SideAndTree::BidFixed;
+        oo.side_and_tree = SideAndOrderTree::BidFixed;
         oo.id = 0;
         oo.client_id = 0;
         Ok(())

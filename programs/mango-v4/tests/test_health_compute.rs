@@ -244,7 +244,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 account,
                 perp_market,
                 owner,
-                side_and_tree: SideAndTree::BidFixed,
+                side_and_tree: SideAndOrderTree::BidFixed,
                 price_data: price_lots,
                 max_base_lots: 1,
                 max_quote_lots: i64::MAX,

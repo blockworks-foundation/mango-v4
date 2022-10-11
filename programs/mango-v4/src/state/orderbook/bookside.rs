@@ -146,8 +146,19 @@ mod tests {
 
         let mut fixed = new_order_tree(order_tree_type);
         let mut oracle_pegged = new_order_tree(order_tree_type);
-        let new_leaf =
-            |key: u128| LeafNode::new(0, key, Pubkey::default(), 0, 0, 1, OrderType::Limit, 0, -1);
+        let new_leaf = |key: u128| {
+            LeafNode::new(
+                0,
+                key,
+                Pubkey::default(),
+                0,
+                0,
+                1,
+                PostOrderType::Limit,
+                0,
+                -1,
+            )
+        };
 
         // add 100 leaves to each BookSide, mostly random
         let mut keys = vec![];
@@ -229,7 +240,7 @@ mod tests {
                 0,
                 0,
                 1000,
-                OrderType::Limit,
+                PostOrderType::Limit,
                 tif,
                 peg_limit,
             )

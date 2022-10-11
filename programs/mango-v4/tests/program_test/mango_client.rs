@@ -2375,7 +2375,7 @@ pub struct PerpPlaceOrderInstruction {
     pub account: Pubkey,
     pub perp_market: Pubkey,
     pub owner: TestKeypair,
-    pub side_and_tree: SideAndTree,
+    pub side_and_tree: SideAndOrderTree,
     pub price_data: i64,
     pub max_base_lots: i64,
     pub max_quote_lots: i64,
@@ -2393,10 +2393,11 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
         let instruction = Self::Instruction {
             side_and_tree: self.side_and_tree,
             price_data: self.price_data,
+            peg_limit: -1,
             max_base_lots: self.max_base_lots,
             max_quote_lots: self.max_quote_lots,
             client_order_id: self.client_order_id,
-            order_type: OrderType::Limit,
+            order_type: PlaceOrderType::Limit,
             expiry_timestamp: 0,
             limit: 1,
         };

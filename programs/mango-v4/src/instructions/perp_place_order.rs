@@ -2,10 +2,12 @@ use anchor_lang::prelude::*;
 
 use crate::accounts_zerocopy::*;
 use crate::error::*;
+use crate::state::BookSideOrderTree;
 use crate::state::MangoAccount;
+use crate::state::OrderParams;
 use crate::state::{
     new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, EventQueue, Group,
-    OrderBook, OrderType, PerpMarket, SideAndTree, QUOTE_TOKEN_INDEX,
+    Order, OrderBook, PerpMarket, PlaceOrderType, SideAndOrderTree, QUOTE_TOKEN_INDEX,
 };
 
 #[derive(Accounts)]
@@ -37,7 +39,7 @@ pub struct PerpPlaceOrder<'info> {
 #[allow(clippy::too_many_arguments)]
 pub fn perp_place_order(
     ctx: Context<PerpPlaceOrder>,
-    side_and_tree: SideAndTree,
+    side_and_tree: SideAndOrderTree,
 
     // Price information, effect is based on order type and component.
     //
@@ -51,6 +53,12 @@ pub fn perp_place_order(
     // - if an order is placed on the book, it'll be in the oracle-pegged book
     price_data: i64,
 
+    // For OraclePegged orders only: the limit at which the pegged order shall expire.
+    // May be -1 to denote no peg limit.
+    //
+    // Example: An bid pegged to -20 with peg_limit 100 would expire if the oracle hits 121.
+    peg_limit: i64,
+
     // Max base lots to buy/sell.
     max_base_lots: i64,
 
@@ -60,7 +68,7 @@ pub fn perp_place_order(
     // Arbitrary user-controlled order id.
     client_order_id: u64,
 
-    order_type: OrderType,
+    order_type: PlaceOrderType,
 
     // Timestamp of when order expires
     //
@@ -129,17 +137,38 @@ pub fn perp_place_order(
 
     // TODO reduce_only based on event queue
 
+    require_gte!(peg_limit, -1);
+
+    let order = Order {
+        side: side_and_tree.side(),
+        params: match order_type {
+            PlaceOrderType::Market => OrderParams::Market,
+            PlaceOrderType::ImmediateOrCancel => OrderParams::ImmediateOrCancel {
+                price_lots: price_data,
+            },
+            _ => match side_and_tree.order_tree() {
+                BookSideOrderTree::Fixed => OrderParams::Fixed {
+                    price_lots: price_data,
+                    order_type: order_type.to_post_order_type()?,
+                },
+                BookSideOrderTree::OraclePegged => OrderParams::OraclePegged {
+                    price_offset_lots: price_data,
+                    order_type: order_type.to_post_order_type()?,
+                    peg_limit,
+                },
+            },
+        },
+    };
+
     book.new_order(
-        side_and_tree,
+        order,
         &mut perp_market,
         &mut event_queue,
         oracle_price,
         &mut account.borrow_mut(),
         &account_pk,
-        price_data,
         max_base_lots,
         max_quote_lots,
-        order_type,
         time_in_force,
         client_order_id,
         now_ts,
