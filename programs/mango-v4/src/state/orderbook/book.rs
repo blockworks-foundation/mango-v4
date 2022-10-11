@@ -479,7 +479,6 @@ impl OrderBook {
             }
 
             let order_id = oo.id;
-            drop(oo);
 
             self.cancel_order(mango_account, order_id, order_side_and_tree, None)?;
 

@@ -39,7 +39,6 @@ pub fn perp_cancel_order_by_client_order_id(
         .ok_or_else(|| error_msg!("could not find perp order with client order id {client_order_id} in perp order books"))?;
     let order_id = oo.id;
     let order_side_and_tree = oo.side_and_tree;
-    drop(oo);
 
     book.cancel_order(
         &mut account.borrow_mut(),
