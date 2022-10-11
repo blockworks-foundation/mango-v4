@@ -7,7 +7,7 @@ use static_assertions::const_assert_eq;
 
 use crate::accounts_zerocopy::KeyedAccountReader;
 use crate::state::oracle;
-use crate::state::orderbook::order_type::Side;
+use crate::state::orderbook::Side;
 use crate::util::checked_math as cm;
 
 use super::{orderbook, OracleConfig, OrderBook, DAY_I80F48};
@@ -136,7 +136,7 @@ impl PerpMarket {
 
     pub fn gen_order_id(&mut self, side: Side, price_data: u64) -> u128 {
         self.seq_num += 1;
-        orderbook::nodes::new_node_key(side, price_data, self.seq_num)
+        orderbook::new_node_key(side, price_data, self.seq_num)
     }
 
     pub fn oracle_price(&self, oracle_acc: &impl KeyedAccountReader) -> Result<I80F48> {

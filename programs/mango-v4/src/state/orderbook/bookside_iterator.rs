@@ -1,93 +1,4 @@
-use crate::state::orderbook::bookside::*;
-use crate::state::orderbook::nodes::*;
-use crate::state::orderbook::order_type::*;
-
-/// Iterate over orders in order (bids=descending, asks=ascending)
-pub struct OrderTreeIter<'a> {
-    order_tree: &'a OrderTree,
-    /// InnerNodes where the right side still needs to be iterated on
-    stack: Vec<&'a InnerNode>,
-    /// To be returned on `next()`
-    next_leaf: Option<(NodeHandle, &'a LeafNode)>,
-
-    /// either 0, 1 to iterate low-to-high, or 1, 0 to iterate high-to-low
-    left: usize,
-    right: usize,
-}
-
-impl<'a> OrderTreeIter<'a> {
-    pub fn new(order_tree: &'a OrderTree) -> Self {
-        let (left, right) = if order_tree.order_tree_type == OrderTreeType::Bids {
-            (1, 0)
-        } else {
-            (0, 1)
-        };
-        let stack = vec![];
-
-        let mut iter = Self {
-            order_tree,
-            stack,
-            next_leaf: None,
-            left,
-            right,
-        };
-        if order_tree.leaf_count != 0 {
-            iter.next_leaf = iter.find_leftmost_leaf(order_tree.root_node);
-        }
-        iter
-    }
-
-    pub fn side(&self) -> Side {
-        if self.left == 1 {
-            Side::Bid
-        } else {
-            Side::Ask
-        }
-    }
-
-    pub fn peek(&self) -> Option<(NodeHandle, &'a LeafNode)> {
-        self.next_leaf
-    }
-
-    fn find_leftmost_leaf(&mut self, start: NodeHandle) -> Option<(NodeHandle, &'a LeafNode)> {
-        let mut current = start;
-        loop {
-            match self.order_tree.node(current).unwrap().case().unwrap() {
-                NodeRef::Inner(inner) => {
-                    self.stack.push(inner);
-                    current = inner.children[self.left];
-                }
-                NodeRef::Leaf(leaf) => {
-                    return Some((current, leaf));
-                }
-            }
-        }
-    }
-}
-
-impl<'a> Iterator for OrderTreeIter<'a> {
-    type Item = (NodeHandle, &'a LeafNode);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // no next leaf? done
-        if self.next_leaf.is_none() {
-            return None;
-        }
-
-        // start popping from stack and get the other child
-        let current_leaf = self.next_leaf;
-        self.next_leaf = match self.stack.pop() {
-            None => None,
-            Some(inner) => {
-                let start = inner.children[self.right];
-                // go down the left branch as much as possible until reaching a leaf
-                self.find_leftmost_leaf(start)
-            }
-        };
-
-        current_leaf
-    }
-}
+use super::*;
 
 pub struct BookSideIterItem<'a> {
     pub handle: BookSideOrderHandle,
@@ -130,7 +41,7 @@ fn oracle_pegged_price(
     let price_offset = oracle_pegged_price_offset(price_data);
     if let Some(price) = oracle_price_lots.checked_add(price_offset) {
         if price >= 1 {
-            if side.is_price_better(price, node.peg_limit) {
+            if node.peg_limit != -1 && side.is_price_better(price, node.peg_limit) {
                 return (OrderState::Invalid, Some(price));
             } else {
                 return (OrderState::Valid, Some(price));

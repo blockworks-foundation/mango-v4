@@ -11,10 +11,7 @@ use bytemuck::cast;
 use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
 
-use super::{
-    order_type::{OrderType, Side, SideAndComponent},
-    FillEvent, OutEvent,
-};
+use super::*;
 use crate::util::checked_math as cm;
 
 /// Drop at most this many expired orders from a BookSide when trying to match orders.
@@ -386,7 +383,7 @@ impl OrderBook {
                 now_ts,
                 OrderType::Limit, // TODO: Support order types? needed?
                 time_in_force,
-                0,
+                -1,
             );
             let _result = bookside.insert_leaf(&new_order)?;
 
