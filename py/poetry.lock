@@ -1,13 +1,13 @@
 [[package]]
 name = "anchorpy"
-version = "0.6.5"
+version = "0.10.0"
 description = "The Python Anchor client."
 category = "main"
 optional = false
 python-versions = ">=3.9,<4.0"
 
 [package.dependencies]
-apischema = ">=0.16.6,<0.17.0"
+apischema = ">=0.17.5,<0.18.0"
 borsh-construct = ">=0.1.0,<0.2.0"
 construct-typing = ">=0.5.1,<0.6.0"
 jsonrpcclient = ">=4.0.1,<5.0.0"
@@ -16,14 +16,14 @@ pyheck = ">=0.1.4,<0.2.0"
 pytest = ">=6.2.5,<7.0.0"
 pytest-asyncio = ">=0.17.2,<0.18.0"
 pytest-xprocess = ">=0.18.1,<0.19.0"
-solana = ">=0.21.0,<0.22.0"
+solana = ">=0.25.0,<0.26.0"
 sumtypes = ">=0.1a6,<0.2"
 toolz = ">=0.11.2,<0.12.0"
 websockets = ">=10.0,<11.0"
-zstandard = ">=0.16.0,<0.17.0"
+zstandard = ">=0.17.0,<0.18.0"
 
 [package.extras]
-cli = ["typer (>=0.4.0,<0.5.0)", "ipython (>=8.0.1,<9.0.0)"]
+cli = ["autoflake (>=1.4,<2.0)", "black (>=22.3.0,<23.0.0)", "genpy (>=2021.1,<2022.0)", "ipython (>=8.0.1,<9.0.0)", "typer (==0.4.1)"]
 
 [[package]]
 name = "anyio"
@@ -44,8 +44,8 @@ trio = ["trio (>=0.16)"]
 
 [[package]]
 name = "apischema"
-version = "0.16.6"
-description = "JSON (de)serialization, *GraphQL* and JSON schema generation using Python typing."
+version = "0.17.5"
+description = "JSON (de)serialization, GraphQL and JSON schema generation using Python typing."
 category = "main"
 optional = false
 python-versions = ">=3.6"
@@ -77,15 +77,12 @@ tests = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)"
 tests_no_zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "mypy (>=0.900,!=0.940)", "pytest-mypy-plugins", "cloudpickle"]
 
 [[package]]
-name = "base58"
-version = "2.1.1"
-description = "Base58 and Base58Check implementation."
+name = "based58"
+version = "0.1.1"
+description = "A fast Python library for Base58 and Base58Check"
 category = "main"
 optional = false
-python-versions = ">=3.5"
-
-[package.extras]
-tests = ["mypy", "PyHamcrest (>=2.0.2)", "pytest (>=4.6)", "pytest-benchmark", "pytest-cov", "pytest-flake8"]
+python-versions = ">=3.7"
 
 [[package]]
 name = "black"
@@ -172,6 +169,14 @@ python-versions = ">=3.6.0"
 unicode_backport = ["unicodedata2"]
 
 [[package]]
+name = "classify-imports"
+version = "4.2.0"
+description = "Utilities for refactoring imports in python-like syntax."
+category = "dev"
+optional = false
+python-versions = ">=3.7"
+
+[[package]]
 name = "click"
 version = "8.1.3"
 description = "Composable command line interface toolkit"
@@ -249,37 +254,41 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "httpcore"
-version = "0.13.7"
+version = "0.15.0"
 description = "A minimal low-level HTTP client."
 category = "main"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 
 [package.dependencies]
 anyio = ">=3.0.0,<4.0.0"
+certifi = "*"
 h11 = ">=0.11,<0.13"
 sniffio = ">=1.0.0,<2.0.0"
 
 [package.extras]
 http2 = ["h2 (>=3,<5)"]
+socks = ["socksio (>=1.0.0,<2.0.0)"]
 
 [[package]]
 name = "httpx"
-version = "0.18.2"
+version = "0.23.0"
 description = "The next generation HTTP client."
 category = "main"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 
 [package.dependencies]
 certifi = "*"
-httpcore = ">=0.13.3,<0.14.0"
+httpcore = ">=0.15.0,<0.16.0"
 rfc3986 = {version = ">=1.3,<2", extras = ["idna2008"]}
 sniffio = "*"
 
 [package.extras]
-brotli = ["brotlicffi (>=1.0.0,<2.0.0)"]
-http2 = ["h2 (>=3.0.0,<4.0.0)"]
+brotli = ["brotlicffi", "brotli"]
+cli = ["click (>=8.0.0,<9.0.0)", "rich (>=10,<13)", "pygments (>=2.0.0,<3.0.0)"]
+http2 = ["h2 (>=3,<5)"]
+socks = ["socksio (>=1.0.0,<2.0.0)"]
 
 [[package]]
 name = "idna"
@@ -642,21 +651,6 @@ python-versions = ">=3.7"
 markdown = ">=3.2"
 
 [[package]]
-name = "pynacl"
-version = "1.5.0"
-description = "Python binding to the Networking and Cryptography (NaCl) library"
-category = "main"
-optional = false
-python-versions = ">=3.6"
-
-[package.dependencies]
-cffi = ">=1.4.1"
-
-[package.extras]
-docs = ["sphinx (>=1.6.5)", "sphinx-rtd-theme"]
-tests = ["pytest (>=3.2.1,!=3.3.0)", "hypothesis (>=3.27.0)"]
-
-[[package]]
 name = "pyparsing"
 version = "3.0.9"
 description = "pyparsing module - Classes and methods to define and execute parsing grammars"
@@ -764,6 +758,17 @@ python-versions = ">=3.6"
 pyyaml = "*"
 
 [[package]]
+name = "reorder-python-imports"
+version = "3.8.4"
+description = "Tool for reordering python imports"
+category = "dev"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+classify-imports = ">=4.1"
+
+[[package]]
 name = "requests"
 version = "2.28.1"
 description = "Python HTTP for Humans."
@@ -813,25 +818,36 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "solana"
-version = "0.21.0"
+version = "0.25.1"
 description = "Solana Python API"
 category = "main"
 optional = false
 python-versions = ">=3.7,<4.0"
 
 [package.dependencies]
-apischema = ">=0.16.1,<0.17.0"
-base58 = ">=2.0.1,<3.0.0"
+apischema = ">=0.17.5,<0.18.0"
+based58 = ">=0.1.0,<0.2.0"
 cachetools = ">=4.2.2,<5.0.0"
 construct-typing = ">=0.5.2,<0.6.0"
-httpx = ">=0.18.2,<0.19.0"
+httpx = ">=0.23.0,<0.24.0"
 jsonrpcclient = ">=4.0.1,<5.0.0"
-jsonrpcserver = ">=5.0.4,<6.0.0"
-PyNaCl = ">=1.4.0,<2.0.0"
+jsonrpcserver = ">=5.0.7,<6.0.0"
 requests = ">=2.24,<3.0"
+solders = ">=0.2.0,<0.3.0"
 types-cachetools = ">=4.2.4,<5.0.0"
-typing-extensions = ">=3.10.0,<4.0.0"
-websockets = ">=10.1,<11.0"
+typing-extensions = ">=3.10.0"
+websockets = ">=10.3,<11.0"
+
+[[package]]
+name = "solders"
+version = "0.2.0"
+description = "Python binding to the Solana Rust SDK"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+typing-extensions = ">=4.2.0,<5.0.0"
 
 [[package]]
 name = "sumtypes"
@@ -897,11 +913,11 @@ python-versions = "*"
 
 [[package]]
 name = "typing-extensions"
-version = "3.10.0.2"
-description = "Backported and Experimental Type Hints for Python 3.5+"
+version = "4.4.0"
+description = "Backported and Experimental Type Hints for Python 3.7+"
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=3.7"
 
 [[package]]
 name = "urllib3"
@@ -949,7 +965,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "flake8 
 
 [[package]]
 name = "zstandard"
-version = "0.16.0"
+version = "0.17.0"
 description = "Zstandard bindings for Python"
 category = "main"
 optional = false
@@ -964,7 +980,7 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "fb12b7c512b8964ed0885ff76ac9f437076f05e65936b1376f09331ebe1058e4"
+content-hash = "3b1888577f2fc999228d085e2292480a96d3e38a477534921cee42ef30bc7334"
 
 [metadata.files]
 anchorpy = []
@@ -972,7 +988,7 @@ anyio = []
 apischema = []
 atomicwrites = []
 attrs = []
-base58 = []
+based58 = []
 black = []
 borsh-construct = []
 bump2version = []
@@ -980,6 +996,7 @@ cachetools = []
 certifi = []
 cffi = []
 charset-normalizer = []
+classify-imports = []
 click = []
 colorama = []
 construct = []
@@ -1042,7 +1059,6 @@ pyflakes = [
 pygments = []
 pyheck = []
 pymdown-extensions = []
-pynacl = []
 pyparsing = []
 pyrsistent = []
 pytest = []
@@ -1055,6 +1071,7 @@ python-dateutil = [
 pytkdocs = []
 pyyaml = []
 pyyaml-env-tag = []
+reorder-python-imports = []
 requests = []
 rfc3986 = []
 six = [
@@ -1063,6 +1080,7 @@ six = [
 ]
 sniffio = []
 solana = []
+solders = []
 sumtypes = []
 toml = []
 tomli = []

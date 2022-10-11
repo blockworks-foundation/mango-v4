@@ -10,8 +10,8 @@ documentation = ""
 
 [tool.poetry.dependencies]
 python = "^3.9"
-anchorpy = "^0.6.5"
-solana = "^0.21.0"
+anchorpy = "^0.10.0"
+solana = "^0.25.0"
 requests = "^2.27.1"
 types-requests = "^2.27.8"
 
@@ -24,6 +24,7 @@ pytest-asyncio = "^0.17.2"
 mkdocstrings = "^0.17.0"
 mkdocs-material = "^8.1.8"
 bump2version = "^1.0.1"
+reorder-python-imports = "^3.8.4"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

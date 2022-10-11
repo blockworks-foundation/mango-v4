@@ -1,21 +1,32 @@
-.DS_Store
-
-.anchor
-test-ledger
-target
-
-**/*.rs.bk
-
+# node
 dist
 node_modules
 yarn-error.log
 
-.idea
-.vscode
+# python
+py/src/__pycache__/
+py/src/accounts/__pycache__/
+py/src/mango_client.py
+py/src/mango_v4.json
+py/src/types/__pycache__/
 
+# solana
 programs/margin-trade/src/lib-expanded.rs
 programs/mango-v4/src/lib-expanded.rs
 
+# anchor
+.anchor
+test-ledger
+target
+
+# ide
+.idea
+.vscode
+
+# dev
 keeper/.env
 
-ts/client/src/scripts/archive/ts.ts
+# misc
+**/*.rs.bk
+.DS_Store
+
