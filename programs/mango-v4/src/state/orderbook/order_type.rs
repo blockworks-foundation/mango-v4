@@ -101,24 +101,24 @@ impl Side {
     AnchorDeserialize,
 )]
 #[repr(u8)]
-pub enum SideAndComponent {
-    BidDirect = 0,
-    AskDirect = 1,
+pub enum SideAndTree {
+    BidFixed = 0,
+    AskFixed = 1,
     BidOraclePegged = 2,
     AskOraclePegged = 3,
 }
 
-impl SideAndComponent {
+impl SideAndTree {
     pub fn side(&self) -> Side {
         match self {
-            Self::BidDirect | Self::BidOraclePegged => Side::Bid,
-            Self::AskDirect | Self::AskOraclePegged => Side::Ask,
+            Self::BidFixed | Self::BidOraclePegged => Side::Bid,
+            Self::AskFixed | Self::AskOraclePegged => Side::Ask,
         }
     }
 
-    pub fn component(&self) -> BookSideOrderTree {
+    pub fn order_tree(&self) -> BookSideOrderTree {
         match self {
-            Self::BidDirect | Self::AskDirect => BookSideOrderTree::Fixed,
+            Self::BidFixed | Self::AskFixed => BookSideOrderTree::Fixed,
             Self::BidOraclePegged | Self::AskOraclePegged => BookSideOrderTree::OraclePegged,
         }
     }

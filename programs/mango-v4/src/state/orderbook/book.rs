@@ -117,14 +117,14 @@ impl OrderBook {
     /// Determine order params based on user input
     fn eval_order_params(
         &self,
-        side_and_component: SideAndComponent,
+        side_and_tree: SideAndTree,
         price_input: i64,
         order_type: OrderType,
         oracle_price_lots: i64,
         now_ts: u64,
     ) -> Result<OrderParams> {
-        let side = side_and_component.side();
-        let component = side_and_component.component();
+        let side = side_and_tree.side();
+        let component = side_and_tree.order_tree();
         if order_type == OrderType::Market {
             let price_lots = market_order_limit_for_side(side);
             return Ok(OrderParams {
@@ -173,7 +173,7 @@ impl OrderBook {
     #[allow(clippy::too_many_arguments)]
     pub fn new_order(
         &mut self,
-        side_and_component: SideAndComponent,
+        side_and_tree: SideAndTree,
         perp_market: &mut PerpMarket,
         event_queue: &mut EventQueue,
         oracle_price: I80F48,
@@ -191,7 +191,7 @@ impl OrderBook {
         require_gte!(max_base_lots, 0);
         require_gte!(max_quote_lots, 0);
 
-        let side = side_and_component.side();
+        let side = side_and_tree.side();
         let other_side = side.invert_side();
         let market = perp_market;
         let oracle_price_lots = market.native_price_to_lot(oracle_price);
@@ -201,7 +201,7 @@ impl OrderBook {
             price_lots,
             price_data,
         } = self.eval_order_params(
-            side_and_component,
+            side_and_tree,
             price_input,
             order_type,
             oracle_price_lots,
@@ -399,11 +399,7 @@ impl OrderBook {
                 price_lots
             );
 
-            mango_account.add_perp_order(
-                market.perp_market_index,
-                side_and_component,
-                &new_order,
-            )?;
+            mango_account.add_perp_order(market.perp_market_index, side_and_tree, &new_order)?;
         }
 
         // if there were matched taker quote apply ref fees
@@ -436,9 +432,9 @@ impl OrderBook {
                 continue;
             }
 
-            let order_side_and_component = oo.side_and_component;
+            let order_side_and_tree = oo.side_and_tree;
             if let Some(side_to_cancel) = side_to_cancel_option {
-                if side_to_cancel != order_side_and_component.side() {
+                if side_to_cancel != order_side_and_tree.side() {
                     continue;
                 }
             }
@@ -446,7 +442,7 @@ impl OrderBook {
             let order_id = oo.id;
             drop(oo);
 
-            self.cancel_order(mango_account, order_id, order_side_and_component, None)?;
+            self.cancel_order(mango_account, order_id, order_side_and_tree, None)?;
 
             limit -= 1;
             if limit == 0 {
@@ -462,11 +458,11 @@ impl OrderBook {
         &mut self,
         mango_account: &mut MangoAccountRefMut,
         order_id: u128,
-        side_and_component: SideAndComponent,
+        side_and_tree: SideAndTree,
         expected_owner: Option<Pubkey>,
     ) -> Result<LeafNode> {
-        let side = side_and_component.side();
-        let book_component = side_and_component.component();
+        let side = side_and_tree.side();
+        let book_component = side_and_tree.order_tree();
         let leaf_node = self.bookside_mut(side).orders_mut(book_component).
         remove_by_key(order_id).ok_or_else(|| {
                     error_msg!("invalid perp order id {order_id} for side {side:?} and component {book_component:?}")

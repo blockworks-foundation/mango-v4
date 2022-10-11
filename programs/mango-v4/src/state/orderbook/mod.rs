@@ -113,9 +113,9 @@ mod tests {
 
                 book.new_order(
                     if side == Side::Bid {
-                        SideAndComponent::BidDirect
+                        SideAndTree::BidFixed
                     } else {
-                        SideAndComponent::AskDirect
+                        SideAndTree::AskFixed
                     },
                     &mut perp_market,
                     event_queue,
@@ -218,7 +218,7 @@ mod tests {
         let price = 1000 * market.base_lot_size / market.quote_lot_size;
         let bid_quantity = 10;
         book.new_order(
-            SideAndComponent::BidDirect,
+            SideAndTree::BidFixed,
             &mut market,
             &mut event_queue,
             oracle_price,
@@ -242,8 +242,8 @@ mod tests {
         assert_ne!(maker.perp_order_mut_by_raw_index(0).id, 0);
         assert_eq!(maker.perp_order_mut_by_raw_index(0).client_id, 42);
         assert_eq!(
-            maker.perp_order_mut_by_raw_index(0).side_and_component,
-            SideAndComponent::BidDirect
+            maker.perp_order_mut_by_raw_index(0).side_and_tree,
+            SideAndTree::BidFixed
         );
         assert!(order_tree_contains_key(
             &book.bids_fixed,
@@ -270,7 +270,7 @@ mod tests {
         // Take the order partially
         let match_quantity = 5;
         book.new_order(
-            SideAndComponent::AskDirect,
+            SideAndTree::AskFixed,
             &mut market,
             &mut event_queue,
             oracle_price,
@@ -387,7 +387,7 @@ mod tests {
 
         // Passive order
         book.new_order(
-            SideAndComponent::AskDirect,
+            SideAndTree::AskFixed,
             &mut market,
             &mut event_queue,
             oracle_price,
@@ -406,7 +406,7 @@ mod tests {
 
         // Partial taker
         book.new_order(
-            SideAndComponent::BidDirect,
+            SideAndTree::BidFixed,
             &mut market,
             &mut event_queue,
             oracle_price,
@@ -439,7 +439,7 @@ mod tests {
 
         // Full taker
         book.new_order(
-            SideAndComponent::BidDirect,
+            SideAndTree::BidFixed,
             &mut market,
             &mut event_queue,
             oracle_price,

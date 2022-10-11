@@ -23,7 +23,7 @@ use super::TokenIndex;
 use super::FREE_ORDER_SLOT;
 use super::{HealthCache, HealthType};
 use super::{PerpPosition, Serum3Orders, TokenPosition};
-use super::{Side, SideAndComponent};
+use super::{Side, SideAndTree};
 use crate::logs::DeactivateTokenPositionLog;
 use checked_math as cm;
 
@@ -768,11 +768,11 @@ impl<
     pub fn add_perp_order(
         &mut self,
         perp_market_index: PerpMarketIndex,
-        side_and_component: SideAndComponent,
+        side_and_tree: SideAndTree,
         order: &LeafNode,
     ) -> Result<()> {
         let mut perp_account = self.perp_position_mut(perp_market_index)?;
-        match side_and_component.side() {
+        match side_and_tree.side() {
             Side::Bid => {
                 cm!(perp_account.bids_base_lots += order.quantity);
             }
@@ -784,7 +784,7 @@ impl<
 
         let mut oo = self.perp_order_mut_by_raw_index(slot);
         oo.market = perp_market_index;
-        oo.side_and_component = side_and_component;
+        oo.side_and_tree = side_and_tree;
         oo.id = order.key;
         oo.client_id = order.client_order_id;
         Ok(())
@@ -794,7 +794,7 @@ impl<
         {
             let oo = self.perp_order_mut_by_raw_index(slot);
             require_neq!(oo.market, FREE_ORDER_SLOT);
-            let order_side = oo.side_and_component.side();
+            let order_side = oo.side_and_tree.side();
             let perp_market_index = oo.market;
             let perp_account = self.perp_position_mut(perp_market_index)?;
 
@@ -812,7 +812,7 @@ impl<
         // release space
         let oo = self.perp_order_mut_by_raw_index(slot);
         oo.market = FREE_ORDER_SLOT;
-        oo.side_and_component = SideAndComponent::BidDirect;
+        oo.side_and_tree = SideAndTree::BidFixed;
         oo.id = 0;
         oo.client_id = 0;
         Ok(())

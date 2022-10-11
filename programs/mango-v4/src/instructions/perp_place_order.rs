@@ -5,7 +5,7 @@ use crate::error::*;
 use crate::state::MangoAccount;
 use crate::state::{
     new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, EventQueue, Group,
-    OrderBook, OrderType, PerpMarket, SideAndComponent, QUOTE_TOKEN_INDEX,
+    OrderBook, OrderType, PerpMarket, SideAndTree, QUOTE_TOKEN_INDEX,
 };
 
 #[derive(Accounts)]
@@ -37,11 +37,11 @@ pub struct PerpPlaceOrder<'info> {
 #[allow(clippy::too_many_arguments)]
 pub fn perp_place_order(
     ctx: Context<PerpPlaceOrder>,
-    side_and_component: SideAndComponent,
+    side_and_tree: SideAndTree,
 
     // Price information, effect is based on order type and component.
     //
-    // For Direct orders it's a literal price in lots
+    // For Fixed orders it's a literal price in lots
     // - fill orders on the book up to this price or
     // - place an order on the book at this price.
     // - ignored for Market orders and potentially adjusted for PostOnlySlide orders.
@@ -130,7 +130,7 @@ pub fn perp_place_order(
     // TODO reduce_only based on event queue
 
     book.new_order(
-        side_and_component,
+        side_and_tree,
         &mut perp_market,
         &mut event_queue,
         oracle_price,
