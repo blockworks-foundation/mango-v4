@@ -48,12 +48,12 @@ pub fn oracle_pegged_price_offset(price_data: u64) -> i64 {
     price_data.wrapping_sub(u64::MAX / 2 + 1) as i64
 }
 
-pub fn direct_price_data(price_lots: i64) -> Result<u64> {
+pub fn fixed_price_data(price_lots: i64) -> Result<u64> {
     require_gte!(price_lots, 1);
     Ok(price_lots as u64)
 }
 
-pub fn direct_price_lots(price_data: u64) -> i64 {
+pub fn fixed_price_lots(price_data: u64) -> i64 {
     assert!(price_data <= i64::MAX as u64);
     price_data as i64
 }
@@ -325,7 +325,7 @@ mod tests {
     #[test]
     fn order_tree_price_data() {
         for price in [1, 42, i64::MAX] {
-            assert_eq!(price, direct_price_lots(direct_price_data(price).unwrap()));
+            assert_eq!(price, fixed_price_lots(fixed_price_data(price).unwrap()));
         }
 
         let seq = [-i64::MAX, -i64::MAX + 1, 0, i64::MAX - 1, i64::MAX];

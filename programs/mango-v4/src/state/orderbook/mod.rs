@@ -36,7 +36,7 @@ mod tests {
             free_list_head: 0,
             root_node: 0,
             leaf_count: 0,
-            nodes: [AnyNode::zeroed(); MAX_BOOK_NODES],
+            nodes: [AnyNode::zeroed(); MAX_ORDERTREE_NODES],
             reserved: [0; 256],
         }
     }

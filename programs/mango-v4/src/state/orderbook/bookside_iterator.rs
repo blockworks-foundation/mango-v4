@@ -54,7 +54,7 @@ fn oracle_pegged_price(
 fn key_for_price(key: u128, price_lots: i64) -> u128 {
     // We know this can never fail, because oracle pegged price will always be >= 1
     assert!(price_lots >= 1);
-    let price_data = direct_price_data(price_lots).unwrap();
+    let price_data = fixed_price_data(price_lots).unwrap();
     let upper = (price_data as u128) << 64;
     let lower = (key as u64) as u128;
     upper | lower
@@ -96,7 +96,7 @@ impl<'a> Iterator for BookSideIter<'a> {
                             node: d_handle,
                         },
                         node: d_node,
-                        price_lots: direct_price_lots(d_node.price_data()),
+                        price_lots: fixed_price_lots(d_node.price_data()),
                         is_valid: d_node.is_not_expired(self.now_ts),
                     })
                 } else {
@@ -135,7 +135,7 @@ impl<'a> Iterator for BookSideIter<'a> {
                         node: handle,
                     },
                     node,
-                    price_lots: direct_price_lots(node.price_data()),
+                    price_lots: fixed_price_lots(node.price_data()),
                     is_valid: node.is_not_expired(self.now_ts),
                 })
             }

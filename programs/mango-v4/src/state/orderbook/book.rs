@@ -157,7 +157,7 @@ impl OrderBook {
         };
         require_gte!(price_lots, 1);
         let price_data = match component {
-            BookSideOrderTree::Fixed => direct_price_data(price_lots).unwrap(),
+            BookSideOrderTree::Fixed => fixed_price_data(price_lots).unwrap(),
             BookSideOrderTree::OraclePegged => {
                 oracle_pegged_price_data(cm!(price_lots - oracle_price_lots))
             }

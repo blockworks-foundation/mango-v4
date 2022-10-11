@@ -130,7 +130,7 @@ mod tests {
             free_list_head: 0,
             root_node: 0,
             leaf_count: 0,
-            nodes: [AnyNode::zeroed(); MAX_BOOK_NODES],
+            nodes: [AnyNode::zeroed(); MAX_ORDERTREE_NODES],
             reserved: [0; 256],
         }
     }
@@ -212,5 +212,67 @@ mod tests {
     fn bookside_iteration_random() {
         bookside_iteration_random_helper(Side::Bid);
         bookside_iteration_random_helper(Side::Ask);
+    }
+
+    #[test]
+    fn bookside_order_filtering() {
+        let side = Side::Bid;
+        let order_tree_type = OrderTreeType::Bids;
+
+        let mut fixed = new_order_tree(order_tree_type);
+        let mut oracle_pegged = new_order_tree(order_tree_type);
+        let new_node = |key: u128, tif: u8, peg_limit: i64| {
+            LeafNode::new(
+                0,
+                key,
+                Pubkey::default(),
+                0,
+                0,
+                1000,
+                OrderType::Limit,
+                tif,
+                peg_limit,
+            )
+        };
+        let mut add_fixed = |price: i64, tif: u8| {
+            let key = new_node_key(side, fixed_price_data(price).unwrap(), 0);
+            fixed.insert_leaf(&new_node(key, tif, -1)).unwrap();
+        };
+        let mut add_pegged = |price_offset: i64, tif: u8, peg_limit: i64| {
+            let key = new_node_key(side, oracle_pegged_price_data(price_offset), 0);
+            oracle_pegged
+                .insert_leaf(&new_node(key, tif, peg_limit))
+                .unwrap();
+        };
+
+        add_fixed(100, 0);
+        add_fixed(120, 5);
+        add_pegged(-10, 0, 100);
+        add_pegged(-15, 0, -1);
+        add_pegged(-20, 7, 95);
+
+        let bookside = BookSideRef {
+            fixed: &fixed,
+            oracle_pegged: &oracle_pegged,
+        };
+
+        let order_prices = |now_ts: u64, oracle: i64| -> Vec<i64> {
+            bookside
+                .iter_valid(now_ts, oracle)
+                .map(|it| it.price_lots)
+                .collect()
+        };
+
+        assert_eq!(order_prices(0, 100), vec![120, 100, 90, 85, 80]);
+        assert_eq!(order_prices(1004, 100), vec![120, 100, 90, 85, 80]);
+        assert_eq!(order_prices(1005, 100), vec![100, 90, 85, 80]);
+        assert_eq!(order_prices(1006, 100), vec![100, 90, 85, 80]);
+        assert_eq!(order_prices(1007, 100), vec![100, 90, 85]);
+        assert_eq!(order_prices(0, 110), vec![120, 100, 100, 95, 90]);
+        assert_eq!(order_prices(0, 111), vec![120, 100, 96, 91]);
+        assert_eq!(order_prices(0, 115), vec![120, 100, 100, 95]);
+        assert_eq!(order_prices(0, 116), vec![120, 101, 100]);
+        assert_eq!(order_prices(0, 2015), vec![2000, 120, 100]);
+        assert_eq!(order_prices(1010, 2015), vec![2000, 100]);
     }
 }

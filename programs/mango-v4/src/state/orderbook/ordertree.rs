@@ -7,7 +7,7 @@ use static_assertions::const_assert_eq;
 use super::*;
 use crate::error::MangoError;
 
-pub const MAX_BOOK_NODES: usize = 1024;
+pub const MAX_ORDERTREE_NODES: usize = 1024;
 
 #[derive(
     Eq,
@@ -40,7 +40,7 @@ pub struct OrderTree {
     pub free_list_head: NodeHandle,
     pub root_node: NodeHandle,
     pub leaf_count: u32,
-    pub nodes: [AnyNode; MAX_BOOK_NODES],
+    pub nodes: [AnyNode; MAX_ORDERTREE_NODES],
     pub reserved: [u8; 256],
 }
 const_assert_eq!(
@@ -426,7 +426,7 @@ mod tests {
             free_list_head: 0,
             root_node: 0,
             leaf_count: 0,
-            nodes: [AnyNode::zeroed(); MAX_BOOK_NODES],
+            nodes: [AnyNode::zeroed(); MAX_ORDERTREE_NODES],
             reserved: [0; 256],
         }
     }
