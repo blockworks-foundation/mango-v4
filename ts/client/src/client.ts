@@ -1764,14 +1764,14 @@ export class MangoClient {
       )
       .instruction();
 
-      return await sendTransaction(
-        this.program.provider as AnchorProvider,
-        [ix],
-        group.addressLookupTablesList,
-        {
-          postSendTxCallback: this.postSendTxCallback,
-        },
-      );
+     return await sendTransaction(
+       this.program.provider as AnchorProvider,
+       [ix],
+       group.addressLookupTablesList,
+       {
+         postSendTxCallback: this.postSendTxCallback,
+       },
+     );
   }
 
   async perpSettleFees(
@@ -1808,14 +1808,14 @@ export class MangoClient {
       )
       .instruction();
 
-      return await sendTransaction(
-        this.program.provider as AnchorProvider,
-        [ix],
-        group.addressLookupTablesList,
-        {
-          postSendTxCallback: this.postSendTxCallback,
-        },
-      );
+     return await sendTransaction(
+       this.program.provider as AnchorProvider,
+       [ix],
+       group.addressLookupTablesList,
+       {
+         postSendTxCallback: this.postSendTxCallback,
+       },
+     );
   }
 
   public async perpConsumeEvents(
