@@ -1742,7 +1742,7 @@ export class MangoClient {
         [group.getFirstBankByTokenIndex(0 as TokenIndex)],
         [perpMarket],
       );
-    const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0]
+    const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0];
     const ix = await this.program.methods
       .perpSettlePnl()
       .accounts({
@@ -1789,7 +1789,7 @@ export class MangoClient {
         [group.getFirstBankByTokenIndex(0 as TokenIndex)],
         [perpMarket],
       );
-    const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0]
+    const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0];
     const ix = await this.program.methods
       .perpSettleFees(maxSettleAmount)
       .accounts({
