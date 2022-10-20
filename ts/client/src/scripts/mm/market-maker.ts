@@ -346,8 +346,8 @@ async function makeMarketUpdateInstructions(
   const leanCoeff = mc.params.leanCoeff;
 
   const fairValue = (aggBid + aggAsk) / 2;
-  const aggSpread = (aggAsk - aggBid) / fairValue;
-  
+  const aggSpread = (aggAsk - aggBid) / fairValue
+
   const requoteThresh = mc.params.requoteThresh;
   const equity = toUiDecimalsForQuote(mangoAccount.getEquity(group));
   const sizePerc = mc.params.sizePerc;
