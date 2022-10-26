@@ -19,3 +19,5 @@ RUN --mount=type=cache,mode=0777,target=target mkdir .bin && cp target/release/k
 FROM debian:bullseye-slim as run
 RUN apt-get update && apt-get -y install ca-certificates libc6
 COPY --from=build /app/.bin/* /usr/local/bin/
+RUN adduser --system --group --no-create-home mangouser
+USER mangouser
