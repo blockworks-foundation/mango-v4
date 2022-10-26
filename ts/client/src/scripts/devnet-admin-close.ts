@@ -33,8 +33,9 @@ async function main() {
     adminProvider,
     'devnet',
     MANGO_V4_ID['devnet'],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
 
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
