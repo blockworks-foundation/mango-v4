@@ -34,13 +34,14 @@ export function toUiDecimals(
   nativeAmount: BN | I80F48 | number,
   decimals: number,
 ): number {
+  // TODO: remove BN and upgrade to bigint https://github.com/solana-labs/solana/issues/27440
+  if (nativeAmount instanceof BN) {
+    nativeAmount = I80F48.fromU64(nativeAmount);
+  }
   if (nativeAmount instanceof I80F48) {
     return nativeAmount
       .div(I80F48.fromNumber(Math.pow(10, decimals)))
       .toNumber();
-  }
-  if (nativeAmount instanceof BN) {
-    nativeAmount = nativeAmount.toNumber();
   }
   return nativeAmount / Math.pow(10, decimals);
 }
