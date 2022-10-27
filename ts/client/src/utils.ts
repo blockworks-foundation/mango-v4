@@ -34,13 +34,12 @@ export function toUiDecimals(
   nativeAmount: BN | I80F48 | number,
   decimals: number,
 ): number {
-  if (nativeAmount instanceof I80F48) {
+  if (nativeAmount instanceof BN) {
+    return nativeAmount.div(new BN(Math.pow(10, decimals))).toNumber();
+  } else if (nativeAmount instanceof I80F48) {
     return nativeAmount
       .div(I80F48.fromNumber(Math.pow(10, decimals)))
       .toNumber();
-  }
-  if (nativeAmount instanceof BN) {
-    nativeAmount = nativeAmount.toNumber();
   }
   return nativeAmount / Math.pow(10, decimals);
 }
