@@ -1,7 +1,7 @@
 # syntax = docker/dockerfile:1.2
 # Base image containing all binaries, deployed to gcr.io/mango-markets/mango-v4:latest
 FROM rust:1.60 as base
-RUN cargo install cargo-chef
+RUN cargo install cargo-chef --locked
 RUN rustup component add rustfmt
 RUN apt-get update && apt-get -y install clang cmake
 WORKDIR /app
@@ -10,6 +10,8 @@ FROM base as plan
 COPY . .
 # Hack to prevent a ghost member lib/init
 RUN sed -i 's|lib/\*|lib/checked_math|' Cargo.toml
+# Hack to prevent local serum_dex manifests conflicting with cargo dependency
+RUN rm -rf anchor/tests
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM base as build
