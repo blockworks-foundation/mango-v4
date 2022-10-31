@@ -590,6 +590,14 @@ export class PerpOrder {
     public timestamp: BN,
     public expiryTimestamp: BN,
   ) {}
+
+  get price(): number {
+    return this.uiPrice;
+  }
+
+  get size(): number {
+    return this.uiSize;
+  }
 }
 
 export class PerpEventQueue {
