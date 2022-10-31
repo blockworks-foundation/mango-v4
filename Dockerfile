@@ -8,12 +8,12 @@ WORKDIR /app
 
 FROM base as plan
 COPY . .
+# Hack to prevent a ghost member lib/init
+RUN sed -i 's|lib/\*|lib/checked_math|' Cargo.toml
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM base as build
 COPY --from=plan /app/recipe.json recipe.json
-# Hack to prevent a ghost member lib/init
-RUN sed -i 's|lib/\*|lib/checked_math|' Cargo.toml
 RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
 RUN cargo build --release --bins
