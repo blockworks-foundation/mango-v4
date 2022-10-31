@@ -573,6 +573,7 @@ export class PerpOrder {
       side,
       leafNode.timestamp,
       expiryTimestamp,
+      perpMarket.perpMarketIndex,
     );
   }
 
@@ -589,6 +590,7 @@ export class PerpOrder {
     public side: PerpOrderSide,
     public timestamp: BN,
     public expiryTimestamp: BN,
+    public perpMarketIndex: number,
   ) {}
 
   get price(): number {
