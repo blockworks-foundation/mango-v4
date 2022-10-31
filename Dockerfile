@@ -1,21 +1,24 @@
+# syntax = docker/dockerfile:1.2
 # Base image containing all binaries, deployed to gcr.io/mango-markets/mango-v4:latest
-FROM rust:1.60 as build
+FROM rust:1.60 as base
+RUN cargo install cargo-chef
+RUN rustup component add rustfmt
 RUN apt-get update && apt-get -y install clang cmake
-
 WORKDIR /app
-COPY ./ .
 
+FROM base as plan
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM base as build
+COPY --from=plan /app/recipe.json recipe.json
 # Hack to prevent a ghost member lib/init
 RUN sed -i 's|lib/\*|lib/checked_math|' Cargo.toml
-
-# Mount cache for downloaded and compiled dependencies
-RUN --mount=type=cache,mode=0777,target=/usr/local/cargo,from=rust,source=/usr/local/cargo \
-    --mount=type=cache,mode=0777,target=target \
-    cargo build --release --bins
-
-# Copy bins out of cache
-RUN --mount=type=cache,mode=0777,target=target mkdir .bin && cp target/release/keeper target/release/liquidator .bin/
+RUN cargo chef cook --release --recipe-path recipe.json
+COPY . .
+RUN cargo build --release --bins
 
 FROM debian:bullseye-slim as run
 RUN apt-get update && apt-get -y install ca-certificates libc6
-COPY --from=build /app/.bin/* /usr/local/bin/
+COPY --from=build /app/target/release/keeper /usr/local/bin/
+COPY --from=build /apptarget/release/liquidator /usr/local/bin/
