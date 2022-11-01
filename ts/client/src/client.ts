@@ -1683,6 +1683,49 @@ export class MangoClient {
       .instruction();
   }
 
+  public async perpCancelOrderIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    orderId: number,
+  ): Promise<TransactionInstruction> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    return await this.program.methods
+      .perpCancelOrder(new BN(orderId))
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        perpMarket: perpMarket.publicKey,
+        asks: perpMarket.asks,
+        bids: perpMarket.bids,
+      })
+      .instruction();
+  }
+
+  public async perpCancelOrder(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    orderId: number,
+  ): Promise<TransactionSignature> {
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      [
+        await this.perpCancelOrderIx(
+          group,
+          mangoAccount,
+          perpMarketIndex,
+          orderId,
+        ),
+      ],
+      group.addressLookupTablesList,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
+  }
+
   public async perpCancelAllOrders(
     group: Group,
     mangoAccount: MangoAccount,
