@@ -26,7 +26,8 @@ pub async fn runner(
         .keys()
         // TokenUpdateIndexAndRate is known to take max 71k cu
         // from cargo test-bpf local tests
-        .chunks(15)
+        // chunk size of 8 seems to be max before encountering "VersionedTransaction too large" issues
+        .chunks(8)
         .into_iter()
         .map(|chunk| {
             loop_update_index_and_rate(
