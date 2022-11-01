@@ -356,6 +356,44 @@ export class MangoAccount {
   }
 
   /**
+   * @returns token cumulative interest, in native token units. Sum of deposit and borrow interest.
+   * Caveat: This will only return cumulative interest since the tokenPosition was last opened.
+   * If the tokenPosition was closed and reopened multiple times it is necessary to add this result to
+   * cumulative interest at each of the prior tokenPosition closings (from mango API) to get the all time
+   * cumulative interest.
+   */
+  getCumulativeInterest(bank: Bank): number {
+    const token = this.getToken(bank.tokenIndex);
+
+    if (token === undefined) {
+      // tokenPosition does not exist on mangoAccount so no cumulative interest
+      return 0;
+    } else {
+      if (token.indexedPosition.isPos()) {
+        const interest = bank.depositIndex
+          .sub(token.previousIndex)
+          .mul(token.indexedPosition)
+          .toNumber();
+        return (
+          interest +
+          token.cumulativeDepositInderest +
+          token.cumulativeBorrowInderest
+        );
+      } else {
+        const interest = bank.borrowIndex
+          .sub(token.previousIndex)
+          .mul(token.indexedPosition)
+          .toNumber();
+        return (
+          interest +
+          token.cumulativeDepositInderest +
+          token.cumulativeBorrowInderest
+        );
+      }
+    }
+  }
+
+  /**
    * The amount of given native token you can withdraw including borrows, considering all existing assets as collateral.
    * @returns amount of given native token you can borrow, considering all existing assets as collateral, in native token
    */
@@ -850,6 +888,9 @@ export class TokenPosition {
       I80F48.from(dto.indexedPosition),
       dto.tokenIndex as TokenIndex,
       dto.inUseCount,
+      I80F48.from(dto.previousIndex),
+      dto.cumulativeDepositInterest,
+      dto.cumulativeBorrowInterest,
     );
   }
 
@@ -857,6 +898,9 @@ export class TokenPosition {
     public indexedPosition: I80F48,
     public tokenIndex: TokenIndex,
     public inUseCount: number,
+    public previousIndex: I80F48,
+    public cumulativeDepositInderest: number,
+    public cumulativeBorrowInderest: number,
   ) {}
 
   public isActive(): boolean {
@@ -955,6 +999,9 @@ export class TokenPositionDto {
     public tokenIndex: number,
     public inUseCount: number,
     public reserved: number[],
+    public previousIndex: I80F48Dto,
+    public cumulativeDepositInterest: number,
+    public cumulativeBorrowInterest: number,
   ) {}
 }
 
