@@ -26,7 +26,7 @@ pub async fn runner(
         .keys()
         // TokenUpdateIndexAndRate is known to take max 71k cu
         // from cargo test-bpf local tests
-        .chunks(8)
+        .chunks(5)
         .into_iter()
         .map(|chunk| {
             loop_update_index_and_rate(
