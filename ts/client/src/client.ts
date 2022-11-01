@@ -1742,7 +1742,7 @@ export class MangoClient {
         [group.getFirstBankByTokenIndex(0 as TokenIndex)],
         [perpMarket],
       );
-    const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0]
+    const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0];
     const ix = await this.program.methods
       .perpSettlePnl()
       .accounts({
@@ -1764,14 +1764,14 @@ export class MangoClient {
       )
       .instruction();
 
-      return await sendTransaction(
-        this.program.provider as AnchorProvider,
-        [ix],
-        group.addressLookupTablesList,
-        {
-          postSendTxCallback: this.postSendTxCallback,
-        },
-      );
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      [ix],
+      group.addressLookupTablesList,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
   }
 
   async perpSettleFees(
@@ -1789,7 +1789,7 @@ export class MangoClient {
         [group.getFirstBankByTokenIndex(0 as TokenIndex)],
         [perpMarket],
       );
-    const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0]
+    const bank = group.banksMapByTokenIndex.get(0 as TokenIndex)![0];
     const ix = await this.program.methods
       .perpSettleFees(maxSettleAmount)
       .accounts({
@@ -1808,14 +1808,14 @@ export class MangoClient {
       )
       .instruction();
 
-      return await sendTransaction(
-        this.program.provider as AnchorProvider,
-        [ix],
-        group.addressLookupTablesList,
-        {
-          postSendTxCallback: this.postSendTxCallback,
-        },
-      );
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      [ix],
+      group.addressLookupTablesList,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
   }
 
   public async perpConsumeEvents(

@@ -1,0 +1,85 @@
+name: Code Review - TypeScript
+
+on:
+  pull_request: 
+    branches: ['main', 'dev']
+    paths: ['ts/**']
+  push:
+    paths: ['ts/**']
+
+jobs:
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    if: (github.actor != 'dependabot[bot]')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16'
+        cache: 'yarn'
+
+    - name: Install dependencies
+      run: yarn install --frozen-lockfile
+
+    - name: Format
+      run: yarn format
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    if: (github.actor != 'dependabot[bot]')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16'
+        cache: 'yarn'
+
+    - name: Install dependencies
+      run: yarn install --frozen-lockfile
+
+    - name: Lint
+      run: yarn lint
+
+  unit-test:
+    name: Unit Test
+    runs-on: ubuntu-latest
+    if: (github.actor != 'dependabot[bot]')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16'
+        cache: 'yarn'
+
+    - name: Install dependencies
+      run: yarn install --frozen-lockfile
+
+    - name: Run Test
+      run: yarn test
+
+  semgrep:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    if: (github.actor != 'dependabot[bot]')
+    container:
+      image: returntocorp/semgrep
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run semgrep
+        run: semgrep ci
+        env:
+           SEMGREP_RULES: p/typescript

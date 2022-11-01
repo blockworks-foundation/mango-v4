@@ -1,16 +1,28 @@
-name: Lint and Test
+name: Code Review - Rust
 on:
   push:
-    branches:
-      - main
-      - dev
-  pull_request:
-  workflow_dispatch:
+    paths: ['cli/**',
+            'client/**',
+            'programs/**',
+            'keeper/**',
+            'lib/**',
+            'liquidator/**',
+            'anchor/cli/**']
+  pull_request: 
+    branches: ['main', 'dev']
+    paths: ['cli/**',
+            'client/**',
+            'programs/**',
+            'keeper/**',
+            'lib/**',
+            'liquidator/**',
+            'anchor/cli/**']
+  workflow_dispatch: # Pick branch manually
 
 env:
   CARGO_TERM_COLOR: always
-  SOLANA_VERSION: '1.10.29'
-  RUST_TOOLCHAIN: 1.60.0
+  SOLANA_VERSION: '1.13.3'
+  RUST_TOOLCHAIN: '1.60.0'
   LOG_PROGRAM: 'm43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD'
 
 defaults:
@@ -20,15 +32,18 @@ defaults:
 jobs:
   lint:
     name: Lint
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    if: (github.actor != 'dependabot[bot]')
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+
       - name: Checkout submodules
         run: git submodule update --init
+
       - name: Install Linux dependencies
         run: sudo apt-get update && sudo apt-get install -y pkg-config build-essential libudev-dev
+
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -36,30 +51,37 @@ jobs:
           profile: minimal
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
+
       - name: Cache dependencies
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2
+        
       - name: Run fmt
         run: cargo fmt -- --check
+
       - name: Run clippy
         run: cargo clippy -- --deny=warnings --allow=clippy::style --allow=clippy::complexity
 
   tests:
-    name: Test
-    if: github.actor != 'github-actions[bot]'
+    name: Run tests
     runs-on: ubuntu-latest
+    if: (github.actor != 'dependabot[bot]')
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+
       - name: Checkout submodules
         run: git submodule update --init
+
       - name: Install Linux dependencies
         run: sudo apt-get update && sudo apt-get install -y pkg-config build-essential libudev-dev
+
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           override: true
           profile: minimal
           toolchain: ${{ env.RUST_TOOLCHAIN }}
+
       - name: Install Solana
         run: |
           sh -c "$(curl -sSfL https://release.solana.com/v${{ env.SOLANA_VERSION }}/install)"
@@ -68,13 +90,20 @@ jobs:
           solana --version
           echo "Generating keypair..."
           solana-keygen new -o "$HOME/.config/solana/id.json" --no-passphrase --silent
+
       - name: Build all deps
         run: |
           cargo build-bpf || true
           cargo +bpf build-bpf
+
+      - name: Run unit tests
+        continue-on-error: true
+        run: cargo test --lib
+
         # Run bpf tests and output to runner and log
-      - name: Run tests
+      - name: Run bpf tests
         run: cargo +bpf test-bpf 2> >(tee raw-test-bpf.log >&2)
+
       - name: Save raw log
         uses: actions/upload-artifact@v3
         with:
@@ -84,34 +113,39 @@ jobs:
   # Download logs and process them
   process-logs:
     name: Process logs
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    if: (github.actor != 'dependabot[bot]')
     needs: [lint, tests]
     steps:
       - name: Download raw log
         uses: actions/download-artifact@v3
         with:
           name: raw-test-bpf
+
       - name: Install deps
         run: |
           sudo apt-get install ripgrep
           curl -Lo xsv.tar.gz "https://github.com/BurntSushi/xsv/releases/latest/download/xsv-0.13.0-x86_64-unknown-linux-musl.tar.gz"
           sudo tar xf xsv.tar.gz -C /usr/local/bin
+
       - name: Setup date input
         id: date
         run: echo "::set-output name=today::$(date +'%Y-%m-%d')"
+
       - name: Process raw log
         run: |
           rg -oNI "(Instruction: |Program ${{ env.LOG_PROGRAM }} consumed).*$" raw-test-bpf.log \
             | rg -U 'Instruction:.*\nProgram ${{ env.LOG_PROGRAM }}.*' \
             | awk 'NR % 2 == 1 { o=$0 ; next } { print o " " $0 }' \
             | sort | uniq -u | sort > cu-per-ix.log
+
       - name: Clean up log
         run: |
           rg -N 'Instruction: (\w+) .* consumed (\d+) .*' cu-per-ix.log -r '${{ steps.date.outputs.today }},$1,$2' \
             | uniq | xsv sort -s 2 -N -R \
             | sort -t ',' -k 2,3 -u \
             | sort > cu-per-ix-clean.log
+
       - name: Save clean log
         uses: actions/upload-artifact@v3
         with:
