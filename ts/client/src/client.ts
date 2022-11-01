@@ -1687,7 +1687,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     perpMarketIndex: PerpMarketIndex,
-    orderId: number,
+    orderId: BN,
   ): Promise<TransactionInstruction> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     return await this.program.methods
@@ -1707,7 +1707,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     perpMarketIndex: PerpMarketIndex,
-    orderId: number,
+    orderId: BN,
   ): Promise<TransactionSignature> {
     return await sendTransaction(
       this.program.provider as AnchorProvider,
