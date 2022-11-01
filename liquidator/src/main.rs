@@ -137,7 +137,7 @@ async fn main() -> anyhow::Result<()> {
     let mango_program = mango_v4::ID;
 
     solana_logger::setup_with_default("info");
-    info!("startup");
+    info!("startup!");
 
     let metrics = metrics::start();
 
