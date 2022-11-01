@@ -1,16 +1,27 @@
 import { BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
-import { nativeI80F48ToUi } from '../utils';
-import { I80F48, I80F48Dto, ZERO_I80F48 } from './I80F48';
+import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
+import { As, toUiDecimals } from '../utils';
 
 export const QUOTE_DECIMALS = 6;
+
+export type TokenIndex = number & As<'token-index'>;
 
 export type OracleConfig = {
   confFilter: I80F48Dto;
 };
 
-export class Bank {
+export interface BankForHealth {
+  tokenIndex: TokenIndex;
+  maintAssetWeight: I80F48;
+  initAssetWeight: I80F48;
+  maintLiabWeight: I80F48;
+  initLiabWeight: I80F48;
+  price: I80F48;
+}
+
+export class Bank implements BankForHealth {
   public name: string;
   public depositIndex: I80F48;
   public borrowIndex: I80F48;
@@ -25,8 +36,8 @@ export class Bank {
   public rate1: I80F48;
   public util0: I80F48;
   public util1: I80F48;
-  public price: I80F48 | undefined;
-  public uiPrice: number | undefined;
+  public _price: I80F48 | undefined;
+  public _uiPrice: number | undefined;
   public collectedFeesNative: I80F48;
   public loanFeeRate: I80F48;
   public loanOriginationFeeRate: I80F48;
@@ -76,7 +87,7 @@ export class Bank {
       mintDecimals: number;
       bankNum: number;
     },
-  ) {
+  ): Bank {
     return new Bank(
       publicKey,
       obj.name,
@@ -111,7 +122,7 @@ export class Bank {
       obj.dust,
       obj.flashLoanTokenAccountInitial,
       obj.flashLoanApprovedAmount,
-      obj.tokenIndex,
+      obj.tokenIndex as TokenIndex,
       obj.mintDecimals,
       obj.bankNum,
     );
@@ -151,7 +162,7 @@ export class Bank {
     dust: I80F48Dto,
     flashLoanTokenAccountInitial: BN,
     flashLoanApprovedAmount: BN,
-    public tokenIndex: number,
+    public tokenIndex: TokenIndex,
     public mintDecimals: number,
     public bankNum: number,
   ) {
@@ -178,8 +189,8 @@ export class Bank {
     this.initLiabWeight = I80F48.from(initLiabWeight);
     this.liquidationFee = I80F48.from(liquidationFee);
     this.dust = I80F48.from(dust);
-    this.price = undefined;
-    this.uiPrice = undefined;
+    this._price = undefined;
+    this._uiPrice = undefined;
   }
 
   toString(): string {
@@ -198,62 +209,80 @@ export class Bank {
       '\n oracle - ' +
       this.oracle.toBase58() +
       '\n price - ' +
-      this.price?.toNumber() +
+      this._price?.toString() +
       '\n uiPrice - ' +
-      this.uiPrice +
+      this._uiPrice +
       '\n deposit index - ' +
-      this.depositIndex.toNumber() +
+      this.depositIndex.toString() +
       '\n borrow index - ' +
-      this.borrowIndex.toNumber() +
+      this.borrowIndex.toString() +
       '\n indexedDeposits - ' +
-      this.indexedDeposits.toNumber() +
+      this.indexedDeposits.toString() +
       '\n indexedBorrows - ' +
-      this.indexedBorrows.toNumber() +
+      this.indexedBorrows.toString() +
       '\n cachedIndexedTotalDeposits - ' +
-      this.cachedIndexedTotalDeposits.toNumber() +
+      this.cachedIndexedTotalDeposits.toString() +
       '\n cachedIndexedTotalBorrows - ' +
-      this.cachedIndexedTotalBorrows.toNumber() +
+      this.cachedIndexedTotalBorrows.toString() +
       '\n indexLastUpdated - ' +
       new Date(this.indexLastUpdated.toNumber() * 1000) +
       '\n bankRateLastUpdated - ' +
       new Date(this.bankRateLastUpdated.toNumber() * 1000) +
       '\n avgUtilization - ' +
-      this.avgUtilization.toNumber() +
+      this.avgUtilization.toString() +
       '\n adjustmentFactor - ' +
-      this.adjustmentFactor.toNumber() +
+      this.adjustmentFactor.toString() +
       '\n maxRate - ' +
-      this.maxRate.toNumber() +
+      this.maxRate.toString() +
       '\n util0 - ' +
-      this.util0.toNumber() +
+      this.util0.toString() +
       '\n rate0 - ' +
-      this.rate0.toNumber() +
+      this.rate0.toString() +
       '\n util1 - ' +
-      this.util1.toNumber() +
+      this.util1.toString() +
       '\n rate1 - ' +
-      this.rate1.toNumber() +
+      this.rate1.toString() +
       '\n loanFeeRate - ' +
-      this.loanFeeRate.toNumber() +
+      this.loanFeeRate.toString() +
       '\n loanOriginationFeeRate - ' +
-      this.loanOriginationFeeRate.toNumber() +
+      this.loanOriginationFeeRate.toString() +
       '\n maintAssetWeight - ' +
-      this.maintAssetWeight.toNumber() +
+      this.maintAssetWeight.toString() +
       '\n initAssetWeight - ' +
-      this.initAssetWeight.toNumber() +
+      this.initAssetWeight.toString() +
       '\n maintLiabWeight - ' +
-      this.maintLiabWeight.toNumber() +
+      this.maintLiabWeight.toString() +
       '\n initLiabWeight - ' +
-      this.initLiabWeight.toNumber() +
+      this.initLiabWeight.toString() +
       '\n liquidationFee - ' +
-      this.liquidationFee.toNumber() +
+      this.liquidationFee.toString() +
       '\n uiDeposits() - ' +
       this.uiDeposits() +
       '\n uiBorrows() - ' +
       this.uiBorrows() +
       '\n getDepositRate() - ' +
-      this.getDepositRate().toNumber() +
+      this.getDepositRate().toString() +
       '\n getBorrowRate() - ' +
-      this.getBorrowRate().toNumber()
+      this.getBorrowRate().toString()
     );
+  }
+
+  get price(): I80F48 {
+    if (!this._price) {
+      throw new Error(
+        `Undefined price for bank ${this.publicKey} with tokenIndex ${this.tokenIndex}!`,
+      );
+    }
+    return this._price;
+  }
+
+  get uiPrice(): number {
+    if (!this._uiPrice) {
+      throw new Error(
+        `Undefined uiPrice for bank ${this.publicKey} with tokenIndex ${this.tokenIndex}!`,
+      );
+    }
+    return this._uiPrice;
   }
 
   nativeDeposits(): I80F48 {
@@ -265,17 +294,17 @@ export class Bank {
   }
 
   uiDeposits(): number {
-    return nativeI80F48ToUi(
+    return toUiDecimals(
       this.indexedDeposits.mul(this.depositIndex),
       this.mintDecimals,
-    ).toNumber();
+    );
   }
 
   uiBorrows(): number {
-    return nativeI80F48ToUi(
+    return toUiDecimals(
       this.indexedBorrows.mul(this.borrowIndex),
       this.mintDecimals,
-    ).toNumber();
+    );
   }
 
   /**
@@ -361,11 +390,11 @@ export class MintInfo {
       registrationTime: BN;
       groupInsuranceFund: number;
     },
-  ) {
+  ): MintInfo {
     return new MintInfo(
       publicKey,
       obj.group,
-      obj.tokenIndex,
+      obj.tokenIndex as TokenIndex,
       obj.mint,
       obj.banks,
       obj.vaults,
@@ -378,7 +407,7 @@ export class MintInfo {
   constructor(
     public publicKey: PublicKey,
     public group: PublicKey,
-    public tokenIndex: number,
+    public tokenIndex: TokenIndex,
     public mint: PublicKey,
     public banks: PublicKey[],
     public vaults: PublicKey[],

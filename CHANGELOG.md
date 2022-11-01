@@ -6,6 +6,11 @@ Update this for each mainnet deployment.
 
 ## mainnet
 
+Oct 8, 2022 at 14:38:31 Central European Summer Time
+https://explorer.solana.com/tx/3m8EDohkgwJZyiwpGXztBWARWQVxyhnSNDVuH467D7FPS2wxJerr79HhdhDEed5hpConHgGsKHvxtW1HJP6GixX9
+
+- New ix `TokenDepositIntoExisting`
+
 Sep 1, 2022 at 10:24:35 Central European Summer Time
 https://explorer.solana.com/tx/3NnX13A3QwsREKKKo3iYR4jqgoongpCjdhhXuJ3y5iP6FwfPcNieVop623tpgPbyreC7m7KtphwdWdoHYE5YC394
 

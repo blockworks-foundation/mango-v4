@@ -1,6 +1,9 @@
 use anchor_lang::prelude::*;
 
+use super::{OpenOrdersAmounts, OpenOrdersSlim};
 use crate::error::*;
+use crate::logs::Serum3OpenOrdersBalanceLog;
+use crate::serum3_cpi::load_open_orders_ref;
 use crate::state::*;
 
 #[derive(Accounts)]
@@ -71,6 +74,22 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
     // Cancel
     //
     cpi_cancel_all_orders(ctx.accounts, limit)?;
+
+    let serum_market = ctx.accounts.serum_market.load()?;
+    let oo_ai = &ctx.accounts.open_orders.as_ref();
+    let open_orders = load_open_orders_ref(oo_ai)?;
+    let after_oo = OpenOrdersSlim::from_oo(&open_orders);
+    emit!(Serum3OpenOrdersBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account.key(),
+        base_token_index: serum_market.base_token_index,
+        quote_token_index: serum_market.quote_token_index,
+        base_total: after_oo.native_base_total(),
+        base_free: after_oo.native_base_free(),
+        quote_total: after_oo.native_quote_total(),
+        quote_free: after_oo.native_quote_free(),
+        referrer_rebates_accrued: after_oo.native_rebates(),
+    });
 
     Ok(())
 }

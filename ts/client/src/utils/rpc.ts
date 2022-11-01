@@ -1,27 +1,34 @@
 import { AnchorProvider } from '@project-serum/anchor';
-import { Transaction } from '@solana/web3.js';
+import {
+  AddressLookupTableAccount,
+  Transaction,
+  TransactionInstruction,
+} from '@solana/web3.js';
 
 export async function sendTransaction(
   provider: AnchorProvider,
-  transaction: Transaction,
+  ixs: TransactionInstruction[],
+  alts: AddressLookupTableAccount[],
   opts: any = {},
-) {
+): Promise<string> {
   const connection = provider.connection;
-  const payer = provider.wallet;
   const latestBlockhash = await connection.getLatestBlockhash(
     opts.preflightCommitment,
   );
-  transaction.recentBlockhash = latestBlockhash.blockhash;
-  transaction.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
-  transaction.feePayer = payer.publicKey;
+
+  const payer = (provider as AnchorProvider).wallet;
+  // const tx = await buildVersionedTx(provider, ixs, opts.additionalSigners, alts);
+  const tx = new Transaction();
+  tx.recentBlockhash = latestBlockhash.blockhash;
+  tx.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
+  tx.feePayer = payer.publicKey;
+  tx.add(...ixs);
   if (opts.additionalSigners?.length > 0) {
-    transaction.partialSign(...opts.additionalSigners);
+    tx.partialSign(...opts.additionalSigners);
   }
+  await payer.signTransaction(tx);
 
-  await payer.signTransaction(transaction);
-  const rawTransaction = transaction.serialize();
-
-  const signature = await connection.sendRawTransaction(rawTransaction, {
+  const signature = await connection.sendRawTransaction(tx.serialize(), {
     skipPreflight: true,
   });
 
@@ -35,21 +42,23 @@ export async function sendTransaction(
 
   let status: any;
   if (
-    transaction.recentBlockhash != null &&
-    transaction.lastValidBlockHeight != null
+    latestBlockhash.blockhash != null &&
+    latestBlockhash.lastValidBlockHeight != null
   ) {
+    // TODO: tyler, can we remove these?
     console.log('confirming via blockhash');
     status = (
       await connection.confirmTransaction(
         {
           signature: signature,
-          blockhash: transaction.recentBlockhash,
-          lastValidBlockHeight: transaction.lastValidBlockHeight,
+          blockhash: latestBlockhash.blockhash,
+          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
         },
         'processed',
       )
     ).value;
   } else {
+    // TODO: tyler, can we remove these?
     console.log('confirming via timeout');
     status = (await connection.confirmTransaction(signature, 'processed'))
       .value;

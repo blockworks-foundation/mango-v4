@@ -1,8 +1,14 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import {
+  AddressLookupTableProgram,
+  Connection,
+  Keypair,
+  PublicKey,
+} from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
+import { buildVersionedTx } from '../utils';
 
 //
 // An example for admins based on high level api i.e. the client
@@ -357,9 +363,7 @@ async function main() {
       0,
       'BTC-PERP',
       0.1,
-      1,
       6,
-      1,
       10,
       100,
       0.975,
@@ -369,18 +373,22 @@ async function main() {
       0.012,
       0.0002,
       0.0,
+      0,
       0.05,
       0.05,
       100,
+      true,
+      true,
+      1000,
+      1000000,
+      0.05,
+      0,
     );
     console.log('done');
   } catch (error) {
     console.log(error);
   }
-  const perpMarkets = await client.perpGetMarkets(
-    group,
-    group.getFirstBankByMint(btcDevnetMint).tokenIndex,
-  );
+  const perpMarkets = await client.perpGetMarkets(group);
   console.log(`...created perp market ${perpMarkets[0].publicKey}`);
 
   //
@@ -480,6 +488,109 @@ async function main() {
     } catch (error) {
       throw error;
     }
+
+    console.log(`Editing BTC-PERP...`);
+    try {
+      let sig = await client.perpEditMarket(
+        group,
+        group.getPerpMarketByName('BTC-PERP').perpMarketIndex,
+        btcDevnetOracle,
+        0.1,
+        6,
+        0.975,
+        0.95,
+        1.025,
+        1.05,
+        0.012,
+        0.0002,
+        0.0,
+        0,
+        0.05,
+        0.05,
+        100,
+        true,
+        true,
+        1000,
+        1000000,
+        0.05,
+      );
+      console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+      await group.reloadAll(client);
+      console.log(group.getFirstBankByMint(btcDevnetMint).toString());
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  if (
+    // true
+    group.addressLookupTables[0].equals(PublicKey.default)
+  ) {
+    try {
+      console.log(`ALT: Creating`);
+      const createIx = AddressLookupTableProgram.createLookupTable({
+        authority: admin.publicKey,
+        payer: admin.publicKey,
+        recentSlot: await connection.getSlot('finalized'),
+      });
+      const createTx = await buildVersionedTx(
+        client.program.provider as AnchorProvider,
+        [createIx[0]],
+      );
+      let sig = await connection.sendTransaction(createTx);
+      console.log(
+        `...created ALT ${createIx[1]} https://explorer.solana.com/tx/${sig}?cluster=devnet`,
+      );
+
+      console.log(`ALT: set at index 0 for group...`);
+      sig = await client.altSet(
+        group,
+        new PublicKey('EmN5RjHUFsoag7tZ2AyBL2N8JrhV7nLMKgNbpCfzC81D'),
+        0,
+      );
+      console.log(`...https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+
+      // Extend using a mango v4 program ix
+      // Throws > Instruction references an unknown account 11111111111111111111111111111111 atm
+      //
+      console.log(
+        `ALT: extending using mango v4 program with bank publick keys and oracles`,
+      );
+      // let sig = await client.altExtend(
+      //   group,
+      //   new PublicKey('EmN5RjHUFsoag7tZ2AyBL2N8JrhV7nLMKgNbpCfzC81D'),
+      //   0,
+      //   Array.from(group.banksMapByMint.values())
+      //     .flat()
+      //     .map((bank) => [bank.publicKey, bank.oracle])
+      //     .flat(),
+      // );
+      // console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+
+      console.log(`ALT: extending manually with bank publick keys and oracles`);
+      const extendIx = AddressLookupTableProgram.extendLookupTable({
+        lookupTable: createIx[1],
+        payer: admin.publicKey,
+        authority: admin.publicKey,
+        addresses: Array.from(group.banksMapByMint.values())
+          .flat()
+          .map((bank) => [bank.publicKey, bank.oracle])
+          .flat(),
+      });
+      const extendTx = await buildVersionedTx(
+        client.program.provider as AnchorProvider,
+        [extendIx],
+      );
+      sig = await client.program.provider.connection.sendTransaction(extendTx);
+      console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  try {
+  } catch (error) {
+    console.log(error);
   }
 
   process.exit();

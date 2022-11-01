@@ -1,9 +1,9 @@
-import { AnchorProvider, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, BN, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { expect } from 'chai';
 import fs from 'fs';
-import { I80F48 } from '../accounts/I80F48';
 import { HealthType } from '../accounts/mangoAccount';
-import { BookSide, PerpOrderType, Side } from '../accounts/perp';
+import { BookSide, PerpOrderSide, PerpOrderType } from '../accounts/perp';
 import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
@@ -69,115 +69,137 @@ async function main() {
 
   // create + fetch account
   console.log(`Creating mangoaccount...`);
-  let mangoAccount = (await client.getOrCreateMangoAccount(
-    group,
-    user.publicKey,
-  ))!;
+  let mangoAccount = (await client.getOrCreateMangoAccount(group))!;
+  await mangoAccount.reload(client);
   if (!mangoAccount) {
     throw new Error(`MangoAccount not found for user ${user.publicKey}`);
   }
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
-  console.log(mangoAccount.toString(group));
-
-  await mangoAccount.reload(client, group);
 
   // set delegate, and change name
-  if (false) {
+  if (true) {
     console.log(`...changing mango account name, and setting a delegate`);
+    const newName = 'my_changed_name';
     const randomKey = new PublicKey(
       '4ZkS7ZZkxfsC3GtvvsHP3DFcUeByU9zzZELS4r8HCELo',
     );
 
-    await client.editMangoAccount(
-      group,
-      mangoAccount,
-      'my_changed_name',
-      randomKey,
-    );
-    await mangoAccount.reload(client, group);
-    console.log(mangoAccount.toString());
+    await client.editMangoAccount(group, mangoAccount, newName, randomKey);
+    await mangoAccount.reload(client);
+    expect(mangoAccount.name).deep.equals(newName);
+    expect(mangoAccount.delegate).deep.equals(randomKey);
 
+    const oldName = 'my_mango_account';
     console.log(`...resetting mango account name, and re-setting a delegate`);
     await client.editMangoAccount(
       group,
       mangoAccount,
-      'my_mango_account',
+      oldName,
       PublicKey.default,
     );
-    await mangoAccount.reload(client, group);
-    console.log(mangoAccount.toString());
+    await mangoAccount.reload(client);
+    expect(mangoAccount.name).deep.equals(oldName);
+    expect(mangoAccount.delegate).deep.equals(PublicKey.default);
   }
 
   // expand account
-  if (false) {
+  if (
+    mangoAccount.tokens.length < 16 ||
+    mangoAccount.serum3.length < 8 ||
+    mangoAccount.perps.length < 8 ||
+    mangoAccount.perpOpenOrders.length < 64
+  ) {
     console.log(
-      `...expanding mango account to have serum3 and perp position slots`,
+      `...expanding mango account to max 16 token positions, 8 serum3, 8 perp position and 64 perp oo slots, previous (tokens ${mangoAccount.tokens.length}, serum3 ${mangoAccount.serum3.length}, perps ${mangoAccount.perps.length}, perps oo ${mangoAccount.perpOpenOrders.length})`,
     );
-    await client.expandMangoAccount(group, mangoAccount, 8, 8, 8, 8);
-    await mangoAccount.reload(client, group);
+    let sig = await client.expandMangoAccount(
+      group,
+      mangoAccount,
+      16,
+      8,
+      8,
+      64,
+    );
+    console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    await mangoAccount.reload(client);
+    expect(mangoAccount.tokens.length).equals(16);
+    expect(mangoAccount.serum3.length).equals(8);
+    expect(mangoAccount.perps.length).equals(8);
+    expect(mangoAccount.perpOpenOrders.length).equals(64);
   }
 
   // deposit and withdraw
-  if (false) {
-    try {
-      console.log(`...depositing 50 USDC, 1 SOL, 1 MNGO`);
-      await client.tokenDeposit(
-        group,
-        mangoAccount,
-        new PublicKey(DEVNET_MINTS.get('USDC')!),
-        50,
-      );
-      await mangoAccount.reload(client, group);
+  if (true) {
+    console.log(`...depositing 50 USDC, 1 SOL, 1 MNGO`);
 
-      await client.tokenDeposit(
-        group,
-        mangoAccount,
-        new PublicKey(DEVNET_MINTS.get('SOL')!),
-        1,
-      );
-      await mangoAccount.reload(client, group);
+    // deposit USDC
+    let oldBalance = mangoAccount.getTokenBalance(
+      group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
+    );
+    await client.tokenDeposit(
+      group,
+      mangoAccount,
+      new PublicKey(DEVNET_MINTS.get('USDC')!),
+      50,
+    );
+    await mangoAccount.reload(client);
+    let newBalance = mangoAccount.getTokenBalance(
+      group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
+    );
+    expect(toUiDecimalsForQuote(newBalance.sub(oldBalance)).toString()).equals(
+      '50',
+    );
 
-      await client.tokenDeposit(
-        group,
-        mangoAccount,
-        new PublicKey(DEVNET_MINTS.get('MNGO')!),
-        1,
-      );
-      await mangoAccount.reload(client, group);
+    // deposit SOL
+    await client.tokenDeposit(
+      group,
+      mangoAccount,
+      new PublicKey(DEVNET_MINTS.get('SOL')!),
+      1,
+    );
+    await mangoAccount.reload(client);
 
-      console.log(`...withdrawing 1 USDC`);
-      await client.tokenWithdraw(
-        group,
-        mangoAccount,
-        new PublicKey(DEVNET_MINTS.get('USDC')!),
-        1,
-        true,
-      );
-      await mangoAccount.reload(client, group);
+    // deposit MNGO
+    await client.tokenDeposit(
+      group,
+      mangoAccount,
+      new PublicKey(DEVNET_MINTS.get('MNGO')!),
+      1,
+    );
+    await mangoAccount.reload(client);
 
-      console.log(`...depositing 0.0005 BTC`);
-      await client.tokenDeposit(
-        group,
-        mangoAccount,
-        new PublicKey(DEVNET_MINTS.get('BTC')!),
-        0.0005,
-      );
-      await mangoAccount.reload(client, group);
+    // withdraw USDC
+    console.log(`...withdrawing 1 USDC`);
+    oldBalance = mangoAccount.getTokenBalance(
+      group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
+    );
+    await client.tokenWithdraw(
+      group,
+      mangoAccount,
+      new PublicKey(DEVNET_MINTS.get('USDC')!),
+      1,
+      true,
+    );
+    await mangoAccount.reload(client);
+    newBalance = mangoAccount.getTokenBalance(
+      group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
+    );
+    expect(toUiDecimalsForQuote(oldBalance.sub(newBalance)).toString()).equals(
+      '1',
+    );
 
-      console.log(mangoAccount.toString(group));
-    } catch (error) {
-      console.log(error);
-    }
+    console.log(`...depositing 0.0005 BTC`);
+    await client.tokenDeposit(
+      group,
+      mangoAccount,
+      new PublicKey(DEVNET_MINTS.get('BTC')!),
+      0.0005,
+    );
+    await mangoAccount.reload(client);
   }
 
-  if (false) {
+  if (true) {
     // serum3
-    const serum3Market = group.serum3MarketsMapByExternal.get(
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')?.toBase58()!,
-    );
-    const serum3MarketExternal = group.serum3MarketExternalsMap.get(
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')?.toBase58()!,
-    );
     const asks = await group.loadSerum3AsksForMarket(
       client,
       DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
@@ -187,7 +209,19 @@ async function main() {
       client,
       DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
     );
-    const highestBid = Array.from(asks!)![0];
+    const highestBid = Array.from(bids!)![0];
+
+    console.log(`...cancelling all existing serum3 orders`);
+    if (
+      Array.from(mangoAccount.serum3OosMapByMarketIndex.values()).length > 0
+    ) {
+      await client.serum3CancelAllOrders(
+        group,
+        mangoAccount,
+        DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+        10,
+      );
+    }
 
     let price = 20;
     let qty = 0.0001;
@@ -206,7 +240,14 @@ async function main() {
       Date.now(),
       10,
     );
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
+    let orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
+      client,
+      group,
+      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+    );
+    expect(orders[0].price).equals(20);
+    expect(orders[0].size).equals(qty);
 
     price = lowestAsk.price + lowestAsk.price / 2;
     qty = 0.0001;
@@ -225,7 +266,7 @@ async function main() {
       Date.now(),
       10,
     );
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
 
     price = highestBid.price - highestBid.price / 2;
     qty = 0.0001;
@@ -246,7 +287,7 @@ async function main() {
     );
 
     console.log(`...current own orders on OB`);
-    let orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
+    orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
       client,
       group,
       DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
@@ -283,42 +324,28 @@ async function main() {
     );
   }
 
-  if (false) {
-    // serum3 market
-    const serum3Market = group.serum3MarketsMapByExternal.get(
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!.toBase58(),
-    );
-    console.log(await serum3Market?.logOb(client, group));
-  }
-
-  if (false) {
-    await mangoAccount.reload(client, group);
+  if (true) {
+    await mangoAccount.reload(client);
     console.log(
       '...mangoAccount.getEquity() ' +
-        toUiDecimalsForQuote(mangoAccount.getEquity()!.toNumber()),
+        toUiDecimalsForQuote(mangoAccount.getEquity(group)!.toNumber()),
     );
     console.log(
       '...mangoAccount.getCollateralValue() ' +
-        toUiDecimalsForQuote(mangoAccount.getCollateralValue()!.toNumber()),
-    );
-    console.log(
-      '...mangoAccount.accountData["healthCache"].health(HealthType.init) ' +
         toUiDecimalsForQuote(
-          mangoAccount
-            .accountData!['healthCache'].health(HealthType.init)
-            .toNumber(),
+          mangoAccount.getCollateralValue(group)!.toNumber(),
         ),
     );
     console.log(
       '...mangoAccount.getAssetsVal() ' +
         toUiDecimalsForQuote(
-          mangoAccount.getAssetsValue(HealthType.init)!.toNumber(),
+          mangoAccount.getAssetsValue(group, HealthType.init)!.toNumber(),
         ),
     );
     console.log(
       '...mangoAccount.getLiabsVal() ' +
         toUiDecimalsForQuote(
-          mangoAccount.getLiabsValue(HealthType.init)!.toNumber(),
+          mangoAccount.getLiabsValue(group, HealthType.init)!.toNumber(),
         ),
     );
     console.log(
@@ -334,35 +361,16 @@ async function main() {
     );
   }
 
-  if (false) {
-    const asks = await group.loadSerum3AsksForMarket(
-      client,
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-    );
-    const lowestAsk = Array.from(asks!)[0];
-    const bids = await group.loadSerum3BidsForMarket(
-      client,
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-    );
-    const highestBid = Array.from(asks!)![0];
-
+  if (true) {
     function getMaxSourceForTokenSwapWrapper(src, tgt) {
-      // console.log();
       console.log(
         `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
-          mangoAccount
-            .getMaxSourceForTokenSwap(
-              group,
-              group.banksMapByName.get(src)![0].mint,
-              group.banksMapByName.get(tgt)![0].mint,
-              1,
-            )!
-            .div(
-              I80F48.fromNumber(
-                Math.pow(10, group.banksMapByName.get(src)![0].mintDecimals),
-              ),
-            )
-            .toNumber(),
+          mangoAccount.getMaxSourceUiForTokenSwap(
+            group,
+            group.banksMapByName.get(src)![0].mint,
+            group.banksMapByName.get(tgt)![0].mint,
+            1,
+          )!,
       );
     }
     for (const srcToken of Array.from(group.banksMapByName.keys())) {
@@ -407,39 +415,101 @@ async function main() {
 
   // perps
   if (true) {
+    let sig;
+    const perpMarket = group.getPerpMarketByName('BTC-PERP');
     const orders = await mangoAccount.loadPerpOpenOrdersForMarket(
       client,
       group,
-      'BTC-PERP',
+      perpMarket.perpMarketIndex,
     );
     for (const order of orders) {
-      console.log(`Current order - ${order.price} ${order.size} ${order.side}`);
+      console.log(
+        `Current order - ${order.uiPrice} ${order.uiSize} ${order.side}`,
+      );
     }
     console.log(`...cancelling all perp orders`);
-    let sig = await client.perpCancelAllOrders(
+    sig = await client.perpCancelAllOrders(
       group,
       mangoAccount,
-      'BTC-PERP',
+      perpMarket.perpMarketIndex,
       10,
     );
     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
     // scenario 1
-    // not going to be hit orders, far from each other
+    // bid max perp
+    try {
+      const clientId = Math.floor(Math.random() * 99999);
+      await mangoAccount.reload(client);
+      await group.reloadAll(client);
+      const price =
+        group.banksMapByName.get('BTC')![0].uiPrice! -
+        Math.floor(Math.random() * 100);
+      const quoteQty = mangoAccount.getMaxQuoteForPerpBidUi(
+        group,
+        perpMarket.perpMarketIndex,
+      );
+      const baseQty = quoteQty / price;
+      console.log(
+        ` simHealthRatioWithPerpBidUiChanges - ${mangoAccount.simHealthRatioWithPerpBidUiChanges(
+          group,
+          perpMarket.perpMarketIndex,
+          baseQty,
+        )}`,
+      );
+      console.log(
+        `...placing max qty perp bid  clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
+      );
+      const sig = await client.perpPlaceOrder(
+        group,
+        mangoAccount,
+        perpMarket.perpMarketIndex,
+        PerpOrderSide.bid,
+        price,
+        baseQty,
+        quoteQty,
+        clientId,
+        PerpOrderType.limit,
+        0, //Date.now() + 200,
+        1,
+      );
+      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    } catch (error) {
+      console.log(error);
+    }
+    console.log(`...cancelling all perp orders`);
+    sig = await client.perpCancelAllOrders(
+      group,
+      mangoAccount,
+      perpMarket.perpMarketIndex,
+      10,
+    );
+    console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+
+    // bid max perp + some
     try {
       const clientId = Math.floor(Math.random() * 99999);
       const price =
         group.banksMapByName.get('BTC')![0].uiPrice! -
         Math.floor(Math.random() * 100);
-      console.log(`...placing perp bid ${clientId} at ${price}`);
+      const quoteQty =
+        mangoAccount.getMaxQuoteForPerpBidUi(
+          group,
+          perpMarket.perpMarketIndex,
+        ) * 1.02;
+
+      const baseQty = quoteQty / price;
+      console.log(
+        `...placing max qty * 1.02 perp bid clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
+      );
       const sig = await client.perpPlaceOrder(
         group,
         mangoAccount,
-        'BTC-PERP',
-        Side.bid,
+        perpMarket.perpMarketIndex,
+        PerpOrderSide.bid,
         price,
-        0.01,
-        price * 0.01,
+        baseQty,
+        quoteQty,
         clientId,
         PerpOrderType.limit,
         0, //Date.now() + 200,
@@ -448,21 +518,38 @@ async function main() {
       console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
     } catch (error) {
       console.log(error);
+      console.log('Errored out as expected');
     }
+
+    // bid max ask
     try {
       const clientId = Math.floor(Math.random() * 99999);
       const price =
         group.banksMapByName.get('BTC')![0].uiPrice! +
         Math.floor(Math.random() * 100);
-      console.log(`...placing perp ask ${clientId} at ${price}`);
+      const baseQty = mangoAccount.getMaxBaseForPerpAskUi(
+        group,
+        perpMarket.perpMarketIndex,
+      );
+      console.log(
+        ` simHealthRatioWithPerpAskUiChanges - ${mangoAccount.simHealthRatioWithPerpAskUiChanges(
+          group,
+          perpMarket.perpMarketIndex,
+          baseQty,
+        )}`,
+      );
+      const quoteQty = baseQty * price;
+      console.log(
+        `...placing max qty perp ask clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
+      );
       const sig = await client.perpPlaceOrder(
         group,
         mangoAccount,
-        'BTC-PERP',
-        Side.ask,
+        perpMarket.perpMarketIndex,
+        PerpOrderSide.ask,
         price,
-        0.01,
-        price * 0.01,
+        baseQty,
+        quoteQty,
         clientId,
         PerpOrderType.limit,
         0, //Date.now() + 200,
@@ -472,9 +559,46 @@ async function main() {
     } catch (error) {
       console.log(error);
     }
-    // should be able to cancel them
+
+    // bid max ask + some
+    try {
+      const clientId = Math.floor(Math.random() * 99999);
+      const price =
+        group.banksMapByName.get('BTC')![0].uiPrice! +
+        Math.floor(Math.random() * 100);
+      const baseQty =
+        mangoAccount.getMaxBaseForPerpAskUi(group, perpMarket.perpMarketIndex) *
+        1.02;
+      const quoteQty = baseQty * price;
+      console.log(
+        `...placing max qty perp ask * 1.02 clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
+      );
+      const sig = await client.perpPlaceOrder(
+        group,
+        mangoAccount,
+        perpMarket.perpMarketIndex,
+        PerpOrderSide.ask,
+        price,
+        baseQty,
+        quoteQty,
+        clientId,
+        PerpOrderType.limit,
+        0, //Date.now() + 200,
+        1,
+      );
+      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    } catch (error) {
+      console.log(error);
+      console.log('Errored out as expected');
+    }
+
     console.log(`...cancelling all perp orders`);
-    sig = await client.perpCancelAllOrders(group, mangoAccount, 'BTC-PERP', 10);
+    sig = await client.perpCancelAllOrders(
+      group,
+      mangoAccount,
+      perpMarket.perpMarketIndex,
+      10,
+    );
     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
     // scenario 2
@@ -486,8 +610,8 @@ async function main() {
       const sig = await client.perpPlaceOrder(
         group,
         mangoAccount,
-        'BTC-PERP',
-        Side.bid,
+        perpMarket.perpMarketIndex,
+        PerpOrderSide.bid,
         price,
         0.01,
         price * 0.01,
@@ -507,8 +631,8 @@ async function main() {
       const sig = await client.perpPlaceOrder(
         group,
         mangoAccount,
-        'BTC-PERP',
-        Side.ask,
+        perpMarket.perpMarketIndex,
+        PerpOrderSide.ask,
         price,
         0.01,
         price * 0.011,
@@ -523,10 +647,8 @@ async function main() {
     }
     // // should be able to cancel them : know bug
     // console.log(`...cancelling all perp orders`);
-    // sig = await client.perpCancelAllOrders(group, mangoAccount, 'BTC-PERP', 10);
+    // sig = await client.perpCancelAllOrders(group, mangoAccount, perpMarket.perpMarketIndex, 10);
     // console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-
-    const perpMarket = group.perpMarketsMap.get('BTC-PERP');
 
     const bids: BookSide = await perpMarket?.loadBids(client)!;
     console.log(`bids - ${Array.from(bids.items())}`);
@@ -534,21 +656,23 @@ async function main() {
     console.log(`asks - ${Array.from(asks.items())}`);
 
     await perpMarket?.loadEventQueue(client)!;
-    const fr = await perpMarket?.getCurrentFundingRate(
+    const fr = perpMarket?.getCurrentFundingRate(
       await perpMarket.loadBids(client),
       await perpMarket.loadAsks(client),
     );
     console.log(`current funding rate per hour is ${fr}`);
 
     const eq = await perpMarket?.loadEventQueue(client)!;
-    console.log(`raw events - ${eq.rawEvents}`);
+    console.log(
+      `raw events - ${JSON.stringify(eq.eventsSince(new BN(0)), null, 2)}`,
+    );
 
     // sleep so that keeper can catch up
     await new Promise((r) => setTimeout(r, 2000));
 
-    // make+take orders should have cancelled each other, and if keeper has already cranked, then should not appear in position
+    // make+take orders should have cancelled each other, and if keeper has already cranked, then should not appear in position or we see a small quotePositionNative
     await group.reloadAll(client);
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
     console.log(`${mangoAccount.toString(group)}`);
   }
 

@@ -32,13 +32,23 @@ pub struct TokenPosition {
     pub padding: [u8; 5],
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 40],
+    pub reserved: [u8; 8],
+
+    // bookkeeping variable for onchain interest calculation
+    // either deposit_index or borrow_index at last indexed_position change
+    pub previous_index: I80F48,
+    // (Display only)
+    // Cumulative deposit interest in token native units
+    pub cumulative_deposit_interest: f64,
+    // (Display only)
+    // Cumulative borrow interest in token native units
+    pub cumulative_borrow_interest: f64,
 }
 
 unsafe impl bytemuck::Pod for TokenPosition {}
 unsafe impl bytemuck::Zeroable for TokenPosition {}
 
-const_assert_eq!(size_of::<TokenPosition>(), 24 + 40);
+const_assert_eq!(size_of::<TokenPosition>(), 64);
 const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
 
 impl Default for TokenPosition {
@@ -47,8 +57,11 @@ impl Default for TokenPosition {
             indexed_position: I80F48::ZERO,
             token_index: TokenIndex::MAX,
             in_use_count: 0,
+            cumulative_deposit_interest: 0.0,
+            cumulative_borrow_interest: 0.0,
+            previous_index: I80F48::ZERO,
             padding: Default::default(),
-            reserved: [0; 40],
+            reserved: [0; 8],
         }
     }
 }
@@ -179,7 +192,23 @@ pub struct PerpPosition {
     pub taker_quote_lots: i64,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 64],
+    pub reserved: [u8; 24],
+
+    // (Display only)
+    // Cumulative long funding in base native units
+    pub cumulative_long_funding: f64,
+    // (Display only)
+    // Cumulative short funding in base native units
+    pub cumulative_short_funding: f64,
+    // (Display only)
+    // Cumulative maker volume in quote native units
+    pub maker_volume: u64,
+    // (Display only)
+    // Cumulative taker volume in quote native units
+    pub taker_volume: u64,
+    // (Display only)
+    // Cumulative realized pnl in quote native units
+    pub perp_spot_transfers: i64,
 }
 const_assert_eq!(size_of::<PerpPosition>(), 8 + 7 * 8 + 3 * 16 + 64);
 const_assert_eq!(size_of::<PerpPosition>() % 8, 0);
@@ -199,10 +228,15 @@ impl Default for PerpPosition {
             asks_base_lots: 0,
             taker_base_lots: 0,
             taker_quote_lots: 0,
-            reserved: [0; 64],
+            reserved: [0; 24],
             long_settled_funding: I80F48::ZERO,
             short_settled_funding: I80F48::ZERO,
             padding: Default::default(),
+            cumulative_long_funding: 0.0,
+            cumulative_short_funding: 0.0,
+            maker_volume: 0,
+            taker_volume: 0,
+            perp_spot_transfers: 0,
         }
     }
 }
@@ -274,6 +308,13 @@ impl PerpPosition {
     pub fn settle_funding(&mut self, perp_market: &PerpMarket) {
         let funding = self.unsettled_funding(perp_market);
         cm!(self.quote_position_native -= funding);
+
+        if self.base_position_lots.is_positive() {
+            self.cumulative_long_funding += funding.to_num::<f64>();
+        } else {
+            self.cumulative_short_funding -= funding.to_num::<f64>();
+        }
+
         self.long_settled_funding = perp_market.long_funding;
         self.short_settled_funding = perp_market.short_funding;
     }
@@ -400,8 +441,7 @@ pub use account_seeds;
 
 #[cfg(test)]
 mod tests {
-    use crate::state::{OracleConfig, PerpMarket};
-    use anchor_lang::prelude::Pubkey;
+    use crate::state::PerpMarket;
     use fixed::types::I80F48;
     use rand::Rng;
 
@@ -416,52 +456,9 @@ mod tests {
         pos
     }
 
-    fn create_perp_market() -> PerpMarket {
-        return PerpMarket {
-            group: Pubkey::new_unique(),
-            perp_market_index: 0,
-            group_insurance_fund: 0,
-            trusted_market: 0,
-            name: Default::default(),
-            oracle: Pubkey::new_unique(),
-            oracle_config: OracleConfig {
-                conf_filter: I80F48::ZERO,
-            },
-            bids: Pubkey::new_unique(),
-            asks: Pubkey::new_unique(),
-            event_queue: Pubkey::new_unique(),
-            quote_lot_size: 1,
-            base_lot_size: 1,
-            maint_asset_weight: I80F48::from(1),
-            init_asset_weight: I80F48::from(1),
-            maint_liab_weight: I80F48::from(1),
-            init_liab_weight: I80F48::from(1),
-            liquidation_fee: I80F48::ZERO,
-            maker_fee: I80F48::ZERO,
-            taker_fee: I80F48::ZERO,
-            min_funding: I80F48::ZERO,
-            max_funding: I80F48::ZERO,
-            impact_quantity: 0,
-            long_funding: I80F48::ZERO,
-            short_funding: I80F48::ZERO,
-            funding_last_updated: 0,
-            open_interest: 0,
-            seq_num: 0,
-            fees_accrued: I80F48::ZERO,
-            fees_settled: I80F48::ZERO,
-            bump: 0,
-            base_decimals: 0,
-            reserved: [0; 112],
-            padding0: Default::default(),
-            padding1: Default::default(),
-            padding2: Default::default(),
-            registration_time: 0,
-        };
-    }
-
     #[test]
     fn test_quote_entry_long_increasing_from_zero() {
-        let mut market = create_perp_market();
+        let mut market = PerpMarket::default_for_tests();
         let mut pos = create_perp_position(0, 0, 0);
         // Go long 10 @ 10
         pos.change_base_and_quote_positions(&mut market, 10, I80F48::from(-100));
@@ -472,7 +469,7 @@ mod tests {
 
     #[test]
     fn test_quote_entry_short_increasing_from_zero() {
-        let mut market = create_perp_market();
+        let mut market = PerpMarket::default_for_tests();
         let mut pos = create_perp_position(0, 0, 0);
         // Go short 10 @ 10
         pos.change_base_and_quote_positions(&mut market, -10, I80F48::from(100));
@@ -483,7 +480,7 @@ mod tests {
 
     #[test]
     fn test_quote_entry_long_increasing_from_long() {
-        let mut market = create_perp_market();
+        let mut market = PerpMarket::default_for_tests();
         let mut pos = create_perp_position(10, -100, -100);
         // Go long 10 @ 30
         pos.change_base_and_quote_positions(&mut market, 10, I80F48::from(-300));
@@ -494,7 +491,7 @@ mod tests {
 
     #[test]
     fn test_quote_entry_short_increasing_from_short() {
-        let mut market = create_perp_market();
+        let mut market = PerpMarket::default_for_tests();
         let mut pos = create_perp_position(-10, 100, 100);
         // Go short 10 @ 10
         pos.change_base_and_quote_positions(&mut market, -10, I80F48::from(300));
@@ -505,7 +502,7 @@ mod tests {
 
     #[test]
     fn test_quote_entry_long_decreasing_from_short() {
-        let mut market = create_perp_market();
+        let mut market = PerpMarket::default_for_tests();
         let mut pos = create_perp_position(-10, 100, 100);
         // Go long 5 @ 50
         pos.change_base_and_quote_positions(&mut market, 5, I80F48::from(-250));
@@ -516,7 +513,7 @@ mod tests {
 
     #[test]
     fn test_quote_entry_short_decreasing_from_long() {
-        let mut market = create_perp_market();
+        let mut market = PerpMarket::default_for_tests();
         let mut pos = create_perp_position(10, -100, -100);
         // Go short 5 @ 50
         pos.change_base_and_quote_positions(&mut market, -5, I80F48::from(250));
@@ -527,7 +524,7 @@ mod tests {
 
     #[test]
     fn test_quote_entry_long_close_with_short() {
-        let mut market = create_perp_market();
+        let mut market = PerpMarket::default_for_tests();
         let mut pos = create_perp_position(10, -100, -100);
         // Go short 10 @ 50
         pos.change_base_and_quote_positions(&mut market, -10, I80F48::from(250));
@@ -538,7 +535,7 @@ mod tests {
 
     #[test]
     fn test_quote_entry_short_close_with_long() {
-        let mut market = create_perp_market();
+        let mut market = PerpMarket::default_for_tests();
         let mut pos = create_perp_position(-10, 100, 100);
         // Go long 10 @ 50
         pos.change_base_and_quote_positions(&mut market, 10, I80F48::from(-250));
@@ -549,7 +546,7 @@ mod tests {
 
     #[test]
     fn test_quote_entry_long_close_short_with_overflow() {
-        let mut market = create_perp_market();
+        let mut market = PerpMarket::default_for_tests();
         let mut pos = create_perp_position(10, -100, -100);
         // Go short 15 @ 20
         pos.change_base_and_quote_positions(&mut market, -15, I80F48::from(300));
@@ -560,7 +557,7 @@ mod tests {
 
     #[test]
     fn test_quote_entry_short_close_long_with_overflow() {
-        let mut market = create_perp_market();
+        let mut market = PerpMarket::default_for_tests();
         let mut pos = create_perp_position(-10, 100, 100);
         // Go short 15 @ 20
         pos.change_base_and_quote_positions(&mut market, 15, I80F48::from(-300));
@@ -571,7 +568,7 @@ mod tests {
 
     #[test]
     fn test_quote_entry_break_even_price() {
-        let mut market = create_perp_market();
+        let mut market = PerpMarket::default_for_tests();
         let mut pos = create_perp_position(0, 0, 0);
         // Buy 11 @ 10,000
         pos.change_base_and_quote_positions(&mut market, 11, I80F48::from(-11 * 10_000));
@@ -585,7 +582,7 @@ mod tests {
 
     #[test]
     fn test_quote_entry_multiple_and_reversed_changes_return_entry_to_zero() {
-        let mut market = create_perp_market();
+        let mut market = PerpMarket::default_for_tests();
         let mut pos = create_perp_position(0, 0, 0);
 
         // Generate array of random trades

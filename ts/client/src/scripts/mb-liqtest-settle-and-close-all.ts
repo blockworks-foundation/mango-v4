@@ -1,7 +1,8 @@
-import { AnchorProvider, Wallet } from '@project-serum/anchor';
+import { BN, AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
+import { Side, PerpOrderType } from '../accounts/perp';
 import { MANGO_V4_ID } from '../constants';
 
 //
@@ -59,63 +60,18 @@ async function main() {
       await client.serum3SettleFunds(group, account, serumExternal);
       await client.serum3CloseOpenOrders(group, account, serumExternal);
     }
-  }
 
-  accounts = await client.getMangoAccountsForOwner(group, admin.publicKey);
-  for (let account of accounts) {
-    console.log(`settling borrows on account: ${account}`);
-
-    // first, settle all borrows
-    for (let token of account.tokensActive()) {
-      const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
-      const amount = token.balance(bank).toNumber();
-      if (amount < 0) {
-        try {
-          await client.tokenDepositNative(
-            group,
-            account,
-            bank.mint,
-            Math.ceil(-amount),
-          );
-          await account.reload(client, group);
-        } catch (error) {
-          console.log(
-            `failed to deposit ${bank.name} into ${account.publicKey}: ${error}`,
-          );
-          process.exit();
-        }
-      }
+    for (let perpPosition of account.perpActive()) {
+      const perpMarket = group.findPerpMarket(perpPosition.marketIndex)!;
+      console.log(
+        `closing perp orders on: ${account} for market ${perpMarket.name}`,
+      );
+      await client.perpCancelAllOrders(group, account, perpMarket.name, 10);
     }
   }
 
   accounts = await client.getMangoAccountsForOwner(group, admin.publicKey);
   for (let account of accounts) {
-    console.log(`withdrawing deposits of account: ${account}`);
-
-    // withdraw all funds
-    for (let token of account.tokensActive()) {
-      const bank = group.getFirstBankByTokenIndex(token.tokenIndex);
-      const amount = token.balance(bank).toNumber();
-      if (amount > 0) {
-        try {
-          const allowBorrow = false;
-          await client.tokenWithdrawNative(
-            group,
-            account,
-            bank.mint,
-            amount,
-            allowBorrow,
-          );
-          await account.reload(client, group);
-        } catch (error) {
-          console.log(
-            `failed to withdraw ${bank.name} from ${account.publicKey}: ${error}`,
-          );
-          process.exit();
-        }
-      }
-    }
-
     // close account
     try {
       console.log(`closing account: ${account}`);

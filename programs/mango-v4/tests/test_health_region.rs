@@ -63,6 +63,7 @@ async fn test_health_wrap() -> Result<(), TransportError> {
         TokenDepositInstruction {
             amount: 1,
             account,
+            owner,
             token_account: payer_mint_accounts[0],
             token_authority: payer.clone(),
             bank_index: 0,
@@ -89,6 +90,7 @@ async fn test_health_wrap() -> Result<(), TransportError> {
             tx.add_instruction(TokenDepositInstruction {
                 amount: repay_amount,
                 account,
+                owner,
                 token_account: payer_mint_accounts[1],
                 token_authority: payer.clone(),
                 bank_index: 0,

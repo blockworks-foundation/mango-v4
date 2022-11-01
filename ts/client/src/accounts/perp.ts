@@ -3,9 +3,11 @@ import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import Big from 'big.js';
 import { MangoClient } from '../client';
-import { U64_MAX_BN } from '../utils';
+import { I80F48, I80F48Dto } from '../numbers/I80F48';
+import { As, toNative, U64_MAX_BN } from '../utils';
 import { OracleConfig, QUOTE_DECIMALS } from './bank';
-import { I80F48, I80F48Dto } from './I80F48';
+
+export type PerpMarketIndex = number & As<'perp-market-index'>;
 
 export class PerpMarket {
   public name: string;
@@ -18,21 +20,24 @@ export class PerpMarket {
   public takerFee: I80F48;
   public minFunding: I80F48;
   public maxFunding: I80F48;
-  public openInterest: number;
-  public seqNum: number;
+  public longFunding: I80F48;
+  public shortFunding: I80F48;
+  public openInterest: BN;
+  public seqNum: BN;
   public feesAccrued: I80F48;
+  public feesSettled: I80F48;
   priceLotsToUiConverter: number;
   baseLotsToUiConverter: number;
   quoteLotsToUiConverter: number;
-  public price: number;
-  public uiPrice: number;
+  public _price: I80F48;
+  public _uiPrice: number;
 
   static from(
     publicKey: PublicKey,
     obj: {
       group: PublicKey;
-      quoteTokenIndex: number;
       perpMarketIndex: number;
+      trustedMarket: number;
       name: number[];
       oracle: PublicKey;
       oracleConfig: OracleConfig;
@@ -55,8 +60,9 @@ export class PerpMarket {
       shortFunding: I80F48Dto;
       fundingLastUpdated: BN;
       openInterest: BN;
-      seqNum: any; // TODO: ts complains that this is unknown for whatever reason
+      seqNum: BN;
       feesAccrued: I80F48Dto;
+      feesSettled: I80F48Dto;
       bump: number;
       baseDecimals: number;
       registrationTime: BN;
@@ -65,8 +71,8 @@ export class PerpMarket {
     return new PerpMarket(
       publicKey,
       obj.group,
-      obj.quoteTokenIndex,
-      obj.perpMarketIndex,
+      obj.perpMarketIndex as PerpMarketIndex,
+      obj.trustedMarket == 1,
       obj.name,
       obj.oracle,
       obj.oracleConfig,
@@ -91,6 +97,7 @@ export class PerpMarket {
       obj.openInterest,
       obj.seqNum,
       obj.feesAccrued,
+      obj.feesSettled,
       obj.bump,
       obj.baseDecimals,
       obj.registrationTime,
@@ -100,8 +107,8 @@ export class PerpMarket {
   constructor(
     public publicKey: PublicKey,
     public group: PublicKey,
-    public quoteTokenIndex: number,
-    public perpMarketIndex: number,
+    public perpMarketIndex: PerpMarketIndex, // TODO rename to marketIndex?
+    public trustedMarket: boolean,
     name: number[],
     public oracle: PublicKey,
     oracleConfig: OracleConfig,
@@ -126,6 +133,7 @@ export class PerpMarket {
     openInterest: BN,
     seqNum: BN,
     feesAccrued: I80F48Dto,
+    feesSettled: I80F48Dto,
     bump: number,
     public baseDecimals: number,
     public registrationTime: BN,
@@ -140,9 +148,12 @@ export class PerpMarket {
     this.takerFee = I80F48.from(takerFee);
     this.minFunding = I80F48.from(minFunding);
     this.maxFunding = I80F48.from(maxFunding);
-    this.openInterest = openInterest.toNumber();
-    this.seqNum = seqNum.toNumber();
+    this.longFunding = I80F48.from(longFunding);
+    this.shortFunding = I80F48.from(shortFunding);
+    this.openInterest = openInterest;
+    this.seqNum = seqNum;
     this.feesAccrued = I80F48.from(feesAccrued);
+    this.feesSettled = I80F48.from(feesSettled);
 
     this.priceLotsToUiConverter = new Big(10)
       .pow(baseDecimals - QUOTE_DECIMALS)
@@ -159,6 +170,23 @@ export class PerpMarket {
       .toNumber();
   }
 
+  get price(): I80F48 {
+    if (!this._price) {
+      throw new Error(
+        `Undefined price for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
+      );
+    }
+    return this._price;
+  }
+
+  get uiPrice(): number {
+    if (!this._uiPrice) {
+      throw new Error(
+        `Undefined price for perpMarket ${this.publicKey} with marketIndex ${this.perpMarketIndex}!`,
+      );
+    }
+    return this._uiPrice;
+  }
   public async loadAsks(client: MangoClient): Promise<BookSide> {
     const asks = await client.program.account.bookSide.fetch(this.asks);
     return BookSide.from(client, this, BookSideType.asks, asks);
@@ -176,11 +204,33 @@ export class PerpMarket {
     return new PerpEventQueue(client, eventQueue.header, eventQueue.buf);
   }
 
-  public async loadFills(client: MangoClient, lastSeqNum: BN) {
+  public async loadFills(
+    client: MangoClient,
+    lastSeqNum: BN,
+  ): Promise<(OutEvent | FillEvent | LiquidateEvent)[]> {
     const eventQueue = await this.loadEventQueue(client);
     return eventQueue
       .eventsSince(lastSeqNum)
       .filter((event) => event.eventType == PerpEventQueue.FILL_EVENT_TYPE);
+  }
+
+  public async logOb(client: MangoClient): Promise<string> {
+    let res = ``;
+    res += `  ${this.name} OrderBook`;
+    let orders = await this?.loadAsks(client);
+    for (const order of orders!.items()) {
+      res += `\n  ${order.uiPrice.toFixed(5).padStart(10)}, ${order.uiSize
+        .toString()
+        .padStart(10)}`;
+    }
+    res += `\n  asks ↑ --------- ↓ bids`;
+    orders = await this?.loadBids(client);
+    for (const order of orders!.items()) {
+      res += `\n  ${order.uiPrice.toFixed(5).padStart(10)}, ${order.uiSize
+        .toString()
+        .padStart(10)}`;
+    }
+    return res;
   }
 
   /**
@@ -189,13 +239,13 @@ export class PerpMarket {
    * @param asks
    * @returns returns funding rate per hour
    */
-  public getCurrentFundingRate(bids: BookSide, asks: BookSide) {
+  public getCurrentFundingRate(bids: BookSide, asks: BookSide): number {
     const MIN_FUNDING = this.minFunding.toNumber();
     const MAX_FUNDING = this.maxFunding.toNumber();
 
     const bid = bids.getImpactPriceUi(new BN(this.impactQuantity));
     const ask = asks.getImpactPriceUi(new BN(this.impactQuantity));
-    const indexPrice = this.uiPrice;
+    const indexPrice = this._uiPrice;
 
     let funding;
     if (bid !== undefined && ask !== undefined) {
@@ -215,21 +265,17 @@ export class PerpMarket {
   }
 
   public uiPriceToLots(price: number): BN {
-    return new BN(price * Math.pow(10, QUOTE_DECIMALS))
+    return toNative(price, QUOTE_DECIMALS)
       .mul(this.baseLotSize)
       .div(this.quoteLotSize.mul(new BN(Math.pow(10, this.baseDecimals))));
   }
 
   public uiBaseToLots(quantity: number): BN {
-    return new BN(quantity * Math.pow(10, this.baseDecimals)).div(
-      this.baseLotSize,
-    );
+    return toNative(quantity, this.baseDecimals).div(this.baseLotSize);
   }
 
   public uiQuoteToLots(uiQuote: number): BN {
-    return new BN(uiQuote * Math.pow(10, QUOTE_DECIMALS)).div(
-      this.quoteLotSize,
-    );
+    return toNative(uiQuote, QUOTE_DECIMALS).div(this.quoteLotSize);
   }
 
   public priceLotsToUi(price: BN): number {
@@ -250,19 +296,19 @@ export class PerpMarket {
       '\n perpMarketIndex -' +
       this.perpMarketIndex +
       '\n maintAssetWeight -' +
-      this.maintAssetWeight.toNumber() +
+      this.maintAssetWeight.toString() +
       '\n initAssetWeight -' +
-      this.initAssetWeight.toNumber() +
+      this.initAssetWeight.toString() +
       '\n maintLiabWeight -' +
-      this.maintLiabWeight.toNumber() +
+      this.maintLiabWeight.toString() +
       '\n initLiabWeight -' +
-      this.initLiabWeight.toNumber() +
+      this.initLiabWeight.toString() +
       '\n liquidationFee -' +
-      this.liquidationFee.toNumber() +
+      this.liquidationFee.toString() +
       '\n makerFee -' +
-      this.makerFee.toNumber() +
+      this.makerFee.toString() +
       '\n takerFee -' +
-      this.takerFee.toNumber()
+      this.takerFee.toString()
     );
   }
 }
@@ -284,7 +330,7 @@ export class BookSide {
       leafCount: number;
       nodes: unknown;
     },
-  ) {
+  ): BookSide {
     return new BookSide(
       client,
       perpMarket,
@@ -311,7 +357,6 @@ export class BookSide {
     public includeExpired = false,
     maxBookDelay?: number,
   ) {
-    // TODO why? Ask Daffy
     // Determine the maxTimestamp found on the book to use for tif
     // If maxBookDelay is not provided, use 3600 as a very large number
     maxBookDelay = maxBookDelay === undefined ? 3600 : maxBookDelay;
@@ -329,7 +374,7 @@ export class BookSide {
     this.now = maxTimestamp;
   }
 
-  static getPriceFromKey(key: BN) {
+  static getPriceFromKey(key: BN): BN {
     return key.ushrn(64);
   }
 
@@ -359,12 +404,16 @@ export class BookSide {
     }
   }
 
+  public best(): PerpOrder | undefined {
+    return this.items().next().value;
+  }
+
   getImpactPriceUi(baseLots: BN): number | undefined {
     const s = new BN(0);
     for (const order of this.items()) {
       s.iadd(order.sizeLots);
       if (s.gte(baseLots)) {
-        return order.price;
+        return order.uiPrice;
       }
     }
     return undefined;
@@ -391,7 +440,7 @@ export class BookSide {
 
   public getL2Ui(depth: number): [number, number][] {
     const levels: [number, number][] = [];
-    for (const { price, size } of this.items()) {
+    for (const { uiPrice: price, uiSize: size } of this.items()) {
       if (levels.length > 0 && levels[levels.length - 1][0] === price) {
         levels[levels.length - 1][1] += size;
       } else if (levels.length === depth) {
@@ -456,29 +505,34 @@ export class LeafNode {
   ) {}
 }
 export class InnerNode {
-  static from(obj: { children: [number] }) {
+  static from(obj: { children: [number] }): InnerNode {
     return new InnerNode(obj.children);
   }
 
   constructor(public children: [number]) {}
 }
 
-export class Side {
+export class PerpOrderSide {
   static bid = { bid: {} };
   static ask = { ask: {} };
 }
 
 export class PerpOrderType {
   static limit = { limit: {} };
-  static immediateOrCancel = { immediateorcancel: {} };
-  static postOnly = { postonly: {} };
+  static immediateOrCancel = { immediateOrCancel: {} };
+  static postOnly = { postOnly: {} };
   static market = { market: {} };
-  static postOnlySlide = { postonlyslide: {} };
+  static postOnlySlide = { postOnlySlide: {} };
 }
 
 export class PerpOrder {
-  static from(perpMarket: PerpMarket, leafNode: LeafNode, type: BookSideType) {
-    const side = type == BookSideType.bids ? Side.bid : Side.ask;
+  static from(
+    perpMarket: PerpMarket,
+    leafNode: LeafNode,
+    type: BookSideType,
+  ): PerpOrder {
+    const side =
+      type == BookSideType.bids ? PerpOrderSide.bid : PerpOrderSide.ask;
     const price = BookSide.getPriceFromKey(leafNode.key);
     const expiryTimestamp = leafNode.timeInForce
       ? leafNode.timestamp.add(new BN(leafNode.timeInForce))
@@ -506,11 +560,11 @@ export class PerpOrder {
     public owner: PublicKey,
     public openOrdersSlot: number,
     public feeTier: 0,
-    public price: number,
+    public uiPrice: number,
     public priceLots: BN,
-    public size: number,
+    public uiSize: number,
     public sizeLots: BN,
-    public side: Side,
+    public side: PerpOrderSide,
     public timestamp: BN,
     public expiryTimestamp: BN,
   ) {}
@@ -532,7 +586,7 @@ export class PerpEventQueue {
     this.head = header.head;
     this.count = header.count;
     this.seqNum = header.seqNum;
-    this.rawEvents = buf.slice(this.head, this.count).map((event) => {
+    this.rawEvents = buf.map((event) => {
       if (event.eventType === PerpEventQueue.FILL_EVENT_TYPE) {
         return (client.program as any)._coder.types.typeLayouts
           .get('FillEvent')
@@ -554,7 +608,7 @@ export class PerpEventQueue {
             ),
           );
       }
-      throw new Error(`Unknown event with eventType ${event.eventType}`);
+      throw new Error(`Unknown event with eventType ${event.eventType}!`);
     });
   }
 

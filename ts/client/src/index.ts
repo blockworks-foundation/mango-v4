@@ -4,8 +4,9 @@ import { MangoClient } from './client';
 import { MANGO_V4_ID } from './constants';
 
 export * from './accounts/bank';
-export * from './accounts/I80F48';
+export * from './numbers/I80F48';
 export * from './accounts/mangoAccount';
+export * from './accounts/perp';
 export {
   Serum3Market,
   Serum3OrderType,

@@ -7,6 +7,8 @@ use crate::error::*;
 use crate::state::*;
 use crate::util::fill_from_str;
 
+use crate::logs::TokenMetaDataLog;
+
 pub const INDEX_START: I80F48 = I80F48!(1_000_000);
 
 const FIRST_BANK_NUM: u32 = 0;
@@ -155,6 +157,15 @@ pub fn token_register(
 
     mint_info.banks[0] = ctx.accounts.bank.key();
     mint_info.vaults[0] = ctx.accounts.vault.key();
+
+    emit!(TokenMetaDataLog {
+        mango_group: ctx.accounts.group.key(),
+        mint: ctx.accounts.mint.key(),
+        token_index,
+        mint_decimals: ctx.accounts.mint.decimals,
+        oracle: ctx.accounts.oracle.key(),
+        mint_info: ctx.accounts.mint_info.key(),
+    });
 
     Ok(())
 }

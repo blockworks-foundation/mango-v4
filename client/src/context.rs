@@ -10,6 +10,7 @@ use mango_v4::state::{
 };
 
 use fixed::types::I80F48;
+use itertools::Itertools;
 
 use crate::gpa::*;
 
@@ -78,6 +79,10 @@ impl MangoGroupContext {
         self.tokens.get(&token_index).unwrap()
     }
 
+    pub fn perp(&self, perp_market_index: PerpMarketIndex) -> &PerpMarketContext {
+        self.perp_markets.get(&perp_market_index).unwrap()
+    }
+
     pub fn token_by_mint(&self, mint: &Pubkey) -> anyhow::Result<&TokenContext> {
         self.tokens
             .iter()
@@ -86,7 +91,7 @@ impl MangoGroupContext {
     }
 
     pub fn perp_market_address(&self, perp_market_index: PerpMarketIndex) -> Pubkey {
-        self.perp_markets.get(&perp_market_index).unwrap().address
+        self.perp(perp_market_index).address
     }
 
     pub fn new_from_rpc(
@@ -237,6 +242,15 @@ impl MangoGroupContext {
         let perp_markets = account
             .active_perp_positions()
             .map(|&pa| self.perp_market_address(pa.market_index));
+        let perp_oracles = account
+            .active_perp_positions()
+            .map(|&pa| self.perp(pa.market_index).market.oracle);
+
+        let to_account_meta = |pubkey| AccountMeta {
+            pubkey,
+            is_writable: false,
+            is_signer: false,
+        };
 
         Ok(banks
             .iter()
@@ -245,21 +259,66 @@ impl MangoGroupContext {
                 is_writable: writable_banks,
                 is_signer: false,
             })
-            .chain(oracles.iter().map(|&pubkey| AccountMeta {
-                pubkey,
-                is_writable: false,
+            .chain(oracles.into_iter().map(to_account_meta))
+            .chain(perp_markets.map(to_account_meta))
+            .chain(perp_oracles.map(to_account_meta))
+            .chain(serum_oos.map(to_account_meta))
+            .collect())
+    }
+
+    pub fn derive_health_check_remaining_account_metas_two_accounts(
+        &self,
+        account1: &MangoAccountValue,
+        account2: &MangoAccountValue,
+        writable_banks: &[TokenIndex],
+    ) -> anyhow::Result<Vec<AccountMeta>> {
+        // figure out all the banks/oracles that need to be passed for the health check
+        let mut banks = vec![];
+        let mut oracles = vec![];
+
+        let token_indexes = account2
+            .active_token_positions()
+            .chain(account1.active_token_positions())
+            .map(|ta| ta.token_index)
+            .unique();
+
+        for token_index in token_indexes {
+            let mint_info = self.mint_info(token_index);
+            let writable_bank = writable_banks.iter().contains(&token_index);
+            banks.push((mint_info.first_bank(), writable_bank));
+            oracles.push(mint_info.oracle);
+        }
+
+        let serum_oos = account2
+            .active_serum3_orders()
+            .chain(account1.active_serum3_orders())
+            .map(|&s| s.open_orders);
+        let perp_markets = account2
+            .active_perp_positions()
+            .chain(account1.active_perp_positions())
+            .map(|&pa| self.perp_market_address(pa.market_index));
+        let perp_oracles = account2
+            .active_perp_positions()
+            .chain(account1.active_perp_positions())
+            .map(|&pa| self.perp(pa.market_index).market.oracle);
+
+        let to_account_meta = |pubkey| AccountMeta {
+            pubkey,
+            is_writable: false,
+            is_signer: false,
+        };
+
+        Ok(banks
+            .iter()
+            .map(|(pubkey, is_writable)| AccountMeta {
+                pubkey: *pubkey,
+                is_writable: *is_writable,
                 is_signer: false,
-            }))
-            .chain(perp_markets.map(|pubkey| AccountMeta {
-                pubkey,
-                is_writable: false,
-                is_signer: false,
-            }))
-            .chain(serum_oos.map(|pubkey| AccountMeta {
-                pubkey,
-                is_writable: false,
-                is_signer: false,
-            }))
+            })
+            .chain(oracles.into_iter().map(to_account_meta))
+            .chain(perp_markets.map(to_account_meta))
+            .chain(perp_oracles.map(to_account_meta))
+            .chain(serum_oos.map(to_account_meta))
             .collect())
     }
 }

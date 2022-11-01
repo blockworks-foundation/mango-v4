@@ -59,6 +59,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
         TokenDepositInstruction {
             amount: 10,
             account: vault_account,
+            owner,
             token_account: payer_mint_accounts[0],
             token_authority: payer.clone(),
             bank_index: 0,
@@ -94,6 +95,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
         TokenDepositInstruction {
             amount: deposit1_amount,
             account,
+            owner,
             token_account: payer_mint_accounts[2],
             token_authority: payer.clone(),
             bank_index: 0,
@@ -106,6 +108,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
         TokenDepositInstruction {
             amount: deposit2_amount,
             account,
+            owner,
             token_account: payer_mint_accounts[3],
             token_authority: payer.clone(),
             bank_index: 0,
@@ -354,6 +357,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
             TokenDepositInstruction {
                 amount: vault_amount,
                 account: vault_account,
+                owner,
                 token_account,
                 token_authority: payer.clone(),
                 bank_index: 1,
@@ -369,6 +373,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
         TokenDepositInstruction {
             amount: 10,
             account: vault_account,
+            owner,
             token_account: payer_mint_accounts[0],
             token_authority: payer.clone(),
             bank_index: 0,
@@ -404,6 +409,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
         TokenDepositInstruction {
             amount: deposit1_amount,
             account,
+            owner,
             token_account: payer_mint_accounts[2],
             token_authority: payer.clone(),
             bank_index: 0,
@@ -416,6 +422,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
         TokenDepositInstruction {
             amount: deposit2_amount,
             account,
+            owner,
             token_account: payer_mint_accounts[3],
             token_authority: payer.clone(),
             bank_index: 0,

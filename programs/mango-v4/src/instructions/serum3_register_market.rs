@@ -5,6 +5,8 @@ use crate::serum3_cpi::{load_market_state, pubkey_from_u64_array};
 use crate::state::*;
 use crate::util::fill_from_str;
 
+use crate::logs::Serum3RegisterMarketLog;
+
 #[derive(Accounts)]
 #[instruction(market_index: Serum3MarketIndex)]
 pub struct Serum3RegisterMarket<'info> {
@@ -96,6 +98,16 @@ pub fn serum3_register_market(
         market_index,
         reserved: [0; 38],
     };
+
+    emit!(Serum3RegisterMarketLog {
+        mango_group: ctx.accounts.group.key(),
+        serum_market: ctx.accounts.serum_market.key(),
+        market_index: market_index,
+        base_token_index: base_bank.token_index,
+        quote_token_index: quote_bank.token_index,
+        serum_program: ctx.accounts.serum_program.key(),
+        serum_program_external: ctx.accounts.serum_market_external.key(),
+    });
 
     Ok(())
 }

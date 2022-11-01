@@ -25,3 +25,5 @@ FROM debian:bullseye-slim as run
 RUN apt-get update && apt-get -y install ca-certificates libc6
 COPY --from=build /app/target/release/keeper /usr/local/bin/
 COPY --from=build /app/target/release/liquidator /usr/local/bin/
+RUN adduser --system --group --no-create-home mangouser
+USER mangouser

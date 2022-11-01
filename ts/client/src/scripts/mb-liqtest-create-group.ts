@@ -16,12 +16,14 @@ const MAINNET_MINTS = new Map([
   ['USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'],
   ['BTC', '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E'],
   ['SOL', 'So11111111111111111111111111111111111111112'],
+  ['MNGO', 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac'],
 ]);
 
 const STUB_PRICES = new Map([
   ['USDC', 1.0],
   ['BTC', 20000.0], // btc and usdc both have 6 decimals
   ['SOL', 0.04], // sol has 9 decimals, equivalent to $40 per SOL
+  ['MNGO', 0.04], // same price/decimals as SOL for convenience
 ]);
 
 // External markets are matched with those in https://github.com/blockworks-foundation/mango-client-v3/blob/main/src/ids.json
@@ -179,14 +181,52 @@ async function main() {
   }
 
   console.log('Registering SOL/USDC serum market...');
-  await client.serum3RegisterMarket(
-    group,
-    new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
-    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('SOL')!)),
-    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDC')!)),
-    1,
-    'SOL/USDC',
-  );
+  try {
+    await client.serum3RegisterMarket(
+      group,
+      new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
+      group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('SOL')!)),
+      group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDC')!)),
+      1,
+      'SOL/USDC',
+    );
+  } catch (error) {
+    console.log(error);
+  }
+
+  console.log('Registering MNGO-PERP market...');
+  const mngoMainnetOracle = oracles.get('MNGO');
+  try {
+    await client.perpCreateMarket(
+      group,
+      mngoMainnetOracle,
+      0,
+      'MNGO-PERP',
+      0.1,
+      9,
+      10,
+      100000, // base lots
+      0.9,
+      0.8,
+      1.1,
+      1.2,
+      0.05,
+      -0.001,
+      0.002,
+      0,
+      -0.1,
+      0.1,
+      10,
+      false,
+      false,
+      0,
+      0,
+      0,
+      0,
+    );
+  } catch (error) {
+    console.log(error);
+  }
 
   process.exit();
 }

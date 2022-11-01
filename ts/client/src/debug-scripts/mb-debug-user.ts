@@ -1,13 +1,24 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair } from '@solana/web3.js';
+import { Cluster, Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { Group } from '../accounts/group';
-import { I80F48 } from '../accounts/I80F48';
+import { HealthCache } from '../accounts/healthCache';
 import { HealthType, MangoAccount } from '../accounts/mangoAccount';
+import { PerpMarket } from '../accounts/perp';
 import { Serum3Market } from '../accounts/serum3';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 import { toUiDecimalsForQuote } from '../utils';
+
+const CLUSTER_URL =
+  process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;
+const PAYER_KEYPAIR =
+  process.env.PAYER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
+const USER_KEYPAIR =
+  process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
+const GROUP_NUM = Number(process.env.GROUP_NUM || 2);
+const CLUSTER: Cluster =
+  (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
 
 async function debugUser(
   client: MangoClient,
@@ -16,61 +27,56 @@ async function debugUser(
 ) {
   console.log(mangoAccount.toString(group));
 
-  await mangoAccount.reload(client, group);
+  await mangoAccount.reload(client);
 
   console.log(
-    'buildFixedAccountRetrieverHealthAccounts ' +
-      client
-        .buildFixedAccountRetrieverHealthAccounts(
-          group,
-          mangoAccount,
-          [
-            group.banksMapByName.get('BTC')![0],
-            group.banksMapByName.get('USDC')![0],
-          ],
-          [],
-        )
-        .map((pk) => pk.toBase58())
-        .join(', '),
-  );
-  console.log(
     'mangoAccount.getEquity() ' +
-      toUiDecimalsForQuote(mangoAccount.getEquity()!.toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getEquity(group)!.toNumber()),
   );
   console.log(
     'mangoAccount.getHealth(HealthType.init) ' +
-      toUiDecimalsForQuote(mangoAccount.getHealth(HealthType.init)!.toNumber()),
+      toUiDecimalsForQuote(
+        mangoAccount.getHealth(group, HealthType.init)!.toNumber(),
+      ),
+  );
+  console.log(
+    'HealthCache.fromMangoAccount(group,mangoAccount).health(HealthType.init) ' +
+      toUiDecimalsForQuote(
+        HealthCache.fromMangoAccount(group, mangoAccount)
+          .health(HealthType.init)
+          .toNumber(),
+      ),
   );
   console.log(
     'mangoAccount.getHealthRatio(HealthType.init) ' +
-      mangoAccount.getHealthRatio(HealthType.init)!.toNumber(),
+      mangoAccount.getHealthRatio(group, HealthType.init)!.toNumber(),
   );
   console.log(
     'mangoAccount.getHealthRatioUi(HealthType.init) ' +
-      mangoAccount.getHealthRatioUi(HealthType.init),
+      mangoAccount.getHealthRatioUi(group, HealthType.init),
   );
   console.log(
     'mangoAccount.getHealthRatio(HealthType.maint) ' +
-      mangoAccount.getHealthRatio(HealthType.maint)!.toNumber(),
+      mangoAccount.getHealthRatio(group, HealthType.maint)!.toNumber(),
   );
   console.log(
     'mangoAccount.getHealthRatioUi(HealthType.maint) ' +
-      mangoAccount.getHealthRatioUi(HealthType.maint),
+      mangoAccount.getHealthRatioUi(group, HealthType.maint),
   );
   console.log(
     'mangoAccount.getCollateralValue() ' +
-      toUiDecimalsForQuote(mangoAccount.getCollateralValue()!.toNumber()),
+      toUiDecimalsForQuote(mangoAccount.getCollateralValue(group)!.toNumber()),
   );
   console.log(
     'mangoAccount.getAssetsValue() ' +
       toUiDecimalsForQuote(
-        mangoAccount.getAssetsValue(HealthType.init)!.toNumber(),
+        mangoAccount.getAssetsValue(group, HealthType.init)!.toNumber(),
       ),
   );
   console.log(
     'mangoAccount.getLiabsValue() ' +
       toUiDecimalsForQuote(
-        mangoAccount.getLiabsValue(HealthType.init)!.toNumber(),
+        mangoAccount.getLiabsValue(group, HealthType.init)!.toNumber(),
       ),
   );
 
@@ -107,19 +113,12 @@ async function debugUser(
   function getMaxSourceForTokenSwapWrapper(src, tgt) {
     console.log(
       `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
-        mangoAccount
-          .getMaxSourceForTokenSwap(
-            group,
-            group.banksMapByName.get(src)![0].mint,
-            group.banksMapByName.get(tgt)![0].mint,
-            1,
-          )!
-          .div(
-            I80F48.fromNumber(
-              Math.pow(10, group.banksMapByName.get(src)![0].mintDecimals),
-            ),
-          )
-          .toNumber(),
+        mangoAccount.getMaxSourceUiForTokenSwap(
+          group,
+          group.banksMapByName.get(src)![0].mint,
+          group.banksMapByName.get(tgt)![0].mint,
+          1,
+        ),
     );
   }
   for (const srcToken of Array.from(group.banksMapByName.keys())) {
@@ -128,6 +127,30 @@ async function debugUser(
       // if (tgtToken === 'MSOL')
       getMaxSourceForTokenSwapWrapper(srcToken, tgtToken);
     }
+  }
+
+  function getMaxForPerpWrapper(perpMarket: PerpMarket) {
+    console.log(
+      `getMaxQuoteForPerpBidUi ${perpMarket.perpMarketIndex} ` +
+        mangoAccount.getMaxQuoteForPerpBidUi(
+          group,
+          perpMarket.perpMarketIndex,
+          perpMarket.price.toNumber(),
+        ),
+    );
+    console.log(
+      `getMaxBaseForPerpAskUi ${perpMarket.perpMarketIndex} ` +
+        mangoAccount.getMaxBaseForPerpAskUi(
+          group,
+          perpMarket.perpMarketIndex,
+          perpMarket.price.toNumber(),
+        ),
+    );
+  }
+  for (const perpMarket of Array.from(
+    group.perpMarketsMapByMarketIndex.values(),
+  )) {
+    getMaxForPerpWrapper(perpMarket);
   }
 
   function getMaxForSerum3Wrapper(serum3Market: Serum3Market) {
@@ -156,12 +179,10 @@ async function debugUser(
 
 async function main() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
+  const connection = new Connection(CLUSTER_URL!, options);
 
   const admin = Keypair.fromSecretKey(
-    Buffer.from(
-      JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
-    ),
+    Buffer.from(JSON.parse(fs.readFileSync(PAYER_KEYPAIR!, 'utf-8'))),
   );
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
@@ -169,16 +190,15 @@ async function main() {
   const adminProvider = new AnchorProvider(connection, adminWallet, options);
   const client = MangoClient.connect(
     adminProvider,
-    'mainnet-beta',
-    MANGO_V4_ID['mainnet-beta'],
+    CLUSTER,
+    MANGO_V4_ID[CLUSTER],
+    {},
+    'get-program-accounts',
   );
 
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
 
-  for (const keypair of [
-    process.env.MB_PAYER_KEYPAIR!,
-    process.env.MB_USER2_KEYPAIR!,
-  ]) {
+  for (const keypair of [USER_KEYPAIR!]) {
     console.log();
     const user = Keypair.fromSecretKey(
       Buffer.from(JSON.parse(fs.readFileSync(keypair, 'utf-8'))),
@@ -201,9 +221,9 @@ async function main() {
 
     for (const mangoAccount of mangoAccounts) {
       console.log(`MangoAccount ${mangoAccount.publicKey}`);
-      // if (mangoAccount.name === 'PnL Test') {
-      await debugUser(client, group, mangoAccount);
-      // }
+      if (mangoAccount.name === 'PnL Test') {
+        await debugUser(client, group, mangoAccount);
+      }
     }
   }
 

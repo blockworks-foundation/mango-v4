@@ -15,9 +15,7 @@ pub mod queue;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::{
-        MangoAccount, MangoAccountValue, PerpMarket, FREE_ORDER_SLOT, QUOTE_TOKEN_INDEX,
-    };
+    use crate::state::{MangoAccount, MangoAccountValue, PerpMarket, FREE_ORDER_SLOT};
     use anchor_lang::prelude::*;
     use bytemuck::Zeroable;
     use fixed::types::I80F48;
@@ -100,13 +98,14 @@ mod tests {
             bids: bids.borrow_mut(),
             asks: asks.borrow_mut(),
         };
+        let settle_token_index = 0;
 
         let mut new_order =
             |book: &mut Book, event_queue: &mut EventQueue, side, price, now_ts| -> i128 {
                 let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
                 let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
                 account
-                    .ensure_perp_position(perp_market.perp_market_index, QUOTE_TOKEN_INDEX)
+                    .ensure_perp_position(perp_market.perp_market_index, settle_token_index)
                     .unwrap();
 
                 let quantity = 1;
@@ -194,6 +193,7 @@ mod tests {
             bids: bids.borrow_mut(),
             asks: asks.borrow_mut(),
         };
+        let settle_token_index = 0;
 
         // Add lots and fees to make sure to exercise unit conversion
         market.base_lot_size = 10;
@@ -205,10 +205,10 @@ mod tests {
         let mut maker = MangoAccountValue::from_bytes(&buffer).unwrap();
         let mut taker = MangoAccountValue::from_bytes(&buffer).unwrap();
         maker
-            .ensure_perp_position(market.perp_market_index, QUOTE_TOKEN_INDEX)
+            .ensure_perp_position(market.perp_market_index, settle_token_index)
             .unwrap();
         taker
-            .ensure_perp_position(market.perp_market_index, QUOTE_TOKEN_INDEX)
+            .ensure_perp_position(market.perp_market_index, settle_token_index)
             .unwrap();
 
         let maker_pk = Pubkey::new_unique();
@@ -374,5 +374,112 @@ mod tests {
             taker.perp_position_by_raw_index(0).quote_position_native(),
             match_quote - match_quote * market.taker_fee
         );
+    }
+
+    #[test]
+    fn test_fee_penalty_applied_only_on_limit_order() -> Result<()> {
+        let (mut market, oracle_price, mut event_queue, bids, asks) = test_setup(1000.0);
+        let mut book = Book {
+            bids: bids.borrow_mut(),
+            asks: asks.borrow_mut(),
+        };
+
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
+        let taker_pk = Pubkey::new_unique();
+        let now_ts = 1000000;
+
+        market.base_lot_size = 1;
+        market.quote_lot_size = 1;
+        market.taker_fee = I80F48::from_num(0.01);
+        market.fee_penalty = 5.0;
+        account.ensure_perp_position(market.perp_market_index, 0)?;
+
+        // Passive order
+        book.new_order(
+            Side::Ask,
+            &mut market,
+            &mut event_queue,
+            oracle_price,
+            &mut account.borrow_mut(),
+            &taker_pk,
+            1000,
+            2,
+            i64::MAX,
+            OrderType::Limit,
+            0,
+            43,
+            now_ts,
+            u8::MAX,
+        )
+        .unwrap();
+
+        // Partial taker
+        book.new_order(
+            Side::Bid,
+            &mut market,
+            &mut event_queue,
+            oracle_price,
+            &mut account.borrow_mut(),
+            &taker_pk,
+            1000,
+            1,
+            i64::MAX,
+            OrderType::Limit,
+            0,
+            43,
+            now_ts,
+            u8::MAX,
+        )
+        .unwrap();
+
+        let pos = account.perp_position(market.perp_market_index)?;
+
+        assert_eq!(
+            pos.quote_position_native().round(),
+            I80F48::from_num(-10),
+            "Regular fees applied on limit order"
+        );
+
+        assert_eq!(
+            market.fees_accrued.round(),
+            I80F48::from_num(10),
+            "Fees moved to market"
+        );
+
+        // Full taker
+        book.new_order(
+            Side::Bid,
+            &mut market,
+            &mut event_queue,
+            oracle_price,
+            &mut account.borrow_mut(),
+            &taker_pk,
+            1000,
+            1,
+            i64::MAX,
+            OrderType::ImmediateOrCancel,
+            0,
+            43,
+            now_ts,
+            u8::MAX,
+        )
+        .unwrap();
+
+        let pos = account.perp_position(market.perp_market_index)?;
+
+        assert_eq!(
+            pos.quote_position_native().round(),
+            I80F48::from_num(-25), // -10 - 5
+            "Regular fees + fixed penalty applied on IOC order"
+        );
+
+        assert_eq!(
+            market.fees_accrued.round(),
+            I80F48::from_num(25), // 10 + 5
+            "Fees moved to market"
+        );
+
+        Ok(())
     }
 }

@@ -58,6 +58,9 @@ async fn test_perp() -> Result<(), TransportError> {
         0,
     )
     .await;
+    let settler =
+        create_funded_account(&solana, group, owner, 251, &context.users[1], &[], 0, 0).await;
+    let settler_owner = owner.clone();
 
     //
     // TEST: Create a perp market
@@ -384,11 +387,12 @@ async fn test_perp() -> Result<(), TransportError> {
     send_tx(
         solana,
         PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
             account_a: account_0,
             account_b: account_1,
             perp_market,
-            quote_bank: tokens[0].bank,
-            max_settle_amount: u64::MAX,
+            settle_bank: tokens[0].bank,
         },
     )
     .await
@@ -398,7 +402,7 @@ async fn test_perp() -> Result<(), TransportError> {
         PerpSettleFeesInstruction {
             account: account_1,
             perp_market,
-            quote_bank: tokens[0].bank,
+            settle_bank: tokens[0].bank,
             max_settle_amount: u64::MAX,
         },
     )
