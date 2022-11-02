@@ -51,6 +51,8 @@ pub enum MangoError {
     MaxSettleAmountMustBeGreaterThanZero,
     #[msg("the perp position has open orders or unprocessed fill events")]
     HasOpenPerpOrders,
+    #[msg("settlement amount must always be positive")]
+    SettlementAmountMustBePositive,
 }
 
 pub trait Contextable {

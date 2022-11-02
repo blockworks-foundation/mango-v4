@@ -1,5 +1,5 @@
 import * as anchor from '@project-serum/anchor';
-import { AnchorProvider, Program } from '@project-serum/anchor';
+import { AnchorProvider, BN, Program } from '@project-serum/anchor';
 import NodeWallet from '@project-serum/anchor/dist/cjs/nodewallet';
 import * as spl from '@solana/spl-token';
 import {
@@ -744,6 +744,51 @@ describe('mango-v4', () => {
     assert.isTrue(
       bank.indexLastUpdated > lastUpdated,
       'Index timestamp updated',
+    );
+  });
+
+  it('calculates entry and break even price correctly', async () => {
+    const { client: clientA, mangoAccount: accountA } = users[2];
+    const { client: clientB, mangoAccount: accountB } = users[3];
+
+    await accountA!.reload(clientA);
+    await accountB!.reload(clientB);
+
+    const btcPerp = (await envClient.perpGetMarkets(group))[0];
+    const positionA = accountA.getPerpPosition(btcPerp.perpMarketIndex)!;
+    const positionB = accountB.getPerpPosition(btcPerp.perpMarketIndex)!;
+
+    assert.equal(
+      positionA.getBasePositionUi(btcPerp),
+      1,
+      'Position is long'
+    );
+    assert.equal(
+      positionB.getBasePositionUi(btcPerp),
+      -1,
+      'Position is short'
+    );
+
+    assert.isTrue(
+      positionA.getEntryPrice(btcPerp)
+                      .eq(new BN(99.0)),
+      'long entry price matches'
+    );
+    assert.isTrue(
+      positionB.getEntryPrice(btcPerp)
+                      .eq(new BN(99.0)),
+      'short entry price matches'
+    );
+
+    assert.isTrue(
+      positionA.getBreakEvenPrice(btcPerp)
+                      .eq(new BN(99.0)),
+      'long break even price matches'
+    );
+    assert.isTrue(
+      positionB.getBreakEvenPrice(btcPerp)
+                      .eq(new BN(99.0)),
+      'short break even price matches'
     );
   });
 });
