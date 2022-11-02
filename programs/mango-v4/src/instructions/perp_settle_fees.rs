@@ -94,7 +94,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
 
     // Safety check to prevent any accidental negative transfer
     require!(
-        settlement_i64 > 0,
+        settlement_i64 >= 0,
         MangoError::SettlementAmountMustBePositive
     );
 
