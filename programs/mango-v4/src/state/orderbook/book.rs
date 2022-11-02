@@ -469,9 +469,13 @@ fn apply_fees(
 
     let taker_fees = cm!(taker_quote_native * market.taker_fee);
 
+    // taker fees should never be negative
+    require_gte!(taker_fees, 0);
+
     let perp_account = mango_account.perp_position_mut(market.perp_market_index)?;
     perp_account.change_quote_position(-taker_fees);
     cm!(market.fees_accrued += taker_fees + maker_fees);
+    cm!(perp_account.taker_volume += taker_fees.to_num::<u64>());
 
     Ok(())
 }

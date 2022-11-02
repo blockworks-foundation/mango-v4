@@ -5,6 +5,8 @@ use crate::error::*;
 use crate::state::*;
 use crate::util::fill_from_str;
 
+use crate::logs::PerpMarketMetaDataLog;
+
 #[derive(Accounts)]
 #[instruction(perp_market_index: PerpMarketIndex)]
 pub struct PerpCreateMarket<'info> {
@@ -129,6 +131,16 @@ pub fn perp_create_market(
 
     let mut asks = ctx.accounts.asks.load_init()?;
     asks.book_side_type = BookSideType::Asks;
+
+    emit!(PerpMarketMetaDataLog {
+        mango_group: ctx.accounts.group.key(),
+        perp_market: ctx.accounts.perp_market.key(),
+        perp_market_index,
+        base_decimals,
+        base_lot_size,
+        quote_lot_size,
+        oracle: ctx.accounts.oracle.key(),
+    });
 
     Ok(())
 }

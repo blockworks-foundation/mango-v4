@@ -4,7 +4,7 @@ use std::cmp::min;
 
 use crate::error::*;
 use crate::logs::{
-    LiquidateTokenAndTokenLog, LoanOriginationFeeInstruction, TokenBalanceLog,
+    LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqWithTokenLog,
     WithdrawLoanOriginationFeeLog,
 };
 use crate::state::ScanningAccountRetriever;
@@ -253,7 +253,7 @@ pub fn token_liq_with_token(
         require!(liqor_health >= 0, MangoError::HealthMustBePositive);
     }
 
-    emit!(LiquidateTokenAndTokenLog {
+    emit!(TokenLiqWithTokenLog {
         mango_group: ctx.accounts.group.key(),
         liqee: ctx.accounts.liqee.key(),
         liqor: ctx.accounts.liqor.key(),

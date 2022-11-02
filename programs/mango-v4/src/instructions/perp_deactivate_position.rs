@@ -50,9 +50,10 @@ pub fn perp_deactivate_position(ctx: Context<PerpDeactivatePosition>) -> Result<
         "perp position still has events on event queue"
     );
 
-    account.deactivate_perp_position(
+    account.deactivate_perp_position_and_log(
         perp_market.perp_market_index,
         perp_market.settle_token_index,
+        ctx.accounts.account.key(),
     )?;
 
     Ok(())

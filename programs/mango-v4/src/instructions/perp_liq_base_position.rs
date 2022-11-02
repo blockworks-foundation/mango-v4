@@ -6,6 +6,8 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::state::*;
 
+use crate::logs::{emit_perp_balances, PerpLiqBasePositionLog};
+
 #[derive(Accounts)]
 pub struct PerpLiqBasePosition<'info> {
     pub group: AccountLoader<'info, Group>,
@@ -175,6 +177,32 @@ pub fn perp_liq_base_position(
         base_transfer,
         quote_transfer,
     );
+
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.liqor.key(),
+        perp_market.perp_market_index,
+        liqor_perp_position,
+        &perp_market,
+    );
+
+    emit_perp_balances(
+        ctx.accounts.group.key(),
+        ctx.accounts.liqee.key(),
+        perp_market.perp_market_index,
+        liqee_perp_position,
+        &perp_market,
+    );
+
+    emit!(PerpLiqBasePositionLog {
+        mango_group: ctx.accounts.group.key(),
+        perp_market_index: perp_market.perp_market_index,
+        liqor: ctx.accounts.liqor.key(),
+        liqee: ctx.accounts.liqee.key(),
+        base_transfer: base_transfer,
+        quote_transfer: quote_transfer.to_bits(),
+        price: oracle_price.to_bits(),
+    });
 
     // Check liqee health again
     liqee_health_cache.recompute_perp_info(liqee_perp_position, &perp_market)?;
