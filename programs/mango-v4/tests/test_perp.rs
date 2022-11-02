@@ -571,7 +571,6 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     .unwrap();
 
     assert_no_perp_orders(solana, account_0).await;
-    println!("ZZZ C");
 
     //
     // Place a pegged bid, take it with a direct and pegged ask, and consume events
