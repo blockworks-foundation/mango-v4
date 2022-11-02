@@ -24,13 +24,6 @@ export class PerpMarket {
   public shortFunding: I80F48;
   public feesAccrued: I80F48;
   public feesSettled: I80F48;
-<<<<<<< HEAD
-
-=======
-  priceLotsToUiConverter: number;
-  baseLotsToUiConverter: number;
-  quoteLotsToUiConverter: number;
->>>>>>> dev
   public _price: I80F48;
   public _uiPrice: number;
 
@@ -70,11 +63,6 @@ export class PerpMarket {
       openInterest: BN;
       seqNum: BN;
       feesAccrued: I80F48Dto;
-<<<<<<< HEAD
-=======
-      feesSettled: I80F48Dto;
-      bump: number;
->>>>>>> dev
       baseDecimals: number;
       registrationTime: BN;
       feesSettled: I80F48Dto;
@@ -115,11 +103,6 @@ export class PerpMarket {
       obj.openInterest,
       obj.seqNum,
       obj.feesAccrued,
-<<<<<<< HEAD
-=======
-      obj.feesSettled,
-      obj.bump,
->>>>>>> dev
       obj.baseDecimals,
       obj.registrationTime,
       obj.feesSettled,
@@ -161,11 +144,6 @@ export class PerpMarket {
     public openInterest: BN,
     public seqNum: BN,
     feesAccrued: I80F48Dto,
-<<<<<<< HEAD
-=======
-    feesSettled: I80F48Dto,
-    bump: number,
->>>>>>> dev
     public baseDecimals: number,
     public registrationTime: BN,
     feesSettled: I80F48Dto,

@@ -29,7 +29,7 @@ export class MangoAccount {
       beingLiquidated: number;
       inHealthRegion: number;
       netDeposits: BN;
-      netSettled: BN;
+      perpSpotTransfers: BN;
       healthRegionBeginInitHealth: BN;
       headerVersion: number;
       tokens: unknown;
@@ -48,7 +48,7 @@ export class MangoAccount {
       obj.beingLiquidated == 1,
       obj.inHealthRegion == 1,
       obj.netDeposits,
-      obj.netSettled,
+      obj.perpSpotTransfers,
       obj.healthRegionBeginInitHealth,
       obj.headerVersion,
       obj.tokens as TokenPositionDto[],
@@ -69,7 +69,7 @@ export class MangoAccount {
     public beingLiquidated: boolean,
     public inHealthRegion: boolean,
     public netDeposits: BN,
-    public netSettled: BN,
+    public perpSpotTransfers: BN,
     public healthRegionBeginInitHealth: BN,
     public headerVersion: number,
     tokens: TokenPositionDto[],
@@ -1020,10 +1020,17 @@ export class PerpPosition {
       I80F48.from(dto.quotePositionNative),
       dto.bidsBaseLots,
       dto.asksBaseLots,
-      dto.takerBaseLots,
-      dto.takerQuoteLots,
       I80F48.from(dto.longSettledFunding),
       I80F48.from(dto.shortSettledFunding),
+      dto.takerBaseLots,
+      dto.takerQuoteLots,
+      dto.takerBaseLots,
+      dto.takerQuoteLots,
+      dto.cumulativeLongFunding,
+      dto.cumulativeShortFunding,
+      dto.makerVolume,
+      dto.takerVolume,
+      dto.perpSpotTransfers,
     );
   }
 
@@ -1036,10 +1043,17 @@ export class PerpPosition {
       ZERO_I80F48(),
       new BN(0),
       new BN(0),
-      new BN(0),
-      new BN(0),
       ZERO_I80F48(),
       ZERO_I80F48(),
+      new BN(0),
+      new BN(0),
+      new BN(0),
+      new BN(0),
+      0,
+      0,
+      new BN(0),
+      new BN(0),
+      new BN(0),
     );
   }
 
@@ -1047,12 +1061,19 @@ export class PerpPosition {
     public marketIndex: PerpMarketIndex,
     public basePositionLots: BN,
     public quotePositionNative: I80F48,
+    public quoteEntryNative: BN,
+    public quoteRunningNative: BN,
+    public longSettledFunding: I80F48,
+    public shortSettledFunding: I80F48,
     public bidsBaseLots: BN,
     public asksBaseLots: BN,
     public takerBaseLots: BN,
     public takerQuoteLots: BN,
-    public longSettledFunding: I80F48,
-    public shortSettledFunding: I80F48,
+    public cumulativeLongFunding: number,
+    public cumulativeShortFunding: number,
+    public makerVolume: BN,
+    public takerVolume: BN,
+    public perpSpotTransfers: BN,
   ) {}
 
   isActive(): boolean {
@@ -1117,15 +1138,21 @@ export class PerpPosition {
 export class PerpPositionDto {
   constructor(
     public marketIndex: number,
-    public reserved: [],
     public basePositionLots: BN,
     public quotePositionNative: { val: BN },
+    public quoteEntryNative: BN,
+    public quoteRunningNative: BN,
+    public longSettledFunding: I80F48Dto,
+    public shortSettledFunding: I80F48Dto,
     public bidsBaseLots: BN,
     public asksBaseLots: BN,
     public takerBaseLots: BN,
     public takerQuoteLots: BN,
-    public longSettledFunding: I80F48Dto,
-    public shortSettledFunding: I80F48Dto,
+    public cumulativeLongFunding: number,
+    public cumulativeShortFunding: number,
+    public makerVolume: BN,
+    public takerVolume: BN,
+    public perpSpotTransfers: BN,
   ) {}
 }
 
