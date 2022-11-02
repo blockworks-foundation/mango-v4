@@ -21,8 +21,8 @@ pub mod state;
 pub mod types;
 
 use state::{
-    OracleConfig, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side, SideAndOrderTree,
-    TokenIndex,
+    BookSideOrderTree, OracleConfig, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side,
+    SideAndOrderTree, TokenIndex,
 };
 
 declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
@@ -498,8 +498,35 @@ pub mod mango_v4 {
     #[allow(clippy::too_many_arguments)]
     pub fn perp_place_order(
         ctx: Context<PerpPlaceOrder>,
-        side_and_tree: SideAndOrderTree,
-        price_data: i64,
+        side: Side,
+        price_lots: i64,
+        max_base_lots: i64,
+        max_quote_lots: i64,
+        client_order_id: u64,
+        order_type: PlaceOrderType,
+        expiry_timestamp: u64,
+        limit: u8,
+    ) -> Result<()> {
+        let peg_limit = 0;
+        instructions::perp_place_order(
+            ctx,
+            SideAndOrderTree::new(side, BookSideOrderTree::Fixed),
+            price_lots,
+            peg_limit,
+            max_base_lots,
+            max_quote_lots,
+            client_order_id,
+            order_type,
+            expiry_timestamp,
+            limit,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn perp_place_order_pegged(
+        ctx: Context<PerpPlaceOrder>,
+        side: Side,
+        price_offset: i64,
         peg_limit: i64,
         max_base_lots: i64,
         max_quote_lots: i64,
@@ -510,8 +537,8 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::perp_place_order(
             ctx,
-            side_and_tree,
-            price_data,
+            SideAndOrderTree::new(side, BookSideOrderTree::OraclePegged),
+            price_offset,
             peg_limit,
             max_base_lots,
             max_quote_lots,

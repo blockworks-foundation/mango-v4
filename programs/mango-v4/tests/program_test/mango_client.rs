@@ -2377,8 +2377,8 @@ pub struct PerpPlaceOrderInstruction {
     pub account: Pubkey,
     pub perp_market: Pubkey,
     pub owner: TestKeypair,
-    pub side_and_tree: SideAndOrderTree,
-    pub price_data: i64,
+    pub side: Side,
+    pub price_lots: i64,
     pub max_base_lots: i64,
     pub max_quote_lots: i64,
     pub client_order_id: u64,
@@ -2393,8 +2393,72 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            side_and_tree: self.side_and_tree,
-            price_data: self.price_data,
+            side: self.side,
+            price_lots: self.price_lots,
+            max_base_lots: self.max_base_lots,
+            max_quote_lots: self.max_quote_lots,
+            client_order_id: self.client_order_id,
+            order_type: PlaceOrderType::Limit,
+            expiry_timestamp: 0,
+            limit: 1,
+        };
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            None,
+            false,
+            Some(perp_market.perp_market_index),
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            perp_market: self.perp_market,
+            orderbook: perp_market.orderbook,
+            event_queue: perp_market.event_queue,
+            oracle: perp_market.oracle,
+            owner: self.owner.pubkey(),
+        };
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction.accounts.extend(health_check_metas);
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+pub struct PerpPlaceOrderPeggedInstruction {
+    pub account: Pubkey,
+    pub perp_market: Pubkey,
+    pub owner: TestKeypair,
+    pub side: Side,
+    pub price_offset: i64,
+    pub max_base_lots: i64,
+    pub max_quote_lots: i64,
+    pub client_order_id: u64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpPlaceOrderPeggedInstruction {
+    type Accounts = mango_v4::accounts::PerpPlaceOrder;
+    type Instruction = mango_v4::instruction::PerpPlaceOrderPegged;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            side: self.side,
+            price_offset: self.price_offset,
             peg_limit: -1,
             max_base_lots: self.max_base_lots,
             max_quote_lots: self.max_quote_lots,
