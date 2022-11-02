@@ -2387,6 +2387,10 @@ export type MangoV4 = {
         {
           "name": "settleFeeFractionLowHealth",
           "type": "f32"
+        },
+        {
+          "name": "settleTokenIndex",
+          "type": "u16"
         }
       ]
     },
@@ -2951,8 +2955,13 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "quoteBank",
+          "name": "settleBank",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleOracle",
+          "isMut": false,
           "isSigner": false
         }
       ],
@@ -2982,8 +2991,13 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "quoteBank",
+          "name": "settleBank",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleOracle",
+          "isMut": false,
           "isSigner": false
         }
       ],
@@ -3105,13 +3119,18 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "quoteBank",
+          "name": "settleBank",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "quoteVault",
+          "name": "settleVault",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleOracle",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -3896,13 +3915,8 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "padding0",
-            "type": {
-              "array": [
-                "u8",
-                2
-              ]
-            }
+            "name": "settleTokenIndex",
+            "type": "u16"
           },
           {
             "name": "perpMarketIndex",
@@ -8649,6 +8663,10 @@ export const IDL: MangoV4 = {
         {
           "name": "settleFeeFractionLowHealth",
           "type": "f32"
+        },
+        {
+          "name": "settleTokenIndex",
+          "type": "u16"
         }
       ]
     },
@@ -9213,8 +9231,13 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "quoteBank",
+          "name": "settleBank",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleOracle",
+          "isMut": false,
           "isSigner": false
         }
       ],
@@ -9244,8 +9267,13 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "quoteBank",
+          "name": "settleBank",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleOracle",
+          "isMut": false,
           "isSigner": false
         }
       ],
@@ -9367,13 +9395,18 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "quoteBank",
+          "name": "settleBank",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "quoteVault",
+          "name": "settleVault",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "settleOracle",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -10158,13 +10191,8 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "padding0",
-            "type": {
-              "array": [
-                "u8",
-                2
-              ]
-            }
+            "name": "settleTokenIndex",
+            "type": "u16"
           },
           {
             "name": "perpMarketIndex",

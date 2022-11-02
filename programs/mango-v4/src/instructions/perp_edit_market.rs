@@ -2,6 +2,8 @@ use crate::state::*;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
+use crate::logs::PerpMarketMetaDataLog;
+
 #[derive(Accounts)]
 pub struct PerpEditMarket<'info> {
     #[account(
@@ -134,6 +136,16 @@ pub fn perp_edit_market(
     if let Some(settle_fee_fraction_low_health) = settle_fee_fraction_low_health_opt {
         perp_market.settle_fee_fraction_low_health = settle_fee_fraction_low_health;
     }
+
+    emit!(PerpMarketMetaDataLog {
+        mango_group: ctx.accounts.group.key(),
+        perp_market: ctx.accounts.perp_market.key(),
+        perp_market_index: perp_market.perp_market_index,
+        base_decimals: perp_market.base_decimals,
+        base_lot_size: perp_market.base_lot_size,
+        quote_lot_size: perp_market.quote_lot_size,
+        oracle: perp_market.oracle.key(),
+    });
 
     Ok(())
 }

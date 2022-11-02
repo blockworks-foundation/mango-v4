@@ -49,7 +49,7 @@ async function closeUserAccount(userKeypairFile: string) {
     for (const serum3Account of mangoAccount.serum3Active()) {
       let orders = await client.getSerum3Orders(
         group,
-        group.findSerum3Market(serum3Account.marketIndex)!.name,
+        group.getSerum3MarketByIndex(serum3Account.marketIndex)!.name,
       );
       for (const order of orders) {
         console.log(
@@ -69,12 +69,12 @@ async function closeUserAccount(userKeypairFile: string) {
       await client.serum3SettleFunds(
         group,
         mangoAccount,
-        group.findSerum3Market(serum3Account.marketIndex)!.name,
+        group.getSerum3MarketByIndex(serum3Account.marketIndex)!.name,
       );
       await client.serum3CloseOpenOrders(
         group,
         mangoAccount,
-        group.findSerum3Market(serum3Account.marketIndex)!.name,
+        group.getSerum3MarketByIndex(serum3Account.marketIndex)!.name,
       );
     }
 

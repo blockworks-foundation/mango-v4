@@ -3,6 +3,8 @@ use anchor_lang::prelude::*;
 use crate::accounts_zerocopy::*;
 use crate::state::{Group, OrderBook, PerpMarket};
 
+use crate::logs::PerpUpdateFundingLog;
+
 #[derive(Accounts)]
 pub struct PerpUpdateFunding<'info> {
     pub group: AccountLoader<'info, Group>, // Required for group metadata parsing
@@ -31,6 +33,16 @@ pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
         perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
 
     perp_market.update_funding(&book, oracle_price, now_ts as u64)?;
+
+    emit!(PerpUpdateFundingLog {
+        mango_group: ctx.accounts.group.key(),
+        market_index: perp_market.perp_market_index,
+        long_funding: perp_market.long_funding.to_bits(),
+        short_funding: perp_market.long_funding.to_bits(),
+        price: oracle_price.to_bits(),
+        fees_accrued: perp_market.fees_accrued.to_bits(),
+        open_interest: perp_market.open_interest,
+    });
 
     Ok(())
 }

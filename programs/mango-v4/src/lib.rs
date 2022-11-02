@@ -408,9 +408,11 @@ pub mod mango_v4 {
         settle_fee_flat: f32,
         settle_fee_amount_threshold: f32,
         settle_fee_fraction_low_health: f32,
+        settle_token_index: TokenIndex,
     ) -> Result<()> {
         instructions::perp_create_market(
             ctx,
+            settle_token_index,
             perp_market_index,
             name,
             oracle_config,

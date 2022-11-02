@@ -11,7 +11,7 @@ use crate::state::*;
 use crate::util::checked_math as cm;
 
 use crate::logs::{
-    LiquidateTokenBankruptcyLog, LoanOriginationFeeInstruction, TokenBalanceLog,
+    LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqBankruptcyLog,
     WithdrawLoanOriginationFeeLog,
 };
 
@@ -305,7 +305,7 @@ pub fn token_liq_bankruptcy(
         liqee.deactivate_token_position_and_log(liqee_raw_token_index, ctx.accounts.liqee.key());
     }
 
-    emit!(LiquidateTokenBankruptcyLog {
+    emit!(TokenLiqBankruptcyLog {
         mango_group: ctx.accounts.group.key(),
         liqee: ctx.accounts.liqee.key(),
         liqor: ctx.accounts.liqor.key(),

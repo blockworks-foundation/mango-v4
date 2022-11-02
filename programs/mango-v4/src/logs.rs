@@ -5,11 +5,10 @@ use crate::{
 use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 
-/// Warning: This function needs 512+ bytes free on the stack
 pub fn emit_perp_balances(
     mango_group: Pubkey,
     mango_account: Pubkey,
-    market_index: u64,
+    market_index: u16,
     pp: &PerpPosition,
     pm: &PerpMarket,
 ) {
@@ -30,7 +29,7 @@ pub fn emit_perp_balances(
 pub struct PerpBalanceLog {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
-    pub market_index: u64, // IDL doesn't support usize
+    pub market_index: u16,
     pub base_position: i64,
     pub quote_position: i128,        // I80F48
     pub long_settled_funding: i128,  // I80F48
@@ -117,12 +116,14 @@ pub struct FillLog {
 }
 
 #[event]
-pub struct UpdateFundingLog {
+pub struct PerpUpdateFundingLog {
     pub mango_group: Pubkey,
     pub market_index: u16,
-    pub long_funding: i128,  // I80F48
-    pub short_funding: i128, // I80F48
-    pub price: i128,         // I80F48
+    pub long_funding: i128,
+    pub short_funding: i128,
+    pub price: i128,
+    pub fees_accrued: i128,
+    pub open_interest: i64,
 }
 
 #[event]
@@ -135,6 +136,8 @@ pub struct UpdateIndexLog {
     pub price: i128,           // I80F48
     pub collected_fees: i128,  // I80F48
     pub loan_fee_rate: i128,   // I80F48
+    pub total_borrows: i128,
+    pub total_deposits: i128,
 }
 
 #[event]
@@ -147,7 +150,7 @@ pub struct UpdateRateLog {
 }
 
 #[event]
-pub struct LiquidateTokenAndTokenLog {
+pub struct TokenLiqWithTokenLog {
     pub mango_group: Pubkey,
     pub liqee: Pubkey,
     pub liqor: Pubkey,
@@ -196,7 +199,7 @@ pub struct WithdrawLoanOriginationFeeLog {
 }
 
 #[event]
-pub struct LiquidateTokenBankruptcyLog {
+pub struct TokenLiqBankruptcyLog {
     pub mango_group: Pubkey,
     pub liqee: Pubkey,
     pub liqor: Pubkey,
@@ -213,6 +216,90 @@ pub struct DeactivateTokenPositionLog {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
     pub token_index: u16,
-    pub cumulative_deposit_interest: f32,
-    pub cumulative_borrow_interest: f32,
+    pub cumulative_deposit_interest: f64,
+    pub cumulative_borrow_interest: f64,
+}
+
+#[event]
+pub struct DeactivatePerpPositionLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub market_index: u16,
+    pub cumulative_long_funding: f64,
+    pub cumulative_short_funding: f64,
+    pub maker_volume: u64,
+    pub taker_volume: u64,
+    pub perp_spot_transfers: i64,
+}
+
+#[event]
+pub struct TokenMetaDataLog {
+    pub mango_group: Pubkey,
+    pub mint: Pubkey,
+    pub token_index: u16,
+    pub mint_decimals: u8,
+    pub oracle: Pubkey,
+    pub mint_info: Pubkey,
+}
+
+#[event]
+pub struct PerpMarketMetaDataLog {
+    pub mango_group: Pubkey,
+    pub perp_market: Pubkey,
+    pub perp_market_index: u16,
+    pub base_decimals: u8,
+    pub base_lot_size: i64,
+    pub quote_lot_size: i64,
+    pub oracle: Pubkey,
+}
+
+#[event]
+pub struct Serum3RegisterMarketLog {
+    pub mango_group: Pubkey,
+    pub serum_market: Pubkey,
+    pub market_index: u16,
+    pub base_token_index: u16,
+    pub quote_token_index: u16,
+    pub serum_program: Pubkey,
+    pub serum_program_external: Pubkey,
+}
+
+#[event]
+pub struct PerpLiqBasePositionLog {
+    pub mango_group: Pubkey,
+    pub perp_market_index: u16,
+    pub liqor: Pubkey,
+    pub liqee: Pubkey,
+    pub base_transfer: i64,
+    pub quote_transfer: i128,
+    pub price: i128,
+}
+
+#[event]
+pub struct PerpLiqBankruptcyLog {
+    pub mango_group: Pubkey,
+    pub liqee: Pubkey,
+    pub liqor: Pubkey,
+    pub perp_market_index: u16,
+    pub insurance_transfer: i128,
+    pub socialized_loss: i128,
+}
+
+#[event]
+pub struct PerpSettlePnlLog {
+    pub mango_group: Pubkey,
+    pub mango_account_a: Pubkey,
+    pub mango_account_b: Pubkey,
+    pub perp_market_index: u16,
+    pub settlement: i128,
+    pub settler: Pubkey,
+    pub fee: i128,
+}
+
+#[event]
+pub struct PerpSettleFeesLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub perp_market_index: u16,
+    pub settlement: i128,
 }

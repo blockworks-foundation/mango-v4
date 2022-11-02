@@ -32,18 +32,17 @@ pub struct TokenPosition {
     pub padding: [u8; 5],
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 16],
+    pub reserved: [u8; 8],
 
     // bookkeeping variable for onchain interest calculation
     // either deposit_index or borrow_index at last indexed_position change
     pub previous_index: I80F48,
-
     // (Display only)
     // Cumulative deposit interest in token native units
-    pub cumulative_deposit_interest: f32,
+    pub cumulative_deposit_interest: f64,
     // (Display only)
     // Cumulative borrow interest in token native units
-    pub cumulative_borrow_interest: f32,
+    pub cumulative_borrow_interest: f64,
 }
 
 unsafe impl bytemuck::Pod for TokenPosition {}
@@ -62,7 +61,7 @@ impl Default for TokenPosition {
             cumulative_borrow_interest: 0.0,
             previous_index: I80F48::ZERO,
             padding: Default::default(),
-            reserved: [0; 16],
+            reserved: [0; 8],
         }
     }
 }
@@ -193,7 +192,23 @@ pub struct PerpPosition {
     pub taker_quote_lots: i64,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 64],
+    pub reserved: [u8; 24],
+
+    // (Display only)
+    // Cumulative long funding in base native units
+    pub cumulative_long_funding: f64,
+    // (Display only)
+    // Cumulative short funding in base native units
+    pub cumulative_short_funding: f64,
+    // (Display only)
+    // Cumulative maker volume in quote native units
+    pub maker_volume: u64,
+    // (Display only)
+    // Cumulative taker volume in quote native units
+    pub taker_volume: u64,
+    // (Display only)
+    // Cumulative realized pnl in quote native units
+    pub perp_spot_transfers: i64,
 }
 const_assert_eq!(size_of::<PerpPosition>(), 8 + 7 * 8 + 3 * 16 + 64);
 const_assert_eq!(size_of::<PerpPosition>() % 8, 0);
@@ -213,10 +228,15 @@ impl Default for PerpPosition {
             asks_base_lots: 0,
             taker_base_lots: 0,
             taker_quote_lots: 0,
-            reserved: [0; 64],
+            reserved: [0; 24],
             long_settled_funding: I80F48::ZERO,
             short_settled_funding: I80F48::ZERO,
             padding: Default::default(),
+            cumulative_long_funding: 0.0,
+            cumulative_short_funding: 0.0,
+            maker_volume: 0,
+            taker_volume: 0,
+            perp_spot_transfers: 0,
         }
     }
 }
@@ -288,6 +308,13 @@ impl PerpPosition {
     pub fn settle_funding(&mut self, perp_market: &PerpMarket) {
         let funding = self.unsettled_funding(perp_market);
         cm!(self.quote_position_native -= funding);
+
+        if self.base_position_lots.is_positive() {
+            self.cumulative_long_funding += funding.to_num::<f64>();
+        } else {
+            self.cumulative_short_funding -= funding.to_num::<f64>();
+        }
+
         self.long_settled_funding = perp_market.long_funding;
         self.short_settled_funding = perp_market.short_funding;
     }

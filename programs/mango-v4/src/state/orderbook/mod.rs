@@ -19,9 +19,7 @@ mod queue;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::{
-        MangoAccount, MangoAccountValue, PerpMarket, FREE_ORDER_SLOT, QUOTE_TOKEN_INDEX,
-    };
+    use crate::state::{MangoAccount, MangoAccountValue, PerpMarket, FREE_ORDER_SLOT};
     use anchor_lang::prelude::*;
     use bytemuck::Zeroable;
     use fixed::types::I80F48;
@@ -99,6 +97,7 @@ mod tests {
     #[test]
     fn book_bids_full() {
         let (mut perp_market, oracle_price, mut event_queue, mut book) = test_setup(5000.0);
+        let settle_token_index = 0;
 
         let mut new_order = |book: &mut OrderBook,
                              event_queue: &mut EventQueue,
@@ -109,7 +108,7 @@ mod tests {
             let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
             let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
             account
-                .ensure_perp_position(perp_market.perp_market_index, QUOTE_TOKEN_INDEX)
+                .ensure_perp_position(perp_market.perp_market_index, settle_token_index)
                 .unwrap();
 
             let quantity = 1;
@@ -197,6 +196,7 @@ mod tests {
     #[test]
     fn book_new_order() {
         let (mut market, oracle_price, mut event_queue, mut book) = test_setup(1000.0);
+        let settle_token_index = 0;
 
         // Add lots and fees to make sure to exercise unit conversion
         market.base_lot_size = 10;
@@ -208,10 +208,10 @@ mod tests {
         let mut maker = MangoAccountValue::from_bytes(&buffer).unwrap();
         let mut taker = MangoAccountValue::from_bytes(&buffer).unwrap();
         maker
-            .ensure_perp_position(market.perp_market_index, QUOTE_TOKEN_INDEX)
+            .ensure_perp_position(market.perp_market_index, settle_token_index)
             .unwrap();
         taker
-            .ensure_perp_position(market.perp_market_index, QUOTE_TOKEN_INDEX)
+            .ensure_perp_position(market.perp_market_index, settle_token_index)
             .unwrap();
 
         let maker_pk = Pubkey::new_unique();

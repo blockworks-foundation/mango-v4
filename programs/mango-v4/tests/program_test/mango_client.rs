@@ -2200,6 +2200,7 @@ pub struct PerpCreateMarketInstruction {
     pub orderbook: Pubkey,
     pub event_queue: Pubkey,
     pub payer: TestKeypair,
+    pub settle_token_index: TokenIndex,
     pub perp_market_index: PerpMarketIndex,
     pub base_decimals: u8,
     pub quote_lot_size: i64,
@@ -2250,6 +2251,7 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             oracle_config: OracleConfig {
                 conf_filter: I80F48::from_num::<f32>(0.10),
             },
+            settle_token_index: self.settle_token_index,
             perp_market_index: self.perp_market_index,
             quote_lot_size: self.quote_lot_size,
             base_lot_size: self.base_lot_size,
@@ -2617,7 +2619,7 @@ pub struct PerpSettlePnlInstruction {
     pub account_a: Pubkey,
     pub account_b: Pubkey,
     pub perp_market: Pubkey,
-    pub quote_bank: Pubkey,
+    pub settle_bank: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for PerpSettlePnlInstruction {
@@ -2631,6 +2633,7 @@ impl ClientInstruction for PerpSettlePnlInstruction {
         let instruction = Self::Instruction {};
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+        let settle_bank: Bank = account_loader.load(&self.settle_bank).await.unwrap();
         let account_a = account_loader
             .load_mango_account(&self.account_a)
             .await
@@ -2658,7 +2661,8 @@ impl ClientInstruction for PerpSettlePnlInstruction {
             account_a: self.account_a,
             account_b: self.account_b,
             oracle: perp_market.oracle,
-            quote_bank: self.quote_bank,
+            settle_bank: self.settle_bank,
+            settle_oracle: settle_bank.oracle,
         };
 
         let mut instruction = make_instruction(program_id, &accounts, instruction);
@@ -2675,7 +2679,7 @@ impl ClientInstruction for PerpSettlePnlInstruction {
 pub struct PerpSettleFeesInstruction {
     pub account: Pubkey,
     pub perp_market: Pubkey,
-    pub quote_bank: Pubkey,
+    pub settle_bank: Pubkey,
     pub max_settle_amount: u64,
 }
 #[async_trait::async_trait(?Send)]
@@ -2692,6 +2696,7 @@ impl ClientInstruction for PerpSettleFeesInstruction {
         };
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+        let settle_bank: Bank = account_loader.load(&self.settle_bank).await.unwrap();
         let account = account_loader
             .load_mango_account(&self.account)
             .await
@@ -2710,7 +2715,8 @@ impl ClientInstruction for PerpSettleFeesInstruction {
             perp_market: self.perp_market,
             account: self.account,
             oracle: perp_market.oracle,
-            quote_bank: self.quote_bank,
+            settle_bank: self.settle_bank,
+            settle_oracle: settle_bank.oracle,
         };
         let mut instruction = make_instruction(program_id, &accounts, instruction);
         instruction.accounts.extend(health_check_metas);
@@ -2888,8 +2894,9 @@ impl ClientInstruction for PerpLiqBankruptcyInstruction {
             liqor: self.liqor,
             liqor_owner: self.liqor_owner.pubkey(),
             liqee: self.liqee,
-            quote_bank: quote_mint_info.first_bank(),
-            quote_vault: quote_mint_info.first_vault(),
+            settle_bank: quote_mint_info.first_bank(),
+            settle_vault: quote_mint_info.first_vault(),
+            settle_oracle: quote_mint_info.oracle,
             insurance_vault: group.insurance_vault,
             token_program: Token::id(),
         };

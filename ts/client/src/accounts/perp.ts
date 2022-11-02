@@ -25,6 +25,7 @@ export class PerpMarket {
   public openInterest: BN;
   public seqNum: BN;
   public feesAccrued: I80F48;
+  public feesSettled: I80F48;
   priceLotsToUiConverter: number;
   baseLotsToUiConverter: number;
   quoteLotsToUiConverter: number;
@@ -61,6 +62,7 @@ export class PerpMarket {
       openInterest: BN;
       seqNum: BN;
       feesAccrued: I80F48Dto;
+      feesSettled: I80F48Dto;
       bump: number;
       baseDecimals: number;
       registrationTime: BN;
@@ -95,6 +97,7 @@ export class PerpMarket {
       obj.openInterest,
       obj.seqNum,
       obj.feesAccrued,
+      obj.feesSettled,
       obj.bump,
       obj.baseDecimals,
       obj.registrationTime,
@@ -130,6 +133,7 @@ export class PerpMarket {
     openInterest: BN,
     seqNum: BN,
     feesAccrued: I80F48Dto,
+    feesSettled: I80F48Dto,
     bump: number,
     public baseDecimals: number,
     public registrationTime: BN,
@@ -149,6 +153,7 @@ export class PerpMarket {
     this.openInterest = openInterest;
     this.seqNum = seqNum;
     this.feesAccrued = I80F48.from(feesAccrued);
+    this.feesSettled = I80F48.from(feesSettled);
 
     this.priceLotsToUiConverter = new Big(10)
       .pow(baseDecimals - QUOTE_DECIMALS)
@@ -207,6 +212,25 @@ export class PerpMarket {
     return eventQueue
       .eventsSince(lastSeqNum)
       .filter((event) => event.eventType == PerpEventQueue.FILL_EVENT_TYPE);
+  }
+
+  public async logOb(client: MangoClient): Promise<string> {
+    let res = ``;
+    res += `  ${this.name} OrderBook`;
+    let orders = await this?.loadAsks(client);
+    for (const order of orders!.items()) {
+      res += `\n  ${order.uiPrice.toFixed(5).padStart(10)}, ${order.uiSize
+        .toString()
+        .padStart(10)}`;
+    }
+    res += `\n  asks ↑ --------- ↓ bids`;
+    orders = await this?.loadBids(client);
+    for (const order of orders!.items()) {
+      res += `\n  ${order.uiPrice.toFixed(5).padStart(10)}, ${order.uiSize
+        .toString()
+        .padStart(10)}`;
+    }
+    return res;
   }
 
   /**
@@ -380,6 +404,10 @@ export class BookSide {
     }
   }
 
+  public best(): PerpOrder | undefined {
+    return this.items().next().value;
+  }
+
   getImpactPriceUi(baseLots: BN): number | undefined {
     const s = new BN(0);
     for (const order of this.items()) {
@@ -491,10 +519,10 @@ export class PerpOrderSide {
 
 export class PerpOrderType {
   static limit = { limit: {} };
-  static immediateOrCancel = { immediateorcancel: {} };
-  static postOnly = { postonly: {} };
+  static immediateOrCancel = { immediateOrCancel: {} };
+  static postOnly = { postOnly: {} };
   static market = { market: {} };
-  static postOnlySlide = { postonlyslide: {} };
+  static postOnlySlide = { postOnlySlide: {} };
 }
 
 export class PerpOrder {

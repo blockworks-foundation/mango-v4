@@ -49,7 +49,9 @@ async function main() {
   let accounts = await client.getMangoAccountsForOwner(group, admin.publicKey);
   for (let account of accounts) {
     for (let serumOrders of account.serum3Active()) {
-      const serumMarket = group.findSerum3Market(serumOrders.marketIndex)!;
+      const serumMarket = group.getSerum3MarketByIndex(
+        serumOrders.marketIndex,
+      )!;
       const serumExternal = serumMarket.serumMarketExternal;
       console.log(
         `closing serum orders on: ${account} for market ${serumMarket.name}`,
