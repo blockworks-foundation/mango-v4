@@ -1005,7 +1005,7 @@ export class PerpPosition {
       I80F48.from(dto.longSettledFunding),
       I80F48.from(dto.shortSettledFunding),
       dto.quoteEntryNative,
-      dto.quoteRunningNative
+      dto.quoteRunningNative,
     );
   }
 
@@ -1023,7 +1023,7 @@ export class PerpPosition {
       ZERO_I80F48(),
       ZERO_I80F48(),
       new BN(0),
-      new BN(0)
+      new BN(0),
     );
   }
 
@@ -1093,21 +1093,21 @@ export class PerpPosition {
   }
 
   public getEntryPrice(perpMarket: PerpMarket): BN {
-    if(this.basePositionLots.eq(new BN(0))) {
+    if (this.basePositionLots.eq(new BN(0))) {
       return new BN(0);
     }
-    return this.quoteEntryNative.div(
-      this.basePositionLots.mul(perpMarket.baseLotSize)
-    ).abs();
+    return this.quoteEntryNative
+      .div(this.basePositionLots.mul(perpMarket.baseLotSize))
+      .abs();
   }
 
   public getBreakEvenPrice(perpMarket: PerpMarket): BN {
-    if(this.basePositionLots.eq(new BN(0))) {
-      return new BN(0)
+    if (this.basePositionLots.eq(new BN(0))) {
+      return new BN(0);
     }
-    return this.quoteRunningNative.div(
-      this.basePositionLots.mul(perpMarket.baseLotSize)
-    ).abs()
+    return this.quoteRunningNative
+      .div(this.basePositionLots.mul(perpMarket.baseLotSize))
+      .abs();
   }
 }
 

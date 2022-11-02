@@ -89,6 +89,8 @@ describe('Health Cache', () => {
       new BN(2),
       I80F48.fromNumber(0),
       I80F48.fromNumber(0),
+      new BN(0),
+      new BN(0),
     );
     const pi1 = PerpInfo.fromPerpPosition(pM, pp);
 
@@ -190,6 +192,8 @@ describe('Health Cache', () => {
         new BN(0),
         I80F48.fromNumber(0),
         I80F48.fromNumber(0),
+        new BN(0),
+        new BN(0),
       );
       const pi1 = PerpInfo.fromPerpPosition(pM, pp);
 
