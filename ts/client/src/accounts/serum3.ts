@@ -4,10 +4,10 @@ import { Cluster, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
+import { MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { As } from '../utils';
 import { TokenIndex } from './bank';
 import { Group } from './group';
-import { MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 
 export type MarketIndex = number & As<'market-index'>;
 
@@ -23,7 +23,6 @@ export class Serum3Market {
       serumProgram: PublicKey;
       serumMarketExternal: PublicKey;
       marketIndex: number;
-      bump: number;
       registrationTime: BN;
     },
   ): Serum3Market {

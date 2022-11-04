@@ -7,6 +7,7 @@ import {
   TransactionInstruction,
 } from '@solana/web3.js';
 import fs from 'fs';
+import { RestClient } from 'ftx-api';
 import path from 'path';
 import { Group } from '../../accounts/group';
 import { MangoAccount } from '../../accounts/mangoAccount';
@@ -27,7 +28,12 @@ import {
   seqEnforcerProgramIds,
 } from './sequence-enforcer-util';
 
-// TODO switch to more efficient async logging if available in nodejs
+// Future
+// * use async nodejs logging
+// * merge gMa calls
+// * take out spammers
+// * batch ixs across various markets
+// * only refresh part of the group which market maker is interested in
 
 // Env vars
 const CLUSTER: Cluster =
@@ -57,14 +63,14 @@ type State = {
 };
 type MarketContext = {
   params: any;
-  market: PerpMarket;
+  perpMarket: PerpMarket;
   bids: BookSide;
   asks: BookSide;
   lastBookUpdate: number;
 
-  aggBid: number | undefined;
-  aggAsk: number | undefined;
-  ftxMid: number | undefined;
+  ftxBid: number | undefined;
+  ftxAsk: number | undefined;
+  ftxLast: number | undefined;
 
   sequenceAccount: PublicKey;
   sequenceAccountBump: number;
@@ -74,7 +80,18 @@ type MarketContext = {
   lastOrderUpdate: number;
 };
 
-// Refresh mango account and perp market order books
+const ftxClient = new RestClient();
+
+function getPerpMarketAssetsToTradeOn(group: Group) {
+  const allMangoGroupPerpMarketAssets = Array.from(
+    group.perpMarketsMapByName.keys(),
+  ).map((marketName) => marketName.replace('-PERP', ''));
+  return Object.keys(params.assets).filter((asset) =>
+    allMangoGroupPerpMarketAssets.includes(asset),
+  );
+}
+
+// Refresh group, mango account and perp markets
 async function refreshState(
   client: MangoClient,
   group: Group,
@@ -83,18 +100,27 @@ async function refreshState(
 ): Promise<State> {
   const ts = Date.now() / 1000;
 
-  // TODO do all updates in one RPC call
-  await Promise.all([group.reloadAll(client), mangoAccount.reload(client)]);
+  const result = await Promise.all([
+    group.reloadAll(client),
+    mangoAccount.reload(client),
+    ...Array.from(marketContexts.values()).map((mc) =>
+      ftxClient.getMarket(mc.perpMarket.name),
+    ),
+  ]);
 
-  for (const perpMarket of Array.from(
-    group.perpMarketsMapByMarketIndex.values(),
-  )) {
-    const mc = marketContexts.get(perpMarket.perpMarketIndex)!;
-    mc.market = perpMarket;
+  Array.from(marketContexts.values()).map(async (mc, i) => {
+    const perpMarket = mc.perpMarket;
+    mc.perpMarket = group.getPerpMarketByMarketIndex(
+      perpMarket.perpMarketIndex,
+    );
     mc.bids = await perpMarket.loadBids(client);
     mc.asks = await perpMarket.loadAsks(client);
     mc.lastBookUpdate = ts;
-  }
+
+    mc.ftxAsk = (result[i + 2] as any).result.ask;
+    mc.ftxBid = (result[i + 2] as any).result.bid;
+    mc.ftxLast = (result[i + 2] as any).result.last;
+  });
 
   return {
     mangoAccount,
@@ -113,7 +139,7 @@ async function initSequenceEnforcerAccounts(
       mc.sequenceAccount,
       (client.program.provider as AnchorProvider).wallet.publicKey,
       mc.sequenceAccountBump,
-      mc.market.name,
+      mc.perpMarket.name,
       CLUSTER,
     ),
   );
@@ -138,6 +164,40 @@ async function initSequenceEnforcerAccounts(
   }
 }
 
+async function cancelAllOrdersForAMarket(
+  client: MangoClient,
+  group: Group,
+  mangoAccount: MangoAccount,
+  perpMarket: PerpMarket,
+) {
+  for (const i of Array(100).keys()) {
+    await sendTransaction(
+      client.program.provider as AnchorProvider,
+      [
+        await client.perpCancelAllOrdersIx(
+          group,
+          mangoAccount,
+          perpMarket.perpMarketIndex,
+          10,
+        ),
+      ],
+      [],
+    );
+    await mangoAccount.reload(client);
+    if (
+      (
+        await mangoAccount.loadPerpOpenOrdersForMarket(
+          client,
+          group,
+          perpMarket.perpMarketIndex,
+        )
+      ).length === 0
+    ) {
+      break;
+    }
+  }
+}
+
 // Cancel all orders on exit
 async function onExit(
   client: MangoClient,
@@ -145,17 +205,9 @@ async function onExit(
   mangoAccount: MangoAccount,
   marketContexts: MarketContext[],
 ) {
-  const ixs: TransactionInstruction[] = [];
   for (const mc of marketContexts) {
-    const cancelAllIx = await client.perpCancelAllOrdersIx(
-      group,
-      mangoAccount,
-      mc.market.perpMarketIndex,
-      10,
-    );
-    ixs.push(cancelAllIx);
+    cancelAllOrdersForAMarket(client, group, mangoAccount, mc.perpMarket);
   }
-  await sendTransaction(client.program.provider as AnchorProvider, ixs, []);
 }
 
 // Main driver for the market maker
@@ -166,7 +218,6 @@ async function fullMarketMaker() {
   const user = Keypair.fromSecretKey(
     Buffer.from(JSON.parse(fs.readFileSync(USER_KEYPAIR!, 'utf-8'))),
   );
-  // TODO: make work for delegate
   const userWallet = new Wallet(user);
   const userProvider = new AnchorProvider(connection, userWallet, options);
   const client = await MangoClient.connect(
@@ -182,7 +233,9 @@ async function fullMarketMaker() {
     new PublicKey(MANGO_ACCOUNT_PK),
   );
   console.log(
-    `MangoAccount ${mangoAccount.publicKey} for user ${user.publicKey}`,
+    `MangoAccount ${mangoAccount.publicKey} for user ${user.publicKey} ${
+      mangoAccount.isDelegate(client) ? 'via delegate ' + user.publicKey : ''
+    }`,
   );
   await mangoAccount.reload(client);
 
@@ -204,9 +257,8 @@ async function fullMarketMaker() {
 
   // Build and maintain an aggregate context object per market
   const marketContexts: Map<PerpMarketIndex, MarketContext> = new Map();
-  for (const perpMarket of Array.from(
-    group.perpMarketsMapByMarketIndex.values(),
-  )) {
+  for (const perpMarketAsset of getPerpMarketAssetsToTradeOn(group)) {
+    const perpMarket = group.getPerpMarketByName(perpMarketAsset + '-PERP');
     const [sequenceAccount, sequenceAccountBump] =
       await PublicKey.findProgramAddress(
         [
@@ -218,8 +270,8 @@ async function fullMarketMaker() {
         seqEnforcerProgramIds[CLUSTER],
       );
     marketContexts.set(perpMarket.perpMarketIndex, {
-      params: params.assets[perpMarket.name.replace('-PERP', '')].perp,
-      market: perpMarket,
+      params: params.assets[perpMarketAsset].perp,
+      perpMarket: perpMarket,
       bids: await perpMarket.loadBids(client),
       asks: await perpMarket.loadAsks(client),
       lastBookUpdate: 0,
@@ -231,10 +283,9 @@ async function fullMarketMaker() {
       sentAskPrice: 0,
       lastOrderUpdate: 0,
 
-      // TODO
-      aggBid: undefined,
-      aggAsk: undefined,
-      ftxMid: undefined,
+      ftxBid: undefined,
+      ftxAsk: undefined,
+      ftxLast: undefined,
     });
   }
 
@@ -257,8 +308,9 @@ async function fullMarketMaker() {
   // Loop indefinitely
   while (control.isRunning) {
     try {
-      // TODO update this in a non blocking manner
-      state = await refreshState(client, group, mangoAccount, marketContexts);
+      refreshState(client, group, mangoAccount, marketContexts).then(
+        (result) => (state = result),
+      );
 
       mangoAccount = state.mangoAccount;
 
@@ -267,16 +319,15 @@ async function fullMarketMaker() {
       for (const mc of Array.from(marketContexts.values())) {
         const pos = mangoAccount.getPerpPositionUi(
           group,
-          mc.market.perpMarketIndex,
+          mc.perpMarket.perpMarketIndex,
         );
-        // TODO use ftx to get mid then also combine with books from other exchanges
-        const midWorkaround = mc.market.uiPrice;
-        if (midWorkaround) {
-          pfQuoteValue += pos * midWorkaround;
+        const mid = (mc.ftxBid! + mc.ftxAsk!) / 2;
+        if (mid) {
+          pfQuoteValue += pos * mid;
         } else {
           pfQuoteValue = undefined;
           console.log(
-            `Breaking pfQuoteValue computation, since mid is undefined for ${mc.market.name}!`,
+            `Breaking pfQuoteValue computation, since mid is undefined for ${mc.perpMarket.name}!`,
           );
           break;
         }
@@ -303,7 +354,6 @@ async function fullMarketMaker() {
           continue;
         }
 
-        // TODO: batch ixs
         const sig = await sendTransaction(
           client.program.provider as AnchorProvider,
           ixs,
@@ -333,13 +383,13 @@ async function makeMarketUpdateInstructions(
   mc: MarketContext,
   pfQuoteValue: number,
 ): Promise<TransactionInstruction[]> {
-  const perpMarketIndex = mc.market.perpMarketIndex;
-  const perpMarket = mc.market;
+  const perpMarketIndex = mc.perpMarket.perpMarketIndex;
+  const perpMarket = mc.perpMarket;
 
-  const aggBid = perpMarket.uiPrice; // TODO mc.aggBid;
-  const aggAsk = perpMarket.uiPrice; // TODO mc.aggAsk;
+  const aggBid = mc.ftxBid;
+  const aggAsk = mc.ftxAsk;
   if (aggBid === undefined || aggAsk === undefined) {
-    console.log(`No Aggregate Book for ${mc.market.name}!`);
+    console.log(`No Aggregate Book for ${mc.perpMarket.name}!`);
     return [];
   }
 
@@ -353,8 +403,7 @@ async function makeMarketUpdateInstructions(
   const sizePerc = mc.params.sizePerc;
   const quoteSize = equity * sizePerc;
   const size = quoteSize / fairValue;
-  // TODO look at event queue as well for unprocessed fills
-  const basePos = mangoAccount.getPerpPositionUi(group, perpMarketIndex);
+  const basePos = mangoAccount.getPerpPositionUi(group, perpMarketIndex, true);
   const lean = (-leanCoeff * basePos) / size;
   const pfQuoteLeanCoeff = params.pfQuoteLeanCoeff || 0.001; // How much to move if pf pos is equal to equity
   const pfQuoteLean = (pfQuoteValue / equity) * -pfQuoteLeanCoeff;
@@ -362,9 +411,6 @@ async function makeMarketUpdateInstructions(
   const bias = mc.params.bias;
   const bidPrice = fairValue * (1 - charge + lean + bias + pfQuoteLean);
   const askPrice = fairValue * (1 + charge + lean + bias + pfQuoteLean);
-
-  // TODO volatility adjustment
-
   const modelBidPrice = perpMarket.uiPriceToLots(bidPrice);
   const nativeBidSize = perpMarket.uiBaseToLots(size);
   const modelAskPrice = perpMarket.uiPriceToLots(askPrice);
@@ -383,15 +429,8 @@ async function makeMarketUpdateInstructions(
       ? BN.max(bestBid.priceLots.add(new BN(1)), modelAskPrice)
       : modelAskPrice;
 
-  // TODO use order book to requote if size has changed
-
-  // TODO
-  // const takeSpammers = mc.params.takeSpammers;
-  // const spammerCharge = mc.params.spammerCharge;
-
   let moveOrders = false;
   if (mc.lastBookUpdate >= mc.lastOrderUpdate + 2) {
-    // console.log(` - moveOrders - 303`);
     // If mango book was updated recently, then MangoAccount was also updated
     const openOrders = await mangoAccount.loadPerpOpenOrdersForMarket(
       client,
@@ -407,9 +446,6 @@ async function makeMarketUpdateInstructions(
           requoteThresh;
     }
   } else {
-    // console.log(
-    //   ` - moveOrders - 319, mc.lastBookUpdate ${mc.lastBookUpdate}, mc.lastOrderUpdate ${mc.lastOrderUpdate}`,
-    // );
     // If order was updated before MangoAccount, then assume that sent order already executed
     moveOrders =
       moveOrders ||
@@ -427,7 +463,9 @@ async function makeMarketUpdateInstructions(
     ),
   ];
 
-  // TODO Clear 1 lot size orders at the top of book that bad people use to manipulate the price
+  instructions.push(
+    await client.healthRegionBeginIx(group, mangoAccount, [], [perpMarket]),
+  );
 
   if (moveOrders) {
     // Cancel all, requote
@@ -446,7 +484,6 @@ async function makeMarketUpdateInstructions(
       mangoAccount,
       perpMarketIndex,
       PerpOrderSide.bid,
-      // TODO fix this, native to ui to native
       perpMarket.priceLotsToUi(bookAdjBid),
       perpMarket.baseLotsToUi(nativeBidSize),
       undefined,
@@ -479,7 +516,7 @@ async function makeMarketUpdateInstructions(
       instructions.push(placeAskIx);
     }
     console.log(
-      `Requoting for market ${mc.market.name} sentBid: ${
+      `Requoting for market ${mc.perpMarket.name} sentBid: ${
         mc.sentBidPrice
       } newBid: ${bookAdjBid} sentAsk: ${
         mc.sentAskPrice
@@ -492,12 +529,16 @@ async function makeMarketUpdateInstructions(
     mc.lastOrderUpdate = Date.now() / 1000;
   } else {
     console.log(
-      `Not requoting for market ${mc.market.name}. No need to move orders`,
+      `Not requoting for market ${mc.perpMarket.name}. No need to move orders`,
     );
   }
 
-  // If instruction is only the sequence enforcement, then just send empty
-  if (instructions.length === 1) {
+  instructions.push(
+    await client.healthRegionEndIx(group, mangoAccount, [], [perpMarket]),
+  );
+
+  // If instruction is only the sequence enforcement and health region ixs, then just send empty
+  if (instructions.length === 3) {
     return [];
   } else {
     return instructions;

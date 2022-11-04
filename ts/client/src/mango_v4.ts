@@ -3626,11 +3626,11 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "netSettled",
+            "name": "perpSpotTransfers",
             "type": "i64"
           },
           {
-            "name": "healthRegionPreInitHealth",
+            "name": "healthRegionBeginInitHealth",
             "docs": [
               "Init health as calculated during HealthReginBegin, rounded up."
             ],
@@ -4618,7 +4618,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                16
+                8
               ]
             }
           },
@@ -4630,11 +4630,11 @@ export type MangoV4 = {
           },
           {
             "name": "cumulativeDepositInterest",
-            "type": "f32"
+            "type": "f64"
           },
           {
             "name": "cumulativeBorrowInterest",
-            "type": "f32"
+            "type": "f64"
           }
         ]
       }
@@ -4792,9 +4792,29 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                64
+                24
               ]
             }
+          },
+          {
+            "name": "cumulativeLongFunding",
+            "type": "f64"
+          },
+          {
+            "name": "cumulativeShortFunding",
+            "type": "f64"
+          },
+          {
+            "name": "makerVolume",
+            "type": "u64"
+          },
+          {
+            "name": "takerVolume",
+            "type": "u64"
+          },
+          {
+            "name": "perpSpotTransfers",
+            "type": "i64"
           }
         ]
       }
@@ -5561,7 +5581,7 @@ export type MangoV4 = {
         },
         {
           "name": "marketIndex",
-          "type": "u64",
+          "type": "u16",
           "index": false
         },
         {
@@ -5833,7 +5853,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "UpdateFundingLog",
+      "name": "PerpUpdateFundingLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -5858,6 +5878,16 @@ export type MangoV4 = {
         {
           "name": "price",
           "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feesAccrued",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "openInterest",
+          "type": "i64",
           "index": false
         }
       ]
@@ -5904,6 +5934,16 @@ export type MangoV4 = {
           "name": "loanFeeRate",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "totalBorrows",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "totalDeposits",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -5938,7 +5978,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "LiquidateTokenAndTokenLog",
+      "name": "TokenLiqWithTokenLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -6075,7 +6115,7 @@ export type MangoV4 = {
       ]
     },
     {
-      "name": "LiquidateTokenBankruptcyLog",
+      "name": "TokenLiqBankruptcyLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -6144,12 +6184,312 @@ export type MangoV4 = {
         },
         {
           "name": "cumulativeDepositInterest",
-          "type": "f32",
+          "type": "f64",
           "index": false
         },
         {
           "name": "cumulativeBorrowInterest",
-          "type": "f32",
+          "type": "f64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "DeactivatePerpPositionLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "cumulativeLongFunding",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "cumulativeShortFunding",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "makerVolume",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerVolume",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "perpSpotTransfers",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenMetaDataLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "mintDecimals",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mintInfo",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpMarketMetaDataLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarket",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "baseDecimals",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "baseLotSize",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteLotSize",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "Serum3RegisterMarketLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "serumMarket",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "baseTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quoteTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "serumProgram",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "serumProgramExternal",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpLiqBasePositionLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransfer",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpLiqBankruptcyLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "insuranceTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "socializedLoss",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpSettlePnlLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccountA",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccountB",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "settlement",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "settler",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "fee",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpSettleFeesLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "settlement",
+          "type": "i128",
           "index": false
         }
       ]
@@ -9902,11 +10242,11 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "netSettled",
+            "name": "perpSpotTransfers",
             "type": "i64"
           },
           {
-            "name": "healthRegionPreInitHealth",
+            "name": "healthRegionBeginInitHealth",
             "docs": [
               "Init health as calculated during HealthReginBegin, rounded up."
             ],
@@ -10894,7 +11234,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                16
+                8
               ]
             }
           },
@@ -10906,11 +11246,11 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "cumulativeDepositInterest",
-            "type": "f32"
+            "type": "f64"
           },
           {
             "name": "cumulativeBorrowInterest",
-            "type": "f32"
+            "type": "f64"
           }
         ]
       }
@@ -11068,9 +11408,29 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                64
+                24
               ]
             }
+          },
+          {
+            "name": "cumulativeLongFunding",
+            "type": "f64"
+          },
+          {
+            "name": "cumulativeShortFunding",
+            "type": "f64"
+          },
+          {
+            "name": "makerVolume",
+            "type": "u64"
+          },
+          {
+            "name": "takerVolume",
+            "type": "u64"
+          },
+          {
+            "name": "perpSpotTransfers",
+            "type": "i64"
           }
         ]
       }
@@ -11837,7 +12197,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "marketIndex",
-          "type": "u64",
+          "type": "u16",
           "index": false
         },
         {
@@ -12109,7 +12469,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "UpdateFundingLog",
+      "name": "PerpUpdateFundingLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -12134,6 +12494,16 @@ export const IDL: MangoV4 = {
         {
           "name": "price",
           "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feesAccrued",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "openInterest",
+          "type": "i64",
           "index": false
         }
       ]
@@ -12180,6 +12550,16 @@ export const IDL: MangoV4 = {
           "name": "loanFeeRate",
           "type": "i128",
           "index": false
+        },
+        {
+          "name": "totalBorrows",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "totalDeposits",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -12214,7 +12594,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "LiquidateTokenAndTokenLog",
+      "name": "TokenLiqWithTokenLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -12351,7 +12731,7 @@ export const IDL: MangoV4 = {
       ]
     },
     {
-      "name": "LiquidateTokenBankruptcyLog",
+      "name": "TokenLiqBankruptcyLog",
       "fields": [
         {
           "name": "mangoGroup",
@@ -12420,12 +12800,312 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "cumulativeDepositInterest",
-          "type": "f32",
+          "type": "f64",
           "index": false
         },
         {
           "name": "cumulativeBorrowInterest",
-          "type": "f32",
+          "type": "f64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "DeactivatePerpPositionLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "cumulativeLongFunding",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "cumulativeShortFunding",
+          "type": "f64",
+          "index": false
+        },
+        {
+          "name": "makerVolume",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "takerVolume",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "perpSpotTransfers",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenMetaDataLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "mintDecimals",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mintInfo",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpMarketMetaDataLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarket",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "baseDecimals",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "baseLotSize",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteLotSize",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "Serum3RegisterMarketLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "serumMarket",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "marketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "baseTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quoteTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "serumProgram",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "serumProgramExternal",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpLiqBasePositionLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransfer",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpLiqBankruptcyLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "insuranceTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "socializedLoss",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpSettlePnlLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccountA",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccountB",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "settlement",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "settler",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "fee",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpSettleFeesLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "settlement",
+          "type": "i128",
           "index": false
         }
       ]

@@ -115,16 +115,18 @@ async function main() {
   console.log(
     'mangoAccount.simHealthWithTokenPositionChanges ' +
       toUiDecimalsForQuote(
-        await mangoAccount.simHealthRatioWithTokenPositionUiChanges(group, [
+        mangoAccount.simHealthRatioWithTokenPositionUiChanges(group, [
           {
             mintPk: group.banksMapByName.get('USDC')![0].mint,
             uiTokenAmount:
-              -20_000 * Math.pow(10, group.banksMap.get('BTC')?.mintDecimals!),
+              -20000 *
+              Math.pow(10, group.banksMapByName.get('BTC')![0].mintDecimals!),
           },
           {
             mintPk: group.banksMapByName.get('BTC')![0].mint,
             uiTokenAmount:
-              1 * Math.pow(10, group.banksMap.get('BTC')?.mintDecimals!),
+              1 *
+              Math.pow(10, group.banksMapByName.get('BTC')![0].mintDecimals!),
           },
         ]),
       ),

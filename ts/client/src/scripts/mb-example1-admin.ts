@@ -350,7 +350,7 @@ async function createUser(userKeypair: string) {
     new PublicKey(MAINNET_MINTS.get('USDC')!),
     10,
   );
-  await mangoAccount.reload(client, group);
+  await mangoAccount.reload(client);
   console.log(`...deposited 10 USDC`);
 
   await client.tokenDeposit(
@@ -359,7 +359,7 @@ async function createUser(userKeypair: string) {
     new PublicKey(MAINNET_MINTS.get('SOL')!),
     1,
   );
-  await mangoAccount.reload(client, group);
+  await mangoAccount.reload(client);
   console.log(`...deposited 1 SOL`);
 }
 
@@ -422,7 +422,7 @@ async function placeSerum3TradeAndCancelIt(userKeypair: string) {
       console.log(order);
     }
     console.log(`...cancelling serum3 orders`);
-    await client.serum3CancelAllorders(
+    await client.serum3CancelAllOrders(
       group,
       mangoAccount,
       new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),

@@ -1,4 +1,4 @@
-import { BN } from '@project-serum/anchor';
+import { AnchorProvider, BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { AccountInfo, PublicKey } from '@solana/web3.js';
@@ -12,12 +12,11 @@ import { HealthCache } from './healthCache';
 import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
+  public name: string;
   public tokens: TokenPosition[];
   public serum3: Serum3Orders[];
   public perps: PerpPosition[];
   public perpOpenOrders: PerpOo[];
-  public name: string;
-  public netDeposits: BN;
 
   static from(
     publicKey: PublicKey,
@@ -26,29 +25,31 @@ export class MangoAccount {
       owner: PublicKey;
       name: number[];
       delegate: PublicKey;
-      beingLiquidated: number;
       accountNum: number;
-      bump: number;
+      beingLiquidated: number;
+      inHealthRegion: number;
       netDeposits: BN;
-      netSettled: BN;
+      perpSpotTransfers: BN;
+      healthRegionBeginInitHealth: BN;
       headerVersion: number;
       tokens: unknown;
       serum3: unknown;
       perps: unknown;
       perpOpenOrders: unknown;
     },
-  ) {
+  ): MangoAccount {
     return new MangoAccount(
       publicKey,
       obj.group,
       obj.owner,
       obj.name,
       obj.delegate,
-      obj.beingLiquidated,
       obj.accountNum,
-      obj.bump,
+      obj.beingLiquidated == 1,
+      obj.inHealthRegion == 1,
       obj.netDeposits,
-      obj.netSettled,
+      obj.perpSpotTransfers,
+      obj.healthRegionBeginInitHealth,
       obj.headerVersion,
       obj.tokens as TokenPositionDto[],
       obj.serum3 as Serum3PositionDto[],
@@ -64,12 +65,13 @@ export class MangoAccount {
     public owner: PublicKey,
     name: number[],
     public delegate: PublicKey,
-    beingLiquidated: number,
     public accountNum: number,
-    bump: number,
-    netDeposits: BN,
-    netSettled: BN,
-    headerVersion: number,
+    public beingLiquidated: boolean,
+    public inHealthRegion: boolean,
+    public netDeposits: BN,
+    public perpSpotTransfers: BN,
+    public healthRegionBeginInitHealth: BN,
+    public headerVersion: number,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
     perps: PerpPositionDto[],
@@ -81,17 +83,16 @@ export class MangoAccount {
     this.serum3 = serum3.map((dto) => Serum3Orders.from(dto));
     this.perps = perps.map((dto) => PerpPosition.from(dto));
     this.perpOpenOrders = perpOpenOrders.map((dto) => PerpOo.from(dto));
-    this.netDeposits = netDeposits;
   }
 
-  async reload(client: MangoClient): Promise<MangoAccount> {
+  public async reload(client: MangoClient): Promise<MangoAccount> {
     const mangoAccount = await client.getMangoAccount(this);
     await mangoAccount.reloadAccountData(client);
     Object.assign(this, mangoAccount);
     return mangoAccount;
   }
 
-  async reloadWithSlot(
+  public async reloadWithSlot(
     client: MangoClient,
   ): Promise<{ value: MangoAccount; slot: number }> {
     const resp = await client.getMangoAccountWithSlot(this.publicKey);
@@ -127,46 +128,59 @@ export class MangoAccount {
     return this;
   }
 
-  tokensActive(): TokenPosition[] {
+  public isDelegate(client: MangoClient): boolean {
+    return this.delegate.equals(
+      (client.program.provider as AnchorProvider).wallet.publicKey,
+    );
+  }
+
+  public tokensActive(): TokenPosition[] {
     return this.tokens.filter((token) => token.isActive());
   }
 
-  serum3Active(): Serum3Orders[] {
+  public serum3Active(): Serum3Orders[] {
     return this.serum3.filter((serum3) => serum3.isActive());
   }
 
-  perpActive(): PerpPosition[] {
+  public perpActive(): PerpPosition[] {
     return this.perps.filter((perp) => perp.isActive());
   }
 
-  perpOrdersActive(): PerpOo[] {
+  public perpOrdersActive(): PerpOo[] {
     return this.perpOpenOrders.filter(
       (oo) => oo.orderMarket !== PerpOo.OrderMarketUnset,
     );
   }
 
-  getToken(tokenIndex: TokenIndex): TokenPosition | undefined {
+  public getToken(tokenIndex: TokenIndex): TokenPosition | undefined {
     return this.tokens.find((ta) => ta.tokenIndex == tokenIndex);
   }
 
-  getSerum3Account(marketIndex: MarketIndex): Serum3Orders | undefined {
+  public getSerum3Account(marketIndex: MarketIndex): Serum3Orders | undefined {
     return this.serum3.find((sa) => sa.marketIndex == marketIndex);
   }
 
-  getPerpPosition(perpMarketIndex: PerpMarketIndex): PerpPosition | undefined {
+  public getPerpPosition(
+    perpMarketIndex: PerpMarketIndex,
+    useEventQueue?: boolean,
+  ): PerpPosition | undefined {
     return this.perps.find((pp) => pp.marketIndex == perpMarketIndex);
   }
 
-  getPerpPositionUi(group: Group, perpMarketIndex: PerpMarketIndex): number {
+  public getPerpPositionUi(
+    group: Group,
+    perpMarketIndex: PerpMarketIndex,
+    useEventQueue?: boolean,
+  ): number {
     const pp = this.perps.find((pp) => pp.marketIndex == perpMarketIndex);
     if (!pp) {
       throw new Error(`No position found for PerpMarket ${perpMarketIndex}!`);
     }
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
-    return pp.getBasePositionUi(perpMarket);
+    return pp.getBasePositionUi(perpMarket, useEventQueue);
   }
 
-  getSerum3OoAccount(marketIndex: MarketIndex): OpenOrders {
+  public getSerum3OoAccount(marketIndex: MarketIndex): OpenOrders {
     const oo: OpenOrders | undefined =
       this.serum3OosMapByMarketIndex.get(marketIndex);
 
@@ -189,7 +203,7 @@ export class MangoAccount {
    * @param bank
    * @returns native balance for a token, is signed
    */
-  getTokenBalance(bank: Bank): I80F48 {
+  public getTokenBalance(bank: Bank): I80F48 {
     const tp = this.getToken(bank.tokenIndex);
     return tp ? tp.balance(bank) : ZERO_I80F48();
   }
@@ -199,7 +213,7 @@ export class MangoAccount {
    * @param bank
    * @returns native deposits for a token, 0 if position has borrows
    */
-  getTokenDeposits(bank: Bank): I80F48 {
+  public getTokenDeposits(bank: Bank): I80F48 {
     const tp = this.getToken(bank.tokenIndex);
     return tp ? tp.deposits(bank) : ZERO_I80F48();
   }
@@ -209,7 +223,7 @@ export class MangoAccount {
    * @param bank
    * @returns native borrows for a token, 0 if position has deposits
    */
-  getTokenBorrows(bank: Bank): I80F48 {
+  public getTokenBorrows(bank: Bank): I80F48 {
     const tp = this.getToken(bank.tokenIndex);
     return tp ? tp.borrows(bank) : ZERO_I80F48();
   }
@@ -219,7 +233,7 @@ export class MangoAccount {
    * @param bank
    * @returns UI balance for a token, is signed
    */
-  getTokenBalanceUi(bank: Bank): number {
+  public getTokenBalanceUi(bank: Bank): number {
     const tp = this.getToken(bank.tokenIndex);
     return tp ? tp.balanceUi(bank) : 0;
   }
@@ -229,7 +243,7 @@ export class MangoAccount {
    * @param bank
    * @returns UI deposits for a token, 0 or more
    */
-  getTokenDepositsUi(bank: Bank): number {
+  public getTokenDepositsUi(bank: Bank): number {
     const ta = this.getToken(bank.tokenIndex);
     return ta ? ta.depositsUi(bank) : 0;
   }
@@ -239,7 +253,7 @@ export class MangoAccount {
    * @param bank
    * @returns UI borrows for a token, 0 or less
    */
-  getTokenBorrowsUi(bank: Bank): number {
+  public getTokenBorrowsUi(bank: Bank): number {
     const ta = this.getToken(bank.tokenIndex);
     return ta ? ta.borrowsUi(bank) : 0;
   }
@@ -249,7 +263,7 @@ export class MangoAccount {
    * @param healthType
    * @returns raw health number, in native quote
    */
-  getHealth(group: Group, healthType: HealthType): I80F48 {
+  public getHealth(group: Group, healthType: HealthType): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc.health(healthType);
   }
@@ -260,7 +274,7 @@ export class MangoAccount {
    * @param healthType
    * @returns health ratio, in percentage form
    */
-  getHealthRatio(group: Group, healthType: HealthType): I80F48 {
+  public getHealthRatio(group: Group, healthType: HealthType): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc.healthRatio(healthType);
   }
@@ -270,7 +284,7 @@ export class MangoAccount {
    * @param healthType
    * @returns health ratio, in percentage form, capped to 100
    */
-  getHealthRatioUi(group: Group, healthType: HealthType): number {
+  public getHealthRatioUi(group: Group, healthType: HealthType): number {
     const ratio = this.getHealthRatio(group, healthType).toNumber();
     return ratio > 100 ? 100 : Math.trunc(ratio);
   }
@@ -279,7 +293,7 @@ export class MangoAccount {
    * Sum of all the assets i.e. token deposits, borrows, total assets in spot open orders, and perps positions.
    * @returns equity, in native quote
    */
-  getEquity(group: Group): I80F48 {
+  public getEquity(group: Group): I80F48 {
     const tokensMap = new Map<number, I80F48>();
     for (const tp of this.tokensActive()) {
       const bank = group.getFirstBankByTokenIndex(tp.tokenIndex);
@@ -322,7 +336,7 @@ export class MangoAccount {
    * The amount of native quote you could withdraw against your existing assets.
    * @returns collateral value, in native quote
    */
-  getCollateralValue(group: Group): I80F48 {
+  public getCollateralValue(group: Group): I80F48 {
     return this.getHealth(group, HealthType.init);
   }
 
@@ -330,7 +344,7 @@ export class MangoAccount {
    * Sum of all positive assets.
    * @returns assets, in native quote
    */
-  getAssetsValue(group: Group, healthType: HealthType): I80F48 {
+  public getAssetsValue(group: Group, healthType: HealthType): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc.assets(healthType);
   }
@@ -339,7 +353,7 @@ export class MangoAccount {
    * Sum of all negative assets.
    * @returns liabs, in native quote
    */
-  getLiabsValue(group: Group, healthType: HealthType): I80F48 {
+  public getLiabsValue(group: Group, healthType: HealthType): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc.liabs(healthType);
   }
@@ -349,7 +363,7 @@ export class MangoAccount {
    * PNL is defined here as spot value + serum3 open orders value + perp value - net deposits value (evaluated at native quote price at the time of the deposit/withdraw)
    * spot value + serum3 open orders value + perp value is returned by getEquity (open orders values are added to spot token values implicitly)
    */
-  getPnl(group: Group): I80F48 {
+  public getPnl(group: Group): I80F48 {
     return this.getEquity(group)?.add(
       I80F48.fromI64(this.netDeposits).mul(I80F48.fromNumber(-1)),
     );
@@ -359,7 +373,10 @@ export class MangoAccount {
    * The amount of given native token you can withdraw including borrows, considering all existing assets as collateral.
    * @returns amount of given native token you can borrow, considering all existing assets as collateral, in native token
    */
-  getMaxWithdrawWithBorrowForToken(group: Group, mintPk: PublicKey): I80F48 {
+  public getMaxWithdrawWithBorrowForToken(
+    group: Group,
+    mintPk: PublicKey,
+  ): I80F48 {
     const tokenBank: Bank = group.getFirstBankByMint(mintPk);
     const initHealth = this.getHealth(group, HealthType.init);
 
@@ -403,7 +420,10 @@ export class MangoAccount {
     return maxBorrowNativeWithoutFees.add(existingTokenDeposits);
   }
 
-  getMaxWithdrawWithBorrowForTokenUi(group: Group, mintPk: PublicKey): number {
+  public getMaxWithdrawWithBorrowForTokenUi(
+    group: Group,
+    mintPk: PublicKey,
+  ): number {
     const maxWithdrawWithBorrow = this.getMaxWithdrawWithBorrowForToken(
       group,
       mintPk,
@@ -453,7 +473,7 @@ export class MangoAccount {
    * Note: health ratio is technically ∞ if liabs are 0
    * @returns health ratio, in percentage form
    */
-  simHealthRatioWithTokenPositionUiChanges(
+  public simHealthRatioWithTokenPositionUiChanges(
     group: Group,
     uiTokenChanges: {
       uiTokenAmount: number;
@@ -485,7 +505,7 @@ export class MangoAccount {
   ): Promise<OpenOrders[]> {
     const response =
       await client.program.provider.connection.getMultipleAccountsInfo(
-        this.serum3.map((s) => s.openOrders),
+        this.serum3Active().map((s) => s.openOrders),
       );
     const accounts = response.filter((a): a is AccountInfo<Buffer> =>
       Boolean(a),
@@ -1000,10 +1020,17 @@ export class PerpPosition {
       I80F48.from(dto.quotePositionNative),
       dto.bidsBaseLots,
       dto.asksBaseLots,
-      dto.takerBaseLots,
-      dto.takerQuoteLots,
       I80F48.from(dto.longSettledFunding),
       I80F48.from(dto.shortSettledFunding),
+      dto.takerBaseLots,
+      dto.takerQuoteLots,
+      dto.takerBaseLots,
+      dto.takerQuoteLots,
+      dto.cumulativeLongFunding,
+      dto.cumulativeShortFunding,
+      dto.makerVolume,
+      dto.takerVolume,
+      dto.perpSpotTransfers,
     );
   }
 
@@ -1016,10 +1043,17 @@ export class PerpPosition {
       ZERO_I80F48(),
       new BN(0),
       new BN(0),
-      new BN(0),
-      new BN(0),
       ZERO_I80F48(),
       ZERO_I80F48(),
+      new BN(0),
+      new BN(0),
+      new BN(0),
+      new BN(0),
+      0,
+      0,
+      new BN(0),
+      new BN(0),
+      new BN(0),
     );
   }
 
@@ -1027,20 +1061,34 @@ export class PerpPosition {
     public marketIndex: PerpMarketIndex,
     public basePositionLots: BN,
     public quotePositionNative: I80F48,
+    public quoteEntryNative: BN,
+    public quoteRunningNative: BN,
+    public longSettledFunding: I80F48,
+    public shortSettledFunding: I80F48,
     public bidsBaseLots: BN,
     public asksBaseLots: BN,
     public takerBaseLots: BN,
     public takerQuoteLots: BN,
-    public longSettledFunding: I80F48,
-    public shortSettledFunding: I80F48,
+    public cumulativeLongFunding: number,
+    public cumulativeShortFunding: number,
+    public makerVolume: BN,
+    public takerVolume: BN,
+    public perpSpotTransfers: BN,
   ) {}
 
   isActive(): boolean {
     return this.marketIndex != PerpPosition.PerpMarketIndexUnset;
   }
 
-  public getBasePositionUi(perpMarket: PerpMarket): number {
-    return perpMarket.baseLotsToUi(this.basePositionLots);
+  public getBasePositionUi(
+    perpMarket: PerpMarket,
+    useEventQueue?: boolean,
+  ): number {
+    return perpMarket.baseLotsToUi(
+      useEventQueue
+        ? this.basePositionLots.add(this.takerBaseLots)
+        : this.basePositionLots,
+    );
   }
 
   public getUnsettledFunding(perpMarket: PerpMarket): I80F48 {
@@ -1090,15 +1138,21 @@ export class PerpPosition {
 export class PerpPositionDto {
   constructor(
     public marketIndex: number,
-    public reserved: [],
     public basePositionLots: BN,
     public quotePositionNative: { val: BN },
+    public quoteEntryNative: BN,
+    public quoteRunningNative: BN,
+    public longSettledFunding: I80F48Dto,
+    public shortSettledFunding: I80F48Dto,
     public bidsBaseLots: BN,
     public asksBaseLots: BN,
     public takerBaseLots: BN,
     public takerQuoteLots: BN,
-    public longSettledFunding: I80F48Dto,
-    public shortSettledFunding: I80F48Dto,
+    public cumulativeLongFunding: number,
+    public cumulativeShortFunding: number,
+    public makerVolume: BN,
+    public takerVolume: BN,
+    public perpSpotTransfers: BN,
   ) {}
 }
 

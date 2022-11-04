@@ -1683,6 +1683,49 @@ export class MangoClient {
       .instruction();
   }
 
+  public async perpCancelOrderIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    orderId: BN,
+  ): Promise<TransactionInstruction> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    return await this.program.methods
+      .perpCancelOrder(new BN(orderId))
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        perpMarket: perpMarket.publicKey,
+        asks: perpMarket.asks,
+        bids: perpMarket.bids,
+      })
+      .instruction();
+  }
+
+  public async perpCancelOrder(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    orderId: BN,
+  ): Promise<TransactionSignature> {
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      [
+        await this.perpCancelOrderIx(
+          group,
+          mangoAccount,
+          perpMarketIndex,
+          orderId,
+        ),
+      ],
+      group.addressLookupTablesList,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
+  }
+
   public async perpCancelAllOrders(
     group: Group,
     mangoAccount: MangoAccount,
@@ -2167,6 +2210,69 @@ export class MangoClient {
         addressLookupTable,
       })
       .rpc();
+  }
+
+  public async healthRegionBeginIx(
+    group: Group,
+    account: MangoAccount,
+    banks: Bank[] = [],
+    perpMarkets: PerpMarket[] = [],
+  ): Promise<TransactionInstruction> {
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        AccountRetriever.Fixed,
+        group,
+        [account],
+        [...banks],
+        [...perpMarkets],
+      );
+    const parsedHealthAccounts = healthRemainingAccounts.map(
+      (pk) =>
+        ({
+          pubkey: pk,
+          isWritable: false,
+          isSigner: false,
+        } as AccountMeta),
+    );
+
+    return await this.program.methods
+      .healthRegionBegin()
+      .accounts({
+        account: account.publicKey,
+        instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
+      })
+      .remainingAccounts(parsedHealthAccounts)
+      .instruction();
+  }
+
+  public async healthRegionEndIx(
+    group: Group,
+    account: MangoAccount,
+    banks: Bank[] = [],
+    perpMarkets: PerpMarket[] = [],
+  ): Promise<TransactionInstruction> {
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        AccountRetriever.Fixed,
+        group,
+        [account],
+        [...banks],
+        [...perpMarkets],
+      );
+    const parsedHealthAccounts = healthRemainingAccounts.map(
+      (pk) =>
+        ({
+          pubkey: pk,
+          isWritable: false,
+          isSigner: false,
+        } as AccountMeta),
+    );
+
+    return await this.program.methods
+      .healthRegionEnd()
+      .accounts({ account: account.publicKey })
+      .remainingAccounts(parsedHealthAccounts)
+      .instruction();
   }
 
   /// static
