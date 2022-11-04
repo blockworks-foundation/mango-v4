@@ -494,6 +494,7 @@ export class MangoAccount {
       .toNumber();
   }
 
+  // TODO: don't send a settle instruction if there's nothing to settle
   public async serum3SettleFundsForAllMarkets(
     client: MangoClient,
     group: Group,
@@ -511,6 +512,7 @@ export class MangoAccount {
     );
   }
 
+  // TODO: cancel until all are cancelled
   public async serum3CancelAllOrdersForAllMarkets(
     client: MangoClient,
     group: Group,
