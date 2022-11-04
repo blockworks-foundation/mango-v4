@@ -1209,7 +1209,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-    limit: number,
+    limit?: number,
   ): Promise<TransactionSignature> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
@@ -1220,7 +1220,7 @@ export class MangoClient {
     )!;
 
     const ix = await this.program.methods
-      .serum3CancelAllOrders(limit)
+      .serum3CancelAllOrders(limit ? limit : 10)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
