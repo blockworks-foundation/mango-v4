@@ -3,7 +3,8 @@ name: Publish Docker Image to GCR
 on:
   push:
     branches: [dev,main]
-    paths: ['client/**',
+    paths: ['.github/ci-docker-publish.yml',
+            'client/**',
             'keeper/**',
             'liquidator/**']
   workflow_call:
