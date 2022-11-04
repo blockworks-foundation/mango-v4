@@ -186,8 +186,9 @@ async function main(): Promise<void> {
     adminProvider,
     CLUSTER,
     MANGO_V4_ID[CLUSTER],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
 
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);

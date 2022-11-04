@@ -68,8 +68,15 @@ enum AccountRetriever {
 
 export type IdsSource = 'api' | 'static' | 'get-program-accounts';
 
+export type MangoClientOptions = {
+  idsSource?: IdsSource;
+  postSendTxCallback?: ({ txid }: { txid: string }) => void;
+  prioritizationFee?: number;
+};
+
 // TODO: replace ui values with native as input wherever possible
 export class MangoClient {
+  private idsSource: IdsSource;
   private postSendTxCallback?: ({ txid }) => void;
   private prioritizationFee: number;
 
@@ -77,12 +84,9 @@ export class MangoClient {
     public program: Program<MangoV4>,
     public programId: PublicKey,
     public cluster: Cluster,
-    public opts: {
-      postSendTxCallback?: ({ txid }: { txid: string }) => void;
-      prioritizationFee?: number;
-    } = {},
-    public idsSource: IdsSource = 'api',
+    public opts: MangoClientOptions = {},
   ) {
+    this.idsSource = opts?.idsSource || 'api';
     this.prioritizationFee = opts?.prioritizationFee || 0;
     this.postSendTxCallback = opts?.postSendTxCallback;
     // TODO: evil side effect, but limited backtraces are a nightmare
@@ -148,7 +152,8 @@ export class MangoClient {
   public async getGroup(groupPk: PublicKey): Promise<Group> {
     const groupAccount = await this.program.account.group.fetch(groupPk);
     const group = Group.from(groupPk, groupAccount);
-    await group.reloadAll(this);
+    const ids: Id | undefined = await this.getIds(groupPk);
+    await group.reloadAll(this, ids);
     return group;
   }
 
@@ -194,6 +199,17 @@ export class MangoClient {
     );
     await groups[0].reloadAll(this);
     return groups[0];
+  }
+
+  public async getIds(groupPk: PublicKey): Promise<Id | undefined> {
+    switch (this.idsSource) {
+      case 'api':
+        return await Id.fromApi(groupPk);
+      case 'get-program-accounts':
+        return undefined;
+      case 'static':
+        return Id.fromIdsByPk(groupPk);
+    }
   }
 
   // Tokens/Banks
@@ -2281,8 +2297,7 @@ export class MangoClient {
     provider: Provider,
     cluster: Cluster,
     programId: PublicKey,
-    opts: any = {},
-    getIdsFromApi: IdsSource = 'api',
+    opts?: MangoClientOptions,
   ): MangoClient {
     const idl = IDL;
 
@@ -2291,7 +2306,6 @@ export class MangoClient {
       programId,
       cluster,
       opts,
-      getIdsFromApi,
     );
   }
 

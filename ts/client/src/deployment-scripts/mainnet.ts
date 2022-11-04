@@ -50,8 +50,9 @@ async function createGroup() {
     adminProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
 
   console.log(`Creating Group...`);
@@ -83,8 +84,9 @@ async function registerTokens() {
     adminProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
-    {},
-    'get-program-accounts' /* idsjson service doesn't know about this group yet */,
+    {
+      idsSource: 'get-program-accounts',
+    } /* idsjson service doesn't know about this group yet */,
   );
 
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);

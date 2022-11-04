@@ -224,8 +224,9 @@ async function fullMarketMaker() {
     userProvider,
     CLUSTER,
     MANGO_V4_ID[CLUSTER],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
 
   // Load mango account
