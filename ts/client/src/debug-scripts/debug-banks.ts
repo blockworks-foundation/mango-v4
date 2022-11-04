@@ -2,9 +2,9 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { coder } from '@project-serum/anchor/dist/cjs/spl/token';
 import { Cluster, Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
-import { I80F48, ZERO_I80F48 } from '../accounts/I80F48';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
+import { I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { toUiDecimals } from '../utils';
 
 const CLUSTER_URL =
@@ -15,7 +15,7 @@ const GROUP_NUM = Number(process.env.GROUP_NUM || 2);
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
 
-async function main() {
+async function main(): Promise<void> {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(CLUSTER_URL!, options);
 
@@ -29,8 +29,7 @@ async function main() {
     adminProvider,
     CLUSTER,
     MANGO_V4_ID[CLUSTER],
-    {},
-    'get-program-accounts',
+    { idsSource: 'get-program-accounts' },
   );
 
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);

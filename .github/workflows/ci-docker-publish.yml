@@ -59,8 +59,8 @@ jobs:
           tags: |
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:${{ github.sha }}
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:latest
-          cache-from: type=registry,ref=us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:buildcache
-          cache-to: type=registry,ref=us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:buildcache,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       # Build and push the liquidator runtime image
       - name: Build and Push Liquidator
         uses: docker/build-push-action@v2
