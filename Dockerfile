@@ -20,6 +20,7 @@ COPY --from=plan /app/recipe-*.json .
 RUN cargo chef cook --release --recipe-path recipe-keeper.json --bin keeper
 RUN cargo chef cook --release --recipe-path recipe-liquidator.json --bin liquidator
 COPY . .
+RUN cargo build --release --bin keeper --bin liquidator
 
 FROM debian:bullseye-slim as run
 RUN apt-get update && apt-get -y install ca-certificates libc6
