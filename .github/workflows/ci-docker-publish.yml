@@ -1,5 +1,5 @@
 name: Publish Docker Image to GCR
-#0
+
 on:
   push:
     branches: [dev,main]
@@ -14,6 +14,7 @@ on:
         required: true
       GCR_SA_KEY:
         required: true
+  workflow_dispatch:
 
 env:
   PROJECT_ID: ${{ secrets.GCR_PROJECT }}
