@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::error::*;
-use crate::state::{AccountLoaderDynamic, Book, BookSide, Group, MangoAccount, PerpMarket};
+use crate::state::{AccountLoaderDynamic, Group, MangoAccount, OrderBook, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpCancelOrder<'info> {
@@ -14,17 +14,14 @@ pub struct PerpCancelOrder<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = bids,
-        has_one = asks
+        has_one = orderbook,
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]
-    pub asks: AccountLoader<'info, BookSide>,
-    #[account(mut)]
-    pub bids: AccountLoader<'info, BookSide>,
+    pub orderbook: AccountLoader<'info, OrderBook>,
 }
 
-pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: i128) -> Result<()> {
+pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: u128) -> Result<()> {
     let mut account = ctx.accounts.account.load_mut()?;
     require!(
         account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
@@ -32,20 +29,20 @@ pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: i128) -> Resul
     );
 
     let perp_market = ctx.accounts.perp_market.load_mut()?;
-    let bids = ctx.accounts.bids.load_mut()?;
-    let asks = ctx.accounts.asks.load_mut()?;
-    let mut book = Book::new(bids, asks);
+    let mut book = ctx.accounts.orderbook.load_mut()?;
 
-    let side = account
-        .perp_find_order_side(perp_market.perp_market_index, order_id)
+    let oo = account
+        .perp_find_order_with_order_id(perp_market.perp_market_index, order_id)
         .ok_or_else(|| {
             error_msg!("could not find perp order with id {order_id} in perp market orderbook")
         })?;
+    let order_id = oo.id;
+    let order_side_and_tree = oo.side_and_tree;
 
     book.cancel_order(
         &mut account.borrow_mut(),
         order_id,
-        side,
+        order_side_and_tree,
         Some(ctx.accounts.account.key()),
     )?;
 

@@ -3,6 +3,7 @@ use fixed::types::I80F48;
 #[macro_use]
 pub mod util;
 
+extern crate core;
 extern crate static_assertions;
 
 use anchor_lang::prelude::*;
@@ -19,7 +20,7 @@ pub mod serum3_cpi;
 pub mod state;
 pub mod types;
 
-use state::{OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex};
+use state::{OracleConfig, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side, TokenIndex};
 
 declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
 
@@ -485,8 +486,6 @@ pub mod mango_v4 {
         instructions::perp_close_market(ctx)
     }
 
-    // TODO perp_change_perp_market_params
-
     pub fn perp_deactivate_position(ctx: Context<PerpDeactivatePosition>) -> Result<()> {
         instructions::perp_deactivate_position(ctx)
     }
@@ -495,28 +494,118 @@ pub mod mango_v4 {
     pub fn perp_place_order(
         ctx: Context<PerpPlaceOrder>,
         side: Side,
+
+        // The price in lots (quote lots per base lots)
+        // - fill orders on the book up to this price or
+        // - place an order on the book at this price.
+        // - ignored for Market orders and potentially adjusted for PostOnlySlide orders.
         price_lots: i64,
+
         max_base_lots: i64,
         max_quote_lots: i64,
         client_order_id: u64,
-        order_type: OrderType,
+        order_type: PlaceOrderType,
+
+        // Timestamp of when order expires
+        //
+        // Send 0 if you want the order to never expire.
+        // Timestamps in the past mean the instruction is skipped.
+        // Timestamps in the future are reduced to now + 255s.
         expiry_timestamp: u64,
+
+        // Maximum number of orders from the book to fill.
+        //
+        // Use this to limit compute used during order matching.
+        // When the limit is reached, processing stops and the instruction succeeds.
         limit: u8,
     ) -> Result<()> {
-        instructions::perp_place_order(
-            ctx,
+        require_gte!(price_lots, 0);
+
+        use crate::state::{Order, OrderParams};
+        let time_in_force = match Order::tif_from_expiry(expiry_timestamp) {
+            Some(t) => t,
+            None => {
+                msg!("Order is already expired");
+                return Ok(());
+            }
+        };
+        let order = Order {
             side,
-            price_lots,
             max_base_lots,
             max_quote_lots,
             client_order_id,
-            order_type,
-            expiry_timestamp,
-            limit,
-        )
+            time_in_force,
+            params: match order_type {
+                PlaceOrderType::Market => OrderParams::Market,
+                PlaceOrderType::ImmediateOrCancel => OrderParams::ImmediateOrCancel { price_lots },
+                _ => OrderParams::Fixed {
+                    price_lots,
+                    order_type: order_type.to_post_order_type()?,
+                },
+            },
+        };
+        instructions::perp_place_order(ctx, order, limit)
     }
 
-    pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: i128) -> Result<()> {
+    #[allow(clippy::too_many_arguments)]
+    pub fn perp_place_order_pegged(
+        ctx: Context<PerpPlaceOrder>,
+        side: Side,
+
+        // The adjustment from the oracle price, in lots (quote lots per base lots).
+        // Orders on the book may be filled at oracle + adjustment (depends on order type).
+        price_offset_lots: i64,
+
+        // The limit at which the pegged order shall expire.
+        // May be -1 to denote no peg limit.
+        //
+        // Example: An bid pegged to -20 with peg_limit 100 would expire if the oracle hits 121.
+        peg_limit: i64,
+
+        max_base_lots: i64,
+        max_quote_lots: i64,
+        client_order_id: u64,
+        order_type: PlaceOrderType,
+
+        // Timestamp of when order expires
+        //
+        // Send 0 if you want the order to never expire.
+        // Timestamps in the past mean the instruction is skipped.
+        // Timestamps in the future are reduced to now + 255s.
+        expiry_timestamp: u64,
+
+        // Maximum number of orders from the book to fill.
+        //
+        // Use this to limit compute used during order matching.
+        // When the limit is reached, processing stops and the instruction succeeds.
+        limit: u8,
+    ) -> Result<()> {
+        require_gte!(peg_limit, -1);
+
+        use crate::state::{Order, OrderParams};
+        let time_in_force = match Order::tif_from_expiry(expiry_timestamp) {
+            Some(t) => t,
+            None => {
+                msg!("Order is already expired");
+                return Ok(());
+            }
+        };
+        let order = Order {
+            side,
+            max_base_lots,
+            max_quote_lots,
+            client_order_id,
+            time_in_force,
+            params: OrderParams::OraclePegged {
+                price_offset_lots,
+                order_type: order_type.to_post_order_type()?,
+                peg_limit,
+            },
+        };
+        instructions::perp_place_order(ctx, order, limit)
+    }
+
+    pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: u128) -> Result<()> {
         instructions::perp_cancel_order(ctx, order_id)
     }
 

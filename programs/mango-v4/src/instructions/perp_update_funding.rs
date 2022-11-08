@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::accounts_zerocopy::*;
-use crate::state::{Book, BookSide, Group, PerpMarket};
+use crate::state::{Group, OrderBook, PerpMarket};
 
 use crate::logs::PerpUpdateFundingLog;
 
@@ -11,16 +11,13 @@ pub struct PerpUpdateFunding<'info> {
 
     #[account(
         mut,
-        has_one = bids,
-        has_one = asks,
+        has_one = orderbook,
         has_one = oracle,
         constraint = perp_market.load()?.group.key() == group.key(),
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]
-    pub asks: AccountLoader<'info, BookSide>,
-    #[account(mut)]
-    pub bids: AccountLoader<'info, BookSide>,
+    pub orderbook: AccountLoader<'info, OrderBook>,
 
     /// CHECK: The oracle can be one of several different account types and the pubkey is checked above
     pub oracle: UncheckedAccount<'info>,
@@ -30,9 +27,7 @@ pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
     let now_ts = Clock::get()?.unix_timestamp;
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
-    let bids = ctx.accounts.bids.load_mut()?;
-    let asks = ctx.accounts.asks.load_mut()?;
-    let book = Book::new(bids, asks);
+    let book = ctx.accounts.orderbook.load_mut()?;
 
     let oracle_price =
         perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;

@@ -13,17 +13,18 @@ use crate::error::MangoError;
 use crate::error_msg;
 
 use super::dynamic_account::*;
+use super::BookSideOrderTree;
 use super::FillEvent;
 use super::LeafNode;
 use super::PerpMarket;
 use super::PerpMarketIndex;
 use super::PerpOpenOrder;
 use super::Serum3MarketIndex;
-use super::Side;
 use super::TokenIndex;
 use super::FREE_ORDER_SLOT;
 use super::{HealthCache, HealthType};
 use super::{PerpPosition, Serum3Orders, TokenPosition};
+use super::{Side, SideAndOrderTree};
 use crate::logs::{DeactivatePerpPositionLog, DeactivateTokenPositionLog};
 use checked_math as cm;
 
@@ -500,7 +501,7 @@ impl<
 
     pub fn perp_next_order_slot(&self) -> Result<usize> {
         self.all_perp_orders()
-            .position(|&oo| oo.order_market == FREE_ORDER_SLOT)
+            .position(|&oo| oo.market == FREE_ORDER_SLOT)
             .ok_or_else(|| error_msg!("no free perp order index"))
     }
 
@@ -508,23 +509,23 @@ impl<
         &self,
         market_index: PerpMarketIndex,
         client_order_id: u64,
-    ) -> Option<(i128, Side)> {
+    ) -> Option<&PerpOpenOrder> {
         for oo in self.all_perp_orders() {
-            if oo.order_market == market_index && oo.client_order_id == client_order_id {
-                return Some((oo.order_id, oo.order_side));
+            if oo.market == market_index && oo.client_id == client_order_id {
+                return Some(&oo);
             }
         }
         None
     }
 
-    pub fn perp_find_order_side(
+    pub fn perp_find_order_with_order_id(
         &self,
         market_index: PerpMarketIndex,
-        order_id: i128,
-    ) -> Option<Side> {
+        order_id: u128,
+    ) -> Option<&PerpOpenOrder> {
         for oo in self.all_perp_orders() {
-            if oo.order_market == market_index && oo.order_id == order_id {
-                return Some(oo.order_side);
+            if oo.market == market_index && oo.id == order_id {
+                return Some(&oo);
             }
         }
         None
@@ -796,6 +797,7 @@ impl<
         &mut self,
         perp_market_index: PerpMarketIndex,
         side: Side,
+        order_tree: BookSideOrderTree,
         order: &LeafNode,
     ) -> Result<()> {
         let mut perp_account = self.perp_position_mut(perp_market_index)?;
@@ -810,19 +812,19 @@ impl<
         let slot = order.owner_slot as usize;
 
         let mut oo = self.perp_order_mut_by_raw_index(slot);
-        oo.order_market = perp_market_index;
-        oo.order_side = side;
-        oo.order_id = order.key;
-        oo.client_order_id = order.client_order_id;
+        oo.market = perp_market_index;
+        oo.side_and_tree = SideAndOrderTree::new(side, order_tree);
+        oo.id = order.key;
+        oo.client_id = order.client_order_id;
         Ok(())
     }
 
     pub fn remove_perp_order(&mut self, slot: usize, quantity: i64) -> Result<()> {
         {
             let oo = self.perp_order_mut_by_raw_index(slot);
-            require_neq!(oo.order_market, FREE_ORDER_SLOT);
-            let order_side = oo.order_side;
-            let perp_market_index = oo.order_market;
+            require_neq!(oo.market, FREE_ORDER_SLOT);
+            let order_side = oo.side_and_tree.side();
+            let perp_market_index = oo.market;
             let perp_account = self.perp_position_mut(perp_market_index)?;
 
             // accounting
@@ -838,10 +840,10 @@ impl<
 
         // release space
         let oo = self.perp_order_mut_by_raw_index(slot);
-        oo.order_market = FREE_ORDER_SLOT;
-        oo.order_side = Side::Bid;
-        oo.order_id = 0i128;
-        oo.client_order_id = 0u64;
+        oo.market = FREE_ORDER_SLOT;
+        oo.side_and_tree = SideAndOrderTree::BidFixed;
+        oo.id = 0;
+        oo.client_id = 0;
         Ok(())
     }
 

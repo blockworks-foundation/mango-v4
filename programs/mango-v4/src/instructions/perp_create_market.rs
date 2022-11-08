@@ -32,9 +32,7 @@ pub struct PerpCreateMarket<'info> {
     /// Accounts are initialised by client,
     /// anchor discriminator is set first when ix exits,
     #[account(zero)]
-    pub bids: AccountLoader<'info, BookSide>,
-    #[account(zero)]
-    pub asks: AccountLoader<'info, BookSide>,
+    pub orderbook: AccountLoader<'info, OrderBook>,
     #[account(zero)]
     pub event_queue: AccountLoader<'info, EventQueue>,
 
@@ -92,8 +90,7 @@ pub fn perp_create_market(
         name: fill_from_str(&name)?,
         oracle: ctx.accounts.oracle.key(),
         oracle_config,
-        bids: ctx.accounts.bids.key(),
-        asks: ctx.accounts.asks.key(),
+        orderbook: ctx.accounts.orderbook.key(),
         event_queue: ctx.accounts.event_queue.key(),
         quote_lot_size,
         base_lot_size,
@@ -119,6 +116,7 @@ pub fn perp_create_market(
         registration_time: Clock::get()?.unix_timestamp,
         padding1: Default::default(),
         padding2: Default::default(),
+        padding3: Default::default(),
         fee_penalty,
         settle_fee_flat,
         settle_fee_amount_threshold,
@@ -126,11 +124,8 @@ pub fn perp_create_market(
         reserved: [0; 92],
     };
 
-    let mut bids = ctx.accounts.bids.load_init()?;
-    bids.book_side_type = BookSideType::Bids;
-
-    let mut asks = ctx.accounts.asks.load_init()?;
-    asks.book_side_type = BookSideType::Asks;
+    let mut orderbook = ctx.accounts.orderbook.load_init()?;
+    orderbook.init();
 
     emit!(PerpMarketMetaDataLog {
         mango_group: ctx.accounts.group.key(),

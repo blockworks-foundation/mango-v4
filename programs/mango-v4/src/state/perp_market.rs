@@ -6,11 +6,11 @@ use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
 
 use crate::accounts_zerocopy::KeyedAccountReader;
-use crate::state::orderbook::order_type::Side;
+use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
 use crate::util::checked_math as cm;
 
-use super::{Book, OracleConfig, DAY_I80F48};
+use super::{orderbook, OracleConfig, OrderBook, DAY_I80F48};
 
 pub type PerpMarketIndex = u16;
 
@@ -39,8 +39,8 @@ pub struct PerpMarket {
 
     pub oracle_config: OracleConfig,
 
-    pub bids: Pubkey,
-    pub asks: Pubkey,
+    pub orderbook: Pubkey,
+    pub padding3: [u8; 32],
 
     pub event_queue: Pubkey,
 
@@ -133,14 +133,9 @@ impl PerpMarket {
         self.trusted_market == 1
     }
 
-    pub fn gen_order_id(&mut self, side: Side, price: i64) -> i128 {
+    pub fn gen_order_id(&mut self, side: Side, price_data: u64) -> u128 {
         self.seq_num += 1;
-
-        let upper = (price as i128) << 64;
-        match side {
-            Side::Bid => upper | (!self.seq_num as i128),
-            Side::Ask => upper | (self.seq_num as i128),
-        }
+        orderbook::new_node_key(side, price_data, self.seq_num)
     }
 
     pub fn oracle_price(&self, oracle_acc: &impl KeyedAccountReader) -> Result<I80F48> {
@@ -153,12 +148,18 @@ impl PerpMarket {
     }
 
     /// Use current order book price and index price to update the instantaneous funding
-    pub fn update_funding(&mut self, book: &Book, oracle_price: I80F48, now_ts: u64) -> Result<()> {
+    pub fn update_funding(
+        &mut self,
+        book: &OrderBook,
+        oracle_price: I80F48,
+        now_ts: u64,
+    ) -> Result<()> {
         let index_price = oracle_price;
+        let oracle_price_lots = self.native_price_to_lot(oracle_price);
 
         // Get current book price & compare it to index price
-        let bid = book.impact_price(Side::Bid, self.impact_quantity, now_ts);
-        let ask = book.impact_price(Side::Ask, self.impact_quantity, now_ts);
+        let bid = book.impact_price(Side::Bid, self.impact_quantity, now_ts, oracle_price_lots);
+        let ask = book.impact_price(Side::Ask, self.impact_quantity, now_ts, oracle_price_lots);
 
         let diff_price = match (bid, ask) {
             (Some(bid), Some(ask)) => {
@@ -247,8 +248,7 @@ impl PerpMarket {
             oracle_config: OracleConfig {
                 conf_filter: I80F48::ZERO,
             },
-            bids: Pubkey::new_unique(),
-            asks: Pubkey::new_unique(),
+            orderbook: Pubkey::new_unique(),
             event_queue: Pubkey::new_unique(),
             quote_lot_size: 1,
             base_lot_size: 1,
@@ -274,6 +274,7 @@ impl PerpMarket {
             reserved: [0; 92],
             padding1: Default::default(),
             padding2: Default::default(),
+            padding3: Default::default(),
             registration_time: 0,
             fee_penalty: 0.0,
             trusted_market: 0,

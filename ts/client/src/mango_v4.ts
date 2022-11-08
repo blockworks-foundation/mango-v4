@@ -2268,18 +2268,13 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false,
           "docs": [
             "Accounts are initialised by client,",
             "anchor discriminator is set first when ix exits,"
           ]
-        },
-        {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
         },
         {
           "name": "eventQueue",
@@ -2551,12 +2546,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "bids",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "asks",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         },
@@ -2628,12 +2618,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         },
@@ -2674,7 +2659,89 @@ export type MangoV4 = {
         {
           "name": "orderType",
           "type": {
-            "defined": "OrderType"
+            "defined": "PlaceOrderType"
+          }
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64"
+        },
+        {
+          "name": "limit",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "perpPlaceOrderPegged",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "orderbook",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "eventQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "Side"
+          }
+        },
+        {
+          "name": "priceOffsetLots",
+          "type": "i64"
+        },
+        {
+          "name": "pegLimit",
+          "type": "i64"
+        },
+        {
+          "name": "maxBaseLots",
+          "type": "i64"
+        },
+        {
+          "name": "maxQuoteLots",
+          "type": "i64"
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        },
+        {
+          "name": "orderType",
+          "type": {
+            "defined": "PlaceOrderType"
           }
         },
         {
@@ -2711,12 +2778,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         }
@@ -2724,7 +2786,7 @@ export type MangoV4 = {
       "args": [
         {
           "name": "orderId",
-          "type": "i128"
+          "type": "u128"
         }
       ]
     },
@@ -2752,12 +2814,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         }
@@ -2793,12 +2850,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         }
@@ -2834,12 +2886,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         }
@@ -2899,12 +2946,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         },
@@ -3068,12 +3110,7 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         },
@@ -3813,7 +3850,39 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "bookSide",
+      "name": "orderBook",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bidsFixed",
+            "type": {
+              "defined": "OrderTree"
+            }
+          },
+          {
+            "name": "asksFixed",
+            "type": {
+              "defined": "OrderTree"
+            }
+          },
+          {
+            "name": "bidsOraclePegged",
+            "type": {
+              "defined": "OrderTree"
+            }
+          },
+          {
+            "name": "asksOraclePegged",
+            "type": {
+              "defined": "OrderTree"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "orderTree",
       "docs": [
         "A binary tree on AnyNode::key()",
         "",
@@ -3823,9 +3892,9 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
-            "name": "bookSideType",
+            "name": "orderTreeType",
             "type": {
-              "defined": "BookSideType"
+              "defined": "OrderTreeType"
             }
           },
           {
@@ -3968,12 +4037,17 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "bids",
+            "name": "orderbook",
             "type": "publicKey"
           },
           {
-            "name": "asks",
-            "type": "publicKey"
+            "name": "padding3",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
             "name": "eventQueue",
@@ -4825,9 +4899,9 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
-            "name": "orderSide",
+            "name": "sideAndTree",
             "type": {
-              "defined": "Side"
+              "defined": "SideAndOrderTree"
             }
           },
           {
@@ -4840,7 +4914,7 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "orderMarket",
+            "name": "market",
             "type": "u16"
           },
           {
@@ -4853,12 +4927,12 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "clientOrderId",
+            "name": "clientId",
             "type": "u64"
           },
           {
-            "name": "orderId",
-            "type": "i128"
+            "name": "id",
+            "type": "u128"
           },
           {
             "name": "reserved",
@@ -4915,7 +4989,7 @@ export type MangoV4 = {
             "docs": [
               "only the top `prefix_len` bits of `key` are relevant"
             ],
-            "type": "i128"
+            "type": "u128"
           },
           {
             "name": "children",
@@ -4975,7 +5049,7 @@ export type MangoV4 = {
           {
             "name": "orderType",
             "type": {
-              "defined": "OrderType"
+              "defined": "PostOrderType"
             }
           },
           {
@@ -5000,7 +5074,7 @@ export type MangoV4 = {
             "docs": [
               "The binary tree key"
             ],
-            "type": "i128"
+            "type": "u128"
           },
           {
             "name": "owner",
@@ -5019,11 +5093,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "pegLimit",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                16
+                8
               ]
             }
           }
@@ -5142,7 +5220,7 @@ export type MangoV4 = {
           },
           {
             "name": "makerOrderId",
-            "type": "i128"
+            "type": "u128"
           },
           {
             "name": "makerClientOrderId",
@@ -5164,7 +5242,7 @@ export type MangoV4 = {
           },
           {
             "name": "takerOrderId",
-            "type": "i128"
+            "type": "u128"
           },
           {
             "name": "takerClientOrderId",
@@ -5441,15 +5519,32 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "BookSideType",
+      "name": "OrderState",
       "type": {
         "kind": "enum",
         "variants": [
           {
-            "name": "Bids"
+            "name": "Valid"
           },
           {
-            "name": "Asks"
+            "name": "Invalid"
+          },
+          {
+            "name": "Skipped"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BookSideOrderTree",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Fixed"
+          },
+          {
+            "name": "OraclePegged"
           }
         ]
       }
@@ -5478,7 +5573,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "OrderType",
+      "name": "PlaceOrderType",
       "type": {
         "kind": "enum",
         "variants": [
@@ -5501,6 +5596,23 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "PostOrderType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Limit"
+          },
+          {
+            "name": "PostOnly"
+          },
+          {
+            "name": "PostOnlySlide"
+          }
+        ]
+      }
+    },
+    {
       "name": "Side",
       "type": {
         "kind": "enum",
@@ -5510,6 +5622,97 @@ export type MangoV4 = {
           },
           {
             "name": "Ask"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SideAndOrderTree",
+      "docs": [
+        "SideAndOrderTree is a storage optimization, so we don't need two bytes for the data"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "BidFixed"
+          },
+          {
+            "name": "AskFixed"
+          },
+          {
+            "name": "BidOraclePegged"
+          },
+          {
+            "name": "AskOraclePegged"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderParams",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Market"
+          },
+          {
+            "name": "ImmediateOrCancel",
+            "fields": [
+              {
+                "name": "price_lots",
+                "type": "i64"
+              }
+            ]
+          },
+          {
+            "name": "Fixed",
+            "fields": [
+              {
+                "name": "price_lots",
+                "type": "i64"
+              },
+              {
+                "name": "order_type",
+                "type": {
+                  "defined": "PostOrderType"
+                }
+              }
+            ]
+          },
+          {
+            "name": "OraclePegged",
+            "fields": [
+              {
+                "name": "price_offset_lots",
+                "type": "i64"
+              },
+              {
+                "name": "order_type",
+                "type": {
+                  "defined": "PostOrderType"
+                }
+              },
+              {
+                "name": "peg_limit",
+                "type": "i64"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderTreeType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Bids"
+          },
+          {
+            "name": "Asks"
           }
         ]
       }
@@ -5802,7 +6005,7 @@ export type MangoV4 = {
         },
         {
           "name": "makerOrderId",
-          "type": "i128",
+          "type": "u128",
           "index": false
         },
         {
@@ -5827,7 +6030,7 @@ export type MangoV4 = {
         },
         {
           "name": "takerOrderId",
-          "type": "i128",
+          "type": "u128",
           "index": false
         },
         {
@@ -8884,18 +9087,13 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false,
           "docs": [
             "Accounts are initialised by client,",
             "anchor discriminator is set first when ix exits,"
           ]
-        },
-        {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
         },
         {
           "name": "eventQueue",
@@ -9167,12 +9365,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "bids",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "asks",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         },
@@ -9244,12 +9437,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         },
@@ -9290,7 +9478,89 @@ export const IDL: MangoV4 = {
         {
           "name": "orderType",
           "type": {
-            "defined": "OrderType"
+            "defined": "PlaceOrderType"
+          }
+        },
+        {
+          "name": "expiryTimestamp",
+          "type": "u64"
+        },
+        {
+          "name": "limit",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "perpPlaceOrderPegged",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "perpMarket",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "orderbook",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "eventQueue",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "Side"
+          }
+        },
+        {
+          "name": "priceOffsetLots",
+          "type": "i64"
+        },
+        {
+          "name": "pegLimit",
+          "type": "i64"
+        },
+        {
+          "name": "maxBaseLots",
+          "type": "i64"
+        },
+        {
+          "name": "maxQuoteLots",
+          "type": "i64"
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        },
+        {
+          "name": "orderType",
+          "type": {
+            "defined": "PlaceOrderType"
           }
         },
         {
@@ -9327,12 +9597,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         }
@@ -9340,7 +9605,7 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "orderId",
-          "type": "i128"
+          "type": "u128"
         }
       ]
     },
@@ -9368,12 +9633,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         }
@@ -9409,12 +9669,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         }
@@ -9450,12 +9705,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         }
@@ -9515,12 +9765,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         },
@@ -9684,12 +9929,7 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "asks",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "bids",
+          "name": "orderbook",
           "isMut": true,
           "isSigner": false
         },
@@ -10429,7 +10669,39 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "bookSide",
+      "name": "orderBook",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bidsFixed",
+            "type": {
+              "defined": "OrderTree"
+            }
+          },
+          {
+            "name": "asksFixed",
+            "type": {
+              "defined": "OrderTree"
+            }
+          },
+          {
+            "name": "bidsOraclePegged",
+            "type": {
+              "defined": "OrderTree"
+            }
+          },
+          {
+            "name": "asksOraclePegged",
+            "type": {
+              "defined": "OrderTree"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "orderTree",
       "docs": [
         "A binary tree on AnyNode::key()",
         "",
@@ -10439,9 +10711,9 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
-            "name": "bookSideType",
+            "name": "orderTreeType",
             "type": {
-              "defined": "BookSideType"
+              "defined": "OrderTreeType"
             }
           },
           {
@@ -10584,12 +10856,17 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "bids",
+            "name": "orderbook",
             "type": "publicKey"
           },
           {
-            "name": "asks",
-            "type": "publicKey"
+            "name": "padding3",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
             "name": "eventQueue",
@@ -11441,9 +11718,9 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
-            "name": "orderSide",
+            "name": "sideAndTree",
             "type": {
-              "defined": "Side"
+              "defined": "SideAndOrderTree"
             }
           },
           {
@@ -11456,7 +11733,7 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "orderMarket",
+            "name": "market",
             "type": "u16"
           },
           {
@@ -11469,12 +11746,12 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "clientOrderId",
+            "name": "clientId",
             "type": "u64"
           },
           {
-            "name": "orderId",
-            "type": "i128"
+            "name": "id",
+            "type": "u128"
           },
           {
             "name": "reserved",
@@ -11531,7 +11808,7 @@ export const IDL: MangoV4 = {
             "docs": [
               "only the top `prefix_len` bits of `key` are relevant"
             ],
-            "type": "i128"
+            "type": "u128"
           },
           {
             "name": "children",
@@ -11591,7 +11868,7 @@ export const IDL: MangoV4 = {
           {
             "name": "orderType",
             "type": {
-              "defined": "OrderType"
+              "defined": "PostOrderType"
             }
           },
           {
@@ -11616,7 +11893,7 @@ export const IDL: MangoV4 = {
             "docs": [
               "The binary tree key"
             ],
-            "type": "i128"
+            "type": "u128"
           },
           {
             "name": "owner",
@@ -11635,11 +11912,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "pegLimit",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                16
+                8
               ]
             }
           }
@@ -11758,7 +12039,7 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "makerOrderId",
-            "type": "i128"
+            "type": "u128"
           },
           {
             "name": "makerClientOrderId",
@@ -11780,7 +12061,7 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "takerOrderId",
-            "type": "i128"
+            "type": "u128"
           },
           {
             "name": "takerClientOrderId",
@@ -12057,15 +12338,32 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "BookSideType",
+      "name": "OrderState",
       "type": {
         "kind": "enum",
         "variants": [
           {
-            "name": "Bids"
+            "name": "Valid"
           },
           {
-            "name": "Asks"
+            "name": "Invalid"
+          },
+          {
+            "name": "Skipped"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BookSideOrderTree",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Fixed"
+          },
+          {
+            "name": "OraclePegged"
           }
         ]
       }
@@ -12094,7 +12392,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "OrderType",
+      "name": "PlaceOrderType",
       "type": {
         "kind": "enum",
         "variants": [
@@ -12117,6 +12415,23 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "PostOrderType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Limit"
+          },
+          {
+            "name": "PostOnly"
+          },
+          {
+            "name": "PostOnlySlide"
+          }
+        ]
+      }
+    },
+    {
       "name": "Side",
       "type": {
         "kind": "enum",
@@ -12126,6 +12441,97 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Ask"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SideAndOrderTree",
+      "docs": [
+        "SideAndOrderTree is a storage optimization, so we don't need two bytes for the data"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "BidFixed"
+          },
+          {
+            "name": "AskFixed"
+          },
+          {
+            "name": "BidOraclePegged"
+          },
+          {
+            "name": "AskOraclePegged"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderParams",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Market"
+          },
+          {
+            "name": "ImmediateOrCancel",
+            "fields": [
+              {
+                "name": "price_lots",
+                "type": "i64"
+              }
+            ]
+          },
+          {
+            "name": "Fixed",
+            "fields": [
+              {
+                "name": "price_lots",
+                "type": "i64"
+              },
+              {
+                "name": "order_type",
+                "type": {
+                  "defined": "PostOrderType"
+                }
+              }
+            ]
+          },
+          {
+            "name": "OraclePegged",
+            "fields": [
+              {
+                "name": "price_offset_lots",
+                "type": "i64"
+              },
+              {
+                "name": "order_type",
+                "type": {
+                  "defined": "PostOrderType"
+                }
+              },
+              {
+                "name": "peg_limit",
+                "type": "i64"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderTreeType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Bids"
+          },
+          {
+            "name": "Asks"
           }
         ]
       }
@@ -12418,7 +12824,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "makerOrderId",
-          "type": "i128",
+          "type": "u128",
           "index": false
         },
         {
@@ -12443,7 +12849,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "takerOrderId",
-          "type": "i128",
+          "type": "u128",
           "index": false
         },
         {
