@@ -43,7 +43,7 @@ pub fn perp_place_order(
 
     // Price information, effect is based on order type and component.
     //
-    // For Fixed orders it's a literal price in lots
+    // For Fixed orders it's a literal price in lots (quote lots per base lots)
     // - fill orders on the book up to this price or
     // - place an order on the book at this price.
     // - ignored for Market orders and potentially adjusted for PostOnlySlide orders.
@@ -51,6 +51,7 @@ pub fn perp_place_order(
     // For OraclePegged orders its the adjustment from the oracle price, and
     // - orders on the book may be filled at oracle + adjustment (depends on order type)
     // - if an order is placed on the book, it'll be in the oracle-pegged book
+    // - the unit is lots (quote lots per base lots)
     price_data: i64,
 
     // For OraclePegged orders only: the limit at which the pegged order shall expire.
