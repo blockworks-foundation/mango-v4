@@ -59,6 +59,30 @@ export type MangoV4 = {
           }
         },
         {
+          "name": "msrmMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "msrmVault",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "MsrmVault"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              }
+            ]
+          }
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -1590,6 +1614,11 @@ export type MangoV4 = {
       "accounts": [
         {
           "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "msrmVault",
           "isMut": false,
           "isSigner": false
         },
@@ -3543,11 +3572,19 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "msrmVault",
+            "type": "publicKey"
+          },
+          {
+            "name": "msrmMint",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1920
+                1856
               ]
             }
           }
@@ -6675,6 +6712,30 @@ export const IDL: MangoV4 = {
           }
         },
         {
+          "name": "msrmMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "msrmVault",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "MsrmVault"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              }
+            ]
+          }
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -8206,6 +8267,11 @@ export const IDL: MangoV4 = {
       "accounts": [
         {
           "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "msrmVault",
           "isMut": false,
           "isSigner": false
         },
@@ -10159,11 +10225,19 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "msrmVault",
+            "type": "publicKey"
+          },
+          {
+            "name": "msrmMint",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1920
+                1856
               ]
             }
           }
