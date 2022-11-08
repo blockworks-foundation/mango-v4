@@ -17,41 +17,34 @@ const DROP_EXPIRED_ORDER_LIMIT: usize = 5;
 
 #[account(zero_copy)]
 pub struct OrderBook {
-    pub bids_fixed: OrderTree,
-    pub asks_fixed: OrderTree,
-    pub bids_oracle_pegged: OrderTree,
-    pub asks_oracle_pegged: OrderTree,
+    pub bids: BookSide,
+    pub asks: BookSide,
 }
 const_assert_eq!(
     std::mem::size_of::<OrderBook>(),
-    4 * std::mem::size_of::<OrderTree>()
+    2 * std::mem::size_of::<BookSide>()
 );
 const_assert_eq!(std::mem::size_of::<OrderBook>() % 8, 0);
 
 impl OrderBook {
-    pub fn bookside_mut(&mut self, side: Side) -> BookSideRefMut {
+    pub fn init(&mut self) {
+        self.bids.fixed.order_tree_type = OrderTreeType::Bids;
+        self.bids.oracle_pegged.order_tree_type = OrderTreeType::Bids;
+        self.asks.fixed.order_tree_type = OrderTreeType::Asks;
+        self.asks.oracle_pegged.order_tree_type = OrderTreeType::Asks;
+    }
+
+    pub fn bookside_mut(&mut self, side: Side) -> &mut BookSide {
         match side {
-            Side::Bid => BookSideRefMut {
-                fixed: &mut self.bids_fixed,
-                oracle_pegged: &mut self.bids_oracle_pegged,
-            },
-            Side::Ask => BookSideRefMut {
-                fixed: &mut self.asks_fixed,
-                oracle_pegged: &mut self.asks_oracle_pegged,
-            },
+            Side::Bid => &mut self.bids,
+            Side::Ask => &mut self.asks,
         }
     }
 
-    pub fn bookside(&self, side: Side) -> BookSideRef {
+    pub fn bookside(&self, side: Side) -> &BookSide {
         match side {
-            Side::Bid => BookSideRef {
-                fixed: &self.bids_fixed,
-                oracle_pegged: &self.bids_oracle_pegged,
-            },
-            Side::Ask => BookSideRef {
-                fixed: &self.asks_fixed,
-                oracle_pegged: &self.asks_oracle_pegged,
-            },
+            Side::Bid => &self.bids,
+            Side::Ask => &self.asks,
         }
     }
 
@@ -126,10 +119,8 @@ impl OrderBook {
         let mut matched_order_changes: Vec<(BookSideOrderHandle, i64)> = vec![];
         let mut matched_order_deletes: Vec<(BookSideOrderTree, u128)> = vec![];
         let mut number_of_dropped_expired_orders = 0;
-        let mut opposing_bookside = self.bookside_mut(other_side);
-        for best_opposing in opposing_bookside
-            .non_mut()
-            .iter_all_including_invalid(now_ts, oracle_price_lots)
+        let opposing_bookside = self.bookside_mut(other_side);
+        for best_opposing in opposing_bookside.iter_all_including_invalid(now_ts, oracle_price_lots)
         {
             if !best_opposing.is_valid {
                 // Remove the order from the book unless we've done that enough
@@ -235,7 +226,7 @@ impl OrderBook {
             post_target = None;
         }
         if let Some(order_tree_target) = post_target {
-            let mut bookside = self.bookside_mut(side);
+            let bookside = self.bookside_mut(side);
             let order_tree = bookside.orders_mut(order_tree_target);
 
             // Drop an expired order if possible

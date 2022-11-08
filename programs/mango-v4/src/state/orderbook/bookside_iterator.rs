@@ -23,7 +23,7 @@ pub struct BookSideIter<'a> {
 }
 
 impl<'a> BookSideIter<'a> {
-    pub fn new(book_side: BookSideRef<'a>, now_ts: u64, oracle_price_lots: i64) -> Self {
+    pub fn new(book_side: &'a BookSide, now_ts: u64, oracle_price_lots: i64) -> Self {
         Self {
             fixed_iter: book_side.fixed.iter(),
             oracle_pegged_iter: book_side.oracle_pegged.iter(),

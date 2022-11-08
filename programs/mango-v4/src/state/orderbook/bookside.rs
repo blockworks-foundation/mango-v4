@@ -26,18 +26,13 @@ pub struct BookSideOrderHandle {
     pub order_tree: BookSideOrderTree,
 }
 
-#[derive(Clone, Copy)]
-pub struct BookSideRef<'a> {
-    pub fixed: &'a OrderTree,
-    pub oracle_pegged: &'a OrderTree,
+#[account(zero_copy)]
+pub struct BookSide {
+    pub fixed: OrderTree,
+    pub oracle_pegged: OrderTree,
 }
 
-pub struct BookSideRefMut<'a> {
-    pub fixed: &'a mut OrderTree,
-    pub oracle_pegged: &'a mut OrderTree,
-}
-
-impl<'a> BookSideRef<'a> {
+impl BookSide {
     /// Iterate over all entries in the book filtering out invalid orders
     ///
     /// smallest to highest for asks
@@ -47,18 +42,25 @@ impl<'a> BookSideRef<'a> {
         now_ts: u64,
         oracle_price_lots: i64,
     ) -> impl Iterator<Item = BookSideIterItem> {
-        BookSideIter::new(*self, now_ts, oracle_price_lots).filter(|it| it.is_valid)
+        BookSideIter::new(self, now_ts, oracle_price_lots).filter(|it| it.is_valid)
     }
 
     /// Iterate over all entries, including invalid orders
     pub fn iter_all_including_invalid(&self, now_ts: u64, oracle_price_lots: i64) -> BookSideIter {
-        BookSideIter::new(*self, now_ts, oracle_price_lots)
+        BookSideIter::new(self, now_ts, oracle_price_lots)
     }
 
     pub fn orders(&self, component: BookSideOrderTree) -> &OrderTree {
         match component {
-            BookSideOrderTree::Fixed => self.fixed,
-            BookSideOrderTree::OraclePegged => self.oracle_pegged,
+            BookSideOrderTree::Fixed => &self.fixed,
+            BookSideOrderTree::OraclePegged => &self.oracle_pegged,
+        }
+    }
+
+    pub fn orders_mut(&mut self, component: BookSideOrderTree) -> &mut OrderTree {
+        match component {
+            BookSideOrderTree::Fixed => &mut self.fixed,
+            BookSideOrderTree::OraclePegged => &mut self.oracle_pegged,
         }
     }
 
@@ -66,28 +68,12 @@ impl<'a> BookSideRef<'a> {
         self.orders(key.order_tree).node(key.node)
     }
 
-    pub fn is_full(&self, component: BookSideOrderTree) -> bool {
-        self.orders(component).is_full()
-    }
-}
-
-impl<'a> BookSideRefMut<'a> {
-    pub fn non_mut(&self) -> BookSideRef {
-        BookSideRef {
-            fixed: self.fixed,
-            oracle_pegged: self.oracle_pegged,
-        }
-    }
-
-    pub fn orders_mut(&mut self, component: BookSideOrderTree) -> &mut OrderTree {
-        match component {
-            BookSideOrderTree::Fixed => self.fixed,
-            BookSideOrderTree::OraclePegged => self.oracle_pegged,
-        }
-    }
-
     pub fn node_mut(&mut self, key: BookSideOrderHandle) -> Option<&mut AnyNode> {
         self.orders_mut(key.order_tree).node_mut(key.node)
+    }
+
+    pub fn is_full(&self, component: BookSideOrderTree) -> bool {
+        self.orders(component).is_full()
     }
 
     pub fn remove_worst(&mut self, component: BookSideOrderTree) -> Option<LeafNode> {
@@ -190,9 +176,9 @@ mod tests {
             fixed.insert_leaf(&new_leaf(key)).unwrap();
         }
 
-        let bookside = BookSideRef {
-            fixed: &fixed,
-            oracle_pegged: &oracle_pegged,
+        let bookside = BookSide {
+            fixed,
+            oracle_pegged,
         };
 
         // verify iteration order for different oracle prices
@@ -262,9 +248,9 @@ mod tests {
         add_pegged(-15, 0, -1);
         add_pegged(-20, 7, 95);
 
-        let bookside = BookSideRef {
-            fixed: &fixed,
-            oracle_pegged: &oracle_pegged,
+        let bookside = BookSide {
+            fixed,
+            oracle_pegged,
         };
 
         let order_prices = |now_ts: u64, oracle: i64| -> Vec<i64> {

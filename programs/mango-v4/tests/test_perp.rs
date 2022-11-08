@@ -117,7 +117,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     check_prev_instruction_post_health(&solana, account_0).await;
 
     let orderbook_data = solana.get_account_boxed::<OrderBook>(orderbook).await;
-    assert_eq!(orderbook_data.bids_fixed.leaf_count, 1);
+    assert_eq!(orderbook_data.bids.fixed.leaf_count, 1);
     let order_id_to_cancel = solana
         .get_account::<MangoAccount>(account_0)
         .await
@@ -555,7 +555,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     check_prev_instruction_post_health(&solana, account_0).await;
 
     let orderbook_data = solana.get_account_boxed::<OrderBook>(orderbook).await;
-    assert_eq!(orderbook_data.bids_oracle_pegged.leaf_count, 1);
+    assert_eq!(orderbook_data.bids.oracle_pegged.leaf_count, 1);
     let perp_order = solana
         .get_account::<MangoAccount>(account_0)
         .await

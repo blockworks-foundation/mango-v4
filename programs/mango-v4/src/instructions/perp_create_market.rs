@@ -125,10 +125,7 @@ pub fn perp_create_market(
     };
 
     let mut orderbook = ctx.accounts.orderbook.load_init()?;
-    orderbook.bids_fixed.order_tree_type = OrderTreeType::Bids;
-    orderbook.asks_fixed.order_tree_type = OrderTreeType::Asks;
-    orderbook.bids_oracle_pegged.order_tree_type = OrderTreeType::Bids;
-    orderbook.asks_oracle_pegged.order_tree_type = OrderTreeType::Asks;
+    orderbook.init();
 
     emit!(PerpMarketMetaDataLog {
         mango_group: ctx.accounts.group.key(),
