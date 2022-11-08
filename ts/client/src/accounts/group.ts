@@ -95,17 +95,7 @@ export class Group {
     public vaultAmountsMap: Map<string, BN>,
   ) {}
 
-  public async reloadAll(client: MangoClient): Promise<void> {
-    let ids: Id | undefined = undefined;
-
-    if (client.idsSource === 'api') {
-      ids = await Id.fromApi(this.publicKey);
-    } else if (client.idsSource === 'static') {
-      ids = Id.fromIdsByPk(this.publicKey);
-    } else {
-      ids = undefined;
-    }
-
+  public async reloadAll(client: MangoClient, ids?: Id): Promise<void> {
     // console.time('group.reload');
     await Promise.all([
       this.reloadAlts(client),

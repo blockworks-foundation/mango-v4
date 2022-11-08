@@ -3667,7 +3667,7 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "healthRegionPreInitHealth",
+            "name": "healthRegionBeginInitHealth",
             "docs": [
               "Init health as calculated during HealthReginBegin, rounded up."
             ],
@@ -10486,7 +10486,7 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "healthRegionPreInitHealth",
+            "name": "healthRegionBeginInitHealth",
             "docs": [
               "Init health as calculated during HealthReginBegin, rounded up."
             ],

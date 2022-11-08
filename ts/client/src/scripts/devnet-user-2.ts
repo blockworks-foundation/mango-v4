@@ -55,8 +55,9 @@ async function main() {
     userProvider,
     'devnet',
     MANGO_V4_ID['devnet'],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
@@ -86,7 +87,7 @@ async function main() {
         new PublicKey(DEVNET_MINTS.get('USDC')!),
         1000,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       await client.tokenDeposit(
         group,
@@ -94,7 +95,7 @@ async function main() {
         new PublicKey(DEVNET_MINTS.get('MNGO')!),
         100,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       await client.tokenDeposit(
         group,
@@ -102,7 +103,7 @@ async function main() {
         new PublicKey(DEVNET_MINTS.get('ETH')!),
         500,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       await client.tokenDeposit(
         group,
@@ -110,7 +111,7 @@ async function main() {
         new PublicKey(DEVNET_MINTS.get('SRM')!),
         500,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       await client.tokenDeposit(
         group,
@@ -118,7 +119,7 @@ async function main() {
         new PublicKey(DEVNET_MINTS.get('BTC')!),
         1,
       );
-      await mangoAccount.reload(client, group);
+      await mangoAccount.reload(client);
 
       console.log(mangoAccount.toString(group));
     } catch (error) {

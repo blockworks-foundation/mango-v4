@@ -84,7 +84,7 @@ pub struct MangoAccount {
     pub perp_spot_transfers: i64,
 
     /// Init health as calculated during HealthReginBegin, rounded up.
-    pub health_region_pre_init_health: i64,
+    pub health_region_begin_init_health: i64,
 
     pub reserved: [u8; 240],
 
@@ -119,8 +119,7 @@ impl MangoAccount {
             bump: 0,
             padding: Default::default(),
             net_deposits: 0,
-            perp_spot_transfers: 0,
-            health_region_pre_init_health: 0,
+            health_region_begin_init_health: 0,
             reserved: [0; 240],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
@@ -132,6 +131,7 @@ impl MangoAccount {
             perps: vec![PerpPosition::default(); 4],
             padding7: Default::default(),
             perp_open_orders: vec![PerpOpenOrder::default(); 6],
+            perp_spot_transfers: 0,
         }
     }
 
@@ -1097,8 +1097,7 @@ mod tests {
         account.in_health_region = 3;
         account.bump = 4;
         account.net_deposits = 5;
-        account.perp_spot_transfers = 6;
-        account.health_region_pre_init_health = 7;
+        account.health_region_begin_init_health = 7;
         account.tokens.resize(8, TokenPosition::default());
         account.tokens[0].token_index = 8;
         account.serum3.resize(8, Serum3Orders::default());
@@ -1127,7 +1126,7 @@ mod tests {
             account2.fixed.perp_spot_transfers
         );
         assert_eq!(
-            account.health_region_pre_init_health,
+            account.health_region_begin_init_health,
             account2.fixed.health_region_begin_init_health
         );
         assert_eq!(
