@@ -89,13 +89,13 @@ impl Order {
         order_book: &OrderBook,
     ) -> i64 {
         if order_type == PostOrderType::PostOnlySlide {
-            return if let Some(best_other_price) =
+            if let Some(best_other_price) =
                 order_book.best_price(now_ts, oracle_price_lots, self.side.invert_side())
             {
                 post_only_slide_limit(self.side, best_other_price, price_lots)
             } else {
                 price_lots
-            };
+            }
         } else {
             price_lots
         }
