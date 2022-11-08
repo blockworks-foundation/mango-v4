@@ -45,6 +45,7 @@ impl<'a> GroupWithTokensConfig {
                 creator: admin,
                 payer,
                 insurance_mint: mints[0].pubkey,
+                msrm_mint: mints[0].pubkey,
             },
         )
         .await
