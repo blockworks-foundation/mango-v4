@@ -367,7 +367,9 @@ pub async fn check_prev_instruction_post_health(solana: &SolanaCookie, account: 
 //
 
 pub struct FlashLoanBeginInstruction {
+    pub account: Pubkey,
     pub group: Pubkey,
+    pub owner: TestKeypair,
     pub mango_token_bank: Pubkey,
     pub mango_token_vault: Pubkey,
     pub target_token_account: Pubkey,
@@ -384,6 +386,8 @@ impl ClientInstruction for FlashLoanBeginInstruction {
         let program_id = mango_v4::id();
 
         let accounts = Self::Accounts {
+            account: self.account,
+            owner: self.owner.pubkey(),
             token_program: Token::id(),
             instructions: solana_program::sysvar::instructions::id(),
         };

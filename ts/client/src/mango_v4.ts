@@ -1240,6 +1240,16 @@ export type MangoV4 = {
       "name": "flashLoanBegin",
       "accounts": [
         {
+          "name": "account",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "tokenProgram",
           "isMut": false,
           "isSigner": false
@@ -7855,6 +7865,16 @@ export const IDL: MangoV4 = {
     {
       "name": "flashLoanBegin",
       "accounts": [
+        {
+          "name": "account",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
         {
           "name": "tokenProgram",
           "isMut": false,
