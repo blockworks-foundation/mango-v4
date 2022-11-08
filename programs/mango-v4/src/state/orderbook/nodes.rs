@@ -27,7 +27,7 @@ pub enum NodeTag {
 /// and encodes price data in the top 64 bits followed by an ordering number
 /// in the lower bits.
 ///
-/// The `seq_num` that's passed should monotonically. It's used to choose
+/// The `seq_num` that's passed should monotonically increase. It's used to choose
 /// the ordering number such that orders placed later for the same price data
 /// are ordered after earlier orders.
 pub fn new_node_key(side: Side, price_data: u64, seq_num: u64) -> u128 {

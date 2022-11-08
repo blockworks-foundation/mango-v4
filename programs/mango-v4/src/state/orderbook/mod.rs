@@ -2,6 +2,7 @@ pub use book::*;
 pub use bookside::*;
 pub use bookside_iterator::*;
 pub use nodes::*;
+pub use order::*;
 pub use order_type::*;
 pub use ordertree::*;
 pub use ordertree_iterator::*;
@@ -11,6 +12,7 @@ mod book;
 mod bookside;
 mod bookside_iterator;
 mod nodes;
+mod order;
 mod order_type;
 mod ordertree;
 mod ordertree_iterator;
@@ -111,12 +113,16 @@ mod tests {
                 .ensure_perp_position(perp_market.perp_market_index, settle_token_index)
                 .unwrap();
 
-            let quantity = 1;
-            let tif = 100;
+            let max_base_lots = 1;
+            let time_in_force = 100;
 
             book.new_order(
                 Order {
                     side,
+                    max_base_lots,
+                    max_quote_lots: i64::MAX,
+                    client_order_id: 0,
+                    time_in_force,
                     params: OrderParams::Fixed {
                         price_lots,
                         order_type: PostOrderType::Limit,
@@ -127,10 +133,6 @@ mod tests {
                 oracle_price,
                 &mut account.borrow_mut(),
                 &Pubkey::default(),
-                quantity,
-                i64::MAX,
-                tif,
-                0,
                 now_ts,
                 u8::MAX,
             )
@@ -224,6 +226,10 @@ mod tests {
         book.new_order(
             Order {
                 side: Side::Bid,
+                max_base_lots: bid_quantity,
+                max_quote_lots: i64::MAX,
+                client_order_id: 42,
+                time_in_force: 0,
                 params: OrderParams::Fixed {
                     price_lots,
                     order_type: PostOrderType::Limit,
@@ -234,10 +240,6 @@ mod tests {
             oracle_price,
             &mut maker.borrow_mut(),
             &maker_pk,
-            bid_quantity,
-            i64::MAX,
-            0,
-            42,
             now_ts,
             u8::MAX,
         )
@@ -283,6 +285,10 @@ mod tests {
         book.new_order(
             Order {
                 side: Side::Ask,
+                max_base_lots: match_quantity,
+                max_quote_lots: i64::MAX,
+                client_order_id: 43,
+                time_in_force: 0,
                 params: OrderParams::Fixed {
                     price_lots,
                     order_type: PostOrderType::Limit,
@@ -293,10 +299,6 @@ mod tests {
             oracle_price,
             &mut taker.borrow_mut(),
             &taker_pk,
-            match_quantity,
-            i64::MAX,
-            0,
-            43,
             now_ts,
             u8::MAX,
         )
@@ -404,6 +406,10 @@ mod tests {
         book.new_order(
             Order {
                 side: Side::Ask,
+                max_base_lots: 2,
+                max_quote_lots: i64::MAX,
+                client_order_id: 43,
+                time_in_force: 0,
                 params: OrderParams::Fixed {
                     price_lots: 1000,
                     order_type: PostOrderType::Limit,
@@ -414,10 +420,6 @@ mod tests {
             oracle_price,
             &mut account.borrow_mut(),
             &taker_pk,
-            2,
-            i64::MAX,
-            0,
-            43,
             now_ts,
             u8::MAX,
         )
@@ -427,6 +429,10 @@ mod tests {
         book.new_order(
             Order {
                 side: Side::Bid,
+                max_base_lots: 1,
+                max_quote_lots: i64::MAX,
+                client_order_id: 43,
+                time_in_force: 0,
                 params: OrderParams::Fixed {
                     price_lots: 1000,
                     order_type: PostOrderType::Limit,
@@ -437,10 +443,6 @@ mod tests {
             oracle_price,
             &mut account.borrow_mut(),
             &taker_pk,
-            1,
-            i64::MAX,
-            0,
-            43,
             now_ts,
             u8::MAX,
         )
@@ -464,6 +466,10 @@ mod tests {
         book.new_order(
             Order {
                 side: Side::Bid,
+                max_base_lots: 1,
+                max_quote_lots: i64::MAX,
+                client_order_id: 43,
+                time_in_force: 0,
                 params: OrderParams::ImmediateOrCancel { price_lots: 1000 },
             },
             &mut market,
@@ -471,10 +477,6 @@ mod tests {
             oracle_price,
             &mut account.borrow_mut(),
             &taker_pk,
-            1,
-            i64::MAX,
-            0,
-            43,
             now_ts,
             u8::MAX,
         )

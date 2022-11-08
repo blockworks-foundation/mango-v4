@@ -1,10 +1,7 @@
 use crate::state::MangoAccountRefMut;
 use crate::{
     error::*,
-    state::{
-        orderbook::{bookside::*, nodes::*},
-        EventQueue, PerpMarket, FREE_ORDER_SLOT,
-    },
+    state::{orderbook::bookside::*, EventQueue, PerpMarket, FREE_ORDER_SLOT},
 };
 use anchor_lang::prelude::*;
 use bytemuck::cast;
@@ -17,140 +14,6 @@ use crate::util::checked_math as cm;
 /// Drop at most this many expired orders from a BookSide when trying to match orders.
 /// This exists as a guard against excessive compute use.
 const DROP_EXPIRED_ORDER_LIMIT: usize = 5;
-
-/// The implicit limit price to use for market orders
-fn market_order_limit_for_side(side: Side) -> i64 {
-    match side {
-        Side::Bid => i64::MAX,
-        Side::Ask => 1,
-    }
-}
-
-/// The limit to use for PostOnlySlide orders: the tinyest bit better than
-/// the best opposing order
-fn post_only_slide_limit(side: Side, best_other_side: i64, limit: i64) -> i64 {
-    match side {
-        Side::Bid => limit.min(cm!(best_other_side - 1)),
-        Side::Ask => limit.max(cm!(best_other_side + 1)),
-    }
-}
-
-/// TODO: what if oracle is stale for a while
-
-pub struct Order {
-    pub side: Side,
-    pub params: OrderParams,
-}
-
-pub enum OrderParams {
-    Market,
-    ImmediateOrCancel {
-        price_lots: i64,
-    },
-    Fixed {
-        price_lots: i64,
-        order_type: PostOrderType,
-    },
-    OraclePegged {
-        price_offset_lots: i64,
-        order_type: PostOrderType,
-        peg_limit: i64,
-    },
-}
-
-impl Order {
-    pub fn needs_penalty_fee(&self) -> bool {
-        matches!(self.params, OrderParams::ImmediateOrCancel { .. })
-    }
-
-    pub fn is_post_only(&self) -> bool {
-        let order_type = match self.params {
-            OrderParams::Fixed { order_type, .. } => order_type,
-            OrderParams::OraclePegged { order_type, .. } => order_type,
-            _ => return false,
-        };
-        order_type == PostOrderType::PostOnly || order_type == PostOrderType::PostOnlySlide
-    }
-
-    pub fn post_target(&self) -> Option<BookSideOrderTree> {
-        match self.params {
-            OrderParams::Fixed { .. } => Some(BookSideOrderTree::Fixed),
-            OrderParams::OraclePegged { .. } => Some(BookSideOrderTree::OraclePegged),
-            _ => None,
-        }
-    }
-
-    fn price_for_type(
-        &self,
-        now_ts: u64,
-        oracle_price_lots: i64,
-        price_lots: i64,
-        order_type: PostOrderType,
-        order_book: &OrderBook,
-    ) -> i64 {
-        if order_type == PostOrderType::PostOnlySlide {
-            if let Some(best_other_price) =
-                order_book.best_price(now_ts, oracle_price_lots, self.side.invert_side())
-            {
-                post_only_slide_limit(self.side, best_other_price, price_lots)
-            } else {
-                price_lots
-            }
-        } else {
-            price_lots
-        }
-    }
-
-    pub fn price(
-        &self,
-        now_ts: u64,
-        oracle_price_lots: i64,
-        order_book: &OrderBook,
-    ) -> Result<(i64, u64)> {
-        let price_lots = match self.params {
-            OrderParams::Market => market_order_limit_for_side(self.side),
-            OrderParams::ImmediateOrCancel { price_lots } => price_lots,
-            OrderParams::Fixed {
-                price_lots,
-                order_type,
-            } => self.price_for_type(
-                now_ts,
-                oracle_price_lots,
-                price_lots,
-                order_type,
-                order_book,
-            ),
-            OrderParams::OraclePegged {
-                price_offset_lots,
-                order_type,
-                ..
-            } => {
-                let price_lots = cm!(oracle_price_lots + price_offset_lots);
-                self.price_for_type(
-                    now_ts,
-                    oracle_price_lots,
-                    price_lots,
-                    order_type,
-                    order_book,
-                )
-            }
-        };
-        let price_data = match self.params {
-            OrderParams::OraclePegged { .. } => {
-                oracle_pegged_price_data(cm!(price_lots - oracle_price_lots))
-            }
-            _ => fixed_price_data(price_lots)?,
-        };
-        Ok((price_lots, price_data))
-    }
-
-    pub fn peg_limit(&self) -> i64 {
-        match self.params {
-            OrderParams::OraclePegged { peg_limit, .. } => peg_limit,
-            _ => -1,
-        }
-    }
-}
 
 #[account(zero_copy)]
 pub struct OrderBook {
@@ -231,16 +94,9 @@ impl OrderBook {
         oracle_price: I80F48,
         mango_account: &mut MangoAccountRefMut,
         mango_account_pk: &Pubkey,
-        max_base_lots: i64,
-        max_quote_lots: i64,
-        time_in_force: u8,
-        client_order_id: u64,
         now_ts: u64,
         mut limit: u8,
     ) -> std::result::Result<(), Error> {
-        require_gte!(max_base_lots, 0);
-        require_gte!(max_quote_lots, 0);
-
         let side = order.side;
         let other_side = side.invert_side();
         let market = perp_market;
@@ -265,8 +121,8 @@ impl OrderBook {
         //
         // Any changes to matching orders on the other side of the book are collected in
         // matched_changes/matched_deletes and then applied after this loop.
-        let mut remaining_base_lots = max_base_lots;
-        let mut remaining_quote_lots = max_quote_lots;
+        let mut remaining_base_lots = order.max_base_lots;
+        let mut remaining_quote_lots = order.max_quote_lots;
         let mut matched_order_changes: Vec<(BookSideOrderHandle, i64)> = vec![];
         let mut matched_order_deletes: Vec<(BookSideOrderTree, u128)> = vec![];
         let mut number_of_dropped_expired_orders = 0;
@@ -346,7 +202,7 @@ impl OrderBook {
                 best_opposing.node.timestamp,
                 *mango_account_pk,
                 order_id,
-                client_order_id,
+                order.client_order_id,
                 market.taker_fee,
                 best_opposing_price,
                 match_base_lots,
@@ -358,7 +214,7 @@ impl OrderBook {
                 break;
             }
         }
-        let total_quote_lots_taken = cm!(max_quote_lots - remaining_quote_lots);
+        let total_quote_lots_taken = cm!(order.max_quote_lots - remaining_quote_lots);
 
         // Apply changes to matched asks (handles invalidate on delete!)
         for (handle, new_quantity) in matched_order_changes {
@@ -420,10 +276,10 @@ impl OrderBook {
                 order_id,
                 *mango_account_pk,
                 book_base_quantity,
-                client_order_id,
+                order.client_order_id,
                 now_ts,
                 PostOrderType::Limit, // TODO: Support order types? needed?
-                time_in_force,
+                order.time_in_force,
                 order.peg_limit(),
             );
             let _result = order_tree.insert_leaf(&new_order)?;

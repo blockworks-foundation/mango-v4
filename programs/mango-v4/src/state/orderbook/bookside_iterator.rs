@@ -7,6 +7,14 @@ pub struct BookSideIterItem<'a> {
     pub is_valid: bool,
 }
 
+/// Iterates the fixed and oracle_pegged OrderTrees simultaneously, allowing users to
+/// walk the orderbook without caring about where an order came from.
+///
+/// This will skip over orders that are not currently matchable, but might be valid
+/// in the future.
+///
+/// This may return invalid orders (tif expired, peg_limit exceeded; see is_valid) which
+/// users are supposed to remove from the orderbook if they can.
 pub struct BookSideIter<'a> {
     fixed_iter: OrderTreeIter<'a>,
     oracle_pegged_iter: OrderTreeIter<'a>,

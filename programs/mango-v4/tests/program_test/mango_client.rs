@@ -2459,7 +2459,7 @@ impl ClientInstruction for PerpPlaceOrderPeggedInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             side: self.side,
-            price_offset: self.price_offset,
+            price_offset_lots: self.price_offset,
             peg_limit: self.peg_limit,
             max_base_lots: self.max_base_lots,
             max_quote_lots: self.max_quote_lots,

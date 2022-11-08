@@ -1,8 +1,9 @@
 use anchor_lang::prelude::*;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
+use super::*;
 use crate::error::*;
-use crate::{error_msg, state::BookSideOrderTree};
+use crate::error_msg;
 
 #[derive(
     Eq,
@@ -128,6 +129,7 @@ impl Side {
     }
 }
 
+/// SideAndOrderTree is a storage optimization, so we don't need two bytes for the data
 #[derive(
     Eq,
     PartialEq,
