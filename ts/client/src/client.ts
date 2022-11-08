@@ -116,6 +116,22 @@ export class MangoClient {
       .rpc();
   }
 
+  public async groupCreateMsrmVault(
+    group: Group,
+    msrmMintPk: PublicKey,
+  ): Promise<TransactionSignature> {
+    const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
+    return await this.program.methods
+      .groupCreateMsrmVault()
+      .accounts({
+        group: group.publicKey,
+        admin: adminPk,
+        msrmMint: msrmMintPk,
+        payer: adminPk,
+      })
+      .rpc();
+  }
+
   public async groupEdit(
     group: Group,
     admin: PublicKey | undefined,

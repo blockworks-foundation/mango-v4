@@ -39,6 +39,10 @@ pub mod mango_v4 {
         instructions::group_create(ctx, group_num, testing, version)
     }
 
+    pub fn group_create_msrm_vault(ctx: Context<GroupCreateMsrmVault>) -> Result<()> {
+        instructions::group_create_msrm_vault(ctx)
+    }
+
     pub fn group_edit(
         ctx: Context<GroupEdit>,
         admin_opt: Option<Pubkey>,
@@ -225,6 +229,10 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::token_withdraw(ctx, amount, allow_borrow)
     }
+
+    // TODO
+    // pub fn token_deposit_msrm
+    // pub fn token_withdraw_msrm
 
     pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanBegin<'info>>,

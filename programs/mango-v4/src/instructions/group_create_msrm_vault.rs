@@ -32,8 +32,7 @@ pub struct GroupCreateMsrmVault<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-// use case - transfer group ownership to governance, where
-// admin and fast_listing_admin are PDAs
+// Ix only exists to add vaults to groups created before msrm vault integration was done
 pub fn group_create_msrm_vault(ctx: Context<GroupCreateMsrmVault>) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
     group.msrm_vault = ctx.accounts.msrm_vault.key();
