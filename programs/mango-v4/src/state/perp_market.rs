@@ -11,6 +11,7 @@ use crate::state::{oracle, TokenIndex};
 use crate::util::checked_math as cm;
 
 use super::{orderbook, OracleConfig, OrderBook, DAY_I80F48};
+use crate::logs::PerpUpdateFundingLog;
 
 pub type PerpMarketIndex = u16;
 
@@ -187,6 +188,16 @@ impl PerpMarket {
         self.long_funding += funding_delta;
         self.short_funding += funding_delta;
         self.funding_last_updated = now_ts;
+
+        emit!(PerpUpdateFundingLog {
+            mango_group: self.group,
+            market_index: self.perp_market_index,
+            long_funding: self.long_funding.to_bits(),
+            short_funding: self.long_funding.to_bits(),
+            price: oracle_price.to_bits(),
+            fees_accrued: self.fees_accrued.to_bits(),
+            open_interest: self.open_interest,
+        });
 
         Ok(())
     }
