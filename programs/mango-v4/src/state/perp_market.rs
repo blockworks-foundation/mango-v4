@@ -69,7 +69,8 @@ pub struct PerpMarket {
     pub impact_quantity: i64,
     pub long_funding: I80F48,
     pub short_funding: I80F48,
-    pub funding_last_updated: i64,
+    /// timestamp that funding was last updated in
+    pub funding_last_updated: u64,
 
     ///
     pub open_interest: i64,
@@ -93,7 +94,7 @@ pub struct PerpMarket {
 
     pub padding2: [u8; 6],
 
-    pub registration_time: i64,
+    pub registration_time: u64,
 
     /// Fees settled in native quote currency
     pub fees_settled: I80F48,
@@ -154,6 +155,10 @@ impl PerpMarket {
         oracle_price: I80F48,
         now_ts: u64,
     ) -> Result<()> {
+        if now_ts <= self.funding_last_updated {
+            return Ok(());
+        }
+
         let index_price = oracle_price;
         let oracle_price_lots = self.native_price_to_lot(oracle_price);
 
@@ -181,7 +186,7 @@ impl PerpMarket {
 
         self.long_funding += funding_delta;
         self.short_funding += funding_delta;
-        self.funding_last_updated = now_ts as i64;
+        self.funding_last_updated = now_ts;
 
         Ok(())
     }

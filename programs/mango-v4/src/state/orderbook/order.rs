@@ -46,7 +46,7 @@ pub enum OrderParams {
 impl Order {
     /// Convert an input expiry timestamp to a time_in_force value
     pub fn tif_from_expiry(expiry_timestamp: u64) -> Option<u8> {
-        let now_ts = Clock::get().unwrap().unix_timestamp as u64;
+        let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
         if expiry_timestamp != 0 {
             // If expiry is far in the future, clamp to 255 seconds
             let tif = expiry_timestamp.saturating_sub(now_ts).min(255);

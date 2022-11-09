@@ -126,7 +126,7 @@ pub fn token_register_trustless(
         banks: Default::default(),
         vaults: Default::default(),
         oracle: ctx.accounts.oracle.key(),
-        registration_time: Clock::get()?.unix_timestamp,
+        registration_time: Clock::get()?.unix_timestamp.try_into().unwrap(),
         reserved: [0; 2560],
     };
 
