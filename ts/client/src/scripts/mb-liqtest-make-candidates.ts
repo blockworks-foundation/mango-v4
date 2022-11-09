@@ -238,6 +238,7 @@ async function main() {
         0.044, // ui quote quantity
         4200,
         PerpOrderType.limit,
+        false,
         0,
         5,
       );
@@ -281,6 +282,7 @@ async function main() {
         0.044, // ui quote quantity
         4200,
         PerpOrderType.limit,
+        false,
         0,
         5,
       );
@@ -295,6 +297,7 @@ async function main() {
         0.044, // ui quote quantity
         4200,
         PerpOrderType.market,
+        false,
         0,
         5,
       );
@@ -358,6 +361,7 @@ async function main() {
         0.022, // ui quote quantity
         4200,
         PerpOrderType.limit,
+        false,
         0,
         5,
       );
@@ -371,6 +375,7 @@ async function main() {
         0.022, // ui quote quantity
         4200,
         PerpOrderType.market,
+        false,
         0,
         5,
       );
@@ -391,6 +396,7 @@ async function main() {
         0.044, // ui quote quantity
         4201,
         PerpOrderType.limit,
+        false,
         0,
         5,
       );
@@ -404,6 +410,7 @@ async function main() {
         0.044, // ui quote quantity
         4201,
         PerpOrderType.market,
+        false,
         0,
         5,
       );
