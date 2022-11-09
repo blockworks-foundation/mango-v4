@@ -2411,7 +2411,7 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
             max_base_lots: self.max_base_lots,
             max_quote_lots: self.max_quote_lots,
             client_order_id: self.client_order_id,
-            order_type: OrderType::Limit,
+            order_type: PlaceOrderType::Limit,
             reduce_only: false,
             expiry_timestamp: 0,
             limit: 10,
@@ -2479,6 +2479,7 @@ impl ClientInstruction for PerpPlaceOrderPeggedInstruction {
             max_quote_lots: self.max_quote_lots,
             client_order_id: self.client_order_id,
             order_type: PlaceOrderType::Limit,
+            reduce_only: false,
             expiry_timestamp: 0,
             limit: 10,
         };

@@ -101,6 +101,7 @@ mod tests {
                     max_quote_lots: i64::MAX,
                     client_order_id: 0,
                     time_in_force,
+                    reduce_only: false,
                     params: OrderParams::Fixed {
                         price_lots,
                         order_type: PostOrderType::Limit,
@@ -208,6 +209,7 @@ mod tests {
                 max_quote_lots: i64::MAX,
                 client_order_id: 42,
                 time_in_force: 0,
+                reduce_only: false,
                 params: OrderParams::Fixed {
                     price_lots,
                     order_type: PostOrderType::Limit,
@@ -267,6 +269,7 @@ mod tests {
                 max_quote_lots: i64::MAX,
                 client_order_id: 43,
                 time_in_force: 0,
+                reduce_only: false,
                 params: OrderParams::Fixed {
                     price_lots,
                     order_type: PostOrderType::Limit,
@@ -388,6 +391,7 @@ mod tests {
                 max_quote_lots: i64::MAX,
                 client_order_id: 43,
                 time_in_force: 0,
+                reduce_only: false,
                 params: OrderParams::Fixed {
                     price_lots: 1000,
                     order_type: PostOrderType::Limit,
@@ -411,6 +415,7 @@ mod tests {
                 max_quote_lots: i64::MAX,
                 client_order_id: 43,
                 time_in_force: 0,
+                reduce_only: false,
                 params: OrderParams::Fixed {
                     price_lots: 1000,
                     order_type: PostOrderType::Limit,
@@ -448,6 +453,7 @@ mod tests {
                 max_quote_lots: i64::MAX,
                 client_order_id: 43,
                 time_in_force: 0,
+                reduce_only: false,
                 params: OrderParams::ImmediateOrCancel { price_lots: 1000 },
             },
             &mut market,
