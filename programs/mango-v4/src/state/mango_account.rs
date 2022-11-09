@@ -220,6 +220,10 @@ impl MangoAccountFixed {
         self.owner == ix_signer || self.delegate == ix_signer
     }
 
+    pub fn is_delegate(&self, ix_signer: Pubkey) -> bool {
+        self.delegate == ix_signer
+    }
+
     pub fn being_liquidated(&self) -> bool {
         self.being_liquidated == 1
     }

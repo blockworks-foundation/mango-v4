@@ -2052,7 +2052,6 @@ export class MangoClient {
       .flashLoanEnd(flashLoanType)
       .accounts({
         account: mangoAccount.publicKey,
-        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .remainingAccounts([
         ...parsedHealthAccounts,
@@ -2076,6 +2075,8 @@ export class MangoClient {
         ) /* we don't care about borrowing the target amount, this is just a dummy */,
       ])
       .accounts({
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       })
       .remainingAccounts([
