@@ -505,6 +505,7 @@ pub mod mango_v4 {
         max_quote_lots: i64,
         client_order_id: u64,
         order_type: PlaceOrderType,
+        reduce_only: bool,
 
         // Timestamp of when order expires
         //
@@ -534,6 +535,7 @@ pub mod mango_v4 {
             max_base_lots,
             max_quote_lots,
             client_order_id,
+            reduce_only,
             time_in_force,
             params: match order_type {
                 PlaceOrderType::Market => OrderParams::Market,
@@ -566,6 +568,7 @@ pub mod mango_v4 {
         max_quote_lots: i64,
         client_order_id: u64,
         order_type: PlaceOrderType,
+        reduce_only: bool,
 
         // Timestamp of when order expires
         //
@@ -595,6 +598,7 @@ pub mod mango_v4 {
             max_base_lots,
             max_quote_lots,
             client_order_id,
+            reduce_only,
             time_in_force,
             params: OrderParams::OraclePegged {
                 price_offset_lots,

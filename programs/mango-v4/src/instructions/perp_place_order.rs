@@ -84,7 +84,8 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, order: Order, limit: u8) -
 
     let now_ts = Clock::get()?.unix_timestamp as u64;
 
-    // TODO reduce_only based on event queue
+    // TODO apply reduce_only flag to compute final base_lots, also process event queue
+    require!(order.reduce_only == false, MangoError::SomeError);
 
     book.new_order(
         order,

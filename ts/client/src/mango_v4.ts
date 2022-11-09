@@ -2755,6 +2755,10 @@ export type MangoV4 = {
           }
         },
         {
+          "name": "reduceOnly",
+          "type": "bool"
+        },
+        {
           "name": "expiryTimestamp",
           "type": "u64"
         },
@@ -9582,6 +9586,10 @@ export const IDL: MangoV4 = {
           "type": {
             "defined": "PlaceOrderType"
           }
+        },
+        {
+          "name": "reduceOnly",
+          "type": "bool"
         },
         {
           "name": "expiryTimestamp",

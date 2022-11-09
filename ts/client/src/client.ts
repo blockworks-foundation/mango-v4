@@ -1617,6 +1617,7 @@ export class MangoClient {
     maxQuoteQuantity: number | undefined,
     clientOrderId: number | undefined,
     orderType: PerpOrderType | undefined,
+    reduceOnly: boolean | undefined,
     expiryTimestamp: number | undefined,
     limit: number | undefined,
   ): Promise<TransactionSignature> {
@@ -1633,6 +1634,7 @@ export class MangoClient {
           maxQuoteQuantity,
           clientOrderId,
           orderType,
+          reduceOnly,
           expiryTimestamp,
           limit,
         ),
@@ -1654,6 +1656,7 @@ export class MangoClient {
     maxQuoteQuantity?: number,
     clientOrderId?: number,
     orderType?: PerpOrderType,
+    reduceOnly?: boolean,
     expiryTimestamp?: number,
     limit?: number,
   ): Promise<TransactionInstruction> {
@@ -1677,6 +1680,7 @@ export class MangoClient {
           : I64_MAX_BN,
         new BN(clientOrderId ? clientOrderId : Date.now()),
         orderType ? orderType : PerpOrderType.limit,
+        reduceOnly ? reduceOnly : false,
         new BN(expiryTimestamp ? expiryTimestamp : 0),
         limit ? limit : 10,
       )
