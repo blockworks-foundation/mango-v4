@@ -3,6 +3,7 @@ import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID, MSRM_MINTS } from '../constants';
+import { InterestRateParams } from '../types';
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 
@@ -92,6 +93,20 @@ async function registerTokens() {
 
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
 
+  const defaultOracleConfig = {
+    confFilter: 0.1,
+    maxStalenessSlots: null,
+  };
+  // hoping that dynamic rate parameter adjustment would be enough to tune their rates to the markets needs
+  const defaultInterestRate = {
+    adjustmentFactor: 0.004, // rate parameters are chosen to be the same for all high asset weight tokens,
+    util0: 0.7,
+    rate0: 0.1,
+    util1: 0.85,
+    rate1: 0.2,
+    maxRate: 2.0,
+  };
+
   console.log(`Creating USDC stub oracle...`);
   const usdcMainnetMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
   await client.stubOracleCreate(group, usdcMainnetMint, 1.0);
@@ -105,16 +120,10 @@ async function registerTokens() {
     group,
     usdcMainnetMint,
     usdcMainnetOracle.publicKey,
-    0.1,
+    defaultOracleConfig,
     0, // insurance vault token should be the first to be registered
     'USDC',
-    0.004, // rate parameters are chosen to be the same for all high asset weight tokens,
-    // hoping that dynamic rate parameter adjustment would be enough to tune their rates to the markets needs
-    0.7,
-    0.1,
-    0.85,
-    0.2,
-    2.0,
+    defaultInterestRate,
     0.005, // 50 bps
     0.0005, // 5 bps
     1,
@@ -131,15 +140,10 @@ async function registerTokens() {
     group,
     usdtMainnetMint,
     usdtMainnetOracle,
-    0.1,
+    defaultOracleConfig,
     1,
     'USDT',
-    0.004,
-    0.7,
-    0.1,
-    0.85,
-    0.2,
-    2.0,
+    defaultInterestRate,
     0.005,
     0.0005,
     0.95,
@@ -156,15 +160,10 @@ async function registerTokens() {
     group,
     btcMainnetMint,
     btcMainnetOracle,
-    0.1,
+    defaultOracleConfig,
     2,
     'BTC',
-    0.004,
-    0.7,
-    0.1,
-    0.85,
-    0.2,
-    2.0,
+    defaultInterestRate,
     0.005,
     0.0005,
     0.9,
@@ -181,15 +180,10 @@ async function registerTokens() {
     group,
     ethMainnetMint,
     ethMainnetOracle,
-    0.1,
+    defaultOracleConfig,
     3,
     'ETH',
-    0.004,
-    0.7,
-    0.1,
-    0.85,
-    0.2,
-    2.0,
+    defaultInterestRate,
     0.005,
     0.0005,
     0.9,
@@ -206,15 +200,10 @@ async function registerTokens() {
     group,
     soEthMainnetMint,
     soEthMainnetOracle,
-    0.1,
+    defaultOracleConfig,
     4,
     'soETH',
-    0.004,
-    0.7,
-    0.1,
-    0.85,
-    0.2,
-    2.0,
+    defaultInterestRate,
     0.005,
     0.0005,
     0.9,
@@ -231,15 +220,10 @@ async function registerTokens() {
     group,
     solMainnetMint,
     solMainnetOracle,
-    0.1,
+    defaultOracleConfig,
     5,
     'SOL',
-    0.004,
-    0.7,
-    0.1,
-    0.85,
-    0.2,
-    2.0,
+    defaultInterestRate,
     0.005,
     0.0005,
     0.9,
@@ -256,15 +240,10 @@ async function registerTokens() {
     group,
     msolMainnetMint,
     msolMainnetOracle,
-    0.1,
+    defaultOracleConfig,
     6,
     'mSOL',
-    0.004,
-    0.7,
-    0.1,
-    0.85,
-    0.2,
-    2.0,
+    defaultInterestRate,
     0.005,
     0.0005,
     0.9,

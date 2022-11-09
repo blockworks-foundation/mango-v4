@@ -142,6 +142,11 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             bank.borrow_index = borrow_index;
 
             bank.avg_utilization = new_avg_utilization;
+
+            // This copies the old conf_filter parameter location to the new one
+            // inside OracleConfig.
+            // TODO: remove once fully migrated to OracleConfig
+            bank.oracle_config.conf_filter = bank.oracle_conf_filter;
         }
     }
 

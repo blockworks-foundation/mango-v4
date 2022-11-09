@@ -742,8 +742,9 @@ impl ClientInstruction for TokenRegisterInstruction {
                 self.token_index.to_string()
             ),
             token_index: self.token_index,
-            oracle_config: OracleConfig {
-                conf_filter: I80F48::from_num::<f32>(0.10),
+            oracle_config: OracleConfigParams {
+                conf_filter: 0.1,
+                max_staleness_slots: None,
             },
             interest_rate_params: InterestRateParams {
                 adjustment_factor: self.adjustment_factor,
@@ -2261,8 +2262,9 @@ impl ClientInstruction for PerpCreateMarketInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             name: "UUU-PERP".to_string(),
-            oracle_config: OracleConfig {
-                conf_filter: I80F48::from_num::<f32>(0.10),
+            oracle_config: OracleConfigParams {
+                conf_filter: 0.1,
+                max_staleness_slots: None,
             },
             settle_token_index: self.settle_token_index,
             perp_market_index: self.perp_market_index,

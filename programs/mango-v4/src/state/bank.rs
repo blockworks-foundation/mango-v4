@@ -31,7 +31,8 @@ pub struct Bank {
     pub vault: Pubkey,
     pub oracle: Pubkey,
 
-    pub oracle_config: OracleConfig,
+    // TODO: Merge with oracle_config once Bank re-layouts are possible
+    pub oracle_conf_filter: I80F48,
 
     /// the index used to scale the value of an IndexedPosition
     /// TODO: should always be >= 0, add checks?
@@ -101,12 +102,14 @@ pub struct Bank {
 
     pub bank_num: u32,
 
+    pub oracle_config: OracleConfig,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2560],
+    pub reserved: [u8; 2464],
 }
 const_assert_eq!(
     size_of::<Bank>(),
-    32 + 16 + 32 * 3 + 16 + 16 * 6 + 8 * 2 + 16 * 16 + 8 * 2 + 2 + 1 + 1 + 4 + 2560
+    32 + 16 + 32 * 3 + 16 + 16 * 6 + 8 * 2 + 16 * 16 + 8 * 2 + 2 + 1 + 1 + 4 + 96 + 2464
 );
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
@@ -136,7 +139,7 @@ impl Bank {
             group: existing_bank.group,
             mint: existing_bank.mint,
             oracle: existing_bank.oracle,
-            oracle_config: existing_bank.oracle_config,
+            oracle_conf_filter: existing_bank.oracle_conf_filter,
             deposit_index: existing_bank.deposit_index,
             borrow_index: existing_bank.borrow_index,
             cached_indexed_total_deposits: existing_bank.cached_indexed_total_deposits,
@@ -159,7 +162,8 @@ impl Bank {
             liquidation_fee: existing_bank.liquidation_fee,
             token_index: existing_bank.token_index,
             mint_decimals: existing_bank.mint_decimals,
-            reserved: [0; 2560],
+            oracle_config: existing_bank.oracle_config.clone(),
+            reserved: [0; 2464],
         }
     }
 
@@ -581,11 +585,7 @@ impl Bank {
 
     pub fn oracle_price(&self, oracle_acc: &impl KeyedAccountReader) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        oracle::oracle_price(
-            oracle_acc,
-            self.oracle_config.conf_filter,
-            self.mint_decimals,
-        )
+        oracle::oracle_price(oracle_acc, &self.oracle_config, self.mint_decimals)
     }
 }
 

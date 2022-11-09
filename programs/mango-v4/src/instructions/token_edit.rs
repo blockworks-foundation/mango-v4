@@ -33,7 +33,7 @@ pub struct TokenEdit<'info> {
 pub fn token_edit(
     ctx: Context<TokenEdit>,
     oracle_opt: Option<Pubkey>,
-    oracle_config_opt: Option<OracleConfig>,
+    oracle_config_opt: Option<OracleConfigParams>,
     group_insurance_fund_opt: Option<bool>,
     interest_rate_params_opt: Option<InterestRateParams>,
     loan_fee_rate_opt: Option<f32>,
@@ -63,8 +63,9 @@ pub fn token_edit(
             bank.oracle = oracle;
             mint_info.oracle = oracle;
         }
-        if let Some(oracle_config) = oracle_config_opt {
-            bank.oracle_config = oracle_config;
+        if let Some(oracle_config) = oracle_config_opt.as_ref() {
+            bank.oracle_config = oracle_config.to_oracle_config();
+            bank.oracle_conf_filter = bank.oracle_config.conf_filter;
         };
 
         if let Some(group_insurance_fund) = group_insurance_fund_opt {

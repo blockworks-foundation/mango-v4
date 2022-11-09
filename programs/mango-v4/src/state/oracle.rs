@@ -60,9 +60,27 @@ pub mod switchboard_v2_mainnet_oracle {
 #[derive(AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct OracleConfig {
     pub conf_filter: I80F48,
+    pub max_staleness_slots: i64,
+    pub reserved: [u8; 72],
 }
-const_assert_eq!(size_of::<OracleConfig>(), 16);
+const_assert_eq!(size_of::<OracleConfig>(), 96);
 const_assert_eq!(size_of::<OracleConfig>() % 8, 0);
+
+#[derive(AnchorDeserialize, AnchorSerialize, Debug)]
+pub struct OracleConfigParams {
+    pub conf_filter: f32,
+    pub max_staleness_slots: Option<u32>,
+}
+
+impl OracleConfigParams {
+    pub fn to_oracle_config(&self) -> OracleConfig {
+        OracleConfig {
+            conf_filter: I80F48::from_num(self.conf_filter),
+            max_staleness_slots: self.max_staleness_slots.map(|v| v as i64).unwrap_or(-1),
+            reserved: [0; 72],
+        }
+    }
+}
 
 #[derive(PartialEq)]
 pub enum OracleType {
@@ -115,7 +133,7 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
 /// This currently assumes that quote decimals is 6, like for USDC.
 pub fn oracle_price(
     acc_info: &impl KeyedAccountReader,
-    oracle_conf_filter: I80F48,
+    config: &OracleConfig,
     base_decimals: u8,
 ) -> Result<I80F48> {
     let data = &acc_info.data();
@@ -128,7 +146,7 @@ pub fn oracle_price(
             let price = I80F48::from_num(price_account.price);
 
             // Filter out bad prices
-            if I80F48::from_num(price_account.conf) > cm!(oracle_conf_filter * price) {
+            if I80F48::from_num(price_account.conf) > cm!(config.conf_filter * price) {
                 msg!(
                     "Pyth conf interval too high; pubkey {} price: {} price_account.conf: {}",
                     acc_info.key(),
@@ -162,7 +180,7 @@ pub fn oracle_price(
                 .std_deviation
                 .try_into()
                 .map_err(from_foreign_error)?;
-            if I80F48::from_num(std_deviation_decimal) > cm!(oracle_conf_filter * price) {
+            if I80F48::from_num(std_deviation_decimal) > cm!(config.conf_filter * price) {
                 msg!(
                     "Switchboard v2 std deviation too high; pubkey {} price: {} latest_confirmed_round.std_deviation: {}",
                     acc_info.key(),
@@ -183,7 +201,7 @@ pub fn oracle_price(
             // Filter out bad prices
             let min_response = I80F48::from_num(result.result.min_response);
             let max_response = I80F48::from_num(result.result.max_response);
-            if cm!(max_response - min_response) > cm!(oracle_conf_filter * price) {
+            if cm!(max_response - min_response) > cm!(config.conf_filter * price) {
                 msg!(
                     "Switchboard v1 min-max response gap too wide; pubkey {} price: {} min_response: {} max_response {}",
                     acc_info.key(),
