@@ -36,6 +36,5 @@ pub struct GroupCreateMsrmVault<'info> {
 pub fn group_create_msrm_vault(ctx: Context<GroupCreateMsrmVault>) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
     group.msrm_vault = ctx.accounts.msrm_vault.key();
-    group.msrm_mint = ctx.accounts.msrm_mint.key();
     Ok(())
 }

@@ -36,9 +36,8 @@ pub struct Group {
     pub address_lookup_tables: [Pubkey; 20],
 
     pub msrm_vault: Pubkey,
-    pub msrm_mint: Pubkey,
 
-    pub reserved: [u8; 1856],
+    pub reserved: [u8; 1888],
 }
 const_assert_eq!(
     size_of::<Group>(),

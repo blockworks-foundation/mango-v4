@@ -3636,15 +3636,11 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "msrmMint",
-            "type": "publicKey"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1856
+                1888
               ]
             }
           }
@@ -10349,15 +10345,11 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "msrmMint",
-            "type": "publicKey"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1856
+                1888
               ]
             }
           }

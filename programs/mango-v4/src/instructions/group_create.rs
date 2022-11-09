@@ -67,6 +67,5 @@ pub fn group_create(
     group.testing = testing;
     group.version = version;
     group.msrm_vault = ctx.accounts.msrm_vault.key();
-    group.msrm_mint = ctx.accounts.msrm_mint.key();
     Ok(())
 }
