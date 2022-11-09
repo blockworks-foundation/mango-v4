@@ -590,6 +590,11 @@ impl MangoClient {
             Serum3Side::Ask => s3.base.mint_info,
         };
 
+        let group = account_fetcher_fetch_anchor_account::<Group>(
+            &*self.account_fetcher,
+            &self.context.group,
+        )?;
+
         self.program()
             .request()
             .instruction(Instruction {
@@ -598,6 +603,7 @@ impl MangoClient {
                     let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
                         &mango_v4::accounts::Serum3PlaceOrder {
                             group: self.group(),
+                            msrm_vault: group.msrm_vault,
                             account: self.mango_account_address,
                             open_orders,
                             payer_bank: payer_mint_info.first_bank(),

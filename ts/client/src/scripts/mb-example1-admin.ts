@@ -14,7 +14,7 @@ import {
   Serum3Side,
 } from '../accounts/serum3';
 import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
+import { MANGO_V4_ID, MSRM_MINTS } from '../constants';
 import { buildVersionedTx } from '../utils';
 
 const MAINNET_MINTS = new Map([
@@ -110,7 +110,13 @@ async function createGroup() {
 
   console.log(`Creating Group...`);
   const insuranceMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
-  await client.groupCreate(2, true, 0, insuranceMint);
+  await client.groupCreate(
+    2,
+    true,
+    0,
+    insuranceMint,
+    MSRM_MINTS['mainnet-beta'],
+  );
   const group = await client.getGroupForCreator(admin.publicKey, 2);
   console.log(`...registered group ${group.publicKey}`);
 }

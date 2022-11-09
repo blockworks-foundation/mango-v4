@@ -2,7 +2,7 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
+import { MANGO_V4_ID, MSRM_MINTS } from '../constants';
 
 //
 // Script which depoys a new mango group, and registers 3 tokens
@@ -60,7 +60,13 @@ async function main() {
   console.log(`Creating Group...`);
   try {
     const insuranceMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
-    await client.groupCreate(GROUP_NUM, true, 0, insuranceMint);
+    await client.groupCreate(
+      GROUP_NUM,
+      true,
+      0,
+      insuranceMint,
+      MSRM_MINTS['mainnet-beta'],
+    );
   } catch (error) {
     console.log(error);
   }

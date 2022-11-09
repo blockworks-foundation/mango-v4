@@ -2,7 +2,7 @@ import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
+import { MANGO_V4_ID, MSRM_MINTS } from '../constants';
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 
@@ -62,6 +62,7 @@ async function createGroup() {
     true /* with intention */,
     0 /* since spot and perp features are not finished */,
     insuranceMint,
+    MSRM_MINTS['mainnet-beta'],
   );
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(`...registered group ${group.publicKey}`);
