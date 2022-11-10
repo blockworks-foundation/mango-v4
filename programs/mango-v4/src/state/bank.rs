@@ -104,12 +104,17 @@ pub struct Bank {
 
     pub oracle_config: OracleConfig,
 
+    pub ma_window: i64,
+    pub ma_price: I80F48,
+    pub ma_price_upper_bound_factor: f32,
+    pub ma_price_lower_bound_factor: f32,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2464],
+    pub reserved: [u8; 2432],
 }
 const_assert_eq!(
     size_of::<Bank>(),
-    32 + 16 + 32 * 3 + 16 + 16 * 6 + 8 * 2 + 16 * 16 + 8 * 2 + 2 + 1 + 1 + 4 + 96 + 2464
+    3112
 );
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
@@ -163,7 +168,11 @@ impl Bank {
             token_index: existing_bank.token_index,
             mint_decimals: existing_bank.mint_decimals,
             oracle_config: existing_bank.oracle_config.clone(),
-            reserved: [0; 2464],
+            ma_window: existing_bank.ma_window,
+            ma_price: existing_bank.ma_price,
+            ma_price_upper_bound_factor: existing_bank.ma_price_upper_bound_factor,
+            ma_price_lower_bound_factor: existing_bank.ma_price_lower_bound_factor,
+            reserved: [0; 2432],
         }
     }
 

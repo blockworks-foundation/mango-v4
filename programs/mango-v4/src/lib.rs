@@ -73,6 +73,9 @@ pub mod mango_v4 {
         maint_liab_weight: f32,
         init_liab_weight: f32,
         liquidation_fee: f32,
+        ma_window: i64,
+        ma_price_upper_bound_factor: f32,
+        ma_price_lower_bound_factor: f32,
     ) -> Result<()> {
         instructions::token_register(
             ctx,
@@ -87,6 +90,9 @@ pub mod mango_v4 {
             maint_liab_weight,
             init_liab_weight,
             liquidation_fee,
+            ma_window,
+            ma_price_upper_bound_factor,
+            ma_price_lower_bound_factor,
         )
     }
 

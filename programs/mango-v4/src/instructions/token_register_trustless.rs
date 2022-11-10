@@ -115,7 +115,11 @@ pub fn token_register_trustless(
             max_staleness_slots: -1,
             reserved: [0; 72],
         },
-        reserved: [0; 2464],
+        ma_window: 30 * 60, // 30 minutes
+        ma_price: I80F48::from_num(0),
+        ma_price_upper_bound_factor: 1.05,
+        ma_price_lower_bound_factor: 0.95,
+        reserved: [0; 2432],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
