@@ -131,33 +131,59 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
 /// Example: The for SOL at 40 USDC/SOL it would return 0.04 (the unit is USDC-native/SOL-native)
 ///
 /// This currently assumes that quote decimals is 6, like for USDC.
+///
+/// Pass `staleness_slot` = None to skip the staleness check
 pub fn oracle_price(
     acc_info: &impl KeyedAccountReader,
     config: &OracleConfig,
     base_decimals: u8,
+    staleness_slot: Option<u64>,
 ) -> Result<I80F48> {
     let data = &acc_info.data();
     let oracle_type = determine_oracle_type(acc_info)?;
+    let staleness_slot = staleness_slot.unwrap_or(0);
 
     Ok(match oracle_type {
         OracleType::Stub => acc_info.load::<StubOracle>()?.price,
         OracleType::Pyth => {
-            let price_account = pyth_sdk_solana::load_price(data).unwrap();
-            let price = I80F48::from_num(price_account.price);
+            let price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
+            let price_data = price_account.to_price();
+            let price = I80F48::from_num(price_data.price);
 
             // Filter out bad prices
-            if I80F48::from_num(price_account.conf) > cm!(config.conf_filter * price) {
+            if I80F48::from_num(price_data.conf) > cm!(config.conf_filter * price) {
                 msg!(
-                    "Pyth conf interval too high; pubkey {} price: {} price_account.conf: {}",
+                    "Pyth conf interval too high; pubkey {} price: {} price_data.conf: {}",
                     acc_info.key(),
                     price.to_num::<f64>(),
-                    price_account.conf
+                    price_data.conf
                 );
 
                 // future: in v3, we had pricecache, and in case of luna, when there were no updates, we used last known value from cache
                 // we'll have to add a CachedOracle that is based on one of the oracle types, needs a separate keeper and supports
                 // maintaining this "last known good value"
-                return Err(MangoError::SomeError.into());
+                return Err(MangoError::OracleConfidence.into());
+            }
+
+            // The aggregation pub slot is the time that the aggregate was computed from published data
+            // that was at most 25 slots old. That means it underestimates the actual staleness, potentially
+            // significantly.
+            let agg_pub_slot = price_account.agg.pub_slot;
+            if config.max_staleness_slots >= 0
+                && price_account
+                    .agg
+                    .pub_slot
+                    .saturating_add(config.max_staleness_slots as u64)
+                    < staleness_slot
+            {
+                msg!(
+                    "Pyth price too stale; pubkey {} price: {} pub slot: {}",
+                    acc_info.key(),
+                    price.to_num::<f64>(),
+                    agg_pub_slot,
+                );
+
+                return Err(MangoError::OracleStale.into());
             }
 
             let decimals = cm!((price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8));
@@ -187,7 +213,23 @@ pub fn oracle_price(
                     price.to_num::<f64>(),
                     std_deviation_decimal
                 );
-                return Err(MangoError::SomeError.into());
+                return Err(MangoError::OracleConfidence.into());
+            }
+
+            // The round_open_slot is an overestimate of the oracle staleness: Reporters will see
+            // the round opening and only then start executing the price tasks.
+            let round_open_slot = feed.latest_confirmed_round.round_open_slot;
+            if config.max_staleness_slots >= 0
+                && round_open_slot.saturating_add(config.max_staleness_slots as u64)
+                    < staleness_slot
+            {
+                msg!(
+                    "Switchboard v2 price too stale; pubkey {} price: {} latest_confirmed_round.round_open_slot: {}",
+                    acc_info.key(),
+                    price.to_num::<f64>(),
+                    round_open_slot,
+                );
+                return Err(MangoError::OracleConfidence.into());
             }
 
             let decimals = cm!(QUOTE_DECIMALS - (base_decimals as i8));
@@ -209,7 +251,21 @@ pub fn oracle_price(
                     min_response,
                     max_response
                 );
-                return Err(MangoError::SomeError.into());
+                return Err(MangoError::OracleConfidence.into());
+            }
+
+            let round_open_slot = result.result.round_open_slot;
+            if config.max_staleness_slots >= 0
+                && round_open_slot.saturating_add(config.max_staleness_slots as u64)
+                    < staleness_slot
+            {
+                msg!(
+                    "Switchboard v1 price too stale; pubkey {} price: {} round_open_slot: {}",
+                    acc_info.key(),
+                    price.to_num::<f64>(),
+                    round_open_slot,
+                );
+                return Err(MangoError::OracleConfidence.into());
             }
 
             let decimals = cm!(QUOTE_DECIMALS - (base_decimals as i8));

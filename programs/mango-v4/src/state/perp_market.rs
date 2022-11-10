@@ -139,9 +139,18 @@ impl PerpMarket {
         orderbook::new_node_key(side, price_data, self.seq_num)
     }
 
-    pub fn oracle_price(&self, oracle_acc: &impl KeyedAccountReader) -> Result<I80F48> {
+    pub fn oracle_price(
+        &self,
+        oracle_acc: &impl KeyedAccountReader,
+        staleness_slot: Option<u64>,
+    ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        oracle::oracle_price(oracle_acc, &self.oracle_config, self.base_decimals)
+        oracle::oracle_price(
+            oracle_acc,
+            &self.oracle_config,
+            self.base_decimals,
+            staleness_slot,
+        )
     }
 
     /// Use current order book price and index price to update the instantaneous funding

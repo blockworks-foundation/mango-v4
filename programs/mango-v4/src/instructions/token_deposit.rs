@@ -121,7 +121,10 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
 
         let indexed_position = position.indexed_position;
         let bank = self.bank.load()?;
-        let oracle_price = bank.oracle_price(&AccountInfoRef::borrow(self.oracle.as_ref())?)?;
+        let oracle_price = bank.oracle_price(
+            &AccountInfoRef::borrow(self.oracle.as_ref())?,
+            None, // staleness checked in health
+        )?;
 
         // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
         let amount_usd = cm!(amount_i80f48 * oracle_price).to_num::<i64>();

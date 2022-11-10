@@ -583,9 +583,18 @@ impl Bank {
         }
     }
 
-    pub fn oracle_price(&self, oracle_acc: &impl KeyedAccountReader) -> Result<I80F48> {
+    pub fn oracle_price(
+        &self,
+        oracle_acc: &impl KeyedAccountReader,
+        staleness_slot: Option<u64>,
+    ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
-        oracle::oracle_price(oracle_acc, &self.oracle_config, self.mint_decimals)
+        oracle::oracle_price(
+            oracle_acc,
+            &self.oracle_config,
+            self.mint_decimals,
+            staleness_slot,
+        )
     }
 }
 

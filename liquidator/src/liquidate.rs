@@ -161,10 +161,10 @@ impl<'a> LiquidateHelper<'a> {
                 let oracle = self
                     .account_fetcher
                     .fetch_raw_account(&perp.market.oracle)?;
-                let price = perp.market.oracle_price(&KeyedAccountSharedData::new(
-                    perp.market.oracle,
-                    oracle.into(),
-                ))?;
+                let price = perp.market.oracle_price(
+                    &KeyedAccountSharedData::new(perp.market.oracle, oracle.into()),
+                    None,
+                )?;
                 Ok(Some((
                     pp.market_index,
                     base_lots,
@@ -342,10 +342,10 @@ impl<'a> LiquidateHelper<'a> {
                 let oracle = self
                     .account_fetcher
                     .fetch_raw_account(&token.mint_info.oracle)?;
-                let price = bank.oracle_price(&KeyedAccountSharedData::new(
-                    token.mint_info.oracle,
-                    oracle.into(),
-                ))?;
+                let price = bank.oracle_price(
+                    &KeyedAccountSharedData::new(token.mint_info.oracle, oracle.into()),
+                    None,
+                )?;
                 Ok((
                     token_position.token_index,
                     price,
