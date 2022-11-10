@@ -28,7 +28,7 @@ pub struct MintInfo {
     pub vaults: [Pubkey; MAX_BANKS],
     pub oracle: Pubkey,
 
-    pub registration_time: i64,
+    pub registration_time: u64,
 
     pub reserved: [u8; 2560],
 }

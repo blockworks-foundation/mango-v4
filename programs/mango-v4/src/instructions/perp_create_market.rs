@@ -80,6 +80,8 @@ pub fn perp_create_market(
         "settlement tokens != USDC are not fully implemented"
     );
 
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+
     let mut perp_market = ctx.accounts.perp_market.load_init()?;
     *perp_market = PerpMarket {
         group: ctx.accounts.group.key(),
@@ -106,14 +108,14 @@ pub fn perp_create_market(
         impact_quantity,
         long_funding: I80F48::ZERO,
         short_funding: I80F48::ZERO,
-        funding_last_updated: Clock::get()?.unix_timestamp,
+        funding_last_updated: now_ts,
         open_interest: 0,
         seq_num: 0,
         fees_accrued: I80F48::ZERO,
         fees_settled: I80F48::ZERO,
         bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
         base_decimals,
-        registration_time: Clock::get()?.unix_timestamp,
+        registration_time: now_ts,
         padding1: Default::default(),
         padding2: Default::default(),
         padding3: Default::default(),
