@@ -112,7 +112,11 @@ pub fn token_register_trustless(
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
-        reserved: [0; 2560],
+        ma_window: 30 * 60, // 30 minutes
+        ma_price: I80F48::from_num(0),
+        ma_price_upper_bound_factor: 1.05,
+        ma_price_lower_bound_factor: 0.95,
+        reserved: [0; 2528],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 

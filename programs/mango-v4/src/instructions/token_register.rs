@@ -89,6 +89,9 @@ pub fn token_register(
     maint_liab_weight: f32,
     init_liab_weight: f32,
     liquidation_fee: f32,
+    ma_window: i64,
+    ma_price_upper_bound_factor: f32,
+    ma_price_lower_bound_factor: f32,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == QUOTE_TOKEN_INDEX {
@@ -137,7 +140,11 @@ pub fn token_register(
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
-        reserved: [0; 2560],
+        ma_window,
+        ma_price: I80F48::from_num(0),
+        ma_price_upper_bound_factor,
+        ma_price_lower_bound_factor,
+        reserved: [0; 2528],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 

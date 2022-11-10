@@ -90,6 +90,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
     }
 
     // compute and set latest index and average utilization on each bank
+    // also update moving average prices
     {
         let mut some_bank = ctx.remaining_accounts[0].load_mut::<Bank>()?;
 
@@ -108,6 +109,14 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
 
         let price =
             some_bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
+        let price_duration = now_ts - some_bank.index_last_updated;
+        let bounded_price = price
+            .min(some_bank.ma_price * I80F48::from_num(some_bank.ma_price_upper_bound_factor))
+            .max(some_bank.ma_price * I80F48::from_num(some_bank.ma_price_lower_bound_factor));
+        let ma_price = cm!(some_bank.ma_price
+            + (bounded_price - some_bank.ma_price) * I80F48::from(price_duration)
+                / I80F48::from(some_bank.ma_window));
+
         emit!(UpdateIndexLog {
             mango_group: mint_info.group.key(),
             token_index: mint_info.token_index,
@@ -115,6 +124,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             borrow_index: borrow_index.to_bits(),
             avg_utilization: new_avg_utilization.to_bits(),
             price: price.to_bits(),
+            ma_price: ma_price.to_bits(),
             collected_fees: some_bank.collected_fees_native.to_bits(),
             loan_fee_rate: some_bank.loan_fee_rate.to_bits(),
             total_deposits: cm!(deposit_index * indexed_total_deposits).to_bits(),
@@ -142,6 +152,8 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             bank.borrow_index = borrow_index;
 
             bank.avg_utilization = new_avg_utilization;
+
+            bank.ma_price = ma_price;
         }
     }
 
