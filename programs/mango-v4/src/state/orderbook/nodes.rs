@@ -41,6 +41,7 @@ pub fn oracle_pegged_price_data(price_offset_lots: i64) -> u64 {
     // Price data is used for ordering in the bookside's top bits of the u128 key.
     // Map i64::MIN to be 0 and i64::MAX to u64::MAX, that way comparisons on the
     // u64 produce the same result as on the source i64.
+    // Equivalent: (price_offset_lots as i128 - (i64::MIN as i128) as u64
     (price_offset_lots as u64).wrapping_add(u64::MAX / 2 + 1)
 }
 
@@ -341,6 +342,10 @@ mod tests {
             let r_price_data = oracle_pegged_price_data(*rhs);
             assert!(l_price_data < r_price_data);
         }
+
+        assert_eq!(oracle_pegged_price_data(i64::MIN), 0);
+        assert_eq!(oracle_pegged_price_data(i64::MAX), u64::MAX);
+        assert_eq!(oracle_pegged_price_data(0), -(i64::MIN as i128) as u64); // remember -i64::MIN is not a valid i64
     }
 
     #[test]
