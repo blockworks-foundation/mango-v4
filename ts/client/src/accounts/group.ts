@@ -40,6 +40,7 @@ export class Group {
       testing: number;
       version: number;
       addressLookupTables: PublicKey[];
+      msrmVault: PublicKey;
     },
   ): Group {
     return new Group(
@@ -54,6 +55,7 @@ export class Group {
       obj.version,
       obj.addressLookupTables,
       [], // addressLookupTablesList
+      obj.msrmVault,
       new Map(), // banksMapByName
       new Map(), // banksMapByMint
       new Map(), // banksMapByTokenIndex
@@ -81,6 +83,7 @@ export class Group {
     public version: number,
     public addressLookupTables: PublicKey[],
     public addressLookupTablesList: AddressLookupTableAccount[],
+    public msrmVault: PublicKey,
     public banksMapByName: Map<string, Bank[]>,
     public banksMapByMint: Map<string, Bank[]>,
     public banksMapByTokenIndex: Map<TokenIndex, Bank[]>,
@@ -95,17 +98,7 @@ export class Group {
     public vaultAmountsMap: Map<string, BN>,
   ) {}
 
-  public async reloadAll(client: MangoClient): Promise<void> {
-    let ids: Id | undefined = undefined;
-
-    if (client.idsSource === 'api') {
-      ids = await Id.fromApi(this.publicKey);
-    } else if (client.idsSource === 'static') {
-      ids = Id.fromIdsByPk(this.publicKey);
-    } else {
-      ids = undefined;
-    }
-
+  public async reloadAll(client: MangoClient, ids?: Id): Promise<void> {
     // console.time('group.reload');
     await Promise.all([
       this.reloadAlts(client),

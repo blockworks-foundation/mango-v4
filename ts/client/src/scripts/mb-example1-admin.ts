@@ -1,6 +1,12 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import {
+  AddressLookupTableProgram,
+  Connection,
+  Keypair,
+  PublicKey,
+} from '@solana/web3.js';
 import fs from 'fs';
+import { TokenIndex } from '../accounts/bank';
 import { Group } from '../accounts/group';
 import {
   Serum3OrderType,
@@ -8,7 +14,8 @@ import {
   Serum3Side,
 } from '../accounts/serum3';
 import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
+import { MANGO_V4_ID, MSRM_MINTS } from '../constants';
+import { buildVersionedTx } from '../utils';
 
 const MAINNET_MINTS = new Map([
   ['USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'],
@@ -19,6 +26,8 @@ const MAINNET_MINTS = new Map([
   ['SOL', 'So11111111111111111111111111111111111111112'], // Wrapped SOL
   ['MSOL', 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So'],
   ['MNGO', 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac'],
+  ['RAY', '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R'],
+  ['DUST', 'DUSTawucrTsGU8hcqRdHDCbuYhCPADMLM2VcCb8VnFnQ'],
 ]);
 const MAINNET_ORACLES = new Map([
   ['USDT', '3vxLXJqLqF3JG5TCbYycbKWRBbCJQLxQmBGCkyqEEefL'],
@@ -28,6 +37,8 @@ const MAINNET_ORACLES = new Map([
   ['SOL', 'H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG'],
   ['MSOL', 'E4v1BBgoso9s64TQvmyownAVJbhbEPGyzA3qn4n46qj9'],
   ['MNGO', '79wm3jjcPr6RaNQ4DGvP5KxG1mNd3gEBsg6FsNVFezK4'],
+  ['RAY', 'AnLf8tVYCM816gmBjiy8n53eXKKEDydT5piYjjQDPgTB'],
+  ['DUST', 'C5tuUPi7xJHBHZGZX6wWYf1Svm6jtTVwYrYrBCiEVejK'],
 ]);
 
 // External markets are matched with those in https://github.com/blockworks-foundation/mango-client-v3/blob/main/src/ids.json
@@ -35,17 +46,20 @@ const MAINNET_ORACLES = new Map([
 const MAINNET_SERUM3_MARKETS = new Map([
   ['BTC/USDC', 'A8YFbxQYFVqKZaoYJLLUVcQiWP7G2MeEgW5wsAQgMvFw'],
   ['SOL/USDC', '9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT'],
+  ['RAY/SOL', 'C6tp2RVZnxBPFbnAsfTjis8BN9tycESAT4SgDQgbbrsA'],
+  ['DUST/SOL', '8WCzJpSNcLUYXPYeUDAXpH4hgqxFJpkYkVT6GJDSpcGx'],
 ]);
+
+const { MB_CLUSTER_URL, MB_PAYER_KEYPAIR, MB_USER_KEYPAIR, MB_USER2_KEYPAIR } =
+  process.env;
 
 async function buildAdminClient(): Promise<[MangoClient, Keypair]> {
   const admin = Keypair.fromSecretKey(
-    Buffer.from(
-      JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
-    ),
+    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER_KEYPAIR!, 'utf-8'))),
   );
 
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
+  const connection = new Connection(MB_CLUSTER_URL!, options);
 
   const adminWallet = new Wallet(admin);
   console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
@@ -55,6 +69,9 @@ async function buildAdminClient(): Promise<[MangoClient, Keypair]> {
       adminProvider,
       'mainnet-beta',
       MANGO_V4_ID['mainnet-beta'],
+      {
+        idsSource: 'get-program-accounts',
+      },
     ),
     admin,
   ];
@@ -64,7 +81,7 @@ async function buildUserClient(
   userKeypair: string,
 ): Promise<[MangoClient, Group, Keypair]> {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(process.env.MB_CLUSTER_URL!, options);
+  const connection = new Connection(MB_CLUSTER_URL!, options);
 
   const user = Keypair.fromSecretKey(
     Buffer.from(JSON.parse(fs.readFileSync(userKeypair, 'utf-8'))),
@@ -79,9 +96,7 @@ async function buildUserClient(
   );
 
   const admin = Keypair.fromSecretKey(
-    Buffer.from(
-      JSON.parse(fs.readFileSync(process.env.MB_PAYER_KEYPAIR!, 'utf-8')),
-    ),
+    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER_KEYPAIR!, 'utf-8'))),
   );
   console.log(`Admin ${admin.publicKey.toBase58()}`);
   const group = await client.getGroupForCreator(admin.publicKey, 2);
@@ -95,7 +110,13 @@ async function createGroup() {
 
   console.log(`Creating Group...`);
   const insuranceMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
-  await client.groupCreate(2, true, 0, insuranceMint);
+  await client.groupCreate(
+    2,
+    true,
+    0,
+    insuranceMint,
+    MSRM_MINTS['mainnet-beta'],
+  );
   const group = await client.getGroupForCreator(admin.publicKey, 2);
   console.log(`...registered group ${group.publicKey}`);
 }
@@ -287,12 +308,75 @@ async function registerTokens() {
     1.2,
     0.05,
   );
+  console.log(`Registering RAY...`);
+  const rayMainnetMint = new PublicKey(MAINNET_MINTS.get('RAY')!);
+  const rayMainnetOracle = new PublicKey(MAINNET_ORACLES.get('RAY')!);
+  await client.tokenRegister(
+    group,
+    rayMainnetMint,
+    rayMainnetOracle,
+    0.1,
+    7,
+    'RAY',
+    0.004,
+    0.7,
+    0.2,
+    0.85,
+    0.4,
+    4.0,
+    0.005,
+    0.0005,
+    7 / 8,
+    3 / 4,
+    8 / 7,
+    4 / 3,
+    1 / 16,
+  );
+
+  console.log(`Registering DUST...`);
+  const dustMainnetMint = new PublicKey(MAINNET_MINTS.get('DUST')!);
+  const dustMainnetOracle = new PublicKey(MAINNET_ORACLES.get('DUST')!);
+  await client.tokenRegister(
+    group,
+    dustMainnetMint,
+    dustMainnetOracle,
+    0.1,
+    8,
+    'DUST',
+    0.004,
+    0.7,
+    0.3,
+    0.85,
+    0.6,
+    6.0,
+    0.005,
+    0.0005,
+    0, // no asset weight for isolation
+    0,
+    81 / 80,
+    41 / 40, // 40x leverage so we can test something
+    1 / 160, // no liquidation fee
+  );
 
   // log tokens/banks
   await group.reloadAll(client);
   for (const bank of await Array.from(group.banksMapByMint.values()).flat()) {
     console.log(`${bank.toString()}`);
   }
+}
+
+async function unregisterTokens() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+
+  const group = await client.getGroupForCreator(admin.publicKey, 2);
+
+  let bank = group.getFirstBankByTokenIndex(8 as TokenIndex);
+  let sig = await client.tokenDeregister(group, bank.mint);
+  console.log(
+    `Removed token ${bank.name}, sig https://explorer.solana.com/tx/${sig}`,
+  );
 }
 
 async function registerSerum3Markets() {
@@ -328,6 +412,50 @@ async function registerSerum3Markets() {
     1,
     'SOL/USDC',
   );
+
+  // Register RAY and DUST markets
+  await client.serum3RegisterMarket(
+    group,
+    new PublicKey(MAINNET_SERUM3_MARKETS.get('RAY/SOL')!),
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('RAY')!)),
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('SOL')!)),
+    2,
+    'RAY/SOL',
+  );
+  await client.serum3RegisterMarket(
+    group,
+    new PublicKey(MAINNET_SERUM3_MARKETS.get('DUST/SOL')!),
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('DUST')!)),
+    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('SOL')!)),
+    3,
+    'DUST/SOL',
+  );
+}
+
+async function unregisterSerum3Markets() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+
+  const group = await client.getGroupForCreator(admin.publicKey, 2);
+
+  let serum3Market = group.getSerum3MarketByName('RAY/SOL');
+  let sig = await client.serum3deregisterMarket(
+    group,
+    serum3Market.serumMarketExternal,
+  );
+  console.log(
+    `Deregistered serum market ${serum3Market.name}, sig https://explorer.solana.com/tx/${sig}`,
+  );
+
+  serum3Market = group.getSerum3MarketByName('DUST/SOL');
+  sig = await client.serum3deregisterMarket(
+    group,
+    serum3Market.serumMarketExternal,
+  );
+  console.log(
+    `Deregistered serum market ${serum3Market.name}, sig https://explorer.solana.com/tx/${sig}`,
+  );
 }
 
 async function createUser(userKeypair: string) {
@@ -350,7 +478,7 @@ async function createUser(userKeypair: string) {
     new PublicKey(MAINNET_MINTS.get('USDC')!),
     10,
   );
-  await mangoAccount.reload(client, group);
+  await mangoAccount.reload(client);
   console.log(`...deposited 10 USDC`);
 
   await client.tokenDeposit(
@@ -359,7 +487,7 @@ async function createUser(userKeypair: string) {
     new PublicKey(MAINNET_MINTS.get('SOL')!),
     1,
   );
-  await mangoAccount.reload(client, group);
+  await mangoAccount.reload(client);
   console.log(`...deposited 1 SOL`);
 }
 
@@ -422,7 +550,7 @@ async function placeSerum3TradeAndCancelIt(userKeypair: string) {
       console.log(order);
     }
     console.log(`...cancelling serum3 orders`);
-    await client.serum3CancelAllorders(
+    await client.serum3CancelAllOrders(
       group,
       mangoAccount,
       new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
@@ -440,6 +568,126 @@ async function placeSerum3TradeAndCancelIt(userKeypair: string) {
   }
 }
 
+async function createAndPopulateAlt() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+
+  const group = await client.getGroupForCreator(admin.publicKey, 2);
+
+  const connection = client.program.provider.connection;
+
+  // Create ALT, and set to group at index 0
+  if (group.addressLookupTables[0].equals(PublicKey.default)) {
+    try {
+      console.log(`ALT: Creating`);
+      const createIx = AddressLookupTableProgram.createLookupTable({
+        authority: admin.publicKey,
+        payer: admin.publicKey,
+        recentSlot: await connection.getSlot('finalized'),
+      });
+      const createTx = await buildVersionedTx(
+        client.program.provider as AnchorProvider,
+        [createIx[0]],
+      );
+      let sig = await connection.sendTransaction(createTx);
+      console.log(
+        `...created ALT ${createIx[1]} https://explorer.solana.com/tx/${sig}`,
+      );
+
+      console.log(`ALT: set at index 0 for group...`);
+      sig = await client.altSet(group, createIx[1], 0);
+      console.log(`...https://explorer.solana.com/tx/${sig}`);
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  // Extend using mango v4 relevant pub keys
+  try {
+    let bankAddresses = Array.from(group.banksMapByMint.values())
+      .flat()
+      .map((bank) => [bank.publicKey, bank.oracle, bank.vault])
+      .flat()
+      .concat(
+        Array.from(group.banksMapByMint.values())
+          .flat()
+          .map((mintInfo) => mintInfo.publicKey),
+      );
+
+    let serum3MarketAddresses = Array.from(
+      group.serum3MarketsMapByExternal.values(),
+    )
+      .flat()
+      .map((serum3Market) => serum3Market.publicKey);
+
+    let serum3ExternalMarketAddresses = Array.from(
+      group.serum3ExternalMarketsMap.values(),
+    )
+      .flat()
+      .map((serum3ExternalMarket) => [
+        serum3ExternalMarket.publicKey,
+        serum3ExternalMarket.bidsAddress,
+        serum3ExternalMarket.asksAddress,
+      ])
+      .flat();
+
+    let perpMarketAddresses = Array.from(
+      group.perpMarketsMapByMarketIndex.values(),
+    )
+      .flat()
+      .map((perpMarket) => [
+        perpMarket.publicKey,
+        perpMarket.oracle,
+        perpMarket.bids,
+        perpMarket.asks,
+        perpMarket.eventQueue,
+      ])
+      .flat();
+
+    async function extendTable(addresses: PublicKey[]) {
+      await group.reloadAll(client);
+      const alt =
+        await client.program.provider.connection.getAddressLookupTable(
+          group.addressLookupTables[0],
+        );
+
+      addresses = addresses.filter(
+        (newAddress) =>
+          alt.value?.state.addresses &&
+          alt.value?.state.addresses.findIndex((addressInALt) =>
+            addressInALt.equals(newAddress),
+          ) === -1,
+      );
+      if (addresses.length === 0) {
+        return;
+      }
+      const extendIx = AddressLookupTableProgram.extendLookupTable({
+        lookupTable: group.addressLookupTables[0],
+        payer: admin.publicKey,
+        authority: admin.publicKey,
+        addresses,
+      });
+      const extendTx = await buildVersionedTx(
+        client.program.provider as AnchorProvider,
+        [extendIx],
+      );
+      let sig = await client.program.provider.connection.sendTransaction(
+        extendTx,
+      );
+      console.log(`https://explorer.solana.com/tx/${sig}`);
+    }
+
+    console.log(`ALT: extending using mango v4 relevant public keys`);
+    await extendTable(bankAddresses);
+    await extendTable(serum3MarketAddresses);
+    await extendTable(serum3ExternalMarketAddresses);
+    await extendTable(perpMarketAddresses);
+  } catch (error) {
+    console.log(error);
+  }
+}
+
 async function main() {
   try {
     // await createGroup();
@@ -448,22 +696,28 @@ async function main() {
   }
   try {
     // await registerTokens();
+    // await unregisterTokens();
   } catch (error) {
     console.log(error);
   }
   try {
     // await registerSerum3Markets();
+    // await unregisterSerum3Markets();
   } catch (error) {
     console.log(error);
   }
   try {
-    // await createUser(process.env.MB_USER_KEYPAIR!);
-    // await createUser(process.env.MB_USER2_KEYPAIR!);
-    // await expandMangoAccount(process.env.MB_USER_KEYPAIR!);
-    await placeSerum3TradeAndCancelIt(process.env.MB_USER_KEYPAIR!);
+    // await createUser(MB_USER_KEYPAIR!);
+    // await createUser(MB_USER2_KEYPAIR!);
+    // await expandMangoAccount(MB_USER_KEYPAIR!);
+    // await placeSerum3TradeAndCancelIt(MB_USER_KEYPAIR!);
   } catch (error) {
     console.log(error);
   }
+
+  try {
+    // await createAndPopulateAlt();
+  } catch (error) {}
 }
 
 try {

@@ -18,7 +18,7 @@ use crate::state::{
 use crate::util::checked_math as cm;
 
 #[cfg(feature = "client")]
-use crate::state::orderbook::order_type::Side as PerpOrderSide;
+use crate::state::orderbook::Side as PerpOrderSide;
 
 use super::MangoAccountRef;
 

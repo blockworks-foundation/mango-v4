@@ -1,4 +1,4 @@
-import { AnchorProvider, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, BN, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { Serum3Side } from '../accounts/serum3';
@@ -35,8 +35,9 @@ async function main() {
     userProvider,
     'devnet',
     MANGO_V4_ID['devnet'],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
@@ -59,9 +60,11 @@ async function main() {
 
     // close mango account serum3 positions, closing might require cancelling orders and settling
     for (const serum3Account of mangoAccount.serum3Active()) {
-      let orders = await client.getSerum3Orders(
+      let orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
+        client,
         group,
-        group.getSerum3MarketByIndex(serum3Account.marketIndex)!.name,
+        group.serum3MarketsMapByMarketIndex.get(serum3Account.marketIndex)
+          ?.serumMarketExternal!,
       );
       for (const order of orders) {
         console.log(
@@ -71,8 +74,8 @@ async function main() {
         await client.serum3CancelOrder(
           group,
           mangoAccount,
-
-          'BTC/USDC',
+          group.serum3MarketsMapByMarketIndex.get(serum3Account.marketIndex)
+            ?.serumMarketExternal!,
           order.side === 'buy' ? Serum3Side.bid : Serum3Side.ask,
           order.orderId,
         );
@@ -80,17 +83,19 @@ async function main() {
       await client.serum3SettleFunds(
         group,
         mangoAccount,
-        group.getSerum3MarketByIndex(serum3Account.marketIndex)!.name,
+        group.serum3MarketsMapByMarketIndex.get(serum3Account.marketIndex)
+          ?.serumMarketExternal!,
       );
       await client.serum3CloseOpenOrders(
         group,
         mangoAccount,
-        group.getSerum3MarketByIndex(serum3Account.marketIndex)!.name,
+        group.serum3MarketsMapByMarketIndex.get(serum3Account.marketIndex)
+          ?.serumMarketExternal!,
       );
     }
 
     // we closed a serum account, this changes the health accounts we are passing in for future ixs
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
 
     // withdraw all tokens
     for (const token of mangoAccount.tokensActive()) {
@@ -113,13 +118,15 @@ async function main() {
         group,
         mangoAccount,
         group.getFirstBankByTokenIndex(token.tokenIndex).mint,
-        nativeFlooredNumber - 1 /* see comment in token_withdraw in program */,
+        new BN(
+          nativeFlooredNumber - 1,
+        ) /* see comment in token_withdraw in program */,
         false,
       );
     }
 
     // reload and print current positions
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
     console.log(`...mangoAccount ${mangoAccount.publicKey}`);
     console.log(mangoAccount.toString());
 

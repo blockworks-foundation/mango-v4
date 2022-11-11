@@ -2,31 +2,32 @@ name: Soteria Scan
 
 on:
   push:
-    branches:
-      - main
-      - dev
+    paths: ['programs/**']
   pull_request:
-  workflow_dispatch: #pick branch to manually run on
+    branches: ['main', 'dev']
+    paths: ['programs/**']
+  workflow_dispatch: # Pick branch manually
 
 env:
   CARGO_TERM_COLOR: always
-  SOLANA_VERSION: "1.10.29"
+  SOLANA_VERSION: "1.13.3"
 
 jobs:
   build:
     name: Soteria
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    if: (github.actor != 'dependabot[bot]')
     strategy:
       fail-fast: false
       matrix:
-        program: ["programs/mango-v4", "programs/margin-trade"]
+        program: ['programs/mango-v4/',
+                  'programs/margin-trade/']
     env:
       PROGRAM_PATH: ${{ matrix.program }}
 
     steps:
-      - name: Check-out repo
-        uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Cache Solana binaries
         uses: actions/cache@v2
@@ -39,9 +40,9 @@ jobs:
           key: solana-${{ env.SOLANA_VERSION }}
 
       - name: Cache build dependencies
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2
         with:
-          target-dir: .coderrect/build
+          target-dir: ${{ matrix.program }}.coderrect/build
 
       - name: Install Solana
         if: steps.solana-cache.outputs.cache-hit != 'true'

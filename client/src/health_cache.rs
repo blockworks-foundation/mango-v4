@@ -27,7 +27,7 @@ pub fn new(
         n_banks: active_token_len,
         n_perps: active_perp_len,
         begin_perp: active_token_len * 2,
-        begin_serum3: active_token_len * 2 + active_perp_len,
+        begin_serum3: active_token_len * 2 + active_perp_len * 2,
     };
     mango_v4::state::new_health_cache(&account.borrow(), &retriever).context("make health cache")
 }

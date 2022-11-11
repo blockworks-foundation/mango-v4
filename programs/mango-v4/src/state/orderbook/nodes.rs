@@ -6,7 +6,7 @@ use mango_macro::Pod;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 
-use super::order_type::OrderType;
+use super::order_type::{PostOrderType, Side};
 
 pub type NodeHandle = u32;
 const NODE_SIZE: usize = 96;
@@ -19,6 +19,44 @@ pub enum NodeTag {
     LeafNode = 2,
     FreeNode = 3,
     LastFreeNode = 4,
+}
+
+/// Creates a binary tree node key.
+///
+/// It's used for sorting nodes (ascending for asks, descending for bids)
+/// and encodes price data in the top 64 bits followed by an ordering number
+/// in the lower bits.
+///
+/// The `seq_num` that's passed should monotonically increase. It's used to choose
+/// the ordering number such that orders placed later for the same price data
+/// are ordered after earlier orders.
+pub fn new_node_key(side: Side, price_data: u64, seq_num: u64) -> u128 {
+    let seq_num = if side == Side::Bid { !seq_num } else { seq_num };
+
+    let upper = (price_data as u128) << 64;
+    upper | (seq_num as u128)
+}
+
+pub fn oracle_pegged_price_data(price_offset_lots: i64) -> u64 {
+    // Price data is used for ordering in the bookside's top bits of the u128 key.
+    // Map i64::MIN to be 0 and i64::MAX to u64::MAX, that way comparisons on the
+    // u64 produce the same result as on the source i64.
+    // Equivalent: (price_offset_lots as i128 - (i64::MIN as i128) as u64
+    (price_offset_lots as u64).wrapping_add(u64::MAX / 2 + 1)
+}
+
+pub fn oracle_pegged_price_offset(price_data: u64) -> i64 {
+    price_data.wrapping_sub(u64::MAX / 2 + 1) as i64
+}
+
+pub fn fixed_price_data(price_lots: i64) -> Result<u64> {
+    require_gte!(price_lots, 1);
+    Ok(price_lots as u64)
+}
+
+pub fn fixed_price_lots(price_data: u64) -> i64 {
+    assert!(price_data <= i64::MAX as u64);
+    price_data as i64
 }
 
 /// InnerNodes and LeafNodes compose the binary tree of orders.
@@ -35,7 +73,7 @@ pub struct InnerNode {
     pub prefix_len: u32,
 
     /// only the top `prefix_len` bits of `key` are relevant
-    pub key: i128,
+    pub key: u128,
 
     /// indexes into `BookSide::nodes`
     pub children: [NodeHandle; 2],
@@ -52,7 +90,7 @@ const_assert_eq!(size_of::<InnerNode>() % 8, 0);
 const_assert_eq!(size_of::<InnerNode>(), NODE_SIZE);
 
 impl InnerNode {
-    pub fn new(prefix_len: u32, key: i128) -> Self {
+    pub fn new(prefix_len: u32, key: u128) -> Self {
         Self {
             tag: NodeTag::InnerNode.into(),
             prefix_len,
@@ -65,8 +103,8 @@ impl InnerNode {
 
     /// Returns the handle of the child that may contain the search key
     /// and 0 or 1 depending on which child it was.
-    pub(crate) fn walk_down(&self, search_key: i128) -> (NodeHandle, bool) {
-        let crit_bit_mask = 1i128 << (127 - self.prefix_len);
+    pub(crate) fn walk_down(&self, search_key: u128) -> (NodeHandle, bool) {
+        let crit_bit_mask = 1u128 << (127 - self.prefix_len);
         let crit_bit = (search_key & crit_bit_mask) != 0;
         (self.children[crit_bit as usize], crit_bit)
     }
@@ -84,7 +122,7 @@ impl InnerNode {
 pub struct LeafNode {
     pub tag: u32,
     pub owner_slot: u8,
-    pub order_type: OrderType, // this was added for TradingView move order
+    pub order_type: PostOrderType, // this was added for TradingView move order
 
     pub padding: [u8; 1],
 
@@ -93,7 +131,7 @@ pub struct LeafNode {
     pub time_in_force: u8,
 
     /// The binary tree key
-    pub key: i128,
+    pub key: u128,
 
     pub owner: Pubkey,
     pub quantity: i64,
@@ -102,27 +140,26 @@ pub struct LeafNode {
     // The time the order was placed
     pub timestamp: u64,
 
-    pub reserved: [u8; 16],
+    // Only applicable in the oracle_pegged OrderTree
+    pub peg_limit: i64,
+
+    pub reserved: [u8; 8],
 }
 const_assert_eq!(size_of::<LeafNode>() % 8, 0);
 const_assert_eq!(size_of::<LeafNode>(), NODE_SIZE);
-
-#[inline(always)]
-fn key_to_price(key: i128) -> i64 {
-    (key >> 64) as i64
-}
 
 impl LeafNode {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         owner_slot: u8,
-        key: i128,
+        key: u128,
         owner: Pubkey,
         quantity: i64,
         client_order_id: u64,
         timestamp: u64,
-        order_type: OrderType,
+        order_type: PostOrderType,
         time_in_force: u8,
+        peg_limit: i64,
     ) -> Self {
         Self {
             tag: NodeTag::LeafNode.into(),
@@ -135,13 +172,20 @@ impl LeafNode {
             quantity,
             client_order_id,
             timestamp,
-            reserved: [0; 16],
+            peg_limit,
+            reserved: [0; 8],
         }
     }
 
+    // TODO: remove, it's not always the price
     #[inline(always)]
     pub fn price(&self) -> i64 {
-        key_to_price(self.key)
+        self.price_data() as i64
+    }
+
+    #[inline(always)]
+    pub fn price_data(&self) -> u64 {
+        (self.key >> 64) as u64
     }
 
     /// Time at which this order will expire, u64::MAX if never
@@ -155,7 +199,7 @@ impl LeafNode {
     }
 
     #[inline(always)]
-    pub fn is_valid(&self, now_ts: u64) -> bool {
+    pub fn is_not_expired(&self, now_ts: u64) -> bool {
         self.time_in_force == 0 || now_ts < self.timestamp + self.time_in_force as u64
     }
 }
@@ -191,7 +235,7 @@ pub(crate) enum NodeRefMut<'a> {
 }
 
 impl AnyNode {
-    pub fn key(&self) -> Option<i128> {
+    pub fn key(&self) -> Option<u128> {
         match self.case()? {
             NodeRef::Inner(inner) => Some(inner.key),
             NodeRef::Leaf(leaf) => Some(leaf.key),
@@ -272,5 +316,76 @@ impl AsRef<AnyNode> for LeafNode {
     #[inline]
     fn as_ref(&self) -> &AnyNode {
         cast_ref(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use itertools::Itertools;
+
+    #[test]
+    fn order_tree_price_data() {
+        for price in [1, 42, i64::MAX] {
+            assert_eq!(price, fixed_price_lots(fixed_price_data(price).unwrap()));
+        }
+
+        let seq = [-i64::MAX, -i64::MAX + 1, 0, i64::MAX - 1, i64::MAX];
+        for price_offset in seq {
+            assert_eq!(
+                price_offset,
+                oracle_pegged_price_offset(oracle_pegged_price_data(price_offset))
+            );
+        }
+        for (lhs, rhs) in seq.iter().tuple_windows() {
+            let l_price_data = oracle_pegged_price_data(*lhs);
+            let r_price_data = oracle_pegged_price_data(*rhs);
+            assert!(l_price_data < r_price_data);
+        }
+
+        assert_eq!(oracle_pegged_price_data(i64::MIN), 0);
+        assert_eq!(oracle_pegged_price_data(i64::MAX), u64::MAX);
+        assert_eq!(oracle_pegged_price_data(0), -(i64::MIN as i128) as u64); // remember -i64::MIN is not a valid i64
+    }
+
+    #[test]
+    fn order_tree_key_ordering() {
+        let bid_seq: Vec<(i64, u64)> = vec![
+            (-5, 15),
+            (-5, 10),
+            (-4, 6),
+            (-4, 5),
+            (0, 20),
+            (0, 1),
+            (4, 6),
+            (4, 5),
+            (5, 3),
+        ];
+        for (lhs, rhs) in bid_seq.iter().tuple_windows() {
+            let l_price_data = oracle_pegged_price_data(lhs.0);
+            let r_price_data = oracle_pegged_price_data(rhs.0);
+            let l_key = new_node_key(Side::Bid, l_price_data, lhs.1);
+            let r_key = new_node_key(Side::Bid, r_price_data, rhs.1);
+            assert!(l_key < r_key);
+        }
+
+        let ask_seq: Vec<(i64, u64)> = vec![
+            (-5, 10),
+            (-5, 15),
+            (-4, 6),
+            (-4, 7),
+            (0, 1),
+            (0, 20),
+            (4, 5),
+            (4, 6),
+            (5, 3),
+        ];
+        for (lhs, rhs) in ask_seq.iter().tuple_windows() {
+            let l_price_data = oracle_pegged_price_data(lhs.0);
+            let r_price_data = oracle_pegged_price_data(rhs.0);
+            let l_key = new_node_key(Side::Ask, l_price_data, lhs.1);
+            let r_key = new_node_key(Side::Ask, r_price_data, rhs.1);
+            assert!(l_key < r_key);
+        }
     }
 }

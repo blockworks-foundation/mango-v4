@@ -395,24 +395,24 @@ impl PerpPosition {
 #[zero_copy]
 #[derive(AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct PerpOpenOrder {
-    pub order_side: Side, // TODO: storing enums isn't POD
+    pub side_and_tree: SideAndOrderTree, // TODO: storing enums isn't POD
     pub padding1: [u8; 1],
-    pub order_market: PerpMarketIndex,
+    pub market: PerpMarketIndex,
     pub padding2: [u8; 4],
-    pub client_order_id: u64,
-    pub order_id: i128,
+    pub client_id: u64,
+    pub id: u128,
     pub reserved: [u8; 64],
 }
 
 impl Default for PerpOpenOrder {
     fn default() -> Self {
         Self {
-            order_side: Side::Bid,
+            side_and_tree: SideAndOrderTree::BidFixed,
             padding1: Default::default(),
-            order_market: FREE_ORDER_SLOT,
+            market: FREE_ORDER_SLOT,
             padding2: Default::default(),
-            client_order_id: 0,
-            order_id: 0,
+            client_id: 0,
+            id: 0,
             reserved: [0; 64],
         }
     }

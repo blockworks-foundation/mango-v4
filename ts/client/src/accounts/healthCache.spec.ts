@@ -85,10 +85,17 @@ describe('Health Cache', () => {
       I80F48.fromNumber(-310),
       new BN(7),
       new BN(11),
+      I80F48.fromNumber(0),
+      I80F48.fromNumber(0),
       new BN(1),
       new BN(2),
-      I80F48.fromNumber(0),
-      I80F48.fromNumber(0),
+      new BN(0),
+      new BN(0),
+      0,
+      0,
+      new BN(0),
+      new BN(0),
+      new BN(0),
     );
     const pi1 = PerpInfo.fromPerpPosition(pM, pp);
 
@@ -186,10 +193,17 @@ describe('Health Cache', () => {
         I80F48.fromNumber(fixture.perp1[1]),
         new BN(fixture.perp1[2]),
         new BN(fixture.perp1[3]),
-        new BN(0),
-        new BN(0),
         I80F48.fromNumber(0),
         I80F48.fromNumber(0),
+        new BN(0),
+        new BN(0),
+        new BN(0),
+        new BN(0),
+        0,
+        0,
+        new BN(0),
+        new BN(0),
+        new BN(0),
       );
       const pi1 = PerpInfo.fromPerpPosition(pM, pp);
 

@@ -24,7 +24,7 @@ async function debugUser(
   client: MangoClient,
   group: Group,
   mangoAccount: MangoAccount,
-) {
+): Promise<void> {
   console.log(mangoAccount.toString(group));
 
   await mangoAccount.reload(client);
@@ -80,7 +80,9 @@ async function debugUser(
       ),
   );
 
-  async function getMaxWithdrawWithBorrowForTokenUiWrapper(token) {
+  async function getMaxWithdrawWithBorrowForTokenUiWrapper(
+    token,
+  ): Promise<void> {
     console.log(
       `mangoAccount.getMaxWithdrawWithBorrowForTokenUi(group, ${token}) ` +
         mangoAccount.getMaxWithdrawWithBorrowForTokenUi(
@@ -93,7 +95,7 @@ async function debugUser(
     await getMaxWithdrawWithBorrowForTokenUiWrapper(srcToken);
   }
 
-  function simHealthRatioWithTokenPositionChangesWrapper(debug, change) {
+  function simHealthRatioWithTokenPositionChangesWrapper(debug, change): void {
     console.log(
       `mangoAccount.simHealthRatioWithTokenPositionChanges ${debug}` +
         mangoAccount.simHealthRatioWithTokenPositionUiChanges(group, [change]),
@@ -110,7 +112,7 @@ async function debugUser(
     });
   }
 
-  function getMaxSourceForTokenSwapWrapper(src, tgt) {
+  function getMaxSourceForTokenSwapWrapper(src, tgt): void {
     console.log(
       `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
         mangoAccount.getMaxSourceUiForTokenSwap(
@@ -129,22 +131,14 @@ async function debugUser(
     }
   }
 
-  function getMaxForPerpWrapper(perpMarket: PerpMarket) {
+  function getMaxForPerpWrapper(perpMarket: PerpMarket): void {
     console.log(
       `getMaxQuoteForPerpBidUi ${perpMarket.perpMarketIndex} ` +
-        mangoAccount.getMaxQuoteForPerpBidUi(
-          group,
-          perpMarket.perpMarketIndex,
-          perpMarket.price.toNumber(),
-        ),
+        mangoAccount.getMaxQuoteForPerpBidUi(group, perpMarket.perpMarketIndex),
     );
     console.log(
       `getMaxBaseForPerpAskUi ${perpMarket.perpMarketIndex} ` +
-        mangoAccount.getMaxBaseForPerpAskUi(
-          group,
-          perpMarket.perpMarketIndex,
-          perpMarket.price.toNumber(),
-        ),
+        mangoAccount.getMaxBaseForPerpAskUi(group, perpMarket.perpMarketIndex),
     );
   }
   for (const perpMarket of Array.from(
@@ -153,7 +147,7 @@ async function debugUser(
     getMaxForPerpWrapper(perpMarket);
   }
 
-  function getMaxForSerum3Wrapper(serum3Market: Serum3Market) {
+  function getMaxForSerum3Wrapper(serum3Market: Serum3Market): void {
     // if (serum3Market.name !== 'SOL/USDC') return;
     console.log(
       `getMaxQuoteForSerum3BidUi ${serum3Market.name} ` +
@@ -177,7 +171,7 @@ async function debugUser(
   }
 }
 
-async function main() {
+async function main(): Promise<void> {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(CLUSTER_URL!, options);
 
@@ -192,8 +186,9 @@ async function main() {
     adminProvider,
     CLUSTER,
     MANGO_V4_ID[CLUSTER],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
 
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);

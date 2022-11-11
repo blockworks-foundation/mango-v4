@@ -197,7 +197,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut metric_websocket_queue_len = metrics.register_u64("websocket_queue_length".into());
     let mut metric_snapshot_queue_len = metrics.register_u64("snapshot_queue_length".into());
-    let mut metric_mango_accounts = metrics.register_u64("mango_accouns".into());
+    let mut metric_mango_accounts = metrics.register_u64("mango_accounts".into());
 
     //
     // mango client setup

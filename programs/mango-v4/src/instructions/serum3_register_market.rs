@@ -88,7 +88,7 @@ pub fn serum3_register_market(
         bump: *ctx.bumps.get("serum_market").ok_or(MangoError::SomeError)?,
         padding1: Default::default(),
         padding2: Default::default(),
-        registration_time: Clock::get()?.unix_timestamp,
+        registration_time: Clock::get()?.unix_timestamp.try_into().unwrap(),
         reserved: [0; 128],
     };
 

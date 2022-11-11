@@ -6,11 +6,12 @@ use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
 
 use crate::accounts_zerocopy::KeyedAccountReader;
-use crate::state::orderbook::order_type::Side;
+use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
 use crate::util::checked_math as cm;
 
-use super::{Book, OracleConfig, DAY_I80F48};
+use super::{orderbook, OracleConfig, OrderBook, DAY_I80F48};
+use crate::logs::PerpUpdateFundingLog;
 
 pub type PerpMarketIndex = u16;
 
@@ -39,8 +40,8 @@ pub struct PerpMarket {
 
     pub oracle_config: OracleConfig,
 
-    pub bids: Pubkey,
-    pub asks: Pubkey,
+    pub orderbook: Pubkey,
+    pub padding3: [u8; 32],
 
     pub event_queue: Pubkey,
 
@@ -69,7 +70,8 @@ pub struct PerpMarket {
     pub impact_quantity: i64,
     pub long_funding: I80F48,
     pub short_funding: I80F48,
-    pub funding_last_updated: i64,
+    /// timestamp that funding was last updated in
+    pub funding_last_updated: u64,
 
     ///
     pub open_interest: i64,
@@ -93,7 +95,7 @@ pub struct PerpMarket {
 
     pub padding2: [u8; 6],
 
-    pub registration_time: i64,
+    pub registration_time: u64,
 
     /// Fees settled in native quote currency
     pub fees_settled: I80F48,
@@ -133,14 +135,9 @@ impl PerpMarket {
         self.trusted_market == 1
     }
 
-    pub fn gen_order_id(&mut self, side: Side, price: i64) -> i128 {
+    pub fn gen_order_id(&mut self, side: Side, price_data: u64) -> u128 {
         self.seq_num += 1;
-
-        let upper = (price as i128) << 64;
-        match side {
-            Side::Bid => upper | (!self.seq_num as i128),
-            Side::Ask => upper | (self.seq_num as i128),
-        }
+        orderbook::new_node_key(side, price_data, self.seq_num)
     }
 
     pub fn oracle_price(&self, oracle_acc: &impl KeyedAccountReader) -> Result<I80F48> {
@@ -153,12 +150,22 @@ impl PerpMarket {
     }
 
     /// Use current order book price and index price to update the instantaneous funding
-    pub fn update_funding(&mut self, book: &Book, oracle_price: I80F48, now_ts: u64) -> Result<()> {
+    pub fn update_funding(
+        &mut self,
+        book: &OrderBook,
+        oracle_price: I80F48,
+        now_ts: u64,
+    ) -> Result<()> {
+        if now_ts <= self.funding_last_updated {
+            return Ok(());
+        }
+
         let index_price = oracle_price;
+        let oracle_price_lots = self.native_price_to_lot(oracle_price);
 
         // Get current book price & compare it to index price
-        let bid = book.impact_price(Side::Bid, self.impact_quantity, now_ts);
-        let ask = book.impact_price(Side::Ask, self.impact_quantity, now_ts);
+        let bid = book.impact_price(Side::Bid, self.impact_quantity, now_ts, oracle_price_lots);
+        let ask = book.impact_price(Side::Ask, self.impact_quantity, now_ts, oracle_price_lots);
 
         let diff_price = match (bid, ask) {
             (Some(bid), Some(ask)) => {
@@ -180,7 +187,17 @@ impl PerpMarket {
 
         self.long_funding += funding_delta;
         self.short_funding += funding_delta;
-        self.funding_last_updated = now_ts as i64;
+        self.funding_last_updated = now_ts;
+
+        emit!(PerpUpdateFundingLog {
+            mango_group: self.group,
+            market_index: self.perp_market_index,
+            long_funding: self.long_funding.to_bits(),
+            short_funding: self.long_funding.to_bits(),
+            price: oracle_price.to_bits(),
+            fees_accrued: self.fees_accrued.to_bits(),
+            open_interest: self.open_interest,
+        });
 
         Ok(())
     }
@@ -247,8 +264,7 @@ impl PerpMarket {
             oracle_config: OracleConfig {
                 conf_filter: I80F48::ZERO,
             },
-            bids: Pubkey::new_unique(),
-            asks: Pubkey::new_unique(),
+            orderbook: Pubkey::new_unique(),
             event_queue: Pubkey::new_unique(),
             quote_lot_size: 1,
             base_lot_size: 1,
@@ -274,6 +290,7 @@ impl PerpMarket {
             reserved: [0; 92],
             padding1: Default::default(),
             padding2: Default::default(),
+            padding3: Default::default(),
             registration_time: 0,
             fee_penalty: 0.0,
             trusted_market: 0,
