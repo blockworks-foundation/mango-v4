@@ -20,4 +20,4 @@ test-bpf = []
 [dependencies]
 anchor-lang = { path = "../../anchor/lang" }
 anchor-spl = { path = "../../anchor/spl" }
-solana-program = "1.10.29"
+solana-program = "1.10.35"
