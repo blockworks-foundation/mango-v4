@@ -376,8 +376,8 @@ export class MangoAccount {
           .toNumber();
         return (
           interest +
-          token.cumulativeDepositInderest +
-          token.cumulativeBorrowInderest
+          token.cumulativeDepositInterest +
+          token.cumulativeBorrowInterest
         );
       } else {
         const interest = bank.borrowIndex
@@ -386,8 +386,8 @@ export class MangoAccount {
           .toNumber();
         return (
           interest +
-          token.cumulativeDepositInderest +
-          token.cumulativeBorrowInderest
+          token.cumulativeDepositInterest +
+          token.cumulativeBorrowInterest
         );
       }
     }
@@ -899,8 +899,8 @@ export class TokenPosition {
     public tokenIndex: TokenIndex,
     public inUseCount: number,
     public previousIndex: I80F48,
-    public cumulativeDepositInderest: number,
-    public cumulativeBorrowInderest: number,
+    public cumulativeDepositInterest: number,
+    public cumulativeBorrowInterest: number,
   ) {}
 
   public isActive(): boolean {
