@@ -408,7 +408,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             loan_origination_fee: loan_origination_fee.to_bits(),
             deposit_index: bank.deposit_index.to_bits(),
             borrow_index: bank.borrow_index.to_bits(),
-            price: price.to_bits(),
+            price: price.fixme().to_bits(),
         });
 
         emit!(TokenBalanceLog {

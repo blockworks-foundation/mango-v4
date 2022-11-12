@@ -24,6 +24,27 @@ use super::MangoAccountRef;
 
 const ONE_NATIVE_USDC_IN_USD: I80F48 = I80F48!(0.000001);
 
+#[derive(Clone, AnchorDeserialize, AnchorSerialize)]
+pub struct OraclePrice {
+    pub asset: I80F48, // native/native
+    pub liab: I80F48,
+}
+
+impl OraclePrice {
+    // intended for tests
+    pub fn new_single_price(price: I80F48) -> Self {
+        Self {
+            asset: price,
+            liab: price,
+        }
+    }
+
+    // TODO: everything using this function needs investigation and updates
+    pub fn fixme(&self) -> I80F48 {
+        self.asset
+    }
+}
+
 /// This trait abstracts how to find accounts needed for the health computation.
 ///
 /// There are different ways they are retrieved from remainingAccounts, based
@@ -40,7 +61,7 @@ pub trait AccountRetriever {
         group: &Pubkey,
         account_index: usize,
         token_index: TokenIndex,
-    ) -> Result<(&Bank, I80F48)>;
+    ) -> Result<(&Bank, OraclePrice)>;
 
     fn serum_oo(&self, account_index: usize, key: &Pubkey) -> Result<&OpenOrders>;
 
@@ -49,7 +70,7 @@ pub trait AccountRetriever {
         group: &Pubkey,
         account_index: usize,
         perp_market_index: PerpMarketIndex,
-    ) -> Result<(&PerpMarket, I80F48)>;
+    ) -> Result<(&PerpMarket, OraclePrice)>;
 }
 
 /// Assumes the account infos needed for the health computation follow a strict order.
@@ -111,14 +132,26 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
         Ok(market)
     }
 
-    fn oracle_price(&self, account_index: usize, bank: &Bank) -> Result<I80F48> {
+    fn oracle_price(&self, account_index: usize, bank: &Bank) -> Result<OraclePrice> {
         let oracle = &self.ais[cm!(self.n_banks + account_index)];
-        bank.oracle_price(oracle, self.staleness_slot)
+        let price = bank.oracle_price(oracle, self.staleness_slot)?;
+        Ok(OraclePrice {
+            asset: price,
+            liab: price,
+        })
     }
 
-    fn oracle_price_perp(&self, account_index: usize, perp_market: &PerpMarket) -> Result<I80F48> {
+    fn oracle_price_perp(
+        &self,
+        account_index: usize,
+        perp_market: &PerpMarket,
+    ) -> Result<OraclePrice> {
         let oracle = &self.ais[self.begin_perp + self.n_perps + account_index];
-        perp_market.oracle_price(oracle, self.staleness_slot)
+        let price = perp_market.oracle_price(oracle, self.staleness_slot)?;
+        Ok(OraclePrice {
+            asset: price,
+            liab: price,
+        })
     }
 }
 
@@ -128,7 +161,7 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
         group: &Pubkey,
         account_index: usize,
         token_index: TokenIndex,
-    ) -> Result<(&Bank, I80F48)> {
+    ) -> Result<(&Bank, OraclePrice)> {
         let bank = self
             .bank(group, account_index, token_index)
             .with_context(|| {
@@ -157,7 +190,7 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
         group: &Pubkey,
         account_index: usize,
         perp_market_index: PerpMarketIndex,
-    ) -> Result<(&PerpMarket, I80F48)> {
+    ) -> Result<(&PerpMarket, OraclePrice)> {
         let perp_market = self
             .perp_market(group, account_index, perp_market_index)
             .with_context(|| {
@@ -351,22 +384,31 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         }
     }
 
-    pub fn scanned_bank_and_oracle(&self, token_index: TokenIndex) -> Result<(&Bank, I80F48)> {
+    pub fn scanned_bank_and_oracle(&self, token_index: TokenIndex) -> Result<(&Bank, OraclePrice)> {
         let index = self.bank_index(token_index)?;
         let bank = self.banks[index].load_fully_unchecked::<Bank>()?;
         let oracle = &self.oracles[index];
-        Ok((bank, bank.oracle_price(oracle, self.staleness_slot)?))
+        let price = bank.oracle_price(oracle, self.staleness_slot)?;
+        let prices = OraclePrice {
+            asset: price,
+            liab: price,
+        };
+        Ok((bank, prices))
     }
 
     pub fn scanned_perp_market_and_oracle(
         &self,
         perp_market_index: PerpMarketIndex,
-    ) -> Result<(&PerpMarket, I80F48)> {
+    ) -> Result<(&PerpMarket, OraclePrice)> {
         let index = self.perp_market_index(perp_market_index)?;
         let perp_market = self.perp_markets[index].load_fully_unchecked::<PerpMarket>()?;
         let oracle_acc = &self.perp_oracles[index];
-        let oracle_price = perp_market.oracle_price(oracle_acc, self.staleness_slot)?;
-        Ok((perp_market, oracle_price))
+        let price = perp_market.oracle_price(oracle_acc, self.staleness_slot)?;
+        let prices = OraclePrice {
+            asset: price,
+            liab: price,
+        };
+        Ok((perp_market, prices))
     }
 
     pub fn scanned_serum_oo(&self, key: &Pubkey) -> Result<&OpenOrders> {
@@ -385,7 +427,7 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
         _group: &Pubkey,
         _account_index: usize,
         token_index: TokenIndex,
-    ) -> Result<(&Bank, I80F48)> {
+    ) -> Result<(&Bank, OraclePrice)> {
         self.scanned_bank_and_oracle(token_index)
     }
 
@@ -394,7 +436,7 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
         _group: &Pubkey,
         _account_index: usize,
         perp_market_index: PerpMarketIndex,
-    ) -> Result<(&PerpMarket, I80F48)> {
+    ) -> Result<(&PerpMarket, OraclePrice)> {
         self.scanned_perp_market_and_oracle(perp_market_index)
     }
 
@@ -443,7 +485,9 @@ pub struct TokenInfo {
     pub init_asset_weight: I80F48,
     pub maint_liab_weight: I80F48,
     pub init_liab_weight: I80F48,
-    pub oracle_price: I80F48, // native/native
+    // TODO: it seems redundant to store the weights _and_ the asset/liab prices
+    // can't we just store the asset_weight * asset_price and liab_weight * liab_price?
+    pub oracle_price: OraclePrice,
     // in health-reference-token native units
     pub balance: I80F48,
     // in health-reference-token native units
@@ -536,7 +580,7 @@ pub struct PerpInfo {
     pub base: I80F48,
     // in health-reference-token native units, no asset/liab factor needed
     pub quote: I80F48,
-    pub oracle_price: I80F48,
+    pub oracle_price: OraclePrice,
     pub has_open_orders: bool,
     pub trusted_market: bool,
 }
@@ -545,7 +589,7 @@ impl PerpInfo {
     fn new(
         perp_position: &PerpPosition,
         perp_market: &PerpMarket,
-        oracle_price: I80F48,
+        oracle_price: OraclePrice,
     ) -> Result<Self> {
         let base_lot_size = I80F48::from(perp_market.base_lot_size);
         let base_lots = cm!(perp_position.base_position_lots() + perp_position.taker_base_lots);
@@ -600,7 +644,8 @@ impl PerpInfo {
         let bids_net_lots = cm!(base_lots + perp_position.bids_base_lots);
         let asks_net_lots = cm!(base_lots - perp_position.asks_base_lots);
 
-        let lots_to_quote = base_lot_size * oracle_price;
+        // TODO: depends on whether base lots is positive or negative...
+        let lots_to_quote = base_lot_size * oracle_price.fixme();
         let base;
         let quote;
         if cm!(bids_net_lots.abs()) > cm!(asks_net_lots.abs()) {
@@ -732,7 +777,7 @@ impl HealthCache {
         // Work around the fact that -((-x) * y) == x * y does not hold for I80F48:
         // We need to make sure that if balance is before * price, then change = -before
         // brings it to exactly zero.
-        let removed_contribution = (-change) * entry.oracle_price;
+        let removed_contribution = (-change) * entry.oracle_price.fixme();
         cm!(entry.balance -= removed_contribution);
         Ok(())
     }
@@ -754,23 +799,23 @@ impl HealthCache {
         let mut reserved_amount;
         {
             let base_entry = &mut self.token_infos[base_entry_index];
-            reserved_amount = cm!(reserved_base_change * base_entry.oracle_price);
+            reserved_amount = cm!(reserved_base_change * base_entry.oracle_price.asset);
         }
         {
             let quote_entry = &mut self.token_infos[quote_entry_index];
-            cm!(reserved_amount += reserved_quote_change * quote_entry.oracle_price);
+            cm!(reserved_amount += reserved_quote_change * quote_entry.oracle_price.asset);
         }
 
         // Apply it to the tokens
         {
             let base_entry = &mut self.token_infos[base_entry_index];
             cm!(base_entry.serum3_max_reserved += reserved_amount);
-            cm!(base_entry.balance += free_base_change * base_entry.oracle_price);
+            cm!(base_entry.balance += free_base_change * base_entry.oracle_price.asset);
         }
         {
             let quote_entry = &mut self.token_infos[quote_entry_index];
             cm!(quote_entry.serum3_max_reserved += reserved_amount);
-            cm!(quote_entry.balance += free_quote_change * quote_entry.oracle_price);
+            cm!(quote_entry.balance += free_quote_change * quote_entry.oracle_price.asset);
         }
 
         // Apply it to the serum3 info
@@ -793,7 +838,7 @@ impl HealthCache {
             .iter_mut()
             .find(|m| m.perp_market_index == perp_market.perp_market_index)
             .ok_or_else(|| error_msg!("perp market {} not found", perp_market.perp_market_index))?;
-        *perp_entry = PerpInfo::new(perp_position, perp_market, perp_entry.oracle_price)?;
+        *perp_entry = PerpInfo::new(perp_position, perp_market, perp_entry.oracle_price.clone())?;
         Ok(())
     }
 
@@ -954,7 +999,8 @@ impl HealthCache {
         let source = &self.token_infos[source_index];
         let target = &self.token_infos[target_index];
 
-        let oracle_swap_price = cm!(source.oracle_price / target.oracle_price);
+        // TODO: err, this'll be annoying?!
+        let oracle_swap_price = cm!(source.oracle_price.fixme() / target.oracle_price.fixme());
         let price_factor = cm!(price / oracle_swap_price);
 
         // If the price is sufficiently good, then health will just increase from swapping:
@@ -1050,7 +1096,7 @@ impl HealthCache {
                 )?
             };
 
-        Ok(amount / source.oracle_price)
+        Ok(amount / source.oracle_price.fixme())
     }
 
     #[cfg(feature = "client")]
@@ -1077,13 +1123,13 @@ impl HealthCache {
 
         let perp_info_index = self.perp_info_index(perp_market_index)?;
         let perp_info = &self.perp_infos[perp_info_index];
-        let oracle_price = perp_info.oracle_price;
+        let oracle_price = &perp_info.oracle_price;
 
         // If the price is sufficiently good then health will just increase from trading
         let final_health_slope = if direction == 1 {
-            perp_info.init_asset_weight * oracle_price - price
+            perp_info.init_asset_weight * oracle_price.fixme() - price
         } else {
-            price - perp_info.init_liab_weight * oracle_price
+            price - perp_info.init_liab_weight * oracle_price.fixme()
         };
         if final_health_slope >= 0 {
             return Ok(i64::MAX);
@@ -1093,7 +1139,7 @@ impl HealthCache {
             let mut adjusted_cache = self.clone();
             let d = I80F48::from(direction);
             adjusted_cache.perp_infos[perp_info_index].base +=
-                d * base_lots * base_lot_size * oracle_price;
+                d * base_lots * base_lot_size * oracle_price.fixme();
             adjusted_cache.perp_infos[perp_info_index].quote -=
                 d * base_lots * base_lot_size * price;
             adjusted_cache
@@ -1102,7 +1148,7 @@ impl HealthCache {
             |base_lots| cache_after_trade(base_lots).health_ratio(HealthType::Init);
 
         // This is awkward, can we pass the base_lots and lot_size in PerpInfo?
-        let initial_base_lots = perp_info.base / perp_info.oracle_price / base_lot_size;
+        let initial_base_lots = perp_info.base / perp_info.oracle_price.fixme() / base_lot_size;
 
         // There are two cases:
         // 1. We are increasing abs(base_lots)
@@ -1217,6 +1263,7 @@ pub fn new_health_cache(
         // converts the token value to the basis token value for health computations
         // TODO: health basis token == USDC?
         let native = position.native(bank);
+        let balance = cm!(native * oracle_price.fixme());
 
         token_infos.push(TokenInfo {
             token_index: bank.token_index,
@@ -1225,7 +1272,7 @@ pub fn new_health_cache(
             maint_liab_weight: bank.maint_liab_weight,
             init_liab_weight: bank.init_liab_weight,
             oracle_price,
-            balance: cm!(native * oracle_price),
+            balance,
             serum3_max_reserved: I80F48::ZERO,
         });
     }
@@ -1250,14 +1297,14 @@ pub fn new_health_cache(
         // add the amounts that are freely settleable
         let base_free = I80F48::from_num(oo.native_coin_free);
         let quote_free = I80F48::from_num(cm!(oo.native_pc_free + oo.referrer_rebates_accrued));
-        cm!(base_info.balance += base_free * base_info.oracle_price);
-        cm!(quote_info.balance += quote_free * quote_info.oracle_price);
+        cm!(base_info.balance += base_free * base_info.oracle_price.fixme());
+        cm!(quote_info.balance += quote_free * quote_info.oracle_price.fixme());
 
         // add the reserved amount to both sides, to have the worst-case covered
         let reserved_base = I80F48::from_num(cm!(oo.native_coin_total - oo.native_coin_free));
         let reserved_quote = I80F48::from_num(cm!(oo.native_pc_total - oo.native_pc_free));
-        let reserved_balance =
-            cm!(reserved_base * base_info.oracle_price + reserved_quote * quote_info.oracle_price);
+        let reserved_balance = cm!(reserved_base * base_info.oracle_price.fixme()
+            + reserved_quote * quote_info.oracle_price.fixme());
         cm!(base_info.serum3_max_reserved += reserved_balance);
         cm!(quote_info.serum3_max_reserved += reserved_balance);
 
@@ -1585,7 +1632,7 @@ mod tests {
         {
             let (b, o) = retriever.scanned_bank_and_oracle(5).unwrap();
             assert_eq!(b.token_index, 5);
-            assert_eq!(o, 5 * I80F48::ONE);
+            assert_eq!(o.fixme(), 5 * I80F48::ONE);
         }
 
         let oo = retriever.serum_oo(0, &oo1key).unwrap();
@@ -1597,13 +1644,13 @@ mod tests {
             .perp_market_and_oracle_price(&group, 0, 9)
             .unwrap();
         assert_eq!(identity(perp.perp_market_index), 9);
-        assert_eq!(oracle_price, oracle2_price);
+        assert_eq!(oracle_price.fixme(), oracle2_price);
 
         let (perp, oracle_price) = retriever
             .perp_market_and_oracle_price(&group, 1, 8)
             .unwrap();
         assert_eq!(identity(perp.perp_market_index), 8);
-        assert_eq!(oracle_price, oracle1_price);
+        assert_eq!(oracle_price.fixme(), oracle1_price);
 
         assert!(retriever
             .perp_market_and_oracle_price(&group, 1, 5)
@@ -1831,7 +1878,7 @@ mod tests {
             init_asset_weight: I80F48::from_num(1.0 - x),
             maint_liab_weight: I80F48::from_num(1.0 + x),
             init_liab_weight: I80F48::from_num(1.0 + x),
-            oracle_price: I80F48::from_num(2.0),
+            oracle_price: OraclePrice::new_single_price(I80F48::from_num(2.0)),
             balance: I80F48::ZERO,
             serum3_max_reserved: I80F48::ZERO,
         };
@@ -1840,17 +1887,17 @@ mod tests {
             token_infos: vec![
                 TokenInfo {
                     token_index: 0,
-                    oracle_price: I80F48::from_num(2.0),
+                    oracle_price: OraclePrice::new_single_price(I80F48::from_num(2.0)),
                     ..default_token_info(0.1)
                 },
                 TokenInfo {
                     token_index: 1,
-                    oracle_price: I80F48::from_num(3.0),
+                    oracle_price: OraclePrice::new_single_price(I80F48::from_num(3.0)),
                     ..default_token_info(0.2)
                 },
                 TokenInfo {
                     token_index: 2,
-                    oracle_price: I80F48::from_num(4.0),
+                    oracle_price: OraclePrice::new_single_price(I80F48::from_num(4.0)),
                     ..default_token_info(0.3)
                 },
             ],
@@ -1883,9 +1930,10 @@ mod tests {
                                     ratio: f64,
                                     price_factor: f64| {
             let mut c = c.clone();
-            let source_price = c.token_infos[source as usize].oracle_price;
-            let target_price = c.token_infos[target as usize].oracle_price;
-            let swap_price = I80F48::from_num(price_factor) * source_price / target_price;
+            let source_price = &c.token_infos[source as usize].oracle_price;
+            let target_price = &c.token_infos[target as usize].oracle_price;
+            let swap_price =
+                I80F48::from_num(price_factor) * source_price.fixme() / target_price.fixme();
             let source_amount = c
                 .max_swap_source_for_health_ratio(
                     source,
@@ -2008,7 +2056,7 @@ mod tests {
             init_asset_weight: I80F48::from_num(1.0 - x),
             maint_liab_weight: I80F48::from_num(1.0 + x),
             init_liab_weight: I80F48::from_num(1.0 + x),
-            oracle_price: I80F48::from_num(2.0),
+            oracle_price: OraclePrice::new_single_price(I80F48::from_num(2.0)),
             balance: I80F48::ZERO,
             serum3_max_reserved: I80F48::ZERO,
         };
@@ -2020,7 +2068,7 @@ mod tests {
             init_liab_weight: I80F48::from_num(1.0 + x),
             base: I80F48::ZERO,
             quote: I80F48::ZERO,
-            oracle_price: I80F48::from_num(2.0),
+            oracle_price: OraclePrice::new_single_price(I80F48::from_num(2.0)),
             has_open_orders: false,
             trusted_market: false,
         };
@@ -2028,7 +2076,7 @@ mod tests {
         let health_cache = HealthCache {
             token_infos: vec![TokenInfo {
                 token_index: 0,
-                oracle_price: I80F48::from_num(1.0),
+                oracle_price: OraclePrice::new_single_price(I80F48::from_num(1.0)),
                 balance: I80F48::ZERO,
                 ..default_token_info(0.0)
             }],
@@ -2062,8 +2110,8 @@ mod tests {
         };
         let find_max_trade =
             |c: &HealthCache, side: PerpOrderSide, ratio: f64, price_factor: f64| {
-                let oracle_price = c.perp_infos[0].oracle_price;
-                let trade_price = I80F48::from_num(price_factor) * oracle_price;
+                let oracle_price = &c.perp_infos[0].oracle_price;
+                let trade_price = I80F48::from_num(price_factor) * oracle_price.fixme();
                 let base_lots = c
                     .max_perp_for_health_ratio(
                         0,
@@ -2086,7 +2134,7 @@ mod tests {
                 let actual_ratio = {
                     let base_native = I80F48::from(direction * base_lots * base_lot_size);
                     let mut c = c.clone();
-                    c.perp_infos[0].base += base_native * oracle_price;
+                    c.perp_infos[0].base += base_native * oracle_price.fixme();
                     c.perp_infos[0].quote -= base_native * trade_price;
                     c.health_ratio(HealthType::Init).to_num::<f64>()
                 };
@@ -2094,7 +2142,7 @@ mod tests {
                 let plus_ratio = {
                     let base_native = I80F48::from(direction * (base_lots + 1) * base_lot_size);
                     let mut c = c.clone();
-                    c.perp_infos[0].base += base_native * oracle_price;
+                    c.perp_infos[0].base += base_native * oracle_price.fixme();
                     c.perp_infos[0].quote -= base_native * trade_price;
                     c.health_ratio(HealthType::Init).to_num::<f64>()
                 };
