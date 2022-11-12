@@ -31,6 +31,7 @@ pub struct TokenPosition {
     #[derivative(Debug = "ignore")]
     pub padding: [u8; 5],
 
+    // TODO: When re-layouting: move this to the end
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 8],
 
@@ -191,9 +192,6 @@ pub struct PerpPosition {
     pub taker_base_lots: i64,
     pub taker_quote_lots: i64,
 
-    #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 24],
-
     // (Display only)
     // Cumulative long funding in base native units
     pub cumulative_long_funding: f64,
@@ -209,6 +207,9 @@ pub struct PerpPosition {
     // (Display only)
     // Cumulative realized pnl in quote native units
     pub perp_spot_transfers: i64,
+
+    #[derivative(Debug = "ignore")]
+    pub reserved: [u8; 24],
 }
 const_assert_eq!(size_of::<PerpPosition>(), 8 + 7 * 8 + 3 * 16 + 64);
 const_assert_eq!(size_of::<PerpPosition>() % 8, 0);
@@ -228,7 +229,6 @@ impl Default for PerpPosition {
             asks_base_lots: 0,
             taker_base_lots: 0,
             taker_quote_lots: 0,
-            reserved: [0; 24],
             long_settled_funding: I80F48::ZERO,
             short_settled_funding: I80F48::ZERO,
             padding: Default::default(),
@@ -237,6 +237,7 @@ impl Default for PerpPosition {
             maker_volume: 0,
             taker_volume: 0,
             perp_spot_transfers: 0,
+            reserved: [0; 24],
         }
     }
 }

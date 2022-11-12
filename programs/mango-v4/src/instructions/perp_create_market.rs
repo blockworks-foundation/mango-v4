@@ -48,7 +48,7 @@ pub fn perp_create_market(
     settle_token_index: TokenIndex,
     perp_market_index: PerpMarketIndex,
     name: String,
-    oracle_config: OracleConfig,
+    oracle_config: OracleConfigParams,
     base_decimals: u8,
     quote_lot_size: i64,
     base_lot_size: i64,
@@ -91,7 +91,7 @@ pub fn perp_create_market(
         trusted_market: if trusted_market { 1 } else { 0 },
         name: fill_from_str(&name)?,
         oracle: ctx.accounts.oracle.key(),
-        oracle_config,
+        oracle_config: oracle_config.to_oracle_config(),
         orderbook: ctx.accounts.orderbook.key(),
         event_queue: ctx.accounts.event_queue.key(),
         quote_lot_size,
@@ -118,12 +118,11 @@ pub fn perp_create_market(
         registration_time: now_ts,
         padding1: Default::default(),
         padding2: Default::default(),
-        padding3: Default::default(),
         fee_penalty,
         settle_fee_flat,
         settle_fee_amount_threshold,
         settle_fee_fraction_low_health,
-        reserved: [0; 92],
+        reserved: [0; 2244],
     };
 
     let mut orderbook = ctx.accounts.orderbook.load_init()?;

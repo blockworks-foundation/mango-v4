@@ -25,8 +25,10 @@ pub fn fetch_top(
     let perp_market =
         account_fetcher_fetch_anchor_account::<PerpMarket>(account_fetcher, &perp.address)?;
     let oracle_acc = account_fetcher.fetch_raw_account(&perp_market.oracle)?;
-    let oracle_price =
-        perp_market.oracle_price(&KeyedAccountSharedData::new(perp_market.oracle, oracle_acc))?;
+    let oracle_price = perp_market.oracle_price(
+        &KeyedAccountSharedData::new(perp_market.oracle, oracle_acc),
+        None,
+    )?;
 
     let accounts =
         account_fetcher.fetch_program_accounts(&mango_v4::id(), MangoAccount::discriminator())?;

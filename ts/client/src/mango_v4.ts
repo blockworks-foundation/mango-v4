@@ -389,7 +389,7 @@ export type MangoV4 = {
         {
           "name": "oracleConfig",
           "type": {
-            "defined": "OracleConfig"
+            "defined": "OracleConfigParams"
           }
         },
         {
@@ -596,7 +596,7 @@ export type MangoV4 = {
           "name": "oracleConfigOpt",
           "type": {
             "option": {
-              "defined": "OracleConfig"
+              "defined": "OracleConfigParams"
             }
           }
         },
@@ -2403,7 +2403,7 @@ export type MangoV4 = {
         {
           "name": "oracleConfig",
           "type": {
-            "defined": "OracleConfig"
+            "defined": "OracleConfigParams"
           }
         },
         {
@@ -2518,7 +2518,7 @@ export type MangoV4 = {
           "name": "oracleConfigOpt",
           "type": {
             "option": {
-              "defined": "OracleConfig"
+              "defined": "OracleConfigParams"
             }
           }
         },
@@ -2760,6 +2760,10 @@ export type MangoV4 = {
           "type": {
             "defined": "PlaceOrderType"
           }
+        },
+        {
+          "name": "reduceOnly",
+          "type": "bool"
         },
         {
           "name": "expiryTimestamp",
@@ -3413,9 +3417,9 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "oracleConfig",
+            "name": "oracleConfFilter",
             "type": {
-              "defined": "OracleConfig"
+              "defined": "I80F48"
             }
           },
           {
@@ -3603,11 +3607,17 @@ export type MangoV4 = {
             "type": "u32"
           },
           {
+            "name": "oracleConfig",
+            "type": {
+              "defined": "OracleConfig"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                2464
               ]
             }
           }
@@ -3962,25 +3972,33 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
-            "name": "bidsFixed",
+            "name": "bids",
+            "type": {
+              "defined": "BookSide"
+            }
+          },
+          {
+            "name": "asks",
+            "type": {
+              "defined": "BookSide"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "bookSide",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fixed",
             "type": {
               "defined": "OrderTree"
             }
           },
           {
-            "name": "asksFixed",
-            "type": {
-              "defined": "OrderTree"
-            }
-          },
-          {
-            "name": "bidsOraclePegged",
-            "type": {
-              "defined": "OrderTree"
-            }
-          },
-          {
-            "name": "asksOraclePegged",
+            "name": "oraclePegged",
             "type": {
               "defined": "OrderTree"
             }
@@ -4146,15 +4164,6 @@ export type MangoV4 = {
           {
             "name": "orderbook",
             "type": "publicKey"
-          },
-          {
-            "name": "padding3",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
           },
           {
             "name": "eventQueue",
@@ -4341,7 +4350,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                92
+                2244
               ]
             }
           }
@@ -4969,15 +4978,6 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                24
-              ]
-            }
-          },
-          {
             "name": "cumulativeLongFunding",
             "type": "f64"
           },
@@ -4996,6 +4996,15 @@ export type MangoV4 = {
           {
             "name": "perpSpotTransfers",
             "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                24
+              ]
+            }
           }
         ]
       }
@@ -5062,6 +5071,37 @@ export type MangoV4 = {
             "name": "confFilter",
             "type": {
               "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maxStalenessSlots",
+            "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                72
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleConfigParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "confFilter",
+            "type": "f32"
+          },
+          {
+            "name": "maxStalenessSlots",
+            "type": {
+              "option": "u32"
             }
           }
         ]
@@ -7315,7 +7355,7 @@ export const IDL: MangoV4 = {
         {
           "name": "oracleConfig",
           "type": {
-            "defined": "OracleConfig"
+            "defined": "OracleConfigParams"
           }
         },
         {
@@ -7522,7 +7562,7 @@ export const IDL: MangoV4 = {
           "name": "oracleConfigOpt",
           "type": {
             "option": {
-              "defined": "OracleConfig"
+              "defined": "OracleConfigParams"
             }
           }
         },
@@ -9329,7 +9369,7 @@ export const IDL: MangoV4 = {
         {
           "name": "oracleConfig",
           "type": {
-            "defined": "OracleConfig"
+            "defined": "OracleConfigParams"
           }
         },
         {
@@ -9444,7 +9484,7 @@ export const IDL: MangoV4 = {
           "name": "oracleConfigOpt",
           "type": {
             "option": {
-              "defined": "OracleConfig"
+              "defined": "OracleConfigParams"
             }
           }
         },
@@ -9686,6 +9726,10 @@ export const IDL: MangoV4 = {
           "type": {
             "defined": "PlaceOrderType"
           }
+        },
+        {
+          "name": "reduceOnly",
+          "type": "bool"
         },
         {
           "name": "expiryTimestamp",
@@ -10339,9 +10383,9 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "oracleConfig",
+            "name": "oracleConfFilter",
             "type": {
-              "defined": "OracleConfig"
+              "defined": "I80F48"
             }
           },
           {
@@ -10529,11 +10573,17 @@ export const IDL: MangoV4 = {
             "type": "u32"
           },
           {
+            "name": "oracleConfig",
+            "type": {
+              "defined": "OracleConfig"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                2464
               ]
             }
           }
@@ -10888,25 +10938,33 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
-            "name": "bidsFixed",
+            "name": "bids",
+            "type": {
+              "defined": "BookSide"
+            }
+          },
+          {
+            "name": "asks",
+            "type": {
+              "defined": "BookSide"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "bookSide",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fixed",
             "type": {
               "defined": "OrderTree"
             }
           },
           {
-            "name": "asksFixed",
-            "type": {
-              "defined": "OrderTree"
-            }
-          },
-          {
-            "name": "bidsOraclePegged",
-            "type": {
-              "defined": "OrderTree"
-            }
-          },
-          {
-            "name": "asksOraclePegged",
+            "name": "oraclePegged",
             "type": {
               "defined": "OrderTree"
             }
@@ -11072,15 +11130,6 @@ export const IDL: MangoV4 = {
           {
             "name": "orderbook",
             "type": "publicKey"
-          },
-          {
-            "name": "padding3",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
           },
           {
             "name": "eventQueue",
@@ -11267,7 +11316,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                92
+                2244
               ]
             }
           }
@@ -11895,15 +11944,6 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                24
-              ]
-            }
-          },
-          {
             "name": "cumulativeLongFunding",
             "type": "f64"
           },
@@ -11922,6 +11962,15 @@ export const IDL: MangoV4 = {
           {
             "name": "perpSpotTransfers",
             "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                24
+              ]
+            }
           }
         ]
       }
@@ -11988,6 +12037,37 @@ export const IDL: MangoV4 = {
             "name": "confFilter",
             "type": {
               "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maxStalenessSlots",
+            "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                72
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleConfigParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "confFilter",
+            "type": "f32"
+          },
+          {
+            "name": "maxStalenessSlots",
+            "type": {
+              "option": "u32"
             }
           }
         ]

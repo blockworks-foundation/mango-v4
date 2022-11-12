@@ -24,7 +24,7 @@ import {
   TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { Bank, MintInfo, TokenIndex } from './accounts/bank';
+import { Bank, MintInfo, TokenIndex, OracleConfig } from './accounts/bank';
 import { Group } from './accounts/group';
 import {
   MangoAccount,
@@ -52,7 +52,7 @@ import { SERUM3_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
-import { FlashLoanType, InterestRateParams } from './types';
+import { FlashLoanType, InterestRateParams, OracleConfigParams } from './types';
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
@@ -236,15 +236,10 @@ export class MangoClient {
     group: Group,
     mintPk: PublicKey,
     oraclePk: PublicKey,
-    oracleConfFilter: number,
+    oracleConfig: OracleConfigParams,
     tokenIndex: number,
     name: string,
-    adjustmentFactor: number,
-    util0: number,
-    rate0: number,
-    util1: number,
-    rate1: number,
-    maxRate: number,
+    interestRateParams: InterestRateParams,
     loanFeeRate: number,
     loanOriginationFeeRate: number,
     maintAssetWeight: number,
@@ -257,12 +252,8 @@ export class MangoClient {
       .tokenRegister(
         tokenIndex,
         name,
-        {
-          confFilter: {
-            val: I80F48.fromNumber(oracleConfFilter).getData(),
-          },
-        } as any, // future: nested custom types dont typecheck, fix if possible?
-        { adjustmentFactor, util0, rate0, util1, rate1, maxRate },
+        oracleConfig,
+        interestRateParams,
         loanFeeRate,
         loanOriginationFeeRate,
         maintAssetWeight,
@@ -307,7 +298,7 @@ export class MangoClient {
     group: Group,
     mintPk: PublicKey,
     oracle: PublicKey | null,
-    oracleConfFilter: number | null,
+    oracleConfig: OracleConfigParams | null,
     groupInsuranceFund: boolean | null,
     interestRateParams: InterestRateParams | null,
     loanFeeRate: number | null,
@@ -321,21 +312,10 @@ export class MangoClient {
     const bank = group.getFirstBankByMint(mintPk);
     const mintInfo = group.mintInfosMapByTokenIndex.get(bank.tokenIndex)!;
 
-    let oracleConf;
-    if (oracleConfFilter !== null) {
-      oracleConf = {
-        confFilter: {
-          val: I80F48.fromNumber(oracleConfFilter).getData(),
-        },
-      } as any; // future: nested custom types dont typecheck, fix if possible?
-    } else {
-      oracleConf = null;
-    }
-
     return await this.program.methods
       .tokenEdit(
         oracle,
-        oracleConf,
+        oracleConfig,
         groupInsuranceFund,
         interestRateParams,
         loanFeeRate,
@@ -1384,7 +1364,7 @@ export class MangoClient {
     oraclePk: PublicKey,
     perpMarketIndex: number,
     name: string,
-    oracleConfFilter: number,
+    oracleConfig: OracleConfigParams,
     baseDecimals: number,
     quoteLotSize: number,
     baseLotSize: number,
@@ -1421,11 +1401,7 @@ export class MangoClient {
       .perpCreateMarket(
         perpMarketIndex,
         name,
-        {
-          confFilter: {
-            val: I80F48.fromNumber(oracleConfFilter).getData(),
-          },
-        } as any, // future: nested custom types dont typecheck, fix if possible?
+        oracleConfig,
         baseDecimals,
         new BN(quoteLotSize),
         new BN(baseLotSize),
@@ -1501,7 +1477,7 @@ export class MangoClient {
     group: Group,
     perpMarketIndex: PerpMarketIndex,
     oracle: PublicKey,
-    oracleConfFilter: number,
+    oracleConfig: OracleConfigParams,
     baseDecimals: number,
     maintAssetWeight: number,
     initAssetWeight: number,
@@ -1525,11 +1501,7 @@ export class MangoClient {
     return await this.program.methods
       .perpEditMarket(
         oracle,
-        {
-          confFilter: {
-            val: I80F48.fromNumber(oracleConfFilter).getData(),
-          },
-        } as any, // future: nested custom types dont typecheck, fix if possible?
+        oracleConfig,
         baseDecimals,
         maintAssetWeight,
         initAssetWeight,

@@ -89,6 +89,19 @@ async function main() {
     oracles.set(name, oracle.publicKey);
   }
 
+  const defaultOracleConfig = {
+    confFilter: 0.1,
+    maxStalenessSlots: null,
+  };
+  const defaultInterestRate = {
+    adjustmentFactor: 0.01,
+    util0: 0.4,
+    rate0: 0.07,
+    util1: 0.8,
+    rate1: 0.9,
+    maxRate: 1.5,
+  };
+
   // register token 0
   console.log(`Registering USDC...`);
   const usdcMainnetMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
@@ -98,15 +111,10 @@ async function main() {
       group,
       usdcMainnetMint,
       usdcMainnetOracle,
-      0.1,
+      defaultOracleConfig,
       0,
       'USDC',
-      0.01,
-      0.4,
-      0.07,
-      0.8,
-      0.9,
-      1.5,
+      defaultInterestRate,
       0.0,
       0.0001,
       1,
@@ -129,15 +137,10 @@ async function main() {
       group,
       btcMainnetMint,
       btcMainnetOracle,
-      0.1,
+      defaultOracleConfig,
       1,
       'BTC',
-      0.01,
-      0.4,
-      0.07,
-      0.7,
-      0.88,
-      1.5,
+      defaultInterestRate,
       0.0,
       0.0001,
       0.9,
@@ -160,15 +163,10 @@ async function main() {
       group,
       solMainnetMint,
       solMainnetOracle,
-      0.1,
+      defaultOracleConfig,
       2, // tokenIndex
       'SOL',
-      0.01,
-      0.4,
-      0.07,
-      0.8,
-      0.9,
-      1.5,
+      defaultInterestRate,
       0.0,
       0.0001,
       0.9,
@@ -209,7 +207,7 @@ async function main() {
       mngoMainnetOracle,
       0,
       'MNGO-PERP',
-      0.1,
+      defaultOracleConfig,
       9,
       10,
       100000, // base lots
