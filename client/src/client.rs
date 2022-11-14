@@ -1451,7 +1451,10 @@ fn create_associated_token_account_idempotent(
     mint: &Pubkey,
 ) -> Instruction {
     let mut instr = spl_associated_token_account::instruction::create_associated_token_account(
-        funder, owner, mint, &spl_associated_token_account::ID
+        funder,
+        owner,
+        mint,
+        &spl_associated_token_account::ID,
     );
     instr.data = vec![0x1]; // CreateIdempotent
     instr
