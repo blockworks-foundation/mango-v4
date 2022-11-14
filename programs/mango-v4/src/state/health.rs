@@ -488,10 +488,9 @@ pub struct TokenInfo {
     // TODO: it seems redundant to store the weights _and_ the asset/liab prices
     // can't we just store the asset_weight * asset_price and liab_weight * liab_price?
     pub oracle_price: OraclePrice,
-    // in health-reference-token native units
-    pub balance: I80F48,
-    // in health-reference-token native units
-    pub serum3_max_reserved: I80F48,
+    // in token native units
+    pub token_balance: I80F48,
+    pub serum3_max_reserved_token: I80F48,
 }
 
 impl TokenInfo {
@@ -513,18 +512,19 @@ impl TokenInfo {
 
     #[inline(always)]
     fn health_contribution(&self, health_type: HealthType) -> I80F48 {
-        let weight = if self.balance.is_negative() {
-            self.liab_weight(health_type)
+        let (weight, price) = if self.token_balance.is_negative() {
+            (self.liab_weight(health_type), self.oracle_price.liab)
         } else {
-            self.asset_weight(health_type)
+            (self.asset_weight(health_type), self.oracle_price.asset)
         };
-        cm!(self.balance * weight)
+        cm!(self.token_balance * price * weight)
     }
 }
 
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct Serum3Info {
-    pub reserved: I80F48,
+    pub reserved_base: I80F48,
+    pub reserved_quote: I80F48,
     pub base_index: usize,
     pub quote_index: usize,
     pub market_index: Serum3MarketIndex,
@@ -533,20 +533,19 @@ pub struct Serum3Info {
 impl Serum3Info {
     #[inline(always)]
     fn health_contribution(&self, health_type: HealthType, token_infos: &[TokenInfo]) -> I80F48 {
-        let base_info = &token_infos[self.base_index];
-        let quote_info = &token_infos[self.quote_index];
-        let reserved = self.reserved;
-
-        if reserved.is_zero() {
+        if self.reserved_base.is_zero() || self.reserved_quote.is_zero() {
             return I80F48::ZERO;
         }
 
+        let base_info = &token_infos[self.base_index];
+        let quote_info = &token_infos[self.quote_index];
+
         // How much the health would increase if the reserved balance were applied to the passed
         // token info?
-        let compute_health_effect = |token_info: &TokenInfo| {
+        let compute_health_effect = |token_info: &TokenInfo, reserved: I80F48| {
             // This balance includes all possible reserved funds from markets that relate to the
             // token, including this market itself: `reserved` is already included in `max_balance`.
-            let max_balance = cm!(token_info.balance + token_info.serum3_max_reserved);
+            let max_balance = cm!(token_info.token_balance + token_info.serum3_max_reserved_token);
 
             // Assuming `reserved` was added to `max_balance` last (because that gives the smallest
             // health effects): how much did health change because of it?
@@ -560,11 +559,12 @@ impl Serum3Info {
 
             let asset_weight = token_info.asset_weight(health_type);
             let liab_weight = token_info.liab_weight(health_type);
-            cm!(asset_weight * asset_part + liab_weight * liab_part)
+            cm!(asset_weight * asset_part * token_info.oracle_price.asset
+                + liab_weight * liab_part * token_info.oracle_price.liab)
         };
 
-        let reserved_as_base = compute_health_effect(base_info);
-        let reserved_as_quote = compute_health_effect(quote_info);
+        let reserved_as_base = compute_health_effect(base_info, self.reserved_base);
+        let reserved_as_quote = compute_health_effect(quote_info, self.reserved_quote);
         reserved_as_base.min(reserved_as_quote)
     }
 }
@@ -777,8 +777,8 @@ impl HealthCache {
         // Work around the fact that -((-x) * y) == x * y does not hold for I80F48:
         // We need to make sure that if balance is before * price, then change = -before
         // brings it to exactly zero.
-        let removed_contribution = (-change) * entry.oracle_price.fixme();
-        cm!(entry.balance -= removed_contribution);
+        let removed_contribution = -change;
+        cm!(entry.token_balance -= removed_contribution);
         Ok(())
     }
 
@@ -1263,7 +1263,6 @@ pub fn new_health_cache(
         // converts the token value to the basis token value for health computations
         // TODO: health basis token == USDC?
         let native = position.native(bank);
-        let balance = cm!(native * oracle_price.fixme());
 
         token_infos.push(TokenInfo {
             token_index: bank.token_index,
@@ -1272,8 +1271,8 @@ pub fn new_health_cache(
             maint_liab_weight: bank.maint_liab_weight,
             init_liab_weight: bank.init_liab_weight,
             oracle_price,
-            balance,
-            serum3_max_reserved: I80F48::ZERO,
+            token_balance: native,
+            serum3_max_reserved_token: I80F48::ZERO,
         });
     }
 
@@ -1297,19 +1296,22 @@ pub fn new_health_cache(
         // add the amounts that are freely settleable
         let base_free = I80F48::from_num(oo.native_coin_free);
         let quote_free = I80F48::from_num(cm!(oo.native_pc_free + oo.referrer_rebates_accrued));
-        cm!(base_info.balance += base_free * base_info.oracle_price.fixme());
-        cm!(quote_info.balance += quote_free * quote_info.oracle_price.fixme());
+        cm!(base_info.token_balance += base_free);
+        cm!(quote_info.token_balance += quote_free);
 
         // add the reserved amount to both sides, to have the worst-case covered
         let reserved_base = I80F48::from_num(cm!(oo.native_coin_total - oo.native_coin_free));
         let reserved_quote = I80F48::from_num(cm!(oo.native_pc_total - oo.native_pc_free));
-        let reserved_balance = cm!(reserved_base * base_info.oracle_price.fixme()
-            + reserved_quote * quote_info.oracle_price.fixme());
-        cm!(base_info.serum3_max_reserved += reserved_balance);
-        cm!(quote_info.serum3_max_reserved += reserved_balance);
+        let reserved_total_base = cm!(reserved_base
+            + reserved_quote * quote_info.oracle_price.asset / base_info.oracle_price.liab);
+        let reserved_total_quote = cm!(reserved_quote
+            + reserved_base * base_info.oracle_price.asset / quote_info.oracle_price.liab);
+        cm!(base_info.serum3_max_reserved_token += reserved_total_base);
+        cm!(quote_info.serum3_max_reserved_token += reserved_total_quote);
 
         serum3_infos.push(Serum3Info {
-            reserved: reserved_balance,
+            reserved_base: reserved_total_base,
+            reserved_quote: reserved_total_quote,
             base_index,
             quote_index,
             market_index: serum_account.market_index,
@@ -1879,8 +1881,8 @@ mod tests {
             maint_liab_weight: I80F48::from_num(1.0 + x),
             init_liab_weight: I80F48::from_num(1.0 + x),
             oracle_price: OraclePrice::new_single_price(I80F48::from_num(2.0)),
-            balance: I80F48::ZERO,
-            serum3_max_reserved: I80F48::ZERO,
+            token_balance: I80F48::ZERO,
+            serum3_max_reserved_token: I80F48::ZERO,
         };
 
         let health_cache = HealthCache {
@@ -2057,8 +2059,8 @@ mod tests {
             maint_liab_weight: I80F48::from_num(1.0 + x),
             init_liab_weight: I80F48::from_num(1.0 + x),
             oracle_price: OraclePrice::new_single_price(I80F48::from_num(2.0)),
-            balance: I80F48::ZERO,
-            serum3_max_reserved: I80F48::ZERO,
+            token_balance: I80F48::ZERO,
+            serum3_max_reserved_token: I80F48::ZERO,
         };
         let default_perp_info = |x| PerpInfo {
             perp_market_index: 0,
