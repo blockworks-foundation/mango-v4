@@ -43,6 +43,18 @@ struct Cli {
 
     #[clap(subcommand)]
     command: Command,
+
+    #[clap(long, env, default_value_t = 60)]
+    interval_update_banks: u64,
+
+    #[clap(long, env, default_value_t = 5)]
+    interval_consume_events: u64,
+
+    #[clap(long, env, default_value_t = 5)]
+    interval_update_funding: u64,
+
+    #[clap(long, env, default_value_t = 10)]
+    timeout: u64,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -76,7 +88,12 @@ fn main() -> Result<(), anyhow::Error> {
     };
 
     let mango_client = Arc::new(MangoClient::new_for_existing_account(
-        Client::new(cluster, commitment, &owner, Some(Duration::from_secs(10))),
+        Client::new(
+            cluster,
+            commitment,
+            &owner,
+            Some(Duration::from_secs(cli.timeout)),
+        ),
         cli.mango_account,
         owner,
     )?);
@@ -103,7 +120,13 @@ fn main() -> Result<(), anyhow::Error> {
     match cli.command {
         Command::Crank { .. } => {
             let client = mango_client.clone();
-            rt.block_on(crank::runner(client, debugging_handle))
+            rt.block_on(crank::runner(
+                client,
+                debugging_handle,
+                cli.interval_update_banks,
+                cli.interval_consume_events,
+                cli.interval_update_funding,
+            ))
         }
         Command::Taker { .. } => {
             let client = mango_client.clone();
