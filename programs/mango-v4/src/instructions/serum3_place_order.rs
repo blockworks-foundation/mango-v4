@@ -306,6 +306,7 @@ pub fn serum3_place_order(
         order_type: u8::try_from(order_type).unwrap().try_into().unwrap(),
         client_order_id,
         limit,
+        max_ts: i64::MAX,
     };
     cpi_place_order(ctx.accounts, order)?;
 
