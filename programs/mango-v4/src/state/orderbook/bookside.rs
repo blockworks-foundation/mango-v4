@@ -26,7 +26,7 @@ pub struct BookSideOrderHandle {
     pub order_tree: BookSideOrderTree,
 }
 
-#[account(zero_copy)]
+#[zero_copy]
 pub struct BookSide {
     pub fixed: OrderTree,
     pub oracle_pegged: OrderTree,

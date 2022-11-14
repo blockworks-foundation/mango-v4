@@ -2240,7 +2240,7 @@ impl PerpCreateMarketInstruction {
     ) -> Self {
         PerpCreateMarketInstruction {
             orderbook: solana
-                .create_account_for_type::<OrderBook>(&mango_v4::id())
+                .create_account_for_type::<Orderbook>(&mango_v4::id())
                 .await,
             event_queue: solana
                 .create_account_for_type::<EventQueue>(&mango_v4::id())

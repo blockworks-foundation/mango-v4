@@ -29,7 +29,7 @@ pub enum OrderTreeType {
 /// A binary tree on AnyNode::key()
 ///
 /// The key encodes the price in the top 64 bits.
-#[account(zero_copy)]
+#[zero_copy]
 pub struct OrderTree {
     // pub meta_data: MetaData,
     // todo: do we want this type at this level?

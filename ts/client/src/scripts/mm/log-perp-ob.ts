@@ -38,11 +38,15 @@ async function main() {
   await group.reloadAll(client);
 
   // Log OB
-  const perpMarket = group.getPerpMarketByName('BTC-PERP');
   while (true) {
     await new Promise((r) => setTimeout(r, 2000));
     console.clear();
+    await group.reloadAll(client);
+    const perpMarket = group.getPerpMarketByName('BTC-PERP');
+    console.log(`  perpMarket.uiPrice ${perpMarket.uiPrice}`);
+    console.log(``);
     console.log(await perpMarket.logOb(client));
+    console.log(``);
   }
 }
 

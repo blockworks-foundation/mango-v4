@@ -6,8 +6,8 @@ import {
   PublicKey,
   TransactionInstruction,
 } from '@solana/web3.js';
+import Binance from 'binance-api-node';
 import fs from 'fs';
-import { RestClient } from 'ftx-api';
 import path from 'path';
 import { Group } from '../../accounts/group';
 import { MangoAccount } from '../../accounts/mangoAccount';
@@ -68,9 +68,8 @@ type MarketContext = {
   asks: BookSide;
   lastBookUpdate: number;
 
-  ftxBid: number | undefined;
-  ftxAsk: number | undefined;
-  ftxLast: number | undefined;
+  binanceBid: number | undefined;
+  binanceAsk: number | undefined;
 
   sequenceAccount: PublicKey;
   sequenceAccountBump: number;
@@ -80,7 +79,7 @@ type MarketContext = {
   lastOrderUpdate: number;
 };
 
-const ftxClient = new RestClient();
+const binanceClient = Binance();
 
 function getPerpMarketAssetsToTradeOn(group: Group) {
   const allMangoGroupPerpMarketAssets = Array.from(
@@ -104,7 +103,9 @@ async function refreshState(
     group.reloadAll(client),
     mangoAccount.reload(client),
     ...Array.from(marketContexts.values()).map((mc) =>
-      ftxClient.getMarket(mc.perpMarket.name),
+      binanceClient.book({
+        symbol: mc.perpMarket.name.replace('-PERP', 'USDT'),
+      }),
     ),
   ]);
 
@@ -117,9 +118,8 @@ async function refreshState(
     mc.asks = await perpMarket.loadAsks(client);
     mc.lastBookUpdate = ts;
 
-    mc.ftxAsk = (result[i + 2] as any).result.ask;
-    mc.ftxBid = (result[i + 2] as any).result.bid;
-    mc.ftxLast = (result[i + 2] as any).result.last;
+    mc.binanceAsk = parseFloat((result[i + 2] as any).asks[0].price);
+    mc.binanceBid = parseFloat((result[i + 2] as any).bids[0].price);
   });
 
   return {
@@ -284,9 +284,8 @@ async function fullMarketMaker() {
       sentAskPrice: 0,
       lastOrderUpdate: 0,
 
-      ftxBid: undefined,
-      ftxAsk: undefined,
-      ftxLast: undefined,
+      binanceBid: undefined,
+      binanceAsk: undefined,
     });
   }
 
@@ -297,6 +296,7 @@ async function fullMarketMaker() {
   );
 
   // Load state first time
+  console.log(`Loading state first time`);
   let state = await refreshState(client, group, mangoAccount, marketContexts);
 
   // Add handler for e.g. CTRL+C
@@ -309,6 +309,7 @@ async function fullMarketMaker() {
   // Loop indefinitely
   while (control.isRunning) {
     try {
+      console.log(`Refreshing state`);
       refreshState(client, group, mangoAccount, marketContexts).then(
         (result) => (state = result),
       );
@@ -322,7 +323,7 @@ async function fullMarketMaker() {
           group,
           mc.perpMarket.perpMarketIndex,
         );
-        const mid = (mc.ftxBid! + mc.ftxAsk!) / 2;
+        const mid = (mc.binanceBid! + mc.binanceAsk!) / 2;
         if (mid) {
           pfQuoteValue += pos * mid;
         } else {
@@ -387,8 +388,8 @@ async function makeMarketUpdateInstructions(
   const perpMarketIndex = mc.perpMarket.perpMarketIndex;
   const perpMarket = mc.perpMarket;
 
-  const aggBid = mc.ftxBid;
-  const aggAsk = mc.ftxAsk;
+  const aggBid = mc.binanceBid;
+  const aggAsk = mc.binanceAsk;
   if (aggBid === undefined || aggAsk === undefined) {
     console.log(`No Aggregate Book for ${mc.perpMarket.name}!`);
     return [];
@@ -404,55 +405,28 @@ async function makeMarketUpdateInstructions(
   const sizePerc = mc.params.sizePerc;
   const quoteSize = equity * sizePerc;
   const size = quoteSize / fairValue;
+  // console.log(`equity ${equity}`);
+  // console.log(`sizePerc ${sizePerc}`);
+  // console.log(`fairValue ${fairValue}`);
+  // console.log(`size ${size}`);
   const basePos = mangoAccount.getPerpPositionUi(group, perpMarketIndex, true);
   const lean = (-leanCoeff * basePos) / size;
   const pfQuoteLeanCoeff = params.pfQuoteLeanCoeff || 0.001; // How much to move if pf pos is equal to equity
   const pfQuoteLean = (pfQuoteValue / equity) * -pfQuoteLeanCoeff;
-  const charge = (mc.params.charge || 0.0015) + aggSpread / 2;
+  const charge = (mc.params.charge || 0.0012) + aggSpread / 2;
   const bias = mc.params.bias;
-  const bidPrice = fairValue * (1 - charge + lean + bias + pfQuoteLean);
-  const askPrice = fairValue * (1 + charge + lean + bias + pfQuoteLean);
-  const modelBidPrice = perpMarket.uiPriceToLots(bidPrice);
+
+  const fairValueInlots = perpMarket.uiPriceToLots(fairValue);
+
   const nativeBidSize = perpMarket.uiBaseToLots(size);
-  const modelAskPrice = perpMarket.uiPriceToLots(askPrice);
   const nativeAskSize = perpMarket.uiBaseToLots(size);
 
   const bids = mc.bids;
   const asks = mc.asks;
   const bestBid = bids.best();
   const bestAsk = asks.best();
-  const bookAdjBid =
-    bestAsk !== undefined
-      ? BN.min(bestAsk.priceLots.sub(new BN(1)), modelBidPrice)
-      : modelBidPrice;
-  const bookAdjAsk =
-    bestBid !== undefined
-      ? BN.max(bestBid.priceLots.add(new BN(1)), modelAskPrice)
-      : modelAskPrice;
 
   let moveOrders = false;
-  if (mc.lastBookUpdate >= mc.lastOrderUpdate + 2) {
-    // If mango book was updated recently, then MangoAccount was also updated
-    const openOrders = await mangoAccount.loadPerpOpenOrdersForMarket(
-      client,
-      group,
-      perpMarketIndex,
-    );
-    moveOrders = openOrders.length < 2 || openOrders.length > 2;
-    for (const o of openOrders) {
-      const refPrice = o.side === 'buy' ? bookAdjBid : bookAdjAsk;
-      moveOrders =
-        moveOrders ||
-        Math.abs(o.priceLots.toNumber() / refPrice.toNumber() - 1) >
-          requoteThresh;
-    }
-  } else {
-    // If order was updated before MangoAccount, then assume that sent order already executed
-    moveOrders =
-      moveOrders ||
-      Math.abs(mc.sentBidPrice / bookAdjBid.toNumber() - 1) > requoteThresh ||
-      Math.abs(mc.sentAskPrice / bookAdjAsk.toNumber() - 1) > requoteThresh;
-  }
 
   // Start building the transaction
   const instructions: TransactionInstruction[] = [
@@ -468,70 +442,213 @@ async function makeMarketUpdateInstructions(
     await client.healthRegionBeginIx(group, mangoAccount, [], [perpMarket]),
   );
 
-  if (moveOrders) {
-    // Cancel all, requote
-    const cancelAllIx = await client.perpCancelAllOrdersIx(
+  const expiryTimestamp =
+    params.tif !== undefined ? Date.now() / 1000 + params.tif : 0;
+
+  if (params.oraclePegged) {
+    const uiOPegBidOffset = fairValue * (-charge + lean + bias + pfQuoteLean);
+    const uiOPegAskOffset = fairValue * (charge + lean + bias + pfQuoteLean);
+
+    const modelBidOPegOffset = perpMarket.uiPriceToLots(uiOPegBidOffset);
+    const modelAskOPegOffset = perpMarket.uiPriceToLots(uiOPegAskOffset);
+
+    const bookAdjBidOPegOffset =
+      bestAsk !== undefined &&
+      bestAsk.priceLots
+        .sub(new BN(1))
+        .lt(fairValueInlots.add(modelBidOPegOffset))
+        ? fairValueInlots.sub(bestAsk.priceLots.sub(new BN(1)))
+        : modelBidOPegOffset;
+    const bookAdjAskOPegOffset =
+      bestBid !== undefined &&
+      bestBid.priceLots
+        .add(new BN(1))
+        .gt(fairValueInlots.add(modelAskOPegOffset))
+        ? bestBid.priceLots.sub(new BN(1)).sub(fairValueInlots)
+        : modelAskOPegOffset;
+
+    const openOrders = await mangoAccount.loadPerpOpenOrdersForMarket(
+      client,
       group,
-      mangoAccount,
       perpMarketIndex,
-      10,
     );
 
-    const expiryTimestamp =
-      params.tif !== undefined ? Date.now() / 1000 + params.tif : 0;
+    moveOrders = openOrders.length < 2;
 
-    const placeBidIx = await client.perpPlaceOrderIx(
+    const placeBidOPegIx = await client.perpPlaceOrderPeggedIx(
       group,
       mangoAccount,
       perpMarketIndex,
       PerpOrderSide.bid,
-      perpMarket.priceLotsToUi(bookAdjBid),
+      perpMarket.priceLotsToUi(bookAdjBidOPegOffset),
+      perpMarket.priceLotsToUi(
+        fairValueInlots.mul(new BN(101)).div(new BN(100)),
+      ),
       perpMarket.baseLotsToUi(nativeBidSize),
       undefined,
       Date.now(),
-      PerpOrderType.postOnlySlide,
+      PerpOrderType.limit,
+      false,
       expiryTimestamp,
       20,
     );
 
-    const placeAskIx = await client.perpPlaceOrderIx(
+    const placeAskOPegIx = await client.perpPlaceOrderPeggedIx(
       group,
       mangoAccount,
       perpMarketIndex,
       PerpOrderSide.ask,
-      perpMarket.priceLotsToUi(bookAdjAsk),
+      perpMarket.priceLotsToUi(bookAdjAskOPegOffset),
+      perpMarket.priceLotsToUi(
+        fairValueInlots.mul(new BN(98)).div(new BN(100)),
+      ),
       perpMarket.baseLotsToUi(nativeAskSize),
       undefined,
       Date.now(),
-      PerpOrderType.postOnlySlide,
+      PerpOrderType.limit,
+      false,
       expiryTimestamp,
       20,
     );
 
-    instructions.push(cancelAllIx);
     const posAsTradeSizes = basePos / size;
+    // console.log(
+    //   `basePos ${basePos}, posAsTradeSizes ${posAsTradeSizes}, size ${size}`,
+    // );
+
     if (posAsTradeSizes < 15) {
-      instructions.push(placeBidIx);
+      instructions.push(placeBidOPegIx);
     }
     if (posAsTradeSizes > -15) {
-      instructions.push(placeAskIx);
+      instructions.push(placeAskOPegIx);
     }
-    console.log(
-      `Requoting for market ${mc.perpMarket.name} sentBid: ${
-        mc.sentBidPrice
-      } newBid: ${bookAdjBid} sentAsk: ${
-        mc.sentAskPrice
-      } newAsk: ${bookAdjAsk} pfLean: ${(pfQuoteLean * 10000).toFixed(
-        1,
-      )} aggBid: ${aggBid} addAsk: ${aggAsk}`,
+
+    const approxOPegBidPrice = perpMarket.priceLotsToUi(
+      fairValueInlots.add(bookAdjBidOPegOffset),
     );
-    mc.sentBidPrice = bookAdjBid.toNumber();
-    mc.sentAskPrice = bookAdjAsk.toNumber();
-    mc.lastOrderUpdate = Date.now() / 1000;
+    const approxOPegAskPrice = perpMarket.priceLotsToUi(
+      fairValueInlots.add(bookAdjAskOPegOffset),
+    );
+
+    if (posAsTradeSizes < 15 || posAsTradeSizes > -15) {
+      console.log(
+        `Requoting for market ${mc.perpMarket.name} sentBid: ${
+          mc.sentBidPrice
+        } newBid: ${approxOPegBidPrice} sentAsk: ${
+          mc.sentAskPrice
+        } newAsk: ${approxOPegAskPrice} pfLean: ${(pfQuoteLean * 10000).toFixed(
+          1,
+        )} aggBid: ${aggBid} addAsk: ${aggAsk}`,
+      );
+      mc.sentBidPrice = approxOPegAskPrice;
+      mc.sentAskPrice = approxOPegAskPrice;
+      mc.lastOrderUpdate = Date.now() / 1000;
+    }
   } else {
-    console.log(
-      `Not requoting for market ${mc.perpMarket.name}. No need to move orders`,
-    );
+    const uiBidPrice = fairValue * (1 - charge + lean + bias + pfQuoteLean);
+    const uiAskPrice = fairValue * (1 + charge + lean + bias + pfQuoteLean);
+
+    const modelBidPrice = perpMarket.uiPriceToLots(uiBidPrice);
+    const modelAskPrice = perpMarket.uiPriceToLots(uiAskPrice);
+
+    const bookAdjBid =
+      bestAsk !== undefined
+        ? BN.min(bestAsk.priceLots.sub(new BN(1)), modelBidPrice)
+        : modelBidPrice;
+    const bookAdjAsk =
+      bestBid !== undefined
+        ? BN.max(bestBid.priceLots.add(new BN(1)), modelAskPrice)
+        : modelAskPrice;
+
+    if (mc.lastBookUpdate >= mc.lastOrderUpdate + 2) {
+      // If mango book was updated recently, then MangoAccount was also updated
+      const openOrders = await mangoAccount.loadPerpOpenOrdersForMarket(
+        client,
+        group,
+        perpMarketIndex,
+      );
+      moveOrders = openOrders.length < 2 || openOrders.length > 2;
+      for (const o of openOrders) {
+        const refPrice = o.side === 'buy' ? bookAdjBid : bookAdjAsk;
+        moveOrders =
+          moveOrders ||
+          Math.abs(o.priceLots.toNumber() / refPrice.toNumber() - 1) >
+            requoteThresh;
+      }
+    } else {
+      // If order was updated before MangoAccount, then assume that sent order already executed
+      moveOrders =
+        moveOrders ||
+        Math.abs(mc.sentBidPrice / bookAdjBid.toNumber() - 1) > requoteThresh ||
+        Math.abs(mc.sentAskPrice / bookAdjAsk.toNumber() - 1) > requoteThresh;
+    }
+
+    if (moveOrders) {
+      // Cancel all, requote
+      const cancelAllIx = await client.perpCancelAllOrdersIx(
+        group,
+        mangoAccount,
+        perpMarketIndex,
+        10,
+      );
+
+      const placeBidIx = await client.perpPlaceOrderIx(
+        group,
+        mangoAccount,
+        perpMarketIndex,
+        PerpOrderSide.bid,
+        perpMarket.priceLotsToUi(bookAdjBid),
+        perpMarket.baseLotsToUi(nativeBidSize),
+        undefined,
+        Date.now(),
+        PerpOrderType.postOnlySlide,
+        false,
+        expiryTimestamp,
+        20,
+      );
+
+      const placeAskIx = await client.perpPlaceOrderIx(
+        group,
+        mangoAccount,
+        perpMarketIndex,
+        PerpOrderSide.ask,
+        perpMarket.priceLotsToUi(bookAdjAsk),
+        perpMarket.baseLotsToUi(nativeAskSize),
+        undefined,
+        Date.now(),
+        PerpOrderType.postOnlySlide,
+        false,
+        expiryTimestamp,
+        20,
+      );
+
+      const posAsTradeSizes = basePos / size;
+
+      instructions.push(cancelAllIx);
+      if (posAsTradeSizes < 15) {
+        instructions.push(placeBidIx);
+      }
+      if (posAsTradeSizes > -15) {
+        instructions.push(placeAskIx);
+      }
+
+      console.log(
+        `Requoting for market ${mc.perpMarket.name} sentBid: ${
+          mc.sentBidPrice
+        } newBid: ${bookAdjBid} sentAsk: ${
+          mc.sentAskPrice
+        } newAsk: ${bookAdjAsk} pfLean: ${(pfQuoteLean * 10000).toFixed(
+          1,
+        )} aggBid: ${aggBid} addAsk: ${aggAsk}`,
+      );
+      mc.sentBidPrice = bookAdjBid.toNumber();
+      mc.sentAskPrice = bookAdjAsk.toNumber();
+      mc.lastOrderUpdate = Date.now() / 1000;
+    } else {
+      console.log(
+        `Not requoting for market ${mc.perpMarket.name}. No need to move orders`,
+      );
+    }
   }
 
   instructions.push(
@@ -547,8 +664,14 @@ async function makeMarketUpdateInstructions(
 }
 
 function startMarketMaker() {
-  if (control.isRunning) {
-    fullMarketMaker().finally(startMarketMaker);
+  try {
+    if (control.isRunning) {
+      fullMarketMaker()
+        .catch((error) => console.log(error))
+        .finally(startMarketMaker);
+    }
+  } catch (error) {
+    console.log(error);
   }
 }
 
