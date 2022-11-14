@@ -122,7 +122,11 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     )?;
 
     let native_position_after = position.native(&bank);
-    let oracle_price = bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
+    let now_slot = Clock::get()?.slot;
+    let oracle_price = bank.oracle_price(
+        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        Some(now_slot),
+    )?;
 
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),

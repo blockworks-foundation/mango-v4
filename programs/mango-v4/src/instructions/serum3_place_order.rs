@@ -133,7 +133,11 @@ pub enum Serum3Side {
 
 #[derive(Accounts)]
 pub struct Serum3PlaceOrder<'info> {
+    #[account(
+        has_one = msrm_vault
+    )]
     pub group: AccountLoader<'info, Group>,
+    pub msrm_vault: Account<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -492,6 +496,7 @@ fn cpi_place_order(ctx: &Serum3PlaceOrder, order: NewOrderInstructionV3) -> Resu
         open_orders: ctx.open_orders.to_account_info(),
         order_payer_token_account: ctx.payer_vault.to_account_info(),
         user_authority: ctx.group.to_account_info(),
+        msrm_vault: ctx.msrm_vault.to_account_info(),
     }
     .call(&group, order)
 }

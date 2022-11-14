@@ -217,17 +217,16 @@ impl SolanaCookie {
     }
 
     pub async fn get_account_opt<T: AccountDeserialize>(&self, address: Pubkey) -> Option<T> {
-        self.context
-            .borrow_mut()
-            .banks_client
-            .get_account(address)
-            .await
-            .unwrap()
-            .unwrap();
-
         let data = self.get_account_data(address).await?;
         let mut data_slice: &[u8] = &data;
         AccountDeserialize::try_deserialize(&mut data_slice).ok()
+    }
+
+    // Use when accounts are too big for the stack
+    pub async fn get_account_boxed<T: AccountDeserialize>(&self, address: Pubkey) -> Box<T> {
+        let data = self.get_account_data(address).await.unwrap();
+        let mut data_slice: &[u8] = &data;
+        Box::new(AccountDeserialize::try_deserialize(&mut data_slice).unwrap())
     }
 
     pub async fn get_account<T: AccountDeserialize>(&self, address: Pubkey) -> T {

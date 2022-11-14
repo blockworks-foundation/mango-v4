@@ -18,7 +18,7 @@ use crate::state::{
 use crate::util::checked_math as cm;
 
 #[cfg(feature = "client")]
-use crate::state::orderbook::order_type::Side as PerpOrderSide;
+use crate::state::orderbook::Side as PerpOrderSide;
 
 use super::MangoAccountRef;
 
@@ -65,6 +65,7 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
     pub n_perps: usize,
     pub begin_perp: usize,
     pub begin_serum3: usize,
+    pub staleness_slot: Option<u64>,
 }
 
 pub fn new_fixed_order_account_retriever<'a, 'info>(
@@ -85,6 +86,7 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
         n_perps: active_perp_len,
         begin_perp: cm!(active_token_len * 2),
         begin_serum3: cm!(active_token_len * 2 + active_perp_len * 2),
+        staleness_slot: Some(Clock::get()?.slot),
     })
 }
 
@@ -111,12 +113,12 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
 
     fn oracle_price(&self, account_index: usize, bank: &Bank) -> Result<I80F48> {
         let oracle = &self.ais[cm!(self.n_banks + account_index)];
-        bank.oracle_price(oracle)
+        bank.oracle_price(oracle, self.staleness_slot)
     }
 
     fn oracle_price_perp(&self, account_index: usize, perp_market: &PerpMarket) -> Result<I80F48> {
         let oracle = &self.ais[self.begin_perp + self.n_perps + account_index];
-        perp_market.oracle_price(oracle)
+        perp_market.oracle_price(oracle, self.staleness_slot)
     }
 }
 
@@ -210,6 +212,7 @@ pub struct ScanningAccountRetriever<'a, 'info> {
     serum3_oos: Vec<AccountInfoRef<'a, 'info>>,
     token_index_map: HashMap<TokenIndex, usize>,
     perp_index_map: HashMap<PerpMarketIndex, usize>,
+    staleness_slot: Option<u64>,
 }
 
 // Returns None if `ai` doesn't have the owner or discriminator for T
@@ -232,6 +235,14 @@ fn can_load_as<'a, T: ZeroCopy + Owner>(
 
 impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
     pub fn new(ais: &'a [AccountInfo<'info>], group: &Pubkey) -> Result<Self> {
+        Self::new_with_staleness(ais, group, Some(Clock::get()?.slot))
+    }
+
+    pub fn new_with_staleness(
+        ais: &'a [AccountInfo<'info>],
+        group: &Pubkey,
+        staleness_slot: Option<u64>,
+    ) -> Result<Self> {
         // find all Bank accounts
         let mut token_index_map = HashMap::with_capacity(ais.len() / 2);
         ais.iter()
@@ -283,6 +294,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
             serum3_oos: AccountInfoRef::borrow_slice(&ais[serum3_start..])?,
             token_index_map,
             perp_index_map,
+            staleness_slot,
         })
     }
 
@@ -312,7 +324,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
             let index = self.bank_index(token_index1)?;
             let bank = self.banks[index].load_mut_fully_unchecked::<Bank>()?;
             let oracle = &self.oracles[index];
-            let price = bank.oracle_price(oracle)?;
+            let price = bank.oracle_price(oracle, self.staleness_slot)?;
             return Ok((bank, price, None));
         }
         let index1 = self.bank_index(token_index1)?;
@@ -330,8 +342,8 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         let bank2 = second_bank_part[second - (first + 1)].load_mut_fully_unchecked::<Bank>()?;
         let oracle1 = &self.oracles[first];
         let oracle2 = &self.oracles[second];
-        let price1 = bank1.oracle_price(oracle1)?;
-        let price2 = bank2.oracle_price(oracle2)?;
+        let price1 = bank1.oracle_price(oracle1, self.staleness_slot)?;
+        let price2 = bank2.oracle_price(oracle2, self.staleness_slot)?;
         if swap {
             Ok((bank2, price2, Some((bank1, price1))))
         } else {
@@ -343,7 +355,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         let index = self.bank_index(token_index)?;
         let bank = self.banks[index].load_fully_unchecked::<Bank>()?;
         let oracle = &self.oracles[index];
-        Ok((bank, bank.oracle_price(oracle)?))
+        Ok((bank, bank.oracle_price(oracle, self.staleness_slot)?))
     }
 
     pub fn scanned_perp_market_and_oracle(
@@ -353,7 +365,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         let index = self.perp_market_index(perp_market_index)?;
         let perp_market = self.perp_markets[index].load_fully_unchecked::<PerpMarket>()?;
         let oracle_acc = &self.perp_oracles[index];
-        let oracle_price = perp_market.oracle_price(oracle_acc)?;
+        let oracle_price = perp_market.oracle_price(oracle_acc, self.staleness_slot)?;
         Ok((perp_market, oracle_price))
     }
 
@@ -1481,7 +1493,7 @@ mod tests {
             oo1.as_account_info(),
         ];
 
-        let retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
+        let retriever = ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
 
         // for bank1/oracle1, including open orders (scenario: bids execute)
         let health1 = (100.0 + 1.0 + 2.0 + (20.0 + 15.0 * 5.0)) * 0.8;
@@ -1532,7 +1544,8 @@ mod tests {
             oo1.as_account_info(),
         ];
 
-        let mut retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
+        let mut retriever =
+            ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
 
         assert_eq!(retriever.banks.len(), 3);
         assert_eq!(retriever.token_index_map.len(), 3);
@@ -1678,7 +1691,7 @@ mod tests {
             oo2.as_account_info(),
         ];
 
-        let retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
+        let retriever = ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
 
         assert!(health_eq(
             compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
@@ -2166,7 +2179,7 @@ mod tests {
             oracle1_ai,
         ];
 
-        let retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
+        let retriever = ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
 
         assert!(health_eq(
             compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
@@ -2207,7 +2220,7 @@ mod tests {
             oo1.as_account_info(),
         ];
 
-        let retriever = ScanningAccountRetriever::new(&ais, &group).unwrap();
+        let retriever = ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
         let result = retriever.perp_market_and_oracle_price(&group, 0, 9);
         assert!(result.is_err());
     }
