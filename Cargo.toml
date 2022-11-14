@@ -13,3 +13,4 @@ members = [
 # for gzip encoded responses
 jsonrpc-core-client = { git = "https://github.com/ckamm/jsonrpc.git", branch = "ckamm/http-with-gzip" }
 anchor-spl = { path = "./anchor/spl/" }
+anchor-lang = { path = "./anchor/lang/" }
