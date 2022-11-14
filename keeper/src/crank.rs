@@ -309,8 +309,7 @@ pub async fn loop_update_funding(
                         &mango_v4::accounts::PerpUpdateFunding {
                             group: perp_market.group,
                             perp_market: pk,
-                            asks: perp_market.asks,
-                            bids: perp_market.bids,
+                            orderbook: perp_market.orderbook,
                             oracle: perp_market.oracle,
                         },
                         None,

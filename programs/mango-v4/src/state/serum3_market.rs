@@ -26,7 +26,7 @@ pub struct Serum3Market {
 
     pub padding2: [u8; 5],
 
-    pub registration_time: i64,
+    pub registration_time: u64,
 
     pub reserved: [u8; 128],
 }

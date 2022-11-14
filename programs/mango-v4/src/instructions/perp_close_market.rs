@@ -15,8 +15,7 @@ pub struct PerpCloseMarket<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = bids,
-        has_one = asks,
+        has_one = orderbook,
         has_one = event_queue,
         close = sol_destination
     )]
@@ -26,13 +25,7 @@ pub struct PerpCloseMarket<'info> {
         mut,
         close = sol_destination
     )]
-    pub bids: AccountLoader<'info, BookSide>,
-
-    #[account(
-        mut,
-        close = sol_destination
-    )]
-    pub asks: AccountLoader<'info, BookSide>,
+    pub orderbook: AccountLoader<'info, OrderBook>,
 
     #[account(
         mut,

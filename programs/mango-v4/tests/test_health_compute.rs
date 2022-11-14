@@ -203,13 +203,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     //
     let mut perp_markets = vec![];
     for (perp_market_index, token) in tokens[1..].iter().enumerate() {
-        let mango_v4::accounts::PerpCreateMarket {
-            perp_market,
-            asks,
-            bids,
-            event_queue,
-            ..
-        } = send_tx(
+        let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
             solana,
             PerpCreateMarketInstruction {
                 group,
@@ -231,18 +225,18 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
         .await
         .unwrap();
 
-        perp_markets.push((perp_market, asks, bids, event_queue));
+        perp_markets.push(perp_market);
     }
 
     let price_lots = {
-        let perp_market = solana.get_account::<PerpMarket>(perp_markets[0].0).await;
+        let perp_market = solana.get_account::<PerpMarket>(perp_markets[0]).await;
         perp_market.native_price_to_lot(I80F48::from(1))
     };
 
     //
     // TEST: Create a perp order for each market
     //
-    for (i, &(perp_market, _asks, _bids, _event_queue)) in perp_markets.iter().enumerate() {
+    for (i, &perp_market) in perp_markets.iter().enumerate() {
         println!("adding market {}", i);
         send_tx(
             solana,

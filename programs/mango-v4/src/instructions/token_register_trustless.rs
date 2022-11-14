@@ -78,9 +78,6 @@ pub fn token_register_trustless(
         mint: ctx.accounts.mint.key(),
         vault: ctx.accounts.vault.key(),
         oracle: ctx.accounts.oracle.key(),
-        oracle_config: OracleConfig {
-            conf_filter: I80F48::from_num(0.10),
-        },
         deposit_index: INDEX_START,
         borrow_index: INDEX_START,
         cached_indexed_total_deposits: I80F48::ZERO,
@@ -112,7 +109,13 @@ pub fn token_register_trustless(
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
-        reserved: [0; 2560],
+        oracle_conf_filter: I80F48::from_num(0.10),
+        oracle_config: OracleConfig {
+            conf_filter: I80F48::from_num(0.10),
+            max_staleness_slots: -1,
+            reserved: [0; 72],
+        },
+        reserved: [0; 2464],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
@@ -126,7 +129,7 @@ pub fn token_register_trustless(
         banks: Default::default(),
         vaults: Default::default(),
         oracle: ctx.accounts.oracle.key(),
-        registration_time: Clock::get()?.unix_timestamp,
+        registration_time: Clock::get()?.unix_timestamp.try_into().unwrap(),
         reserved: [0; 2560],
     };
 
