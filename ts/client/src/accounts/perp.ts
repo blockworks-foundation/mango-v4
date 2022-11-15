@@ -210,31 +210,22 @@ export class PerpMarket {
   private async loadOrderbook(
     client: MangoClient,
     forceReload = false,
-  ): Promise<void> {
+  ): Promise<Orderbook> {
     if (forceReload || !this._orderbook)
       this._orderbook = await client.program.account.orderbook.fetch(
         this.orderbook,
       );
+    return this._orderbook;
   }
 
   public async loadAsks(client: MangoClient): Promise<BookSide> {
     await this.loadOrderbook(client);
-    return BookSide.from(
-      client,
-      this,
-      BookSideType.asks,
-      (this._orderbook as Orderbook).asks,
-    );
+    return BookSide.from(client, this, BookSideType.asks, this._orderbook.asks);
   }
 
   public async loadBids(client: MangoClient): Promise<BookSide> {
     await this.loadOrderbook(client);
-    return BookSide.from(
-      client,
-      this,
-      BookSideType.bids,
-      (this._orderbook as Orderbook).bids,
-    );
+    return BookSide.from(client, this, BookSideType.bids, this._orderbook.bids);
   }
 
   public async loadEventQueue(client: MangoClient): Promise<PerpEventQueue> {
@@ -468,8 +459,16 @@ export class BookSide {
    * iterates over all orders
    */
   public *items(): Generator<PerpOrder> {
-    function isBetter(type, a, b): boolean {
-      return type === BookSideType.bids ? a > b : b < a;
+    function isBetter(
+      type: PerpOrderSide,
+      a: PerpOrder,
+      b: PerpOrder,
+    ): boolean {
+      return a.priceLots.eq(b.priceLots)
+        ? a.seqNum.lt(b.seqNum) // if prices are equal prefer perp orders in the order they are placed
+        : type === BookSideType.bids // else compare the actual prices
+        ? a.priceLots.gt(b.priceLots)
+        : b.priceLots.gt(a.priceLots);
     }
 
     const fGen = this.fixedItems();
@@ -480,7 +479,7 @@ export class BookSide {
 
     while (true) {
       if (fOrderRes.value && oPegOrderRes.value) {
-        if (isBetter(this.type, fOrderRes.value.key, oPegOrderRes.value.key)) {
+        if (isBetter(this.type, fOrderRes.value, oPegOrderRes.value)) {
           yield fOrderRes.value;
           fOrderRes = fGen.next();
         } else {
@@ -511,9 +510,9 @@ export class BookSide {
       if (itemsRes.value) {
         const val = itemsRes.value;
         if (
-          !val.isExpired ||
-          !val.isOraclePegged ||
-          (val.isOraclePegged && !val.oraclePeggedProperties.isInvalid)
+          !val.isExpired &&
+          (!val.isOraclePegged ||
+            (val.isOraclePegged && !val.oraclePeggedProperties.isInvalid))
         ) {
           yield val;
         }
@@ -719,16 +718,16 @@ export class PerpOrder {
   ): PerpOrder {
     const side =
       type == BookSideType.bids ? PerpOrderSide.bid : PerpOrderSide.ask;
-    let price;
+    let priceLots;
     let oraclePeggedProperties;
     if (isOraclePegged) {
       const priceData = leafNode.key.ushrn(64);
       const priceOffset = priceData.sub(new BN(1).ushln(63));
-      price = perpMarket.uiPriceToLots(perpMarket.uiPrice).add(priceOffset);
+      priceLots = perpMarket.uiPriceToLots(perpMarket.uiPrice).add(priceOffset);
       const isInvalid =
         type === BookSideType.bids
-          ? price.gt(leafNode.pegLimit)
-          : leafNode.pegLimit.gt(price);
+          ? priceLots.gt(leafNode.pegLimit)
+          : leafNode.pegLimit.gt(priceLots);
       oraclePeggedProperties = {
         isInvalid,
         priceOffset,
@@ -737,32 +736,35 @@ export class PerpOrder {
         uiPegLimit: perpMarket.priceLotsToUi(leafNode.pegLimit),
       } as OraclePeggedProperties;
     } else {
-      price = BookSide.getPriceFromKey(leafNode.key);
+      priceLots = BookSide.getPriceFromKey(leafNode.key);
     }
     const expiryTimestamp = leafNode.timeInForce
       ? leafNode.timestamp.add(new BN(leafNode.timeInForce))
       : U64_MAX_BN;
 
     return new PerpOrder(
+      leafNode.key.maskn(64),
       leafNode.key,
       leafNode.clientOrderId,
       leafNode.owner,
       leafNode.ownerSlot,
       0,
-      perpMarket.priceLotsToUi(price),
-      price,
+      perpMarket.priceLotsToUi(priceLots),
+      priceLots,
       perpMarket.baseLotsToUi(leafNode.quantity),
       leafNode.quantity,
       side,
       leafNode.timestamp,
       expiryTimestamp,
       perpMarket.perpMarketIndex,
+      isExpired,
       isOraclePegged,
       oraclePeggedProperties,
     );
   }
 
   constructor(
+    public seqNum: BN,
     public orderId: BN,
     public clientId: BN,
     public owner: PublicKey,
@@ -776,6 +778,7 @@ export class PerpOrder {
     public timestamp: BN,
     public expiryTimestamp: BN,
     public perpMarketIndex: number,
+    public isExpired = false,
     public isOraclePegged = false,
     public oraclePeggedProperties?: OraclePeggedProperties,
   ) {}

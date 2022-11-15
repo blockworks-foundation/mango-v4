@@ -5,12 +5,6 @@ import { I80F48 } from './I80F48';
 
 describe('Math', () => {
   it('js number to BN and I80F48', () => {
-    const x = { a: 1, b: { c: undefined } };
-    const y = x.b.c !== undefined ? 1 : 2;
-    console.log(y);
-    const z = x.b?.c ? 1 : 2;
-    console.log(z);
-
     // BN can be only be created from js numbers which are <=2^53
     expect(function () {
       new BN(0x1fffffffffffff);
