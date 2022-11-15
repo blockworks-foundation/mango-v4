@@ -6,6 +6,7 @@ import { MangoAccount } from '../../accounts/mangoAccount';
 import { PerpMarket, PerpOrderSide, PerpOrderType } from '../../accounts/perp';
 import { MangoClient } from '../../client';
 import { MANGO_V4_ID } from '../../constants';
+import { ZERO_I80F48 } from '../../numbers/I80F48';
 import { toUiDecimalsForQuote } from '../../utils';
 
 // For easy switching between mainnet and devnet, default is mainnet
@@ -16,6 +17,60 @@ const CLUSTER_URL =
 const USER_KEYPAIR =
   process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
 const MANGO_ACCOUNT_PK = process.env.MANGO_ACCOUNT_PK || '';
+
+async function settlePnl(
+  mangoAccount: MangoAccount,
+  perpMarket: PerpMarket,
+  client: MangoClient,
+  group: Group,
+) {
+  if (!mangoAccount.perpPositionExistsForMarket(perpMarket)) {
+    return;
+  }
+
+  const pp = mangoAccount
+    .perpActive()
+    .find((pp) => pp.marketIndex === perpMarket.perpMarketIndex)!;
+  const pnl = pp.getPnl(perpMarket);
+
+  let profitableAccount, unprofitableAccount;
+
+  if (pnl.gt(ZERO_I80F48())) {
+    profitableAccount = mangoAccount;
+    unprofitableAccount = (
+      await perpMarket.getSettlePnlCandidates(client, group, 'negative')
+    )[0].account;
+    const sig = await client.perpSettlePnl(
+      group,
+      profitableAccount,
+      unprofitableAccount,
+      mangoAccount,
+      perpMarket.perpMarketIndex,
+    );
+    console.log(
+      `Settled pnl, sig https://explorer.solana.com/tx/${sig}?cluster=${
+        CLUSTER == 'devnet' ? 'devnet' : ''
+      }`,
+    );
+  } else if (pnl.lt(ZERO_I80F48())) {
+    unprofitableAccount = mangoAccount;
+    profitableAccount = (
+      await perpMarket.getSettlePnlCandidates(client, group, 'positive')
+    )[0].account;
+    const sig = await client.perpSettlePnl(
+      group,
+      profitableAccount,
+      unprofitableAccount,
+      mangoAccount,
+      perpMarket.perpMarketIndex,
+    );
+    console.log(
+      `Settled pnl, sig https://explorer.solana.com/tx/${sig}?cluster=${
+        CLUSTER == 'devnet' ? 'devnet' : ''
+      }`,
+    );
+  }
+}
 
 async function takeOrder(
   client: MangoClient,
@@ -105,6 +160,11 @@ async function main() {
   // Take on OB
   const perpMarket = group.getPerpMarketByName('BTC-PERP');
   while (true) {
+    await group.reloadAll(client);
+
+    // Settle pnl
+    await settlePnl(mangoAccount, perpMarket, client, group);
+
     await takeOrder(client, group, mangoAccount, perpMarket, PerpOrderSide.bid);
     await takeOrder(client, group, mangoAccount, perpMarket, PerpOrderSide.ask);
   }

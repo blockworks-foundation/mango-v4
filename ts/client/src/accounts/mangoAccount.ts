@@ -142,6 +142,12 @@ export class MangoAccount {
     return this.serum3.filter((serum3) => serum3.isActive());
   }
 
+  public perpPositionExistsForMarket(perpMarket: PerpMarket): boolean {
+    return this.perps.some(
+      (pp) => pp.isActive() && pp.marketIndex == perpMarket.perpMarketIndex,
+    );
+  }
+
   public perpActive(): PerpPosition[] {
     return this.perps.filter((perp) => perp.isActive());
   }
@@ -266,6 +272,11 @@ export class MangoAccount {
   public getHealth(group: Group, healthType: HealthType): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc.health(healthType);
+  }
+
+  public getPerpSettleHealth(group: Group): I80F48 {
+    const hc = HealthCache.fromMangoAccount(group, this);
+    return hc.perpSettleHealth();
   }
 
   /**
@@ -1233,6 +1244,14 @@ export class PerpPosition {
     return this.quoteRunningNative
       .div(this.basePositionLots.mul(perpMarket.baseLotSize))
       .abs();
+  }
+
+  public getPnl(perpMarket: PerpMarket): I80F48 {
+    return this.quotePositionNative.add(
+      I80F48.fromI64(this.basePositionLots.mul(perpMarket.baseLotSize)).mul(
+        perpMarket.price,
+      ),
+    );
   }
 }
 

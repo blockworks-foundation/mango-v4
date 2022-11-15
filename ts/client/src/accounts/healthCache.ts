@@ -134,6 +134,34 @@ export class HealthCache {
     return health;
   }
 
+  // Note: only considers positive perp pnl contributions, see program code for more reasoning
+  public perpSettleHealth(): I80F48 {
+    const health = ZERO_I80F48();
+    for (const tokenInfo of this.tokenInfos) {
+      const contrib = tokenInfo.healthContribution(HealthType.maint);
+      // console.log(` - ti ${contrib}`);
+      health.iadd(contrib);
+    }
+    for (const serum3Info of this.serum3Infos) {
+      const contrib = serum3Info.healthContribution(
+        HealthType.maint,
+        this.tokenInfos,
+      );
+      // console.log(` - si ${contrib}`);
+      health.iadd(contrib);
+    }
+    for (const perpInfo of this.perpInfos) {
+      if (perpInfo.trustedMarket) {
+        const positiveContrib = perpInfo
+          .healthContribution(HealthType.maint)
+          .max(ZERO_I80F48());
+        // console.log(` - pi ${positiveContrib}`);
+        health.iadd(positiveContrib);
+      }
+    }
+    return health;
+  }
+
   public assets(healthType: HealthType): I80F48 {
     const assets = ZERO_I80F48();
     for (const tokenInfo of this.tokenInfos) {

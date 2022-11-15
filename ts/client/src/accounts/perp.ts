@@ -3,9 +3,11 @@ import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import Big from 'big.js';
 import { MangoClient } from '../client';
-import { I80F48, I80F48Dto } from '../numbers/I80F48';
+import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
 import { As, toNative, U64_MAX_BN } from '../utils';
 import { OracleConfig, QUOTE_DECIMALS, TokenIndex } from './bank';
+import { Group } from './group';
+import { MangoAccount } from './mangoAccount';
 
 export type PerpMarketIndex = number & As<'perp-market-index'>;
 
@@ -327,6 +329,90 @@ export class PerpMarket {
 
   public quoteLotsToUi(quantity: BN): number {
     return parseFloat(quantity.toString()) * this.quoteLotsToUiConverter;
+  }
+
+  /**
+   * Returns a list of (upto count) accounts, and the pnl that is settle'able on this perp market,
+   * the list is sorted ascending for 'negative' direction and descending for 'positive' direction.
+   *
+   * NOTE: keep in sync with perp_pnl.rs:fetch_top
+   *
+   * TODO: replace with a more performant offchain service call
+   * @param client
+   * @param group
+   * @param direction
+   * @returns
+   */
+  public async getSettlePnlCandidates(
+    client: MangoClient,
+    group: Group,
+    direction: 'negative' | 'positive',
+    count = 2,
+  ): Promise<{ account: MangoAccount; settleablePnl: I80F48 }[]> {
+    let accs = (await client.getAllMangoAccounts(group))
+      .filter((acc) =>
+        // need a perp position in this market
+        acc.perpPositionExistsForMarket(this),
+      )
+      .map((acc) => {
+        return {
+          account: acc,
+          settleablePnl: acc
+            .perpActive()
+            .find((pp) => pp.marketIndex === this.perpMarketIndex)!
+            .getPnl(this),
+        };
+      });
+
+    accs = accs
+      .filter(
+        (acc) =>
+          // need perp positions with -ve pnl to settle +ve pnl and vice versa
+          (direction === 'negative' && acc.settleablePnl.lt(ZERO_I80F48())) ||
+          (direction === 'positive' && acc.settleablePnl.gt(ZERO_I80F48())),
+      )
+      .sort((a, b) =>
+        direction === 'negative'
+          ? // most negative
+            a.settleablePnl.cmp(b.settleablePnl)
+          : // most positive
+            b.settleablePnl.cmp(a.settleablePnl),
+      );
+
+    if (direction === 'negative') {
+      let stable = 0;
+      for (let i = 0; i < accs.length; i++) {
+        const acc = accs[i];
+        const nextPnl =
+          i + 1 < accs.length ? accs[i + 1].settleablePnl : ZERO_I80F48();
+
+        const perpSettleHealth = acc.account.getPerpSettleHealth(group);
+        acc.settleablePnl =
+          // need positive health to settle against +ve pnl
+          perpSettleHealth.gt(ZERO_I80F48()) && !acc.account.beingLiquidated
+            ? // can only settle min
+              acc.settleablePnl.max(perpSettleHealth.neg())
+            : ZERO_I80F48();
+
+        // If the ordering was unchanged `count` times we know we have the top `count` accounts
+        if (acc.settleablePnl.lte(nextPnl)) {
+          stable += 1;
+          if (stable >= count) {
+            break;
+          }
+        }
+      }
+    }
+
+    accs.sort((a, b) =>
+      direction === 'negative'
+        ? // most negative
+          a.settleablePnl.cmp(b.settleablePnl)
+        : // most positive
+          b.settleablePnl.cmp(a.settleablePnl),
+    );
+
+    return accs.slice(0, count);
   }
 
   toString(): string {
