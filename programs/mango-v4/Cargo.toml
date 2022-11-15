@@ -35,7 +35,7 @@ mango-macro = { path = "../../mango-macro" }
 num_enum = "0.5.1"
 pyth-sdk-solana = "0.1.0"
 serde = "^1.0"
-serum_dex = { version = "0.4.0", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false,features = ["no-entrypoint", "program"], branch = "v4-compat" }
+serum_dex = { version = "0.5.6", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false,features = ["no-entrypoint", "program"], branch = "ckamm/find_by_key" }
 solana-address-lookup-table-program = "~1.10.35"
 solana-program = "~1.10.35"
 solana-sdk = { version = "~1.10.35", default-features = false, optional = true }
