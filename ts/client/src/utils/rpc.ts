@@ -1,9 +1,11 @@
-import { AnchorProvider } from '@project-serum/anchor';
+import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import {
   AddressLookupTableAccount,
+  Signer,
   Transaction,
   TransactionInstruction,
 } from '@solana/web3.js';
+import { buildVersionedTx } from '../utils';
 
 export async function sendTransaction(
   provider: AnchorProvider,
@@ -17,16 +19,25 @@ export async function sendTransaction(
   );
 
   const payer = (provider as AnchorProvider).wallet;
-  // const tx = await buildVersionedTx(provider, ixs, opts.additionalSigners, alts);
-  const tx = new Transaction();
-  tx.recentBlockhash = latestBlockhash.blockhash;
-  tx.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
-  tx.feePayer = payer.publicKey;
-  tx.add(...ixs);
-  if (opts.additionalSigners?.length > 0) {
-    tx.partialSign(...opts.additionalSigners);
+  const tx = await buildVersionedTx(
+    provider,
+    ixs,
+    opts.additionalSigners,
+    alts,
+  );
+  // const tx = new Transaction();
+  // tx.recentBlockhash = latestBlockhash.blockhash;
+  // tx.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
+  // tx.feePayer = payer.publicKey;
+  // tx.add(...ixs);
+  // if (opts.additionalSigners?.length > 0) {
+  //   tx.partialSign(...opts.additionalSigners);
+  // }
+  if (payer instanceof Wallet) {
+    await payer.signTransaction(tx as any);
+  } else {
+    tx.sign([((provider as AnchorProvider).wallet as any).payer as Signer]);
   }
-  await payer.signTransaction(tx);
 
   const signature = await connection.sendRawTransaction(tx.serialize(), {
     skipPreflight: true,
