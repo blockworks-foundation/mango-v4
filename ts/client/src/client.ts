@@ -24,7 +24,7 @@ import {
   TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { Bank, MintInfo, TokenIndex, OracleConfig } from './accounts/bank';
+import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
 import {
   MangoAccount,
@@ -134,10 +134,10 @@ export class MangoClient {
 
   public async groupEdit(
     group: Group,
-    admin: PublicKey | undefined,
-    fastListingAdmin: PublicKey | undefined,
-    testing: number | undefined,
-    version: number | undefined,
+    admin?: PublicKey,
+    fastListingAdmin?: PublicKey,
+    testing?: number,
+    version?: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
       .groupEdit(
@@ -1591,12 +1591,12 @@ export class MangoClient {
     side: PerpOrderSide,
     price: number,
     quantity: number,
-    maxQuoteQuantity: number | undefined,
-    clientOrderId: number | undefined,
-    orderType: PerpOrderType | undefined,
-    reduceOnly: boolean | undefined,
-    expiryTimestamp: number | undefined,
-    limit: number | undefined,
+    maxQuoteQuantity?: number,
+    clientOrderId?: number,
+    orderType?: PerpOrderType,
+    reduceOnly?: boolean,
+    expiryTimestamp?: number,
+    limit?: number,
   ): Promise<TransactionSignature> {
     return await sendTransaction(
       this.program.provider as AnchorProvider,
@@ -1687,12 +1687,12 @@ export class MangoClient {
     priceOffset: number,
     pegLimit: number,
     quantity: number,
-    maxQuoteQuantity: number | undefined,
-    clientOrderId: number | undefined,
-    orderType: PerpOrderType | undefined,
-    reduceOnly: boolean | undefined,
-    expiryTimestamp: number | undefined,
-    limit: number | undefined,
+    maxQuoteQuantity?: number,
+    clientOrderId?: number,
+    orderType?: PerpOrderType,
+    reduceOnly?: boolean,
+    expiryTimestamp?: number,
+    limit?: number,
   ): Promise<TransactionSignature> {
     return await sendTransaction(
       this.program.provider as AnchorProvider,
@@ -1754,7 +1754,7 @@ export class MangoClient {
         maxQuoteQuantity
           ? perpMarket.uiQuoteToLots(maxQuoteQuantity)
           : I64_MAX_BN,
-        new BN(clientOrderId ? clientOrderId : Date.now()),
+        new BN(clientOrderId ?? Date.now()),
         orderType ? orderType : PerpOrderType.limit,
         reduceOnly ? reduceOnly : false,
         new BN(expiryTimestamp ? expiryTimestamp : 0),

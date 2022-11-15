@@ -31,6 +31,8 @@ export class PerpMarket {
   private baseLotsToUiConverter: number;
   private quoteLotsToUiConverter: number;
 
+  private _orderbook: Orderbook;
+
   static from(
     publicKey: PublicKey,
     obj: {
@@ -205,14 +207,34 @@ export class PerpMarket {
     return this.priceLotsToUiConverter;
   }
 
+  private async loadOrderbook(
+    client: MangoClient,
+    forceReload = false,
+  ): Promise<void> {
+    if (forceReload || !this._orderbook)
+      this._orderbook = await client.program.account.orderbook.fetch(
+        this.orderbook,
+      );
+  }
+
   public async loadAsks(client: MangoClient): Promise<BookSide> {
-    const ob = await client.program.account.orderbook.fetch(this.orderbook);
-    return BookSide.from(client, this, BookSideType.asks, (ob as any).asks);
+    await this.loadOrderbook(client);
+    return BookSide.from(
+      client,
+      this,
+      BookSideType.asks,
+      (this._orderbook as Orderbook).asks,
+    );
   }
 
   public async loadBids(client: MangoClient): Promise<BookSide> {
-    const ob = await client.program.account.orderbook.fetch(this.orderbook);
-    return BookSide.from(client, this, BookSideType.bids, (ob as any).bids);
+    await this.loadOrderbook(client);
+    return BookSide.from(
+      client,
+      this,
+      BookSideType.bids,
+      (this._orderbook as Orderbook).bids,
+    );
   }
 
   public async loadEventQueue(client: MangoClient): Promise<PerpEventQueue> {
@@ -339,6 +361,30 @@ export class PerpMarket {
   }
 }
 
+interface Orderbook {
+  bids: OrderTree;
+  asks: OrderTree;
+}
+
+interface OrderTree {
+  fixed: {
+    bumpIndex: number;
+    freeListLen: number;
+    freeListHead: number;
+    rootNode: number;
+    leafCount: number;
+    nodes: [any];
+  };
+  oraclePegged: {
+    bumpIndex: number;
+    freeListLen: number;
+    freeListHead: number;
+    rootNode: number;
+    leafCount: number;
+    nodes: [any];
+  };
+}
+
 export class BookSide {
   private static INNER_NODE_TAG = 1;
   private static LEAF_NODE_TAG = 2;
@@ -392,7 +438,6 @@ export class BookSide {
         nodes: [any];
       };
     },
-    public includeExpired = false,
     maxBookDelay?: number,
   ) {
     // Determine the maxTimestamp found on the book to use for tif
@@ -419,6 +464,9 @@ export class BookSide {
     return key.ushrn(64);
   }
 
+  /**
+   * iterates over all orders
+   */
   public *items(): Generator<PerpOrder> {
     function isBetter(type, a, b): boolean {
       return type === BookSideType.bids ? a > b : b < a;
@@ -432,9 +480,7 @@ export class BookSide {
 
     while (true) {
       if (fOrderRes.value && oPegOrderRes.value) {
-        if (
-          isBetter(this.type, fOrderRes.value.price, oPegOrderRes.value.price)
-        ) {
+        if (isBetter(this.type, fOrderRes.value.key, oPegOrderRes.value.key)) {
           yield fOrderRes.value;
           fOrderRes = fGen.next();
         } else {
@@ -453,6 +499,11 @@ export class BookSide {
     }
   }
 
+  /**
+   * iterates over all orders,
+   * skips oracle pegged orders which are invalid due to oracle price crossing the peg limit,
+   * skips tif orders which are invalid due to tif having elapsed,
+   */
   public *itemsValid(): Generator<PerpOrder> {
     const itemsGen = this.items();
     let itemsRes = itemsGen.next();
@@ -460,6 +511,7 @@ export class BookSide {
       if (itemsRes.value) {
         const val = itemsRes.value;
         if (
+          !val.isExpired ||
           !val.isOraclePegged ||
           (val.isOraclePegged && !val.oraclePeggedProperties.isInvalid)
         ) {
@@ -491,9 +543,13 @@ export class BookSide {
         const expiryTimestamp = leafNode.timeInForce
           ? leafNode.timestamp.add(new BN(leafNode.timeInForce))
           : U64_MAX_BN;
-        if (now.lt(expiryTimestamp) || this.includeExpired) {
-          yield PerpOrder.from(this.perpMarket, leafNode, this.type);
-        }
+
+        yield PerpOrder.from(
+          this.perpMarket,
+          leafNode,
+          this.type,
+          now.lt(expiryTimestamp),
+        );
       }
     }
   }
@@ -517,9 +573,14 @@ export class BookSide {
         const expiryTimestamp = leafNode.timeInForce
           ? leafNode.timestamp.add(new BN(leafNode.timeInForce))
           : U64_MAX_BN;
-        if (now.lt(expiryTimestamp) || this.includeExpired) {
-          yield PerpOrder.from(this.perpMarket, leafNode, this.type, true);
-        }
+
+        yield PerpOrder.from(
+          this.perpMarket,
+          leafNode,
+          this.type,
+          now.lt(expiryTimestamp),
+          true,
+        );
       }
     }
   }
@@ -653,6 +714,7 @@ export class PerpOrder {
     perpMarket: PerpMarket,
     leafNode: LeafNode,
     type: BookSideType,
+    isExpired = false,
     isOraclePegged = false,
   ): PerpOrder {
     const side =
@@ -661,9 +723,7 @@ export class PerpOrder {
     let oraclePeggedProperties;
     if (isOraclePegged) {
       const priceData = leafNode.key.ushrn(64);
-      const priceOffset = priceData.sub(
-        new BN(2).ushln(63).div(new BN(2)), //TODO do I need this - .add(new BN(1))
-      );
+      const priceOffset = priceData.sub(new BN(1).ushln(63));
       price = perpMarket.uiPriceToLots(perpMarket.uiPrice).add(priceOffset);
       const isInvalid =
         type === BookSideType.bids

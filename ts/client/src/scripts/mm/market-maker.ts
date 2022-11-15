@@ -416,7 +416,7 @@ async function makeMarketUpdateInstructions(
   const charge = (mc.params.charge || 0.0012) + aggSpread / 2;
   const bias = mc.params.bias;
 
-  const fairValueInlots = perpMarket.uiPriceToLots(fairValue);
+  const fairValueInLots = perpMarket.uiPriceToLots(fairValue);
 
   const nativeBidSize = perpMarket.uiBaseToLots(size);
   const nativeAskSize = perpMarket.uiBaseToLots(size);
@@ -452,20 +452,16 @@ async function makeMarketUpdateInstructions(
     const modelBidOPegOffset = perpMarket.uiPriceToLots(uiOPegBidOffset);
     const modelAskOPegOffset = perpMarket.uiPriceToLots(uiOPegAskOffset);
 
-    const bookAdjBidOPegOffset =
-      bestAsk !== undefined &&
-      bestAsk.priceLots
-        .sub(new BN(1))
-        .lt(fairValueInlots.add(modelBidOPegOffset))
-        ? fairValueInlots.sub(bestAsk.priceLots.sub(new BN(1)))
-        : modelBidOPegOffset;
-    const bookAdjAskOPegOffset =
-      bestBid !== undefined &&
-      bestBid.priceLots
-        .add(new BN(1))
-        .gt(fairValueInlots.add(modelAskOPegOffset))
-        ? bestBid.priceLots.sub(new BN(1)).sub(fairValueInlots)
-        : modelAskOPegOffset;
+    const bookAdjBidOPegOffset = bestAsk?.priceLots
+      .sub(new BN(1))
+      .lt(fairValueInLots.add(modelBidOPegOffset))
+      ? fairValueInLots.sub(bestAsk.priceLots.sub(new BN(1)))
+      : modelBidOPegOffset;
+    const bookAdjAskOPegOffset = bestBid?.priceLots
+      .add(new BN(1))
+      .gt(fairValueInLots.add(modelAskOPegOffset))
+      ? bestBid.priceLots.sub(new BN(1)).sub(fairValueInLots)
+      : modelAskOPegOffset;
 
     const openOrders = await mangoAccount.loadPerpOpenOrdersForMarket(
       client,
@@ -482,7 +478,7 @@ async function makeMarketUpdateInstructions(
       PerpOrderSide.bid,
       perpMarket.priceLotsToUi(bookAdjBidOPegOffset),
       perpMarket.priceLotsToUi(
-        fairValueInlots.mul(new BN(101)).div(new BN(100)),
+        fairValueInLots.mul(new BN(101)).div(new BN(100)),
       ),
       perpMarket.baseLotsToUi(nativeBidSize),
       undefined,
@@ -500,7 +496,7 @@ async function makeMarketUpdateInstructions(
       PerpOrderSide.ask,
       perpMarket.priceLotsToUi(bookAdjAskOPegOffset),
       perpMarket.priceLotsToUi(
-        fairValueInlots.mul(new BN(98)).div(new BN(100)),
+        fairValueInLots.mul(new BN(98)).div(new BN(100)),
       ),
       perpMarket.baseLotsToUi(nativeAskSize),
       undefined,
@@ -524,10 +520,10 @@ async function makeMarketUpdateInstructions(
     }
 
     const approxOPegBidPrice = perpMarket.priceLotsToUi(
-      fairValueInlots.add(bookAdjBidOPegOffset),
+      fairValueInLots.add(bookAdjBidOPegOffset),
     );
     const approxOPegAskPrice = perpMarket.priceLotsToUi(
-      fairValueInlots.add(bookAdjAskOPegOffset),
+      fairValueInLots.add(bookAdjAskOPegOffset),
     );
 
     if (posAsTradeSizes < 15 || posAsTradeSizes > -15) {
