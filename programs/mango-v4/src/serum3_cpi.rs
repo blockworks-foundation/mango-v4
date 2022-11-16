@@ -59,7 +59,7 @@ pub fn load_market_state<'a>(
             bytemuck::from_bytes(data)
         });
     state
-        .check_flags()
+        .check_flags(false)
         .map_err(|_| error!(MangoError::SomeError))?;
     Ok(state)
 }
