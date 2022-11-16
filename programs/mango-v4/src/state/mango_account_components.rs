@@ -208,8 +208,11 @@ pub struct PerpPosition {
     // Cumulative realized pnl in quote native units
     pub perp_spot_transfers: i64,
 
+    pub last_pnl_settled_slot: u64,
+    pub last_pnl_settled: i64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 24],
+    pub reserved: [u8; 8],
 }
 const_assert_eq!(size_of::<PerpPosition>(), 8 + 7 * 8 + 3 * 16 + 64);
 const_assert_eq!(size_of::<PerpPosition>() % 8, 0);
@@ -237,7 +240,9 @@ impl Default for PerpPosition {
             maker_volume: 0,
             taker_volume: 0,
             perp_spot_transfers: 0,
-            reserved: [0; 24],
+            last_pnl_settled_slot: 0,
+            last_pnl_settled: 0,
+            reserved: [0; 8],
         }
     }
 }

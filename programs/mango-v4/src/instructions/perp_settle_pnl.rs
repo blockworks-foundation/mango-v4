@@ -125,10 +125,40 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     require!(a_pnl.is_positive(), MangoError::ProfitabilityMismatch);
     require!(b_pnl.is_negative(), MangoError::ProfitabilityMismatch);
 
-    // Settle for the maximum possible capped to b's settle health
-    let settlement = a_pnl.abs().min(b_pnl.abs()).min(b_settle_health);
+    // Cap settlement
+    // 1. Settle at max. 100% of quote each hour
+    let now_slot = Clock::get()?.slot;
+    let settle_pnl_cap_window = 7200; // TODO: @ckamm should I make this a constant outside the function?
+    let slots_since_last_settled = now_slot
+        .checked_sub(a_perp_position.last_pnl_settled_slot)
+        .unwrap();
+    let a_pnl_capped_for_window = if slots_since_last_settled >= settle_pnl_cap_window {
+        a_pnl.min(I80F48::from(a_perp_position.quote_entry_native))
+    } else {
+        a_pnl.min(I80F48::from_num(
+            a_perp_position
+                .quote_entry_native
+                .checked_sub(a_perp_position.last_pnl_settled)
+                .unwrap(),
+        ))
+    };
+    // 2. Settle for the maximum possible capped to b's settle health
+    let settlement = a_pnl_capped_for_window
+        .abs()
+        .min(b_pnl.abs())
+        .min(b_settle_health);
+
+    // Settle
     a_perp_position.change_quote_position(-settlement);
     b_perp_position.change_quote_position(settlement);
+
+    a_perp_position.last_pnl_settled_slot = now_slot;
+    a_perp_position.last_pnl_settled = settlement
+        // TODO: @ckamm is flooring ok?
+        .checked_floor()
+        .unwrap()
+        .checked_to_num()
+        .unwrap();
 
     emit_perp_balances(
         ctx.accounts.group.key(),
