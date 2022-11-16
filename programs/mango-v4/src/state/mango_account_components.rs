@@ -208,8 +208,14 @@ pub struct PerpPosition {
     // Cumulative realized pnl in quote native units
     pub perp_spot_transfers: i64,
 
-    #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 24],
+    pub last_pnl_settled_slot: u64,
+    pub pnl_settled_in_slots_window_native: i64,
+
+    pub realized_pnl_native: i64,
+    //
+    // TODO: add reserved,
+    // #[derivative(Debug = "ignore")]
+    // pub reserved: [u8; 8],
 }
 const_assert_eq!(size_of::<PerpPosition>(), 8 + 7 * 8 + 3 * 16 + 64);
 const_assert_eq!(size_of::<PerpPosition>() % 8, 0);
@@ -237,7 +243,9 @@ impl Default for PerpPosition {
             maker_volume: 0,
             taker_volume: 0,
             perp_spot_transfers: 0,
-            reserved: [0; 24],
+            last_pnl_settled_slot: 0,
+            pnl_settled_in_slots_window_native: 0,
+            realized_pnl_native: 0,
         }
     }
 }
@@ -349,6 +357,17 @@ impl PerpPosition {
         }
     }
 
+    fn update_realized_pnl(
+        &mut self,
+        perp_market: &mut PerpMarket,
+        base_change: i64,
+        quote_change_native: I80F48,
+    ) {
+        self.realized_pnl_native =
+            cm!(self.realized_pnl_native + quote_change_native
+                - base_change * self.avg_entry_price());
+    }
+
     /// Change the base and quote positions as the result of a trade
     pub fn change_base_and_quote_positions(
         &mut self,
@@ -360,6 +379,7 @@ impl PerpPosition {
             base_change,
             quote_change_native.round().checked_to_num().unwrap(),
         );
+        self.update_realized_pnl(perp_market, base_change, quote_change_native);
         self.change_base_position(perp_market, base_change);
         self.change_quote_position(quote_change_native);
     }

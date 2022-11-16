@@ -123,10 +123,74 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     require!(a_pnl.is_positive(), MangoError::ProfitabilityMismatch);
     require!(b_pnl.is_negative(), MangoError::ProfitabilityMismatch);
 
+    // Cap settlement of unrealized pnl
+    // Settles at most x100% each hour
+    let now_slot = Clock::get()?.slot;
+    let slots_window = 7200; // TODO make configurable
+    let settle_factor = I80F48::ONE; // TODO make configurable
+    let in_new_slots_window =
+        now_slot / slots_window > a_perp_position.last_pnl_settled_slot / slots_window;
+    let a_pnl_capped_for_window = {
+        let unrealized_pnl = cm!(a_pnl - a_perp_position.realized_pnl_native);
+        let a_unrealized_pnl_capped_for_window = if in_new_slots_window {
+            unrealized_pnl.min(cm!(settle_factor * a_base_native * oracle_price))
+        } else {
+            unrealized_pnl.min(cm!(settle_factor * a_base_native * oracle_price
+                - I80F48::from_num(a_perp_position.pnl_settled_in_slots_window_native)))
+        };
+
+        a_pnl.min(cm!(I80F48::from_num(a_perp_position.realized_pnl_native)
+            + a_unrealized_pnl_capped_for_window))
+    };
     // Settle for the maximum possible capped to b's settle health
-    let settlement = a_pnl.abs().min(b_pnl.abs()).min(b_settle_health);
+    let settlement = a_pnl_capped_for_window
+        .abs()
+        .min(b_pnl.abs())
+        .min(b_settle_health);
+
+    // Settle
     a_perp_position.change_quote_position(-settlement);
     b_perp_position.change_quote_position(settlement);
+
+    // Bookkeep settled
+    a_perp_position.last_pnl_settled_slot = now_slot;
+    b_perp_position.last_pnl_settled_slot = now_slot;
+    a_perp_position.pnl_settled_in_slots_window_native = if in_new_slots_window {
+        settlement
+            .checked_floor()
+            .unwrap()
+            .checked_to_num()
+            .unwrap()
+    } else {
+        a_perp_position
+            .pnl_settled_in_slots_window_native
+            .checked_add(
+                settlement
+                    .checked_floor()
+                    .unwrap()
+                    .checked_to_num()
+                    .unwrap(),
+            )
+            .unwrap()
+    };
+    b_perp_position.pnl_settled_in_slots_window_native = if in_new_slots_window {
+        -settlement
+            .checked_floor()
+            .unwrap()
+            .checked_to_num()
+            .unwrap()
+    } else {
+        a_perp_position
+            .pnl_settled_in_slots_window_native
+            .checked_add(
+                -settlement
+                    .checked_floor()
+                    .unwrap()
+                    .checked_to_num()
+                    .unwrap(),
+            )
+            .unwrap()
+    };
 
     emit_perp_balances(
         ctx.accounts.group.key(),
