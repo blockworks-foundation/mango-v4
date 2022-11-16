@@ -2,6 +2,8 @@ import { AnchorProvider } from '@project-serum/anchor';
 import {
   AddressLookupTableAccount,
   MessageV0,
+  Signer,
+  Transaction,
   TransactionInstruction,
   VersionedTransaction,
 } from '@solana/web3.js';
@@ -30,14 +32,14 @@ export async function sendTransaction(
     vtx.sign([...opts?.additionalSigners]);
   }
 
-  // if (payer instanceof Wallet) {
-  const tx = await payer.signTransaction(vtx as any);
-  // } else {
-  //   tx.sign([((provider as AnchorProvider).wallet as any).payer as Signer]);
-  // }
+  if (typeof payer.signTransaction === 'function') {
+    await payer.signTransaction(vtx as any);
+  } else {
+    vtx.sign([((provider as AnchorProvider).wallet as any).payer as Signer]);
+  }
 
   const signature = await connection.sendTransaction(
-    tx as any as VersionedTransaction,
+    vtx as any as VersionedTransaction,
     {
       skipPreflight: true,
     },
