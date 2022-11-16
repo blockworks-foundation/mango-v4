@@ -278,7 +278,7 @@ version = "0.25.0"
 dependencies = [
  "anchor-lang",
  "mpl-token-metadata",
- "serum_dex 0.4.0 (git+https://github.com/project-serum/serum-dex?rev=1be91f2)",
+ "serum_dex 0.4.0",
  "solana-program",
  "spl-associated-token-account",
  "spl-token",
@@ -1085,7 +1085,7 @@ dependencies = [
  "log 0.4.17",
  "mango-v4",
  "pyth-sdk-solana",
- "serum_dex 0.4.0 (git+https://github.com/blockworks-foundation/serum-dex.git?branch=v4-compat)",
+ "serum_dex 0.5.6",
  "solana-client",
  "solana-sdk",
  "tokio",
@@ -1110,7 +1110,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serum_dex 0.4.0 (git+https://github.com/blockworks-foundation/serum-dex.git?branch=v4-compat)",
+ "serum_dex 0.5.6",
  "shellexpand",
  "solana-account-decoder",
  "solana-client",
@@ -2833,7 +2833,7 @@ dependencies = [
  "log 0.4.17",
  "mango-v4",
  "pyth-sdk-solana",
- "serum_dex 0.4.0 (git+https://github.com/blockworks-foundation/serum-dex.git?branch=v4-compat)",
+ "serum_dex 0.5.6",
  "solana-client",
  "solana-sdk",
  "tokio",
@@ -3011,7 +3011,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "serum_dex 0.4.0 (git+https://github.com/blockworks-foundation/serum-dex.git?branch=v4-compat)",
+ "serum_dex 0.5.6",
  "shellexpand",
  "solana-account-decoder",
  "solana-client",
@@ -3124,7 +3124,7 @@ dependencies = [
  "pyth-sdk-solana",
  "rand 0.8.5",
  "serde",
- "serum_dex 0.4.0 (git+https://github.com/blockworks-foundation/serum-dex.git?branch=v4-compat)",
+ "serum_dex 0.5.6",
  "solana-address-lookup-table-program",
  "solana-logger",
  "solana-program",
@@ -4953,7 +4953,7 @@ dependencies = [
 [[package]]
 name = "serum_dex"
 version = "0.4.0"
-source = "git+https://github.com/blockworks-foundation/serum-dex.git?branch=v4-compat#7033229b816af91cdeef3f14aff23a5e20be11f1"
+source = "git+https://github.com/project-serum/serum-dex?rev=1be91f2#1be91f2863d8ecede32daaae7e768034e24bbc79"
 dependencies = [
  "arrayref",
  "bincode",
@@ -4975,8 +4975,8 @@ dependencies = [
 
 [[package]]
 name = "serum_dex"
-version = "0.4.0"
-source = "git+https://github.com/project-serum/serum-dex?rev=1be91f2#1be91f2863d8ecede32daaae7e768034e24bbc79"
+version = "0.5.6"
+source = "git+https://github.com/blockworks-foundation/serum-dex.git?branch=ckamm/find_by_key#c0b9f559daa74ec5960cc371a8bed610029a656b"
 dependencies = [
  "arrayref",
  "bincode",

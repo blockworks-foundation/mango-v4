@@ -519,8 +519,8 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
             .await;
     }
 
-    let without_serum_taker_fee = |amount: i64| (amount as f64 * (1.0 - 0.0022)).trunc() as i64;
-    let serum_maker_rebate = |amount: i64| (amount as f64 * 0.0003).round() as i64;
+    let without_serum_taker_fee = |amount: i64| (amount as f64 * (1.0 - 0.0004)).trunc() as i64;
+    let serum_maker_rebate = |amount: i64| (amount as f64 * 0.0).round() as i64;
     let loan_origination_fee = |amount: i64| (amount as f64 * 0.0005).trunc() as i64;
 
     //
