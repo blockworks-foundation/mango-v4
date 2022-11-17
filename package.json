@@ -27,7 +27,7 @@
     "format": "prettier --check ./ts",
     "lint": "eslint ./ts --ext ts --ext tsx --ext js --quiet",
     "typecheck": "tsc --noEmit --pretty",
-    "prepare": "yarn build",
+    "prepare": "npm run build",
     "prebuild": "npm run clean",
     "prepublishOnly": "npm run validate && npm run build",
     "validate": "npm run typecheck && npm run lint && npm run format"
