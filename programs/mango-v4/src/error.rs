@@ -37,6 +37,8 @@ pub enum MangoError {
     Serum3OpenOrdersExistAlready,
     #[msg("bank vault has insufficent funds")]
     InsufficentBankVaultFunds,
+    #[msg("bank utilization has reached limit")]
+    BankUtilizationReachedLimit,
     #[msg("account is currently being liquidated")]
     BeingLiquidated,
     #[msg("invalid bank")]

@@ -116,6 +116,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     // Transfer the actual tokens
     let group_seeds = group_seeds!(group);
+    msg!("ctx.accounts.vault.amount {:?}", ctx.accounts.vault.amount);
     token::transfer(
         ctx.accounts.transfer_ctx().with_signer(&[group_seeds]),
         amount,
@@ -176,6 +177,22 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             loan_origination_fee: loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::TokenWithdraw,
         });
+    }
+
+    // Prevent borrowing if vault amount to total deposits ratio falls below the threshold
+    if bank.native_deposits() != I80F48::ZERO && allow_borrow {
+        ctx.accounts.vault.reload()?;
+        let vault_to_deposits_ratio =
+            cm!(I80F48::from_num(ctx.accounts.vault.amount) / bank.native_deposits());
+        let min_vault_to_deposits_ratio = 0.2;
+        if vault_to_deposits_ratio > min_vault_to_deposits_ratio {
+            return err!(MangoError::BankUtilizationReachedLimit).with_context(|| {
+                format!(
+                    "vault to deposits ratio cannot fall below {:?} when borrowing",
+                    min_vault_to_deposits_ratio,
+                )
+            });
+        }
     }
 
     Ok(())
