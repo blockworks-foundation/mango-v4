@@ -6,7 +6,7 @@ import {
 } from '@project-serum/serum/lib/token-instructions';
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
-  Token,
+  createAssociatedTokenAccountInstruction,
   TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import {
@@ -341,7 +341,7 @@ export class MangoClient {
     if (!ai) {
       const tx = new Transaction();
       tx.add(
-        Token.createAssociatedTokenAccountInstruction(
+        createAssociatedTokenAccountInstruction(
           ASSOCIATED_TOKEN_PROGRAM_ID,
           TOKEN_PROGRAM_ID,
           bank.mint,
