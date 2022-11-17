@@ -164,7 +164,9 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
 // Try to reach compute limits in health checks by having many perp markets in an account
 #[tokio::test]
 async fn test_health_compute_perp() -> Result<(), TransportError> {
-    let context = TestContext::new().await;
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(95_000);
+    let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = TestKeypair::new();
