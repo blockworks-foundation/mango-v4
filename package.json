@@ -70,9 +70,6 @@
     "big.js": "^6.1.1",
     "bs58": "^5.0.0"
   },
-  "resolutions": {
-    "@project-serum/anchor/@solana/web3.js": "1.66.2"
-  },
   "peerDependencies": {
     "@solana/spl-token-swap": "^0.2.0"
   },
