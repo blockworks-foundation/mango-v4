@@ -66,7 +66,7 @@
     "@pythnetwork/client": "^2.7.0",
     "@solana/spl-token": "^0.2.0",
     "@solana/web3.js": "^1.63.1",
-    "@switchboard-xyz/switchboard-v2": "^0.0.129",
+    "@switchboard-xyz/sbv2-lite": "^0.1.6",
     "big.js": "^6.1.1",
     "bs58": "^5.0.0"
   },

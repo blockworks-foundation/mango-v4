@@ -1,11 +1,6 @@
 import { Magic as PythMagic } from '@pythnetwork/client';
 import { AccountInfo, PublicKey } from '@solana/web3.js';
-import {
-  loadSwitchboardProgram,
-  SBV2_DEVNET_PID,
-  SBV2_MAINNET_PID,
-  SwitchboardDecimal,
-} from '@switchboard-xyz/switchboard-v2';
+import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import BN from 'bn.js';
 import { I80F48, I80F48Dto } from '../numbers/I80F48';
 
@@ -60,17 +55,14 @@ export function parseSwitcboardOracleV1(
 }
 
 export function parseSwitcboardOracleV2(
-  program,
+  program: SwitchboardProgram,
   accountInfo: AccountInfo<Buffer>,
 ): number {
-  const aggregatorAccountData = (program as any)._coder.accounts.decode(
-    (program.account.aggregatorAccountData as any)._idlAccount.name,
-    accountInfo.data,
-  );
-  const sbDecimal = SwitchboardDecimal.from(
-    aggregatorAccountData.latestConfirmedRound.result,
-  );
-  return sbDecimal.toBig().toNumber();
+  const aggregatorAccountData =
+    program.decodeLatestAggregatorValue(accountInfo);
+  if (!aggregatorAccountData)
+    throw new Error('Unable to parse Switchboard Oracle V2');
+  return aggregatorAccountData?.toNumber();
 }
 
 /**
@@ -81,16 +73,16 @@ export function parseSwitcboardOracleV2(
 export async function parseSwitchboardOracle(
   accountInfo: AccountInfo<Buffer>,
 ): Promise<number> {
-  if (accountInfo.owner.equals(SBV2_DEVNET_PID)) {
+  if (accountInfo.owner.equals(SwitchboardProgram.devnetPid)) {
     if (!sbv2DevnetProgram) {
-      sbv2DevnetProgram = await loadSwitchboardProgram('devnet');
+      sbv2DevnetProgram = await SwitchboardProgram.loadDevnet();
     }
     return parseSwitcboardOracleV2(sbv2DevnetProgram, accountInfo);
   }
 
-  if (accountInfo.owner.equals(SBV2_MAINNET_PID)) {
+  if (accountInfo.owner.equals(SwitchboardProgram.mainnetPid)) {
     if (!sbv2MainnetProgram) {
-      sbv2MainnetProgram = await loadSwitchboardProgram('mainnet-beta');
+      sbv2MainnetProgram = await SwitchboardProgram.loadMainnet();
     }
     return parseSwitcboardOracleV2(sbv2MainnetProgram, accountInfo);
   }
@@ -109,8 +101,8 @@ export function isSwitchboardOracle(accountInfo: AccountInfo<Buffer>): boolean {
   if (
     accountInfo.owner.equals(SBV1_DEVNET_PID) ||
     accountInfo.owner.equals(SBV1_MAINNET_PID) ||
-    accountInfo.owner.equals(SBV2_DEVNET_PID) ||
-    accountInfo.owner.equals(SBV2_MAINNET_PID)
+    accountInfo.owner.equals(SwitchboardProgram.devnetPid) ||
+    accountInfo.owner.equals(SwitchboardProgram.mainnetPid)
   ) {
     return true;
   }
