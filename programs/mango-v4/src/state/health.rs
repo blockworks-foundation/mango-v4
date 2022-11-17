@@ -863,6 +863,8 @@ impl HealthCache {
     ///   (+100 USDC health, -150 perp1 health, -150 perp2 health -> allow settling 100 health worth)
     /// - Positive trusted perp pnl can enable settling.
     ///   (+100 trusted perp1 health, -100 perp2 health -> allow settling of 100 health worth)
+    ///
+    /// REVIEW: Add a note about moving quote from negative perp pnl to negative usdc
     pub fn perp_settle_health(&self) -> I80F48 {
         let health_type = HealthType::Maint;
         let mut health = I80F48::ZERO;

@@ -37,6 +37,7 @@ pub struct PerpSettlePnl<'info> {
     /// CHECK: Oracle can have different account types, constrained by address in perp_market
     pub oracle: UncheckedAccount<'info>,
 
+    // REVIEW: what kind of bank is this??
     #[account(mut, has_one = group)]
     pub settle_bank: AccountLoader<'info, Bank>,
 
@@ -45,6 +46,7 @@ pub struct PerpSettlePnl<'info> {
     pub settle_oracle: UncheckedAccount<'info>,
 }
 
+// REVIEW: is max_settle_amount now superfluous because this always settles the max possible?
 pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Cannot settle with yourself
     require!(
@@ -91,6 +93,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     //   Further settlement would convert perp-losses into token-losses and isn't allowed.
     require!(b_settle_health >= 0, MangoError::HealthMustBePositive);
 
+    // REVIEW: settle_bank
     let mut bank = ctx.accounts.settle_bank.load_mut()?;
     let perp_market = ctx.accounts.perp_market.load()?;
 
@@ -101,6 +104,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     );
 
     // Get oracle price for market. Price is validated inside
+    // REVIEW: perp_price?
     let oracle_price = perp_market.oracle_price(
         &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
         None, // staleness checked in health
@@ -111,6 +115,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     let b_perp_position = account_b.perp_position_mut(perp_market_index)?;
 
     // Settle funding before settling any PnL
+    // REVIEW: Add comment about settle_funding not changing health numbers because it uses unsettled_funding internally
     a_perp_position.settle_funding(&perp_market);
     b_perp_position.settle_funding(&perp_market);
 
@@ -127,6 +132,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
 
     // Settle for the maximum possible capped to b's settle health
     let settlement = a_pnl.abs().min(b_pnl.abs()).min(b_settle_health);
+    // REVIEW: require settlement > 0
     a_perp_position.change_quote_position(-settlement);
     b_perp_position.change_quote_position(settlement);
 
@@ -153,6 +159,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         if a_maint_health < 0 {
             cm!(settlement * fee_fraction)
         } else {
+            // REVIEW: compute rhs separately and assert <=1 for ease of reading
             cm!(settlement * fee_fraction * (-a_init_health / (a_maint_health - a_init_health)))
         }
     } else {
@@ -164,7 +171,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
 
     // Fees only apply when the settlement is large enough
     let fee = if settlement >= perp_market.settle_fee_amount_threshold {
-        cm!(low_health_fee + flat_fee).min(settlement)
+        cm!(low_health_fee + flat_fee).min(settlement) // REVIEW: this min should be an assert
     } else {
         I80F48::ZERO
     };
@@ -182,6 +189,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // The fee is paid by the account with positive unsettled pnl
     let a_token_position = account_a.token_position_mut(settle_token_index)?.0;
     let b_token_position = account_b.token_position_mut(settle_token_index)?.0;
+    // REVIEW: This only works if the bank is for the quote token, require(settle_token_index == 0)
     bank.deposit(a_token_position, cm!(settlement - fee))?;
     bank.withdraw_with_fee(b_token_position, settlement)?;
 
