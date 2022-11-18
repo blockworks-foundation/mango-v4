@@ -55,6 +55,8 @@ pub enum MangoError {
     OracleConfidence,
     #[msg("an oracle is stale")]
     OracleStale,
+    #[msg("settlement amount must always be positive")]
+    SettlementAmountMustBePositive,
 }
 
 pub trait Contextable {

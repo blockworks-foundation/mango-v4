@@ -1054,12 +1054,12 @@ export class PerpPosition {
       dto.marketIndex as PerpMarketIndex,
       dto.basePositionLots,
       I80F48.from(dto.quotePositionNative),
-      dto.bidsBaseLots,
-      dto.asksBaseLots,
+      dto.quoteEntryNative,
+      dto.quoteRunningNative,
       I80F48.from(dto.longSettledFunding),
       I80F48.from(dto.shortSettledFunding),
-      dto.takerBaseLots,
-      dto.takerQuoteLots,
+      dto.bidsBaseLots,
+      dto.asksBaseLots,
       dto.takerBaseLots,
       dto.takerQuoteLots,
       dto.cumulativeLongFunding,
@@ -1168,6 +1168,24 @@ export class PerpPosition {
       !this.takerBaseLots.eq(zero) ||
       !this.takerQuoteLots.eq(zero)
     );
+  }
+
+  public getEntryPrice(perpMarket: PerpMarket): BN {
+    if (this.basePositionLots.eq(new BN(0))) {
+      return new BN(0);
+    }
+    return this.quoteEntryNative
+      .div(this.basePositionLots.mul(perpMarket.baseLotSize))
+      .abs();
+  }
+
+  public getBreakEvenPrice(perpMarket: PerpMarket): BN {
+    if (this.basePositionLots.eq(new BN(0))) {
+      return new BN(0);
+    }
+    return this.quoteRunningNative
+      .div(this.basePositionLots.mul(perpMarket.baseLotSize))
+      .abs();
   }
 }
 

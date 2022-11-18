@@ -47,8 +47,7 @@ pub fn fetch_top(
                 return None;
             }
             let perp_pos = perp_pos.unwrap();
-            let pnl = perp_pos.base_position_native(&perp_market) * oracle_price
-                + perp_pos.quote_position_native();
+            let pnl = perp_pos.pnl_for_price(&perp_market, oracle_price).unwrap();
             if pnl >= 0 && direction == Direction::MaxNegative
                 || pnl <= 0 && direction == Direction::MaxPositive
             {
