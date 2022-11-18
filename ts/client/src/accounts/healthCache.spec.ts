@@ -203,7 +203,7 @@ describe('Health Cache', () => {
         0,
         new BN(0),
         new BN(0),
-        new BN(0),  
+        new BN(0),
       );
       const pi1 = PerpInfo.fromPerpPosition(pM, pp);
 
