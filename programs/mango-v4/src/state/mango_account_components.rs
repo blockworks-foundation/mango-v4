@@ -380,7 +380,7 @@ impl PerpPosition {
         if self.base_position_lots == 0 {
             return I80F48::ZERO; // TODO: What should this actually return? Error? NaN?
         }
-        (I80F48::from(self.quote_entry_native)
+        cm!(I80F48::from(self.quote_entry_native)
             / (I80F48::from(self.base_position_lots) * I80F48::from(market.base_lot_size)))
         .abs()
     }
@@ -390,7 +390,7 @@ impl PerpPosition {
         if self.base_position_lots == 0 {
             return I80F48::ZERO; // TODO: What should this actually return? Error? NaN?
         }
-        (I80F48::from(self.quote_running_native)
+        cm!(I80F48::from(self.quote_running_native)
             / (I80F48::from(self.base_position_lots) * I80F48::from(market.base_lot_size)))
         .abs()
     }
@@ -648,17 +648,6 @@ mod tests {
         assert_eq!(pos.quote_entry_native, 0);
         // running quote should be 0
         assert_eq!(pos.quote_running_native, 0);
-    }
-
-    #[test]
-    fn test_perp_position_pnl_errors_if_wrong_market() {
-        let market = PerpMarket::default_for_tests();
-        let mut market2 = PerpMarket::default_for_tests();
-        market2.perp_market_index = market.perp_market_index + 1;
-
-        let pos = create_perp_position(&market, 0, 0, 0);
-        let res = pos.pnl_for_price(&market2, I80F48::from(100));
-        assert!(res.is_err());
     }
 
     #[test]
