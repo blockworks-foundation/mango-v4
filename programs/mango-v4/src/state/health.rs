@@ -39,11 +39,6 @@ impl Prices {
         }
     }
 
-    // TODO: everything using this function needs investigation and updates
-    pub fn fixme(&self) -> I80F48 {
-        self.oracle
-    }
-
     pub fn liab(&self, health_type: HealthType) -> I80F48 {
         if health_type == HealthType::Maint {
             self.oracle
@@ -1009,8 +1004,7 @@ impl HealthCache {
         price: I80F48,
         min_ratio: I80F48,
     ) -> Result<I80F48> {
-        /*
-        // The health_ratio is a nonlinear based on swap amount.
+        // The health_ratio is nonlinear based on swap amount.
         // For large swap amounts the slope is guaranteed to be negative (unless the price
         // is extremely good), but small amounts can have positive slope (e.g. using
         // source deposits to pay back target borrows).
@@ -1019,7 +1013,8 @@ impl HealthCache {
         // - even if the initial ratio is < min_ratio it can be useful to swap to *increase* health
         // - be careful about finding the min_ratio point: the function isn't convex
 
-        let initial_ratio = self.health_ratio(HealthType::Init);
+        let health_type = HealthType::Init;
+        let initial_ratio = self.health_ratio(health_type);
         if initial_ratio < 0 {
             return Ok(I80F48::ZERO);
         }
@@ -1029,14 +1024,11 @@ impl HealthCache {
         let source = &self.token_infos[source_index];
         let target = &self.token_infos[target_index];
 
-        // TODO: err, this'll be annoying?!
-        let oracle_swap_price = cm!(source.prices.fixme() / target.prices.fixme());
-        let price_factor = cm!(price / oracle_swap_price);
-
         // If the price is sufficiently good, then health will just increase from swapping:
         // once we've swapped enough, swapping x reduces health by x * source_liab_weight and
         // increases it by x * target_asset_weight * price_factor.
-        let final_health_slope = -source.init_liab_weight + target.init_asset_weight * price_factor;
+        let final_health_slope = -source.init_liab_weight * source.prices.liab(health_type)
+            + target.init_asset_weight * target.prices.asset(health_type) * price;
         if final_health_slope >= 0 {
             return Ok(I80F48::MAX);
         }
@@ -1044,7 +1036,7 @@ impl HealthCache {
         let cache_after_swap = |amount: I80F48| {
             let mut adjusted_cache = self.clone();
             adjusted_cache.token_infos[source_index].balance_native -= amount;
-            adjusted_cache.token_infos[target_index].balance_native += cm!(amount * price_factor);
+            adjusted_cache.token_infos[target_index].balance_native += cm!(amount * price);
             adjusted_cache
         };
         let health_ratio_after_swap =
@@ -1054,13 +1046,13 @@ impl HealthCache {
         // When these values flip sign, the health slope decreases, but could still be positive.
         // After point1 it's definitely negative (due to final_health_slope check above).
         // The maximum health ratio will be at 0 or at one of these points (ignoring serum3 effects).
-        let source_for_zero_target_balance = -target.balance / price_factor;
+        let source_for_zero_target_balance = -target.balance_native / price;
         let point0_amount = source
-            .balance
+            .balance_native
             .min(source_for_zero_target_balance)
             .max(I80F48::ZERO);
         let point1_amount = source
-            .balance
+            .balance_native
             .max(source_for_zero_target_balance)
             .max(I80F48::ZERO);
         let point0_ratio = health_ratio_after_swap(point0_amount);
@@ -1090,7 +1082,10 @@ impl HealthCache {
                 // If point1_ratio is still bigger than min_ratio, the target amount must be >point1_amount
                 // search to the right of point1_amount: but how far?
                 // At point1, source.balance < 0 and target.balance > 0, so use a simple estimation for
-                // zero health: health - source_liab_weight * a + target_asset_weight * a * price_factor = 0.
+                // zero health: health
+                //              - source_liab_weight * source_liab_price * a
+                //              + target_asset_weight * target_asset_price * price * a = 0.
+                // where a is the source token native amount.
                 if point1_health <= 0 {
                     return Ok(I80F48::ZERO);
                 }
@@ -1102,6 +1097,7 @@ impl HealthCache {
                     zero_health_amount,
                     zero_health_ratio,
                     min_ratio,
+                    I80F48::ZERO,
                     health_ratio_after_swap,
                 )?
             } else if point0_ratio >= min_ratio {
@@ -1112,6 +1108,7 @@ impl HealthCache {
                     point1_amount,
                     point1_ratio,
                     min_ratio,
+                    I80F48::ZERO,
                     health_ratio_after_swap,
                 )?
             } else {
@@ -1122,13 +1119,12 @@ impl HealthCache {
                     point0_amount,
                     point0_ratio,
                     min_ratio,
+                    I80F48::ZERO,
                     health_ratio_after_swap,
                 )?
             };
 
-        Ok(amount / source.oracle_price.fixme())
-        */
-        Ok(I80F48::ZERO)
+        Ok(amount)
     }
 
     #[cfg(feature = "client")]
@@ -1137,14 +1133,11 @@ impl HealthCache {
         &self,
         perp_market_index: PerpMarketIndex,
         price: I80F48,
-        base_lot_size: i64,
         side: PerpOrderSide,
         min_ratio: I80F48,
     ) -> Result<i64> {
-        /*
-        let base_lot_size = I80F48::from(base_lot_size);
-
-        let initial_ratio = self.health_ratio(HealthType::Init);
+        let health_type = HealthType::Init;
+        let initial_ratio = self.health_ratio(health_type);
         if initial_ratio < 0 {
             return Ok(0);
         }
@@ -1156,32 +1149,33 @@ impl HealthCache {
 
         let perp_info_index = self.perp_info_index(perp_market_index)?;
         let perp_info = &self.perp_infos[perp_info_index];
-        let oracle_price = &perp_info.oracle_price;
+        let prices = &perp_info.prices;
+        let base_lot_size = I80F48::from(perp_info.base_lot_size);
 
         // If the price is sufficiently good then health will just increase from trading
+        // TODO: This is not actually correct, since perp health for untrusted markets can't go above 0
         let final_health_slope = if direction == 1 {
-            perp_info.init_asset_weight * oracle_price.fixme() - price
+            perp_info.init_asset_weight * prices.asset(health_type) - price
         } else {
-            price - perp_info.init_liab_weight * oracle_price.fixme()
+            price - perp_info.init_liab_weight * prices.liab(health_type)
         };
         if final_health_slope >= 0 {
             return Ok(i64::MAX);
         }
 
-        let cache_after_trade = |base_lots: I80F48| {
+        let cache_after_trade = |base_lots: i64| {
             let mut adjusted_cache = self.clone();
-            let d = I80F48::from(direction);
-            adjusted_cache.perp_infos[perp_info_index].base +=
-                d * base_lots * base_lot_size * oracle_price.fixme();
+            adjusted_cache.perp_infos[perp_info_index].base_lots += direction * base_lots;
             adjusted_cache.perp_infos[perp_info_index].quote -=
-                d * base_lots * base_lot_size * price;
+                I80F48::from(direction) * I80F48::from(base_lots) * base_lot_size * price;
             adjusted_cache
         };
         let health_ratio_after_trade =
-            |base_lots| cache_after_trade(base_lots).health_ratio(HealthType::Init);
+            |base_lots: i64| cache_after_trade(base_lots).health_ratio(HealthType::Init);
+        let health_ratio_after_trade_trunc =
+            |base_lots: I80F48| health_ratio_after_trade(base_lots.round_to_zero().to_num());
 
-        // This is awkward, can we pass the base_lots and lot_size in PerpInfo?
-        let initial_base_lots = perp_info.base / perp_info.oracle_price.fixme() / base_lot_size;
+        let initial_base_lots = perp_info.base_lots;
 
         // There are two cases:
         // 1. We are increasing abs(base_lots)
@@ -1194,13 +1188,14 @@ impl HealthCache {
             let case1_start_ratio = health_ratio_after_trade(case1_start);
             (case1_start, case1_start_ratio)
         } else {
-            (I80F48::ZERO, initial_ratio)
+            (0, initial_ratio)
         };
+        let case1_start_i80f48 = I80F48::from(case1_start);
 
         // If we start out below min_ratio and can't go above, pick the best case
         let base_lots = if initial_ratio <= min_ratio && case1_start_ratio < min_ratio {
             if case1_start_ratio >= initial_ratio {
-                case1_start
+                case1_start_i80f48
             } else {
                 I80F48::ZERO
             }
@@ -1210,34 +1205,36 @@ impl HealthCache {
             if case1_start_health <= 0 {
                 return Ok(0);
             }
-            let zero_health_amount =
-                case1_start - case1_start_health / final_health_slope / base_lot_size;
-            let zero_health_ratio = health_ratio_after_trade(zero_health_amount);
+            // We add 1 here because health is computed for truncated base_lots and we want to guarantee
+            // zero_health_ratio <= 0.
+            let zero_health_amount = case1_start_i80f48
+                - case1_start_health / final_health_slope / base_lot_size
+                + I80F48::ONE;
+            let zero_health_ratio = health_ratio_after_trade_trunc(zero_health_amount);
 
             binary_search(
-                case1_start,
+                case1_start_i80f48,
                 case1_start_ratio,
                 zero_health_amount,
                 zero_health_ratio,
                 min_ratio,
-                health_ratio_after_trade,
+                I80F48::ONE,
+                health_ratio_after_trade_trunc,
             )?
         } else {
             // Between 0 and case1_start
             binary_search(
                 I80F48::ZERO,
                 initial_ratio,
-                case1_start,
+                case1_start_i80f48,
                 case1_start_ratio,
                 min_ratio,
-                health_ratio_after_trade,
+                I80F48::ONE,
+                health_ratio_after_trade_trunc,
             )?
         };
 
-        // truncate result
-        Ok(base_lots.floor().to_num())
-        */
-        Ok(0)
+        Ok(base_lots.round_to_zero().to_num())
     }
 }
 
@@ -1248,6 +1245,7 @@ fn binary_search(
     mut right: I80F48,
     right_value: I80F48,
     target_value: I80F48,
+    min_step: I80F48,
     fun: impl Fn(I80F48) -> I80F48,
 ) -> Result<I80F48> {
     let max_iterations = 20;
@@ -1260,8 +1258,12 @@ fn binary_search(
         target_value
     );
     for _ in 0..max_iterations {
+        if (right - left).abs() < min_step {
+            return Ok(left);
+        }
         let new = I80F48::from_num(0.5) * (left + right);
         let new_value = fun(new);
+        println!("l {} r {} v {}", left, right, new_value);
         let error = new_value - target_value;
         if error > 0 && error < target_error {
             return Ok(new);
@@ -1901,7 +1903,6 @@ mod tests {
         }
     }
 
-    /*
     #[test]
     fn test_max_swap() {
         let default_token_info = |x| TokenInfo {
@@ -1953,7 +1954,7 @@ mod tests {
 
         let adjust_by_usdc = |c: &mut HealthCache, ti: TokenIndex, usdc: f64| {
             let ti = &mut c.token_infos[ti as usize];
-            ti.balance_native += I80F48::from_num(usdc) / ti.prices.fixme();
+            ti.balance_native += I80F48::from_num(usdc) / ti.prices.oracle;
         };
         let find_max_swap_actual = |c: &HealthCache,
                                     source: TokenIndex,
@@ -1964,7 +1965,7 @@ mod tests {
             let source_price = &c.token_infos[source as usize].prices;
             let target_price = &c.token_infos[target as usize].prices;
             let swap_price =
-                I80F48::from_num(price_factor) * source_price.fixme() / target_price.fixme();
+                I80F48::from_num(price_factor) * source_price.oracle / target_price.oracle;
             let source_amount = c
                 .max_swap_source_for_health_ratio(
                     source,
@@ -2090,13 +2091,14 @@ mod tests {
             prices: Prices::new_single_price(I80F48::from_num(2.0)),
             balance_native: I80F48::ZERO,
         };
+        let base_lot_size = 100;
         let default_perp_info = |x| PerpInfo {
             perp_market_index: 0,
             maint_asset_weight: I80F48::from_num(1.0 - x),
             init_asset_weight: I80F48::from_num(1.0 - x),
             maint_liab_weight: I80F48::from_num(1.0 + x),
             init_liab_weight: I80F48::from_num(1.0 + x),
-            base_lot_size: 1,
+            base_lot_size,
             base_lots: 0,
             bids_base_lots: 0,
             asks_base_lots: 0,
@@ -2120,7 +2122,6 @@ mod tests {
             }],
             being_liquidated: false,
         };
-        let base_lot_size = 100;
 
         assert_eq!(health_cache.health(HealthType::Init), I80F48::ZERO);
         assert_eq!(health_cache.health_ratio(HealthType::Init), I80F48::MAX);
@@ -2129,7 +2130,6 @@ mod tests {
                 .max_perp_for_health_ratio(
                     0,
                     I80F48::from(2),
-                    base_lot_size,
                     PerpOrderSide::Bid,
                     I80F48::from_num(50.0)
                 )
@@ -2139,20 +2139,14 @@ mod tests {
 
         let adjust_token = |c: &mut HealthCache, value: f64| {
             let ti = &mut c.token_infos[0];
-            ti.balance_native += I80F48::from_num(value) / ti.prices.fixme();
+            ti.balance_native += I80F48::from_num(value);
         };
         let find_max_trade =
             |c: &HealthCache, side: PerpOrderSide, ratio: f64, price_factor: f64| {
-                let oracle_price = &c.perp_infos[0].prices;
-                let trade_price = I80F48::from_num(price_factor) * oracle_price.fixme();
+                let prices = &c.perp_infos[0].prices;
+                let trade_price = I80F48::from_num(price_factor) * prices.oracle;
                 let base_lots = c
-                    .max_perp_for_health_ratio(
-                        0,
-                        trade_price,
-                        base_lot_size,
-                        side,
-                        I80F48::from_num(ratio),
-                    )
+                    .max_perp_for_health_ratio(0, trade_price, side, I80F48::from_num(ratio))
                     .unwrap();
                 if base_lots == i64::MAX {
                     return (i64::MAX, f64::MAX, f64::MAX);
@@ -2231,7 +2225,6 @@ mod tests {
             );
         }
     }
-    */
 
     #[test]
     fn test_health_perp_funding() {
