@@ -1,250 +1,163 @@
-use std::cell::RefMut;
-
-use crate::accounts_zerocopy::*;
 use crate::state::MangoAccountRefMut;
 use crate::{
     error::*,
-    state::{
-        orderbook::{bookside::BookSide, nodes::LeafNode},
-        EventQueue, PerpMarket, FREE_ORDER_SLOT,
-    },
+    state::{orderbook::bookside::*, EventQueue, PerpMarket, FREE_ORDER_SLOT},
 };
 use anchor_lang::prelude::*;
 use bytemuck::cast;
 use fixed::types::I80F48;
+use static_assertions::const_assert_eq;
 
-use super::{
-    nodes::NodeHandle,
-    order_type::{OrderType, Side},
-    FillEvent, OutEvent,
-};
+use super::*;
 use crate::util::checked_math as cm;
 
 /// Drop at most this many expired orders from a BookSide when trying to match orders.
 /// This exists as a guard against excessive compute use.
 const DROP_EXPIRED_ORDER_LIMIT: usize = 5;
 
-/// The implicit limit price to use for market orders
-fn market_order_limit_for_side(side: Side) -> i64 {
-    match side {
-        Side::Bid => i64::MAX,
-        Side::Ask => 1,
-    }
+#[account(zero_copy)]
+pub struct OrderBook {
+    pub bids: BookSide,
+    pub asks: BookSide,
 }
+const_assert_eq!(
+    std::mem::size_of::<OrderBook>(),
+    2 * std::mem::size_of::<BookSide>()
+);
+const_assert_eq!(std::mem::size_of::<OrderBook>() % 8, 0);
 
-/// The limit to use for PostOnlySlide orders: the tinyest bit better than
-/// the best opposing order
-fn post_only_slide_limit(side: Side, best_other_side: i64, limit: i64) -> i64 {
-    match side {
-        Side::Bid => limit.min(cm!(best_other_side - 1)),
-        Side::Ask => limit.max(cm!(best_other_side + 1)),
-    }
-}
-
-pub struct Book<'a> {
-    pub bids: RefMut<'a, BookSide>, // todo: why refmut?
-    pub asks: RefMut<'a, BookSide>,
-}
-
-impl<'a> Book<'a> {
-    pub fn new(bids: RefMut<'a, BookSide>, asks: RefMut<'a, BookSide>) -> Self {
-        Self { bids, asks }
+impl OrderBook {
+    pub fn init(&mut self) {
+        self.bids.fixed.order_tree_type = OrderTreeType::Bids;
+        self.bids.oracle_pegged.order_tree_type = OrderTreeType::Bids;
+        self.asks.fixed.order_tree_type = OrderTreeType::Asks;
+        self.asks.oracle_pegged.order_tree_type = OrderTreeType::Asks;
     }
 
-    pub fn load_mut(
-        bids_ai: &'a AccountInfo,
-        asks_ai: &'a AccountInfo,
-        perp_market: &PerpMarket,
-    ) -> std::result::Result<Self, Error> {
-        require!(bids_ai.key == &perp_market.bids, MangoError::SomeError);
-        require!(asks_ai.key == &perp_market.asks, MangoError::SomeError);
-        Ok(Self::new(
-            bids_ai.load_mut::<BookSide>()?,
-            asks_ai.load_mut::<BookSide>()?,
-        ))
-    }
-
-    pub fn bookside(&mut self, side: Side) -> &mut BookSide {
+    pub fn bookside_mut(&mut self, side: Side) -> &mut BookSide {
         match side {
             Side::Bid => &mut self.bids,
             Side::Ask => &mut self.asks,
         }
     }
 
-    /// Returns best valid bid
-    pub fn best_bid_price(&self, now_ts: u64) -> Option<i64> {
-        Some(self.bids.iter_valid(now_ts).next()?.1.price())
-    }
-
-    /// Returns best valid ask
-    pub fn best_ask_price(&self, now_ts: u64) -> Option<i64> {
-        Some(self.asks.iter_valid(now_ts).next()?.1.price())
-    }
-
-    pub fn best_price(&self, now_ts: u64, side: Side) -> Option<i64> {
+    pub fn bookside(&self, side: Side) -> &BookSide {
         match side {
-            Side::Bid => self.best_bid_price(now_ts),
-            Side::Ask => self.best_ask_price(now_ts),
+            Side::Bid => &self.bids,
+            Side::Ask => &self.asks,
         }
     }
 
-    /// Get the quantity of valid bids above and including the price
-    pub fn bids_size_above(&self, price: i64, max_depth: i64, now_ts: u64) -> i64 {
-        let mut sum: i64 = 0;
-        for (_, bid) in self.bids.iter_valid(now_ts) {
-            if price > bid.price() || sum >= max_depth {
-                break;
-            }
-            sum = sum.checked_add(bid.quantity).unwrap();
-        }
-        sum.min(max_depth)
+    pub fn best_price(&self, now_ts: u64, oracle_price_lots: i64, side: Side) -> Option<i64> {
+        Some(
+            self.bookside(side)
+                .iter_valid(now_ts, oracle_price_lots)
+                .next()?
+                .price_lots,
+        )
     }
 
     /// Walk up the book `quantity` units and return the price at that level. If `quantity` units
     /// not on book, return None
-    pub fn impact_price(&self, side: Side, quantity: i64, now_ts: u64) -> Option<i64> {
+    pub fn impact_price(
+        &self,
+        side: Side,
+        quantity: i64,
+        now_ts: u64,
+        oracle_price_lots: i64,
+    ) -> Option<i64> {
         let mut sum: i64 = 0;
-        let book_side = match side {
-            Side::Bid => self.bids.iter_valid(now_ts),
-            Side::Ask => self.asks.iter_valid(now_ts),
-        };
-        for (_, order) in book_side {
-            sum = sum.checked_add(order.quantity).unwrap();
+        let bookside = self.bookside(side);
+        let iter = bookside.iter_valid(now_ts, oracle_price_lots);
+        for order in iter {
+            cm!(sum += order.node.quantity);
             if sum >= quantity {
-                return Some(order.price());
+                return Some(order.price_lots);
             }
         }
         None
     }
 
-    /// Get the quantity of valid asks below and including the price
-    pub fn asks_size_below(&self, price: i64, max_depth: i64, now_ts: u64) -> i64 {
-        let mut s = 0;
-        for (_, ask) in self.asks.iter_valid(now_ts) {
-            if price < ask.price() || s >= max_depth {
-                break;
-            }
-            s += ask.quantity;
-        }
-        s.min(max_depth)
-    }
-    /// Get the quantity of valid bids above this order id. Will return full size of book if order id not found
-    pub fn bids_size_above_order(&self, order_id: i128, max_depth: i64, now_ts: u64) -> i64 {
-        let mut s = 0;
-        for (_, bid) in self.bids.iter_valid(now_ts) {
-            if bid.key == order_id || s >= max_depth {
-                break;
-            }
-            s += bid.quantity;
-        }
-        s.min(max_depth)
-    }
-
-    /// Get the quantity of valid asks above this order id. Will return full size of book if order id not found
-    pub fn asks_size_below_order(&self, order_id: i128, max_depth: i64, now_ts: u64) -> i64 {
-        let mut s = 0;
-        for (_, ask) in self.asks.iter_valid(now_ts) {
-            if ask.key == order_id || s >= max_depth {
-                break;
-            }
-            s += ask.quantity;
-        }
-        s.min(max_depth)
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub fn new_order(
         &mut self,
-        side: Side,
+        order: Order,
         perp_market: &mut PerpMarket,
         event_queue: &mut EventQueue,
         oracle_price: I80F48,
         mango_account: &mut MangoAccountRefMut,
         mango_account_pk: &Pubkey,
-        price_lots: i64,
-        max_base_lots: i64,
-        max_quote_lots: i64,
-        order_type: OrderType,
-        time_in_force: u8,
-        client_order_id: u64,
         now_ts: u64,
         mut limit: u8,
     ) -> std::result::Result<(), Error> {
+        let side = order.side;
         let other_side = side.invert_side();
         let market = perp_market;
-        let (post_only, mut post_allowed, price_lots) = match order_type {
-            OrderType::Limit => (false, true, price_lots),
-            OrderType::ImmediateOrCancel => (false, false, price_lots),
-            OrderType::PostOnly => (true, true, price_lots),
-            OrderType::Market => (false, false, market_order_limit_for_side(side)),
-            OrderType::PostOnlySlide => {
-                let price = if let Some(best_other_price) = self.best_price(now_ts, other_side) {
-                    post_only_slide_limit(side, best_other_price, price_lots)
-                } else {
-                    price_lots
-                };
-                (true, true, price)
-            }
-        };
+        let oracle_price_lots = market.native_price_to_lot(oracle_price);
+        let post_only = order.is_post_only();
+        let mut post_target = order.post_target();
+        let (price_lots, price_data) = order.price(now_ts, oracle_price_lots, self)?;
 
-        if post_allowed {
+        if post_target.is_some() {
             // price limit check computed lazily to save CU on average
             let native_price = market.lot_to_native_price(price_lots);
             if !market.inside_price_limit(side, native_price, oracle_price) {
                 msg!("Posting on book disallowed due to price limits");
-                post_allowed = false;
+                post_target = None;
             }
         }
 
         // generate new order id
-        let order_id = market.gen_order_id(side, price_lots);
+        let order_id = market.gen_order_id(side, price_data);
 
         // Iterate through book and match against this new order.
         //
         // Any changes to matching orders on the other side of the book are collected in
         // matched_changes/matched_deletes and then applied after this loop.
-        let mut remaining_base_lots = max_base_lots;
-        let mut remaining_quote_lots = max_quote_lots;
-        let mut matched_order_changes: Vec<(NodeHandle, i64)> = vec![];
-        let mut matched_order_deletes: Vec<i128> = vec![];
+        let mut remaining_base_lots = order.max_base_lots;
+        let mut remaining_quote_lots = order.max_quote_lots;
+        let mut matched_order_changes: Vec<(BookSideOrderHandle, i64)> = vec![];
+        let mut matched_order_deletes: Vec<(BookSideOrderTree, u128)> = vec![];
         let mut number_of_dropped_expired_orders = 0;
-        let opposing_bookside = self.bookside(other_side);
-        for (best_opposing_h, best_opposing) in opposing_bookside.iter_all_including_invalid() {
-            if !best_opposing.is_valid(now_ts) {
+        let opposing_bookside = self.bookside_mut(other_side);
+        for best_opposing in opposing_bookside.iter_all_including_invalid(now_ts, oracle_price_lots)
+        {
+            if !best_opposing.is_valid {
                 // Remove the order from the book unless we've done that enough
                 if number_of_dropped_expired_orders < DROP_EXPIRED_ORDER_LIMIT {
                     number_of_dropped_expired_orders += 1;
                     let event = OutEvent::new(
                         other_side,
-                        best_opposing.owner_slot,
+                        best_opposing.node.owner_slot,
                         now_ts,
                         event_queue.header.seq_num,
-                        best_opposing.owner,
-                        best_opposing.quantity,
+                        best_opposing.node.owner,
+                        best_opposing.node.quantity,
                     );
                     event_queue.push_back(cast(event)).unwrap();
-                    matched_order_deletes.push(best_opposing.key);
+                    matched_order_deletes
+                        .push((best_opposing.handle.order_tree, best_opposing.node.key));
                 }
                 continue;
             }
 
-            let best_opposing_price = best_opposing.price();
+            let best_opposing_price = best_opposing.price_lots;
 
             if !side.is_price_within_limit(best_opposing_price, price_lots) {
                 break;
             } else if post_only {
                 msg!("Order could not be placed due to PostOnly");
-                post_allowed = false;
+                post_target = None;
                 break; // return silently to not fail other instructions in tx
             } else if limit == 0 {
                 msg!("Order matching limit reached");
-                post_allowed = false;
+                post_target = None;
                 break;
             }
 
             let max_match_by_quote = remaining_quote_lots / best_opposing_price;
             let match_base_lots = remaining_base_lots
-                .min(best_opposing.quantity)
+                .min(best_opposing.node.quantity)
                 .min(max_match_by_quote);
             let done =
                 match_base_lots == max_match_by_quote || match_base_lots == remaining_base_lots;
@@ -253,12 +166,13 @@ impl<'a> Book<'a> {
             cm!(remaining_base_lots -= match_base_lots);
             cm!(remaining_quote_lots -= match_quote_lots);
 
-            let new_best_opposing_quantity = cm!(best_opposing.quantity - match_base_lots);
+            let new_best_opposing_quantity = cm!(best_opposing.node.quantity - match_base_lots);
             let maker_out = new_best_opposing_quantity == 0;
             if maker_out {
-                matched_order_deletes.push(best_opposing.key);
+                matched_order_deletes
+                    .push((best_opposing.handle.order_tree, best_opposing.node.key));
             } else {
-                matched_order_changes.push((best_opposing_h, new_best_opposing_quantity));
+                matched_order_changes.push((best_opposing.handle, new_best_opposing_quantity));
             }
 
             // Record the taker trade in the account already, even though it will only be
@@ -269,17 +183,17 @@ impl<'a> Book<'a> {
             let fill = FillEvent::new(
                 side,
                 maker_out,
-                best_opposing.owner_slot,
+                best_opposing.node.owner_slot,
                 now_ts,
                 event_queue.header.seq_num,
-                best_opposing.owner,
-                best_opposing.key,
-                best_opposing.client_order_id,
+                best_opposing.node.owner,
+                best_opposing.node.key,
+                best_opposing.node.client_order_id,
                 market.maker_fee,
-                best_opposing.timestamp,
+                best_opposing.node.timestamp,
                 *mango_account_pk,
                 order_id,
-                client_order_id,
+                order.client_order_id,
                 market.taker_fee,
                 best_opposing_price,
                 match_base_lots,
@@ -291,7 +205,7 @@ impl<'a> Book<'a> {
                 break;
             }
         }
-        let total_quote_lots_taken = cm!(max_quote_lots - remaining_quote_lots);
+        let total_quote_lots_taken = cm!(order.max_quote_lots - remaining_quote_lots);
 
         // Apply changes to matched asks (handles invalidate on delete!)
         for (handle, new_quantity) in matched_order_changes {
@@ -302,17 +216,21 @@ impl<'a> Book<'a> {
                 .unwrap()
                 .quantity = new_quantity;
         }
-        for key in matched_order_deletes {
-            let _removed_leaf = opposing_bookside.remove_by_key(key).unwrap();
+        for (component, key) in matched_order_deletes {
+            let _removed_leaf = opposing_bookside.remove_by_key(component, key).unwrap();
         }
 
         // If there are still quantity unmatched, place on the book
         let book_base_quantity = remaining_base_lots.min(remaining_quote_lots / price_lots);
-        msg!("{:?}", post_allowed);
-        if post_allowed && book_base_quantity > 0 {
+        if book_base_quantity <= 0 {
+            post_target = None;
+        }
+        if let Some(order_tree_target) = post_target {
+            let bookside = self.bookside_mut(side);
+            let order_tree = bookside.orders_mut(order_tree_target);
+
             // Drop an expired order if possible
-            let bookside = self.bookside(side);
-            if let Some(expired_order) = bookside.remove_one_expired(now_ts) {
+            if let Some(expired_order) = order_tree.remove_one_expired(now_ts) {
                 let event = OutEvent::new(
                     side,
                     expired_order.owner_slot,
@@ -324,12 +242,12 @@ impl<'a> Book<'a> {
                 event_queue.push_back(cast(event)).unwrap();
             }
 
-            if bookside.is_full() {
+            if order_tree.is_full() {
                 // If this bid is higher than lowest bid, boot that bid and insert this one
-                let worst_order = bookside.remove_worst().unwrap();
+                let worst_order = order_tree.remove_worst().unwrap();
                 // MangoErrorCode::OutOfSpace
                 require!(
-                    side.is_price_better(price_lots, worst_order.price()),
+                    side.is_price_data_better(price_data, worst_order.price_data()),
                     MangoError::SomeError
                 );
                 let event = OutEvent::new(
@@ -349,12 +267,13 @@ impl<'a> Book<'a> {
                 order_id,
                 *mango_account_pk,
                 book_base_quantity,
-                client_order_id,
+                order.client_order_id,
                 now_ts,
-                order_type,
-                time_in_force,
+                PostOrderType::Limit, // TODO: Support order types? needed?
+                order.time_in_force,
+                order.peg_limit(),
             );
-            let _result = bookside.insert_leaf(&new_order)?;
+            let _result = order_tree.insert_leaf(&new_order)?;
 
             // TODO OPT remove if PlacePerpOrder needs more compute
             msg!(
@@ -368,7 +287,12 @@ impl<'a> Book<'a> {
                 price_lots
             );
 
-            mango_account.add_perp_order(market.perp_market_index, side, &new_order)?;
+            mango_account.add_perp_order(
+                market.perp_market_index,
+                side,
+                order_tree_target,
+                &new_order,
+            )?;
         }
 
         // if there were matched taker quote apply ref fees
@@ -378,7 +302,7 @@ impl<'a> Book<'a> {
         }
 
         // IOC orders have a fee penalty applied regardless of match
-        if order_type == OrderType::ImmediateOrCancel {
+        if order.needs_penalty_fee() {
             apply_penalty(market, mango_account)?;
         }
 
@@ -397,21 +321,20 @@ impl<'a> Book<'a> {
     ) -> Result<()> {
         for i in 0..mango_account.header.perp_oo_count() {
             let oo = mango_account.perp_order_by_raw_index(i);
-            if oo.order_market == FREE_ORDER_SLOT
-                || oo.order_market != perp_market.perp_market_index
-            {
+            if oo.market == FREE_ORDER_SLOT || oo.market != perp_market.perp_market_index {
                 continue;
             }
 
-            let order_side = oo.order_side;
+            let order_side_and_tree = oo.side_and_tree;
             if let Some(side_to_cancel) = side_to_cancel_option {
-                if side_to_cancel != order_side {
+                if side_to_cancel != order_side_and_tree.side() {
                     continue;
                 }
             }
 
-            let order_id = oo.order_id;
-            self.cancel_order(mango_account, order_id, order_side, None)?;
+            let order_id = oo.id;
+
+            self.cancel_order(mango_account, order_id, order_side_and_tree, None)?;
 
             limit -= 1;
             if limit == 0 {
@@ -426,19 +349,16 @@ impl<'a> Book<'a> {
     pub fn cancel_order(
         &mut self,
         mango_account: &mut MangoAccountRefMut,
-        order_id: i128,
-        side: Side,
+        order_id: u128,
+        side_and_tree: SideAndOrderTree,
         expected_owner: Option<Pubkey>,
     ) -> Result<LeafNode> {
-        let leaf_node =
-            match side {
-                Side::Bid => self.bids.remove_by_key(order_id).ok_or_else(|| {
-                    error_msg!("invalid perp order id {order_id} for side {side:?}")
-                }),
-                Side::Ask => self.asks.remove_by_key(order_id).ok_or_else(|| {
-                    error_msg!("invalid perp order id {order_id} for side {side:?}")
-                }),
-            }?;
+        let side = side_and_tree.side();
+        let book_component = side_and_tree.order_tree();
+        let leaf_node = self.bookside_mut(side).orders_mut(book_component).
+        remove_by_key(order_id).ok_or_else(|| {
+                    error_msg!("invalid perp order id {order_id} for side {side:?} and component {book_component:?}")
+                })?;
         if let Some(owner) = expected_owner {
             require_keys_eq!(leaf_node.owner, owner);
         }

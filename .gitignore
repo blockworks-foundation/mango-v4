@@ -18,9 +18,4 @@ programs/mango-v4/src/lib-expanded.rs
 
 keeper/.env
 
-ts/client/**/*.js
-ts/client/**/*.js.map
-migrations/*.js
-migrations/*.js.map
-
 ts/client/src/scripts/archive/ts.ts

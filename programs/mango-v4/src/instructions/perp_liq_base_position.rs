@@ -82,8 +82,10 @@ pub fn perp_liq_base_position(
     let base_lot_size = I80F48::from(perp_market.base_lot_size);
 
     // Get oracle price for market. Price is validated inside
-    let oracle_price =
-        perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
+    let oracle_price = perp_market.oracle_price(
+        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        None, // checked in health
+    )?;
     let price_per_lot = cm!(base_lot_size * oracle_price);
 
     // Fetch perp positions for accounts, creating for the liqor if needed

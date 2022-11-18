@@ -7,7 +7,7 @@ import {
 } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
+import { MANGO_V4_ID, MSRM_MINTS } from '../constants';
 import { buildVersionedTx } from '../utils';
 
 //
@@ -65,20 +65,40 @@ async function main() {
     adminProvider,
     'devnet',
     MANGO_V4_ID['devnet'],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
 
   // group
   console.log(`Creating Group...`);
   const insuranceMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
-    await client.groupCreate(GROUP_NUM, true, 0, insuranceMint);
+    await client.groupCreate(
+      GROUP_NUM,
+      true,
+      0,
+      insuranceMint,
+      MSRM_MINTS['devnet'],
+    );
   } catch (error) {
     console.log(error);
   }
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(`...registered group ${group.publicKey}`);
+
+  const defaultOracleConfig = {
+    confFilter: 0.1,
+    maxStalenessSlots: null,
+  };
+  const defaultInterestRate = {
+    adjustmentFactor: 0.004,
+    util0: 0.7,
+    rate0: 0.1,
+    util1: 0.85,
+    rate1: 0.2,
+    maxRate: 2.0,
+  };
 
   // stub oracle + register token 0
   console.log(`Registering USDC...`);
@@ -97,15 +117,10 @@ async function main() {
       group,
       usdcDevnetMint,
       usdcDevnetOracle.publicKey,
-      0.1,
+      defaultOracleConfig,
       0, // tokenIndex
       'USDC',
-      0.004,
-      0.7,
-      0.1,
-      0.85,
-      0.2,
-      2.0,
+      defaultInterestRate,
       0.005,
       0.0005,
       1,
@@ -126,15 +141,10 @@ async function main() {
       group,
       btcDevnetMint,
       btcDevnetOracle,
-      0.1,
+      defaultOracleConfig,
       1, // tokenIndex
       'BTC',
-      0.004,
-      0.7,
-      0.1,
-      0.85,
-      0.2,
-      2.0,
+      defaultInterestRate,
       0.005,
       0.0005,
       0.9,
@@ -157,15 +167,10 @@ async function main() {
       group,
       solDevnetMint,
       solDevnetOracle,
-      0.1,
+      defaultOracleConfig,
       2, // tokenIndex
       'SOL',
-      0.004,
-      0.7,
-      0.1,
-      0.85,
-      0.2,
-      2.0,
+      defaultInterestRate,
       0.005,
       0.0005,
       0.9,
@@ -188,15 +193,17 @@ async function main() {
       group,
       orcaDevnetMint,
       orcaDevnetOracle,
-      0.1,
+      defaultOracleConfig,
       3, // tokenIndex
       'ORCA',
-      0.01,
-      0.4,
-      0.07,
-      0.8,
-      0.9,
-      0.63,
+      {
+        adjustmentFactor: 0.01,
+        util0: 0.4,
+        rate0: 0.07,
+        util1: 0.8,
+        rate1: 0.9,
+        maxRate: 0.63, // weird?
+      },
       0.0005,
       0.0005,
       0.8,
@@ -219,15 +226,10 @@ async function main() {
       group,
       ethDevnetMint,
       ethDevnetOracle,
-      0.1,
+      defaultOracleConfig,
       7, // tokenIndex
       'ETH',
-      0.004,
-      0.7,
-      0.1,
-      0.85,
-      0.2,
-      2.0,
+      defaultInterestRate,
       0.005,
       0.0005,
       0.9,
@@ -250,15 +252,10 @@ async function main() {
       group,
       srmDevnetMint,
       srmDevnetOracle,
-      0.1,
+      defaultOracleConfig,
       5, // tokenIndex
       'SRM',
-      0.004,
-      0.7,
-      0.1,
-      0.85,
-      0.2,
-      2.0,
+      defaultInterestRate,
       0.005,
       0.0005,
       0.9,
@@ -362,7 +359,7 @@ async function main() {
       btcDevnetOracle,
       0,
       'BTC-PERP',
-      0.1,
+      defaultOracleConfig,
       6,
       10,
       100,
@@ -402,16 +399,9 @@ async function main() {
         group,
         usdcDevnetMint,
         usdcDevnetOracle.publicKey,
-        0.1,
+        defaultOracleConfig,
         null,
-        {
-          adjustmentFactor: 0.004,
-          util0: 0.7,
-          rate0: 0.1,
-          util1: 0.85,
-          rate1: 0.2,
-          maxRate: 2.0,
-        },
+        defaultInterestRate,
         0.005,
         0.0005,
         1,
@@ -433,16 +423,9 @@ async function main() {
         group,
         usdcDevnetMint,
         usdcDevnetOracle.publicKey,
-        0.1,
+        defaultOracleConfig,
         null,
-        {
-          adjustmentFactor: 0.004,
-          util0: 0.7,
-          rate0: 0.1,
-          util1: 0.85,
-          rate1: 0.2,
-          maxRate: 2.0,
-        },
+        defaultInterestRate,
         0.005,
         0.0005,
         0.9,
@@ -464,16 +447,9 @@ async function main() {
         group,
         usdcDevnetMint,
         usdcDevnetOracle.publicKey,
-        0.1,
+        defaultOracleConfig,
         null,
-        {
-          adjustmentFactor: 0.004,
-          util0: 0.7,
-          rate0: 0.1,
-          util1: 0.85,
-          rate1: 0.2,
-          maxRate: 2.0,
-        },
+        defaultInterestRate,
         0.005,
         0.0005,
         0.9,
@@ -495,7 +471,7 @@ async function main() {
         group,
         group.getPerpMarketByName('BTC-PERP').perpMarketIndex,
         btcDevnetOracle,
-        0.1,
+        defaultOracleConfig,
         6,
         0.975,
         0.95,

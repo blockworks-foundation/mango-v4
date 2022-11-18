@@ -54,8 +54,9 @@ async function main() {
     userProvider,
     'devnet',
     MANGO_V4_ID['devnet'],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
@@ -470,6 +471,7 @@ async function main() {
         quoteQty,
         clientId,
         PerpOrderType.limit,
+        false,
         0, //Date.now() + 200,
         1,
       );
@@ -512,6 +514,7 @@ async function main() {
         quoteQty,
         clientId,
         PerpOrderType.limit,
+        false,
         0, //Date.now() + 200,
         1,
       );
@@ -552,6 +555,7 @@ async function main() {
         quoteQty,
         clientId,
         PerpOrderType.limit,
+        false,
         0, //Date.now() + 200,
         1,
       );
@@ -583,6 +587,7 @@ async function main() {
         quoteQty,
         clientId,
         PerpOrderType.limit,
+        false,
         0, //Date.now() + 200,
         1,
       );
@@ -617,6 +622,7 @@ async function main() {
         price * 0.01,
         clientId,
         PerpOrderType.limit,
+        false,
         0, //Date.now() + 200,
         1,
       );
@@ -638,6 +644,7 @@ async function main() {
         price * 0.011,
         clientId,
         PerpOrderType.limit,
+        false,
         0, //Date.now() + 200,
         1,
       );

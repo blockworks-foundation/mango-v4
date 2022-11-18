@@ -1027,7 +1027,7 @@ available-typed-arrays@^1.0.5:
   resolved "https://registry.yarnpkg.com/available-typed-arrays/-/available-typed-arrays-1.0.5.tgz#92f95616501069d07d10edb2fc37d3e1c65123b7"
   integrity sha512-DMD0KiN46eipeziST1LPP/STfDU0sufISXmjSgvVsoU2tqxctQeASejWcfNtxYKqETM1UxQ8sp2OrSBWpHY6sw==
 
-axios@^0.21.1:
+axios@^0.21.1, axios@^0.21.4:
   version "0.21.4"
   resolved "https://registry.npmjs.org/axios/-/axios-0.21.4.tgz"
   integrity sha512-ut5vewkiu8jjGBdqpM44XxjuCjq9LAKeHVmoVfHVzy8eHgxxq8SbAVQNovDA8mVi05kP0Ea/n/UzcSHcTJQfNg==
@@ -1903,6 +1903,15 @@ fsevents@~2.3.2:
   version "2.3.2"
   resolved "https://registry.npmjs.org/fsevents/-/fsevents-2.3.2.tgz"
   integrity sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==
+
+ftx-api@^1.1.13:
+  version "1.1.13"
+  resolved "https://registry.yarnpkg.com/ftx-api/-/ftx-api-1.1.13.tgz#89ced81182020c80bcf5a97082fd3b2b62d1fea3"
+  integrity sha512-YZdiU4QN2H8wId4Bglb/Yj6hJrLImKv/yEIj3jw1pHMb1Bv/kdM25mlr+t+TqGPWy2prX/ywsh1+OVVI6G5jhA==
+  dependencies:
+    axios "^0.21.4"
+    isomorphic-ws "^4.0.1"
+    ws "^7.4.0"
 
 function-bind@^1.1.1:
   version "1.1.1"
@@ -3465,7 +3474,7 @@ wrappy@1:
   resolved "https://registry.npmjs.org/wrappy/-/wrappy-1.0.2.tgz"
   integrity sha1-tSQ9jz7BqjXxNkYFvA0QNuMKtp8=
 
-ws@^7.4.5:
+ws@^7.4.0, ws@^7.4.5:
   version "7.5.9"
   resolved "https://registry.yarnpkg.com/ws/-/ws-7.5.9.tgz#54fa7db29f4c7cec68b1ddd3a89de099942bb591"
   integrity sha512-F+P9Jil7UiSKSkppIiD94dN07AwvFixvLIj1Og1Rl9GGMuNipJnV9JzjD6XuqmAeiswGvUmNLjr5cFuXwNS77Q==

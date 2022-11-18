@@ -123,6 +123,8 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     let send_flash_loan_tx = |solana, withdraw_amount, deposit_amount| async move {
         let mut tx = ClientTransaction::new(solana);
         tx.add_instruction(FlashLoanBeginInstruction {
+            account,
+            owner,
             group,
             mango_token_bank: bank,
             mango_token_vault: vault,

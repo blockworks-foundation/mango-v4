@@ -80,7 +80,7 @@ pub fn token_register(
     ctx: Context<TokenRegister>,
     token_index: TokenIndex,
     name: String,
-    oracle_config: OracleConfig,
+    oracle_config: OracleConfigParams,
     interest_rate_params: InterestRateParams,
     loan_fee_rate: f32,
     loan_origination_fee_rate: f32,
@@ -105,7 +105,6 @@ pub fn token_register(
         mint: ctx.accounts.mint.key(),
         vault: ctx.accounts.vault.key(),
         oracle: ctx.accounts.oracle.key(),
-        oracle_config,
         deposit_index: INDEX_START,
         borrow_index: INDEX_START,
         cached_indexed_total_deposits: I80F48::ZERO,
@@ -137,7 +136,9 @@ pub fn token_register(
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
-        reserved: [0; 2560],
+        oracle_conf_filter: oracle_config.to_oracle_config().conf_filter,
+        oracle_config: oracle_config.to_oracle_config(),
+        reserved: [0; 2464],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
@@ -151,7 +152,7 @@ pub fn token_register(
         banks: Default::default(),
         vaults: Default::default(),
         oracle: ctx.accounts.oracle.key(),
-        registration_time: Clock::get()?.unix_timestamp,
+        registration_time: Clock::get()?.unix_timestamp.try_into().unwrap(),
         reserved: [0; 2560],
     };
 

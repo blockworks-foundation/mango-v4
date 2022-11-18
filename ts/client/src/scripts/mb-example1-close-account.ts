@@ -1,4 +1,4 @@
-import { AnchorProvider, Wallet } from '@project-serum/anchor';
+import { AnchorProvider, BN, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
 import fs from 'fs';
 import { Serum3Side } from '../accounts/serum3';
@@ -47,9 +47,11 @@ async function closeUserAccount(userKeypairFile: string) {
   try {
     // cancel serum3 accounts, closing might require cancelling orders and settling
     for (const serum3Account of mangoAccount.serum3Active()) {
-      let orders = await client.getSerum3Orders(
+      let orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
+        client,
         group,
-        group.getSerum3MarketByIndex(serum3Account.marketIndex)!.name,
+        group.serum3MarketsMapByMarketIndex.get(serum3Account.marketIndex)
+          ?.serumMarketExternal!,
       );
       for (const order of orders) {
         console.log(
@@ -59,8 +61,8 @@ async function closeUserAccount(userKeypairFile: string) {
         await client.serum3CancelOrder(
           group,
           mangoAccount,
-
-          'BTC/USDC',
+          group.serum3MarketsMapByMarketIndex.get(serum3Account.marketIndex)
+            ?.serumMarketExternal!,
           order.side === 'buy' ? Serum3Side.bid : Serum3Side.ask,
           order.orderId,
         );
@@ -69,23 +71,29 @@ async function closeUserAccount(userKeypairFile: string) {
       await client.serum3SettleFunds(
         group,
         mangoAccount,
-        group.getSerum3MarketByIndex(serum3Account.marketIndex)!.name,
+        group.serum3MarketsMapByMarketIndex.get(serum3Account.marketIndex)
+          ?.serumMarketExternal!,
       );
       await client.serum3CloseOpenOrders(
         group,
         mangoAccount,
-        group.getSerum3MarketByIndex(serum3Account.marketIndex)!.name,
+        group.serum3MarketsMapByMarketIndex.get(serum3Account.marketIndex)
+          ?.serumMarketExternal!,
       );
     }
 
     // we closed a serum account, this changes the health accounts we are passing in for future ixs
-    await mangoAccount.reload(client, group);
+    await mangoAccount.reload(client);
 
     // withdraw all tokens
     for (const token of mangoAccount.tokensActive()) {
-      const native = token.native(group.findBank(token.tokenIndex)!);
+      const native = token.balance(
+        group.getFirstBankByTokenIndex(token.tokenIndex)!,
+      );
       console.log(
-        `token native ${native} ${group.findBank(token.tokenIndex)!.name}`,
+        `token native ${native} ${
+          group.getFirstBankByTokenIndex(token.tokenIndex)!.name
+        }`,
       );
       if (native.toNumber() < 1) {
         continue;
@@ -94,8 +102,12 @@ async function closeUserAccount(userKeypairFile: string) {
       await client.tokenWithdrawNative(
         group,
         mangoAccount,
-        group.findBank(token.tokenIndex)!.name,
-        token.native(group.findBank(token.tokenIndex)!).toNumber(),
+        group.getFirstBankByTokenIndex(token.tokenIndex)!.mint,
+        new BN(
+          token
+            .balance(group.getFirstBankByTokenIndex(token.tokenIndex)!)
+            .toNumber(),
+        ),
         false,
       );
     }
@@ -103,7 +115,7 @@ async function closeUserAccount(userKeypairFile: string) {
     console.log(error);
   }
 
-  await mangoAccount.reload(client, group);
+  await mangoAccount.reload(client);
   console.log(`...mangoAccount ${mangoAccount.publicKey}`);
   console.log(mangoAccount.toString());
 

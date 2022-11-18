@@ -101,8 +101,10 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     );
 
     // Get oracle price for market. Price is validated inside
-    let oracle_price =
-        perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
+    let oracle_price = perp_market.oracle_price(
+        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        None, // staleness checked in health
+    )?;
 
     // Fetch perp positions for accounts
     let a_perp_position = account_a.perp_position_mut(perp_market_index)?;

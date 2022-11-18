@@ -10,6 +10,8 @@ export type TokenIndex = number & As<'token-index'>;
 
 export type OracleConfig = {
   confFilter: I80F48Dto;
+  maxStalenessSlots: BN;
+  reserved: number[];
 };
 
 export interface BankForHealth {
