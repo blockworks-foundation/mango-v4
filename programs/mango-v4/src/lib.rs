@@ -14,6 +14,7 @@ pub mod accounts_zerocopy;
 pub mod address_lookup_table_program;
 pub mod error;
 pub mod events;
+pub mod i80f48;
 pub mod instructions;
 pub mod logs;
 pub mod serum3_cpi;
