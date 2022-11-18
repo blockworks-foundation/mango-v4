@@ -743,7 +743,9 @@ export class PerpOrder {
       : U64_MAX_BN;
 
     return new PerpOrder(
-      leafNode.key.maskn(64),
+      type === BookSideType.bids
+        ? new BN('18446744073709551615').sub(leafNode.key.maskn(64))
+        : leafNode.key.maskn(64),
       leafNode.key,
       leafNode.clientOrderId,
       leafNode.owner,
