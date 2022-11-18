@@ -39,6 +39,7 @@ impl Prices {
         }
     }
 
+    #[inline(always)]
     pub fn liab(&self, health_type: HealthType) -> I80F48 {
         if health_type == HealthType::Maint {
             self.oracle
@@ -47,6 +48,7 @@ impl Prices {
         }
     }
 
+    #[inline(always)]
     pub fn asset(&self, health_type: HealthType) -> I80F48 {
         if health_type == HealthType::Maint {
             self.oracle
@@ -55,6 +57,7 @@ impl Prices {
         }
     }
 
+    #[inline(always)]
     pub fn mul_using_sign(&self, v: I80F48, health_type: HealthType) -> I80F48 {
         if v.is_positive() {
             let asset_price = self.asset(health_type);
@@ -661,9 +664,9 @@ impl PerpInfo {
     #[inline(always)]
     fn uncapped_health_contribution(&self, health_type: HealthType) -> I80F48 {
         let order_execution_case = |orders_base_lots: i64| {
-            let net_base_lots = cm!(self.base_lots + orders_base_lots);
-            let net_base_native = I80F48::from(cm!(net_base_lots * self.base_lot_size));
-            let weight = match (health_type, net_base_lots.is_negative()) {
+            let net_base_native =
+                I80F48::from(cm!((self.base_lots + orders_base_lots) * self.base_lot_size));
+            let weight = match (health_type, net_base_native.is_negative()) {
                 (HealthType::Init, true) => self.init_liab_weight,
                 (HealthType::Init, false) => self.init_asset_weight,
                 (HealthType::Maint, true) => self.maint_liab_weight,
