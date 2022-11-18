@@ -3,7 +3,6 @@ import {
   AddressLookupTableAccount,
   MessageV0,
   Signer,
-  Transaction,
   TransactionInstruction,
   VersionedTransaction,
 } from '@solana/web3.js';
@@ -27,13 +26,15 @@ export async function sendTransaction(
     recentBlockhash: latestBlockhash.blockhash,
     addressLookupTableAccounts: alts,
   });
-  const vtx = new VersionedTransaction(message);
+  let vtx = new VersionedTransaction(message);
   if (opts?.additionalSigners?.length) {
     vtx.sign([...opts?.additionalSigners]);
   }
 
   if (typeof payer.signTransaction === 'function') {
-    await payer.signTransaction(vtx as any);
+    vtx = (await payer.signTransaction(
+      vtx as any,
+    )) as unknown as VersionedTransaction;
   } else {
     vtx.sign([((provider as AnchorProvider).wallet as any).payer as Signer]);
   }
