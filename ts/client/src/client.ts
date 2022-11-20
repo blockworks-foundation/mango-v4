@@ -102,7 +102,6 @@ export class MangoClient {
     testing: boolean,
     version: number,
     insuranceMintPk: PublicKey,
-    msrmMintPk: PublicKey,
   ): Promise<TransactionSignature> {
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
     return await this.program.methods
@@ -111,23 +110,6 @@ export class MangoClient {
         creator: adminPk,
         payer: adminPk,
         insuranceMint: insuranceMintPk,
-        msrmMint: msrmMintPk,
-      })
-      .rpc();
-  }
-
-  public async groupCreateMsrmVault(
-    group: Group,
-    msrmMintPk: PublicKey,
-  ): Promise<TransactionSignature> {
-    const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
-    return await this.program.methods
-      .groupCreateMsrmVault()
-      .accounts({
-        group: group.publicKey,
-        admin: adminPk,
-        msrmMint: msrmMintPk,
-        payer: adminPk,
       })
       .rpc();
   }
@@ -1186,7 +1168,6 @@ export class MangoClient {
       )
       .accounts({
         group: group.publicKey,
-        msrmVault: group.msrmVault,
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)

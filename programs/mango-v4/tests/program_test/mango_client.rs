@@ -1120,7 +1120,6 @@ pub struct GroupCreateInstruction {
     pub creator: TestKeypair,
     pub payer: TestKeypair,
     pub insurance_mint: Pubkey,
-    pub msrm_mint: Pubkey,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for GroupCreateInstruction {
@@ -1153,16 +1152,11 @@ impl ClientInstruction for GroupCreateInstruction {
         )
         .0;
 
-        let msrm_vault =
-            Pubkey::find_program_address(&[b"MsrmVault".as_ref(), group.as_ref()], &program_id).0;
-
         let accounts = Self::Accounts {
             group,
             creator: self.creator.pubkey(),
             insurance_mint: self.insurance_mint,
             insurance_vault,
-            msrm_mint: self.msrm_mint,
-            msrm_vault,
             payer: self.payer.pubkey(),
             token_program: Token::id(),
             system_program: System::id(),
@@ -1719,11 +1713,8 @@ impl ClientInstruction for Serum3PlaceOrderInstruction {
             Serum3Side::Ask => (base_info.first_bank(), base_info.first_vault()),
         };
 
-        let group: Group = account_loader.load(&account.fixed.group).await.unwrap();
-
         let accounts = Self::Accounts {
             group: account.fixed.group,
-            msrm_vault: group.msrm_vault,
             account: self.account,
             open_orders,
             payer_bank,

@@ -7,7 +7,7 @@ import {
 } from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
-import { MANGO_V4_ID, MSRM_MINTS } from '../constants';
+import { MANGO_V4_ID } from '../constants';
 import { buildVersionedTx } from '../utils';
 
 //
@@ -74,13 +74,7 @@ async function main() {
   console.log(`Creating Group...`);
   const insuranceMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
-    await client.groupCreate(
-      GROUP_NUM,
-      true,
-      0,
-      insuranceMint,
-      MSRM_MINTS['devnet'],
-    );
+    await client.groupCreate(GROUP_NUM, true, 0, insuranceMint);
   } catch (error) {
     console.log(error);
   }
