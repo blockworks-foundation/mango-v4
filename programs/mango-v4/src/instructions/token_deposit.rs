@@ -113,7 +113,11 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         let amount_i80f48 = I80F48::from(amount);
         let position_is_active = {
             let mut bank = self.bank.load_mut()?;
-            bank.deposit(position, amount_i80f48)?
+            bank.deposit(
+                position,
+                amount_i80f48,
+                Clock::get()?.unix_timestamp.try_into().unwrap(),
+            )?
         };
 
         // Transfer the actual tokens

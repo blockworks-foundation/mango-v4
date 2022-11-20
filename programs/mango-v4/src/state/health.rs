@@ -1422,6 +1422,8 @@ mod tests {
     use std::rc::Rc;
     use std::str::FromStr;
 
+    pub const DUMMY_NOW_TS: u64 = 0;
+
     #[test]
     fn test_precision() {
         // I80F48 can only represent until 1/2^48
@@ -1578,6 +1580,7 @@ mod tests {
             .deposit(
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(100),
+                DUMMY_NOW_TS,
             )
             .unwrap();
         bank2
@@ -1585,6 +1588,7 @@ mod tests {
             .withdraw_without_fee(
                 account.ensure_token_position(4).unwrap().0,
                 I80F48::from(10),
+                DUMMY_NOW_TS,
             )
             .unwrap();
 
@@ -1760,6 +1764,7 @@ mod tests {
             .change_without_fee(
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(testcase.token1),
+                DUMMY_NOW_TS,
             )
             .unwrap();
         bank2
@@ -1767,6 +1772,7 @@ mod tests {
             .change_without_fee(
                 account.ensure_token_position(4).unwrap().0,
                 I80F48::from(testcase.token2),
+                DUMMY_NOW_TS,
             )
             .unwrap();
         bank3
@@ -1774,6 +1780,7 @@ mod tests {
             .change_without_fee(
                 account.ensure_token_position(5).unwrap().0,
                 I80F48::from(testcase.token3),
+                DUMMY_NOW_TS,
             )
             .unwrap();
 
@@ -2285,6 +2292,7 @@ mod tests {
             .change_without_fee(
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(100),
+                0,
             )
             .unwrap();
 
@@ -2366,6 +2374,7 @@ mod tests {
             .change_without_fee(
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(100),
+                DUMMY_NOW_TS,
             )
             .unwrap();
         bank1
@@ -2373,6 +2382,7 @@ mod tests {
             .change_without_fee(
                 account2.ensure_token_position(1).unwrap().0,
                 I80F48::from(-100),
+                DUMMY_NOW_TS,
             )
             .unwrap();
 

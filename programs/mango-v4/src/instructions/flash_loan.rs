@@ -392,8 +392,11 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         let loan_origination_fee = cm!(loan * bank.loan_origination_fee_rate);
         cm!(bank.collected_fees_native += loan_origination_fee);
 
-        let is_active =
-            bank.change_without_fee(position, cm!(change.amount - loan_origination_fee))?;
+        let is_active = bank.change_without_fee(
+            position,
+            cm!(change.amount - loan_origination_fee),
+            Clock::get()?.unix_timestamp.try_into().unwrap(),
+        )?;
         if !is_active {
             deactivated_token_positions.push(change.raw_token_index);
         }

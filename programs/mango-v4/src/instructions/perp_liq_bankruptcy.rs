@@ -159,7 +159,11 @@ pub fn perp_liq_bankruptcy(ctx: Context<PerpLiqBankruptcy>, max_liab_transfer: u
 
         // credit the liqor with quote tokens
         let (liqor_quote, _, _) = liqor.ensure_token_position(settle_token_index)?;
-        settle_bank.deposit(liqor_quote, insurance_transfer_i80f48)?;
+        settle_bank.deposit(
+            liqor_quote,
+            insurance_transfer_i80f48,
+            Clock::get()?.unix_timestamp.try_into().unwrap(),
+        )?;
 
         emit!(TokenBalanceLog {
             mango_group: ctx.accounts.group.key(),

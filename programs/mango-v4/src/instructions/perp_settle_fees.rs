@@ -107,7 +107,11 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     let token_position = account
         .token_position_mut(perp_market.settle_token_index)?
         .0;
-    bank.withdraw_with_fee(token_position, settlement)?;
+    bank.withdraw_with_fee(
+        token_position,
+        settlement,
+        Clock::get()?.unix_timestamp.try_into().unwrap(),
+    )?;
     // Update the settled balance on the market itself
     perp_market.fees_settled = cm!(perp_market.fees_settled + settlement);
 
