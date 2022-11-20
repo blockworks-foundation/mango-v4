@@ -1,5 +1,6 @@
 use super::{OracleConfig, TokenIndex, TokenPosition};
 use crate::accounts_zerocopy::KeyedAccountReader;
+use crate::error::{Contextable, MangoError};
 use crate::state::oracle;
 use crate::util;
 use crate::util::checked_math as cm;
@@ -104,12 +105,15 @@ pub struct Bank {
 
     pub oracle_config: OracleConfig,
 
+    pub last_net_borrows_updated_slot: u64,
+    pub net_borrowed_in_slots_window_native: i64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2464],
+    pub reserved: [u8; 2448],
 }
 const_assert_eq!(
     size_of::<Bank>(),
-    32 + 16 + 32 * 3 + 16 + 16 * 6 + 8 * 2 + 16 * 16 + 8 * 2 + 2 + 1 + 1 + 4 + 96 + 2464
+    32 + 16 + 32 * 3 + 16 + 16 * 6 + 8 * 2 + 16 * 16 + 8 * 2 + 2 + 1 + 1 + 4 + 96 + 8 + 8 + 2448
 );
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
@@ -163,7 +167,9 @@ impl Bank {
             token_index: existing_bank.token_index,
             mint_decimals: existing_bank.mint_decimals,
             oracle_config: existing_bank.oracle_config.clone(),
-            reserved: [0; 2464],
+            last_net_borrows_updated_slot: 0,
+            net_borrowed_in_slots_window_native: 0,
+            reserved: [0; 2448],
         }
     }
 
@@ -264,6 +270,8 @@ impl Bank {
         cm!(self.indexed_deposits += indexed_change);
         cm!(position.indexed_position += indexed_change);
         self.update_cumulative_interest(position, opening_indexed_position);
+
+        self.update_net_borrows(-native_amount);
 
         Ok(true)
     }
@@ -368,6 +376,8 @@ impl Bank {
         cm!(position.indexed_position -= indexed_change);
         self.update_cumulative_interest(position, opening_indexed_position);
 
+        self.update_net_borrows(-native_amount);
+
         Ok((true, loan_origination_fee))
     }
 
@@ -411,6 +421,41 @@ impl Bank {
         } else {
             self.withdraw_with_fee(position, -native_amount)
         }
+    }
+
+    pub fn update_net_borrows(&mut self, native_amount: I80F48) -> Result<()> {
+        let now_slot = Clock::get()?.slot;
+        let slots_window = 7200; // TODO make configurable
+        let settle_factor = I80F48::ONE; // TODO make configurable
+        let in_new_slots_window =
+            now_slot / slots_window > self.last_net_borrows_updated_slot / slots_window;
+        self.net_borrowed_in_slots_window_native = if in_new_slots_window {
+            native_amount
+                .checked_floor()
+                .unwrap()
+                .checked_to_num::<i64>()
+                .unwrap()
+        } else {
+            cm!(self.net_borrowed_in_slots_window_native
+                native_amount
+                    .checked_floor()
+                    .unwrap()
+                    .checked_to_num()
+                    .unwrap())
+        };
+
+        if self.net_borrowed_in_slots_window_native > 2_000_000_000_000 {
+            return err!(MangoError::SomeError).with_context(|| {
+                format!(
+                    "net borrows have exceeded {:?} the configured limit",
+                    self.net_borrowed_in_slots_window_native,
+                )
+            });
+        }
+
+        self.last_net_borrows_updated_slot = now_slot;
+
+        Ok(())
     }
 
     pub fn update_cumulative_interest(
