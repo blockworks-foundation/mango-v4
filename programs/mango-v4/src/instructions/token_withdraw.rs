@@ -178,5 +178,21 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         });
     }
 
+    // Prevent borrowing away the full bank vault. Keep some in reserve to satisfy non-borrow withdraws
+    if bank.native_deposits() != I80F48::ZERO && amount > native_position {
+        ctx.accounts.vault.reload()?;
+        let vault_to_deposits_ratio =
+            cm!(I80F48::from_num(ctx.accounts.vault.amount) / bank.native_deposits());
+        let min_vault_to_deposits_ratio = 0.2; // TODO make configurable
+        if vault_to_deposits_ratio > min_vault_to_deposits_ratio {
+            return err!(MangoError::BankBorrowLimitReached).with_context(|| {
+                format!(
+                    "Bank borrow limit reached, vault_to_deposits_ratio {:?} below min_vault_to_deposits_ratio {:?}",
+                    vault_to_deposits_ratio, min_vault_to_deposits_ratio,
+                )
+            });
+        }
+    }
+
     Ok(())
 }

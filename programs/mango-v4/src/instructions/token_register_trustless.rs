@@ -115,7 +115,9 @@ pub fn token_register_trustless(
             max_staleness_slots: -1,
             reserved: [0; 72],
         },
-        reserved: [0; 2464],
+        last_net_borrows_updated_slot: 0,
+        net_borrowed_in_slots_window_native: 0,
+        reserved: [0; 2448],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
