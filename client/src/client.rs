@@ -870,7 +870,6 @@ impl MangoClient {
                             account: *liqee.0,
                             perp_market: perp.address,
                             orderbook: perp.market.orderbook,
-                            oracle: perp.market.oracle,
                         },
                         None,
                     );
