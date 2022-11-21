@@ -232,6 +232,7 @@ impl FillEvent {
             taker_side,
             maker_out,
             maker_slot,
+            // REVIEW: drop this field
             market_fees_applied: true, // Since mango v3.3.5, market fees are adjusted at matching time
             padding: Default::default(),
             timestamp,

@@ -35,6 +35,11 @@ pub struct PerpSettleFees<'info> {
     pub settle_oracle: UncheckedAccount<'info>,
 }
 
+// REVIEW: max_settle_amount not needed, health check not needed
+//         just compute account's perp_settle_health, and that's the max settlement
+// REVIEW: This consumes negative pnl, meaning that the sum over all PNL will be more
+//         positive after this instruction. Couldn't it happen that some users have positive pnl
+//         but no one with negative pnl to settle against?
 pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) -> Result<()> {
     // max_settle_amount must greater than zero
     require!(
@@ -43,6 +48,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     );
 
     let mut account = ctx.accounts.account.load_mut()?;
+    // REVIEW: rename settle_bank
     let mut bank = ctx.accounts.settle_bank.load_mut()?;
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
@@ -81,6 +87,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         .abs()
         .min(perp_market.fees_accrued.abs())
         .min(I80F48::from(max_settle_amount));
+    // REVIEW: require! on settlement >= 0
     perp_position.change_quote_position(settlement);
     perp_market.fees_accrued = cm!(perp_market.fees_accrued - settlement);
 
@@ -93,14 +100,17 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     );
 
     // Update the account's perp_spot_transfers with the new PnL
+    // REVIEW: drop round()?
     let settlement_i64 = settlement.round().checked_to_num::<i64>().unwrap();
     cm!(perp_position.perp_spot_transfers -= settlement_i64);
     cm!(account.fixed.perp_spot_transfers -= settlement_i64);
 
     // Transfer token balances
+    // REVIEW: settle_token_index == QUOTE_TOKEN_INDEX
     let token_position = account
         .token_position_mut(perp_market.settle_token_index)?
         .0;
+    // REVIEW: Paying a fee here means that the account's health could go down! Is that a problem?
     bank.withdraw_with_fee(token_position, settlement)?;
     // Update the settled balance on the market itself
     perp_market.fees_settled = cm!(perp_market.fees_settled + settlement);
@@ -126,6 +136,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     drop(perp_market);
 
     // Verify that the result of settling did not violate the health of the account that lost money
+    // REVIEW: delete this, covered by using perp
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
     let health = compute_health(&account.borrow(), HealthType::Init, &retriever)?;
     require!(health >= 0, MangoError::HealthMustBePositive);
