@@ -319,10 +319,9 @@ async function fullMarketMaker() {
       // Calculate pf level values
       let pfQuoteValue: number | undefined = 0;
       for (const mc of Array.from(marketContexts.values())) {
-        const pos = mangoAccount.getPerpPositionUi(
-          group,
-          mc.perpMarket.perpMarketIndex,
-        );
+        const pos = mangoAccount.perpPositionExistsForMarket(mc.perpMarket)
+          ? mangoAccount.getPerpPositionUi(group, mc.perpMarket.perpMarketIndex)
+          : 0;
         const mid = (mc.binanceBid! + mc.binanceAsk!) / 2;
         if (mid) {
           pfQuoteValue += pos * mid;
@@ -405,11 +404,15 @@ async function makeMarketUpdateInstructions(
   const sizePerc = mc.params.sizePerc;
   const quoteSize = equity * sizePerc;
   const size = quoteSize / fairValue;
+
   // console.log(`equity ${equity}`);
   // console.log(`sizePerc ${sizePerc}`);
   // console.log(`fairValue ${fairValue}`);
   // console.log(`size ${size}`);
-  const basePos = mangoAccount.getPerpPositionUi(group, perpMarketIndex, true);
+
+  const basePos = mangoAccount.perpPositionExistsForMarket(mc.perpMarket)
+    ? mangoAccount.getPerpPositionUi(group, perpMarketIndex, true)
+    : 0;
   const lean = (-leanCoeff * basePos) / size;
   const pfQuoteLeanCoeff = params.pfQuoteLeanCoeff || 0.001; // How much to move if pf pos is equal to equity
   const pfQuoteLean = (pfQuoteValue / equity) * -pfQuoteLeanCoeff;
@@ -508,6 +511,7 @@ async function makeMarketUpdateInstructions(
     );
 
     const posAsTradeSizes = basePos / size;
+
     // console.log(
     //   `basePos ${basePos}, posAsTradeSizes ${posAsTradeSizes}, size ${size}`,
     // );
