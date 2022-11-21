@@ -104,19 +104,76 @@ pub struct Bank {
 
     pub oracle_config: OracleConfig,
 
-    pub ma_window: i64,
-    pub ma_price: I80F48,
-    pub ma_price_upper_bound_factor: f32,
-    pub ma_price_lower_bound_factor: f32,
+    pub safe_price: SafePriceAccumulator,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2432],
+    pub reserved: [u8; 2240],
 }
-const_assert_eq!(
-    size_of::<Bank>(),
-    3112
-);
+const_assert_eq!(size_of::<Bank>(), 3112);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
+
+#[zero_copy]
+pub struct SafePriceAccumulator {
+    pub safe_price: f64,
+    pub delay_price_slots: [f64; 24],
+    pub delay_current: f64,
+    pub last_delay_slot: u8,
+    pub padding: [u8; 3],
+    pub delay_max_growth: f32,
+    pub safe_growth_limit: f32,
+    pub delay_window: u32, // seconds
+}
+const_assert_eq!(size_of::<SafePriceAccumulator>(), 224);
+const_assert_eq!(size_of::<SafePriceAccumulator>() % 8, 0);
+
+impl SafePriceAccumulator {
+    pub fn delay_slot(&self, timestamp: u64) -> u8 {
+        ((timestamp % self.delay_window as u64) % self.delay_price_slots.len() as u64) as u8
+    }
+
+    pub fn update(&mut self, timestamp: u64, last_update: u64, oracle_price: I80F48) {
+        let dt = timestamp.saturating_sub(last_update);
+        let min_dt = 10;
+        if dt < min_dt {
+            return;
+        }
+        let oracle_price = oracle_price.to_num();
+
+        let delay_slot = self.delay_slot(timestamp);
+        if delay_slot != self.last_delay_slot {
+            self.delay_price_slots[self.last_delay_slot as usize] = self.delay_current;
+            self.last_delay_slot = delay_slot;
+        }
+        // TODO: real update
+        self.delay_current = oracle_price;
+        let delay_price = self.delay_price_slots[delay_slot as usize];
+
+        let prev_safe_price = self.safe_price;
+        let fraction = if delay_price >= prev_safe_price {
+            prev_safe_price / delay_price
+        } else {
+            delay_price / prev_safe_price
+        };
+        let max_growth_limit = 0.10;
+        let growth_limit = ((self.safe_growth_limit as f64) * fraction * fraction * (dt as f64))
+            .min(max_growth_limit);
+        // for the lower bound, we technically should divide by (1 + growth_limit), but
+        // the error is small when growth_limit is small and this saves a division
+        let lower_bound = prev_safe_price * (1.0 - growth_limit);
+        let upper_bound = prev_safe_price * (1.0 + growth_limit);
+        self.safe_price = if oracle_price < lower_bound {
+            lower_bound
+        } else if oracle_price > upper_bound {
+            upper_bound
+        } else {
+            oracle_price
+        };
+    }
+
+    pub fn delay_price(&self) -> I80F48 {
+        I80F48::from_num(self.delay_price_slots[self.last_delay_slot as usize])
+    }
+}
 
 impl Bank {
     pub fn from_existing_bank(
