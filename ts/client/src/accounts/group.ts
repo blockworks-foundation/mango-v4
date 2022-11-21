@@ -303,6 +303,7 @@ export class Group {
             bank.oracle,
             ai,
             this.getMintDecimals(bank.mint),
+            client,
           );
           bank._price = price;
           bank._uiPrice = uiPrice;
@@ -333,6 +334,7 @@ export class Group {
         perpMarket.oracle,
         ai,
         perpMarket.baseDecimals,
+        client,
       );
       perpMarket._price = price;
       perpMarket._uiPrice = uiPrice;
@@ -344,6 +346,7 @@ export class Group {
     oracle: PublicKey,
     ai: AccountInfo<Buffer>,
     baseDecimals: number,
+    client: MangoClient,
   ): Promise<{ price: I80F48; uiPrice: number }> {
     let price, uiPrice;
     if (
@@ -358,7 +361,10 @@ export class Group {
       uiPrice = parsePriceData(ai.data).previousPrice;
       price = this?.toNativePrice(uiPrice, baseDecimals);
     } else if (isSwitchboardOracle(ai)) {
-      uiPrice = await parseSwitchboardOracle(ai);
+      uiPrice = await parseSwitchboardOracle(
+        ai,
+        client.program.provider.connection,
+      );
       price = this?.toNativePrice(uiPrice, baseDecimals);
     } else {
       throw new Error(

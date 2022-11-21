@@ -1,5 +1,5 @@
 import { Magic as PythMagic } from '@pythnetwork/client';
-import { AccountInfo, PublicKey } from '@solana/web3.js';
+import { AccountInfo, Connection, PublicKey } from '@solana/web3.js';
 import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import BN from 'bn.js';
 import { I80F48, I80F48Dto } from '../numbers/I80F48';
@@ -72,17 +72,18 @@ export function parseSwitcboardOracleV2(
  */
 export async function parseSwitchboardOracle(
   accountInfo: AccountInfo<Buffer>,
+  connection: Connection,
 ): Promise<number> {
   if (accountInfo.owner.equals(SwitchboardProgram.devnetPid)) {
     if (!sbv2DevnetProgram) {
-      sbv2DevnetProgram = await SwitchboardProgram.loadDevnet();
+      sbv2DevnetProgram = await SwitchboardProgram.loadDevnet(connection);
     }
     return parseSwitcboardOracleV2(sbv2DevnetProgram, accountInfo);
   }
 
   if (accountInfo.owner.equals(SwitchboardProgram.mainnetPid)) {
     if (!sbv2MainnetProgram) {
-      sbv2MainnetProgram = await SwitchboardProgram.loadMainnet();
+      sbv2MainnetProgram = await SwitchboardProgram.loadMainnet(connection);
     }
     return parseSwitcboardOracleV2(sbv2MainnetProgram, accountInfo);
   }
