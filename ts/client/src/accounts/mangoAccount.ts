@@ -1133,6 +1133,24 @@ export class PerpPosition {
       !this.takerQuoteLots.eq(zero)
     );
   }
+
+  public getEntryPrice(perpMarket: PerpMarket): BN {
+    if (this.basePositionLots.eq(new BN(0))) {
+      return new BN(0);
+    }
+    return this.quoteEntryNative
+      .div(this.basePositionLots.mul(perpMarket.baseLotSize))
+      .abs();
+  }
+
+  public getBreakEvenPrice(perpMarket: PerpMarket): BN {
+    if (this.basePositionLots.eq(new BN(0))) {
+      return new BN(0);
+    }
+    return this.quoteRunningNative
+      .div(this.basePositionLots.mul(perpMarket.baseLotSize))
+      .abs();
+  }
 }
 
 export class PerpPositionDto {
