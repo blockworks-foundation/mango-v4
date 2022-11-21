@@ -14,7 +14,7 @@ import {
   Serum3Side,
 } from '../accounts/serum3';
 import { MangoClient } from '../client';
-import { MANGO_V4_ID, MSRM_MINTS } from '../constants';
+import { MANGO_V4_ID } from '../constants';
 import { buildVersionedTx } from '../utils';
 
 const MAINNET_MINTS = new Map([
@@ -110,13 +110,7 @@ async function createGroup() {
 
   console.log(`Creating Group...`);
   const insuranceMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
-  await client.groupCreate(
-    2,
-    true,
-    0,
-    insuranceMint,
-    MSRM_MINTS['mainnet-beta'],
-  );
+  await client.groupCreate(2, true, 0, insuranceMint);
   const group = await client.getGroupForCreator(admin.publicKey, 2);
   console.log(`...registered group ${group.publicKey}`);
 }
@@ -127,6 +121,20 @@ async function registerTokens() {
   const admin = result[1];
 
   const group = await client.getGroupForCreator(admin.publicKey, 2);
+
+  const defaultOracleConfig = {
+    confFilter: 0.1,
+    maxStalenessSlots: null,
+  };
+  // hoping that dynamic rate parameter adjustment would be enough to tune their rates to the markets needs
+  const defaultInterestRate = {
+    adjustmentFactor: 0.004, // rate parameters are chosen to be the same for all high asset weight tokens,
+    util0: 0.7,
+    rate0: 0.1,
+    util1: 0.85,
+    rate1: 0.2,
+    maxRate: 2.0,
+  };
 
   console.log(`Creating USDC stub oracle...`);
   const usdcMainnetMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
@@ -141,15 +149,10 @@ async function registerTokens() {
     group,
     usdcMainnetMint,
     usdcMainnetOracle.publicKey,
-    0.1,
+    defaultOracleConfig,
     0,
     'USDC',
-    0.004,
-    0.7,
-    0.1,
-    0.85,
-    0.2,
-    2.0,
+    defaultInterestRate,
     0.005,
     0.0005,
     1,
@@ -166,15 +169,10 @@ async function registerTokens() {
     group,
     usdtMainnetMint,
     usdtMainnetOracle,
-    0.1,
+    defaultOracleConfig,
     1,
     'USDT',
-    0.004,
-    0.7,
-    0.1,
-    0.85,
-    0.2,
-    2.0,
+    defaultInterestRate,
     0.005,
     0.0005,
     0.95,
@@ -191,15 +189,10 @@ async function registerTokens() {
     group,
     btcMainnetMint,
     btcMainnetOracle,
-    0.1,
+    defaultOracleConfig,
     2,
     'BTC',
-    0.004,
-    0.7,
-    0.1,
-    0.85,
-    0.2,
-    2.0,
+    defaultInterestRate,
     0.005,
     0.0005,
     0.9,
@@ -216,15 +209,10 @@ async function registerTokens() {
     group,
     ethMainnetMint,
     ethMainnetOracle,
-    0.1,
+    defaultOracleConfig,
     3,
     'ETH',
-    0.004,
-    0.7,
-    0.1,
-    0.85,
-    0.2,
-    2.0,
+    defaultInterestRate,
     0.005,
     0.0005,
     0.9,
@@ -241,15 +229,10 @@ async function registerTokens() {
     group,
     soEthMainnetMint,
     soEthMainnetOracle,
-    0.1,
+    defaultOracleConfig,
     4,
     'soETH',
-    0.004,
-    0.7,
-    0.1,
-    0.85,
-    0.2,
-    2.0,
+    defaultInterestRate,
     0.005,
     0.0005,
     0.9,
@@ -266,15 +249,10 @@ async function registerTokens() {
     group,
     solMainnetMint,
     solMainnetOracle,
-    0.1,
+    defaultOracleConfig,
     5,
     'SOL',
-    0.004,
-    0.7,
-    0.1,
-    0.85,
-    0.2,
-    2.0,
+    defaultInterestRate,
     0.005,
     0.0005,
     0.9,
@@ -291,15 +269,10 @@ async function registerTokens() {
     group,
     msolMainnetMint,
     msolMainnetOracle,
-    0.1,
+    defaultOracleConfig,
     6,
     'MSOL',
-    0.004,
-    0.7,
-    0.1,
-    0.85,
-    0.2,
-    2.0,
+    defaultInterestRate,
     0.005,
     0.0005,
     0.9,
@@ -315,15 +288,17 @@ async function registerTokens() {
     group,
     rayMainnetMint,
     rayMainnetOracle,
-    0.1,
+    defaultOracleConfig,
     7,
     'RAY',
-    0.004,
-    0.7,
-    0.2,
-    0.85,
-    0.4,
-    4.0,
+    {
+      adjustmentFactor: 0.004,
+      util0: 0.7,
+      rate0: 0.2,
+      util1: 0.85,
+      rate1: 0.4,
+      maxRate: 4.0,
+    },
     0.005,
     0.0005,
     7 / 8,
@@ -340,15 +315,17 @@ async function registerTokens() {
     group,
     dustMainnetMint,
     dustMainnetOracle,
-    0.1,
+    defaultOracleConfig,
     8,
     'DUST',
-    0.004,
-    0.7,
-    0.3,
-    0.85,
-    0.6,
-    6.0,
+    {
+      adjustmentFactor: 0.004,
+      util0: 0.7,
+      rate0: 0.3,
+      util1: 0.85,
+      rate1: 0.6,
+      maxRate: 6.0,
+    },
     0.005,
     0.0005,
     0, // no asset weight for isolation
@@ -639,8 +616,7 @@ async function createAndPopulateAlt() {
       .map((perpMarket) => [
         perpMarket.publicKey,
         perpMarket.oracle,
-        perpMarket.bids,
-        perpMarket.asks,
+        perpMarket.orderbook,
         perpMarket.eventQueue,
       ])
       .flat();

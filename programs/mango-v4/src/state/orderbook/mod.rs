@@ -54,8 +54,8 @@ mod tests {
         false
     }
 
-    fn test_setup(price: f64) -> (PerpMarket, I80F48, EventQueue, Box<OrderBook>) {
-        let mut book = Box::new(OrderBook::zeroed());
+    fn test_setup(price: f64) -> (PerpMarket, I80F48, EventQueue, Box<Orderbook>) {
+        let mut book = Box::new(Orderbook::zeroed());
         book.init();
 
         let event_queue = EventQueue::zeroed();
@@ -79,7 +79,7 @@ mod tests {
         let (mut perp_market, oracle_price, mut event_queue, mut book) = test_setup(5000.0);
         let settle_token_index = 0;
 
-        let mut new_order = |book: &mut OrderBook,
+        let mut new_order = |book: &mut Orderbook,
                              event_queue: &mut EventQueue,
                              side,
                              price_lots,
@@ -142,20 +142,20 @@ mod tests {
             }
         }
         assert!(book.bids.fixed.is_full());
-        assert_eq!(book.bids.fixed.min_leaf().unwrap().price(), 1001);
+        assert_eq!(book.bids.fixed.min_leaf().unwrap().price_data(), 1001);
         assert_eq!(
-            book.bids.fixed.max_leaf().unwrap().price(),
+            fixed_price_lots(book.bids.fixed.max_leaf().unwrap().price_data()),
             (1000 + book.bids.fixed.leaf_count) as i64
         );
 
         // add another bid at a higher price before expiry, replacing the lowest-price one (1001)
         new_order(&mut book, &mut event_queue, Side::Bid, 1005, 1000000 - 1);
-        assert_eq!(book.bids.fixed.min_leaf().unwrap().price(), 1002);
+        assert_eq!(book.bids.fixed.min_leaf().unwrap().price_data(), 1002);
         assert_eq!(event_queue.len(), 1);
 
         // adding another bid after expiry removes the soonest-expiring order (1005)
         new_order(&mut book, &mut event_queue, Side::Bid, 999, 2000000);
-        assert_eq!(book.bids.fixed.min_leaf().unwrap().price(), 999);
+        assert_eq!(book.bids.fixed.min_leaf().unwrap().price_data(), 999);
         assert!(!order_tree_contains_key(&book.bids.fixed, 1005));
         assert_eq!(event_queue.len(), 2);
 
@@ -288,7 +288,7 @@ mod tests {
         // (the maker account is unchanged: it was not even passed in)
         let order =
             order_tree_leaf_by_key(&book.bids.fixed, maker.perp_order_by_raw_index(0).id).unwrap();
-        assert_eq!(order.price(), price_lots);
+        assert_eq!(fixed_price_lots(order.price_data()), price_lots);
         assert_eq!(order.quantity, bid_quantity - match_quantity);
 
         // fees were immediately accrued

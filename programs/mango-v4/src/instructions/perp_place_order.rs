@@ -5,7 +5,7 @@ use crate::error::*;
 use crate::state::MangoAccount;
 use crate::state::{
     new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, EventQueue, Group,
-    Order, OrderBook, PerpMarket,
+    Order, Orderbook, PerpMarket,
 };
 
 #[derive(Accounts)]
@@ -25,7 +25,7 @@ pub struct PerpPlaceOrder<'info> {
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]
-    pub orderbook: AccountLoader<'info, OrderBook>,
+    pub orderbook: AccountLoader<'info, Orderbook>,
     #[account(mut)]
     pub event_queue: AccountLoader<'info, EventQueue>,
 
@@ -50,8 +50,10 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, order: Order, limit: u8) -
         let mut perp_market = ctx.accounts.perp_market.load_mut()?;
         let book = ctx.accounts.orderbook.load_mut()?;
 
-        oracle_price =
-            perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
+        oracle_price = perp_market.oracle_price(
+            &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+            None, // staleness checked in health
+        )?;
 
         perp_market.update_funding(&book, oracle_price, now_ts)?;
     }

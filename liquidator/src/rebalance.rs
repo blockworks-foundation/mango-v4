@@ -45,10 +45,10 @@ impl TokenState {
         account_fetcher: &chain_data::AccountFetcher,
     ) -> anyhow::Result<I80F48> {
         let oracle = account_fetcher.fetch_raw_account(&token.mint_info.oracle)?;
-        bank.oracle_price(&KeyedAccountSharedData::new(
-            token.mint_info.oracle,
-            oracle.into(),
-        ))
+        bank.oracle_price(
+            &KeyedAccountSharedData::new(token.mint_info.oracle, oracle.into()),
+            None,
+        )
         .map_err_anyhow()
     }
 }

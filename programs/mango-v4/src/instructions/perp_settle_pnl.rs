@@ -101,8 +101,10 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     );
 
     // Get oracle price for market. Price is validated inside
-    let oracle_price =
-        perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
+    let oracle_price = perp_market.oracle_price(
+        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        None, // staleness checked in health
+    )?;
 
     // Fetch perp positions for accounts
     let a_perp_position = account_a.perp_position_mut(perp_market_index)?;
@@ -113,10 +115,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     b_perp_position.settle_funding(&perp_market);
 
     // Calculate PnL for each account
-    let a_base_native = a_perp_position.base_position_native(&perp_market);
-    let b_base_native = b_perp_position.base_position_native(&perp_market);
-    let a_pnl: I80F48 = cm!(a_perp_position.quote_position_native() + a_base_native * oracle_price);
-    let b_pnl: I80F48 = cm!(b_perp_position.quote_position_native() + b_base_native * oracle_price);
+    let a_pnl = a_perp_position.pnl_for_price(&perp_market, oracle_price)?;
+    let b_pnl = b_perp_position.pnl_for_price(&perp_market, oracle_price)?;
 
     // Account A must be profitable, and B must be unprofitable
     // PnL must be opposite signs for there to be a settlement
@@ -166,6 +166,10 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     } else {
         I80F48::ZERO
     };
+
+    // Safety check to prevent any accidental negative transfer
+    require!(settlement >= 0, MangoError::SettlementAmountMustBePositive);
+    require!(fee >= 0, MangoError::SettlementAmountMustBePositive);
 
     // Update the account's net_settled with the new PnL.
     // Applying the fee here means that it decreases the displayed perp pnl.

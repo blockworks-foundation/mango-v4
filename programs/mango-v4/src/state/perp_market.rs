@@ -10,7 +10,7 @@ use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
 use crate::util::checked_math as cm;
 
-use super::{orderbook, OracleConfig, OrderBook, DAY_I80F48};
+use super::{orderbook, OracleConfig, Orderbook, DAY_I80F48};
 use crate::logs::PerpUpdateFundingLog;
 
 pub type PerpMarketIndex = u16;
@@ -41,7 +41,6 @@ pub struct PerpMarket {
     pub oracle_config: OracleConfig,
 
     pub orderbook: Pubkey,
-    pub padding3: [u8; 32],
 
     pub event_queue: Pubkey,
 
@@ -110,10 +109,10 @@ pub struct PerpMarket {
     /// Fraction of pnl to pay out as fee if +pnl account has low health.
     pub settle_fee_fraction_low_health: f32,
 
-    pub reserved: [u8; 92],
+    pub reserved: [u8; 2244],
 }
 
-const_assert_eq!(size_of::<PerpMarket>(), 584);
+const_assert_eq!(size_of::<PerpMarket>(), 2784);
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
 
 impl PerpMarket {
@@ -140,19 +139,24 @@ impl PerpMarket {
         orderbook::new_node_key(side, price_data, self.seq_num)
     }
 
-    pub fn oracle_price(&self, oracle_acc: &impl KeyedAccountReader) -> Result<I80F48> {
+    pub fn oracle_price(
+        &self,
+        oracle_acc: &impl KeyedAccountReader,
+        staleness_slot: Option<u64>,
+    ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
         oracle::oracle_price(
             oracle_acc,
-            self.oracle_config.conf_filter,
+            &self.oracle_config,
             self.base_decimals,
+            staleness_slot,
         )
     }
 
     /// Use current order book price and index price to update the instantaneous funding
     pub fn update_funding(
         &mut self,
-        book: &OrderBook,
+        book: &Orderbook,
         oracle_price: I80F48,
         now_ts: u64,
     ) -> Result<()> {
@@ -263,6 +267,8 @@ impl PerpMarket {
             oracle: Pubkey::new_unique(),
             oracle_config: OracleConfig {
                 conf_filter: I80F48::ZERO,
+                max_staleness_slots: -1,
+                reserved: [0; 72],
             },
             orderbook: Pubkey::new_unique(),
             event_queue: Pubkey::new_unique(),
@@ -287,10 +293,9 @@ impl PerpMarket {
             fees_settled: I80F48::ZERO,
             bump: 0,
             base_decimals: 0,
-            reserved: [0; 92],
+            reserved: [0; 2244],
             padding1: Default::default(),
             padding2: Default::default(),
-            padding3: Default::default(),
             registration_time: 0,
             fee_penalty: 0.0,
             trusted_market: 0,

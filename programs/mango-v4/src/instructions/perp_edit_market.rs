@@ -23,7 +23,7 @@ pub struct PerpEditMarket<'info> {
 pub fn perp_edit_market(
     ctx: Context<PerpEditMarket>,
     oracle_opt: Option<Pubkey>,
-    oracle_config_opt: Option<OracleConfig>,
+    oracle_config_opt: Option<OracleConfigParams>,
     base_decimals_opt: Option<u8>,
     maint_asset_weight_opt: Option<f32>,
     init_asset_weight_opt: Option<f32>,
@@ -55,7 +55,7 @@ pub fn perp_edit_market(
         perp_market.oracle = oracle;
     }
     if let Some(oracle_config) = oracle_config_opt {
-        perp_market.oracle_config = oracle_config;
+        perp_market.oracle_config = oracle_config.to_oracle_config();
     };
 
     // unchanged -

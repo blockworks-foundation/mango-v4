@@ -29,7 +29,7 @@ pub enum OrderTreeType {
 /// A binary tree on AnyNode::key()
 ///
 /// The key encodes the price in the top 64 bits.
-#[account(zero_copy)]
+#[zero_copy]
 pub struct OrderTree {
     // pub meta_data: MetaData,
     // todo: do we want this type at this level?
@@ -108,6 +108,7 @@ impl OrderTree {
         }
     }
 
+    // only for fixed-price ordertrees
     #[cfg(test)]
     #[allow(dead_code)]
     fn to_price_quantity_vec(&self, reverse: bool) -> Vec<(i64, i64)> {
@@ -130,7 +131,7 @@ impl OrderTree {
                 NodeRef::Leaf(leaf) => {
                     // if you hit leaf then pop stack and go right
                     // all inner nodes on stack have already been visited to the left
-                    pqs.push((leaf.price(), leaf.quantity));
+                    pqs.push((fixed_price_lots(leaf.price_data()), leaf.quantity));
                     match stack.pop() {
                         None => return pqs,
                         Some(inner) => {

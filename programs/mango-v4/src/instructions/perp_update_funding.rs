@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::accounts_zerocopy::*;
-use crate::state::{Group, OrderBook, PerpMarket};
+use crate::state::{Group, Orderbook, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpUpdateFunding<'info> {
@@ -15,7 +15,7 @@ pub struct PerpUpdateFunding<'info> {
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]
-    pub orderbook: AccountLoader<'info, OrderBook>,
+    pub orderbook: AccountLoader<'info, Orderbook>,
 
     /// CHECK: The oracle can be one of several different account types and the pubkey is checked above
     pub oracle: UncheckedAccount<'info>,
@@ -26,8 +26,11 @@ pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
     let book = ctx.accounts.orderbook.load_mut()?;
 
-    let oracle_price =
-        perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
+    let now_slot = Clock::get()?.slot;
+    let oracle_price = perp_market.oracle_price(
+        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        Some(now_slot),
+    )?;
 
     perp_market.update_funding(&book, oracle_price, now_ts)?;
 

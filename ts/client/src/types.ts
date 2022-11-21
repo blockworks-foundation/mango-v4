@@ -18,3 +18,8 @@ export class InterestRateParams {
   maxRate: number;
   adjustmentFactor: number;
 }
+
+export class OracleConfigParams {
+  confFilter: number;
+  maxStalenessSlots: number | null;
+}

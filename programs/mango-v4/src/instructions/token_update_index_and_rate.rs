@@ -78,7 +78,8 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
         .load()?
         .verify_banks_ais(ctx.remaining_accounts)?;
 
-    let now_ts = Clock::get()?.unix_timestamp;
+    let clock = Clock::get()?;
+    let now_ts = clock.unix_timestamp;
 
     // compute indexed_total
     let mut indexed_total_deposits = I80F48::ZERO;
@@ -106,8 +107,10 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             now_ts,
         );
 
-        let price =
-            some_bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
+        let price = some_bank.oracle_price(
+            &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+            Some(clock.slot),
+        )?;
         emit!(UpdateIndexLog {
             mango_group: mint_info.group.key(),
             token_index: mint_info.token_index,
@@ -142,6 +145,11 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             bank.borrow_index = borrow_index;
 
             bank.avg_utilization = new_avg_utilization;
+
+            // This copies the old conf_filter parameter location to the new one
+            // inside OracleConfig.
+            // TODO: remove once fully migrated to OracleConfig
+            bank.oracle_config.conf_filter = bank.oracle_conf_filter;
         }
     }
 

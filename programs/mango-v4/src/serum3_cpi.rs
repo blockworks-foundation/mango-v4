@@ -59,7 +59,7 @@ pub fn load_market_state<'a>(
             bytemuck::from_bytes(data)
         });
     state
-        .check_flags()
+        .check_flags(false)
         .map_err(|_| error!(MangoError::SomeError))?;
     Ok(state)
 }
@@ -298,8 +298,6 @@ pub struct PlaceOrder<'info> {
     /// must cover the open_orders and the order_payer_token_account
     /// CHECK: cpi
     pub user_authority: AccountInfo<'info>,
-    /// CHECK: cpi
-    pub msrm_vault: AccountInfo<'info>,
 }
 
 impl<'a> PlaceOrder<'a> {
@@ -325,7 +323,6 @@ impl<'a> PlaceOrder<'a> {
                 AccountMeta::new(*self.quote_vault.key, false),
                 AccountMeta::new_readonly(*self.token_program.key, false),
                 AccountMeta::new_readonly(*self.user_authority.key, false),
-                AccountMeta::new_readonly(*self.msrm_vault.key, false),
             ],
         };
         let account_infos = [
@@ -342,7 +339,6 @@ impl<'a> PlaceOrder<'a> {
             self.quote_vault,
             self.token_program,
             self.user_authority,
-            self.msrm_vault,
         ];
 
         let seeds = group_seeds!(group);

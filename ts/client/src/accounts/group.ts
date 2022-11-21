@@ -40,7 +40,6 @@ export class Group {
       testing: number;
       version: number;
       addressLookupTables: PublicKey[];
-      msrmVault: PublicKey;
     },
   ): Group {
     return new Group(
@@ -55,7 +54,6 @@ export class Group {
       obj.version,
       obj.addressLookupTables,
       [], // addressLookupTablesList
-      obj.msrmVault,
       new Map(), // banksMapByName
       new Map(), // banksMapByMint
       new Map(), // banksMapByTokenIndex
@@ -83,7 +81,6 @@ export class Group {
     public version: number,
     public addressLookupTables: PublicKey[],
     public addressLookupTablesList: AddressLookupTableAccount[],
-    public msrmVault: PublicKey,
     public banksMapByName: Map<string, Bank[]>,
     public banksMapByMint: Map<string, Bank[]>,
     public banksMapByTokenIndex: Map<TokenIndex, Bank[]>,

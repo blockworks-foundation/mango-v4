@@ -133,11 +133,7 @@ pub enum Serum3Side {
 
 #[derive(Accounts)]
 pub struct Serum3PlaceOrder<'info> {
-    #[account(
-        has_one = msrm_vault
-    )]
     pub group: AccountLoader<'info, Group>,
-    pub msrm_vault: Account<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -310,6 +306,7 @@ pub fn serum3_place_order(
         order_type: u8::try_from(order_type).unwrap().try_into().unwrap(),
         client_order_id,
         limit,
+        max_ts: i64::MAX,
     };
     cpi_place_order(ctx.accounts, order)?;
 
@@ -495,7 +492,6 @@ fn cpi_place_order(ctx: &Serum3PlaceOrder, order: NewOrderInstructionV3) -> Resu
         open_orders: ctx.open_orders.to_account_info(),
         order_payer_token_account: ctx.payer_vault.to_account_info(),
         user_authority: ctx.group.to_account_info(),
-        msrm_vault: ctx.msrm_vault.to_account_info(),
     }
     .call(&group, order)
 }

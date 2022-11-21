@@ -59,30 +59,6 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "msrmMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "msrmVault",
-          "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "MsrmVault"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              }
-            ]
-          }
-        },
-        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -117,66 +93,6 @@ export type MangoV4 = {
           "type": "u8"
         }
       ]
-    },
-    {
-      "name": "groupCreateMsrmVault",
-      "accounts": [
-        {
-          "name": "group",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "admin",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "msrmMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "msrmVault",
-          "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "MsrmVault"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              }
-            ]
-          }
-        },
-        {
-          "name": "payer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rent",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
     },
     {
       "name": "groupEdit",
@@ -389,7 +305,7 @@ export type MangoV4 = {
         {
           "name": "oracleConfig",
           "type": {
-            "defined": "OracleConfig"
+            "defined": "OracleConfigParams"
           }
         },
         {
@@ -596,7 +512,7 @@ export type MangoV4 = {
           "name": "oracleConfigOpt",
           "type": {
             "option": {
-              "defined": "OracleConfig"
+              "defined": "OracleConfigParams"
             }
           }
         },
@@ -1688,11 +1604,6 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "msrmVault",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "account",
           "isMut": true,
           "isSigner": false
@@ -2403,7 +2314,7 @@ export type MangoV4 = {
         {
           "name": "oracleConfig",
           "type": {
-            "defined": "OracleConfig"
+            "defined": "OracleConfigParams"
           }
         },
         {
@@ -2518,7 +2429,7 @@ export type MangoV4 = {
           "name": "oracleConfigOpt",
           "type": {
             "option": {
-              "defined": "OracleConfig"
+              "defined": "OracleConfigParams"
             }
           }
         },
@@ -2760,6 +2671,10 @@ export type MangoV4 = {
           "type": {
             "defined": "PlaceOrderType"
           }
+        },
+        {
+          "name": "reduceOnly",
+          "type": "bool"
         },
         {
           "name": "expiryTimestamp",
@@ -3413,9 +3328,9 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "oracleConfig",
+            "name": "oracleConfFilter",
             "type": {
-              "defined": "OracleConfig"
+              "defined": "I80F48"
             }
           },
           {
@@ -3603,11 +3518,17 @@ export type MangoV4 = {
             "type": "u32"
           },
           {
+            "name": "oracleConfig",
+            "type": {
+              "defined": "OracleConfig"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                2464
               ]
             }
           }
@@ -3683,15 +3604,11 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "msrmVault",
-            "type": "publicKey"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1888
+                1920
               ]
             }
           }
@@ -3907,7 +3824,7 @@ export type MangoV4 = {
           },
           {
             "name": "registrationTime",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "reserved",
@@ -3957,100 +3874,20 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "orderBook",
+      "name": "orderbook",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "bidsFixed",
+            "name": "bids",
             "type": {
-              "defined": "OrderTree"
+              "defined": "BookSide"
             }
           },
           {
-            "name": "asksFixed",
+            "name": "asks",
             "type": {
-              "defined": "OrderTree"
-            }
-          },
-          {
-            "name": "bidsOraclePegged",
-            "type": {
-              "defined": "OrderTree"
-            }
-          },
-          {
-            "name": "asksOraclePegged",
-            "type": {
-              "defined": "OrderTree"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "orderTree",
-      "docs": [
-        "A binary tree on AnyNode::key()",
-        "",
-        "The key encodes the price in the top 64 bits."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "orderTreeType",
-            "type": {
-              "defined": "OrderTreeType"
-            }
-          },
-          {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                3
-              ]
-            }
-          },
-          {
-            "name": "bumpIndex",
-            "type": "u32"
-          },
-          {
-            "name": "freeListLen",
-            "type": "u32"
-          },
-          {
-            "name": "freeListHead",
-            "type": "u32"
-          },
-          {
-            "name": "rootNode",
-            "type": "u32"
-          },
-          {
-            "name": "leafCount",
-            "type": "u32"
-          },
-          {
-            "name": "nodes",
-            "type": {
-              "array": [
-                {
-                  "defined": "AnyNode"
-                },
-                1024
-              ]
-            }
-          },
-          {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                256
-              ]
+              "defined": "BookSide"
             }
           }
         ]
@@ -4148,15 +3985,6 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "padding3",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
             "name": "eventQueue",
             "type": "publicKey"
           },
@@ -4248,7 +4076,10 @@ export type MangoV4 = {
           },
           {
             "name": "fundingLastUpdated",
-            "type": "i64"
+            "docs": [
+              "timestamp that funding was last updated in"
+            ],
+            "type": "u64"
           },
           {
             "name": "openInterest",
@@ -4299,7 +4130,7 @@ export type MangoV4 = {
           },
           {
             "name": "registrationTime",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "feesSettled",
@@ -4341,7 +4172,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                92
+                2244
               ]
             }
           }
@@ -4410,7 +4241,7 @@ export type MangoV4 = {
           },
           {
             "name": "registrationTime",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "reserved",
@@ -4969,15 +4800,6 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                24
-              ]
-            }
-          },
-          {
             "name": "cumulativeLongFunding",
             "type": "f64"
           },
@@ -4996,6 +4818,15 @@ export type MangoV4 = {
           {
             "name": "perpSpotTransfers",
             "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                24
+              ]
+            }
           }
         ]
       }
@@ -5062,6 +4893,57 @@ export type MangoV4 = {
             "name": "confFilter",
             "type": {
               "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maxStalenessSlots",
+            "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                72
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleConfigParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "confFilter",
+            "type": "f32"
+          },
+          {
+            "name": "maxStalenessSlots",
+            "type": {
+              "option": "u32"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "BookSide",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fixed",
+            "type": {
+              "defined": "OrderTree"
+            }
+          },
+          {
+            "name": "oraclePegged",
+            "type": {
+              "defined": "OrderTree"
             }
           }
         ]
@@ -5230,6 +5112,74 @@ export type MangoV4 = {
               "array": [
                 "u8",
                 92
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderTree",
+      "docs": [
+        "A binary tree on AnyNode::key()",
+        "",
+        "The key encodes the price in the top 64 bits."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "orderTreeType",
+            "type": {
+              "defined": "OrderTreeType"
+            }
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
+          },
+          {
+            "name": "bumpIndex",
+            "type": "u32"
+          },
+          {
+            "name": "freeListLen",
+            "type": "u32"
+          },
+          {
+            "name": "freeListHead",
+            "type": "u32"
+          },
+          {
+            "name": "rootNode",
+            "type": "u32"
+          },
+          {
+            "name": "leafCount",
+            "type": "u32"
+          },
+          {
+            "name": "nodes",
+            "type": {
+              "array": [
+                {
+                  "defined": "AnyNode"
+                },
+                1024
+              ]
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                256
               ]
             }
           }
@@ -6920,6 +6870,16 @@ export type MangoV4 = {
       "code": 6022,
       "name": "HasOpenPerpOrders",
       "msg": "the perp position has open orders or unprocessed fill events"
+    },
+    {
+      "code": 6023,
+      "name": "OracleConfidence",
+      "msg": "an oracle does not reach the confidence threshold"
+    },
+    {
+      "code": 6024,
+      "name": "OracleStale",
+      "msg": "an oracle is stale"
     }
   ]
 };
@@ -6985,30 +6945,6 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "msrmMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "msrmVault",
-          "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "MsrmVault"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              }
-            ]
-          }
-        },
-        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -7043,66 +6979,6 @@ export const IDL: MangoV4 = {
           "type": "u8"
         }
       ]
-    },
-    {
-      "name": "groupCreateMsrmVault",
-      "accounts": [
-        {
-          "name": "group",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "admin",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "msrmMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "msrmVault",
-          "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "MsrmVault"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              }
-            ]
-          }
-        },
-        {
-          "name": "payer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rent",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
     },
     {
       "name": "groupEdit",
@@ -7315,7 +7191,7 @@ export const IDL: MangoV4 = {
         {
           "name": "oracleConfig",
           "type": {
-            "defined": "OracleConfig"
+            "defined": "OracleConfigParams"
           }
         },
         {
@@ -7522,7 +7398,7 @@ export const IDL: MangoV4 = {
           "name": "oracleConfigOpt",
           "type": {
             "option": {
-              "defined": "OracleConfig"
+              "defined": "OracleConfigParams"
             }
           }
         },
@@ -8614,11 +8490,6 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "msrmVault",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "account",
           "isMut": true,
           "isSigner": false
@@ -9329,7 +9200,7 @@ export const IDL: MangoV4 = {
         {
           "name": "oracleConfig",
           "type": {
-            "defined": "OracleConfig"
+            "defined": "OracleConfigParams"
           }
         },
         {
@@ -9444,7 +9315,7 @@ export const IDL: MangoV4 = {
           "name": "oracleConfigOpt",
           "type": {
             "option": {
-              "defined": "OracleConfig"
+              "defined": "OracleConfigParams"
             }
           }
         },
@@ -9686,6 +9557,10 @@ export const IDL: MangoV4 = {
           "type": {
             "defined": "PlaceOrderType"
           }
+        },
+        {
+          "name": "reduceOnly",
+          "type": "bool"
         },
         {
           "name": "expiryTimestamp",
@@ -10339,9 +10214,9 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "oracleConfig",
+            "name": "oracleConfFilter",
             "type": {
-              "defined": "OracleConfig"
+              "defined": "I80F48"
             }
           },
           {
@@ -10529,11 +10404,17 @@ export const IDL: MangoV4 = {
             "type": "u32"
           },
           {
+            "name": "oracleConfig",
+            "type": {
+              "defined": "OracleConfig"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                2464
               ]
             }
           }
@@ -10609,15 +10490,11 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "msrmVault",
-            "type": "publicKey"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1888
+                1920
               ]
             }
           }
@@ -10833,7 +10710,7 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "registrationTime",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "reserved",
@@ -10883,100 +10760,20 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "orderBook",
+      "name": "orderbook",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "bidsFixed",
+            "name": "bids",
             "type": {
-              "defined": "OrderTree"
+              "defined": "BookSide"
             }
           },
           {
-            "name": "asksFixed",
+            "name": "asks",
             "type": {
-              "defined": "OrderTree"
-            }
-          },
-          {
-            "name": "bidsOraclePegged",
-            "type": {
-              "defined": "OrderTree"
-            }
-          },
-          {
-            "name": "asksOraclePegged",
-            "type": {
-              "defined": "OrderTree"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "orderTree",
-      "docs": [
-        "A binary tree on AnyNode::key()",
-        "",
-        "The key encodes the price in the top 64 bits."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "orderTreeType",
-            "type": {
-              "defined": "OrderTreeType"
-            }
-          },
-          {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                3
-              ]
-            }
-          },
-          {
-            "name": "bumpIndex",
-            "type": "u32"
-          },
-          {
-            "name": "freeListLen",
-            "type": "u32"
-          },
-          {
-            "name": "freeListHead",
-            "type": "u32"
-          },
-          {
-            "name": "rootNode",
-            "type": "u32"
-          },
-          {
-            "name": "leafCount",
-            "type": "u32"
-          },
-          {
-            "name": "nodes",
-            "type": {
-              "array": [
-                {
-                  "defined": "AnyNode"
-                },
-                1024
-              ]
-            }
-          },
-          {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                256
-              ]
+              "defined": "BookSide"
             }
           }
         ]
@@ -11074,15 +10871,6 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "padding3",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
             "name": "eventQueue",
             "type": "publicKey"
           },
@@ -11174,7 +10962,10 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "fundingLastUpdated",
-            "type": "i64"
+            "docs": [
+              "timestamp that funding was last updated in"
+            ],
+            "type": "u64"
           },
           {
             "name": "openInterest",
@@ -11225,7 +11016,7 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "registrationTime",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "feesSettled",
@@ -11267,7 +11058,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                92
+                2244
               ]
             }
           }
@@ -11336,7 +11127,7 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "registrationTime",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "reserved",
@@ -11895,15 +11686,6 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                24
-              ]
-            }
-          },
-          {
             "name": "cumulativeLongFunding",
             "type": "f64"
           },
@@ -11922,6 +11704,15 @@ export const IDL: MangoV4 = {
           {
             "name": "perpSpotTransfers",
             "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                24
+              ]
+            }
           }
         ]
       }
@@ -11988,6 +11779,57 @@ export const IDL: MangoV4 = {
             "name": "confFilter",
             "type": {
               "defined": "I80F48"
+            }
+          },
+          {
+            "name": "maxStalenessSlots",
+            "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                72
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleConfigParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "confFilter",
+            "type": "f32"
+          },
+          {
+            "name": "maxStalenessSlots",
+            "type": {
+              "option": "u32"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "BookSide",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fixed",
+            "type": {
+              "defined": "OrderTree"
+            }
+          },
+          {
+            "name": "oraclePegged",
+            "type": {
+              "defined": "OrderTree"
             }
           }
         ]
@@ -12156,6 +11998,74 @@ export const IDL: MangoV4 = {
               "array": [
                 "u8",
                 92
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderTree",
+      "docs": [
+        "A binary tree on AnyNode::key()",
+        "",
+        "The key encodes the price in the top 64 bits."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "orderTreeType",
+            "type": {
+              "defined": "OrderTreeType"
+            }
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
+          },
+          {
+            "name": "bumpIndex",
+            "type": "u32"
+          },
+          {
+            "name": "freeListLen",
+            "type": "u32"
+          },
+          {
+            "name": "freeListHead",
+            "type": "u32"
+          },
+          {
+            "name": "rootNode",
+            "type": "u32"
+          },
+          {
+            "name": "leafCount",
+            "type": "u32"
+          },
+          {
+            "name": "nodes",
+            "type": {
+              "array": [
+                {
+                  "defined": "AnyNode"
+                },
+                1024
+              ]
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                256
               ]
             }
           }
@@ -13846,6 +13756,16 @@ export const IDL: MangoV4 = {
       "code": 6022,
       "name": "HasOpenPerpOrders",
       "msg": "the perp position has open orders or unprocessed fill events"
+    },
+    {
+      "code": 6023,
+      "name": "OracleConfidence",
+      "msg": "an oracle does not reach the confidence threshold"
+    },
+    {
+      "code": 6024,
+      "name": "OracleStale",
+      "msg": "an oracle is stale"
     }
   ]
 };

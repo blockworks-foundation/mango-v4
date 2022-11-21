@@ -30,18 +30,6 @@ pub struct GroupCreate<'info> {
     )]
     pub insurance_vault: Account<'info, TokenAccount>,
 
-    pub msrm_mint: Account<'info, Mint>,
-
-    #[account(
-        init,
-        seeds = [b"MsrmVault".as_ref(), group.key().as_ref()],
-        bump,
-        token::authority = group,
-        token::mint = msrm_mint,
-        payer = payer
-    )]
-    pub msrm_vault: Account<'info, TokenAccount>,
-
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -66,6 +54,5 @@ pub fn group_create(
     group.bump = *ctx.bumps.get("group").ok_or(MangoError::SomeError)?;
     group.testing = testing;
     group.version = version;
-    group.msrm_vault = ctx.accounts.msrm_vault.key();
     Ok(())
 }

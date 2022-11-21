@@ -51,6 +51,12 @@ pub enum MangoError {
     MaxSettleAmountMustBeGreaterThanZero,
     #[msg("the perp position has open orders or unprocessed fill events")]
     HasOpenPerpOrders,
+    #[msg("an oracle does not reach the confidence threshold")]
+    OracleConfidence,
+    #[msg("an oracle is stale")]
+    OracleStale,
+    #[msg("settlement amount must always be positive")]
+    SettlementAmountMustBePositive,
 }
 
 pub trait Contextable {

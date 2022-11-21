@@ -20,15 +20,14 @@ pub mod serum3_cpi;
 pub mod state;
 pub mod types;
 
-use state::{OracleConfig, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side, TokenIndex};
+use state::{
+    OracleConfigParams, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side, TokenIndex,
+};
 
 declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
 
 #[program]
 pub mod mango_v4 {
-
-    use crate::state::OracleConfig;
-
     use super::*;
 
     pub fn group_create(
@@ -38,10 +37,6 @@ pub mod mango_v4 {
         version: u8,
     ) -> Result<()> {
         instructions::group_create(ctx, group_num, testing, version)
-    }
-
-    pub fn group_create_msrm_vault(ctx: Context<GroupCreateMsrmVault>) -> Result<()> {
-        instructions::group_create_msrm_vault(ctx)
     }
 
     pub fn group_edit(
@@ -69,7 +64,7 @@ pub mod mango_v4 {
         ctx: Context<TokenRegister>,
         token_index: TokenIndex,
         name: String,
-        oracle_config: OracleConfig,
+        oracle_config: OracleConfigParams,
         interest_rate_params: InterestRateParams,
         loan_fee_rate: f32,
         loan_origination_fee_rate: f32,
@@ -107,7 +102,7 @@ pub mod mango_v4 {
     pub fn token_edit(
         ctx: Context<TokenEdit>,
         oracle_opt: Option<Pubkey>,
-        oracle_config_opt: Option<OracleConfig>,
+        oracle_config_opt: Option<OracleConfigParams>,
         group_insurance_fund_opt: Option<bool>,
         interest_rate_params_opt: Option<InterestRateParams>,
         loan_fee_rate_opt: Option<f32>,
@@ -230,10 +225,6 @@ pub mod mango_v4 {
     ) -> Result<()> {
         instructions::token_withdraw(ctx, amount, allow_borrow)
     }
-
-    // TODO
-    // pub fn token_deposit_msrm
-    // pub fn token_withdraw_msrm
 
     pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanBegin<'info>>,
@@ -393,7 +384,7 @@ pub mod mango_v4 {
         ctx: Context<PerpCreateMarket>,
         perp_market_index: PerpMarketIndex,
         name: String,
-        oracle_config: OracleConfig,
+        oracle_config: OracleConfigParams,
         base_decimals: u8,
         quote_lot_size: i64,
         base_lot_size: i64,
@@ -447,7 +438,7 @@ pub mod mango_v4 {
     pub fn perp_edit_market(
         ctx: Context<PerpEditMarket>,
         oracle_opt: Option<Pubkey>,
-        oracle_config_opt: Option<OracleConfig>,
+        oracle_config_opt: Option<OracleConfigParams>,
         base_decimals_opt: Option<u8>,
         maint_asset_weight_opt: Option<f32>,
         init_asset_weight_opt: Option<f32>,

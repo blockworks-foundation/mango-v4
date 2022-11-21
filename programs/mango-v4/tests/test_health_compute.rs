@@ -39,7 +39,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     create_funded_account(&solana, group, owner, 0, &context.users[1], mints, 1000, 0).await;
 
     // TODO: actual explicit CU comparisons.
-    // On 2022-5-25 the final deposit costs 36905 CU and each new token increases it by roughly 1600 CU
+    // On 2022-11-18 the final deposit costs 45495 CU and each new token increases it by roughly 1729 CU
 
     Ok(())
 }
@@ -156,7 +156,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     }
 
     // TODO: actual explicit CU comparisons.
-    // On 2022-6-21 the final deposit costs 54074 CU and each new market increases it by roughly 4500 CU
+    // On 2022-11-18 the final deposit costs 62920 CU and each new market increases it by roughly 4820 CU
 
     Ok(())
 }
@@ -270,7 +270,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     }
 
     // TODO: actual explicit CU comparisons.
-    // On 2022-5-25 the final deposit costs 32700 CU and each new market increases it by roughly 1500 CU
+    // On 2022-11-18 the final deposit costs 50502 CU and each new market increases it by roughly 3037 CU
 
     Ok(())
 }
