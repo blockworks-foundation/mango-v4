@@ -25,7 +25,7 @@ pub struct PerpCloseMarket<'info> {
         mut,
         close = sol_destination
     )]
-    pub orderbook: AccountLoader<'info, OrderBook>,
+    pub orderbook: AccountLoader<'info, Orderbook>,
 
     #[account(
         mut,

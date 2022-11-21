@@ -2,8 +2,9 @@ import { AnchorProvider, BN, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { expect } from 'chai';
 import fs from 'fs';
+import { Group } from '../accounts/group';
 import { HealthType } from '../accounts/mangoAccount';
-import { BookSide, PerpOrderSide, PerpOrderType } from '../accounts/perp';
+import { PerpOrderSide, PerpOrderType } from '../accounts/perp';
 import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
@@ -108,25 +109,18 @@ async function main() {
     mangoAccount.tokens.length < 16 ||
     mangoAccount.serum3.length < 8 ||
     mangoAccount.perps.length < 8 ||
-    mangoAccount.perpOpenOrders.length < 64
+    mangoAccount.perpOpenOrders.length < 8
   ) {
     console.log(
-      `...expanding mango account to max 16 token positions, 8 serum3, 8 perp position and 64 perp oo slots, previous (tokens ${mangoAccount.tokens.length}, serum3 ${mangoAccount.serum3.length}, perps ${mangoAccount.perps.length}, perps oo ${mangoAccount.perpOpenOrders.length})`,
+      `...expanding mango account to max 16 token positions, 8 serum3, 8 perp position and 8 perp oo slots, previous (tokens ${mangoAccount.tokens.length}, serum3 ${mangoAccount.serum3.length}, perps ${mangoAccount.perps.length}, perps oo ${mangoAccount.perpOpenOrders.length})`,
     );
-    let sig = await client.expandMangoAccount(
-      group,
-      mangoAccount,
-      16,
-      8,
-      8,
-      64,
-    );
+    let sig = await client.expandMangoAccount(group, mangoAccount, 16, 8, 8, 8);
     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
     await mangoAccount.reload(client);
     expect(mangoAccount.tokens.length).equals(16);
     expect(mangoAccount.serum3.length).equals(8);
     expect(mangoAccount.perps.length).equals(8);
-    expect(mangoAccount.perpOpenOrders.length).equals(64);
+    expect(mangoAccount.perpOpenOrders.length).equals(8);
   }
 
   // deposit and withdraw
@@ -417,7 +411,7 @@ async function main() {
   // perps
   if (true) {
     let sig;
-    const perpMarket = group.getPerpMarketByName('BTC-PERP');
+    let perpMarket = group.getPerpMarketByName('BTC-PERP');
     const orders = await mangoAccount.loadPerpOpenOrdersForMarket(
       client,
       group,
@@ -429,6 +423,68 @@ async function main() {
       );
     }
     console.log(`...cancelling all perp orders`);
+    sig = await client.perpCancelAllOrders(
+      group,
+      mangoAccount,
+      perpMarket.perpMarketIndex,
+      10,
+    );
+    console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+
+    // oracle pegged
+    try {
+      const clientId = Math.floor(Math.random() * 99999);
+      const price = group.banksMapByName.get('BTC')![0].uiPrice!;
+      console.log(
+        `...placing perp pegged bid ${clientId} at oracle price ${perpMarket.uiPrice}`,
+      );
+      const sig = await client.perpPlaceOrderPegged(
+        group,
+        mangoAccount,
+        perpMarket.perpMarketIndex,
+        PerpOrderSide.bid,
+        -5,
+        perpMarket.uiPrice + 5,
+        0.01,
+        price * 0.011,
+        clientId,
+        PerpOrderType.limit,
+        false,
+        0,
+        1,
+      );
+      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    } catch (error) {
+      console.log(error);
+    }
+    try {
+      const clientId = Math.floor(Math.random() * 99999);
+      const price = group.banksMapByName.get('BTC')![0].uiPrice!;
+      console.log(
+        `...placing perp pegged bid ${clientId} at oracle price ${perpMarket.uiPrice}`,
+      );
+      const sig = await client.perpPlaceOrderPegged(
+        group,
+        mangoAccount,
+        perpMarket.perpMarketIndex,
+        PerpOrderSide.ask,
+        5,
+        perpMarket.uiPrice - 5,
+        0.01,
+        price * 0.011,
+        clientId,
+        PerpOrderType.limit,
+        false,
+        0,
+        1,
+      );
+      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    } catch (error) {
+      console.log(error);
+    }
+
+    await logBidsAndAsks(client, group);
+
     sig = await client.perpCancelAllOrders(
       group,
       mangoAccount,
@@ -657,11 +713,6 @@ async function main() {
     // sig = await client.perpCancelAllOrders(group, mangoAccount, perpMarket.perpMarketIndex, 10);
     // console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
-    const bids: BookSide = await perpMarket?.loadBids(client)!;
-    console.log(`bids - ${Array.from(bids.items())}`);
-    const asks: BookSide = await perpMarket?.loadAsks(client)!;
-    console.log(`asks - ${Array.from(asks.items())}`);
-
     await perpMarket?.loadEventQueue(client)!;
     const fr = perpMarket?.getCurrentFundingRate(
       await perpMarket.loadBids(client),
@@ -684,6 +735,18 @@ async function main() {
   }
 
   process.exit();
+}
+
+async function logBidsAndAsks(client: MangoClient, group: Group) {
+  await group.reloadAll(client);
+  const perpMarket = group.getPerpMarketByName('BTC-PERP');
+  const res = [
+    (await perpMarket?.loadBids(client)).items(),
+    (await perpMarket?.loadAsks(client)!).items(),
+  ];
+  console.log(`bids ${JSON.stringify(Array.from(res[0]), null, 2)}`);
+  console.log(`asks ${JSON.stringify(Array.from(res[1]), null, 2)}`);
+  return res;
 }
 
 main();

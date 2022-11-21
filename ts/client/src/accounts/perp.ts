@@ -31,6 +31,8 @@ export class PerpMarket {
   private baseLotsToUiConverter: number;
   private quoteLotsToUiConverter: number;
 
+  private _orderbook: Orderbook;
+
   static from(
     publicKey: PublicKey,
     obj: {
@@ -42,8 +44,7 @@ export class PerpMarket {
       name: number[];
       oracle: PublicKey;
       oracleConfig: OracleConfig;
-      bids: PublicKey;
-      asks: PublicKey;
+      orderbook: PublicKey;
       eventQueue: PublicKey;
       quoteLotSize: BN;
       baseLotSize: BN;
@@ -82,8 +83,7 @@ export class PerpMarket {
       obj.name,
       obj.oracle,
       obj.oracleConfig,
-      obj.bids,
-      obj.asks,
+      obj.orderbook,
       obj.eventQueue,
       obj.quoteLotSize,
       obj.baseLotSize,
@@ -123,8 +123,7 @@ export class PerpMarket {
     name: number[],
     public oracle: PublicKey,
     oracleConfig: OracleConfig,
-    public bids: PublicKey,
-    public asks: PublicKey,
+    public orderbook: PublicKey,
     public eventQueue: PublicKey,
     public quoteLotSize: BN,
     public baseLotSize: BN,
@@ -208,14 +207,25 @@ export class PerpMarket {
     return this.priceLotsToUiConverter;
   }
 
+  private async loadOrderbook(
+    client: MangoClient,
+    forceReload = false,
+  ): Promise<Orderbook> {
+    if (forceReload || !this._orderbook)
+      this._orderbook = await client.program.account.orderbook.fetch(
+        this.orderbook,
+      );
+    return this._orderbook;
+  }
+
   public async loadAsks(client: MangoClient): Promise<BookSide> {
-    const asks = await client.program.account.bookSide.fetch(this.asks);
-    return BookSide.from(client, this, BookSideType.asks, asks);
+    await this.loadOrderbook(client);
+    return BookSide.from(client, this, BookSideType.asks, this._orderbook.asks);
   }
 
   public async loadBids(client: MangoClient): Promise<BookSide> {
-    const bids = await client.program.account.bookSide.fetch(this.bids);
-    return BookSide.from(client, this, BookSideType.bids, bids);
+    await this.loadOrderbook(client);
+    return BookSide.from(client, this, BookSideType.bids, this._orderbook.bids);
   }
 
   public async loadEventQueue(client: MangoClient): Promise<PerpEventQueue> {
@@ -240,16 +250,24 @@ export class PerpMarket {
     res += `  ${this.name} OrderBook`;
     let orders = await this?.loadAsks(client);
     for (const order of orders!.items()) {
-      res += `\n  ${order.uiPrice.toFixed(5).padStart(10)}, ${order.uiSize
-        .toString()
-        .padStart(10)}`;
+      res += `\n  ${order.clientId.toString()}  ${order.uiPrice
+        .toFixed(5)
+        .padStart(10)}, ${order.uiSize.toString().padStart(10)} ${
+        order.isOraclePegged && order.oraclePeggedProperties
+          ? order.oraclePeggedProperties.pegLimit.toNumber() + ' (PegLimit)'
+          : ''
+      }`;
     }
     res += `\n  asks ↑ --------- ↓ bids`;
     orders = await this?.loadBids(client);
     for (const order of orders!.items()) {
-      res += `\n  ${order.uiPrice.toFixed(5).padStart(10)}, ${order.uiSize
-        .toString()
-        .padStart(10)}`;
+      res += `\n  ${order.clientId.toString()} ${order.uiPrice
+        .toFixed(5)
+        .padStart(10)}, ${order.uiSize.toString().padStart(10)} ${
+        order.isOraclePegged && order.oraclePeggedProperties
+          ? order.oraclePeggedProperties.pegLimit.toNumber() + ' (PegLimit)'
+          : ''
+      }`;
     }
     return res;
   }
@@ -334,6 +352,30 @@ export class PerpMarket {
   }
 }
 
+interface Orderbook {
+  bids: OrderTree;
+  asks: OrderTree;
+}
+
+interface OrderTree {
+  fixed: {
+    bumpIndex: number;
+    freeListLen: number;
+    freeListHead: number;
+    rootNode: number;
+    leafCount: number;
+    nodes: [any];
+  };
+  oraclePegged: {
+    bumpIndex: number;
+    freeListLen: number;
+    freeListHead: number;
+    rootNode: number;
+    leafCount: number;
+    nodes: [any];
+  };
+}
+
 export class BookSide {
   private static INNER_NODE_TAG = 1;
   private static LEAF_NODE_TAG = 2;
@@ -344,45 +386,59 @@ export class BookSide {
     perpMarket: PerpMarket,
     bookSideType: BookSideType,
     obj: {
-      bumpIndex: number;
-      freeListLen: number;
-      freeListHead: number;
-      rootNode: number;
-      leafCount: number;
-      nodes: unknown;
+      fixed: {
+        bumpIndex: number;
+        freeListLen: number;
+        freeListHead: number;
+        rootNode: number;
+        leafCount: number;
+        nodes: [any];
+      };
+      oraclePegged: {
+        bumpIndex: number;
+        freeListLen: number;
+        freeListHead: number;
+        rootNode: number;
+        leafCount: number;
+        nodes: [any];
+      };
     },
   ): BookSide {
-    return new BookSide(
-      client,
-      perpMarket,
-      bookSideType,
-      obj.bumpIndex,
-      obj.freeListLen,
-      obj.freeListHead,
-      obj.rootNode,
-      obj.leafCount,
-      obj.nodes,
-    );
+    return new BookSide(client, perpMarket, bookSideType, obj);
   }
 
   constructor(
     public client: MangoClient,
     public perpMarket: PerpMarket,
     public type: BookSideType,
-    public bumpIndex,
-    public freeListLen,
-    public freeListHead,
-    public rootNode,
-    public leafCount,
-    public nodes,
-    public includeExpired = false,
+    public orderTree: {
+      fixed: {
+        bumpIndex: number;
+        freeListLen: number;
+        freeListHead: number;
+        rootNode: number;
+        leafCount: number;
+        nodes: [any];
+      };
+      oraclePegged: {
+        bumpIndex: number;
+        freeListLen: number;
+        freeListHead: number;
+        rootNode: number;
+        leafCount: number;
+        nodes: [any];
+      };
+    },
     maxBookDelay?: number,
   ) {
     // Determine the maxTimestamp found on the book to use for tif
     // If maxBookDelay is not provided, use 3600 as a very large number
     maxBookDelay = maxBookDelay === undefined ? 3600 : maxBookDelay;
     let maxTimestamp = new BN(new Date().getTime() / 1000 - maxBookDelay);
-    for (const node of this.nodes) {
+    for (const node of [
+      ...this.orderTree.fixed.nodes,
+      ...this.orderTree.oraclePegged.nodes,
+    ]) {
       if (node.tag !== BookSide.LEAF_NODE_TAG) {
         continue;
       }
@@ -399,17 +455,85 @@ export class BookSide {
     return key.ushrn(64);
   }
 
+  /**
+   * iterates over all orders
+   */
   public *items(): Generator<PerpOrder> {
-    if (this.leafCount === 0) {
+    function isBetter(
+      type: PerpOrderSide,
+      a: PerpOrder,
+      b: PerpOrder,
+    ): boolean {
+      return a.priceLots.eq(b.priceLots)
+        ? a.seqNum.lt(b.seqNum) // if prices are equal prefer perp orders in the order they are placed
+        : type === BookSideType.bids // else compare the actual prices
+        ? a.priceLots.gt(b.priceLots)
+        : b.priceLots.gt(a.priceLots);
+    }
+
+    const fGen = this.fixedItems();
+    const oPegGen = this.oraclePeggedItems();
+
+    let fOrderRes = fGen.next();
+    let oPegOrderRes = oPegGen.next();
+
+    while (true) {
+      if (fOrderRes.value && oPegOrderRes.value) {
+        if (isBetter(this.type, fOrderRes.value, oPegOrderRes.value)) {
+          yield fOrderRes.value;
+          fOrderRes = fGen.next();
+        } else {
+          yield oPegOrderRes.value;
+          oPegOrderRes = oPegGen.next();
+        }
+      } else if (fOrderRes.value && !oPegOrderRes.value) {
+        yield fOrderRes.value;
+        fOrderRes = fGen.next();
+      } else if (!fOrderRes.value && oPegOrderRes.value) {
+        yield oPegOrderRes.value;
+        oPegOrderRes = oPegGen.next();
+      } else if (!fOrderRes.value && !oPegOrderRes.value) {
+        break;
+      }
+    }
+  }
+
+  /**
+   * iterates over all orders,
+   * skips oracle pegged orders which are invalid due to oracle price crossing the peg limit,
+   * skips tif orders which are invalid due to tif having elapsed,
+   */
+  public *itemsValid(): Generator<PerpOrder> {
+    const itemsGen = this.items();
+    let itemsRes = itemsGen.next();
+    while (true) {
+      if (itemsRes.value) {
+        const val = itemsRes.value;
+        if (
+          !val.isExpired &&
+          (!val.isOraclePegged ||
+            (val.isOraclePegged && !val.oraclePeggedProperties.isInvalid))
+        ) {
+          yield val;
+        }
+        itemsRes = itemsGen.next();
+      } else {
+        break;
+      }
+    }
+  }
+
+  public *fixedItems(): Generator<PerpOrder> {
+    if (this.orderTree.fixed.leafCount === 0) {
       return;
     }
     const now = this.now;
-    const stack = [this.rootNode];
+    const stack = [this.orderTree.fixed.rootNode];
     const [left, right] = this.type === BookSideType.bids ? [1, 0] : [0, 1];
 
     while (stack.length > 0) {
-      const index = stack.pop();
-      const node = this.nodes[index];
+      const index = stack.pop()!;
+      const node = this.orderTree.fixed.nodes[index];
       if (node.tag === BookSide.INNER_NODE_TAG) {
         const innerNode = BookSide.toInnerNode(this.client, node.data);
         stack.push(innerNode.children[right], innerNode.children[left]);
@@ -418,9 +542,44 @@ export class BookSide {
         const expiryTimestamp = leafNode.timeInForce
           ? leafNode.timestamp.add(new BN(leafNode.timeInForce))
           : U64_MAX_BN;
-        if (now.lt(expiryTimestamp) || this.includeExpired) {
-          yield PerpOrder.from(this.perpMarket, leafNode, this.type);
-        }
+
+        yield PerpOrder.from(
+          this.perpMarket,
+          leafNode,
+          this.type,
+          now.lt(expiryTimestamp),
+        );
+      }
+    }
+  }
+
+  public *oraclePeggedItems(): Generator<PerpOrder> {
+    if (this.orderTree.oraclePegged.leafCount === 0) {
+      return;
+    }
+    const now = this.now;
+    const stack = [this.orderTree.oraclePegged.rootNode];
+    const [left, right] = this.type === BookSideType.bids ? [1, 0] : [0, 1];
+
+    while (stack.length > 0) {
+      const index = stack.pop()!;
+      const node = this.orderTree.oraclePegged.nodes[index];
+      if (node.tag === BookSide.INNER_NODE_TAG) {
+        const innerNode = BookSide.toInnerNode(this.client, node.data);
+        stack.push(innerNode.children[right], innerNode.children[left]);
+      } else if (node.tag === BookSide.LEAF_NODE_TAG) {
+        const leafNode = BookSide.toLeafNode(this.client, node.data);
+        const expiryTimestamp = leafNode.timeInForce
+          ? leafNode.timestamp.add(new BN(leafNode.timeInForce))
+          : U64_MAX_BN;
+
+        yield PerpOrder.from(
+          this.perpMarket,
+          leafNode,
+          this.type,
+          now.lt(expiryTimestamp),
+          true,
+        );
       }
     }
   }
@@ -501,6 +660,7 @@ export class LeafNode {
     quantity: BN;
     clientOrderId: BN;
     timestamp: BN;
+    pegLimit: BN;
   }): LeafNode {
     return new LeafNode(
       obj.ownerSlot,
@@ -511,6 +671,7 @@ export class LeafNode {
       obj.quantity,
       obj.clientOrderId,
       obj.timestamp,
+      obj.pegLimit,
     );
   }
 
@@ -523,6 +684,7 @@ export class LeafNode {
     public quantity: BN,
     public clientOrderId: BN,
     public timestamp: BN,
+    public pegLimit: BN,
   ) {}
 }
 export class InnerNode {
@@ -551,32 +713,60 @@ export class PerpOrder {
     perpMarket: PerpMarket,
     leafNode: LeafNode,
     type: BookSideType,
+    isExpired = false,
+    isOraclePegged = false,
   ): PerpOrder {
     const side =
       type == BookSideType.bids ? PerpOrderSide.bid : PerpOrderSide.ask;
-    const price = BookSide.getPriceFromKey(leafNode.key);
+    let priceLots;
+    let oraclePeggedProperties;
+    if (isOraclePegged) {
+      const priceData = leafNode.key.ushrn(64);
+      const priceOffset = priceData.sub(new BN(1).ushln(63));
+      priceLots = perpMarket.uiPriceToLots(perpMarket.uiPrice).add(priceOffset);
+      const isInvalid =
+        type === BookSideType.bids
+          ? priceLots.gt(leafNode.pegLimit)
+          : leafNode.pegLimit.gt(priceLots);
+      oraclePeggedProperties = {
+        isInvalid,
+        priceOffset,
+        uiPriceOffset: perpMarket.priceLotsToUi(priceOffset),
+        pegLimit: leafNode.pegLimit,
+        uiPegLimit: perpMarket.priceLotsToUi(leafNode.pegLimit),
+      } as OraclePeggedProperties;
+    } else {
+      priceLots = BookSide.getPriceFromKey(leafNode.key);
+    }
     const expiryTimestamp = leafNode.timeInForce
       ? leafNode.timestamp.add(new BN(leafNode.timeInForce))
       : U64_MAX_BN;
 
     return new PerpOrder(
+      type === BookSideType.bids
+        ? new BN('18446744073709551615').sub(leafNode.key.maskn(64))
+        : leafNode.key.maskn(64),
       leafNode.key,
       leafNode.clientOrderId,
       leafNode.owner,
       leafNode.ownerSlot,
       0,
-      perpMarket.priceLotsToUi(price),
-      price,
+      perpMarket.priceLotsToUi(priceLots),
+      priceLots,
       perpMarket.baseLotsToUi(leafNode.quantity),
       leafNode.quantity,
       side,
       leafNode.timestamp,
       expiryTimestamp,
       perpMarket.perpMarketIndex,
+      isExpired,
+      isOraclePegged,
+      oraclePeggedProperties,
     );
   }
 
   constructor(
+    public seqNum: BN,
     public orderId: BN,
     public clientId: BN,
     public owner: PublicKey,
@@ -590,6 +780,9 @@ export class PerpOrder {
     public timestamp: BN,
     public expiryTimestamp: BN,
     public perpMarketIndex: number,
+    public isExpired = false,
+    public isOraclePegged = false,
+    public oraclePeggedProperties?: OraclePeggedProperties,
   ) {}
 
   get price(): number {
@@ -599,6 +792,14 @@ export class PerpOrder {
   get size(): number {
     return this.uiSize;
   }
+}
+
+interface OraclePeggedProperties {
+  isInvalid: boolean;
+  priceOffset: BN;
+  uiPriceOffset: number;
+  pegLimit: BN;
+  uiPegLimit: number;
 }
 
 export class PerpEventQueue {

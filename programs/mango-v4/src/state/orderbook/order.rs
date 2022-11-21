@@ -96,7 +96,7 @@ impl Order {
         oracle_price_lots: i64,
         price_lots: i64,
         order_type: PostOrderType,
-        order_book: &OrderBook,
+        order_book: &Orderbook,
     ) -> i64 {
         if order_type == PostOrderType::PostOnlySlide {
             if let Some(best_other_price) =
@@ -117,7 +117,7 @@ impl Order {
         &self,
         now_ts: u64,
         oracle_price_lots: i64,
-        order_book: &OrderBook,
+        order_book: &Orderbook,
     ) -> Result<(i64, u64)> {
         let price_lots = match self.params {
             OrderParams::Market => market_order_limit_for_side(self.side),

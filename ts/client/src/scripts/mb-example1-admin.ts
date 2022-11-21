@@ -616,8 +616,7 @@ async function createAndPopulateAlt() {
       .map((perpMarket) => [
         perpMarket.publicKey,
         perpMarket.oracle,
-        perpMarket.bids,
-        perpMarket.asks,
+        perpMarket.orderbook,
         perpMarket.eventQueue,
       ])
       .flat();

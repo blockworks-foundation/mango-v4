@@ -10,7 +10,7 @@ use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
 use crate::util::checked_math as cm;
 
-use super::{orderbook, OracleConfig, OrderBook, DAY_I80F48};
+use super::{orderbook, OracleConfig, Orderbook, DAY_I80F48};
 use crate::logs::PerpUpdateFundingLog;
 
 pub type PerpMarketIndex = u16;
@@ -156,7 +156,7 @@ impl PerpMarket {
     /// Use current order book price and index price to update the instantaneous funding
     pub fn update_funding(
         &mut self,
-        book: &OrderBook,
+        book: &Orderbook,
         oracle_price: I80F48,
         now_ts: u64,
     ) -> Result<()> {

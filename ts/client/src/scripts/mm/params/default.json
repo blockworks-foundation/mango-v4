@@ -1,5 +1,6 @@
 {
   "interval": 1000,
+  "oraclePegged": true,
   "batch": 1,
   "assets": {
     "BTC": {

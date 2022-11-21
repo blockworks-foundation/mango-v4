@@ -54,8 +54,8 @@ mod tests {
         false
     }
 
-    fn test_setup(price: f64) -> (PerpMarket, I80F48, EventQueue, Box<OrderBook>) {
-        let mut book = Box::new(OrderBook::zeroed());
+    fn test_setup(price: f64) -> (PerpMarket, I80F48, EventQueue, Box<Orderbook>) {
+        let mut book = Box::new(Orderbook::zeroed());
         book.init();
 
         let event_queue = EventQueue::zeroed();
@@ -79,7 +79,7 @@ mod tests {
         let (mut perp_market, oracle_price, mut event_queue, mut book) = test_setup(5000.0);
         let settle_token_index = 0;
 
-        let mut new_order = |book: &mut OrderBook,
+        let mut new_order = |book: &mut Orderbook,
                              event_queue: &mut EventQueue,
                              side,
                              price_lots,

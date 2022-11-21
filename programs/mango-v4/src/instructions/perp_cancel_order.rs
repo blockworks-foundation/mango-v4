@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::error::*;
-use crate::state::{AccountLoaderDynamic, Group, MangoAccount, OrderBook, PerpMarket};
+use crate::state::{AccountLoaderDynamic, Group, MangoAccount, Orderbook, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpCancelOrder<'info> {
@@ -18,7 +18,7 @@ pub struct PerpCancelOrder<'info> {
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]
-    pub orderbook: AccountLoader<'info, OrderBook>,
+    pub orderbook: AccountLoader<'info, Orderbook>,
 }
 
 pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: u128) -> Result<()> {
