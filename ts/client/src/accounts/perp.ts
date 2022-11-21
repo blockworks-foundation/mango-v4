@@ -227,7 +227,7 @@ export class PerpMarket {
 
   public async loadFills(
     client: MangoClient,
-    lastSeqNum: BN,
+    lastSeqNum = new BN(0),
   ): Promise<(OutEvent | FillEvent | LiquidateEvent)[]> {
     const eventQueue = await this.loadEventQueue(client);
     return eventQueue
