@@ -39,12 +39,16 @@ export async function sendTransaction(
     vtx.sign([((provider as AnchorProvider).wallet as any).payer as Signer]);
   }
 
-  const signature = await connection.sendTransaction(
-    vtx as any as VersionedTransaction,
-    {
-      skipPreflight: true,
-    },
-  );
+  const signature = await connection.sendRawTransaction(vtx.serialize(), {
+    skipPreflight: true,
+  });
+
+  // const signature = await connection.sendTransactionss(
+  //   vtx as any as VersionedTransaction,
+  //   {
+  //     skipPreflight: true,
+  //   },
+  // );
 
   if (opts.postSendTxCallback) {
     try {
