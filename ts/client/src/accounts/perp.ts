@@ -4,10 +4,19 @@ import { PublicKey } from '@solana/web3.js';
 import Big from 'big.js';
 import { MangoClient } from '../client';
 import { I80F48, I80F48Dto } from '../numbers/I80F48';
+import { Modify } from '../types';
 import { As, toNative, U64_MAX_BN } from '../utils';
 import { OracleConfig, QUOTE_DECIMALS, TokenIndex } from './bank';
 
 export type PerpMarketIndex = number & As<'perp-market-index'>;
+
+export type ParsedFillEvent = Modify<
+  FillEvent,
+  {
+    price: number;
+    quantity: number;
+  }
+>;
 
 export class PerpMarket {
   public name: string;
@@ -230,9 +239,23 @@ export class PerpMarket {
     lastSeqNum = new BN(0),
   ): Promise<(OutEvent | FillEvent | LiquidateEvent)[]> {
     const eventQueue = await this.loadEventQueue(client);
+
     return eventQueue
       .eventsSince(lastSeqNum)
-      .filter((event) => event.eventType == PerpEventQueue.FILL_EVENT_TYPE);
+      .filter((event) => event.eventType == PerpEventQueue.FILL_EVENT_TYPE)
+      .map(this.parseFillEvent.bind(this)) as ParsedFillEvent[];
+  }
+
+  public parseFillEvent(event): ParsedFillEvent {
+    const quantity = this.baseLotsToUi(event.quantity);
+    const price = this.priceLotsToUi(event.price);
+
+    return {
+      ...event,
+      quantity,
+      size: quantity,
+      price,
+    };
   }
 
   public async logOb(client: MangoClient): Promise<string> {
