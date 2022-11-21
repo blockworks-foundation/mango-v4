@@ -79,9 +79,10 @@ export async function sendTransaction(
   }
 
   if (status.err) {
+    console.warn('Tx status: ', status);
     throw new MangoError({
       txid: signature,
-      message: `Transaction ${signature} failed (${JSON.stringify(status)})`,
+      message: `${JSON.stringify(status)}`,
     });
   }
 
