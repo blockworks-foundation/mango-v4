@@ -1092,15 +1092,16 @@ export class PerpPosition {
   }
 
   public getUnsettledFunding(perpMarket: PerpMarket): I80F48 {
-    if (this.basePositionLots.isNeg()) {
-      return perpMarket.shortFunding
-        .sub(this.shortSettledFunding)
-        .mul(I80F48.fromI64(this.basePositionLots));
-    } else {
+    if (this.basePositionLots.gt(new BN(0))) {
       return perpMarket.longFunding
         .sub(this.longSettledFunding)
         .mul(I80F48.fromI64(this.basePositionLots));
+    } else if (this.basePositionLots.lt(new BN(0))) {
+      return perpMarket.shortFunding
+        .sub(this.shortSettledFunding)
+        .mul(I80F48.fromI64(this.basePositionLots));
     }
+    return ZERO_I80F48();
   }
 
   public getEquity(perpMarket: PerpMarket): I80F48 {
