@@ -182,7 +182,6 @@ impl<'a> LiquidateHelper<'a> {
 
         // Liquidate the highest-value perp base position
         let (perp_market_index, base_lots, price, _) = perp_base_positions.last().unwrap();
-        let _perp = self.client.context.perp(*perp_market_index);
 
         let (side, side_signum) = if *base_lots > 0 {
             (Side::Bid, 1)
