@@ -142,13 +142,7 @@ pub fn token_register(
         bank_num: 0,
         oracle_conf_filter: oracle_config.to_oracle_config().conf_filter,
         oracle_config: oracle_config.to_oracle_config(),
-        safe_price: SafePriceAccumulator {
-            // safe_price and delayed_prices are initialized later from the oracle
-            delay_interval_seconds: 60 * 60, // 1h, for a total delay of 24h
-            delay_growth_limit: 0.06,        // 6% per hour, 400% per day
-            safe_growth_limit: 0.0003, // 0.03% per second, 293% in 1h if updated every 10s, 281% in 1h if updated every 5min
-            ..SafePriceAccumulator::default()
-        },
+        stable_price_model: StablePriceModel::default(),
         reserved: [0; 2232],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
@@ -157,7 +151,8 @@ pub fn token_register(
         &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
         None, // staleness checked in health
     )?;
-    bank.safe_price.init(oracle_price.to_num());
+    bank.stable_price_model
+        .reset_to_price(oracle_price.to_num());
 
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {

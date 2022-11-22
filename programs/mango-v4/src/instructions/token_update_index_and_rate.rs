@@ -115,9 +115,9 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
 
         let last_updated = some_bank.index_last_updated;
         some_bank
-            .safe_price
+            .stable_price_model
             .update(now_ts as u64, last_updated as u64, price.to_num());
-        let safe_price = some_bank.safe_price.clone();
+        let stable_price_model = some_bank.stable_price_model.clone();
 
         emit!(UpdateIndexLog {
             mango_group: mint_info.group.key(),
@@ -160,7 +160,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             // TODO: remove once fully migrated to OracleConfig
             bank.oracle_config.conf_filter = bank.oracle_conf_filter;
 
-            bank.safe_price = safe_price.clone();
+            bank.stable_price_model = stable_price_model.clone();
         }
     }
 

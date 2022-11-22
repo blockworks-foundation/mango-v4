@@ -1,6 +1,6 @@
 use super::{OracleConfig, TokenIndex, TokenPosition};
 use crate::accounts_zerocopy::KeyedAccountReader;
-use crate::state::oracle;
+use crate::state::{oracle, StablePriceModel};
 use crate::util;
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
@@ -104,167 +104,13 @@ pub struct Bank {
 
     pub oracle_config: OracleConfig,
 
-    pub safe_price: SafePriceAccumulator,
+    pub stable_price_model: StablePriceModel,
 
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 2232],
 }
 const_assert_eq!(size_of::<Bank>(), 3112);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
-
-#[zero_copy]
-#[derive(Derivative, Debug)]
-pub struct SafePriceAccumulator {
-    /// Current safe price to use in health
-    pub safe_price: f64,
-
-    /// Stored delay_price for each delay_interval.
-    /// If we want the delay_price to be 24h delayed, we would store one for each hour.
-    /// This is used in a cyclical way: We use the maximally-delayed value at delay_interval_index
-    /// and once enough time passes to move to the next delay interval, that gets overwritten and
-    /// we use the next one.
-    pub delay_prices: [f64; 24],
-
-    /// The delay price is based on an average over each delay_interval. The contributions
-    /// to the average are summed up here.
-    pub delay_accumulator_price: f64,
-
-    /// Accumulating the total time for the above average.
-    pub delay_accumulator_time: u32,
-
-    /// Length of a delay_interval
-    pub delay_interval_seconds: u32,
-
-    /// Maximal relative difference between two delay_price in consecutive intervals.
-    pub delay_growth_limit: f32,
-
-    /// Maximal per-second relative difference of the safe price.
-    /// It gets scaled down if safe and delay price disagree.
-    pub safe_growth_limit: f32,
-
-    /// The delay_interval_index that update() was last called on.
-    pub last_delay_interval_index: u8,
-
-    #[derivative(Debug = "ignore")]
-    pub padding: [u8; 7],
-}
-const_assert_eq!(size_of::<SafePriceAccumulator>(), 232);
-const_assert_eq!(size_of::<SafePriceAccumulator>() % 8, 0);
-
-impl Default for SafePriceAccumulator {
-    fn default() -> Self {
-        Self {
-            safe_price: 0.0,
-            delay_prices: [0.0; 24],
-            delay_accumulator_price: 0.0,
-            delay_accumulator_time: 0,
-            delay_interval_seconds: 0,
-            delay_growth_limit: 0.0,
-            safe_growth_limit: 0.0,
-            last_delay_interval_index: 0,
-            padding: Default::default(),
-        }
-    }
-}
-
-impl SafePriceAccumulator {
-    pub fn init(&mut self, oracle_price: f64) {
-        self.delay_prices = [oracle_price; 24];
-        self.safe_price = oracle_price;
-    }
-
-    pub fn delay_interval_index(&self, timestamp: u64) -> u8 {
-        // TODO: check compute costs
-        ((timestamp / self.delay_interval_seconds as u64) % self.delay_prices.len() as u64) as u8
-    }
-
-    pub fn update(&mut self, timestamp: u64, last_update: u64, oracle_price: f64) {
-        let dt = timestamp.saturating_sub(last_update);
-        // Hardcoded. Requiring a minimum time between updates reduces the possible difference
-        // between frequent updates and infrequent ones.
-        // Limiting the max dt prevents very strong updates if update() hasn't been
-        // called for hours.
-        let min_dt = 10;
-        let max_dt = 10 * 60;
-        if dt < min_dt {
-            return;
-        }
-        let dt = dt.min(max_dt) as f64;
-
-        //
-        // Update delay price
-        //
-        cm!(self.delay_accumulator_time += dt as u32);
-        self.delay_accumulator_price += oracle_price * dt;
-
-        let delay_interval_index = self.delay_interval_index(timestamp);
-        if delay_interval_index != self.last_delay_interval_index {
-            let new_delay_price = {
-                let prev = if self.last_delay_interval_index == 0 {
-                    self.delay_prices[self.delay_prices.len() - 1]
-                } else {
-                    self.delay_prices[self.last_delay_interval_index as usize - 1]
-                };
-                if self.delay_accumulator_time == 0 {
-                    prev
-                } else {
-                    let avg = self.delay_accumulator_price / (self.delay_accumulator_time as f64);
-                    let max = prev * (1.0 + self.delay_growth_limit as f64);
-                    let min = prev * (1.0 - self.delay_growth_limit as f64);
-                    if avg > max {
-                        max
-                    } else if avg < min {
-                        min
-                    } else {
-                        avg
-                    }
-                }
-            };
-
-            // Store the new delay price, accounting for skipped intervals
-            if delay_interval_index > self.last_delay_interval_index {
-                for i in self.last_delay_interval_index..delay_interval_index {
-                    self.delay_prices[i as usize] = new_delay_price;
-                }
-            } else {
-                for i in self.last_delay_interval_index as usize..self.delay_prices.len() {
-                    self.delay_prices[i] = new_delay_price;
-                }
-                for i in 0..delay_interval_index {
-                    self.delay_prices[i as usize] = new_delay_price;
-                }
-            }
-
-            self.delay_accumulator_price = 0.0;
-            self.delay_accumulator_time = 0;
-            self.last_delay_interval_index = delay_interval_index;
-        }
-
-        let delay_price = self.delay_prices[delay_interval_index as usize];
-
-        //
-        // Update safe price
-        //
-        let prev_safe_price = self.safe_price;
-        let fraction = if delay_price >= prev_safe_price {
-            prev_safe_price / delay_price
-        } else {
-            delay_price / prev_safe_price
-        };
-        let growth_limit = (self.safe_growth_limit as f64) * fraction * fraction * dt;
-        // for the lower bound, we technically should divide by (1 + growth_limit), but
-        // the error is small when growth_limit is small and this saves a division
-        let lower_bound = prev_safe_price * (1.0 - growth_limit);
-        let upper_bound = prev_safe_price * (1.0 + growth_limit);
-        self.safe_price = if oracle_price < lower_bound {
-            lower_bound
-        } else if oracle_price > upper_bound {
-            upper_bound
-        } else {
-            oracle_price
-        };
-    }
-}
 
 impl Bank {
     pub fn from_existing_bank(
@@ -316,7 +162,7 @@ impl Bank {
             token_index: existing_bank.token_index,
             mint_decimals: existing_bank.mint_decimals,
             oracle_config: existing_bank.oracle_config.clone(),
-            safe_price: SafePriceAccumulator::default(),
+            stable_price_model: StablePriceModel::default(),
             reserved: [0; 2232],
         }
     }
@@ -913,80 +759,5 @@ mod tests {
         bank.bank_rate_last_updated = 1020;
         compute_new_avg_utilization_runner(&mut bank, I80F48::ONE, 1040);
         assert_eq!(bank.avg_utilization, I80F48::ONE);
-    }
-
-    fn run_and_print_safe_price_steps(
-        safe_price: &mut SafePriceAccumulator,
-        start: u64,
-        dt: u64,
-        steps: u64,
-        price: fn(u64) -> f64,
-    ) -> u64 {
-        println!("step,timestamp,safe price,delay price");
-        for i in 0..steps {
-            let time = start + dt * (i + 1);
-            safe_price.update(time, time - dt, price(time));
-            println!(
-                "{i},{time},{},{}",
-                safe_price.safe_price,
-                safe_price.delay_prices[safe_price.last_delay_interval_index as usize]
-            );
-        }
-        start + dt * steps
-    }
-
-    #[test]
-    fn test_safe_price_10x() {
-        let mut model = SafePriceAccumulator {
-            delay_interval_seconds: 60 * 60,
-            delay_growth_limit: 0.06,
-            safe_growth_limit: 0.0003,
-            ..SafePriceAccumulator::default()
-        };
-        model.init(1.0);
-
-        let mut t;
-        t = run_and_print_safe_price_steps(&mut model, 0, 60, 60, |_| 10.0);
-        assert!((model.safe_price - 1.8).abs() < 0.1);
-        assert_eq!(model.delay_prices[1..], [1.0; 23]);
-        assert!((model.delay_prices[0] - 1.06).abs() < 0.01);
-        assert_eq!(model.last_delay_interval_index, 1);
-        assert_eq!(model.delay_accumulator_time, 0);
-        assert_eq!(model.delay_accumulator_price, 0.0);
-
-        t = run_and_print_safe_price_steps(&mut model, t, 10, 6 * 60, |_| 10.0);
-        assert!((model.safe_price - 2.3).abs() < 0.1);
-        assert_eq!(model.delay_prices[2..], [1.0; 22]);
-        assert!((model.delay_prices[0] - 1.06).abs() < 0.01);
-        assert!((model.delay_prices[1] - 1.06 * 1.06).abs() < 0.01);
-        assert_eq!(model.last_delay_interval_index, 2);
-        assert_eq!(model.delay_accumulator_time, 0);
-        assert_eq!(model.delay_accumulator_price, 0.0);
-
-        // check delay price wraparound (25h since start)
-        t = run_and_print_safe_price_steps(&mut model, t, 300, 12 * 23, |_| 10.0);
-        assert!((model.safe_price - 7.4).abs() < 0.1);
-        assert!(model.delay_prices[0] > model.delay_prices[23]);
-        assert!(model.delay_prices[23] > model.delay_prices[22]);
-        assert!(model.delay_prices[1] < model.delay_prices[0]);
-        assert!(model.delay_prices[1] < model.delay_prices[2]);
-        assert_eq!(model.last_delay_interval_index, 1);
-
-        println!("{t}");
-    }
-
-    #[test]
-    fn test_safe_price_average() {
-        let mut model = SafePriceAccumulator {
-            delay_interval_seconds: 60 * 60,
-            delay_growth_limit: 0.06,
-            safe_growth_limit: 0.0003,
-            ..SafePriceAccumulator::default()
-        };
-        model.init(1.0);
-
-        run_and_print_safe_price_steps(&mut model, 0, 60, 60, |t| if t > 1800 { 2.0 } else { 1.0 });
-        println!("{}", model.delay_prices[0]);
-        assert!((model.delay_prices[0] - 1.5).abs() < 0.01); // what's wrong? delay growth limit
     }
 }
