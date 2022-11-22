@@ -113,6 +113,7 @@ const_assert_eq!(size_of::<Bank>(), 3112);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
 #[zero_copy]
+#[derive(Derivative, Debug)]
 pub struct SafePriceAccumulator {
     /// Current safe price to use in health
     pub safe_price: f64,
@@ -144,10 +145,27 @@ pub struct SafePriceAccumulator {
     /// The delay_interval_index that update() was last called on.
     pub last_delay_interval_index: u8,
 
+    #[derivative(Debug = "ignore")]
     pub padding: [u8; 7],
 }
 const_assert_eq!(size_of::<SafePriceAccumulator>(), 232);
 const_assert_eq!(size_of::<SafePriceAccumulator>() % 8, 0);
+
+impl Default for SafePriceAccumulator {
+    fn default() -> Self {
+        Self {
+            safe_price: 0.0,
+            delay_prices: [0.0; 24],
+            delay_accumulator_price: 0.0,
+            delay_accumulator_time: 0,
+            delay_interval_seconds: 0,
+            delay_growth_limit: 0.0,
+            safe_growth_limit: 0.0,
+            last_delay_interval_index: 0,
+            padding: Default::default(),
+        }
+    }
+}
 
 impl SafePriceAccumulator {
     pub fn delay_interval_index(&self, timestamp: u64) -> u8 {
@@ -180,17 +198,19 @@ impl SafePriceAccumulator {
                 } else {
                     self.delay_prices[self.last_delay_interval_index as usize - 1]
                 };
-                let avg = self.delay_accumulator_price / (self.delay_accumulator_time as f64);
-                let max = prev * (1.0 + self.delay_growth_limit as f64);
-                let min = prev * (1.0 - self.delay_growth_limit as f64);
-                if avg == 0.0 {
+                if self.delay_accumulator_time == 0 {
                     prev
-                } else if avg > max {
-                    max
-                } else if avg < min {
-                    min
                 } else {
-                    avg
+                    let avg = self.delay_accumulator_price / (self.delay_accumulator_time as f64);
+                    let max = prev * (1.0 + self.delay_growth_limit as f64);
+                    let min = prev * (1.0 - self.delay_growth_limit as f64);
+                    if avg > max {
+                        max
+                    } else if avg < min {
+                        min
+                    } else {
+                        avg
+                    }
                 }
             };
 
@@ -209,6 +229,7 @@ impl SafePriceAccumulator {
             }
 
             self.delay_accumulator_price = 0.0;
+            self.delay_accumulator_time = 0;
             self.last_delay_interval_index = delay_interval_index;
         }
         cm!(self.delay_accumulator_time += dt as u32);
@@ -225,11 +246,7 @@ impl SafePriceAccumulator {
         } else {
             delay_price / prev_safe_price
         };
-        // Hardcoded. Limiting the max safe price growth to 10% means that even if this function
-        // isn't called for a few hours, there's no huge immediate jump.
-        let max_growth_limit = 0.10;
-        let growth_limit =
-            ((self.safe_growth_limit as f64) * fraction * fraction * dt).min(max_growth_limit);
+        let growth_limit = (self.safe_growth_limit as f64) * fraction * fraction * dt;
         // for the lower bound, we technically should divide by (1 + growth_limit), but
         // the error is small when growth_limit is small and this saves a division
         let lower_bound = prev_safe_price * (1.0 - growth_limit);
@@ -294,11 +311,8 @@ impl Bank {
             token_index: existing_bank.token_index,
             mint_decimals: existing_bank.mint_decimals,
             oracle_config: existing_bank.oracle_config.clone(),
-            ma_window: existing_bank.ma_window,
-            ma_price: existing_bank.ma_price,
-            ma_price_upper_bound_factor: existing_bank.ma_price_upper_bound_factor,
-            ma_price_lower_bound_factor: existing_bank.ma_price_lower_bound_factor,
-            reserved: [0; 2432],
+            safe_price: SafePriceAccumulator::default(),
+            reserved: [0; 2232],
         }
     }
 

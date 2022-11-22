@@ -113,13 +113,11 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             Some(clock.slot),
         )?;
 
-        let price_duration = now_ts - some_bank.index_last_updated;
-        let bounded_price = price
-            .min(some_bank.ma_price * I80F48::from_num(some_bank.ma_price_upper_bound_factor))
-            .max(some_bank.ma_price * I80F48::from_num(some_bank.ma_price_lower_bound_factor));
-        let ma_price = cm!(some_bank.ma_price
-            + (bounded_price - some_bank.ma_price) * I80F48::from(price_duration)
-                / I80F48::from(some_bank.ma_window));
+        let last_updated = some_bank.index_last_updated;
+        some_bank
+            .safe_price
+            .update(now_ts as u64, last_updated as u64, price);
+        let safe_price = some_bank.safe_price.clone();
 
         emit!(UpdateIndexLog {
             mango_group: mint_info.group.key(),
@@ -128,7 +126,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             borrow_index: borrow_index.to_bits(),
             avg_utilization: new_avg_utilization.to_bits(),
             price: price.to_bits(),
-            ma_price: ma_price.to_bits(),
+            ma_price: 0, // TODO
             collected_fees: some_bank.collected_fees_native.to_bits(),
             loan_fee_rate: some_bank.loan_fee_rate.to_bits(),
             total_deposits: cm!(deposit_index * indexed_total_deposits).to_bits(),
@@ -162,7 +160,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             // TODO: remove once fully migrated to OracleConfig
             bank.oracle_config.conf_filter = bank.oracle_conf_filter;
 
-            bank.ma_price = ma_price;
+            bank.safe_price = safe_price.clone();
         }
     }
 

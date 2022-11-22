@@ -115,11 +115,14 @@ pub fn token_register_trustless(
             max_staleness_slots: -1,
             reserved: [0; 72],
         },
-        ma_window: 30 * 60, // 30 minutes
-        ma_price: I80F48::from_num(0),
-        ma_price_upper_bound_factor: 1.05,
-        ma_price_lower_bound_factor: 0.95,
-        reserved: [0; 2432],
+        safe_price: SafePriceAccumulator {
+            // TODO: set all values to current oracle price
+            delay_interval_seconds: 60 * 60, // 1h, for a total delay of 24h
+            delay_growth_limit: 0.06,        // 6% per hour, 400% per day
+            safe_growth_limit: 0.0003, // 0.03% per second, 293% in 1h if updated every 10s, 281% in 1h if updated every 5min
+            ..SafePriceAccumulator::default()
+        },
+        reserved: [0; 2232],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
