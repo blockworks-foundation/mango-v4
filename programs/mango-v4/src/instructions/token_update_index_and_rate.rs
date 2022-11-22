@@ -116,7 +116,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
         let last_updated = some_bank.index_last_updated;
         some_bank
             .safe_price
-            .update(now_ts as u64, last_updated as u64, price);
+            .update(now_ts as u64, last_updated as u64, price.to_num());
         let safe_price = some_bank.safe_price.clone();
 
         emit!(UpdateIndexLog {

@@ -168,12 +168,17 @@ impl Default for SafePriceAccumulator {
 }
 
 impl SafePriceAccumulator {
+    pub fn init(&mut self, oracle_price: f64) {
+        self.delay_prices = [oracle_price; 24];
+        self.safe_price = oracle_price;
+    }
+
     pub fn delay_interval_index(&self, timestamp: u64) -> u8 {
         // TODO: check compute costs
         ((timestamp / self.delay_interval_seconds as u64) % self.delay_prices.len() as u64) as u8
     }
 
-    pub fn update(&mut self, timestamp: u64, last_update: u64, oracle_price: I80F48) {
+    pub fn update(&mut self, timestamp: u64, last_update: u64, oracle_price: f64) {
         let dt = timestamp.saturating_sub(last_update);
         // Hardcoded. Requiring a minimum time between updates reduces the possible difference
         // between frequent updates and infrequent ones.
@@ -185,11 +190,13 @@ impl SafePriceAccumulator {
             return;
         }
         let dt = dt.min(max_dt) as f64;
-        let oracle_price = oracle_price.to_num();
 
         //
         // Update delay price
         //
+        cm!(self.delay_accumulator_time += dt as u32);
+        self.delay_accumulator_price += oracle_price * dt;
+
         let delay_interval_index = self.delay_interval_index(timestamp);
         if delay_interval_index != self.last_delay_interval_index {
             let new_delay_price = {
@@ -232,8 +239,6 @@ impl SafePriceAccumulator {
             self.delay_accumulator_time = 0;
             self.last_delay_interval_index = delay_interval_index;
         }
-        cm!(self.delay_accumulator_time += dt as u32);
-        self.delay_accumulator_price += oracle_price * dt;
 
         let delay_price = self.delay_prices[delay_interval_index as usize];
 
@@ -908,5 +913,80 @@ mod tests {
         bank.bank_rate_last_updated = 1020;
         compute_new_avg_utilization_runner(&mut bank, I80F48::ONE, 1040);
         assert_eq!(bank.avg_utilization, I80F48::ONE);
+    }
+
+    fn run_and_print_safe_price_steps(
+        safe_price: &mut SafePriceAccumulator,
+        start: u64,
+        dt: u64,
+        steps: u64,
+        price: fn(u64) -> f64,
+    ) -> u64 {
+        println!("step,timestamp,safe price,delay price");
+        for i in 0..steps {
+            let time = start + dt * (i + 1);
+            safe_price.update(time, time - dt, price(time));
+            println!(
+                "{i},{time},{},{}",
+                safe_price.safe_price,
+                safe_price.delay_prices[safe_price.last_delay_interval_index as usize]
+            );
+        }
+        start + dt * steps
+    }
+
+    #[test]
+    fn test_safe_price_10x() {
+        let mut model = SafePriceAccumulator {
+            delay_interval_seconds: 60 * 60,
+            delay_growth_limit: 0.06,
+            safe_growth_limit: 0.0003,
+            ..SafePriceAccumulator::default()
+        };
+        model.init(1.0);
+
+        let mut t;
+        t = run_and_print_safe_price_steps(&mut model, 0, 60, 60, |_| 10.0);
+        assert!((model.safe_price - 1.8).abs() < 0.1);
+        assert_eq!(model.delay_prices[1..], [1.0; 23]);
+        assert!((model.delay_prices[0] - 1.06).abs() < 0.01);
+        assert_eq!(model.last_delay_interval_index, 1);
+        assert_eq!(model.delay_accumulator_time, 0);
+        assert_eq!(model.delay_accumulator_price, 0.0);
+
+        t = run_and_print_safe_price_steps(&mut model, t, 10, 6 * 60, |_| 10.0);
+        assert!((model.safe_price - 2.3).abs() < 0.1);
+        assert_eq!(model.delay_prices[2..], [1.0; 22]);
+        assert!((model.delay_prices[0] - 1.06).abs() < 0.01);
+        assert!((model.delay_prices[1] - 1.06 * 1.06).abs() < 0.01);
+        assert_eq!(model.last_delay_interval_index, 2);
+        assert_eq!(model.delay_accumulator_time, 0);
+        assert_eq!(model.delay_accumulator_price, 0.0);
+
+        // check delay price wraparound (25h since start)
+        t = run_and_print_safe_price_steps(&mut model, t, 300, 12 * 23, |_| 10.0);
+        assert!((model.safe_price - 7.4).abs() < 0.1);
+        assert!(model.delay_prices[0] > model.delay_prices[23]);
+        assert!(model.delay_prices[23] > model.delay_prices[22]);
+        assert!(model.delay_prices[1] < model.delay_prices[0]);
+        assert!(model.delay_prices[1] < model.delay_prices[2]);
+        assert_eq!(model.last_delay_interval_index, 1);
+
+        println!("{t}");
+    }
+
+    #[test]
+    fn test_safe_price_average() {
+        let mut model = SafePriceAccumulator {
+            delay_interval_seconds: 60 * 60,
+            delay_growth_limit: 0.06,
+            safe_growth_limit: 0.0003,
+            ..SafePriceAccumulator::default()
+        };
+        model.init(1.0);
+
+        run_and_print_safe_price_steps(&mut model, 0, 60, 60, |t| if t > 1800 { 2.0 } else { 1.0 });
+        println!("{}", model.delay_prices[0]);
+        assert!((model.delay_prices[0] - 1.5).abs() < 0.01); // what's wrong? delay growth limit
     }
 }

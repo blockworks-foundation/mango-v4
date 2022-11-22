@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use fixed::types::I80F48;
 
+use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
 use crate::instructions::INDEX_START;
 use crate::state::*;
@@ -116,7 +117,6 @@ pub fn token_register_trustless(
             reserved: [0; 72],
         },
         safe_price: SafePriceAccumulator {
-            // TODO: set all values to current oracle price
             delay_interval_seconds: 60 * 60, // 1h, for a total delay of 24h
             delay_growth_limit: 0.06,        // 6% per hour, 400% per day
             safe_growth_limit: 0.0003, // 0.03% per second, 293% in 1h if updated every 10s, 281% in 1h if updated every 5min
@@ -125,6 +125,12 @@ pub fn token_register_trustless(
         reserved: [0; 2232],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
+
+    let oracle_price = bank.oracle_price(
+        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        None, // staleness checked in health
+    )?;
+    bank.safe_price.init(oracle_price.to_num());
 
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {
