@@ -107,56 +107,129 @@ pub struct Bank {
     pub safe_price: SafePriceAccumulator,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2240],
+    pub reserved: [u8; 2232],
 }
 const_assert_eq!(size_of::<Bank>(), 3112);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
 #[zero_copy]
 pub struct SafePriceAccumulator {
+    /// Current safe price to use in health
     pub safe_price: f64,
-    pub delay_price_slots: [f64; 24],
-    pub delay_current: f64,
-    pub last_delay_slot: u8,
-    pub padding: [u8; 3],
-    pub delay_max_growth: f32,
+
+    /// Stored delay_price for each delay_interval.
+    /// If we want the delay_price to be 24h delayed, we would store one for each hour.
+    /// This is used in a cyclical way: We use the maximally-delayed value at delay_interval_index
+    /// and once enough time passes to move to the next delay interval, that gets overwritten and
+    /// we use the next one.
+    pub delay_prices: [f64; 24],
+
+    /// The delay price is based on an average over each delay_interval. The contributions
+    /// to the average are summed up here.
+    pub delay_accumulator_price: f64,
+
+    /// Accumulating the total time for the above average.
+    pub delay_accumulator_time: u32,
+
+    /// Length of a delay_interval
+    pub delay_interval_seconds: u32,
+
+    /// Maximal relative difference between two delay_price in consecutive intervals.
+    pub delay_growth_limit: f32,
+
+    /// Maximal per-second relative difference of the safe price.
+    /// It gets scaled down if safe and delay price disagree.
     pub safe_growth_limit: f32,
-    pub delay_window: u32, // seconds
+
+    /// The delay_interval_index that update() was last called on.
+    pub last_delay_interval_index: u8,
+
+    pub padding: [u8; 7],
 }
-const_assert_eq!(size_of::<SafePriceAccumulator>(), 224);
+const_assert_eq!(size_of::<SafePriceAccumulator>(), 232);
 const_assert_eq!(size_of::<SafePriceAccumulator>() % 8, 0);
 
 impl SafePriceAccumulator {
-    pub fn delay_slot(&self, timestamp: u64) -> u8 {
-        ((timestamp % self.delay_window as u64) % self.delay_price_slots.len() as u64) as u8
+    pub fn delay_interval_index(&self, timestamp: u64) -> u8 {
+        // TODO: check compute costs
+        ((timestamp / self.delay_interval_seconds as u64) % self.delay_prices.len() as u64) as u8
     }
 
     pub fn update(&mut self, timestamp: u64, last_update: u64, oracle_price: I80F48) {
         let dt = timestamp.saturating_sub(last_update);
+        // Hardcoded. Requiring a minimum time between updates reduces the possible difference
+        // between frequent updates and infrequent ones.
+        // Limiting the max dt prevents very strong updates if update() hasn't been
+        // called for hours.
         let min_dt = 10;
+        let max_dt = 10 * 60;
         if dt < min_dt {
             return;
         }
+        let dt = dt.min(max_dt) as f64;
         let oracle_price = oracle_price.to_num();
 
-        let delay_slot = self.delay_slot(timestamp);
-        if delay_slot != self.last_delay_slot {
-            self.delay_price_slots[self.last_delay_slot as usize] = self.delay_current;
-            self.last_delay_slot = delay_slot;
-        }
-        // TODO: real update
-        self.delay_current = oracle_price;
-        let delay_price = self.delay_price_slots[delay_slot as usize];
+        //
+        // Update delay price
+        //
+        let delay_interval_index = self.delay_interval_index(timestamp);
+        if delay_interval_index != self.last_delay_interval_index {
+            let new_delay_price = {
+                let prev = if self.last_delay_interval_index == 0 {
+                    self.delay_prices[self.delay_prices.len() - 1]
+                } else {
+                    self.delay_prices[self.last_delay_interval_index as usize - 1]
+                };
+                let avg = self.delay_accumulator_price / (self.delay_accumulator_time as f64);
+                let max = prev * (1.0 + self.delay_growth_limit as f64);
+                let min = prev * (1.0 - self.delay_growth_limit as f64);
+                if avg == 0.0 {
+                    prev
+                } else if avg > max {
+                    max
+                } else if avg < min {
+                    min
+                } else {
+                    avg
+                }
+            };
 
+            // Store the new delay price, accounting for skipped intervals
+            if delay_interval_index > self.last_delay_interval_index {
+                for i in self.last_delay_interval_index..delay_interval_index {
+                    self.delay_prices[i as usize] = new_delay_price;
+                }
+            } else {
+                for i in self.last_delay_interval_index as usize..self.delay_prices.len() {
+                    self.delay_prices[i] = new_delay_price;
+                }
+                for i in 0..delay_interval_index {
+                    self.delay_prices[i as usize] = new_delay_price;
+                }
+            }
+
+            self.delay_accumulator_price = 0.0;
+            self.last_delay_interval_index = delay_interval_index;
+        }
+        cm!(self.delay_accumulator_time += dt as u32);
+        self.delay_accumulator_price += oracle_price * dt;
+
+        let delay_price = self.delay_prices[delay_interval_index as usize];
+
+        //
+        // Update safe price
+        //
         let prev_safe_price = self.safe_price;
         let fraction = if delay_price >= prev_safe_price {
             prev_safe_price / delay_price
         } else {
             delay_price / prev_safe_price
         };
+        // Hardcoded. Limiting the max safe price growth to 10% means that even if this function
+        // isn't called for a few hours, there's no huge immediate jump.
         let max_growth_limit = 0.10;
-        let growth_limit = ((self.safe_growth_limit as f64) * fraction * fraction * (dt as f64))
-            .min(max_growth_limit);
+        let growth_limit =
+            ((self.safe_growth_limit as f64) * fraction * fraction * dt).min(max_growth_limit);
         // for the lower bound, we technically should divide by (1 + growth_limit), but
         // the error is small when growth_limit is small and this saves a division
         let lower_bound = prev_safe_price * (1.0 - growth_limit);
@@ -168,10 +241,6 @@ impl SafePriceAccumulator {
         } else {
             oracle_price
         };
-    }
-
-    pub fn delay_price(&self) -> I80F48 {
-        I80F48::from_num(self.delay_price_slots[self.last_delay_slot as usize])
     }
 }
 
