@@ -761,9 +761,6 @@ impl ClientInstruction for TokenRegisterInstruction {
             maint_liab_weight: self.maint_liab_weight,
             init_liab_weight: self.init_liab_weight,
             liquidation_fee: self.liquidation_fee,
-            stable_price_delay_interval_seconds: 60 * 60,
-            stable_price_delay_growth_limit: 0.06,
-            stable_price_growth_limit: 0.0003,
         };
 
         let bank = Pubkey::find_program_address(

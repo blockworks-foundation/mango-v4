@@ -596,6 +596,10 @@ impl Bank {
             staleness_slot,
         )
     }
+
+    pub fn stable_price(&self) -> I80F48 {
+        I80F48::from_num(self.stable_price_model.stable_price)
+    }
 }
 
 #[macro_export]

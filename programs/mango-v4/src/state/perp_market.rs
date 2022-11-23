@@ -10,7 +10,7 @@ use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
 use crate::util::checked_math as cm;
 
-use super::{orderbook, OracleConfig, OrderBook, DAY_I80F48};
+use super::{orderbook, OracleConfig, OrderBook, StablePriceModel, DAY_I80F48};
 use crate::logs::PerpUpdateFundingLog;
 
 pub type PerpMarketIndex = u16;
@@ -109,7 +109,9 @@ pub struct PerpMarket {
     /// Fraction of pnl to pay out as fee if +pnl account has low health.
     pub settle_fee_fraction_low_health: f32,
 
-    pub reserved: [u8; 2244],
+    pub stable_price_model: StablePriceModel,
+
+    pub reserved: [u8; 1964],
 }
 
 const_assert_eq!(size_of::<PerpMarket>(), 2784);
@@ -151,6 +153,10 @@ impl PerpMarket {
             self.base_decimals,
             staleness_slot,
         )
+    }
+
+    pub fn stable_price(&self) -> I80F48 {
+        I80F48::from_num(self.stable_price_model.stable_price)
     }
 
     /// Use current order book price and index price to update the instantaneous funding
@@ -293,7 +299,7 @@ impl PerpMarket {
             fees_settled: I80F48::ZERO,
             bump: 0,
             base_decimals: 0,
-            reserved: [0; 2244],
+            reserved: [0; 1964],
             padding1: Default::default(),
             padding2: Default::default(),
             registration_time: 0,
@@ -303,6 +309,7 @@ impl PerpMarket {
             settle_fee_flat: 0.0,
             settle_fee_amount_threshold: 0.0,
             settle_fee_fraction_low_health: 0.0,
+            stable_price_model: StablePriceModel::default(),
         }
     }
 }

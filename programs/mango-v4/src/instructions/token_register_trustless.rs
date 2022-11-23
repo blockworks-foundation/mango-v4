@@ -121,10 +121,8 @@ pub fn token_register_trustless(
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
-    let oracle_price = bank.oracle_price(
-        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
-        None, // staleness checked in health
-    )?;
+    let oracle_price =
+        bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
     bank.stable_price_model
         .reset_to_price(oracle_price.to_num());
 

@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
+use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
 use crate::state::*;
 use crate::util::fill_from_str;
@@ -122,8 +123,15 @@ pub fn perp_create_market(
         settle_fee_flat,
         settle_fee_amount_threshold,
         settle_fee_fraction_low_health,
-        reserved: [0; 2244],
+        stable_price_model: StablePriceModel::default(),
+        reserved: [0; 1964],
     };
+
+    let oracle_price =
+        perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
+    perp_market
+        .stable_price_model
+        .reset_to_price(oracle_price.to_num());
 
     let mut orderbook = ctx.accounts.orderbook.load_init()?;
     orderbook.init();

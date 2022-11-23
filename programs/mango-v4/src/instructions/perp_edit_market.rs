@@ -41,6 +41,9 @@ pub fn perp_edit_market(
     settle_fee_flat_opt: Option<f32>,
     settle_fee_amount_threshold_opt: Option<f32>,
     settle_fee_fraction_low_health_opt: Option<f32>,
+    stable_price_delay_interval_seconds_opt: Option<u32>,
+    stable_price_delay_growth_limit_opt: Option<f32>,
+    stable_price_growth_limit_opt: Option<f32>,
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
@@ -135,6 +138,17 @@ pub fn perp_edit_market(
     }
     if let Some(settle_fee_fraction_low_health) = settle_fee_fraction_low_health_opt {
         perp_market.settle_fee_fraction_low_health = settle_fee_fraction_low_health;
+    }
+
+    if let Some(stable_price_delay_interval_seconds) = stable_price_delay_interval_seconds_opt {
+        // Updating this makes the old delay values slightly inconsistent
+        perp_market.stable_price_model.delay_interval_seconds = stable_price_delay_interval_seconds;
+    }
+    if let Some(stable_price_delay_growth_limit) = stable_price_delay_growth_limit_opt {
+        perp_market.stable_price_model.delay_growth_limit = stable_price_delay_growth_limit;
+    }
+    if let Some(stable_price_growth_limit) = stable_price_growth_limit_opt {
+        perp_market.stable_price_model.stable_growth_limit = stable_price_growth_limit;
     }
 
     emit!(PerpMarketMetaDataLog {
