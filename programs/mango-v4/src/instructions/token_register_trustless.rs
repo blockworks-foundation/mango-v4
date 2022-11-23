@@ -117,7 +117,7 @@ pub fn token_register_trustless(
             reserved: [0; 72],
         },
         stable_price_model: StablePriceModel::default(),
-        reserved: [0; 2232],
+        reserved: [0; 2184],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 

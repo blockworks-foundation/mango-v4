@@ -107,7 +107,7 @@ pub struct Bank {
     pub stable_price_model: StablePriceModel,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2232],
+    pub reserved: [u8; 2184],
 }
 const_assert_eq!(size_of::<Bank>(), 3112);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -163,7 +163,7 @@ impl Bank {
             mint_decimals: existing_bank.mint_decimals,
             oracle_config: existing_bank.oracle_config.clone(),
             stable_price_model: StablePriceModel::default(),
-            reserved: [0; 2232],
+            reserved: [0; 2184],
         }
     }
 

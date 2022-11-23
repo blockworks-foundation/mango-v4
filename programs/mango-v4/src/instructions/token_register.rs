@@ -143,7 +143,7 @@ pub fn token_register(
         oracle_conf_filter: oracle_config.to_oracle_config().conf_filter,
         oracle_config: oracle_config.to_oracle_config(),
         stable_price_model: StablePriceModel::default(),
-        reserved: [0; 2232],
+        reserved: [0; 2184],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
