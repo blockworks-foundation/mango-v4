@@ -2333,4 +2333,73 @@ mod tests {
         let result = retriever.perp_market_and_oracle_price(&group, 0, 9);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_health_stable_price_token() {
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
+        let buffer2 = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut account2 = MangoAccountValue::from_bytes(&buffer2).unwrap();
+        let buffer3 = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut account3 = MangoAccountValue::from_bytes(&buffer3).unwrap();
+
+        let group = Pubkey::new_unique();
+
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
+        bank1.data().stable_price_model.stable_price = 0.5;
+        bank1
+            .data()
+            .change_without_fee(
+                account.ensure_token_position(1).unwrap().0,
+                I80F48::from(100),
+            )
+            .unwrap();
+        bank1
+            .data()
+            .change_without_fee(
+                account2.ensure_token_position(1).unwrap().0,
+                I80F48::from(-100),
+            )
+            .unwrap();
+
+        let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, 0.2, 0.1);
+        perp1.data().stable_price_model.stable_price = 0.5;
+        let perpaccount = account3.ensure_perp_position(9, 1).unwrap().0;
+        perpaccount.change_base_and_quote_positions(perp1.data(), 10, I80F48::from(-100));
+
+        let oracle1_ai = oracle1.as_account_info();
+        let ais = vec![
+            bank1.as_account_info(),
+            oracle1_ai.clone(),
+            perp1.as_account_info(),
+            oracle1_ai,
+        ];
+
+        let retriever = ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
+
+        assert!(health_eq(
+            compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
+            0.8 * 0.5 * 100.0
+        ));
+        assert!(health_eq(
+            compute_health(&account.borrow(), HealthType::Maint, &retriever).unwrap(),
+            0.9 * 1.0 * 100.0
+        ));
+        assert!(health_eq(
+            compute_health(&account2.borrow(), HealthType::Init, &retriever).unwrap(),
+            -1.2 * 1.0 * 100.0
+        ));
+        assert!(health_eq(
+            compute_health(&account2.borrow(), HealthType::Maint, &retriever).unwrap(),
+            -1.1 * 1.0 * 100.0
+        ));
+        assert!(health_eq(
+            compute_health(&account3.borrow(), HealthType::Init, &retriever).unwrap(),
+            0.8 * 0.5 * 10.0 * 10.0 - 100.0
+        ));
+        assert!(health_eq(
+            compute_health(&account3.borrow(), HealthType::Maint, &retriever).unwrap(),
+            0.9 * 1.0 * 10.0 * 10.0 - 100.0
+        ));
+    }
 }
