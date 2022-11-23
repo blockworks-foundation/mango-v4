@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
 use super::InterestRateParams;
-use crate::accounts_zerocopy::LoadMutZeroCopyRef;
+use crate::accounts_zerocopy::{AccountInfoRef, LoadMutZeroCopyRef};
 
 use crate::state::*;
 
@@ -26,6 +26,9 @@ pub struct TokenEdit<'info> {
         has_one = group
     )]
     pub mint_info: AccountLoader<'info, MintInfo>,
+
+    /// CHECK: The oracle can be one of several different account types
+    pub oracle: UncheckedAccount<'info>,
 }
 
 #[allow(unused_variables)]
@@ -62,14 +65,20 @@ pub fn token_edit(
         // mint
         // vault
 
-        if let Some(oracle) = oracle_opt {
-            bank.oracle = oracle;
-            mint_info.oracle = oracle;
-        }
         if let Some(oracle_config) = oracle_config_opt.as_ref() {
             bank.oracle_config = oracle_config.to_oracle_config();
             bank.oracle_conf_filter = bank.oracle_config.conf_filter;
         };
+        if let Some(oracle) = oracle_opt {
+            bank.oracle = oracle;
+            mint_info.oracle = oracle;
+
+            require_keys_eq!(oracle, ctx.accounts.oracle.key());
+            let oracle_price =
+                bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
+            bank.stable_price_model
+                .reset_to_price(oracle_price.to_num());
+        }
 
         if let Some(group_insurance_fund) = group_insurance_fund_opt {
             mint_info.group_insurance_fund = if group_insurance_fund { 1 } else { 0 };

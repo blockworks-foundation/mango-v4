@@ -164,18 +164,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     //
     // SETUP: Change the oracle to make health go very negative
     //
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: borrow_token1.mint.pubkey,
-            payer,
-            price: "20.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, borrow_token1, admin, 20.0).await;
 
     //
     // SETUP: liquidate all the collateral against borrow1
@@ -478,18 +467,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     //
     // SETUP: Change the oracle to make health go very negative
     //
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: borrow_token2.mint.pubkey,
-            payer,
-            price: "20.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, borrow_token2, admin, 20.0).await;
 
     //
     // SETUP: liquidate all the collateral against borrow2
