@@ -124,14 +124,14 @@ pub fn perp_create_market(
         settle_fee_amount_threshold,
         settle_fee_fraction_low_health,
         stable_price_model: StablePriceModel::default(),
-        reserved: [0; 1964],
+        reserved: [0; 1956],
     };
 
     let oracle_price =
         perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
     perp_market
         .stable_price_model
-        .reset_to_price(oracle_price.to_num());
+        .reset_to_price(oracle_price.to_num(), now_ts);
 
     let mut orderbook = ctx.accounts.orderbook.load_init()?;
     orderbook.init();

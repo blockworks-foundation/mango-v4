@@ -66,9 +66,10 @@ pub fn perp_edit_market(
         require_keys_eq!(oracle, ctx.accounts.oracle.key());
         let oracle_price = perp_market
             .oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
-        perp_market
-            .stable_price_model
-            .reset_to_price(oracle_price.to_num());
+        perp_market.stable_price_model.reset_to_price(
+            oracle_price.to_num(),
+            Clock::get()?.unix_timestamp.try_into().unwrap(),
+        );
     }
 
     // unchanged -

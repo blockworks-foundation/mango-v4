@@ -1514,7 +1514,7 @@ mod tests {
         bank.data().init_liab_weight = I80F48::from_num(1.0 + init_weights);
         bank.data().maint_asset_weight = I80F48::from_num(1.0 - maint_weights);
         bank.data().maint_liab_weight = I80F48::from_num(1.0 + maint_weights);
-        bank.data().stable_price_model.reset_to_price(price);
+        bank.data().stable_price_model.reset_to_price(price, 0);
         (bank, oracle)
     }
 
@@ -1536,7 +1536,7 @@ mod tests {
         pm.data().maint_liab_weight = I80F48::from_num(1.0 + maint_weights);
         pm.data().quote_lot_size = 100;
         pm.data().base_lot_size = 10;
-        pm.data().stable_price_model.reset_to_price(price);
+        pm.data().stable_price_model.reset_to_price(price, 0);
         pm
     }
 

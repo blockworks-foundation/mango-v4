@@ -99,6 +99,8 @@ pub fn token_register(
         );
     }
 
+    let now_ts = Clock::get()?.unix_timestamp;
+
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
         group: ctx.accounts.group.key(),
@@ -112,8 +114,8 @@ pub fn token_register(
         cached_indexed_total_borrows: I80F48::ZERO,
         indexed_deposits: I80F48::ZERO,
         indexed_borrows: I80F48::ZERO,
-        index_last_updated: Clock::get()?.unix_timestamp,
-        bank_rate_last_updated: Clock::get()?.unix_timestamp,
+        index_last_updated: now_ts,
+        bank_rate_last_updated: now_ts,
         // TODO: add a require! verifying relation between the parameters
         avg_utilization: I80F48::ZERO,
         adjustment_factor: I80F48::from_num(interest_rate_params.adjustment_factor),
@@ -140,14 +142,14 @@ pub fn token_register(
         oracle_conf_filter: oracle_config.to_oracle_config().conf_filter,
         oracle_config: oracle_config.to_oracle_config(),
         stable_price_model: StablePriceModel::default(),
-        reserved: [0; 2184],
+        reserved: [0; 2176],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
     let oracle_price =
         bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
     bank.stable_price_model
-        .reset_to_price(oracle_price.to_num());
+        .reset_to_price(oracle_price.to_num(), now_ts.try_into().unwrap());
 
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {

@@ -111,7 +111,7 @@ pub struct PerpMarket {
 
     pub stable_price_model: StablePriceModel,
 
-    pub reserved: [u8; 1964],
+    pub reserved: [u8; 1956],
 }
 
 const_assert_eq!(size_of::<PerpMarket>(), 2784);
@@ -160,7 +160,7 @@ impl PerpMarket {
     }
 
     /// Use current order book price and index price to update the instantaneous funding
-    pub fn update_funding(
+    pub fn update_funding_and_stable_price(
         &mut self,
         book: &OrderBook,
         oracle_price: I80F48,
@@ -199,12 +199,16 @@ impl PerpMarket {
         self.short_funding += funding_delta;
         self.funding_last_updated = now_ts;
 
+        self.stable_price_model
+            .update(now_ts, oracle_price.to_num());
+
         emit!(PerpUpdateFundingLog {
             mango_group: self.group,
             market_index: self.perp_market_index,
             long_funding: self.long_funding.to_bits(),
             short_funding: self.long_funding.to_bits(),
             price: oracle_price.to_bits(),
+            stable_price: self.stable_price().to_bits(),
             fees_accrued: self.fees_accrued.to_bits(),
             open_interest: self.open_interest,
         });
@@ -299,7 +303,7 @@ impl PerpMarket {
             fees_settled: I80F48::ZERO,
             bump: 0,
             base_decimals: 0,
-            reserved: [0; 1964],
+            reserved: [0; 1956],
             padding1: Default::default(),
             padding2: Default::default(),
             registration_time: 0,

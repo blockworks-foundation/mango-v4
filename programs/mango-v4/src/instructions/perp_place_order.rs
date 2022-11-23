@@ -55,7 +55,7 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, order: Order, limit: u8) -
             None, // staleness checked in health
         )?;
 
-        perp_market.update_funding(&book, oracle_price, now_ts)?;
+        perp_market.update_funding_and_stable_price(&book, oracle_price, now_ts)?;
     }
 
     let mut account = ctx.accounts.account.load_mut()?;

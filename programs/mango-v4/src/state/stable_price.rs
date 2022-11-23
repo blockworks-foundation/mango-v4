@@ -21,6 +21,8 @@ pub struct StablePriceModel {
     /// Current stable price to use in health
     pub stable_price: f64,
 
+    pub last_update_timestamp: u64,
+
     /// Stored delay_price for each delay_interval.
     /// If we want the delay_price to be 24h delayed, we would store one for each hour.
     /// This is used in a cyclical way: We use the maximally-delayed value at delay_interval_index
@@ -54,13 +56,14 @@ pub struct StablePriceModel {
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 48],
 }
-const_assert_eq!(size_of::<StablePriceModel>(), 280);
+const_assert_eq!(size_of::<StablePriceModel>(), 288);
 const_assert_eq!(size_of::<StablePriceModel>() % 8, 0);
 
 impl Default for StablePriceModel {
     fn default() -> Self {
         Self {
             stable_price: 0.0,
+            last_update_timestamp: 0,
             delay_prices: [0.0; 24],
             delay_accumulator_price: 0.0,
             delay_accumulator_time: 0,
@@ -75,11 +78,12 @@ impl Default for StablePriceModel {
 }
 
 impl StablePriceModel {
-    pub fn reset_to_price(&mut self, oracle_price: f64) {
+    pub fn reset_to_price(&mut self, oracle_price: f64, now_ts: u64) {
         self.stable_price = oracle_price;
         self.delay_prices = [oracle_price; 24];
         self.delay_accumulator_price = 0.0;
         self.delay_accumulator_time = 0;
+        self.last_update_timestamp = now_ts;
     }
 
     pub fn delay_interval_index(&self, timestamp: u64) -> u8 {
@@ -95,11 +99,8 @@ impl StablePriceModel {
         target.clamp(min, max)
     }
 
-    pub fn update(&mut self, now_ts: u64, last_update_ts: u64, oracle_price: f64) {
-        let dt = now_ts.saturating_sub(last_update_ts);
-        // did we wrap around all delay intervals?
-        let full_delay_passed =
-            dt > self.delay_prices.len() as u64 * self.delay_interval_seconds as u64;
+    pub fn update(&mut self, now_ts: u64, oracle_price: f64) {
+        let dt = now_ts.saturating_sub(self.last_update_timestamp);
         // Hardcoded. Requiring a minimum time between updates reduces the possible difference
         // between frequent updates and infrequent ones.
         // Limiting the max dt prevents very strong updates if update() hasn't been
@@ -109,13 +110,17 @@ impl StablePriceModel {
         if dt < min_dt {
             return;
         }
-        let dt_f64 = dt.min(max_dt) as f64;
+        // did we wrap around all delay intervals?
+        let full_delay_passed =
+            dt > self.delay_prices.len() as u64 * self.delay_interval_seconds as u64;
+        let dt_limited = dt.min(max_dt) as f64;
+        self.last_update_timestamp = now_ts;
 
         //
         // Update delay price
         //
         cm!(self.delay_accumulator_time += dt as u32);
-        self.delay_accumulator_price += oracle_price * dt_f64;
+        self.delay_accumulator_price += oracle_price * dt_limited;
 
         let delay_interval_index = self.delay_interval_index(now_ts);
         if delay_interval_index != self.last_delay_interval_index {
@@ -161,7 +166,7 @@ impl StablePriceModel {
             } else {
                 delay_price / prev_stable_price
             };
-            let growth_limit = (self.stable_growth_limit as f64) * fraction * fraction * dt_f64;
+            let growth_limit = (self.stable_growth_limit as f64) * fraction * fraction * dt_limited;
             Self::growth_clamped(oracle_price, prev_stable_price, growth_limit)
         };
     }
@@ -181,7 +186,7 @@ mod tests {
         println!("step,timestamp,stable_price,delay_price");
         for i in 0..steps {
             let time = start + dt * (i + 1);
-            model.update(time, time - dt, price(time));
+            model.update(time, price(time));
             println!(
                 "{i},{time},{},{}",
                 model.stable_price, model.delay_prices[model.last_delay_interval_index as usize]
@@ -193,7 +198,7 @@ mod tests {
     #[test]
     fn test_stable_price_10x() {
         let mut model = StablePriceModel::default();
-        model.reset_to_price(1.0);
+        model.reset_to_price(1.0, 0);
 
         let mut t;
         t = run_and_print(&mut model, 0, 60, 60, |_| 10.0);
@@ -229,11 +234,11 @@ mod tests {
     fn test_stable_price_characteristics_upwards() {
         let mut model = StablePriceModel::default();
 
-        model.reset_to_price(1.0);
+        model.reset_to_price(1.0, 0);
 
         let mut last = 1;
         for i in 0..100000 {
-            model.update(60 * (i + 1), 60 * i, 1000.0);
+            model.update(60 * (i + 1), 1000.0);
             let now = model.stable_price as i32;
             if now > last {
                 last = now;
@@ -249,11 +254,11 @@ mod tests {
     fn test_stable_price_characteristics_downwards() {
         let mut model = StablePriceModel::default();
         let init = 10000.0;
-        model.reset_to_price(init);
+        model.reset_to_price(init, 0);
 
         let mut last = 1;
         for i in 0..100000 {
-            model.update(60 * (i + 1), 60 * i, 0.0);
+            model.update(60 * (i + 1), 0.0);
             let now = (init / model.stable_price) as i32;
             if now > last {
                 last = now;
@@ -274,7 +279,7 @@ mod tests {
             delay_growth_limit: 10.00,
             ..StablePriceModel::default()
         };
-        model.reset_to_price(1.0);
+        model.reset_to_price(1.0, 0);
 
         run_and_print(&mut model, 0, 60, 60, |t| if t > 1800 { 2.0 } else { 1.0 });
         println!("{}", model.delay_prices[0]);

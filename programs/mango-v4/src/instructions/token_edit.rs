@@ -76,8 +76,10 @@ pub fn token_edit(
             require_keys_eq!(oracle, ctx.accounts.oracle.key());
             let oracle_price =
                 bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
-            bank.stable_price_model
-                .reset_to_price(oracle_price.to_num());
+            bank.stable_price_model.reset_to_price(
+                oracle_price.to_num(),
+                Clock::get()?.unix_timestamp.try_into().unwrap(),
+            );
         }
 
         if let Some(group_insurance_fund) = group_insurance_fund_opt {

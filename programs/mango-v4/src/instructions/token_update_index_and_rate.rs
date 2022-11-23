@@ -113,10 +113,9 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             Some(clock.slot),
         )?;
 
-        let last_updated = some_bank.index_last_updated;
         some_bank
             .stable_price_model
-            .update(now_ts as u64, last_updated as u64, price.to_num());
+            .update(now_ts as u64, price.to_num());
         let stable_price_model = some_bank.stable_price_model.clone();
 
         emit!(UpdateIndexLog {
@@ -126,7 +125,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             borrow_index: borrow_index.to_bits(),
             avg_utilization: new_avg_utilization.to_bits(),
             price: price.to_bits(),
-            ma_price: 0, // TODO
+            stable_price: some_bank.stable_price().to_bits(),
             collected_fees: some_bank.collected_fees_native.to_bits(),
             loan_fee_rate: some_bank.loan_fee_rate.to_bits(),
             total_deposits: cm!(deposit_index * indexed_total_deposits).to_bits(),
