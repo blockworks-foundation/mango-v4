@@ -90,9 +90,9 @@ pub fn token_register(
     maint_liab_weight: f32,
     init_liab_weight: f32,
     liquidation_fee: f32,
-    ma_window: i64,
-    ma_price_upper_bound_factor: f32,
-    ma_price_lower_bound_factor: f32,
+    stable_price_delay_interval_seconds: u32,
+    stable_price_delay_growth_limit: f32,
+    stable_price_growth_limit: f32,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == QUOTE_TOKEN_INDEX {
@@ -142,7 +142,12 @@ pub fn token_register(
         bank_num: 0,
         oracle_conf_filter: oracle_config.to_oracle_config().conf_filter,
         oracle_config: oracle_config.to_oracle_config(),
-        stable_price_model: StablePriceModel::default(),
+        stable_price_model: StablePriceModel {
+            delay_interval_seconds: stable_price_delay_interval_seconds,
+            delay_growth_limit: stable_price_delay_growth_limit,
+            stable_growth_limit: stable_price_growth_limit,
+            ..StablePriceModel::default()
+        },
         reserved: [0; 2184],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);

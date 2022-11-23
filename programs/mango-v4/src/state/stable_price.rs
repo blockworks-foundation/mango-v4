@@ -83,7 +83,6 @@ impl StablePriceModel {
     }
 
     pub fn delay_interval_index(&self, timestamp: u64) -> u8 {
-        // TODO: check compute costs
         ((timestamp / self.delay_interval_seconds as u64) % self.delay_prices.len() as u64) as u8
     }
 

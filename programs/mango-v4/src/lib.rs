@@ -73,9 +73,9 @@ pub mod mango_v4 {
         maint_liab_weight: f32,
         init_liab_weight: f32,
         liquidation_fee: f32,
-        ma_window: i64,
-        ma_price_upper_bound_factor: f32,
-        ma_price_lower_bound_factor: f32,
+        stable_price_delay_interval_seconds: u32,
+        stable_price_delay_growth_limit: f32,
+        stable_price_growth_limit: f32,
     ) -> Result<()> {
         instructions::token_register(
             ctx,
@@ -90,9 +90,9 @@ pub mod mango_v4 {
             maint_liab_weight,
             init_liab_weight,
             liquidation_fee,
-            ma_window,
-            ma_price_upper_bound_factor,
-            ma_price_lower_bound_factor,
+            stable_price_delay_interval_seconds,
+            stable_price_delay_growth_limit,
+            stable_price_growth_limit,
         )
     }
 
@@ -118,6 +118,9 @@ pub mod mango_v4 {
         maint_liab_weight_opt: Option<f32>,
         init_liab_weight_opt: Option<f32>,
         liquidation_fee_opt: Option<f32>,
+        stable_price_delay_interval_seconds_opt: Option<u32>,
+        stable_price_delay_growth_limit_opt: Option<f32>,
+        stable_price_growth_limit_opt: Option<f32>,
     ) -> Result<()> {
         instructions::token_edit(
             ctx,
@@ -132,6 +135,9 @@ pub mod mango_v4 {
             maint_liab_weight_opt,
             init_liab_weight_opt,
             liquidation_fee_opt,
+            stable_price_delay_interval_seconds_opt,
+            stable_price_delay_growth_limit_opt,
+            stable_price_growth_limit_opt,
         )
     }
 

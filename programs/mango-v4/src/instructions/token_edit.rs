@@ -43,6 +43,9 @@ pub fn token_edit(
     maint_liab_weight_opt: Option<f32>,
     init_liab_weight_opt: Option<f32>,
     liquidation_fee_opt: Option<f32>,
+    stable_price_delay_interval_seconds_opt: Option<u32>,
+    stable_price_delay_growth_limit_opt: Option<f32>,
+    stable_price_growth_limit_opt: Option<f32>,
 ) -> Result<()> {
     let mut mint_info = ctx.accounts.mint_info.load_mut()?;
     mint_info.verify_banks_ais(ctx.remaining_accounts)?;
@@ -115,6 +118,17 @@ pub fn token_edit(
         }
         if let Some(liquidation_fee) = liquidation_fee_opt {
             bank.liquidation_fee = I80F48::from_num(liquidation_fee);
+        }
+
+        if let Some(stable_price_delay_interval_seconds) = stable_price_delay_interval_seconds_opt {
+            // Updating this makes the old delay values slightly inconsistent
+            bank.stable_price_model.delay_interval_seconds = stable_price_delay_interval_seconds;
+        }
+        if let Some(stable_price_delay_growth_limit) = stable_price_delay_growth_limit_opt {
+            bank.stable_price_model.delay_growth_limit = stable_price_delay_growth_limit;
+        }
+        if let Some(stable_price_growth_limit) = stable_price_growth_limit_opt {
+            bank.stable_price_model.stable_growth_limit = stable_price_growth_limit;
         }
 
         // unchanged -
