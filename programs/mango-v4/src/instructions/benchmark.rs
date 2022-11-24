@@ -4,6 +4,8 @@ use anchor_lang::prelude::*;
 use fixed::types::{I80F48, U80F48};
 use solana_program::{log::sol_log_compute_units, program_memory::sol_memcmp};
 
+use crate::i80f48::LowPrecisionDivision;
+
 #[derive(Accounts)]
 pub struct Benchmark {}
 
@@ -61,6 +63,24 @@ pub fn division_u32(a: u32, b: u32) -> u32 {
     r
 }
 
+#[inline(never)]
+pub fn division_i80f48_30bit(a: I80F48, b: I80F48) -> I80F48 {
+    msg!("division_i80f48_30bit");
+    sol_log_compute_units();
+    let r = a.checked_div_30bit_precision(b).unwrap();
+    sol_log_compute_units();
+    r
+}
+
+#[inline(never)]
+pub fn division_i80f48_f64(a: I80F48, b: I80F48) -> I80F48 {
+    msg!("division_i80f48_f64");
+    sol_log_compute_units();
+    let r = a.checked_div_f64_precision(b).unwrap();
+    sol_log_compute_units();
+    r
+}
+
 pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
     // 101000
     // 477
@@ -76,6 +96,8 @@ pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
         let b = I80F48::from_bits(t << 64 + t);
         division_i80f48(a, b); // 1000 - 5000 CU
         division_i128(a.to_bits(), b.to_bits()); // 100 - 2000 CU
+        division_i80f48_30bit(a, b); // 300 CU
+        division_i80f48_f64(a, b); // 500 CU
     }
 
     {

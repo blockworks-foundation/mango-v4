@@ -59,3 +59,4 @@ margin-trade = { path = "../margin-trade", features = ["cpi"] }
 itertools = "0.10.3"
 rand = "0.8.4"
 lazy_static = "1.4.0"
+num = "0.4.0"
