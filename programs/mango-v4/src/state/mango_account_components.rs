@@ -386,13 +386,13 @@ impl PerpPosition {
             || self.taker_quote_lots != 0
     }
 
-    /// Calculate the average entry price of the position
+    /// Calculate the average entry price of the position, in native/native units
     pub fn avg_entry_price(&self, market: &PerpMarket) -> f64 {
         assert_eq!(self.market_index, market.perp_market_index);
         self.avg_entry_price_per_base_lot / (market.base_lot_size as f64)
     }
 
-    /// Calculate the break even price of the position
+    /// Calculate the break even price of the position, in native/native units
     pub fn break_even_price(&self, market: &PerpMarket) -> f64 {
         if self.base_position_lots == 0 {
             return 0.0;
