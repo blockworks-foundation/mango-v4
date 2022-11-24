@@ -208,10 +208,18 @@ pub struct PerpPosition {
     // Cumulative realized pnl in quote native units
     pub perp_spot_transfers: i64,
 
-    #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 24],
+    pub settle_pnl_limit_window_start_ts: u64,
+    pub settle_pnl_limit_settled_in_current_window_native: i64,
+
+    pub realized_pnl_native: I80F48,
+    // TODO: add reserved
+    // #[derivative(Debug = "ignore")]
+    // pub reserved: [u8; 8],
 }
-const_assert_eq!(size_of::<PerpPosition>(), 8 + 7 * 8 + 3 * 16 + 64);
+const_assert_eq!(
+    size_of::<PerpPosition>(),
+    8 + 8 + 16 + 8 + 16 * 2 + 8 * 12 + 16
+);
 const_assert_eq!(size_of::<PerpPosition>() % 8, 0);
 
 unsafe impl bytemuck::Pod for PerpPosition {}
@@ -237,7 +245,9 @@ impl Default for PerpPosition {
             maker_volume: 0,
             taker_volume: 0,
             perp_spot_transfers: 0,
-            reserved: [0; 24],
+            settle_pnl_limit_window_start_ts: 0,
+            settle_pnl_limit_settled_in_current_window_native: 0,
+            realized_pnl_native: I80F48::ZERO,
         }
     }
 }
@@ -349,6 +359,29 @@ impl PerpPosition {
         }
     }
 
+    fn update_realized_pnl(
+        &mut self,
+        perp_market: &PerpMarket,
+        base_change: i64,
+        quote_change_native: I80F48,
+    ) {
+        if self.base_position_lots.signum() != base_change.signum() {
+            let avg_entry_price = self.avg_entry_price(perp_market);
+            if self.base_position_lots.abs() == base_change.abs() {
+                cm!(self.realized_pnl_native +=
+                    quote_change_native + I80F48::from_num(base_change) * avg_entry_price);
+            } else {
+                let reduced_lots =
+                    I80F48::from_num(self.base_position_lots.abs().min(base_change.abs()));
+                cm!(
+                    self.realized_pnl_native += quote_change_native * reduced_lots
+                        / I80F48::from_num(base_change.abs())
+                        + I80F48::from_num(base_change.signum()) * reduced_lots * avg_entry_price
+                );
+            }
+        }
+    }
+
     /// Change the base and quote positions as the result of a trade
     pub fn change_base_and_quote_positions(
         &mut self,
@@ -356,6 +389,7 @@ impl PerpPosition {
         base_change: i64,
         quote_change_native: I80F48,
     ) {
+        self.update_realized_pnl(perp_market, base_change, quote_change_native);
         self.update_entry_price(
             base_change,
             quote_change_native.round().checked_to_num().unwrap(),

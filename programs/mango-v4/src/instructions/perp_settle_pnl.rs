@@ -123,10 +123,70 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     require!(a_pnl.is_positive(), MangoError::ProfitabilityMismatch);
     require!(b_pnl.is_negative(), MangoError::ProfitabilityMismatch);
 
+    // Cap settlement of unrealized pnl
+    // Settles at most x100% each hour
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let a_settle_pnl_in_new_window = now_ts
+        >= a_perp_position.settle_pnl_limit_window_start_ts
+            + perp_market.settle_pnl_limit_factor_window_size_ts;
+
+    let a_pnl_capped_for_window = {
+        let unrealized_pnl = cm!(a_pnl - a_perp_position.realized_pnl_native);
+        let a_base_native = a_perp_position.base_position_native(&perp_market);
+        let avg_entry_price = a_perp_position.avg_entry_price(&perp_market);
+        let max_allowed_in_window =
+            cm!(perp_market.settle_pnl_limit_factor() * a_base_native * avg_entry_price)
+                .abs()
+                .checked_round()
+                .unwrap();
+
+        let a_unrealized_pnl_capped_for_window = if a_settle_pnl_in_new_window {
+            a_perp_position.settle_pnl_limit_window_start_ts = now_ts
+                / perp_market.settle_pnl_limit_factor_window_size_ts
+                * perp_market.settle_pnl_limit_factor_window_size_ts;
+            unrealized_pnl.min(max_allowed_in_window)
+        } else {
+            unrealized_pnl.min(cm!(max_allowed_in_window
+                - I80F48::from_num(
+                    a_perp_position.settle_pnl_limit_settled_in_current_window_native
+                )))
+        };
+        a_pnl.min(cm!(I80F48::from_num(a_perp_position.realized_pnl_native)
+            + a_unrealized_pnl_capped_for_window))
+    };
+
     // Settle for the maximum possible capped to b's settle health
-    let settlement = a_pnl.abs().min(b_pnl.abs()).min(b_settle_health);
+    let settlement = a_pnl_capped_for_window
+        .abs()
+        .min(b_pnl.abs())
+        .min(b_settle_health);
+
+    // Settle
     a_perp_position.change_quote_position(-settlement);
     b_perp_position.change_quote_position(settlement);
+
+    // Bookkeep settled
+    a_perp_position.settle_pnl_limit_settled_in_current_window_native =
+        if a_settle_pnl_in_new_window {
+            settlement.checked_to_num().unwrap()
+        } else {
+            a_perp_position
+                .settle_pnl_limit_settled_in_current_window_native
+                .checked_add(settlement.checked_to_num().unwrap())
+                .unwrap()
+        };
+    let b_settle_pnl_in_new_window = now_ts
+        >= b_perp_position.settle_pnl_limit_window_start_ts
+            + perp_market.settle_pnl_limit_factor_window_size_ts;
+    b_perp_position.settle_pnl_limit_settled_in_current_window_native =
+        if b_settle_pnl_in_new_window {
+            -settlement.checked_to_num::<i64>().unwrap()
+        } else {
+            b_perp_position
+                .settle_pnl_limit_settled_in_current_window_native
+                .checked_add(-settlement.checked_to_num::<i64>().unwrap())
+                .unwrap()
+        };
 
     emit_perp_balances(
         ctx.accounts.group.key(),

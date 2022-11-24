@@ -412,6 +412,8 @@ pub mod mango_v4 {
         settle_fee_amount_threshold: f32,
         settle_fee_fraction_low_health: f32,
         settle_token_index: TokenIndex,
+        settle_pnl_limit_factor: f32,
+        settle_pnl_limit_factor_window_size_ts: u64,
     ) -> Result<()> {
         instructions::perp_create_market(
             ctx,
@@ -438,6 +440,8 @@ pub mod mango_v4 {
             settle_fee_flat,
             settle_fee_amount_threshold,
             settle_fee_fraction_low_health,
+            settle_pnl_limit_factor,
+            settle_pnl_limit_factor_window_size_ts,
         )
     }
 
@@ -466,6 +470,8 @@ pub mod mango_v4 {
         stable_price_delay_interval_seconds_opt: Option<u32>,
         stable_price_delay_growth_limit_opt: Option<f32>,
         stable_price_growth_limit_opt: Option<f32>,
+        settle_pnl_limit_factor_opt: Option<f32>,
+        settle_pnl_limit_factor_window_size_ts: Option<u64>,
     ) -> Result<()> {
         instructions::perp_edit_market(
             ctx,
@@ -491,6 +497,8 @@ pub mod mango_v4 {
             stable_price_delay_interval_seconds_opt,
             stable_price_delay_growth_limit_opt,
             stable_price_growth_limit_opt,
+            settle_pnl_limit_factor_opt,
+            settle_pnl_limit_factor_window_size_ts,
         )
     }
 

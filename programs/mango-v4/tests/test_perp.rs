@@ -85,6 +85,8 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             liquidation_fee: 0.012,
             maker_fee: -0.0001,
             taker_fee: 0.0002,
+            settle_pnl_limit_factor: 0.2,
+            settle_pnl_limit_factor_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[0]).await
         },
     )
@@ -521,6 +523,8 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             liquidation_fee: 0.012,
             maker_fee: -0.0001,
             taker_fee: 0.0002,
+            settle_pnl_limit_factor: 0.2,
+            settle_pnl_limit_factor_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[0]).await
         },
     )

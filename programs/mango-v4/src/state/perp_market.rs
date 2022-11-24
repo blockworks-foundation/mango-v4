@@ -111,7 +111,10 @@ pub struct PerpMarket {
 
     pub stable_price_model: StablePriceModel,
 
-    pub reserved: [u8; 1956],
+    pub settle_pnl_limit_factor: f32,
+    pub settle_pnl_limit_factor_window_size_ts: u64,
+
+    pub reserved: [u8; 1944],
 }
 
 const_assert_eq!(size_of::<PerpMarket>(), 2784);
@@ -134,6 +137,10 @@ impl PerpMarket {
 
     pub fn trusted_market(&self) -> bool {
         self.trusted_market == 1
+    }
+
+    pub fn settle_pnl_limit_factor(&self) -> I80F48 {
+        I80F48::from_num(self.settle_pnl_limit_factor)
     }
 
     pub fn gen_order_id(&mut self, side: Side, price_data: u64) -> u128 {
@@ -273,6 +280,9 @@ impl PerpMarket {
             group: Pubkey::new_unique(),
             settle_token_index: 0,
             perp_market_index: 0,
+            trusted_market: 0,
+            group_insurance_fund: 0,
+            padding1: Default::default(),
             name: Default::default(),
             oracle: Pubkey::new_unique(),
             oracle_config: OracleConfig {
@@ -300,20 +310,19 @@ impl PerpMarket {
             open_interest: 0,
             seq_num: 0,
             fees_accrued: I80F48::ZERO,
-            fees_settled: I80F48::ZERO,
             bump: 0,
             base_decimals: 0,
-            reserved: [0; 1956],
-            padding1: Default::default(),
             padding2: Default::default(),
             registration_time: 0,
+            fees_settled: I80F48::ZERO,
             fee_penalty: 0.0,
-            trusted_market: 0,
-            group_insurance_fund: 0,
             settle_fee_flat: 0.0,
             settle_fee_amount_threshold: 0.0,
             settle_fee_fraction_low_health: 0.0,
             stable_price_model: StablePriceModel::default(),
+            settle_pnl_limit_factor: 0.2,
+            settle_pnl_limit_factor_window_size_ts: 24 * 60 * 60,
+            reserved: [0; 1944],
         }
     }
 }

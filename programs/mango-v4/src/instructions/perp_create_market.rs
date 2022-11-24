@@ -69,6 +69,8 @@ pub fn perp_create_market(
     settle_fee_flat: f32,
     settle_fee_amount_threshold: f32,
     settle_fee_fraction_low_health: f32,
+    settle_pnl_limit_factor: f32,
+    settle_pnl_limit_factor_window_size_ts: u64,
 ) -> Result<()> {
     // Settlement tokens that aren't USDC aren't fully implemented, the main missing steps are:
     // - In health: the perp health needs to be adjusted by the settlement token weights.
@@ -124,7 +126,9 @@ pub fn perp_create_market(
         settle_fee_amount_threshold,
         settle_fee_fraction_low_health,
         stable_price_model: StablePriceModel::default(),
-        reserved: [0; 1956],
+        settle_pnl_limit_factor,
+        settle_pnl_limit_factor_window_size_ts,
+        reserved: [0; 1944],
     };
 
     let oracle_price =
