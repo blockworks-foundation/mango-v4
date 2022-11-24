@@ -91,6 +91,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
     }
 
     // compute and set latest index and average utilization on each bank
+    // also update moving average prices
     {
         let mut some_bank = ctx.remaining_accounts[0].load_mut::<Bank>()?;
 
@@ -111,6 +112,12 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
             Some(clock.slot),
         )?;
+
+        some_bank
+            .stable_price_model
+            .update(now_ts as u64, price.to_num());
+        let stable_price_model = some_bank.stable_price_model.clone();
+
         emit!(UpdateIndexLog {
             mango_group: mint_info.group.key(),
             token_index: mint_info.token_index,
@@ -118,6 +125,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             borrow_index: borrow_index.to_bits(),
             avg_utilization: new_avg_utilization.to_bits(),
             price: price.to_bits(),
+            stable_price: some_bank.stable_price().to_bits(),
             collected_fees: some_bank.collected_fees_native.to_bits(),
             loan_fee_rate: some_bank.loan_fee_rate.to_bits(),
             total_deposits: cm!(deposit_index * indexed_total_deposits).to_bits(),
@@ -150,6 +158,8 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             // inside OracleConfig.
             // TODO: remove once fully migrated to OracleConfig
             bank.oracle_config.conf_filter = bank.oracle_conf_filter;
+
+            bank.stable_price_model = stable_price_model.clone();
         }
     }
 

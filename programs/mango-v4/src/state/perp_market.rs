@@ -6,12 +6,12 @@ use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
 
 use crate::accounts_zerocopy::KeyedAccountReader;
+use crate::logs::PerpUpdateFundingLog;
 use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
 use crate::util::checked_math as cm;
 
-use super::{orderbook, OracleConfig, Orderbook, DAY_I80F48};
-use crate::logs::PerpUpdateFundingLog;
+use super::{orderbook, OracleConfig, Orderbook, StablePriceModel, DAY_I80F48};
 
 pub type PerpMarketIndex = u16;
 
@@ -109,7 +109,9 @@ pub struct PerpMarket {
     /// Fraction of pnl to pay out as fee if +pnl account has low health.
     pub settle_fee_fraction_low_health: f32,
 
-    pub reserved: [u8; 2244],
+    pub stable_price_model: StablePriceModel,
+
+    pub reserved: [u8; 1956],
 }
 
 const_assert_eq!(size_of::<PerpMarket>(), 2784);
@@ -153,8 +155,12 @@ impl PerpMarket {
         )
     }
 
+    pub fn stable_price(&self) -> I80F48 {
+        I80F48::from_num(self.stable_price_model.stable_price)
+    }
+
     /// Use current order book price and index price to update the instantaneous funding
-    pub fn update_funding(
+    pub fn update_funding_and_stable_price(
         &mut self,
         book: &Orderbook,
         oracle_price: I80F48,
@@ -193,12 +199,16 @@ impl PerpMarket {
         self.short_funding += funding_delta;
         self.funding_last_updated = now_ts;
 
+        self.stable_price_model
+            .update(now_ts, oracle_price.to_num());
+
         emit!(PerpUpdateFundingLog {
             mango_group: self.group,
             market_index: self.perp_market_index,
             long_funding: self.long_funding.to_bits(),
             short_funding: self.long_funding.to_bits(),
             price: oracle_price.to_bits(),
+            stable_price: self.stable_price().to_bits(),
             fees_accrued: self.fees_accrued.to_bits(),
             open_interest: self.open_interest,
         });
@@ -293,7 +303,7 @@ impl PerpMarket {
             fees_settled: I80F48::ZERO,
             bump: 0,
             base_decimals: 0,
-            reserved: [0; 2244],
+            reserved: [0; 1956],
             padding1: Default::default(),
             padding2: Default::default(),
             registration_time: 0,
@@ -303,6 +313,7 @@ impl PerpMarket {
             settle_fee_flat: 0.0,
             settle_fee_amount_threshold: 0.0,
             settle_fee_fraction_low_health: 0.0,
+            stable_price_model: StablePriceModel::default(),
         }
     }
 }

@@ -112,6 +112,9 @@ pub mod mango_v4 {
         maint_liab_weight_opt: Option<f32>,
         init_liab_weight_opt: Option<f32>,
         liquidation_fee_opt: Option<f32>,
+        stable_price_delay_interval_seconds_opt: Option<u32>,
+        stable_price_delay_growth_limit_opt: Option<f32>,
+        stable_price_growth_limit_opt: Option<f32>,
     ) -> Result<()> {
         instructions::token_edit(
             ctx,
@@ -126,6 +129,9 @@ pub mod mango_v4 {
             maint_liab_weight_opt,
             init_liab_weight_opt,
             liquidation_fee_opt,
+            stable_price_delay_interval_seconds_opt,
+            stable_price_delay_growth_limit_opt,
+            stable_price_growth_limit_opt,
         )
     }
 
@@ -456,6 +462,9 @@ pub mod mango_v4 {
         settle_fee_flat_opt: Option<f32>,
         settle_fee_amount_threshold_opt: Option<f32>,
         settle_fee_fraction_low_health_opt: Option<f32>,
+        stable_price_delay_interval_seconds_opt: Option<u32>,
+        stable_price_delay_growth_limit_opt: Option<f32>,
+        stable_price_growth_limit_opt: Option<f32>,
     ) -> Result<()> {
         instructions::perp_edit_market(
             ctx,
@@ -478,6 +487,9 @@ pub mod mango_v4 {
             settle_fee_flat_opt,
             settle_fee_amount_threshold_opt,
             settle_fee_fraction_low_health_opt,
+            stable_price_delay_interval_seconds_opt,
+            stable_price_delay_growth_limit_opt,
+            stable_price_growth_limit_opt,
         )
     }
 

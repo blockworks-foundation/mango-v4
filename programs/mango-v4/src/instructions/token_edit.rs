@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
 use super::InterestRateParams;
-use crate::accounts_zerocopy::LoadMutZeroCopyRef;
+use crate::accounts_zerocopy::{AccountInfoRef, LoadMutZeroCopyRef};
 
 use crate::state::*;
 
@@ -26,6 +26,9 @@ pub struct TokenEdit<'info> {
         has_one = group
     )]
     pub mint_info: AccountLoader<'info, MintInfo>,
+
+    /// CHECK: The oracle can be one of several different account types
+    pub oracle: UncheckedAccount<'info>,
 }
 
 #[allow(unused_variables)]
@@ -43,6 +46,9 @@ pub fn token_edit(
     maint_liab_weight_opt: Option<f32>,
     init_liab_weight_opt: Option<f32>,
     liquidation_fee_opt: Option<f32>,
+    stable_price_delay_interval_seconds_opt: Option<u32>,
+    stable_price_delay_growth_limit_opt: Option<f32>,
+    stable_price_growth_limit_opt: Option<f32>,
 ) -> Result<()> {
     let mut mint_info = ctx.accounts.mint_info.load_mut()?;
     mint_info.verify_banks_ais(ctx.remaining_accounts)?;
@@ -59,14 +65,22 @@ pub fn token_edit(
         // mint
         // vault
 
-        if let Some(oracle) = oracle_opt {
-            bank.oracle = oracle;
-            mint_info.oracle = oracle;
-        }
         if let Some(oracle_config) = oracle_config_opt.as_ref() {
             bank.oracle_config = oracle_config.to_oracle_config();
             bank.oracle_conf_filter = bank.oracle_config.conf_filter;
         };
+        if let Some(oracle) = oracle_opt {
+            bank.oracle = oracle;
+            mint_info.oracle = oracle;
+
+            require_keys_eq!(oracle, ctx.accounts.oracle.key());
+            let oracle_price =
+                bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
+            bank.stable_price_model.reset_to_price(
+                oracle_price.to_num(),
+                Clock::get()?.unix_timestamp.try_into().unwrap(),
+            );
+        }
 
         if let Some(group_insurance_fund) = group_insurance_fund_opt {
             mint_info.group_insurance_fund = if group_insurance_fund { 1 } else { 0 };
@@ -115,6 +129,17 @@ pub fn token_edit(
         }
         if let Some(liquidation_fee) = liquidation_fee_opt {
             bank.liquidation_fee = I80F48::from_num(liquidation_fee);
+        }
+
+        if let Some(stable_price_delay_interval_seconds) = stable_price_delay_interval_seconds_opt {
+            // Updating this makes the old delay values slightly inconsistent
+            bank.stable_price_model.delay_interval_seconds = stable_price_delay_interval_seconds;
+        }
+        if let Some(stable_price_delay_growth_limit) = stable_price_delay_growth_limit_opt {
+            bank.stable_price_model.delay_growth_limit = stable_price_delay_growth_limit;
+        }
+        if let Some(stable_price_growth_limit) = stable_price_growth_limit_opt {
+            bank.stable_price_model.stable_growth_limit = stable_price_growth_limit;
         }
 
         // unchanged -

@@ -122,6 +122,7 @@ pub struct PerpUpdateFundingLog {
     pub long_funding: i128,
     pub short_funding: i128,
     pub price: i128,
+    pub stable_price: i128,
     pub fees_accrued: i128,
     pub open_interest: i64,
 }
@@ -134,6 +135,7 @@ pub struct UpdateIndexLog {
     pub borrow_index: i128,    // I80F48
     pub avg_utilization: i128, // I80F48
     pub price: i128,           // I80F48
+    pub stable_price: i128,    // I80F48
     pub collected_fees: i128,  // I80F48
     pub loan_fee_rate: i128,   // I80F48
     pub total_borrows: i128,

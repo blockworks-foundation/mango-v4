@@ -17,9 +17,6 @@ pub struct StubOracleSet<'info> {
         has_one = group
     )]
     pub oracle: AccountLoader<'info, StubOracle>,
-
-    #[account(mut)]
-    pub payer: Signer<'info>,
 }
 
 pub fn stub_oracle_set(ctx: Context<StubOracleSet>, price: I80F48) -> Result<()> {

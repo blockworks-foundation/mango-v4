@@ -72,8 +72,7 @@ impl<'a> GroupWithTokensConfig {
                     group,
                     admin,
                     mint: mint.pubkey,
-                    payer,
-                    price: "1.0",
+                    price: 1.0,
                 },
             )
             .await

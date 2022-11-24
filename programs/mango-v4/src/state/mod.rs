@@ -10,6 +10,7 @@ pub use oracle::*;
 pub use orderbook::*;
 pub use perp_market::*;
 pub use serum3_market::*;
+pub use stable_price::*;
 
 mod bank;
 mod dynamic_account;
@@ -23,3 +24,4 @@ mod oracle;
 mod orderbook;
 mod perp_market;
 mod serum3_market;
+mod stable_price;

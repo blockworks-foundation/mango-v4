@@ -126,18 +126,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
     //
     // SETUP: Change the oracle to make health go negative
     //
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: base_token.mint.pubkey,
-            payer,
-            price: "10.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, base_token, admin, 10.0).await;
 
     // verify health is bad: can't withdraw
     assert!(send_tx(
@@ -372,18 +361,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     //
     // SETUP: Change the oracle to make health go negative for account_0
     //
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: base_token.mint.pubkey,
-            payer,
-            price: "0.5",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, base_token, admin, 0.5).await;
 
     // verify health is bad: can't withdraw
     assert!(send_tx(
@@ -435,18 +413,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     //
     // SETUP: Change the oracle to make health go negative for account_1
     //
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: base_token.mint.pubkey,
-            payer,
-            price: "2.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, base_token, admin, 2.0).await;
 
     // verify health is bad: can't withdraw
     assert!(send_tx(

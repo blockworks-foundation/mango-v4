@@ -706,18 +706,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     .unwrap();
 
     // TEST: Change the oracle, now the ask matches
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[0].pubkey,
-            payer,
-            price: "1.002",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[0], admin, 1.002).await;
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
@@ -745,18 +734,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     assert_no_perp_orders(solana, account_0).await;
 
     // restore the oracle to default
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[0].pubkey,
-            payer,
-            price: "1.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[0], admin, 1.0).await;
 
     //
     // TEST: order is cancelled when the price exceeds the peg limit
@@ -779,18 +757,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     .unwrap();
 
     // order is still matchable when exactly at the peg limit
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[0].pubkey,
-            payer,
-            price: "1.003",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[0], admin, 1.003).await;
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
@@ -819,18 +786,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     .is_err());
 
     // but once the adjusted price is > the peg limit, it's gone
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[0].pubkey,
-            payer,
-            price: "1.004",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[0], admin, 1.004).await;
     send_tx(
         solana,
         PerpPlaceOrderInstruction {

@@ -13,7 +13,6 @@ use solana_program::instruction::Instruction;
 use solana_program_test::BanksClientError;
 use solana_sdk::instruction;
 use solana_sdk::transport::TransportError;
-use std::str::FromStr;
 use std::sync::Arc;
 
 use super::solana::SolanaCookie;
@@ -359,6 +358,58 @@ pub async fn check_prev_instruction_post_health(solana: &SolanaCookie, account: 
         .pop()
         .unwrap();
     assert_eq!(health_data.init_health.to_num::<f64>(), post_health);
+}
+
+pub async fn set_bank_stub_oracle_price(
+    solana: &SolanaCookie,
+    group: Pubkey,
+    token: &super::mango_setup::Token,
+    admin: TestKeypair,
+    price: f64,
+) {
+    send_tx(
+        solana,
+        StubOracleSetInstruction {
+            group,
+            admin,
+            mint: token.mint.pubkey,
+            price,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        TokenResetStablePriceModel {
+            group,
+            admin,
+            mint: token.mint.pubkey,
+        },
+    )
+    .await
+    .unwrap();
+}
+
+pub async fn set_perp_stub_oracle_price(
+    solana: &SolanaCookie,
+    group: Pubkey,
+    perp_market: Pubkey,
+    token: &super::mango_setup::Token,
+    admin: TestKeypair,
+    price: f64,
+) {
+    set_bank_stub_oracle_price(solana, group, token, admin, price).await;
+    send_tx(
+        solana,
+        PerpResetStablePriceModel {
+            group,
+            admin,
+            perp_market,
+        },
+    )
+    .await
+    .unwrap();
 }
 
 //
@@ -976,12 +1027,78 @@ impl ClientInstruction for TokenDeregisterInstruction {
     }
 }
 
+pub struct TokenResetStablePriceModel {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub mint: Pubkey,
+}
+
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenResetStablePriceModel {
+    type Accounts = mango_v4::accounts::TokenEdit;
+    type Instruction = mango_v4::instruction::TokenEdit;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let mint_info_key = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                self.group.as_ref(),
+                self.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let mint_info: MintInfo = account_loader.load(&mint_info_key).await.unwrap();
+
+        let instruction = Self::Instruction {
+            oracle_opt: Some(mint_info.oracle),
+            oracle_config_opt: None,
+            group_insurance_fund_opt: None,
+            interest_rate_params_opt: None,
+            loan_fee_rate_opt: None,
+            loan_origination_fee_rate_opt: None,
+            maint_asset_weight_opt: None,
+            init_asset_weight_opt: None,
+            maint_liab_weight_opt: None,
+            init_liab_weight_opt: None,
+            liquidation_fee_opt: None,
+            stable_price_delay_interval_seconds_opt: None,
+            stable_price_delay_growth_limit_opt: None,
+            stable_price_growth_limit_opt: None,
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            mint_info: mint_info_key,
+            oracle: mint_info.oracle,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction
+            .accounts
+            .extend(mint_info.banks().iter().map(|&k| AccountMeta {
+                pubkey: k,
+                is_signer: false,
+                is_writable: true,
+            }));
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
 pub struct StubOracleSetInstruction {
     pub mint: Pubkey,
     pub group: Pubkey,
     pub admin: TestKeypair,
-    pub payer: TestKeypair,
-    pub price: &'static str,
+    pub price: f64,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for StubOracleSetInstruction {
@@ -994,7 +1111,7 @@ impl ClientInstruction for StubOracleSetInstruction {
     ) -> (Self::Accounts, Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            price: I80F48::from_str(self.price).unwrap(),
+            price: I80F48::from_num(self.price),
         };
         // TODO: remove copy pasta of pda derivation, use reference
         let oracle = Pubkey::find_program_address(
@@ -1011,7 +1128,6 @@ impl ClientInstruction for StubOracleSetInstruction {
             oracle,
             group: self.group,
             admin: self.admin.pubkey(),
-            payer: self.payer.pubkey(),
         };
 
         let instruction = make_instruction(program_id, &accounts, instruction);
@@ -1019,7 +1135,7 @@ impl ClientInstruction for StubOracleSetInstruction {
     }
 
     fn signers(&self) -> Vec<TestKeypair> {
-        vec![self.payer, self.admin]
+        vec![self.admin]
     }
 }
 
@@ -2307,6 +2423,65 @@ impl ClientInstruction for PerpCreateMarketInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![self.admin, self.payer]
+    }
+}
+
+pub struct PerpResetStablePriceModel {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub perp_market: Pubkey,
+}
+
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpResetStablePriceModel {
+    type Accounts = mango_v4::accounts::PerpEditMarket;
+    type Instruction = mango_v4::instruction::PerpEditMarket;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+
+        let instruction = Self::Instruction {
+            oracle_opt: Some(perp_market.oracle),
+            oracle_config_opt: None,
+            base_decimals_opt: None,
+            maint_asset_weight_opt: None,
+            init_asset_weight_opt: None,
+            maint_liab_weight_opt: None,
+            init_liab_weight_opt: None,
+            liquidation_fee_opt: None,
+            maker_fee_opt: None,
+            taker_fee_opt: None,
+            min_funding_opt: None,
+            max_funding_opt: None,
+            impact_quantity_opt: None,
+            group_insurance_fund_opt: None,
+            trusted_market_opt: None,
+            fee_penalty_opt: None,
+            settle_fee_flat_opt: None,
+            settle_fee_amount_threshold_opt: None,
+            settle_fee_fraction_low_health_opt: None,
+            stable_price_delay_interval_seconds_opt: None,
+            stable_price_delay_growth_limit_opt: None,
+            stable_price_growth_limit_opt: None,
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            perp_market: self.perp_market,
+            oracle: perp_market.oracle,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
     }
 }
 

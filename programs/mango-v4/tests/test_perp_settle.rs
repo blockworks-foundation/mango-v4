@@ -120,18 +120,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     };
 
     // Set the initial oracle price
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "1000.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1000.0).await;
 
     //
     // Place orders and create a position
@@ -270,18 +259,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     }
 
     // Try and settle with high price
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "1200.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1200.0).await;
 
     // Account a must be the profitable one
     let result = send_tx(
@@ -304,18 +282,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     );
 
     // Change the oracle to a more reasonable price
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "1005.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1005.0).await;
 
     let expected_pnl_0 = I80F48::from(480); // Less due to fees
     let expected_pnl_1 = I80F48::from(-500);
@@ -335,18 +302,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     }
 
     // Change the oracle to a very high price, such that the pnl exceeds the account funding
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "1500.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1500.0).await;
 
     let expected_pnl_0 = I80F48::from(50000 - 20);
     let expected_pnl_1 = I80F48::from(-50000);
@@ -431,18 +387,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     }
 
     // Change the oracle to a reasonable price in other direction
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "995.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 995.0).await;
 
     let expected_pnl_0 = I80F48::from(-8520);
     let expected_pnl_1 = I80F48::from(8500);
@@ -647,18 +592,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     };
 
     // Set the initial oracle price
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "1000.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1000.0).await;
 
     //
     // SETUP: Create a perp base position
@@ -721,18 +655,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     //
     // TEST: Settle (health is high)
     //
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "1050.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1050.0).await;
 
     let expected_pnl = 5000;
 
@@ -795,34 +718,12 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[2].pubkey,
-            payer,
-            price: "10700.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, &tokens[2], admin, 10700.0).await;
 
     //
     // TEST: Settle (health is low)
     //
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "1100.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1100.0).await;
 
     let expected_pnl = 5000;
 

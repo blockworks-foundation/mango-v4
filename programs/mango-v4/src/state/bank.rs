@@ -1,6 +1,6 @@
 use super::{OracleConfig, TokenIndex, TokenPosition};
 use crate::accounts_zerocopy::KeyedAccountReader;
-use crate::state::oracle;
+use crate::state::{oracle, StablePriceModel};
 use crate::util;
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
@@ -104,13 +104,12 @@ pub struct Bank {
 
     pub oracle_config: OracleConfig,
 
+    pub stable_price_model: StablePriceModel,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2464],
+    pub reserved: [u8; 2176],
 }
-const_assert_eq!(
-    size_of::<Bank>(),
-    32 + 16 + 32 * 3 + 16 + 16 * 6 + 8 * 2 + 16 * 16 + 8 * 2 + 2 + 1 + 1 + 4 + 96 + 2464
-);
+const_assert_eq!(size_of::<Bank>(), 3112);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
 impl Bank {
@@ -163,7 +162,8 @@ impl Bank {
             token_index: existing_bank.token_index,
             mint_decimals: existing_bank.mint_decimals,
             oracle_config: existing_bank.oracle_config.clone(),
-            reserved: [0; 2464],
+            stable_price_model: StablePriceModel::default(),
+            reserved: [0; 2176],
         }
     }
 
@@ -595,6 +595,10 @@ impl Bank {
             self.mint_decimals,
             staleness_slot,
         )
+    }
+
+    pub fn stable_price(&self) -> I80F48 {
+        I80F48::from_num(self.stable_price_model.stable_price)
     }
 }
 

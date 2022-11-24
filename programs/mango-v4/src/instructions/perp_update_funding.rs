@@ -32,7 +32,7 @@ pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
         Some(now_slot),
     )?;
 
-    perp_market.update_funding(&book, oracle_price, now_ts)?;
+    perp_market.update_funding_and_stable_price(&book, oracle_price, now_ts)?;
 
     Ok(())
 }

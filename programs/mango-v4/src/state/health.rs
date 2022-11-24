@@ -30,8 +30,8 @@ pub struct Prices {
     /// The current oracle price
     pub oracle: I80F48, // native/native
 
-    /// A "safe" price, some sort of average over time that is harder to manipulate
-    pub safe: I80F48, // native/native
+    /// A "stable" price, provided by StablePriceModel
+    pub stable: I80F48, // native/native
 }
 
 impl Prices {
@@ -39,7 +39,7 @@ impl Prices {
     pub fn new_single_price(price: I80F48) -> Self {
         Self {
             oracle: price,
-            safe: price,
+            stable: price,
         }
     }
 
@@ -49,7 +49,7 @@ impl Prices {
         if health_type == HealthType::Maint {
             self.oracle
         } else {
-            self.oracle.max(self.safe)
+            self.oracle.max(self.stable)
         }
     }
 
@@ -59,7 +59,7 @@ impl Prices {
         if health_type == HealthType::Maint {
             self.oracle
         } else {
-            self.oracle.min(self.safe)
+            self.oracle.min(self.stable)
         }
     }
 }
@@ -1349,7 +1349,7 @@ pub fn new_health_cache(
             init_liab_weight: bank.init_liab_weight,
             prices: Prices {
                 oracle: oracle_price,
-                safe: oracle_price,
+                stable: bank.stable_price(),
             },
             balance_native: native,
         });
@@ -1398,7 +1398,7 @@ pub fn new_health_cache(
             perp_market,
             Prices {
                 oracle: oracle_price,
-                safe: oracle_price,
+                stable: perp_market.stable_price(),
             },
         )?);
     }
@@ -1528,12 +1528,14 @@ mod tests {
         bank.data().init_liab_weight = I80F48::from_num(1.0 + init_weights);
         bank.data().maint_asset_weight = I80F48::from_num(1.0 - maint_weights);
         bank.data().maint_liab_weight = I80F48::from_num(1.0 + maint_weights);
+        bank.data().stable_price_model.reset_to_price(price, 0);
         (bank, oracle)
     }
 
     fn mock_perp_market(
         group: Pubkey,
         oracle: Pubkey,
+        price: f64,
         market_index: PerpMarketIndex,
         init_weights: f64,
         maint_weights: f64,
@@ -1548,6 +1550,7 @@ mod tests {
         pm.data().maint_liab_weight = I80F48::from_num(1.0 + maint_weights);
         pm.data().quote_lot_size = 100;
         pm.data().base_lot_size = 10;
+        pm.data().stable_price_model.reset_to_price(price, 0);
         pm
     }
 
@@ -1596,7 +1599,7 @@ mod tests {
         oo1.data().native_coin_free = 3;
         oo1.data().referrer_rebates_accrued = 2;
 
-        let mut perp1 = mock_perp_market(group, oracle2.pubkey, 9, 0.2, 0.1);
+        let mut perp1 = mock_perp_market(group, oracle2.pubkey, 5.0, 9, 0.2, 0.1);
         let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
         perpaccount.change_base_and_quote_positions(perp1.data(), 3, -I80F48::from(310u16));
         perpaccount.bids_base_lots = 7;
@@ -1648,8 +1651,8 @@ mod tests {
         let oo1key = oo1.pubkey;
         oo1.data().native_pc_total = 20;
 
-        let mut perp1 = mock_perp_market(group, oracle2.pubkey, 9, 0.2, 0.1);
-        let mut perp2 = mock_perp_market(group, oracle1.pubkey, 8, 0.2, 0.1);
+        let mut perp1 = mock_perp_market(group, oracle2.pubkey, oracle2_price, 9, 0.2, 0.1);
+        let mut perp2 = mock_perp_market(group, oracle1.pubkey, oracle1_price, 8, 0.2, 0.1);
 
         let oracle1_account_info = oracle1.as_account_info();
         let oracle2_account_info = oracle2.as_account_info();
@@ -1790,7 +1793,7 @@ mod tests {
         oo2.data().native_pc_total = testcase.oo_1_3.0;
         oo2.data().native_coin_total = testcase.oo_1_3.1;
 
-        let mut perp1 = mock_perp_market(group, oracle2.pubkey, 9, 0.2, 0.1);
+        let mut perp1 = mock_perp_market(group, oracle2.pubkey, 5.0, 9, 0.2, 0.1);
         let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
         perpaccount.change_base_and_quote_positions(
             perp1.data(),
@@ -2285,7 +2288,7 @@ mod tests {
             )
             .unwrap();
 
-        let mut perp1 = mock_perp_market(group, oracle1.pubkey, 9, 0.2, 0.1);
+        let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, 0.2, 0.1);
         perp1.data().long_funding = I80F48::from_num(10.1);
         let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
         perpaccount.change_base_and_quote_positions(perp1.data(), 10, I80F48::from(-110));
@@ -2323,8 +2326,8 @@ mod tests {
 
         let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
 
-        let mut perp1 = mock_perp_market(group, oracle1.pubkey, 9, 0.2, 0.1);
-        let mut perp2 = mock_perp_market(group, oracle2.pubkey, 8, 0.2, 0.1);
+        let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, 0.2, 0.1);
+        let mut perp2 = mock_perp_market(group, oracle2.pubkey, 5.0, 8, 0.2, 0.1);
 
         let oracle1_account_info = oracle1.as_account_info();
         let oracle2_account_info = oracle2.as_account_info();
@@ -2343,5 +2346,74 @@ mod tests {
         let retriever = ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
         let result = retriever.perp_market_and_oracle_price(&group, 0, 9);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_health_stable_price_token() {
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
+        let buffer2 = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut account2 = MangoAccountValue::from_bytes(&buffer2).unwrap();
+        let buffer3 = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut account3 = MangoAccountValue::from_bytes(&buffer3).unwrap();
+
+        let group = Pubkey::new_unique();
+
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, 1.0, 0.2, 0.1);
+        bank1.data().stable_price_model.stable_price = 0.5;
+        bank1
+            .data()
+            .change_without_fee(
+                account.ensure_token_position(1).unwrap().0,
+                I80F48::from(100),
+            )
+            .unwrap();
+        bank1
+            .data()
+            .change_without_fee(
+                account2.ensure_token_position(1).unwrap().0,
+                I80F48::from(-100),
+            )
+            .unwrap();
+
+        let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, 0.2, 0.1);
+        perp1.data().stable_price_model.stable_price = 0.5;
+        let perpaccount = account3.ensure_perp_position(9, 1).unwrap().0;
+        perpaccount.change_base_and_quote_positions(perp1.data(), 10, I80F48::from(-100));
+
+        let oracle1_ai = oracle1.as_account_info();
+        let ais = vec![
+            bank1.as_account_info(),
+            oracle1_ai.clone(),
+            perp1.as_account_info(),
+            oracle1_ai,
+        ];
+
+        let retriever = ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
+
+        assert!(health_eq(
+            compute_health(&account.borrow(), HealthType::Init, &retriever).unwrap(),
+            0.8 * 0.5 * 100.0
+        ));
+        assert!(health_eq(
+            compute_health(&account.borrow(), HealthType::Maint, &retriever).unwrap(),
+            0.9 * 1.0 * 100.0
+        ));
+        assert!(health_eq(
+            compute_health(&account2.borrow(), HealthType::Init, &retriever).unwrap(),
+            -1.2 * 1.0 * 100.0
+        ));
+        assert!(health_eq(
+            compute_health(&account2.borrow(), HealthType::Maint, &retriever).unwrap(),
+            -1.1 * 1.0 * 100.0
+        ));
+        assert!(health_eq(
+            compute_health(&account3.borrow(), HealthType::Init, &retriever).unwrap(),
+            0.8 * 0.5 * 10.0 * 10.0 - 100.0
+        ));
+        assert!(health_eq(
+            compute_health(&account3.borrow(), HealthType::Maint, &retriever).unwrap(),
+            0.9 * 1.0 * 10.0 * 10.0 - 100.0
+        ));
     }
 }

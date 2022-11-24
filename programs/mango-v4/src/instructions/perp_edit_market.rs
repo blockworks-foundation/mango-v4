@@ -1,4 +1,4 @@
-use crate::state::*;
+use crate::{accounts_zerocopy::AccountInfoRef, state::*};
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
@@ -17,6 +17,9 @@ pub struct PerpEditMarket<'info> {
         has_one = group
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
+
+    /// CHECK: The oracle can be one of several different account types
+    pub oracle: UncheckedAccount<'info>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -41,6 +44,9 @@ pub fn perp_edit_market(
     settle_fee_flat_opt: Option<f32>,
     settle_fee_amount_threshold_opt: Option<f32>,
     settle_fee_fraction_low_health_opt: Option<f32>,
+    stable_price_delay_interval_seconds_opt: Option<u32>,
+    stable_price_delay_growth_limit_opt: Option<f32>,
+    stable_price_growth_limit_opt: Option<f32>,
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
@@ -51,12 +57,20 @@ pub fn perp_edit_market(
     // name
     // group
 
-    if let Some(oracle) = oracle_opt {
-        perp_market.oracle = oracle;
-    }
     if let Some(oracle_config) = oracle_config_opt {
         perp_market.oracle_config = oracle_config.to_oracle_config();
     };
+    if let Some(oracle) = oracle_opt {
+        perp_market.oracle = oracle;
+
+        require_keys_eq!(oracle, ctx.accounts.oracle.key());
+        let oracle_price = perp_market
+            .oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
+        perp_market.stable_price_model.reset_to_price(
+            oracle_price.to_num(),
+            Clock::get()?.unix_timestamp.try_into().unwrap(),
+        );
+    }
 
     // unchanged -
     // bids
@@ -135,6 +149,17 @@ pub fn perp_edit_market(
     }
     if let Some(settle_fee_fraction_low_health) = settle_fee_fraction_low_health_opt {
         perp_market.settle_fee_fraction_low_health = settle_fee_fraction_low_health;
+    }
+
+    if let Some(stable_price_delay_interval_seconds) = stable_price_delay_interval_seconds_opt {
+        // Updating this makes the old delay values slightly inconsistent
+        perp_market.stable_price_model.delay_interval_seconds = stable_price_delay_interval_seconds;
+    }
+    if let Some(stable_price_delay_growth_limit) = stable_price_delay_growth_limit_opt {
+        perp_market.stable_price_model.delay_growth_limit = stable_price_delay_growth_limit;
+    }
+    if let Some(stable_price_growth_limit) = stable_price_growth_limit_opt {
+        perp_market.stable_price_model.stable_growth_limit = stable_price_growth_limit;
     }
 
     emit!(PerpMarketMetaDataLog {
