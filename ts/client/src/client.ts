@@ -229,6 +229,9 @@ export class MangoClient {
     maintLiabWeight: number,
     initLiabWeight: number,
     liquidationFee: number,
+    minVaultToDepositsRatio: number,
+    netBorrowsWindowSizeTs: number,
+    netBorrowsLimitNative: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
       .tokenRegister(
@@ -243,6 +246,9 @@ export class MangoClient {
         maintLiabWeight,
         initLiabWeight,
         liquidationFee,
+        minVaultToDepositsRatio,
+        new BN(netBorrowsWindowSizeTs),
+        new BN(netBorrowsLimitNative),
       )
       .accounts({
         group: group.publicKey,
@@ -290,6 +296,9 @@ export class MangoClient {
     maintLiabWeight: number | null,
     initLiabWeight: number | null,
     liquidationFee: number | null,
+    minVaultToDepositsRatio: number | null,
+    netBorrowsLimitNative: number | null,
+    netBorrowsWindowSizeTs: number | null,
   ): Promise<TransactionSignature> {
     const bank = group.getFirstBankByMint(mintPk);
     const mintInfo = group.mintInfosMapByTokenIndex.get(bank.tokenIndex)!;
@@ -307,6 +316,9 @@ export class MangoClient {
         maintLiabWeight,
         initLiabWeight,
         liquidationFee,
+        minVaultToDepositsRatio,
+        netBorrowsLimitNative,
+        netBorrowsWindowSizeTs,
       )
       .accounts({
         group: group.publicKey,
@@ -467,7 +479,6 @@ export class MangoClient {
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         oracle: oraclePk,
-        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .rpc();
   }
@@ -1444,25 +1455,28 @@ export class MangoClient {
   public async perpEditMarket(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
-    oracle: PublicKey,
-    oracleConfig: OracleConfigParams,
-    baseDecimals: number,
-    maintAssetWeight: number,
-    initAssetWeight: number,
-    maintLiabWeight: number,
-    initLiabWeight: number,
-    liquidationFee: number,
-    makerFee: number,
-    takerFee: number,
-    feePenalty: number,
-    minFunding: number,
-    maxFunding: number,
-    impactQuantity: number,
-    groupInsuranceFund: boolean,
-    trustedMarket: boolean,
-    settleFeeFlat: number,
-    settleFeeAmountThreshold: number,
-    settleFeeFractionLowHealth: number,
+    oracle: PublicKey | null,
+    oracleConfig: OracleConfigParams | null,
+    baseDecimals: number | null,
+    maintAssetWeight: number | null,
+    initAssetWeight: number | null,
+    maintLiabWeight: number | null,
+    initLiabWeight: number | null,
+    liquidationFee: number | null,
+    makerFee: number | null,
+    takerFee: number | null,
+    feePenalty: number | null,
+    minFunding: number | null,
+    maxFunding: number | null,
+    impactQuantity: number | null,
+    groupInsuranceFund: boolean | null,
+    trustedMarket: boolean | null,
+    settleFeeFlat: number | null,
+    settleFeeAmountThreshold: number | null,
+    settleFeeFractionLowHealth: number | null,
+    stablePriceDelayIntervalSeconds: number | null,
+    stablePriceDelayGrowthLimit: number | null,
+    stablePriceGrowthLimit: number | null,
   ): Promise<TransactionSignature> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
 
@@ -1480,13 +1494,16 @@ export class MangoClient {
         takerFee,
         minFunding,
         maxFunding,
-        new BN(impactQuantity),
+        impactQuantity ? new BN(impactQuantity) : null,
         groupInsuranceFund,
         trustedMarket,
         feePenalty,
         settleFeeFlat,
         settleFeeAmountThreshold,
         settleFeeFractionLowHealth,
+        stablePriceDelayIntervalSeconds,
+        stablePriceDelayGrowthLimit,
+        stablePriceGrowthLimit,
       )
       .accounts({
         group: group.publicKey,

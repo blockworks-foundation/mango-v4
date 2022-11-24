@@ -50,6 +50,10 @@ const MAINNET_SERUM3_MARKETS = new Map([
   ['DUST/SOL', '8WCzJpSNcLUYXPYeUDAXpH4hgqxFJpkYkVT6GJDSpcGx'],
 ]);
 
+const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
+const NET_BORROWS_WINDOW_SIZE_TS = 24 * 60 * 60;
+const NET_BORROWS_LIMIT_NATIVE = 1 * Math.pow(10, 7) * Math.pow(10, 6);
+
 const { MB_CLUSTER_URL, MB_PAYER_KEYPAIR, MB_USER_KEYPAIR, MB_USER2_KEYPAIR } =
   process.env;
 
@@ -160,6 +164,9 @@ async function registerTokens() {
     1,
     1,
     0,
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
 
   console.log(`Registering USDT...`);
@@ -180,6 +187,9 @@ async function registerTokens() {
     1.05,
     1.1,
     0.025,
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
 
   console.log(`Registering BTC...`);
@@ -200,6 +210,9 @@ async function registerTokens() {
     1.1,
     1.2,
     0.05,
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
 
   console.log(`Registering ETH...`);
@@ -220,6 +233,9 @@ async function registerTokens() {
     1.1,
     1.2,
     0.05,
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
 
   console.log(`Registering soETH...`);
@@ -240,6 +256,9 @@ async function registerTokens() {
     1.1,
     1.2,
     0.05,
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
 
   console.log(`Registering SOL...`);
@@ -260,6 +279,9 @@ async function registerTokens() {
     1.1,
     1.2,
     0.05,
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
 
   console.log(`Registering MSOL...`);
@@ -280,6 +302,9 @@ async function registerTokens() {
     1.1,
     1.2,
     0.05,
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
   console.log(`Registering RAY...`);
   const rayMainnetMint = new PublicKey(MAINNET_MINTS.get('RAY')!);
@@ -306,6 +331,9 @@ async function registerTokens() {
     8 / 7,
     4 / 3,
     1 / 16,
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
 
   console.log(`Registering DUST...`);
@@ -333,6 +361,9 @@ async function registerTokens() {
     81 / 80,
     41 / 40, // 40x leverage so we can test something
     1 / 160, // no liquidation fee
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
 
   // log tokens/banks
