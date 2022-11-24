@@ -174,8 +174,7 @@ impl Bank {
             min_vault_to_deposits_ratio: existing_bank.min_vault_to_deposits_ratio,
             net_borrows_limit_native: existing_bank.net_borrows_limit_native,
             net_borrows_window_size_ts: existing_bank.net_borrows_window_size_ts,
-            last_net_borrows_window_start_ts: now_ts / existing_bank.net_borrows_window_size_ts
-                * existing_bank.net_borrows_window_size_ts,
+            last_net_borrows_window_start_ts: existing_bank.last_net_borrows_window_start_ts,
             net_borrows_window_native: 0,
             reserved: [0; 2136],
         }
@@ -233,8 +232,8 @@ impl Bank {
         now_ts: u64,
     ) -> Result<bool> {
         self.update_net_borrows(-native_amount, now_ts)?;
-        let (result, opening_indexed_position) =
-            self.deposit_internal(position, native_amount, allow_dusting)?;
+        let opening_indexed_position = position.indexed_position;
+        let result = self.deposit_internal(position, native_amount, allow_dusting)?;
         self.update_cumulative_interest(position, opening_indexed_position);
         Ok(result)
     }
@@ -245,7 +244,7 @@ impl Bank {
         position: &mut TokenPosition,
         mut native_amount: I80F48,
         allow_dusting: bool,
-    ) -> Result<(bool, I80F48)> {
+    ) -> Result<bool> {
         require_gte!(native_amount, 0);
 
         let native_position = position.native(self);
@@ -275,13 +274,13 @@ impl Bank {
                 // pay back borrows only, leaving a negative position
                 cm!(self.indexed_borrows -= indexed_change);
                 position.indexed_position = new_indexed_value;
-                return Ok((true, opening_indexed_position));
+                return Ok(true);
             } else if new_native_position < I80F48::ONE && allow_dusting {
                 // if there's less than one token deposited, zero the position
                 cm!(self.dust += new_native_position);
                 cm!(self.indexed_borrows += position.indexed_position);
                 position.indexed_position = I80F48::ZERO;
-                return Ok((false, opening_indexed_position));
+                return Ok(false);
             }
 
             // pay back all borrows
@@ -297,7 +296,7 @@ impl Bank {
         cm!(self.indexed_deposits += indexed_change);
         cm!(position.indexed_position += indexed_change);
 
-        Ok((true, opening_indexed_position))
+        Ok(true)
     }
 
     /// Withdraws `native_amount` without applying the loan origination fee.
@@ -314,7 +313,7 @@ impl Bank {
         native_amount: I80F48,
         now_ts: u64,
     ) -> Result<bool> {
-        let (position_is_active, _) = self.withdraw_internal(
+        let (position_is_active, _) = self.withdraw_internal_wrapper(
             position,
             native_amount,
             false,
@@ -334,7 +333,7 @@ impl Bank {
         native_amount: I80F48,
         now_ts: u64,
     ) -> Result<bool> {
-        self.withdraw_internal(position, native_amount, false, true, now_ts)
+        self.withdraw_internal_wrapper(position, native_amount, false, true, now_ts)
             .map(|(not_dusted, _)| not_dusted || position.is_in_use())
     }
 
@@ -352,7 +351,28 @@ impl Bank {
         native_amount: I80F48,
         now_ts: u64,
     ) -> Result<(bool, I80F48)> {
-        self.withdraw_internal(position, native_amount, true, !position.is_in_use(), now_ts)
+        self.withdraw_internal_wrapper(position, native_amount, true, !position.is_in_use(), now_ts)
+    }
+
+    /// Internal function to withdraw funds
+    fn withdraw_internal_wrapper(
+        &mut self,
+        position: &mut TokenPosition,
+        mut native_amount: I80F48,
+        with_loan_origination_fee: bool,
+        allow_dusting: bool,
+        now_ts: u64,
+    ) -> Result<(bool, I80F48)> {
+        let opening_indexed_position = position.indexed_position;
+        let res = self.withdraw_internal(
+            position,
+            native_amount,
+            with_loan_origination_fee,
+            allow_dusting,
+            now_ts,
+        );
+        self.update_cumulative_interest(position, opening_indexed_position);
+        res
     }
 
     /// Internal function to withdraw funds
@@ -377,14 +397,12 @@ impl Bank {
                     cm!(self.dust += new_native_position);
                     cm!(self.indexed_deposits -= position.indexed_position);
                     position.indexed_position = I80F48::ZERO;
-                    self.update_cumulative_interest(position, opening_indexed_position);
                     return Ok((false, I80F48::ZERO));
                 } else {
                     // withdraw some deposits leaving a positive balance
                     let indexed_change = cm!(native_amount / self.deposit_index);
                     cm!(self.indexed_deposits -= indexed_change);
                     cm!(position.indexed_position -= indexed_change);
-                    self.update_cumulative_interest(position, opening_indexed_position);
                     return Ok((true, I80F48::ZERO));
                 }
             }
@@ -407,8 +425,9 @@ impl Bank {
         let indexed_change = cm!(native_amount / self.borrow_index);
         cm!(self.indexed_borrows += indexed_change);
         cm!(position.indexed_position -= indexed_change);
-        self.update_cumulative_interest(position, opening_indexed_position);
 
+        // net borrows requires updating in only this case, since other branches of the method deal with
+        // withdraws and not borrows
         self.update_net_borrows(native_amount, now_ts)?;
 
         Ok((true, loan_origination_fee))
@@ -425,7 +444,7 @@ impl Bank {
             cm!(self.loan_origination_fee_rate * already_borrowed_native_amount);
         cm!(self.collected_fees_native += loan_origination_fee);
 
-        let (position_is_active, _) = self.withdraw_internal(
+        let (position_is_active, _) = self.withdraw_internal_wrapper(
             position,
             loan_origination_fee,
             false,

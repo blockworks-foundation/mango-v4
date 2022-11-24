@@ -59,7 +59,7 @@ pub enum MangoError {
     SettlementAmountMustBePositive,
     #[msg("bank utilization has reached limit")]
     BankBorrowLimitReached,
-    #[msg("bank net borrows has reached limit")]
+    #[msg("bank net borrows has reached limit - this is an intermittent error - the limit will reset regularly")]
     BankNetBorrowsLimitReached,
 }
 
