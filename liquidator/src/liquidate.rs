@@ -182,7 +182,6 @@ impl<'a> LiquidateHelper<'a> {
 
         // Liquidate the highest-value perp base position
         let (perp_market_index, base_lots, price, _) = perp_base_positions.last().unwrap();
-        let perp = self.client.context.perp(*perp_market_index);
 
         let (side, side_signum) = if *base_lots > 0 {
             (Side::Bid, 1)
@@ -203,7 +202,6 @@ impl<'a> LiquidateHelper<'a> {
             health_cache.max_perp_for_health_ratio(
                 *perp_market_index,
                 *price,
-                perp.market.base_lot_size,
                 side,
                 self.liqor_min_health_ratio,
             )?
@@ -375,8 +373,8 @@ impl<'a> LiquidateHelper<'a> {
         let health_cache = health_cache::new(&self.client.context, self.account_fetcher, &liqor)
             .expect("always ok");
 
-        let source_price = health_cache.token_info(source).unwrap().oracle_price;
-        let target_price = health_cache.token_info(target).unwrap().oracle_price;
+        let source_price = health_cache.token_info(source).unwrap().prices.oracle;
+        let target_price = health_cache.token_info(target).unwrap().prices.oracle;
         // TODO: This is where we could multiply in the liquidation fee factors
         let oracle_swap_price = source_price / target_price;
 

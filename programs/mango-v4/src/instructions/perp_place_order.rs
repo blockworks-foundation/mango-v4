@@ -5,7 +5,7 @@ use crate::error::*;
 use crate::state::MangoAccount;
 use crate::state::{
     new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, EventQueue, Group,
-    Order, OrderBook, PerpMarket,
+    Order, Orderbook, PerpMarket,
 };
 
 #[derive(Accounts)]
@@ -25,7 +25,7 @@ pub struct PerpPlaceOrder<'info> {
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]
-    pub orderbook: AccountLoader<'info, OrderBook>,
+    pub orderbook: AccountLoader<'info, Orderbook>,
     #[account(mut)]
     pub event_queue: AccountLoader<'info, EventQueue>,
 

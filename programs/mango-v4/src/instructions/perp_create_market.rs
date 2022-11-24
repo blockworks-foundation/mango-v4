@@ -33,7 +33,7 @@ pub struct PerpCreateMarket<'info> {
     /// Accounts are initialised by client,
     /// anchor discriminator is set first when ix exits,
     #[account(zero)]
-    pub orderbook: AccountLoader<'info, OrderBook>,
+    pub orderbook: AccountLoader<'info, Orderbook>,
     #[account(zero)]
     pub event_queue: AccountLoader<'info, EventQueue>,
 

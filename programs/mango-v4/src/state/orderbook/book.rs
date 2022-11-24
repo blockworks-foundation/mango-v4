@@ -16,17 +16,17 @@ use crate::util::checked_math as cm;
 const DROP_EXPIRED_ORDER_LIMIT: usize = 5;
 
 #[account(zero_copy)]
-pub struct OrderBook {
+pub struct Orderbook {
     pub bids: BookSide,
     pub asks: BookSide,
 }
 const_assert_eq!(
-    std::mem::size_of::<OrderBook>(),
+    std::mem::size_of::<Orderbook>(),
     2 * std::mem::size_of::<BookSide>()
 );
-const_assert_eq!(std::mem::size_of::<OrderBook>() % 8, 0);
+const_assert_eq!(std::mem::size_of::<Orderbook>() % 8, 0);
 
-impl OrderBook {
+impl Orderbook {
     pub fn init(&mut self) {
         self.bids.fixed.order_tree_type = OrderTreeType::Bids;
         self.bids.oracle_pegged.order_tree_type = OrderTreeType::Bids;
@@ -102,7 +102,7 @@ impl OrderBook {
             // price limit check computed lazily to save CU on average
             let native_price = market.lot_to_native_price(price_lots);
             if !market.inside_price_limit(side, native_price, oracle_price) {
-                msg!("Posting on book disallowed due to price limits");
+                msg!("Posting on book disallowed due to price limits, order price {:?}, oracle price {:?}", native_price, oracle_price);
                 post_target = None;
             }
         }

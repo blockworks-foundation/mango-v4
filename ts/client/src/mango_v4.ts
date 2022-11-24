@@ -3824,7 +3824,7 @@ export type MangoV4 = {
           },
           {
             "name": "registrationTime",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "reserved",
@@ -3874,7 +3874,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "orderBook",
+      "name": "orderbook",
       "type": {
         "kind": "struct",
         "fields": [
@@ -3888,94 +3888,6 @@ export type MangoV4 = {
             "name": "asks",
             "type": {
               "defined": "BookSide"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "bookSide",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "fixed",
-            "type": {
-              "defined": "OrderTree"
-            }
-          },
-          {
-            "name": "oraclePegged",
-            "type": {
-              "defined": "OrderTree"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "orderTree",
-      "docs": [
-        "A binary tree on AnyNode::key()",
-        "",
-        "The key encodes the price in the top 64 bits."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "orderTreeType",
-            "type": {
-              "defined": "OrderTreeType"
-            }
-          },
-          {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                3
-              ]
-            }
-          },
-          {
-            "name": "bumpIndex",
-            "type": "u32"
-          },
-          {
-            "name": "freeListLen",
-            "type": "u32"
-          },
-          {
-            "name": "freeListHead",
-            "type": "u32"
-          },
-          {
-            "name": "rootNode",
-            "type": "u32"
-          },
-          {
-            "name": "leafCount",
-            "type": "u32"
-          },
-          {
-            "name": "nodes",
-            "type": {
-              "array": [
-                {
-                  "defined": "AnyNode"
-                },
-                1024
-              ]
-            }
-          },
-          {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                256
-              ]
             }
           }
         ]
@@ -4164,7 +4076,10 @@ export type MangoV4 = {
           },
           {
             "name": "fundingLastUpdated",
-            "type": "i64"
+            "docs": [
+              "timestamp that funding was last updated in"
+            ],
+            "type": "u64"
           },
           {
             "name": "openInterest",
@@ -4215,7 +4130,7 @@ export type MangoV4 = {
           },
           {
             "name": "registrationTime",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "feesSettled",
@@ -4326,7 +4241,7 @@ export type MangoV4 = {
           },
           {
             "name": "registrationTime",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "reserved",
@@ -5015,6 +4930,26 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "BookSide",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fixed",
+            "type": {
+              "defined": "OrderTree"
+            }
+          },
+          {
+            "name": "oraclePegged",
+            "type": {
+              "defined": "OrderTree"
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "InnerNode",
       "docs": [
         "InnerNodes and LeafNodes compose the binary tree of orders.",
@@ -5177,6 +5112,74 @@ export type MangoV4 = {
               "array": [
                 "u8",
                 92
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderTree",
+      "docs": [
+        "A binary tree on AnyNode::key()",
+        "",
+        "The key encodes the price in the top 64 bits."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "orderTreeType",
+            "type": {
+              "defined": "OrderTreeType"
+            }
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
+          },
+          {
+            "name": "bumpIndex",
+            "type": "u32"
+          },
+          {
+            "name": "freeListLen",
+            "type": "u32"
+          },
+          {
+            "name": "freeListHead",
+            "type": "u32"
+          },
+          {
+            "name": "rootNode",
+            "type": "u32"
+          },
+          {
+            "name": "leafCount",
+            "type": "u32"
+          },
+          {
+            "name": "nodes",
+            "type": {
+              "array": [
+                {
+                  "defined": "AnyNode"
+                },
+                1024
+              ]
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                256
               ]
             }
           }
@@ -6867,6 +6870,16 @@ export type MangoV4 = {
       "code": 6022,
       "name": "HasOpenPerpOrders",
       "msg": "the perp position has open orders or unprocessed fill events"
+    },
+    {
+      "code": 6023,
+      "name": "OracleConfidence",
+      "msg": "an oracle does not reach the confidence threshold"
+    },
+    {
+      "code": 6024,
+      "name": "OracleStale",
+      "msg": "an oracle is stale"
     }
   ]
 };
@@ -10697,7 +10710,7 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "registrationTime",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "reserved",
@@ -10747,7 +10760,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "orderBook",
+      "name": "orderbook",
       "type": {
         "kind": "struct",
         "fields": [
@@ -10761,94 +10774,6 @@ export const IDL: MangoV4 = {
             "name": "asks",
             "type": {
               "defined": "BookSide"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "bookSide",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "fixed",
-            "type": {
-              "defined": "OrderTree"
-            }
-          },
-          {
-            "name": "oraclePegged",
-            "type": {
-              "defined": "OrderTree"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "orderTree",
-      "docs": [
-        "A binary tree on AnyNode::key()",
-        "",
-        "The key encodes the price in the top 64 bits."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "orderTreeType",
-            "type": {
-              "defined": "OrderTreeType"
-            }
-          },
-          {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                3
-              ]
-            }
-          },
-          {
-            "name": "bumpIndex",
-            "type": "u32"
-          },
-          {
-            "name": "freeListLen",
-            "type": "u32"
-          },
-          {
-            "name": "freeListHead",
-            "type": "u32"
-          },
-          {
-            "name": "rootNode",
-            "type": "u32"
-          },
-          {
-            "name": "leafCount",
-            "type": "u32"
-          },
-          {
-            "name": "nodes",
-            "type": {
-              "array": [
-                {
-                  "defined": "AnyNode"
-                },
-                1024
-              ]
-            }
-          },
-          {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                256
-              ]
             }
           }
         ]
@@ -11037,7 +10962,10 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "fundingLastUpdated",
-            "type": "i64"
+            "docs": [
+              "timestamp that funding was last updated in"
+            ],
+            "type": "u64"
           },
           {
             "name": "openInterest",
@@ -11088,7 +11016,7 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "registrationTime",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "feesSettled",
@@ -11199,7 +11127,7 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "registrationTime",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "reserved",
@@ -11888,6 +11816,26 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "BookSide",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fixed",
+            "type": {
+              "defined": "OrderTree"
+            }
+          },
+          {
+            "name": "oraclePegged",
+            "type": {
+              "defined": "OrderTree"
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "InnerNode",
       "docs": [
         "InnerNodes and LeafNodes compose the binary tree of orders.",
@@ -12050,6 +11998,74 @@ export const IDL: MangoV4 = {
               "array": [
                 "u8",
                 92
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderTree",
+      "docs": [
+        "A binary tree on AnyNode::key()",
+        "",
+        "The key encodes the price in the top 64 bits."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "orderTreeType",
+            "type": {
+              "defined": "OrderTreeType"
+            }
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
+          },
+          {
+            "name": "bumpIndex",
+            "type": "u32"
+          },
+          {
+            "name": "freeListLen",
+            "type": "u32"
+          },
+          {
+            "name": "freeListHead",
+            "type": "u32"
+          },
+          {
+            "name": "rootNode",
+            "type": "u32"
+          },
+          {
+            "name": "leafCount",
+            "type": "u32"
+          },
+          {
+            "name": "nodes",
+            "type": {
+              "array": [
+                {
+                  "defined": "AnyNode"
+                },
+                1024
+              ]
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                256
               ]
             }
           }
@@ -13740,6 +13756,16 @@ export const IDL: MangoV4 = {
       "code": 6022,
       "name": "HasOpenPerpOrders",
       "msg": "the perp position has open orders or unprocessed fill events"
+    },
+    {
+      "code": 6023,
+      "name": "OracleConfidence",
+      "msg": "an oracle does not reach the confidence threshold"
+    },
+    {
+      "code": 6024,
+      "name": "OracleStale",
+      "msg": "an oracle is stale"
     }
   ]
 };

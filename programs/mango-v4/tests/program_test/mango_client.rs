@@ -2347,7 +2347,7 @@ impl PerpCreateMarketInstruction {
     ) -> Self {
         PerpCreateMarketInstruction {
             orderbook: solana
-                .create_account_for_type::<OrderBook>(&mango_v4::id())
+                .create_account_for_type::<Orderbook>(&mango_v4::id())
                 .await,
             event_queue: solana
                 .create_account_for_type::<EventQueue>(&mango_v4::id())
@@ -3011,7 +3011,6 @@ impl ClientInstruction for PerpLiqForceCancelOrdersInstruction {
             perp_market: self.perp_market,
             account: self.account,
             orderbook: perp_market.orderbook,
-            oracle: perp_market.oracle,
         };
         let mut instruction = make_instruction(program_id, &accounts, instruction);
         instruction.accounts.extend(health_check_metas);

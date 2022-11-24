@@ -6,12 +6,12 @@ use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
 
 use crate::accounts_zerocopy::KeyedAccountReader;
+use crate::logs::PerpUpdateFundingLog;
 use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
 use crate::util::checked_math as cm;
 
-use super::{orderbook, OracleConfig, OrderBook, StablePriceModel, DAY_I80F48};
-use crate::logs::PerpUpdateFundingLog;
+use super::{orderbook, OracleConfig, Orderbook, StablePriceModel, DAY_I80F48};
 
 pub type PerpMarketIndex = u16;
 
@@ -162,7 +162,7 @@ impl PerpMarket {
     /// Use current order book price and index price to update the instantaneous funding
     pub fn update_funding_and_stable_price(
         &mut self,
-        book: &OrderBook,
+        book: &Orderbook,
         oracle_price: I80F48,
         now_ts: u64,
     ) -> Result<()> {

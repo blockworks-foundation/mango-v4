@@ -68,13 +68,11 @@ async function main() {
     ),
   );
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
-  console.log(`${group}`);
 
   // create + fetch account
   console.log(`Creating mangoaccount...`);
   const mangoAccount = await client.getOrCreateMangoAccount(group);
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
-  console.log(mangoAccount.toString(group));
 
   if (true) {
     // deposit and withdraw
@@ -126,6 +124,22 @@ async function main() {
       console.log(error);
     }
   }
+
+  // expand account
+  if (
+    mangoAccount.tokens.length < 16 ||
+    mangoAccount.serum3.length < 8 ||
+    mangoAccount.perps.length < 8 ||
+    mangoAccount.perpOpenOrders.length < 8
+  ) {
+    console.log(
+      `...expanding mango account to max 16 token positions, 8 serum3, 8 perp position and 8 perp oo slots, previous (tokens ${mangoAccount.tokens.length}, serum3 ${mangoAccount.serum3.length}, perps ${mangoAccount.perps.length}, perps oo ${mangoAccount.perpOpenOrders.length})`,
+    );
+    let sig = await client.expandMangoAccount(group, mangoAccount, 16, 8, 8, 8);
+    console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    await mangoAccount.reload(client);
+  }
+
   process.exit();
 }
 

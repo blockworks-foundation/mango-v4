@@ -14,6 +14,7 @@ pub enum Direction {
 }
 
 /// Returns up to `count` accounts with highest abs pnl (by `direction`) in descending order.
+/// Note: keep in sync with perp.ts:getSettlePnlCandidates
 pub fn fetch_top(
     context: &crate::context::MangoGroupContext,
     account_fetcher: &impl AccountFetcher,
