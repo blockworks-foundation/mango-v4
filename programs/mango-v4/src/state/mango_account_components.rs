@@ -356,6 +356,7 @@ impl PerpPosition {
             self.avg_entry_price_per_base_lot =
                 new_position_quote_value / (new_position.abs() as f64);
         }
+        // The average entry price does not change when the position decreases while keeping sign.
     }
 
     /// Change the base and quote positions as the result of a trade
