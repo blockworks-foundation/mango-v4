@@ -944,7 +944,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     let mango_account_1_expected_qpn_after_settle = mango_account_1.perps[0]
         .quote_position_native()
         + (market.settle_pnl_limit_factor()
-            * mango_account_0.perps[0].avg_entry_price(&market)
+            * I80F48::from_num(mango_account_0.perps[0].avg_entry_price(&market))
             * mango_account_0.perps[0].base_position_native(&market))
         .abs();
     send_tx(

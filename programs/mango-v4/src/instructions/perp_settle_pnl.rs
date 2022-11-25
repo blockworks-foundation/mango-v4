@@ -133,10 +133,10 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     let a_pnl_capped_for_window = {
         let realized_pnl = I80F48::from(a_perp_position.realized_pnl_native);
         let unrealized_pnl = cm!(a_pnl - realized_pnl);
-        let a_base_native = a_perp_position.base_position_native(&perp_market);
-        let avg_entry_price = a_perp_position.avg_entry_price(&perp_market);
+        let a_base_lots = I80F48::from(a_perp_position.base_position_lots());
+        let avg_entry_price_lots = I80F48::from_num(a_perp_position.avg_entry_price_per_base_lot);
         let max_allowed_in_window =
-            cm!(perp_market.settle_pnl_limit_factor() * a_base_native * avg_entry_price)
+            cm!(perp_market.settle_pnl_limit_factor() * a_base_lots * avg_entry_price_lots)
                 .abs()
                 .checked_round()
                 .unwrap();
