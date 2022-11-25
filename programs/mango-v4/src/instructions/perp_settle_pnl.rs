@@ -127,11 +127,12 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Settles at most x100% each hour
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     let a_settle_pnl_in_new_window = now_ts
-        >= a_perp_position.settle_pnl_limit_window_start_ts
-            + perp_market.settle_pnl_limit_factor_window_size_ts;
+        >= cm!((a_perp_position.settle_pnl_limit_window + 1) as u64
+            * perp_market.settle_pnl_limit_factor_window_size_ts);
 
     let a_pnl_capped_for_window = {
-        let unrealized_pnl = cm!(a_pnl - a_perp_position.realized_pnl_native);
+        let realized_pnl = I80F48::from(a_perp_position.realized_pnl_native);
+        let unrealized_pnl = cm!(a_pnl - realized_pnl);
         let a_base_native = a_perp_position.base_position_native(&perp_market);
         let avg_entry_price = a_perp_position.avg_entry_price(&perp_market);
         let max_allowed_in_window =
@@ -141,9 +142,10 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
                 .unwrap();
 
         let a_unrealized_pnl_capped_for_window = if a_settle_pnl_in_new_window {
-            a_perp_position.settle_pnl_limit_window_start_ts = now_ts
-                / perp_market.settle_pnl_limit_factor_window_size_ts
-                * perp_market.settle_pnl_limit_factor_window_size_ts;
+            a_perp_position.settle_pnl_limit_window =
+                cm!(now_ts / perp_market.settle_pnl_limit_factor_window_size_ts)
+                    .try_into()
+                    .unwrap();
             unrealized_pnl.min(max_allowed_in_window)
         } else {
             unrealized_pnl.min(cm!(max_allowed_in_window
@@ -151,8 +153,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
                     a_perp_position.settle_pnl_limit_settled_in_current_window_native
                 )))
         };
-        a_pnl.min(cm!(I80F48::from_num(a_perp_position.realized_pnl_native)
-            + a_unrealized_pnl_capped_for_window))
+        a_pnl.min(cm!(realized_pnl + a_unrealized_pnl_capped_for_window))
     };
 
     // Settle for the maximum possible capped to b's settle health
@@ -176,10 +177,14 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
                 .unwrap()
         };
     let b_settle_pnl_in_new_window = now_ts
-        >= b_perp_position.settle_pnl_limit_window_start_ts
-            + perp_market.settle_pnl_limit_factor_window_size_ts;
+        >= cm!((b_perp_position.settle_pnl_limit_window + 1) as u64
+            * perp_market.settle_pnl_limit_factor_window_size_ts);
     b_perp_position.settle_pnl_limit_settled_in_current_window_native =
         if b_settle_pnl_in_new_window {
+            b_perp_position.settle_pnl_limit_window =
+                cm!(now_ts / perp_market.settle_pnl_limit_factor_window_size_ts)
+                    .try_into()
+                    .unwrap();
             -settlement.checked_to_num::<i64>().unwrap()
         } else {
             b_perp_position
