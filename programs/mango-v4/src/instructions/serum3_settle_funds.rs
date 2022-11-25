@@ -206,6 +206,8 @@ pub fn charge_loan_origination_fees(
 ) -> Result<()> {
     let serum3_account = account.serum3_orders_mut(market_index).unwrap();
 
+    let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
+
     let oo_base_total = before_oo.native_base_total();
     let actualized_base_loan = I80F48::from_num(
         serum3_account
@@ -218,8 +220,11 @@ pub fn charge_loan_origination_fees(
         // now that the loan is actually materialized, charge the loan origination fee
         // note: the withdraw has already happened while placing the order
         let base_token_account = account.token_position_mut(base_bank.token_index)?.0;
-        let (_, fee) =
-            base_bank.withdraw_loan_origination_fee(base_token_account, actualized_base_loan)?;
+        let (_, fee) = base_bank.withdraw_loan_origination_fee(
+            base_token_account,
+            actualized_base_loan,
+            now_ts,
+        )?;
 
         emit!(WithdrawLoanOriginationFeeLog {
             mango_group: *group_pubkey,
@@ -243,8 +248,11 @@ pub fn charge_loan_origination_fees(
         // now that the loan is actually materialized, charge the loan origination fee
         // note: the withdraw has already happened while placing the order
         let quote_token_account = account.token_position_mut(quote_bank.token_index)?.0;
-        let (_, fee) =
-            quote_bank.withdraw_loan_origination_fee(quote_token_account, actualized_quote_loan)?;
+        let (_, fee) = quote_bank.withdraw_loan_origination_fee(
+            quote_token_account,
+            actualized_quote_loan,
+            now_ts,
+        )?;
 
         emit!(WithdrawLoanOriginationFeeLog {
             mango_group: *group_pubkey,

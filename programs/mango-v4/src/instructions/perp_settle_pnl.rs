@@ -180,12 +180,14 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     cm!(account_a.fixed.perp_spot_transfers += settlement_i64 - fee_i64);
     cm!(account_b.fixed.perp_spot_transfers -= settlement_i64);
 
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+
     // Transfer token balances
     // The fee is paid by the account with positive unsettled pnl
     let a_token_position = account_a.token_position_mut(settle_token_index)?.0;
     let b_token_position = account_b.token_position_mut(settle_token_index)?.0;
-    bank.deposit(a_token_position, cm!(settlement - fee))?;
-    bank.withdraw_with_fee(b_token_position, settlement)?;
+    bank.deposit(a_token_position, cm!(settlement - fee), now_ts)?;
+    bank.withdraw_with_fee(b_token_position, settlement, now_ts)?;
 
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
@@ -220,7 +222,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
 
     let (settler_token_position, settler_token_raw_index, _) =
         settler.ensure_token_position(settle_token_index)?;
-    let settler_token_position_active = bank.deposit(settler_token_position, fee)?;
+    let settler_token_position_active = bank.deposit(settler_token_position, fee, now_ts)?;
 
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),

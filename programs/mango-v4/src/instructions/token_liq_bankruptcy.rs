@@ -143,11 +143,13 @@ pub fn token_liq_bankruptcy(
     // liquidators to exploit the insurance fund for 1 native token each call.
     let liab_transfer = cm!(insurance_transfer_i80f48 / liab_price_adjusted);
 
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+
     let mut liqee_liab_active = true;
     if insurance_transfer > 0 {
         // liqee gets liab assets (enable dusting to prevent a case where the position is brought
         // to +I80F48::DELTA)
-        liqee_liab_active = liab_bank.deposit_with_dusting(liqee_liab, liab_transfer)?;
+        liqee_liab_active = liab_bank.deposit_with_dusting(liqee_liab, liab_transfer, now_ts)?;
         remaining_liab_loss = -liqee_liab.native(liab_bank);
 
         // move insurance assets into quote bank
@@ -169,7 +171,8 @@ pub fn token_liq_bankruptcy(
             // credit the liqor
             let (liqor_quote, liqor_quote_raw_token_index, _) =
                 liqor.ensure_token_position(QUOTE_TOKEN_INDEX)?;
-            let liqor_quote_active = quote_bank.deposit(liqor_quote, insurance_transfer_i80f48)?;
+            let liqor_quote_active =
+                quote_bank.deposit(liqor_quote, insurance_transfer_i80f48, now_ts)?;
 
             // liqor quote
             emit!(TokenBalanceLog {
@@ -185,7 +188,7 @@ pub fn token_liq_bankruptcy(
             let (liqor_liab, liqor_liab_raw_token_index, _) =
                 liqor.ensure_token_position(liab_token_index)?;
             let (liqor_liab_active, loan_origination_fee) =
-                liab_bank.withdraw_with_fee(liqor_liab, liab_transfer)?;
+                liab_bank.withdraw_with_fee(liqor_liab, liab_transfer, now_ts)?;
 
             // liqor liab
             emit!(TokenBalanceLog {
@@ -268,7 +271,8 @@ pub fn token_liq_bankruptcy(
             if amount_for_bank.is_positive() {
                 // enable dusting, because each deposit() is allowed to round up. thus multiple deposit
                 // could bring the total position slightly above zero otherwise
-                liqee_liab_active = bank.deposit_with_dusting(liqee_liab, amount_for_bank)?;
+                liqee_liab_active =
+                    bank.deposit_with_dusting(liqee_liab, amount_for_bank, now_ts)?;
                 cm!(amount_to_credit -= amount_for_bank);
                 if amount_to_credit <= 0 {
                     break;

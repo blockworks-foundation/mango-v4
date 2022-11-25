@@ -33,6 +33,10 @@ const MAINNET_SERUM3_MARKETS = new Map([
   ['SOL/USDC', '9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT'],
 ]);
 
+const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
+const NET_BORROWS_WINDOW_SIZE_TS = 24 * 60 * 60;
+const NET_BORROWS_LIMIT_NATIVE = 1 * Math.pow(10, 7) * Math.pow(10, 6);
+
 async function main() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(process.env.CLUSTER_URL!, options);
@@ -116,6 +120,9 @@ async function main() {
       1,
       1,
       0,
+      MIN_VAULT_TO_DEPOSITS_RATIO,
+      NET_BORROWS_WINDOW_SIZE_TS,
+      NET_BORROWS_LIMIT_NATIVE,
     );
     await group.reloadAll(client);
   } catch (error) {
@@ -142,6 +149,9 @@ async function main() {
       1.1,
       1.2,
       0.05,
+      MIN_VAULT_TO_DEPOSITS_RATIO,
+      NET_BORROWS_WINDOW_SIZE_TS,
+      NET_BORROWS_LIMIT_NATIVE,
     );
     await group.reloadAll(client);
   } catch (error) {
@@ -168,6 +178,9 @@ async function main() {
       1.1,
       1.2,
       0.05,
+      MIN_VAULT_TO_DEPOSITS_RATIO,
+      NET_BORROWS_WINDOW_SIZE_TS,
+      NET_BORROWS_LIMIT_NATIVE,
     );
     await group.reloadAll(client);
   } catch (error) {

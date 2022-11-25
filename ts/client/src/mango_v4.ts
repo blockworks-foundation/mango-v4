@@ -341,6 +341,18 @@ export type MangoV4 = {
         {
           "name": "liquidationFee",
           "type": "f32"
+        },
+        {
+          "name": "minVaultToDepositsRatio",
+          "type": "f64"
+        },
+        {
+          "name": "netBorrowsWindowSizeTs",
+          "type": "u64"
+        },
+        {
+          "name": "netBorrowsLimitNative",
+          "type": "i64"
         }
       ]
     },
@@ -499,6 +511,11 @@ export type MangoV4 = {
           "name": "mintInfo",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -568,6 +585,24 @@ export type MangoV4 = {
         },
         {
           "name": "liquidationFeeOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "stablePriceDelayIntervalSecondsOpt",
+          "type": {
+            "option": "u32"
+          }
+        },
+        {
+          "name": "stablePriceDelayGrowthLimitOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "stablePriceGrowthLimitOpt",
           "type": {
             "option": "f32"
           }
@@ -1058,11 +1093,6 @@ export type MangoV4 = {
           "name": "oracle",
           "isMut": true,
           "isSigner": false
-        },
-        {
-          "name": "payer",
-          "isMut": true,
-          "isSigner": true
         }
       ],
       "args": [
@@ -2416,6 +2446,11 @@ export type MangoV4 = {
           "name": "perpMarket",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -2531,6 +2566,24 @@ export type MangoV4 = {
         },
         {
           "name": "settleFeeFractionLowHealthOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "stablePriceDelayIntervalSecondsOpt",
+          "type": {
+            "option": "u32"
+          }
+        },
+        {
+          "name": "stablePriceDelayGrowthLimitOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "stablePriceGrowthLimitOpt",
           "type": {
             "option": "f32"
           }
@@ -3131,11 +3184,6 @@ export type MangoV4 = {
           "name": "orderbook",
           "isMut": true,
           "isSigner": false
-        },
-        {
-          "name": "oracle",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -3391,11 +3439,11 @@ export type MangoV4 = {
           },
           {
             "name": "indexLastUpdated",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "bankRateLastUpdated",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "avgUtilization",
@@ -3524,11 +3572,37 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "stablePriceModel",
+            "type": {
+              "defined": "StablePriceModel"
+            }
+          },
+          {
+            "name": "minVaultToDepositsRatio",
+            "type": "f64"
+          },
+          {
+            "name": "netBorrowsWindowSizeTs",
+            "type": "u64"
+          },
+          {
+            "name": "lastNetBorrowsWindowStartTs",
+            "type": "u64"
+          },
+          {
+            "name": "netBorrowsLimitNative",
+            "type": "i64"
+          },
+          {
+            "name": "netBorrowsWindowNative",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2464
+                2136
               ]
             }
           }
@@ -4168,11 +4242,17 @@ export type MangoV4 = {
             "type": "f32"
           },
           {
+            "name": "stablePriceModel",
+            "type": {
+              "defined": "StablePriceModel"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2244
+                1956
               ]
             }
           }
@@ -4411,6 +4491,35 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "Prices",
+      "docs": [
+        "Information about prices for a bank or perp market."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oracle",
+            "docs": [
+              "The current oracle price"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "stable",
+            "docs": [
+              "A \"stable\" price, provided by StablePriceModel"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "TokenInfo",
       "type": {
         "kind": "struct",
@@ -4444,19 +4553,13 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "oraclePrice",
+            "name": "prices",
             "type": {
-              "defined": "I80F48"
+              "defined": "Prices"
             }
           },
           {
-            "name": "balance",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "serum3MaxReserved",
+            "name": "balanceNative",
             "type": {
               "defined": "I80F48"
             }
@@ -4470,7 +4573,13 @@ export type MangoV4 = {
         "kind": "struct",
         "fields": [
           {
-            "name": "reserved",
+            "name": "reservedBase",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "reservedQuote",
             "type": {
               "defined": "I80F48"
             }
@@ -4524,10 +4633,20 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "base",
-            "type": {
-              "defined": "I80F48"
-            }
+            "name": "baseLotSize",
+            "type": "i64"
+          },
+          {
+            "name": "baseLots",
+            "type": "i64"
+          },
+          {
+            "name": "bidsBaseLots",
+            "type": "i64"
+          },
+          {
+            "name": "asksBaseLots",
+            "type": "i64"
           },
           {
             "name": "quote",
@@ -4536,9 +4655,9 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "oraclePrice",
+            "name": "prices",
             "type": {
-              "defined": "I80F48"
+              "defined": "Prices"
             }
           },
           {
@@ -5388,6 +5507,116 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "StablePriceModel",
+      "docs": [
+        "Maintains a \"stable_price\" based on the oracle price.",
+        "",
+        "The stable price follows the oracle price, but its relative rate of",
+        "change is limited (to `stable_growth_limit`) and futher reduced if",
+        "the oracle price is far from the `delay_price`.",
+        "",
+        "Conceptually the `delay_price` is itself a time delayed",
+        "(`24 * delay_interval_seconds`, assume 24h) and relative rate of change limited",
+        "function of the oracle price. It is implemented as averaging the oracle",
+        "price over every `delay_interval_seconds` (assume 1h) and then applying the",
+        "`delay_growth_limit` between intervals."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stablePrice",
+            "docs": [
+              "Current stable price to use in health"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "lastUpdateTimestamp",
+            "type": "u64"
+          },
+          {
+            "name": "delayPrices",
+            "docs": [
+              "Stored delay_price for each delay_interval.",
+              "If we want the delay_price to be 24h delayed, we would store one for each hour.",
+              "This is used in a cyclical way: We use the maximally-delayed value at delay_interval_index",
+              "and once enough time passes to move to the next delay interval, that gets overwritten and",
+              "we use the next one."
+            ],
+            "type": {
+              "array": [
+                "f64",
+                24
+              ]
+            }
+          },
+          {
+            "name": "delayAccumulatorPrice",
+            "docs": [
+              "The delay price is based on an average over each delay_interval. The contributions",
+              "to the average are summed up here."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "delayAccumulatorTime",
+            "docs": [
+              "Accumulating the total time for the above average."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "delayIntervalSeconds",
+            "docs": [
+              "Length of a delay_interval"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "delayGrowthLimit",
+            "docs": [
+              "Maximal relative difference between two delay_price in consecutive intervals."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "stableGrowthLimit",
+            "docs": [
+              "Maximal per-second relative difference of the stable price.",
+              "It gets further reduced if stable and delay price disagree."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "lastDelayIntervalIndex",
+            "docs": [
+              "The delay_interval_index that update() was last called on."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                48
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "TokenIndex",
       "docs": [
         "Nothing in Rust shall use these types. They only exist so that the Anchor IDL",
@@ -6141,6 +6370,11 @@ export type MangoV4 = {
           "index": false
         },
         {
+          "name": "stablePrice",
+          "type": "i128",
+          "index": false
+        },
+        {
           "name": "feesAccrued",
           "type": "i128",
           "index": false
@@ -6182,6 +6416,11 @@ export type MangoV4 = {
         },
         {
           "name": "price",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "stablePrice",
           "type": "i128",
           "index": false
         },
@@ -6880,6 +7119,21 @@ export type MangoV4 = {
       "code": 6024,
       "name": "OracleStale",
       "msg": "an oracle is stale"
+    },
+    {
+      "code": 6025,
+      "name": "SettlementAmountMustBePositive",
+      "msg": "settlement amount must always be positive"
+    },
+    {
+      "code": 6026,
+      "name": "BankBorrowLimitReached",
+      "msg": "bank utilization has reached limit"
+    },
+    {
+      "code": 6027,
+      "name": "BankNetBorrowsLimitReached",
+      "msg": "bank net borrows has reached limit"
     }
   ]
 };
@@ -7227,6 +7481,18 @@ export const IDL: MangoV4 = {
         {
           "name": "liquidationFee",
           "type": "f32"
+        },
+        {
+          "name": "minVaultToDepositsRatio",
+          "type": "f64"
+        },
+        {
+          "name": "netBorrowsWindowSizeTs",
+          "type": "u64"
+        },
+        {
+          "name": "netBorrowsLimitNative",
+          "type": "i64"
         }
       ]
     },
@@ -7385,6 +7651,11 @@ export const IDL: MangoV4 = {
           "name": "mintInfo",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -7454,6 +7725,24 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "liquidationFeeOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "stablePriceDelayIntervalSecondsOpt",
+          "type": {
+            "option": "u32"
+          }
+        },
+        {
+          "name": "stablePriceDelayGrowthLimitOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "stablePriceGrowthLimitOpt",
           "type": {
             "option": "f32"
           }
@@ -7944,11 +8233,6 @@ export const IDL: MangoV4 = {
           "name": "oracle",
           "isMut": true,
           "isSigner": false
-        },
-        {
-          "name": "payer",
-          "isMut": true,
-          "isSigner": true
         }
       ],
       "args": [
@@ -9302,6 +9586,11 @@ export const IDL: MangoV4 = {
           "name": "perpMarket",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -9417,6 +9706,24 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "settleFeeFractionLowHealthOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "stablePriceDelayIntervalSecondsOpt",
+          "type": {
+            "option": "u32"
+          }
+        },
+        {
+          "name": "stablePriceDelayGrowthLimitOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "stablePriceGrowthLimitOpt",
           "type": {
             "option": "f32"
           }
@@ -10017,11 +10324,6 @@ export const IDL: MangoV4 = {
           "name": "orderbook",
           "isMut": true,
           "isSigner": false
-        },
-        {
-          "name": "oracle",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -10277,11 +10579,11 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "indexLastUpdated",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "bankRateLastUpdated",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "avgUtilization",
@@ -10410,11 +10712,37 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "stablePriceModel",
+            "type": {
+              "defined": "StablePriceModel"
+            }
+          },
+          {
+            "name": "minVaultToDepositsRatio",
+            "type": "f64"
+          },
+          {
+            "name": "netBorrowsWindowSizeTs",
+            "type": "u64"
+          },
+          {
+            "name": "lastNetBorrowsWindowStartTs",
+            "type": "u64"
+          },
+          {
+            "name": "netBorrowsLimitNative",
+            "type": "i64"
+          },
+          {
+            "name": "netBorrowsWindowNative",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2464
+                2136
               ]
             }
           }
@@ -11054,11 +11382,17 @@ export const IDL: MangoV4 = {
             "type": "f32"
           },
           {
+            "name": "stablePriceModel",
+            "type": {
+              "defined": "StablePriceModel"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2244
+                1956
               ]
             }
           }
@@ -11297,6 +11631,35 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "Prices",
+      "docs": [
+        "Information about prices for a bank or perp market."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oracle",
+            "docs": [
+              "The current oracle price"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "stable",
+            "docs": [
+              "A \"stable\" price, provided by StablePriceModel"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "TokenInfo",
       "type": {
         "kind": "struct",
@@ -11330,19 +11693,13 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "oraclePrice",
+            "name": "prices",
             "type": {
-              "defined": "I80F48"
+              "defined": "Prices"
             }
           },
           {
-            "name": "balance",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "serum3MaxReserved",
+            "name": "balanceNative",
             "type": {
               "defined": "I80F48"
             }
@@ -11356,7 +11713,13 @@ export const IDL: MangoV4 = {
         "kind": "struct",
         "fields": [
           {
-            "name": "reserved",
+            "name": "reservedBase",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "reservedQuote",
             "type": {
               "defined": "I80F48"
             }
@@ -11410,10 +11773,20 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "base",
-            "type": {
-              "defined": "I80F48"
-            }
+            "name": "baseLotSize",
+            "type": "i64"
+          },
+          {
+            "name": "baseLots",
+            "type": "i64"
+          },
+          {
+            "name": "bidsBaseLots",
+            "type": "i64"
+          },
+          {
+            "name": "asksBaseLots",
+            "type": "i64"
           },
           {
             "name": "quote",
@@ -11422,9 +11795,9 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "oraclePrice",
+            "name": "prices",
             "type": {
-              "defined": "I80F48"
+              "defined": "Prices"
             }
           },
           {
@@ -12274,6 +12647,116 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "StablePriceModel",
+      "docs": [
+        "Maintains a \"stable_price\" based on the oracle price.",
+        "",
+        "The stable price follows the oracle price, but its relative rate of",
+        "change is limited (to `stable_growth_limit`) and futher reduced if",
+        "the oracle price is far from the `delay_price`.",
+        "",
+        "Conceptually the `delay_price` is itself a time delayed",
+        "(`24 * delay_interval_seconds`, assume 24h) and relative rate of change limited",
+        "function of the oracle price. It is implemented as averaging the oracle",
+        "price over every `delay_interval_seconds` (assume 1h) and then applying the",
+        "`delay_growth_limit` between intervals."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stablePrice",
+            "docs": [
+              "Current stable price to use in health"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "lastUpdateTimestamp",
+            "type": "u64"
+          },
+          {
+            "name": "delayPrices",
+            "docs": [
+              "Stored delay_price for each delay_interval.",
+              "If we want the delay_price to be 24h delayed, we would store one for each hour.",
+              "This is used in a cyclical way: We use the maximally-delayed value at delay_interval_index",
+              "and once enough time passes to move to the next delay interval, that gets overwritten and",
+              "we use the next one."
+            ],
+            "type": {
+              "array": [
+                "f64",
+                24
+              ]
+            }
+          },
+          {
+            "name": "delayAccumulatorPrice",
+            "docs": [
+              "The delay price is based on an average over each delay_interval. The contributions",
+              "to the average are summed up here."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "delayAccumulatorTime",
+            "docs": [
+              "Accumulating the total time for the above average."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "delayIntervalSeconds",
+            "docs": [
+              "Length of a delay_interval"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "delayGrowthLimit",
+            "docs": [
+              "Maximal relative difference between two delay_price in consecutive intervals."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "stableGrowthLimit",
+            "docs": [
+              "Maximal per-second relative difference of the stable price.",
+              "It gets further reduced if stable and delay price disagree."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "lastDelayIntervalIndex",
+            "docs": [
+              "The delay_interval_index that update() was last called on."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                48
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "TokenIndex",
       "docs": [
         "Nothing in Rust shall use these types. They only exist so that the Anchor IDL",
@@ -13027,6 +13510,11 @@ export const IDL: MangoV4 = {
           "index": false
         },
         {
+          "name": "stablePrice",
+          "type": "i128",
+          "index": false
+        },
+        {
           "name": "feesAccrued",
           "type": "i128",
           "index": false
@@ -13068,6 +13556,11 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "price",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "stablePrice",
           "type": "i128",
           "index": false
         },
@@ -13766,6 +14259,21 @@ export const IDL: MangoV4 = {
       "code": 6024,
       "name": "OracleStale",
       "msg": "an oracle is stale"
+    },
+    {
+      "code": 6025,
+      "name": "SettlementAmountMustBePositive",
+      "msg": "settlement amount must always be positive"
+    },
+    {
+      "code": 6026,
+      "name": "BankBorrowLimitReached",
+      "msg": "bank utilization has reached limit"
+    },
+    {
+      "code": 6027,
+      "name": "BankNetBorrowsLimitReached",
+      "msg": "bank net borrows has reached limit"
     }
   ]
 };

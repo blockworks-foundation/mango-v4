@@ -33,6 +33,10 @@ const MAINNET_ORACLES = new Map([
   ['MNGO', '79wm3jjcPr6RaNQ4DGvP5KxG1mNd3gEBsg6FsNVFezK4'],
 ]);
 
+const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
+const NET_BORROWS_WINDOW_SIZE_TS = 24 * 60 * 60;
+const NET_BORROWS_LIMIT_NATIVE = 1 * Math.pow(10, 7) * Math.pow(10, 6);
+
 async function createGroup() {
   const admin = Keypair.fromSecretKey(
     Buffer.from(
@@ -129,6 +133,9 @@ async function registerTokens() {
     1,
     1,
     0,
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
 
   console.log(`Registering USDT...`);
@@ -149,6 +156,9 @@ async function registerTokens() {
     1.05,
     1.1,
     0.025, // rule of thumb used - half of maintLiabWeight
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
 
   console.log(`Registering BTC...`);
@@ -169,6 +179,9 @@ async function registerTokens() {
     1.1,
     1.2,
     0.05,
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
 
   console.log(`Registering ETH...`);
@@ -189,6 +202,9 @@ async function registerTokens() {
     1.1,
     1.2,
     0.05,
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
 
   console.log(`Registering soETH...`);
@@ -209,6 +225,9 @@ async function registerTokens() {
     1.1,
     1.2,
     0.05,
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
 
   console.log(`Registering SOL...`);
@@ -229,6 +248,9 @@ async function registerTokens() {
     1.1,
     1.2,
     0.05,
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
 
   console.log(`Registering mSOL...`);
@@ -249,6 +271,9 @@ async function registerTokens() {
     1.1,
     1.2,
     0.05,
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROWS_LIMIT_NATIVE,
   );
 
   // log tokens/banks

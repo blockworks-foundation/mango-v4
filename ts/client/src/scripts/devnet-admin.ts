@@ -44,6 +44,10 @@ const DEVNET_ORACLES = new Map([
   ['SRM', '992moaMQKs32GKZ9dxi8keyM2bUmbrwBZpK4p2K6X5Vs'],
 ]);
 
+const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
+const NET_BORROWS_WINDOW_SIZE_TS = 24 * 60 * 60;
+const NET_BORROWS_LIMIT_NATIVE = 1 * Math.pow(10, 7) * Math.pow(10, 6);
+
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 
 async function main() {
@@ -122,6 +126,9 @@ async function main() {
       1,
       1,
       0,
+      MIN_VAULT_TO_DEPOSITS_RATIO,
+      NET_BORROWS_WINDOW_SIZE_TS,
+      NET_BORROWS_LIMIT_NATIVE,
     );
     await group.reloadAll(client);
   } catch (error) {}
@@ -146,6 +153,9 @@ async function main() {
       1.1,
       1.2,
       0.05,
+      MIN_VAULT_TO_DEPOSITS_RATIO,
+      NET_BORROWS_WINDOW_SIZE_TS,
+      NET_BORROWS_LIMIT_NATIVE,
     );
     await group.reloadAll(client);
   } catch (error) {
@@ -172,6 +182,9 @@ async function main() {
       1.1,
       1.2,
       0.05,
+      MIN_VAULT_TO_DEPOSITS_RATIO,
+      NET_BORROWS_WINDOW_SIZE_TS,
+      NET_BORROWS_LIMIT_NATIVE,
     );
     await group.reloadAll(client);
   } catch (error) {
@@ -205,6 +218,9 @@ async function main() {
       1.2,
       1.4,
       0.02,
+      MIN_VAULT_TO_DEPOSITS_RATIO,
+      NET_BORROWS_WINDOW_SIZE_TS,
+      NET_BORROWS_LIMIT_NATIVE,
     );
     await group.reloadAll(client);
   } catch (error) {
@@ -231,6 +247,9 @@ async function main() {
       1.1,
       1.2,
       0.05,
+      MIN_VAULT_TO_DEPOSITS_RATIO,
+      NET_BORROWS_WINDOW_SIZE_TS,
+      NET_BORROWS_LIMIT_NATIVE,
     );
     await group.reloadAll(client);
   } catch (error) {
@@ -257,6 +276,9 @@ async function main() {
       1.1,
       1.2,
       0.05,
+      MIN_VAULT_TO_DEPOSITS_RATIO,
+      NET_BORROWS_WINDOW_SIZE_TS,
+      NET_BORROWS_LIMIT_NATIVE,
     );
     await group.reloadAll(client);
   } catch (error) {
@@ -403,6 +425,9 @@ async function main() {
         1,
         1,
         0,
+        MIN_VAULT_TO_DEPOSITS_RATIO,
+        NET_BORROWS_WINDOW_SIZE_TS,
+        NET_BORROWS_LIMIT_NATIVE,
       );
       console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
       await group.reloadAll(client);
@@ -427,6 +452,9 @@ async function main() {
         1.1,
         1.2,
         0.05,
+        MIN_VAULT_TO_DEPOSITS_RATIO,
+        NET_BORROWS_WINDOW_SIZE_TS,
+        NET_BORROWS_LIMIT_NATIVE,
       );
       console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
       await group.reloadAll(client);
@@ -451,6 +479,9 @@ async function main() {
         1.1,
         1.2,
         0.05,
+        MIN_VAULT_TO_DEPOSITS_RATIO,
+        NET_BORROWS_WINDOW_SIZE_TS,
+        NET_BORROWS_LIMIT_NATIVE,
       );
       console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
       await group.reloadAll(client);
@@ -483,6 +514,9 @@ async function main() {
         1000,
         1000000,
         0.05,
+        MIN_VAULT_TO_DEPOSITS_RATIO,
+        NET_BORROWS_WINDOW_SIZE_TS,
+        NET_BORROWS_LIMIT_NATIVE,
       );
       console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
       await group.reloadAll(client);

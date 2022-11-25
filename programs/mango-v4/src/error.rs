@@ -57,6 +57,10 @@ pub enum MangoError {
     OracleStale,
     #[msg("settlement amount must always be positive")]
     SettlementAmountMustBePositive,
+    #[msg("bank utilization has reached limit")]
+    BankBorrowLimitReached,
+    #[msg("bank net borrows has reached limit - this is an intermittent error - the limit will reset regularly")]
+    BankNetBorrowsLimitReached,
 }
 
 pub trait Contextable {

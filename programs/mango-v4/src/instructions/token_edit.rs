@@ -49,6 +49,9 @@ pub fn token_edit(
     stable_price_delay_interval_seconds_opt: Option<u32>,
     stable_price_delay_growth_limit_opt: Option<f32>,
     stable_price_growth_limit_opt: Option<f32>,
+    min_vault_to_deposits_ratio_opt: Option<f64>,
+    net_borrows_limit_native_opt: Option<i64>,
+    net_borrows_window_size_ts_opt: Option<u64>,
 ) -> Result<()> {
     let mut mint_info = ctx.accounts.mint_info.load_mut()?;
     mint_info.verify_banks_ais(ctx.remaining_accounts)?;
@@ -140,6 +143,16 @@ pub fn token_edit(
         }
         if let Some(stable_price_growth_limit) = stable_price_growth_limit_opt {
             bank.stable_price_model.stable_growth_limit = stable_price_growth_limit;
+        }
+
+        if let Some(min_vault_to_deposits_ratio) = min_vault_to_deposits_ratio_opt {
+            bank.min_vault_to_deposits_ratio = min_vault_to_deposits_ratio;
+        }
+        if let Some(net_borrows_limit_native) = net_borrows_limit_native_opt {
+            bank.net_borrows_limit_native = net_borrows_limit_native;
+        }
+        if let Some(net_borrows_window_size_ts) = net_borrows_window_size_ts_opt {
+            bank.net_borrows_window_size_ts = net_borrows_window_size_ts;
         }
 
         // unchanged -
