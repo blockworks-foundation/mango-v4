@@ -1605,7 +1605,7 @@ mod tests {
 
         let mut perp1 = mock_perp_market(group, oracle2.pubkey, 5.0, 9, 0.2, 0.1);
         let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
-        perpaccount.change_base_and_quote_positions(perp1.data(), 3, -I80F48::from(310u16));
+        perpaccount.record_trade(perp1.data(), 3, -I80F48::from(310u16));
         perpaccount.bids_base_lots = 7;
         perpaccount.asks_base_lots = 11;
         perpaccount.taker_base_lots = 1;
@@ -1802,7 +1802,7 @@ mod tests {
 
         let mut perp1 = mock_perp_market(group, oracle2.pubkey, 5.0, 9, 0.2, 0.1);
         let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
-        perpaccount.change_base_and_quote_positions(
+        perpaccount.record_trade(
             perp1.data(),
             testcase.perp1.0,
             I80F48::from(testcase.perp1.1),
@@ -2299,7 +2299,7 @@ mod tests {
         let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, 0.2, 0.1);
         perp1.data().long_funding = I80F48::from_num(10.1);
         let perpaccount = account.ensure_perp_position(9, 1).unwrap().0;
-        perpaccount.change_base_and_quote_positions(perp1.data(), 10, I80F48::from(-110));
+        perpaccount.record_trade(perp1.data(), 10, I80F48::from(-110));
         perpaccount.long_settled_funding = I80F48::from_num(10.0);
 
         let oracle1_ai = oracle1.as_account_info();
@@ -2389,7 +2389,7 @@ mod tests {
         let mut perp1 = mock_perp_market(group, oracle1.pubkey, 1.0, 9, 0.2, 0.1);
         perp1.data().stable_price_model.stable_price = 0.5;
         let perpaccount = account3.ensure_perp_position(9, 1).unwrap().0;
-        perpaccount.change_base_and_quote_positions(perp1.data(), 10, I80F48::from(-100));
+        perpaccount.record_trade(perp1.data(), 10, I80F48::from(-100));
 
         let oracle1_ai = oracle1.as_account_info();
         let ais = vec![

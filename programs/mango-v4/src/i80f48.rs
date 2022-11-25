@@ -226,9 +226,9 @@ mod tests {
                 };
                 let sign_ok = actual.is_negative() == expected.is_negative();
 
-                // either at least 51 bits of precision, or all but the last bit correct (last bit may round differently)
+                // either at least 50 bits of precision, or all but the last bit correct (last bit may round differently)
                 assert!(
-                    (precision_bits >= 51 && sign_ok) || (actual - expected).abs() <= I80F48::DELTA
+                    (precision_bits >= 50 && sign_ok) || (actual - expected).abs() <= I80F48::DELTA
                 );
             }
         }
