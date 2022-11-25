@@ -536,6 +536,7 @@ mod tests {
         assert_eq!(pos.quote_running_native, -100);
         assert_eq!(pos.avg_entry_price(&market), 10.0);
         assert_eq!(pos.break_even_price(&market), 10.0);
+        assert_eq!(pos.realized_pnl_native, 0);
     }
 
     #[test]
@@ -547,6 +548,7 @@ mod tests {
         assert_eq!(pos.quote_running_native, 100);
         assert_eq!(pos.avg_entry_price(&market), 10.0);
         assert_eq!(pos.break_even_price(&market), 10.0);
+        assert_eq!(pos.realized_pnl_native, 0);
     }
 
     #[test]
@@ -558,6 +560,7 @@ mod tests {
         assert_eq!(pos.quote_running_native, -400);
         assert_eq!(pos.avg_entry_price(&market), 20.0);
         assert_eq!(pos.break_even_price(&market), 20.0);
+        assert_eq!(pos.realized_pnl_native, 0);
     }
 
     #[test]
@@ -569,6 +572,7 @@ mod tests {
         assert_eq!(pos.quote_running_native, 400);
         assert_eq!(pos.avg_entry_price(&market), 20.0);
         assert_eq!(pos.break_even_price(&market), 20.0);
+        assert_eq!(pos.realized_pnl_native, 0);
     }
 
     #[test]
@@ -580,6 +584,7 @@ mod tests {
         assert_eq!(pos.quote_running_native, -150);
         assert_eq!(pos.avg_entry_price(&market), 10.0); // Entry price remains the same when decreasing
         assert_eq!(pos.break_even_price(&market), -30.0); // Already broke even
+        assert_eq!(pos.realized_pnl_native, -200);
     }
 
     #[test]
@@ -591,28 +596,31 @@ mod tests {
         assert_eq!(pos.quote_running_native, 150);
         assert_eq!(pos.avg_entry_price(&market), 10.0); // Entry price remains the same when decreasing
         assert_eq!(pos.break_even_price(&market), -30.0); // Already broke even
+        assert_eq!(pos.realized_pnl_native, 200);
     }
 
     #[test]
     fn test_quote_entry_long_close_with_short() {
         let mut market = PerpMarket::default_for_tests();
         let mut pos = create_perp_position(&market, 10, -100);
-        // Go short 10 @ 50
+        // Go short 10 @ 25
         pos.record_trade(&mut market, -10, I80F48::from(250));
         assert_eq!(pos.quote_running_native, 0);
         assert_eq!(pos.avg_entry_price(&market), 0.0); // Entry price zero when no position
         assert_eq!(pos.break_even_price(&market), 0.0);
+        assert_eq!(pos.realized_pnl_native, 150);
     }
 
     #[test]
     fn test_quote_entry_short_close_with_long() {
         let mut market = PerpMarket::default_for_tests();
         let mut pos = create_perp_position(&market, -10, 100);
-        // Go long 10 @ 50
+        // Go long 10 @ 25
         pos.record_trade(&mut market, 10, I80F48::from(-250));
         assert_eq!(pos.quote_running_native, 0);
         assert_eq!(pos.avg_entry_price(&market), 0.0); // Entry price zero when no position
         assert_eq!(pos.break_even_price(&market), 0.0);
+        assert_eq!(pos.realized_pnl_native, -150);
     }
 
     #[test]
@@ -624,6 +632,7 @@ mod tests {
         assert_eq!(pos.quote_running_native, 100);
         assert_eq!(pos.avg_entry_price(&market), 20.0);
         assert_eq!(pos.break_even_price(&market), 20.0);
+        assert_eq!(pos.realized_pnl_native, 100);
     }
 
     #[test]
@@ -635,6 +644,7 @@ mod tests {
         assert_eq!(pos.quote_running_native, -100);
         assert_eq!(pos.avg_entry_price(&market), 20.0);
         assert_eq!(pos.break_even_price(&market), 20.0);
+        assert_eq!(pos.realized_pnl_native, -100);
     }
 
     #[test]
@@ -648,6 +658,7 @@ mod tests {
         assert_eq!(pos.quote_running_native, -98_000);
         assert_eq!(pos.base_position_lots, 10);
         assert_eq!(pos.break_even_price(&market), 9_800.0); // We made 2k on the trade, so we can sell our contract up to a loss of 200 each
+        assert_eq!(pos.realized_pnl_native, 2_000);
     }
 
     #[test]
@@ -665,6 +676,35 @@ mod tests {
         assert_eq!(pos.avg_entry_price_per_base_lot, 100_000.0);
         assert_eq!(pos.avg_entry_price(&market), 10_000.0);
         assert_eq!(pos.break_even_price(&market), 9_800.0);
+        assert_eq!(pos.realized_pnl_native, 20_000);
+    }
+
+    #[test]
+    fn test_realized_pnl_fractional() {
+        let mut market = PerpMarket::default_for_tests();
+        let mut pos = create_perp_position(&market, 0, 0);
+        pos.quote_position_native += I80F48::from_num(0.1);
+
+        // Buy 1 @ 1
+        pos.record_trade(&mut market, 1, I80F48::from(-1));
+        // Buy 2 @ 2
+        pos.record_trade(&mut market, 2, I80F48::from(-2 * 2));
+
+        assert!((pos.avg_entry_price(&market) - 1.66666).abs() < 0.001);
+        assert_eq!(pos.realized_pnl_native, 0);
+
+        // Sell 2 @ 4
+        pos.record_trade(&mut market, -2, I80F48::from(2 * 4));
+
+        assert!((pos.avg_entry_price(&market) - 1.66666).abs() < 0.001);
+        assert_eq!(pos.realized_pnl_native, 4); // 4.666 rounded down
+
+        // Sell 1 @ 2
+        pos.record_trade(&mut market, -1, I80F48::from(2));
+
+        assert_eq!(pos.avg_entry_price(&market), 0.0);
+        assert!((pos.quote_position_native.to_num::<f64>() - 5.1).abs() < 0.001);
+        assert_eq!(pos.realized_pnl_native, 6); // quote position rounded up
     }
 
     #[test]
