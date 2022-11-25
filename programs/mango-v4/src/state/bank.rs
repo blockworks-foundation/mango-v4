@@ -759,6 +759,8 @@ mod tests {
                 //
 
                 let mut bank = Bank::zeroed();
+                bank.net_borrows_window_size_ts = 1; // dummy
+                bank.net_borrows_limit_native = i64::MAX; // max since we don't want this to interfere
                 bank.deposit_index = I80F48::from_num(100.0);
                 bank.borrow_index = I80F48::from_num(10.0);
                 bank.loan_origination_fee_rate = I80F48::from_num(0.1);
@@ -796,7 +798,7 @@ mod tests {
                 //
 
                 let change = I80F48::from(change);
-                let dummy_now_ts = 0 as u64;
+                let dummy_now_ts = 1 as u64;
                 let (is_active, _) = bank.change_with_fee(&mut account, change, dummy_now_ts)?;
 
                 let mut expected_native = start_native + change;
