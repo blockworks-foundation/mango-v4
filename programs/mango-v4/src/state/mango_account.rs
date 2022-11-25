@@ -868,7 +868,7 @@ impl<
             cm!(perp_market.fees_accrued += fees);
         }
         let quote_change_native = cm!(quote - fees);
-        pa.change_base_and_quote_positions(perp_market, base_change, quote_change_native);
+        pa.record_trade(perp_market, base_change, quote_change_native);
 
         cm!(pa.maker_volume += quote.abs().to_num::<u64>());
 
@@ -901,7 +901,7 @@ impl<
         // fees are assessed at time of trade; no need to assess fees here
         let quote_change_native =
             cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
-        pa.change_base_and_quote_positions(perp_market, base_change, quote_change_native);
+        pa.record_trade(perp_market, base_change, quote_change_native);
 
         cm!(pa.taker_volume += quote_change_native.abs().to_num::<u64>());
 

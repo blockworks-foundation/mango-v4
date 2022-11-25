@@ -169,16 +169,8 @@ pub fn perp_liq_base_position(
 
     // Execute the transfer. This is essentially a forced trade and updates the
     // liqee and liqors entry and break even prices.
-    liqee_perp_position.change_base_and_quote_positions(
-        &mut perp_market,
-        -base_transfer,
-        -quote_transfer,
-    );
-    liqor_perp_position.change_base_and_quote_positions(
-        &mut perp_market,
-        base_transfer,
-        quote_transfer,
-    );
+    liqee_perp_position.record_trade(&mut perp_market, -base_transfer, -quote_transfer);
+    liqor_perp_position.record_trade(&mut perp_market, base_transfer, quote_transfer);
 
     emit_perp_balances(
         ctx.accounts.group.key(),
