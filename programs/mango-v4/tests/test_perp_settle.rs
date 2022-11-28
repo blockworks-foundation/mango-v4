@@ -9,7 +9,7 @@ use solana_sdk::transport::TransportError;
 
 mod program_test;
 
-// #[tokio::test]
+#[tokio::test]
 async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
@@ -493,7 +493,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     Ok(())
 }
 
-// #[tokio::test]
+#[tokio::test]
 async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
