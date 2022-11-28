@@ -69,13 +69,7 @@ pub fn token_add_bank(
     let existing_bank = ctx.accounts.existing_bank.load()?;
     let mut bank = ctx.accounts.bank.load_init()?;
     let bump = *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?;
-    *bank = Bank::from_existing_bank(
-        &existing_bank,
-        ctx.accounts.vault.key(),
-        bank_num,
-        bump,
-        Clock::get()?.unix_timestamp as u64,
-    );
+    *bank = Bank::from_existing_bank(&existing_bank, ctx.accounts.vault.key(), bank_num, bump);
 
     let mut mint_info = ctx.accounts.mint_info.load_mut()?;
     let free_slot = mint_info

@@ -99,20 +99,29 @@ impl SolanaCookie {
             .unwrap();
     }
 
-    pub async fn advance_clock(&self) {
+    pub async fn advance_clock_to(&self, target: i64) {
         let mut clock = self.get_clock().await;
-        let old_ts = clock.unix_timestamp;
 
         // just advance enough to ensure we get changes over last_updated in various ix
         // if this gets too slow for our tests, remove and replace with manual time offset
         // which is configurable
-        while clock.unix_timestamp <= old_ts {
+        while clock.unix_timestamp <= target {
             self.context
                 .borrow_mut()
                 .warp_to_slot(clock.slot + 50)
                 .unwrap();
             clock = self.get_clock().await;
         }
+    }
+
+    pub async fn advance_clock_to_next_multiple(&self, window: i64) {
+        let ts = self.get_clock().await.unix_timestamp;
+        self.advance_clock_to(ts / window * window + window).await
+    }
+
+    pub async fn advance_clock(&self) {
+        let clock = self.get_clock().await;
+        self.advance_clock_to(clock.unix_timestamp + 1).await
     }
 
     pub async fn get_newest_slot_from_history(&self) -> u64 {
