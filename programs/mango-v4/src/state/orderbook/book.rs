@@ -393,7 +393,7 @@ fn apply_fees(
     require_gte!(taker_fees, 0);
 
     let perp_account = mango_account.perp_position_mut(market.perp_market_index)?;
-    perp_account.change_quote_position(-taker_fees);
+    perp_account.record_fee(taker_fees);
     cm!(market.fees_accrued += taker_fees + maker_fees);
     cm!(perp_account.taker_volume += taker_fees.to_num::<u64>());
 
@@ -405,7 +405,7 @@ fn apply_penalty(market: &mut PerpMarket, mango_account: &mut MangoAccountRefMut
     let perp_account = mango_account.perp_position_mut(market.perp_market_index)?;
     let fee_penalty = I80F48::from_num(market.fee_penalty);
 
-    perp_account.change_quote_position(-fee_penalty);
+    perp_account.record_fee(fee_penalty);
     cm!(market.fees_accrued += fee_penalty);
 
     Ok(())

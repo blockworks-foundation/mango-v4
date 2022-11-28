@@ -946,7 +946,9 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
         + (market.settle_pnl_limit_factor()
             * I80F48::from_num(mango_account_0.perps[0].avg_entry_price(&market))
             * mango_account_0.perps[0].base_position_native(&market))
-        .abs();
+        .abs()
+        // fees
+        - I80F48::from_num(1000.0 * 100.0 * 0.0002);
     send_tx(
         solana,
         PerpSettlePnlInstruction {

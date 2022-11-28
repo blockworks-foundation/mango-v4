@@ -318,6 +318,7 @@ impl PerpPosition {
     pub fn settle_funding(&mut self, perp_market: &PerpMarket) {
         let funding = self.unsettled_funding(perp_market);
         cm!(self.quote_position_native -= funding);
+        cm!(self.realized_pnl_native -= funding);
 
         if self.base_position_lots.is_positive() {
             self.cumulative_long_funding += funding.to_num::<f64>();
@@ -401,7 +402,7 @@ impl PerpPosition {
         self.change_quote_position(quote_change_native);
     }
 
-    pub fn change_quote_position(&mut self, quote_change_native: I80F48) {
+    fn change_quote_position(&mut self, quote_change_native: I80F48) {
         cm!(self.quote_position_native += quote_change_native);
     }
 
@@ -450,6 +451,8 @@ impl PerpPosition {
     }
 
     /// Update the perp position for pnl settlement
+    ///
+    /// If `pnl` is positive, then that is settled away, deducting from the quote position.
     pub fn record_settle(&mut self, pnl: I80F48) {
         self.change_quote_position(-pnl);
 
@@ -466,6 +469,16 @@ impl PerpPosition {
             pnl.max(self.realized_pnl_native).min(I80F48::ZERO)
         };
         cm!(self.realized_pnl_native -= used_realized);
+    }
+
+    pub fn record_fee(&mut self, fee: I80F48) {
+        self.change_quote_position(-fee);
+        cm!(self.realized_pnl_native -= fee);
+    }
+
+    pub fn record_bankruptcy_quote_change(&mut self, change: I80F48) {
+        self.change_quote_position(change);
+        cm!(self.realized_pnl_native += change);
     }
 }
 
