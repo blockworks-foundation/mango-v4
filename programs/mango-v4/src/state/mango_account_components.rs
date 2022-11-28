@@ -444,6 +444,16 @@ impl PerpPosition {
         let pnl: I80F48 = cm!(self.quote_position_native() + base_native * price);
         Ok(pnl)
     }
+
+    pub fn settle_limit_used(&mut self, perp_market: &PerpMarket, now_ts: u64) -> i64 {
+        let window_size = perp_market.settle_pnl_limit_factor_window_size_ts;
+        let new_window = now_ts >= cm!((self.settle_pnl_limit_window + 1) as u64 * window_size);
+        if new_window {
+            self.settle_pnl_limit_window = cm!(now_ts / window_size).try_into().unwrap();
+            self.settle_pnl_limit_settled_in_current_window_native = 0;
+        }
+        self.settle_pnl_limit_settled_in_current_window_native
+    }
 }
 
 #[zero_copy]

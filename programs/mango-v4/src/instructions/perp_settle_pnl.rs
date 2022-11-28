@@ -126,16 +126,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Cap settlement of unrealized pnl
     // Settles at most x100% each hour
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
-    let a_settle_pnl_in_new_window = now_ts
-        >= cm!((a_perp_position.settle_pnl_limit_window + 1) as u64
-            * perp_market.settle_pnl_limit_factor_window_size_ts);
-    if a_settle_pnl_in_new_window {
-        a_perp_position.settle_pnl_limit_window =
-            cm!(now_ts / perp_market.settle_pnl_limit_factor_window_size_ts)
-                .try_into()
-                .unwrap();
-        a_perp_position.settle_pnl_limit_settled_in_current_window_native = 0;
-    }
+    let a_settle_limit_used = a_perp_position.settle_limit_used(&perp_market, now_ts);
+    let b_settle_limit_used = b_perp_position.settle_limit_used(&perp_market, now_ts);
 
     let a_settleable_pnl = {
         let realized_pnl = I80F48::from(a_perp_position.realized_pnl_native);
@@ -146,10 +138,9 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
             cm!(perp_market.settle_pnl_limit_factor() * a_base_lots * avg_entry_price_lots).abs();
 
         let unrealized_pnl_capped_for_window = unrealized_pnl
-            .min(cm!(max_allowed_in_window
-                - I80F48::from_num(
-                    a_perp_position.settle_pnl_limit_settled_in_current_window_native
-                )))
+            .min(cm!(
+                max_allowed_in_window - I80F48::from_num(a_settle_limit_used)
+            ))
             .max(I80F48::ZERO);
         a_pnl
             .min(cm!(realized_pnl + unrealized_pnl_capped_for_window))
@@ -163,6 +154,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
 
     // Settle for the maximum possible capped to b's settle health
     let settlement = a_settleable_pnl.abs().min(b_pnl.abs()).min(b_settle_health);
+    require!(settlement >= 0, MangoError::SettlementAmountMustBePositive);
+    let settlement_i64 = settlement.round_to_zero().checked_to_num::<i64>().unwrap();
 
     // Settle
     a_perp_position.change_quote_position(-settlement);
@@ -170,30 +163,9 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
 
     // Bookkeep settled
     a_perp_position.settle_pnl_limit_settled_in_current_window_native =
-        if a_settle_pnl_in_new_window {
-            settlement.checked_to_num().unwrap()
-        } else {
-            cm!(
-                a_perp_position.settle_pnl_limit_settled_in_current_window_native
-                    + settlement.checked_to_num::<i64>().unwrap()
-            )
-        };
-    let b_settle_pnl_in_new_window = now_ts
-        >= cm!((b_perp_position.settle_pnl_limit_window + 1) as u64
-            * perp_market.settle_pnl_limit_factor_window_size_ts);
+        cm!(a_settle_limit_used + settlement_i64);
     b_perp_position.settle_pnl_limit_settled_in_current_window_native =
-        if b_settle_pnl_in_new_window {
-            b_perp_position.settle_pnl_limit_window =
-                cm!(now_ts / perp_market.settle_pnl_limit_factor_window_size_ts)
-                    .try_into()
-                    .unwrap();
-            -settlement.checked_to_num::<i64>().unwrap()
-        } else {
-            cm!(
-                b_perp_position.settle_pnl_limit_settled_in_current_window_native
-                    - settlement.checked_to_num::<i64>().unwrap()
-            )
-        };
+        cm!(b_settle_limit_used - settlement_i64);
 
     emit_perp_balances(
         ctx.accounts.group.key(),
@@ -235,12 +207,10 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     };
 
     // Safety check to prevent any accidental negative transfer
-    require!(settlement >= 0, MangoError::SettlementAmountMustBePositive);
     require!(fee >= 0, MangoError::SettlementAmountMustBePositive);
 
     // Update the account's net_settled with the new PnL.
     // Applying the fee here means that it decreases the displayed perp pnl.
-    let settlement_i64 = settlement.checked_to_num::<i64>().unwrap();
     let fee_i64 = fee.checked_to_num::<i64>().unwrap();
     cm!(a_perp_position.perp_spot_transfers += settlement_i64 - fee_i64);
     cm!(b_perp_position.perp_spot_transfers -= settlement_i64);
