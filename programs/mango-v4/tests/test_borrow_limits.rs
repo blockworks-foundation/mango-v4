@@ -273,10 +273,8 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
         .unwrap();
     }
 
-    // We elapse at least 3 seconds, so that next block is in new window
-    solana.advance_clock().await;
-    solana.advance_clock().await;
-    solana.advance_clock().await;
+    // Go to the next net borrow limit window
+    solana.advance_clock_to_next_multiple(3).await;
 
     {
         // succeeds because borrow is less than net borrow limit
@@ -295,6 +293,7 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
         .unwrap();
 
         // fails because borrow is greater than remaining margin in net borrow limit
+        // (requires the test to be quick enough to avoid accidentally going to the next borrow limit window!)
         let res = send_tx(
             solana,
             TokenWithdrawInstruction {
@@ -325,10 +324,8 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
         .unwrap();
     }
 
-    // We elapse at least 3 seconds, so that next block is in new window
-    solana.advance_clock().await;
-    solana.advance_clock().await;
-    solana.advance_clock().await;
+    // Go to the next net borrow limit window
+    solana.advance_clock_to_next_multiple(3).await;
 
     // succeeds because borrow is less than net borrow limit in a fresh window
     {

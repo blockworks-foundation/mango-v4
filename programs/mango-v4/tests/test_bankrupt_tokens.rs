@@ -53,11 +53,12 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     )
     .await;
 
-    // also add a tiny amount to bank0 for borrow_token1, so we can test multi-bank socialized loss
+    // Also add a tiny amount to bank0 for borrow_token1, so we can test multi-bank socialized loss.
+    // It must be enough to not trip the borrow limits on the bank.
     send_tx(
         solana,
         TokenDepositInstruction {
-            amount: 10,
+            amount: 20,
             account: vault_account,
             owner,
             token_account: payer_mint_accounts[0],
@@ -356,11 +357,12 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
         .unwrap();
     }
 
-    // also add a tiny amount to bank0 for borrow_token1, so we can test multi-bank socialized loss
+    // Also add a tiny amount to bank0 for borrow_token1, so we can test multi-bank socialized loss.
+    // It must be enough to not trip the borrow limits on the bank.
     send_tx(
         solana,
         TokenDepositInstruction {
-            amount: 10,
+            amount: 20,
             account: vault_account,
             owner,
             token_account: payer_mint_accounts[0],
