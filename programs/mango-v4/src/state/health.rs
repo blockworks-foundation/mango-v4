@@ -1422,6 +1422,8 @@ mod tests {
     use std::rc::Rc;
     use std::str::FromStr;
 
+    pub const DUMMY_NOW_TS: u64 = 0;
+
     #[test]
     fn test_precision() {
         // I80F48 can only represent until 1/2^48
@@ -1529,6 +1531,8 @@ mod tests {
         bank.data().maint_asset_weight = I80F48::from_num(1.0 - maint_weights);
         bank.data().maint_liab_weight = I80F48::from_num(1.0 + maint_weights);
         bank.data().stable_price_model.reset_to_price(price, 0);
+        bank.data().net_borrows_window_size_ts = 1; // dummy
+        bank.data().net_borrows_limit_native = i64::MAX; // max since we don't want this to interfere
         (bank, oracle)
     }
 
@@ -1578,6 +1582,7 @@ mod tests {
             .deposit(
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(100),
+                DUMMY_NOW_TS,
             )
             .unwrap();
         bank2
@@ -1585,6 +1590,7 @@ mod tests {
             .withdraw_without_fee(
                 account.ensure_token_position(4).unwrap().0,
                 I80F48::from(10),
+                DUMMY_NOW_TS,
             )
             .unwrap();
 
@@ -1760,6 +1766,7 @@ mod tests {
             .change_without_fee(
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(testcase.token1),
+                DUMMY_NOW_TS,
             )
             .unwrap();
         bank2
@@ -1767,6 +1774,7 @@ mod tests {
             .change_without_fee(
                 account.ensure_token_position(4).unwrap().0,
                 I80F48::from(testcase.token2),
+                DUMMY_NOW_TS,
             )
             .unwrap();
         bank3
@@ -1774,6 +1782,7 @@ mod tests {
             .change_without_fee(
                 account.ensure_token_position(5).unwrap().0,
                 I80F48::from(testcase.token3),
+                DUMMY_NOW_TS,
             )
             .unwrap();
 
@@ -2285,6 +2294,7 @@ mod tests {
             .change_without_fee(
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(100),
+                0,
             )
             .unwrap();
 
@@ -2366,6 +2376,7 @@ mod tests {
             .change_without_fee(
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(100),
+                DUMMY_NOW_TS,
             )
             .unwrap();
         bank1
@@ -2373,6 +2384,7 @@ mod tests {
             .change_without_fee(
                 account2.ensure_token_position(1).unwrap().0,
                 I80F48::from(-100),
+                DUMMY_NOW_TS,
             )
             .unwrap();
 

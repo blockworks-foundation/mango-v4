@@ -90,6 +90,9 @@ pub fn token_register(
     maint_liab_weight: f32,
     init_liab_weight: f32,
     liquidation_fee: f32,
+    min_vault_to_deposits_ratio: f64,
+    net_borrows_window_size_ts: u64,
+    net_borrows_limit_native: i64,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == QUOTE_TOKEN_INDEX {
@@ -99,7 +102,7 @@ pub fn token_register(
         );
     }
 
-    let now_ts = Clock::get()?.unix_timestamp;
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
@@ -142,7 +145,13 @@ pub fn token_register(
         oracle_conf_filter: oracle_config.to_oracle_config().conf_filter,
         oracle_config: oracle_config.to_oracle_config(),
         stable_price_model: StablePriceModel::default(),
-        reserved: [0; 2176],
+        min_vault_to_deposits_ratio,
+        net_borrows_window_size_ts,
+        last_net_borrows_window_start_ts: now_ts / net_borrows_window_size_ts
+            * net_borrows_window_size_ts,
+        net_borrows_limit_native,
+        net_borrows_window_native: 0,
+        reserved: [0; 2136],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 

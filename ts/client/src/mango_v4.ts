@@ -341,6 +341,18 @@ export type MangoV4 = {
         {
           "name": "liquidationFee",
           "type": "f32"
+        },
+        {
+          "name": "minVaultToDepositsRatio",
+          "type": "f64"
+        },
+        {
+          "name": "netBorrowsWindowSizeTs",
+          "type": "u64"
+        },
+        {
+          "name": "netBorrowsLimitNative",
+          "type": "i64"
         }
       ]
     },
@@ -593,6 +605,24 @@ export type MangoV4 = {
           "name": "stablePriceGrowthLimitOpt",
           "type": {
             "option": "f32"
+          }
+        },
+        {
+          "name": "minVaultToDepositsRatioOpt",
+          "type": {
+            "option": "f64"
+          }
+        },
+        {
+          "name": "netBorrowsLimitNativeOpt",
+          "type": {
+            "option": "i64"
+          }
+        },
+        {
+          "name": "netBorrowsWindowSizeTsOpt",
+          "type": {
+            "option": "u64"
           }
         }
       ]
@@ -3447,11 +3477,11 @@ export type MangoV4 = {
           },
           {
             "name": "indexLastUpdated",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "bankRateLastUpdated",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "avgUtilization",
@@ -3586,11 +3616,31 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "minVaultToDepositsRatio",
+            "type": "f64"
+          },
+          {
+            "name": "netBorrowsWindowSizeTs",
+            "type": "u64"
+          },
+          {
+            "name": "lastNetBorrowsWindowStartTs",
+            "type": "u64"
+          },
+          {
+            "name": "netBorrowsLimitNative",
+            "type": "i64"
+          },
+          {
+            "name": "netBorrowsWindowNative",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2176
+                2136
               ]
             }
           }
@@ -4841,9 +4891,13 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                6
+                2
               ]
             }
+          },
+          {
+            "name": "settlePnlLimitWindow",
+            "type": "u32"
           },
           {
             "name": "basePositionLots",
@@ -4863,11 +4917,16 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "quoteEntryNative",
+            "name": "padding2",
             "docs": [
               "Tracks what the position is to calculate average entry & break even price"
             ],
-            "type": "i64"
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
           },
           {
             "name": "quoteRunningNative",
@@ -4935,18 +4994,16 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "settlePnlLimitWindowStartTs",
-            "type": "u64"
+            "name": "avgEntryPricePerBaseLot",
+            "type": "f64"
+          },
+          {
+            "name": "realizedPnlNative",
+            "type": "i64"
           },
           {
             "name": "settlePnlLimitSettledInCurrentWindowNative",
             "type": "i64"
-          },
-          {
-            "name": "realizedPnlNative",
-            "type": {
-              "defined": "I80F48"
-            }
           }
         ]
       }
@@ -7125,6 +7182,16 @@ export type MangoV4 = {
       "code": 6025,
       "name": "SettlementAmountMustBePositive",
       "msg": "settlement amount must always be positive"
+    },
+    {
+      "code": 6026,
+      "name": "BankBorrowLimitReached",
+      "msg": "bank utilization has reached limit"
+    },
+    {
+      "code": 6027,
+      "name": "BankNetBorrowsLimitReached",
+      "msg": "bank net borrows has reached limit - this is an intermittent error - the limit will reset regularly"
     }
   ]
 };
@@ -7472,6 +7539,18 @@ export const IDL: MangoV4 = {
         {
           "name": "liquidationFee",
           "type": "f32"
+        },
+        {
+          "name": "minVaultToDepositsRatio",
+          "type": "f64"
+        },
+        {
+          "name": "netBorrowsWindowSizeTs",
+          "type": "u64"
+        },
+        {
+          "name": "netBorrowsLimitNative",
+          "type": "i64"
         }
       ]
     },
@@ -7724,6 +7803,24 @@ export const IDL: MangoV4 = {
           "name": "stablePriceGrowthLimitOpt",
           "type": {
             "option": "f32"
+          }
+        },
+        {
+          "name": "minVaultToDepositsRatioOpt",
+          "type": {
+            "option": "f64"
+          }
+        },
+        {
+          "name": "netBorrowsLimitNativeOpt",
+          "type": {
+            "option": "i64"
+          }
+        },
+        {
+          "name": "netBorrowsWindowSizeTsOpt",
+          "type": {
+            "option": "u64"
           }
         }
       ]
@@ -10578,11 +10675,11 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "indexLastUpdated",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "bankRateLastUpdated",
-            "type": "i64"
+            "type": "u64"
           },
           {
             "name": "avgUtilization",
@@ -10717,11 +10814,31 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "minVaultToDepositsRatio",
+            "type": "f64"
+          },
+          {
+            "name": "netBorrowsWindowSizeTs",
+            "type": "u64"
+          },
+          {
+            "name": "lastNetBorrowsWindowStartTs",
+            "type": "u64"
+          },
+          {
+            "name": "netBorrowsLimitNative",
+            "type": "i64"
+          },
+          {
+            "name": "netBorrowsWindowNative",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2176
+                2136
               ]
             }
           }
@@ -11972,9 +12089,13 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                6
+                2
               ]
             }
+          },
+          {
+            "name": "settlePnlLimitWindow",
+            "type": "u32"
           },
           {
             "name": "basePositionLots",
@@ -11994,11 +12115,16 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "quoteEntryNative",
+            "name": "padding2",
             "docs": [
               "Tracks what the position is to calculate average entry & break even price"
             ],
-            "type": "i64"
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
           },
           {
             "name": "quoteRunningNative",
@@ -12066,18 +12192,16 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "settlePnlLimitWindowStartTs",
-            "type": "u64"
+            "name": "avgEntryPricePerBaseLot",
+            "type": "f64"
+          },
+          {
+            "name": "realizedPnlNative",
+            "type": "i64"
           },
           {
             "name": "settlePnlLimitSettledInCurrentWindowNative",
             "type": "i64"
-          },
-          {
-            "name": "realizedPnlNative",
-            "type": {
-              "defined": "I80F48"
-            }
           }
         ]
       }
@@ -14256,6 +14380,16 @@ export const IDL: MangoV4 = {
       "code": 6025,
       "name": "SettlementAmountMustBePositive",
       "msg": "settlement amount must always be positive"
+    },
+    {
+      "code": 6026,
+      "name": "BankBorrowLimitReached",
+      "msg": "bank utilization has reached limit"
+    },
+    {
+      "code": 6027,
+      "name": "BankNetBorrowsLimitReached",
+      "msg": "bank net borrows has reached limit - this is an intermittent error - the limit will reset regularly"
     }
   ]
 };

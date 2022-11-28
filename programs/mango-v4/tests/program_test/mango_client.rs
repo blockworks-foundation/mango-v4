@@ -772,6 +772,10 @@ pub struct TokenRegisterInstruction {
     pub init_liab_weight: f32,
     pub liquidation_fee: f32,
 
+    pub min_vault_to_deposits_ratio: f64,
+    pub net_borrows_limit_native: i64,
+    pub net_borrows_window_size_ts: u64,
+
     pub group: Pubkey,
     pub admin: TestKeypair,
     pub mint: Pubkey,
@@ -812,6 +816,9 @@ impl ClientInstruction for TokenRegisterInstruction {
             maint_liab_weight: self.maint_liab_weight,
             init_liab_weight: self.init_liab_weight,
             liquidation_fee: self.liquidation_fee,
+            min_vault_to_deposits_ratio: self.min_vault_to_deposits_ratio,
+            net_borrows_limit_native: self.net_borrows_limit_native,
+            net_borrows_window_size_ts: self.net_borrows_window_size_ts,
         };
 
         let bank = Pubkey::find_program_address(
@@ -1069,6 +1076,82 @@ impl ClientInstruction for TokenResetStablePriceModel {
             stable_price_delay_interval_seconds_opt: None,
             stable_price_delay_growth_limit_opt: None,
             stable_price_growth_limit_opt: None,
+            min_vault_to_deposits_ratio_opt: None,
+            net_borrows_limit_native_opt: None,
+            net_borrows_window_size_ts_opt: None,
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            mint_info: mint_info_key,
+            oracle: mint_info.oracle,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction
+            .accounts
+            .extend(mint_info.banks().iter().map(|&k| AccountMeta {
+                pubkey: k,
+                is_signer: false,
+                is_writable: true,
+            }));
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
+pub struct TokenEditNetBorrows {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub mint: Pubkey,
+    pub min_vault_to_deposits_ratio_opt: Option<f64>,
+    pub net_borrows_limit_native_opt: Option<i64>,
+    pub net_borrows_window_size_ts_opt: Option<u64>,
+}
+
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenEditNetBorrows {
+    type Accounts = mango_v4::accounts::TokenEdit;
+    type Instruction = mango_v4::instruction::TokenEdit;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let mint_info_key = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                self.group.as_ref(),
+                self.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let mint_info: MintInfo = account_loader.load(&mint_info_key).await.unwrap();
+
+        let instruction = Self::Instruction {
+            oracle_opt: None,
+            oracle_config_opt: None,
+            group_insurance_fund_opt: None,
+            interest_rate_params_opt: None,
+            loan_fee_rate_opt: None,
+            loan_origination_fee_rate_opt: None,
+            maint_asset_weight_opt: None,
+            init_asset_weight_opt: None,
+            maint_liab_weight_opt: None,
+            init_liab_weight_opt: None,
+            liquidation_fee_opt: None,
+            stable_price_delay_interval_seconds_opt: None,
+            stable_price_delay_growth_limit_opt: None,
+            stable_price_growth_limit_opt: None,
+            min_vault_to_deposits_ratio_opt: self.min_vault_to_deposits_ratio_opt,
+            net_borrows_limit_native_opt: self.net_borrows_limit_native_opt,
+            net_borrows_window_size_ts_opt: self.net_borrows_window_size_ts_opt,
         };
 
         let accounts = Self::Accounts {

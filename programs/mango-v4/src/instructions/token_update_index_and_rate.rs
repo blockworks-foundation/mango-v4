@@ -79,7 +79,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
         .verify_banks_ais(ctx.remaining_accounts)?;
 
     let clock = Clock::get()?;
-    let now_ts = clock.unix_timestamp;
+    let now_ts: u64 = clock.unix_timestamp.try_into().unwrap();
 
     // compute indexed_total
     let mut indexed_total_deposits = I80F48::ZERO;
