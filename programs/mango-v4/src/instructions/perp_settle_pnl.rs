@@ -126,11 +126,12 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Cap settlement of unrealized pnl
     // Settles at most x100% each hour
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
-    let a_settle_limit_used = a_perp_position.settle_limit_used(&perp_market, now_ts);
-    let b_settle_limit_used = b_perp_position.settle_limit_used(&perp_market, now_ts);
+    let a_settle_limit_used =
+        a_perp_position.update_and_get_used_settle_limit(&perp_market, now_ts);
+    b_perp_position.update_and_get_used_settle_limit(&perp_market, now_ts);
 
     let a_settleable_pnl = {
-        let realized_pnl = I80F48::from(a_perp_position.realized_pnl_native);
+        let realized_pnl = a_perp_position.realized_pnl_native;
         let unrealized_pnl = cm!(a_pnl - realized_pnl);
         let a_base_lots = I80F48::from(a_perp_position.base_position_lots());
         let avg_entry_price_lots = I80F48::from_num(a_perp_position.avg_entry_price_per_base_lot);
@@ -155,17 +156,10 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Settle for the maximum possible capped to b's settle health
     let settlement = a_settleable_pnl.abs().min(b_pnl.abs()).min(b_settle_health);
     require!(settlement >= 0, MangoError::SettlementAmountMustBePositive);
-    let settlement_i64 = settlement.round_to_zero().checked_to_num::<i64>().unwrap();
 
     // Settle
-    a_perp_position.change_quote_position(-settlement);
-    b_perp_position.change_quote_position(settlement);
-
-    // Bookkeep settled
-    a_perp_position.settle_pnl_limit_settled_in_current_window_native =
-        cm!(a_settle_limit_used + settlement_i64);
-    b_perp_position.settle_pnl_limit_settled_in_current_window_native =
-        cm!(b_settle_limit_used - settlement_i64);
+    a_perp_position.record_settle(settlement);
+    b_perp_position.record_settle(-settlement);
 
     emit_perp_balances(
         ctx.accounts.group.key(),
@@ -211,6 +205,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
 
     // Update the account's net_settled with the new PnL.
     // Applying the fee here means that it decreases the displayed perp pnl.
+    let settlement_i64 = settlement.round_to_zero().checked_to_num::<i64>().unwrap();
     let fee_i64 = fee.checked_to_num::<i64>().unwrap();
     cm!(a_perp_position.perp_spot_transfers += settlement_i64 - fee_i64);
     cm!(b_perp_position.perp_spot_transfers -= settlement_i64);

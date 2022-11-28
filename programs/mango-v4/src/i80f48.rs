@@ -1,19 +1,5 @@
 use fixed::types::I80F48;
 
-pub trait RoundingZero {
-    fn round_away_from_zero(&self) -> Self;
-}
-
-impl RoundingZero for I80F48 {
-    fn round_away_from_zero(&self) -> Self {
-        if self.is_positive() {
-            self.ceil()
-        } else {
-            self.floor()
-        }
-    }
-}
-
 pub trait LowPrecisionDivision {
     fn checked_div_30bit_precision(&self, rhs: I80F48) -> Option<I80F48>;
     fn checked_div_f64_precision(&self, rhs: I80F48) -> Option<I80F48>;
