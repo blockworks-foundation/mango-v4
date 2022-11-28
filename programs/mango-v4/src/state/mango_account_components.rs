@@ -385,22 +385,22 @@ impl PerpPosition {
             .unwrap();
         } else if old_position != 0 && old_position.signum() != base_change.signum() {
             let avg_entry_price_lots = I80F48::from_num(self.avg_entry_price_per_base_lot);
-            if old_position.abs() == base_change.abs() {
-                let new_realized_pnl =
-                    cm!(quote_change_native + I80F48::from(base_change) * avg_entry_price_lots)
-                        .checked_to_num::<i64>()
-                        .unwrap();
-                cm!(self.realized_pnl_native += new_realized_pnl);
+            let new_realized_pnl = if old_position.signum() == new_position.signum() {
+                // old position is reduced to new position with the same sign
+                cm!(quote_change_native + I80F48::from(base_change) * avg_entry_price_lots)
+                    .checked_to_num::<i64>()
+                    .unwrap()
             } else {
-                let reduced_lots = I80F48::from(old_position.abs().min(base_change.abs()));
+                // old position is reduced to 0, then a new position of the opposite sign is created
+                let reduced_lots = I80F48::from(-old_position);
                 cm!(
-                    self.realized_pnl_native += (quote_change_native * reduced_lots
-                        / I80F48::from(base_change.abs())
-                        + I80F48::from(base_change.signum()) * reduced_lots * avg_entry_price_lots)
-                        .checked_to_num::<i64>()
-                        .unwrap()
-                );
-            }
+                    quote_change_native * reduced_lots.abs() / I80F48::from(base_change.abs())
+                        + reduced_lots * avg_entry_price_lots
+                )
+                .checked_to_num::<i64>()
+                .unwrap()
+            };
+            cm!(self.realized_pnl_native += new_realized_pnl);
         }
     }
 
@@ -639,7 +639,7 @@ mod tests {
     fn test_quote_entry_short_close_long_with_overflow() {
         let mut market = PerpMarket::default_for_tests();
         let mut pos = create_perp_position(&market, -10, 100);
-        // Go short 15 @ 20
+        // Go long 15 @ 20
         pos.record_trade(&mut market, 15, I80F48::from(-300));
         assert_eq!(pos.quote_running_native, -100);
         assert_eq!(pos.avg_entry_price(&market), 20.0);

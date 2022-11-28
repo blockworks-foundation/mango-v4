@@ -125,7 +125,6 @@ impl Bank {
         vault: Pubkey,
         bank_num: u32,
         bump: u8,
-        now_ts: u64,
     ) -> Self {
         Self {
             // values that must be reset/changed
@@ -248,7 +247,6 @@ impl Bank {
         require_gte!(native_amount, 0);
 
         let native_position = position.native(self);
-        let opening_indexed_position = position.indexed_position;
 
         // Adding DELTA to amount/index helps because (amount/index)*index <= amount, but
         // we want to ensure that users can withdraw the same amount they have deposited, so
@@ -358,7 +356,7 @@ impl Bank {
     fn withdraw_internal_wrapper(
         &mut self,
         position: &mut TokenPosition,
-        mut native_amount: I80F48,
+        native_amount: I80F48,
         with_loan_origination_fee: bool,
         allow_dusting: bool,
         now_ts: u64,
@@ -386,7 +384,6 @@ impl Bank {
     ) -> Result<(bool, I80F48)> {
         require_gte!(native_amount, 0);
         let native_position = position.native(self);
-        let opening_indexed_position = position.indexed_position;
 
         if native_position.is_positive() {
             let new_native_position = cm!(native_position - native_amount);

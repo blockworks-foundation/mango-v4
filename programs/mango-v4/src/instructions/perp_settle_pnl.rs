@@ -129,38 +129,40 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     let a_settle_pnl_in_new_window = now_ts
         >= cm!((a_perp_position.settle_pnl_limit_window + 1) as u64
             * perp_market.settle_pnl_limit_factor_window_size_ts);
+    if a_settle_pnl_in_new_window {
+        a_perp_position.settle_pnl_limit_window =
+            cm!(now_ts / perp_market.settle_pnl_limit_factor_window_size_ts)
+                .try_into()
+                .unwrap();
+        a_perp_position.settle_pnl_limit_settled_in_current_window_native = 0;
+    }
 
-    let a_pnl_capped_for_window = {
+    let a_settleable_pnl = {
         let realized_pnl = I80F48::from(a_perp_position.realized_pnl_native);
         let unrealized_pnl = cm!(a_pnl - realized_pnl);
         let a_base_lots = I80F48::from(a_perp_position.base_position_lots());
         let avg_entry_price_lots = I80F48::from_num(a_perp_position.avg_entry_price_per_base_lot);
         let max_allowed_in_window =
-            cm!(perp_market.settle_pnl_limit_factor() * a_base_lots * avg_entry_price_lots)
-                .abs()
-                .checked_round()
-                .unwrap();
+            cm!(perp_market.settle_pnl_limit_factor() * a_base_lots * avg_entry_price_lots).abs();
 
-        let a_unrealized_pnl_capped_for_window = if a_settle_pnl_in_new_window {
-            a_perp_position.settle_pnl_limit_window =
-                cm!(now_ts / perp_market.settle_pnl_limit_factor_window_size_ts)
-                    .try_into()
-                    .unwrap();
-            unrealized_pnl.min(max_allowed_in_window)
-        } else {
-            unrealized_pnl.min(cm!(max_allowed_in_window
+        let unrealized_pnl_capped_for_window = unrealized_pnl
+            .min(cm!(max_allowed_in_window
                 - I80F48::from_num(
                     a_perp_position.settle_pnl_limit_settled_in_current_window_native
                 )))
-        };
-        a_pnl.min(cm!(realized_pnl + a_unrealized_pnl_capped_for_window))
+            .max(I80F48::ZERO);
+        a_pnl
+            .min(cm!(realized_pnl + unrealized_pnl_capped_for_window))
+            .max(I80F48::ZERO)
     };
 
+    require!(
+        a_settleable_pnl.is_positive(),
+        MangoError::ProfitabilityMismatch
+    );
+
     // Settle for the maximum possible capped to b's settle health
-    let settlement = a_pnl_capped_for_window
-        .abs()
-        .min(b_pnl.abs())
-        .min(b_settle_health);
+    let settlement = a_settleable_pnl.abs().min(b_pnl.abs()).min(b_settle_health);
 
     // Settle
     a_perp_position.change_quote_position(-settlement);
@@ -171,10 +173,10 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         if a_settle_pnl_in_new_window {
             settlement.checked_to_num().unwrap()
         } else {
-            a_perp_position
-                .settle_pnl_limit_settled_in_current_window_native
-                .checked_add(settlement.checked_to_num().unwrap())
-                .unwrap()
+            cm!(
+                a_perp_position.settle_pnl_limit_settled_in_current_window_native
+                    + settlement.checked_to_num::<i64>().unwrap()
+            )
         };
     let b_settle_pnl_in_new_window = now_ts
         >= cm!((b_perp_position.settle_pnl_limit_window + 1) as u64
@@ -187,10 +189,10 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
                     .unwrap();
             -settlement.checked_to_num::<i64>().unwrap()
         } else {
-            b_perp_position
-                .settle_pnl_limit_settled_in_current_window_native
-                .checked_add(-settlement.checked_to_num::<i64>().unwrap())
-                .unwrap()
+            cm!(
+                b_perp_position.settle_pnl_limit_settled_in_current_window_native
+                    - settlement.checked_to_num::<i64>().unwrap()
+            )
         };
 
     emit_perp_balances(
