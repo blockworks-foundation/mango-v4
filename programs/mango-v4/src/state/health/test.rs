@@ -95,6 +95,8 @@ pub fn mock_bank_and_oracle(
     bank.data().maint_asset_weight = I80F48::from_num(1.0 - maint_weights);
     bank.data().maint_liab_weight = I80F48::from_num(1.0 + maint_weights);
     bank.data().stable_price_model.reset_to_price(price, 0);
+    bank.data().collateral_limit_quote = f64::MAX;
+    bank.data().borrow_limit_quote = f64::MAX;
     bank.data().net_borrows_window_size_ts = 1; // dummy
     bank.data().net_borrows_limit_native = i64::MAX; // max since we don't want this to interfere
     (bank, oracle)

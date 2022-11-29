@@ -146,8 +146,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     // Health check
     //
     if let Some((mut health_cache, pre_health)) = pre_health_opt {
-        health_cache
-            .adjust_token_balance(token_index, cm!(native_position_after - native_position))?;
+        health_cache.adjust_token_balance(&bank, cm!(native_position_after - native_position))?;
         account.check_health_post(&health_cache, pre_health)?;
     }
 

@@ -13,7 +13,9 @@ mod program_test;
 
 #[tokio::test]
 async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
-    let context = TestContext::new().await;
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(85_000); // TokenLiqWithToken needs 84k
+    let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = TestKeypair::new();
@@ -275,7 +277,9 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
 
 #[tokio::test]
 async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
-    let context = TestContext::new().await;
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(85_000); // TokenLiqWithToken needs 84k
+    let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = TestKeypair::new();

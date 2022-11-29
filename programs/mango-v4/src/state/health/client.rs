@@ -6,7 +6,7 @@ use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
 use crate::error::*;
-use crate::state::{PerpMarketIndex, TokenIndex};
+use crate::state::{Bank, MangoAccountValue, PerpMarketIndex};
 use crate::util::checked_math as cm;
 
 use super::*;
@@ -43,6 +43,44 @@ impl HealthCache {
         }
     }
 
+    fn cache_after_swap(
+        &self,
+        account: &MangoAccountValue,
+        source_bank: &Bank,
+        target_bank: &Bank,
+        amount: I80F48,
+        price: I80F48,
+    ) -> Self {
+        let mut source_position = account
+            .token_position(source_bank.token_index)
+            .map(|v| v.clone())
+            .unwrap_or_default();
+        let mut target_position = account
+            .token_position(target_bank.token_index)
+            .map(|v| v.clone())
+            .unwrap_or_default();
+
+        let target_amount = cm!(amount * price);
+
+        let mut source_bank = source_bank.clone();
+        source_bank
+            .withdraw_with_fee(&mut source_position, amount, 0)
+            .unwrap();
+        let mut target_bank = target_bank.clone();
+        target_bank
+            .deposit(&mut target_position, target_amount, 0)
+            .unwrap();
+
+        let mut resulting_cache = self.clone();
+        resulting_cache
+            .adjust_token_balance(&source_bank, -amount)
+            .unwrap();
+        resulting_cache
+            .adjust_token_balance(&target_bank, target_amount)
+            .unwrap();
+        resulting_cache
+    }
+
     /// How much source native tokens may be swapped for target tokens while staying
     /// above the min_ratio health ratio.
     ///
@@ -54,8 +92,9 @@ impl HealthCache {
     /// NOTE: keep getMaxSourceForTokenSwap in ts/client in sync with changes here
     pub fn max_swap_source_for_health_ratio(
         &self,
-        source: TokenIndex,
-        target: TokenIndex,
+        account: &MangoAccountValue,
+        source_bank: &Bank,
+        target_bank: &Bank,
         price: I80F48,
         min_ratio: I80F48,
     ) -> Result<I80F48> {
@@ -74,8 +113,8 @@ impl HealthCache {
             return Ok(I80F48::ZERO);
         }
 
-        let source_index = find_token_info_index(&self.token_infos, source)?;
-        let target_index = find_token_info_index(&self.token_infos, target)?;
+        let source_index = find_token_info_index(&self.token_infos, source_bank.token_index)?;
+        let target_index = find_token_info_index(&self.token_infos, target_bank.token_index)?;
         let source = &self.token_infos[source_index];
         let target = &self.token_infos[target_index];
 
@@ -89,10 +128,7 @@ impl HealthCache {
         }
 
         let cache_after_swap = |amount: I80F48| {
-            let mut adjusted_cache = self.clone();
-            adjusted_cache.token_infos[source_index].balance_native -= amount;
-            adjusted_cache.token_infos[target_index].balance_native += cm!(amount * price);
-            adjusted_cache
+            self.cache_after_swap(account, source_bank, target_bank, amount, price)
         };
         let health_ratio_after_swap =
             |amount| cache_after_swap(amount).health_ratio(HealthType::Init);
@@ -366,6 +402,15 @@ mod tests {
             balance_native: I80F48::ZERO,
         };
 
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let account = MangoAccountValue::from_bytes(&buffer).unwrap();
+
+        let group = Pubkey::new_unique();
+        let (mut bank0, _) = mock_bank_and_oracle(group, 0, 1.0, 0.1, 0.1);
+        let (mut bank1, _) = mock_bank_and_oracle(group, 1, 5.0, 0.2, 0.2);
+        let (mut bank2, _) = mock_bank_and_oracle(group, 2, 5.0, 0.3, 0.3);
+        let banks = [bank0.data(), bank1.data(), bank2.data()];
+
         let health_cache = HealthCache {
             token_infos: vec![
                 TokenInfo {
@@ -394,8 +439,9 @@ mod tests {
         assert_eq!(
             health_cache
                 .max_swap_source_for_health_ratio(
-                    0,
-                    1,
+                    &account,
+                    banks[0],
+                    banks[1],
                     I80F48::from_num(2.0 / 3.0),
                     I80F48::from_num(50.0)
                 )
@@ -412,15 +458,17 @@ mod tests {
                                     target: TokenIndex,
                                     ratio: f64,
                                     price_factor: f64| {
-            let mut c = c.clone();
             let source_price = &c.token_infos[source as usize].prices;
+            let source_bank = &banks[source as usize];
             let target_price = &c.token_infos[target as usize].prices;
+            let target_bank = &banks[target as usize];
             let swap_price =
                 I80F48::from_num(price_factor) * source_price.oracle / target_price.oracle;
             let source_amount = c
                 .max_swap_source_for_health_ratio(
-                    source,
-                    target,
+                    &account,
+                    source_bank,
+                    target_bank,
                     swap_price,
                     I80F48::from_num(ratio),
                 )
@@ -428,12 +476,16 @@ mod tests {
             if source_amount == I80F48::MAX {
                 return (f64::MAX, f64::MAX);
             }
-            c.adjust_token_balance(source, -source_amount).unwrap();
-            c.adjust_token_balance(target, source_amount * swap_price)
-                .unwrap();
+            let after_swap = c.cache_after_swap(
+                &account,
+                source_bank,
+                target_bank,
+                source_amount,
+                swap_price,
+            );
             (
                 source_amount.to_num::<f64>(),
-                c.health_ratio(HealthType::Init).to_num::<f64>(),
+                after_swap.health_ratio(HealthType::Init).to_num::<f64>(),
             )
         };
         let check_max_swap_result = |c: &HealthCache,

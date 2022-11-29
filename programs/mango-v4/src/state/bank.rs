@@ -113,8 +113,25 @@ pub struct Bank {
     pub net_borrows_limit_native: i64,
     pub net_borrows_window_native: i64,
 
+    /// Soft borrow limit in native quote
+    ///
+    /// Once the borrows on the bank exceed this quote value, init_liab_weight is scaled up.
+    /// Set to f64::MAX to disable.
+    ///
+    /// See scaled_init_liab_weight().
+    pub borrow_limit_quote: f64,
+
+    /// Limit for collateral of deposits
+    ///
+    /// Once the deposits in the bank exceed this quote value, init_asset_weight is scaled
+    /// down to keep the total collateral value constant.
+    /// Set to f64::MAX to disable.
+    ///
+    /// See scaled_init_asset_weight().
+    pub collateral_limit_quote: f64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2136],
+    pub reserved: [u8; 2120],
 }
 const_assert_eq!(size_of::<Bank>(), 3112);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -175,7 +192,9 @@ impl Bank {
             net_borrows_window_size_ts: existing_bank.net_borrows_window_size_ts,
             last_net_borrows_window_start_ts: existing_bank.last_net_borrows_window_start_ts,
             net_borrows_window_native: 0,
-            reserved: [0; 2136],
+            borrow_limit_quote: f64::MAX,
+            collateral_limit_quote: f64::MAX,
+            reserved: [0; 2120],
         }
     }
 
@@ -185,12 +204,14 @@ impl Bank {
             .trim_matches(char::from(0))
     }
 
+    #[inline(always)]
     pub fn native_borrows(&self) -> I80F48 {
-        self.borrow_index * self.indexed_borrows
+        cm!(self.borrow_index * self.indexed_borrows)
     }
 
+    #[inline(always)]
     pub fn native_deposits(&self) -> I80F48 {
-        self.deposit_index * self.indexed_deposits
+        cm!(self.deposit_index * self.indexed_deposits)
     }
 
     /// Deposits `native_amount`.
@@ -691,6 +712,47 @@ impl Bank {
 
     pub fn stable_price(&self) -> I80F48 {
         I80F48::from_num(self.stable_price_model.stable_price)
+    }
+
+    /// Returns the init asset weight, adjusted for the number of deposits on the bank.
+    ///
+    /// If max_collateral is 0, then the scaled init weight will be 0.
+    /// Otherwise the weight is unadjusted until max_collateral and then scaled down
+    /// such that scaled_init_weight * deposits remains constant.
+    #[inline(always)]
+    pub fn scaled_init_asset_weight(&self, price: I80F48) -> I80F48 {
+        if self.collateral_limit_quote == f64::MAX {
+            return self.init_asset_weight;
+        }
+        // The next line is around 500 CU
+        let deposits_quote = self.native_deposits().to_num::<f64>() * price.to_num::<f64>();
+        if deposits_quote <= self.collateral_limit_quote {
+            self.init_asset_weight
+        } else {
+            // The next line is around 500 CU
+            let scale = self.collateral_limit_quote / deposits_quote;
+            cm!(self.init_asset_weight * I80F48::from_num(scale))
+        }
+    }
+
+    #[inline(always)]
+    pub fn scaled_init_liab_weight(&self, price: I80F48) -> I80F48 {
+        if self.borrow_limit_quote == f64::MAX {
+            return self.init_liab_weight;
+        }
+        // The next line is around 500 CU
+        let borrows_quote = self.native_borrows().to_num::<f64>() * price.to_num::<f64>();
+        if borrows_quote <= self.borrow_limit_quote {
+            self.init_liab_weight
+        } else if self.borrow_limit_quote == 0.0 {
+            // TODO: will certainly cause overflow, so it's not exactly what is needed; health should be -MAX?
+            // maybe handling this case isn't super helpful?
+            I80F48::MAX
+        } else {
+            // The next line is around 500 CU
+            let scale = borrows_quote / self.borrow_limit_quote;
+            cm!(self.init_liab_weight * I80F48::from_num(scale))
+        }
     }
 }
 

@@ -297,7 +297,7 @@ pub fn token_liq_bankruptcy(
     let liab_bank = bank_ais[0].load::<Bank>()?;
     let end_liab_native = liqee_liab.native(&liab_bank);
     liqee_health_cache
-        .adjust_token_balance(liab_token_index, cm!(end_liab_native - initial_liab_native))?;
+        .adjust_token_balance(&liab_bank, cm!(end_liab_native - initial_liab_native))?;
 
     // Check liqee health again
     let liqee_init_health = liqee_health_cache.health(HealthType::Init);
