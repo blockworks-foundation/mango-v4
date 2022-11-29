@@ -216,9 +216,7 @@ async function main(): Promise<void> {
 
     for (const mangoAccount of mangoAccounts) {
       console.log(`MangoAccount ${mangoAccount.publicKey}`);
-      if (mangoAccount.name === 'PnL Test') {
-        await debugUser(client, group, mangoAccount);
-      }
+      await debugUser(client, group, mangoAccount);
     }
   }
 
