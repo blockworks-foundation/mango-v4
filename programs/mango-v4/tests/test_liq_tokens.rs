@@ -173,7 +173,9 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
 
 #[tokio::test]
 async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
-    let context = TestContext::new().await;
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(85_000); // LiqTokenWithToken needs 79k
+    let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = TestKeypair::new();

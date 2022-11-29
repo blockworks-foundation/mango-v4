@@ -5,7 +5,7 @@ use fixed_macro::types::I80F48;
 
 use crate::error::*;
 use crate::state::{
-    MangoAccountFixed, MangoAccountRef, PerpMarket, PerpMarketIndex, PerpPosition,
+    Bank, MangoAccountFixed, MangoAccountRef, PerpMarket, PerpMarketIndex, PerpPosition,
     Serum3MarketIndex, TokenIndex,
 };
 use crate::util::checked_math as cm;
@@ -365,9 +365,14 @@ impl HealthCache {
             .ok_or_else(|| error_msg!("token index {} not found", token_index))
     }
 
-    pub fn adjust_token_balance(&mut self, token_index: TokenIndex, change: I80F48) -> Result<()> {
-        let entry_index = self.token_info_index(token_index)?;
+    /// Changes the cached user account token balance.
+    pub fn adjust_token_balance(&mut self, bank: &Bank, change: I80F48) -> Result<()> {
+        let entry_index = self.token_info_index(bank.token_index)?;
         let mut entry = &mut self.token_infos[entry_index];
+
+        entry.init_asset_weight =
+            bank.scaled_init_asset_weight(entry.prices.asset(HealthType::Init));
+        entry.init_liab_weight = bank.scaled_init_liab_weight(entry.prices.liab(HealthType::Init));
 
         // Work around the fact that -((-x) * y) == x * y does not hold for I80F48:
         // We need to make sure that if balance is before * price, then change = -before
@@ -377,6 +382,20 @@ impl HealthCache {
         Ok(())
     }
 
+    /// Recomputes the dynamic init weights for the bank's current deposits/borrows.
+    pub fn recompute_token_weights(&mut self, bank: &Bank) -> Result<()> {
+        let entry_index = self.token_info_index(bank.token_index)?;
+        let mut entry = &mut self.token_infos[entry_index];
+        entry.init_asset_weight =
+            bank.scaled_init_asset_weight(entry.prices.asset(HealthType::Init));
+        entry.init_liab_weight = bank.scaled_init_liab_weight(entry.prices.liab(HealthType::Init));
+        Ok(())
+    }
+
+    /// Changes the cached user account token and serum balances.
+    ///
+    /// WARNING: You must also call recompute_token_weights() after all bank
+    /// deposit/withdraw changes!
     pub fn adjust_serum3_reserved(
         &mut self,
         market_index: Serum3MarketIndex,
@@ -604,16 +623,17 @@ pub fn new_health_cache(
             retriever.bank_and_oracle(&account.fixed.group, i, position.token_index)?;
 
         let native = position.native(bank);
+        let prices = Prices {
+            oracle: oracle_price,
+            stable: bank.stable_price(),
+        };
         token_infos.push(TokenInfo {
             token_index: bank.token_index,
             maint_asset_weight: bank.maint_asset_weight,
-            init_asset_weight: bank.init_asset_weight,
+            init_asset_weight: bank.scaled_init_asset_weight(prices.asset(HealthType::Init)),
             maint_liab_weight: bank.maint_liab_weight,
-            init_liab_weight: bank.init_liab_weight,
-            prices: Prices {
-                oracle: oracle_price,
-                stable: bank.stable_price(),
-            },
+            init_liab_weight: bank.scaled_init_liab_weight(prices.liab(HealthType::Init)),
+            prices,
             balance_native: native,
         });
     }
@@ -788,6 +808,14 @@ mod tests {
     }
 
     #[derive(Default)]
+    struct BankSettings {
+        deposits: u64,
+        borrows: u64,
+        collateral_limit_quote: u64,
+        borrow_limit_quote: u64,
+    }
+
+    #[derive(Default)]
     struct TestHealth1Case {
         token1: i64,
         token2: i64,
@@ -796,6 +824,7 @@ mod tests {
         oo_1_3: (u64, u64),
         perp1: (i64, i64, i64, i64),
         expected_health: f64,
+        bank_settings: [BankSettings; 3],
     }
     fn test_health1_runner(testcase: &TestHealth1Case) {
         let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
@@ -830,6 +859,21 @@ mod tests {
                 DUMMY_NOW_TS,
             )
             .unwrap();
+        for (settings, bank) in testcase
+            .bank_settings
+            .iter()
+            .zip([&mut bank1, &mut bank2, &mut bank3].iter_mut())
+        {
+            let bank = bank.data();
+            bank.indexed_deposits = I80F48::from(settings.deposits) / bank.deposit_index;
+            bank.indexed_borrows = I80F48::from(settings.borrows) / bank.borrow_index;
+            if settings.collateral_limit_quote > 0 {
+                bank.collateral_limit_quote = settings.collateral_limit_quote as f64;
+            }
+            if settings.borrow_limit_quote > 0 {
+                bank.borrow_limit_quote = settings.borrow_limit_quote as f64;
+            }
+        }
 
         let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
         let serum3account1 = account.create_serum3_orders(2).unwrap();
@@ -993,6 +1037,66 @@ mod tests {
                     + 80.0 * 1.2 + 20.0 * 0.8
                     // oo_1_3 (-> token1)
                     + 20.0 * 0.8,
+                ..Default::default()
+            },
+            TestHealth1Case { // 10, checking collateral limit
+                token1: 100,
+                token2: 100,
+                token3: 100,
+                bank_settings: [
+                    BankSettings {
+                        deposits: 100,
+                        collateral_limit_quote: 1000,
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        deposits: 1500,
+                        collateral_limit_quote: 1000 * 5,
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        deposits: 10000,
+                        collateral_limit_quote: 1000 * 10,
+                        ..BankSettings::default()
+                    },
+                ],
+                expected_health:
+                    // token1
+                    0.8 * 100.0
+                    // token2
+                    + 0.5 * 100.0 * 5.0 * (5000.0 / (1500.0 * 5.0))
+                    // token3
+                    + 0.5 * 100.0 * 10.0 * (10000.0 / (10000.0 * 10.0)),
+                ..Default::default()
+            },
+            TestHealth1Case { // 11, checking borrow limit
+                token1: -100,
+                token2: -100,
+                token3: -100,
+                bank_settings: [
+                    BankSettings {
+                        borrows: 100,
+                        borrow_limit_quote: 1000,
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        borrows: 1500,
+                        borrow_limit_quote: 1000 * 5,
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        borrows: 10000,
+                        borrow_limit_quote: 1000 * 10,
+                        ..BankSettings::default()
+                    },
+                ],
+                expected_health:
+                    // token1
+                    -1.2 * 100.0
+                    // token2
+                    - 1.5 * 100.0 * 5.0 * (1500.0 * 5.0 / 5000.0)
+                    // token3
+                    - 1.5 * 100.0 * 10.0 * (10000.0 * 10.0 / 10000.0),
                 ..Default::default()
             },
         ];
