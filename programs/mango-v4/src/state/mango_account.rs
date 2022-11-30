@@ -867,8 +867,8 @@ impl<
         if !fill.market_fees_applied {
             cm!(perp_market.fees_accrued += fees);
         }
-        let quote_change_native = cm!(quote - fees);
-        pa.record_trade(perp_market, base_change, quote_change_native);
+        pa.record_trade(perp_market, base_change, quote);
+        pa.record_fee(fees);
 
         cm!(pa.maker_volume += quote.abs().to_num::<u64>());
 

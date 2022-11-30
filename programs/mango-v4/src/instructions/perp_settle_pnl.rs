@@ -123,10 +123,43 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     require!(a_pnl.is_positive(), MangoError::ProfitabilityMismatch);
     require!(b_pnl.is_negative(), MangoError::ProfitabilityMismatch);
 
+    // Cap settlement of unrealized pnl
+    // Settles at most x100% each hour
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let a_settle_limit_used =
+        a_perp_position.update_and_get_used_settle_limit(&perp_market, now_ts);
+    b_perp_position.update_and_get_used_settle_limit(&perp_market, now_ts);
+
+    let a_settleable_pnl = {
+        let realized_pnl = a_perp_position.realized_pnl_native;
+        let unrealized_pnl = cm!(a_pnl - realized_pnl);
+        let a_base_lots = I80F48::from(a_perp_position.base_position_lots());
+        let avg_entry_price_lots = I80F48::from_num(a_perp_position.avg_entry_price_per_base_lot);
+        let max_allowed_in_window =
+            cm!(perp_market.settle_pnl_limit_factor() * a_base_lots * avg_entry_price_lots).abs();
+
+        let unrealized_pnl_capped_for_window = unrealized_pnl
+            .min(cm!(
+                max_allowed_in_window - I80F48::from_num(a_settle_limit_used)
+            ))
+            .max(I80F48::ZERO);
+        a_pnl
+            .min(cm!(realized_pnl + unrealized_pnl_capped_for_window))
+            .max(I80F48::ZERO)
+    };
+
+    require!(
+        a_settleable_pnl.is_positive(),
+        MangoError::ProfitabilityMismatch
+    );
+
     // Settle for the maximum possible capped to b's settle health
-    let settlement = a_pnl.abs().min(b_pnl.abs()).min(b_settle_health);
-    a_perp_position.change_quote_position(-settlement);
-    b_perp_position.change_quote_position(settlement);
+    let settlement = a_settleable_pnl.abs().min(b_pnl.abs()).min(b_settle_health);
+    require!(settlement >= 0, MangoError::SettlementAmountMustBePositive);
+
+    // Settle
+    a_perp_position.record_settle(settlement);
+    b_perp_position.record_settle(-settlement);
 
     emit_perp_balances(
         ctx.accounts.group.key(),
@@ -168,13 +201,12 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     };
 
     // Safety check to prevent any accidental negative transfer
-    require!(settlement >= 0, MangoError::SettlementAmountMustBePositive);
     require!(fee >= 0, MangoError::SettlementAmountMustBePositive);
 
     // Update the account's net_settled with the new PnL.
     // Applying the fee here means that it decreases the displayed perp pnl.
-    let settlement_i64 = settlement.checked_to_num::<i64>().unwrap();
-    let fee_i64 = fee.checked_to_num::<i64>().unwrap();
+    let settlement_i64 = settlement.round_to_zero().checked_to_num::<i64>().unwrap();
+    let fee_i64 = fee.round_to_zero().checked_to_num::<i64>().unwrap();
     cm!(a_perp_position.perp_spot_transfers += settlement_i64 - fee_i64);
     cm!(b_perp_position.perp_spot_transfers -= settlement_i64);
     cm!(account_a.fixed.perp_spot_transfers += settlement_i64 - fee_i64);

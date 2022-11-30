@@ -606,6 +606,24 @@ export type MangoV4 = {
           "type": {
             "option": "f32"
           }
+        },
+        {
+          "name": "minVaultToDepositsRatioOpt",
+          "type": {
+            "option": "f64"
+          }
+        },
+        {
+          "name": "netBorrowsLimitNativeOpt",
+          "type": {
+            "option": "i64"
+          }
+        },
+        {
+          "name": "netBorrowsWindowSizeTsOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -2426,6 +2444,14 @@ export type MangoV4 = {
         {
           "name": "settleTokenIndex",
           "type": "u16"
+        },
+        {
+          "name": "settlePnlLimitFactor",
+          "type": "f32"
+        },
+        {
+          "name": "settlePnlLimitFactorWindowSizeTs",
+          "type": "u64"
         }
       ]
     },
@@ -2586,6 +2612,18 @@ export type MangoV4 = {
           "name": "stablePriceGrowthLimitOpt",
           "type": {
             "option": "f32"
+          }
+        },
+        {
+          "name": "settlePnlLimitFactorOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "settlePnlLimitFactorWindowSizeTs",
+          "type": {
+            "option": "u64"
           }
         }
       ]
@@ -4248,11 +4286,19 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "settlePnlLimitFactor",
+            "type": "f32"
+          },
+          {
+            "name": "settlePnlLimitFactorWindowSizeTs",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1956
+                1944
               ]
             }
           }
@@ -4845,9 +4891,13 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                6
+                2
               ]
             }
+          },
+          {
+            "name": "settlePnlLimitWindow",
+            "type": "u32"
           },
           {
             "name": "basePositionLots",
@@ -4867,11 +4917,16 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "quoteEntryNative",
+            "name": "padding2",
             "docs": [
               "Tracks what the position is to calculate average entry & break even price"
             ],
-            "type": "i64"
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
           },
           {
             "name": "quoteRunningNative",
@@ -4939,13 +4994,16 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                24
-              ]
-            }
+            "name": "avgEntryPricePerBaseLot",
+            "type": "f64"
+          },
+          {
+            "name": "realizedPnlNative",
+            "type": "i64"
+          },
+          {
+            "name": "settlePnlLimitSettledInCurrentWindowNative",
+            "type": "i64"
           }
         ]
       }
@@ -7133,7 +7191,7 @@ export type MangoV4 = {
     {
       "code": 6027,
       "name": "BankNetBorrowsLimitReached",
-      "msg": "bank net borrows has reached limit"
+      "msg": "bank net borrows has reached limit - this is an intermittent error - the limit will reset regularly"
     }
   ]
 };
@@ -7746,6 +7804,24 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "f32"
           }
+        },
+        {
+          "name": "minVaultToDepositsRatioOpt",
+          "type": {
+            "option": "f64"
+          }
+        },
+        {
+          "name": "netBorrowsLimitNativeOpt",
+          "type": {
+            "option": "i64"
+          }
+        },
+        {
+          "name": "netBorrowsWindowSizeTsOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -9566,6 +9642,14 @@ export const IDL: MangoV4 = {
         {
           "name": "settleTokenIndex",
           "type": "u16"
+        },
+        {
+          "name": "settlePnlLimitFactor",
+          "type": "f32"
+        },
+        {
+          "name": "settlePnlLimitFactorWindowSizeTs",
+          "type": "u64"
         }
       ]
     },
@@ -9726,6 +9810,18 @@ export const IDL: MangoV4 = {
           "name": "stablePriceGrowthLimitOpt",
           "type": {
             "option": "f32"
+          }
+        },
+        {
+          "name": "settlePnlLimitFactorOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "settlePnlLimitFactorWindowSizeTs",
+          "type": {
+            "option": "u64"
           }
         }
       ]
@@ -11388,11 +11484,19 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "settlePnlLimitFactor",
+            "type": "f32"
+          },
+          {
+            "name": "settlePnlLimitFactorWindowSizeTs",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1956
+                1944
               ]
             }
           }
@@ -11985,9 +12089,13 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                6
+                2
               ]
             }
+          },
+          {
+            "name": "settlePnlLimitWindow",
+            "type": "u32"
           },
           {
             "name": "basePositionLots",
@@ -12007,11 +12115,16 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "quoteEntryNative",
+            "name": "padding2",
             "docs": [
               "Tracks what the position is to calculate average entry & break even price"
             ],
-            "type": "i64"
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
           },
           {
             "name": "quoteRunningNative",
@@ -12079,13 +12192,16 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                24
-              ]
-            }
+            "name": "avgEntryPricePerBaseLot",
+            "type": "f64"
+          },
+          {
+            "name": "realizedPnlNative",
+            "type": "i64"
+          },
+          {
+            "name": "settlePnlLimitSettledInCurrentWindowNative",
+            "type": "i64"
           }
         ]
       }
@@ -14273,7 +14389,7 @@ export const IDL: MangoV4 = {
     {
       "code": 6027,
       "name": "BankNetBorrowsLimitReached",
-      "msg": "bank net borrows has reached limit"
+      "msg": "bank net borrows has reached limit - this is an intermittent error - the limit will reset regularly"
     }
   ]
 };

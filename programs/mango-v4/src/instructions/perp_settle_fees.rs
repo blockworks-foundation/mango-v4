@@ -80,7 +80,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         .abs()
         .min(perp_market.fees_accrued.abs())
         .min(I80F48::from(max_settle_amount));
-    perp_position.change_quote_position(settlement);
+    perp_position.record_settle(-settlement); // settle the negative pnl on the user perp position
     perp_market.fees_accrued = cm!(perp_market.fees_accrued - settlement);
 
     emit_perp_balances(
