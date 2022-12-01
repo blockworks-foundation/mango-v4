@@ -124,8 +124,8 @@ pub fn token_register_trustless(
         net_borrows_window_size_ts,
         last_net_borrows_window_start_ts: now_ts / net_borrows_window_size_ts
             * net_borrows_window_size_ts,
-        net_borrows_limit_native: 1_000_000,
-        net_borrows_window_native: 0,
+        net_borrows_limit_quote: 1_000_000_000_000, // 1M USD
+        net_borrows_in_window: 0,
         reserved: [0; 2136],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);

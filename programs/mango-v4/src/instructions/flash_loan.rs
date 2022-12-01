@@ -396,6 +396,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             position,
             cm!(change.amount - loan_origination_fee),
             Clock::get()?.unix_timestamp.try_into().unwrap(),
+            *price,
         )?;
         if !is_active {
             deactivated_token_positions.push(change.raw_token_index);

@@ -92,7 +92,7 @@ pub fn token_register(
     liquidation_fee: f32,
     min_vault_to_deposits_ratio: f64,
     net_borrows_window_size_ts: u64,
-    net_borrows_limit_native: i64,
+    net_borrows_limit_quote: i64,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == QUOTE_TOKEN_INDEX {
@@ -149,8 +149,8 @@ pub fn token_register(
         net_borrows_window_size_ts,
         last_net_borrows_window_start_ts: now_ts / net_borrows_window_size_ts
             * net_borrows_window_size_ts,
-        net_borrows_limit_native,
-        net_borrows_window_native: 0,
+        net_borrows_limit_quote,
+        net_borrows_in_window: 0,
         reserved: [0; 2136],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);

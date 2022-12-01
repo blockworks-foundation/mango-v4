@@ -219,7 +219,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     let a_token_position = account_a.token_position_mut(settle_token_index)?.0;
     let b_token_position = account_b.token_position_mut(settle_token_index)?.0;
     bank.deposit(a_token_position, cm!(settlement - fee), now_ts)?;
-    bank.withdraw_with_fee(b_token_position, settlement, now_ts)?;
+    bank.withdraw_with_fee(b_token_position, settlement, now_ts, oracle_price)?;
 
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),

@@ -691,6 +691,7 @@ mod tests {
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(100),
                 DUMMY_NOW_TS,
+                DUMMY_PRICE,
             )
             .unwrap();
 
@@ -773,6 +774,7 @@ mod tests {
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(100),
                 DUMMY_NOW_TS,
+                DUMMY_PRICE,
             )
             .unwrap();
         bank1
@@ -781,6 +783,7 @@ mod tests {
                 account2.ensure_token_position(1).unwrap().0,
                 I80F48::from(-100),
                 DUMMY_NOW_TS,
+                DUMMY_PRICE,
             )
             .unwrap();
 

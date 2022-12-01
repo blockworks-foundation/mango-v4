@@ -351,7 +351,7 @@ export type MangoV4 = {
           "type": "u64"
         },
         {
-          "name": "netBorrowsLimitNative",
+          "name": "netBorrowsLimitQuote",
           "type": "i64"
         }
       ]
@@ -614,7 +614,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "netBorrowsLimitNativeOpt",
+          "name": "netBorrowsLimitQuoteOpt",
           "type": {
             "option": "i64"
           }
@@ -624,6 +624,14 @@ export type MangoV4 = {
           "type": {
             "option": "u64"
           }
+        },
+        {
+          "name": "resetStablePrice",
+          "type": "bool"
+        },
+        {
+          "name": "resetNetBorrowLimit",
+          "type": "bool"
         }
       ]
     },
@@ -1734,6 +1742,11 @@ export type MangoV4 = {
           "docs": [
             "The bank vault that pays for the order, if necessary"
           ]
+        },
+        {
+          "name": "payerOracle",
+          "isMut": false,
+          "isSigner": false
         },
         {
           "name": "tokenProgram",
@@ -3617,22 +3630,37 @@ export type MangoV4 = {
           },
           {
             "name": "minVaultToDepositsRatio",
+            "docs": [
+              "Min fraction of deposits that must remain in the vault when borrowing."
+            ],
             "type": "f64"
           },
           {
             "name": "netBorrowsWindowSizeTs",
+            "docs": [
+              "Size in seconds of a net borrows window"
+            ],
             "type": "u64"
           },
           {
             "name": "lastNetBorrowsWindowStartTs",
+            "docs": [
+              "Timestamp at which the last net borrows window started"
+            ],
             "type": "u64"
           },
           {
-            "name": "netBorrowsLimitNative",
+            "name": "netBorrowsLimitQuote",
+            "docs": [
+              "Net borrow limit per window in quote native; set to -1 to disable."
+            ],
             "type": "i64"
           },
           {
-            "name": "netBorrowsWindowNative",
+            "name": "netBorrowsInWindow",
+            "docs": [
+              "Sum of all deposits and borrows in the last window, in native units."
+            ],
             "type": "i64"
           },
           {
@@ -4917,19 +4945,14 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "padding2",
-            "docs": [
-              "Tracks what the position is to calculate average entry & break even price"
-            ],
-            "type": {
-              "array": [
-                "u8",
-                8
-              ]
-            }
+            "name": "settlePnlLimitSettledInCurrentWindowNative",
+            "type": "i64"
           },
           {
             "name": "quoteRunningNative",
+            "docs": [
+              "Tracks what the position is to calculate average entry & break even price"
+            ],
             "type": "i64"
           },
           {
@@ -4999,11 +5022,9 @@ export type MangoV4 = {
           },
           {
             "name": "realizedPnlNative",
-            "type": "i64"
-          },
-          {
-            "name": "settlePnlLimitSettledInCurrentWindowNative",
-            "type": "i64"
+            "type": {
+              "defined": "I80F48"
+            }
           }
         ]
       }
@@ -7549,7 +7570,7 @@ export const IDL: MangoV4 = {
           "type": "u64"
         },
         {
-          "name": "netBorrowsLimitNative",
+          "name": "netBorrowsLimitQuote",
           "type": "i64"
         }
       ]
@@ -7812,7 +7833,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "netBorrowsLimitNativeOpt",
+          "name": "netBorrowsLimitQuoteOpt",
           "type": {
             "option": "i64"
           }
@@ -7822,6 +7843,14 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u64"
           }
+        },
+        {
+          "name": "resetStablePrice",
+          "type": "bool"
+        },
+        {
+          "name": "resetNetBorrowLimit",
+          "type": "bool"
         }
       ]
     },
@@ -8932,6 +8961,11 @@ export const IDL: MangoV4 = {
           "docs": [
             "The bank vault that pays for the order, if necessary"
           ]
+        },
+        {
+          "name": "payerOracle",
+          "isMut": false,
+          "isSigner": false
         },
         {
           "name": "tokenProgram",
@@ -10815,22 +10849,37 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "minVaultToDepositsRatio",
+            "docs": [
+              "Min fraction of deposits that must remain in the vault when borrowing."
+            ],
             "type": "f64"
           },
           {
             "name": "netBorrowsWindowSizeTs",
+            "docs": [
+              "Size in seconds of a net borrows window"
+            ],
             "type": "u64"
           },
           {
             "name": "lastNetBorrowsWindowStartTs",
+            "docs": [
+              "Timestamp at which the last net borrows window started"
+            ],
             "type": "u64"
           },
           {
-            "name": "netBorrowsLimitNative",
+            "name": "netBorrowsLimitQuote",
+            "docs": [
+              "Net borrow limit per window in quote native; set to -1 to disable."
+            ],
             "type": "i64"
           },
           {
-            "name": "netBorrowsWindowNative",
+            "name": "netBorrowsInWindow",
+            "docs": [
+              "Sum of all deposits and borrows in the last window, in native units."
+            ],
             "type": "i64"
           },
           {
@@ -12115,19 +12164,14 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "padding2",
-            "docs": [
-              "Tracks what the position is to calculate average entry & break even price"
-            ],
-            "type": {
-              "array": [
-                "u8",
-                8
-              ]
-            }
+            "name": "settlePnlLimitSettledInCurrentWindowNative",
+            "type": "i64"
           },
           {
             "name": "quoteRunningNative",
+            "docs": [
+              "Tracks what the position is to calculate average entry & break even price"
+            ],
             "type": "i64"
           },
           {
@@ -12197,11 +12241,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "realizedPnlNative",
-            "type": "i64"
-          },
-          {
-            "name": "settlePnlLimitSettledInCurrentWindowNative",
-            "type": "i64"
+            "type": {
+              "defined": "I80F48"
+            }
           }
         ]
       }
