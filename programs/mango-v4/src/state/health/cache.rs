@@ -267,7 +267,7 @@ impl PerpInfo {
     /// be bankrupt) or suddenly increase a lot (if users could borrow against perp
     /// balances they could now borrow other assets).
     #[inline(always)]
-    fn health_contribution(&self, health_type: HealthType) -> I80F48 {
+    pub fn health_contribution(&self, health_type: HealthType) -> I80F48 {
         let c = self.uncapped_health_contribution(health_type);
 
         if self.trusted_market {
@@ -278,7 +278,7 @@ impl PerpInfo {
     }
 
     #[inline(always)]
-    fn uncapped_health_contribution(&self, health_type: HealthType) -> I80F48 {
+    pub fn uncapped_health_contribution(&self, health_type: HealthType) -> I80F48 {
         let order_execution_case = |orders_base_lots: i64, order_price: I80F48| {
             let net_base_native =
                 I80F48::from(cm!((self.base_lots + orders_base_lots) * self.base_lot_size));
