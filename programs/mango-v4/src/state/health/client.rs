@@ -262,16 +262,30 @@ impl HealthCache {
             }
         } else if case1_start_ratio >= min_ratio {
             // Must reach min_ratio to the right of case1_start
-            let case1_start_health = cache_after_trade(case1_start).health(HealthType::Init);
-            if case1_start_health <= 0 {
+
+            // Need to figure out how many lots to trade to reach zero health (zero_health_amount).
+            // We do this by looking at the starting health and the health slope per
+            // traded base lot (final_health_slope).
+            let start_cache = cache_after_trade(case1_start);
+            let start_health = start_cache.health(HealthType::Init);
+            if start_health <= 0 {
                 return Ok(0);
             }
+
+            // The perp market's contribution to the health above may be capped. But we need to trade
+            // enough to fully reduce any positive-pnl buffer. Thus get the uncapped health:
+            let perp_info = &start_cache.perp_infos[perp_info_index];
+            let start_health_uncapped = start_health
+                - perp_info.health_contribution(HealthType::Init)
+                + perp_info.uncapped_health_contribution(HealthType::Init);
+
             // We add 1 here because health is computed for truncated base_lots and we want to guarantee
             // zero_health_ratio <= 0.
             let zero_health_amount = case1_start_i80f48
-                - case1_start_health / final_health_slope / base_lot_size
+                - start_health_uncapped / final_health_slope / base_lot_size
                 + I80F48::ONE;
             let zero_health_ratio = health_ratio_after_trade_trunc(zero_health_amount);
+            assert!(zero_health_ratio <= 0);
 
             binary_search(
                 case1_start_i80f48,
@@ -323,7 +337,6 @@ fn binary_search(
         }
         let new = I80F48::from_num(0.5) * (left + right);
         let new_value = fun(new);
-        println!("l {} r {} v {}", left, right, new_value);
         let error = new_value - target_value;
         if error > 0 && error < target_error {
             return Ok(new);
@@ -655,7 +668,7 @@ mod tests {
                     println!("test 0: existing {existing}, side {side:?}");
                     for price_factor in [0.8, 1.0, 1.1] {
                         for ratio in 1..=100 {
-                            check_max_trade(&health_cache, side, ratio as f64, price_factor);
+                            check_max_trade(&c, side, ratio as f64, price_factor);
                         }
                     }
                 }
