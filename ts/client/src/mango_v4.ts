@@ -2860,6 +2860,10 @@ export type MangoV4 = {
         {
           "name": "limit",
           "type": "u8"
+        },
+        {
+          "name": "maxOracleStalenessSlots",
+          "type": "i32"
         }
       ]
     },
@@ -4917,19 +4921,14 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "padding2",
-            "docs": [
-              "Tracks what the position is to calculate average entry & break even price"
-            ],
-            "type": {
-              "array": [
-                "u8",
-                8
-              ]
-            }
+            "name": "settlePnlLimitSettledInCurrentWindowNative",
+            "type": "i64"
           },
           {
             "name": "quoteRunningNative",
+            "docs": [
+              "Tracks what the position is to calculate average entry & break even price"
+            ],
             "type": "i64"
           },
           {
@@ -4999,11 +4998,9 @@ export type MangoV4 = {
           },
           {
             "name": "realizedPnlNative",
-            "type": "i64"
-          },
-          {
-            "name": "settlePnlLimitSettledInCurrentWindowNative",
-            "type": "i64"
+            "type": {
+              "defined": "I80F48"
+            }
           }
         ]
       }
@@ -6041,6 +6038,10 @@ export type MangoV4 = {
               {
                 "name": "peg_limit",
                 "type": "i64"
+              },
+              {
+                "name": "max_oracle_staleness_slots",
+                "type": "i32"
               }
             ]
           }
@@ -10058,6 +10059,10 @@ export const IDL: MangoV4 = {
         {
           "name": "limit",
           "type": "u8"
+        },
+        {
+          "name": "maxOracleStalenessSlots",
+          "type": "i32"
         }
       ]
     },
@@ -12115,19 +12120,14 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "padding2",
-            "docs": [
-              "Tracks what the position is to calculate average entry & break even price"
-            ],
-            "type": {
-              "array": [
-                "u8",
-                8
-              ]
-            }
+            "name": "settlePnlLimitSettledInCurrentWindowNative",
+            "type": "i64"
           },
           {
             "name": "quoteRunningNative",
+            "docs": [
+              "Tracks what the position is to calculate average entry & break even price"
+            ],
             "type": "i64"
           },
           {
@@ -12197,11 +12197,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "realizedPnlNative",
-            "type": "i64"
-          },
-          {
-            "name": "settlePnlLimitSettledInCurrentWindowNative",
-            "type": "i64"
+            "type": {
+              "defined": "I80F48"
+            }
           }
         ]
       }
@@ -13239,6 +13237,10 @@ export const IDL: MangoV4 = {
               {
                 "name": "peg_limit",
                 "type": "i64"
+              },
+              {
+                "name": "max_oracle_staleness_slots",
+                "type": "i32"
               }
             ]
           }
