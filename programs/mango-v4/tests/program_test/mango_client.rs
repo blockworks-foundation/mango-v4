@@ -2428,7 +2428,7 @@ pub struct PerpCreateMarketInstruction {
     pub settle_fee_amount_threshold: f32,
     pub settle_fee_fraction_low_health: f32,
     pub settle_pnl_limit_factor: f32,
-    pub settle_pnl_limit_factor_window_size_ts: u64,
+    pub settle_pnl_limit_window_size_ts: u64,
 }
 impl PerpCreateMarketInstruction {
     pub async fn with_new_book_and_queue(
@@ -2485,7 +2485,7 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             settle_fee_amount_threshold: self.settle_fee_amount_threshold,
             settle_fee_fraction_low_health: self.settle_fee_fraction_low_health,
             settle_pnl_limit_factor: self.settle_pnl_limit_factor,
-            settle_pnl_limit_factor_window_size_ts: self.settle_pnl_limit_factor_window_size_ts,
+            settle_pnl_limit_window_size_ts: self.settle_pnl_limit_window_size_ts,
         };
 
         let perp_market = Pubkey::find_program_address(
@@ -2560,7 +2560,7 @@ impl ClientInstruction for PerpResetStablePriceModel {
             stable_price_delay_growth_limit_opt: None,
             stable_price_growth_limit_opt: None,
             settle_pnl_limit_factor_opt: None,
-            settle_pnl_limit_factor_window_size_ts: None,
+            settle_pnl_limit_window_size_ts: None,
         };
 
         let accounts = Self::Accounts {

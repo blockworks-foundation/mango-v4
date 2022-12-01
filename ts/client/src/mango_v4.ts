@@ -2463,7 +2463,7 @@ export type MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "settlePnlLimitFactorWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTs",
           "type": "u64"
         }
       ]
@@ -2634,7 +2634,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "settlePnlLimitFactorWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTs",
           "type": {
             "option": "u64"
           }
@@ -4318,7 +4318,7 @@ export type MangoV4 = {
             "type": "f32"
           },
           {
-            "name": "settlePnlLimitFactorWindowSizeTs",
+            "name": "settlePnlLimitWindowSizeTs",
             "type": "u64"
           },
           {
@@ -9682,7 +9682,7 @@ export const IDL: MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "settlePnlLimitFactorWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTs",
           "type": "u64"
         }
       ]
@@ -9853,7 +9853,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "settlePnlLimitFactorWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTs",
           "type": {
             "option": "u64"
           }
@@ -11537,7 +11537,7 @@ export const IDL: MangoV4 = {
             "type": "f32"
           },
           {
-            "name": "settlePnlLimitFactorWindowSizeTs",
+            "name": "settlePnlLimitWindowSizeTs",
             "type": "u64"
           },
           {
