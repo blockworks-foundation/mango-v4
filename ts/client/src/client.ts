@@ -1757,6 +1757,7 @@ export class MangoClient {
         reduceOnly ? reduceOnly : false,
         new BN(expiryTimestamp ? expiryTimestamp : 0),
         limit ? limit : 10,
+        -1,
       )
       .accounts({
         group: group.publicKey,
