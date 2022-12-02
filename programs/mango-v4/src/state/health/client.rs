@@ -64,7 +64,7 @@ impl HealthCache {
 
         let mut source_bank = source_bank.clone();
         source_bank
-            .withdraw_with_fee(&mut source_position, amount, 0)
+            .withdraw_with_fee(&mut source_position, amount, 0, I80F48::ZERO)
             .unwrap();
         let mut target_bank = target_bank.clone();
         target_bank
