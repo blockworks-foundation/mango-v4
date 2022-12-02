@@ -2744,6 +2744,7 @@ impl ClientInstruction for PerpPlaceOrderPeggedInstruction {
             reduce_only: false,
             expiry_timestamp: 0,
             limit: 10,
+            max_oracle_staleness_slots: -1,
         };
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();

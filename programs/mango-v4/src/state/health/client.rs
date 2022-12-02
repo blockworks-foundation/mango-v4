@@ -6,7 +6,7 @@ use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
 use crate::error::*;
-use crate::state::{PerpMarketIndex, TokenIndex};
+use crate::state::{Bank, MangoAccountValue, PerpMarketIndex};
 use crate::util::checked_math as cm;
 
 use super::*;
@@ -43,6 +43,44 @@ impl HealthCache {
         }
     }
 
+    fn cache_after_swap(
+        &self,
+        account: &MangoAccountValue,
+        source_bank: &Bank,
+        target_bank: &Bank,
+        amount: I80F48,
+        price: I80F48,
+    ) -> Self {
+        let mut source_position = account
+            .token_position(source_bank.token_index)
+            .map(|v| v.clone())
+            .unwrap_or_default();
+        let mut target_position = account
+            .token_position(target_bank.token_index)
+            .map(|v| v.clone())
+            .unwrap_or_default();
+
+        let target_amount = cm!(amount * price);
+
+        let mut source_bank = source_bank.clone();
+        source_bank
+            .withdraw_with_fee(&mut source_position, amount, 0)
+            .unwrap();
+        let mut target_bank = target_bank.clone();
+        target_bank
+            .deposit(&mut target_position, target_amount, 0)
+            .unwrap();
+
+        let mut resulting_cache = self.clone();
+        resulting_cache
+            .adjust_token_balance(&source_bank, -amount)
+            .unwrap();
+        resulting_cache
+            .adjust_token_balance(&target_bank, target_amount)
+            .unwrap();
+        resulting_cache
+    }
+
     /// How much source native tokens may be swapped for target tokens while staying
     /// above the min_ratio health ratio.
     ///
@@ -54,8 +92,9 @@ impl HealthCache {
     /// NOTE: keep getMaxSourceForTokenSwap in ts/client in sync with changes here
     pub fn max_swap_source_for_health_ratio(
         &self,
-        source: TokenIndex,
-        target: TokenIndex,
+        account: &MangoAccountValue,
+        source_bank: &Bank,
+        target_bank: &Bank,
         price: I80F48,
         min_ratio: I80F48,
     ) -> Result<I80F48> {
@@ -74,8 +113,8 @@ impl HealthCache {
             return Ok(I80F48::ZERO);
         }
 
-        let source_index = find_token_info_index(&self.token_infos, source)?;
-        let target_index = find_token_info_index(&self.token_infos, target)?;
+        let source_index = find_token_info_index(&self.token_infos, source_bank.token_index)?;
+        let target_index = find_token_info_index(&self.token_infos, target_bank.token_index)?;
         let source = &self.token_infos[source_index];
         let target = &self.token_infos[target_index];
 
@@ -89,10 +128,7 @@ impl HealthCache {
         }
 
         let cache_after_swap = |amount: I80F48| {
-            let mut adjusted_cache = self.clone();
-            adjusted_cache.token_infos[source_index].balance_native -= amount;
-            adjusted_cache.token_infos[target_index].balance_native += cm!(amount * price);
-            adjusted_cache
+            self.cache_after_swap(account, source_bank, target_bank, amount, price)
         };
         let health_ratio_after_swap =
             |amount| cache_after_swap(amount).health_ratio(HealthType::Init);
@@ -262,16 +298,30 @@ impl HealthCache {
             }
         } else if case1_start_ratio >= min_ratio {
             // Must reach min_ratio to the right of case1_start
-            let case1_start_health = cache_after_trade(case1_start).health(HealthType::Init);
-            if case1_start_health <= 0 {
+
+            // Need to figure out how many lots to trade to reach zero health (zero_health_amount).
+            // We do this by looking at the starting health and the health slope per
+            // traded base lot (final_health_slope).
+            let start_cache = cache_after_trade(case1_start);
+            let start_health = start_cache.health(HealthType::Init);
+            if start_health <= 0 {
                 return Ok(0);
             }
+
+            // The perp market's contribution to the health above may be capped. But we need to trade
+            // enough to fully reduce any positive-pnl buffer. Thus get the uncapped health:
+            let perp_info = &start_cache.perp_infos[perp_info_index];
+            let start_health_uncapped = start_health
+                - perp_info.health_contribution(HealthType::Init)
+                + perp_info.uncapped_health_contribution(HealthType::Init);
+
             // We add 1 here because health is computed for truncated base_lots and we want to guarantee
             // zero_health_ratio <= 0.
             let zero_health_amount = case1_start_i80f48
-                - case1_start_health / final_health_slope / base_lot_size
+                - start_health_uncapped / final_health_slope / base_lot_size
                 + I80F48::ONE;
             let zero_health_ratio = health_ratio_after_trade_trunc(zero_health_amount);
+            assert!(zero_health_ratio <= 0);
 
             binary_search(
                 case1_start_i80f48,
@@ -323,7 +373,6 @@ fn binary_search(
         }
         let new = I80F48::from_num(0.5) * (left + right);
         let new_value = fun(new);
-        println!("l {} r {} v {}", left, right, new_value);
         let error = new_value - target_value;
         if error > 0 && error < target_error {
             return Ok(new);
@@ -366,6 +415,15 @@ mod tests {
             balance_native: I80F48::ZERO,
         };
 
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let account = MangoAccountValue::from_bytes(&buffer).unwrap();
+
+        let group = Pubkey::new_unique();
+        let (mut bank0, _) = mock_bank_and_oracle(group, 0, 1.0, 0.1, 0.1);
+        let (mut bank1, _) = mock_bank_and_oracle(group, 1, 5.0, 0.2, 0.2);
+        let (mut bank2, _) = mock_bank_and_oracle(group, 2, 5.0, 0.3, 0.3);
+        let banks = [bank0.data(), bank1.data(), bank2.data()];
+
         let health_cache = HealthCache {
             token_infos: vec![
                 TokenInfo {
@@ -394,8 +452,9 @@ mod tests {
         assert_eq!(
             health_cache
                 .max_swap_source_for_health_ratio(
-                    0,
-                    1,
+                    &account,
+                    banks[0],
+                    banks[1],
                     I80F48::from_num(2.0 / 3.0),
                     I80F48::from_num(50.0)
                 )
@@ -412,15 +471,17 @@ mod tests {
                                     target: TokenIndex,
                                     ratio: f64,
                                     price_factor: f64| {
-            let mut c = c.clone();
             let source_price = &c.token_infos[source as usize].prices;
+            let source_bank = &banks[source as usize];
             let target_price = &c.token_infos[target as usize].prices;
+            let target_bank = &banks[target as usize];
             let swap_price =
                 I80F48::from_num(price_factor) * source_price.oracle / target_price.oracle;
             let source_amount = c
                 .max_swap_source_for_health_ratio(
-                    source,
-                    target,
+                    &account,
+                    source_bank,
+                    target_bank,
                     swap_price,
                     I80F48::from_num(ratio),
                 )
@@ -428,12 +489,16 @@ mod tests {
             if source_amount == I80F48::MAX {
                 return (f64::MAX, f64::MAX);
             }
-            c.adjust_token_balance(source, -source_amount).unwrap();
-            c.adjust_token_balance(target, source_amount * swap_price)
-                .unwrap();
+            let after_swap = c.cache_after_swap(
+                &account,
+                source_bank,
+                target_bank,
+                source_amount,
+                swap_price,
+            );
             (
                 source_amount.to_num::<f64>(),
-                c.health_ratio(HealthType::Init).to_num::<f64>(),
+                after_swap.health_ratio(HealthType::Init).to_num::<f64>(),
             )
         };
         let check_max_swap_result = |c: &HealthCache,
@@ -655,7 +720,7 @@ mod tests {
                     println!("test 0: existing {existing}, side {side:?}");
                     for price_factor in [0.8, 1.0, 1.1] {
                         for ratio in 1..=100 {
-                            check_max_trade(&health_cache, side, ratio as f64, price_factor);
+                            check_max_trade(&c, side, ratio as f64, price_factor);
                         }
                     }
                 }

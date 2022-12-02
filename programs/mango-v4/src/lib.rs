@@ -618,8 +618,14 @@ pub mod mango_v4 {
         // Use this to limit compute used during order matching.
         // When the limit is reached, processing stops and the instruction succeeds.
         limit: u8,
+
+        // Oracle staleness limit, in slots. Set to -1 to disable.
+        //
+        // WARNING: Not currently implemented.
+        max_oracle_staleness_slots: i32,
     ) -> Result<()> {
         require_gte!(peg_limit, -1);
+        require_eq!(max_oracle_staleness_slots, -1); // unimplemented
 
         use crate::state::{Order, OrderParams};
         let time_in_force = match Order::tif_from_expiry(expiry_timestamp) {
@@ -640,6 +646,7 @@ pub mod mango_v4 {
                 price_offset_lots,
                 order_type: order_type.to_post_order_type()?,
                 peg_limit,
+                max_oracle_staleness_slots,
             },
         };
         instructions::perp_place_order(ctx, order, limit)

@@ -81,6 +81,39 @@ pub fn division_i80f48_f64(a: I80F48, b: I80F48) -> I80F48 {
     r
 }
 
+#[inline(never)]
+pub fn mul_f64(a: f64, b: f64) -> f64 {
+    msg!("mul_f64");
+    sol_log_compute_units();
+    let r = a * b;
+    if r.is_nan() {
+        panic!("nan"); // here as a side-effect to avoid reordering
+    }
+    sol_log_compute_units();
+    r
+}
+
+#[inline(never)]
+pub fn mul_i80f48(a: I80F48, b: I80F48) -> I80F48 {
+    msg!("mul_i80f48");
+    sol_log_compute_units();
+    let r = a.checked_mul(b).unwrap();
+    sol_log_compute_units();
+    r
+}
+
+#[inline(never)]
+pub fn i80f48_to_f64(a: I80F48) -> f64 {
+    msg!("i80f48_to_f64");
+    sol_log_compute_units();
+    let r = a.to_num::<f64>();
+    if r.is_nan() {
+        panic!("nan"); // here as a side-effect to avoid reordering
+    }
+    sol_log_compute_units();
+    r
+}
+
 pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
     // 101000
     // 477
@@ -98,6 +131,8 @@ pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
         division_i128(a.to_bits(), b.to_bits()); // 100 - 2000 CU
         division_i80f48_30bit(a, b); // 300 CU
         division_i80f48_f64(a, b); // 500 CU
+        mul_i80f48(a >> 64, b >> 64); // 100 CU
+        i80f48_to_f64(a); // 50 CU
     }
 
     {
@@ -124,6 +159,12 @@ pub fn benchmark(_ctx: Context<Benchmark>) -> Result<()> {
         let a = clock.slot as u32;
         let b = clock.unix_timestamp as u32;
         division_u32(a, b); // 20 CU
+    }
+
+    {
+        let a = clock.slot as f64;
+        let b = clock.unix_timestamp as f64;
+        mul_f64(a, b); // 0 CU??
     }
 
     sol_log_compute_units(); // 100321 -> 101

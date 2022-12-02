@@ -344,8 +344,8 @@ pub fn serum3_place_order(
     require_gte!(before_vault, after_vault);
 
     // Charge the difference in vault balance to the user's account
+    let mut payer_bank = ctx.accounts.payer_bank.load_mut()?;
     let vault_difference = {
-        let mut payer_bank = ctx.accounts.payer_bank.load_mut()?;
         let oracle_price =
             payer_bank.oracle_price(&AccountInfoRef::borrow(&ctx.accounts.payer_oracle)?, None)?;
         apply_vault_difference(
@@ -363,7 +363,7 @@ pub fn serum3_place_order(
     // Health check
     //
     if let Some((mut health_cache, pre_health)) = pre_health_opt {
-        vault_difference.adjust_health_cache(&mut health_cache)?;
+        vault_difference.adjust_health_cache(&mut health_cache, &payer_bank)?;
         oo_difference.adjust_health_cache(&mut health_cache, &serum_market)?;
         account.check_health_post(&health_cache, pre_health)?;
     }
@@ -415,8 +415,9 @@ pub struct VaultDifference {
 }
 
 impl VaultDifference {
-    pub fn adjust_health_cache(&self, health_cache: &mut HealthCache) -> Result<()> {
-        health_cache.adjust_token_balance(self.token_index, self.native_change)?;
+    pub fn adjust_health_cache(&self, health_cache: &mut HealthCache, bank: &Bank) -> Result<()> {
+        assert_eq!(bank.token_index, self.token_index);
+        health_cache.adjust_token_balance(bank, self.native_change)?;
         Ok(())
     }
 }

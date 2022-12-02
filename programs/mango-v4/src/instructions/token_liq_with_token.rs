@@ -101,9 +101,18 @@ pub fn token_liq_with_token(
     let liqee_liab_native = liqee_liab_position.native(liab_bank);
     require!(liqee_liab_native.is_negative(), MangoError::SomeError);
 
-    // TODO why sum of both tokens liquidation fees? Add comment
-    let fee_factor = I80F48::ONE + asset_bank.liquidation_fee + liab_bank.liquidation_fee;
-    let liab_price_adjusted = liab_price * fee_factor;
+    // Liquidation fees work by giving the liqor more assets than the oracle price would
+    // indicate. Specifically we choose
+    //   assets =
+    //     liabs * liab_price/asset_price * (1 + liab_liq_fee + asset_liq_fee)
+    // Which means that we use a increased liab price and reduced asset price for the conversion.
+    // It would be more fully correct to use (1+liab_liq_fee)*(1+asset_liq_fee), but for small
+    // fee amounts that is nearly identical.
+    // For simplicity we write
+    //   assets = liabs * liab_price / asset_price * fee_factor
+    //   assets = liabs * liab_price_adjusted / asset_price
+    let fee_factor = cm!(I80F48::ONE + asset_bank.liquidation_fee + liab_bank.liquidation_fee);
+    let liab_price_adjusted = cm!(liab_price * fee_factor);
 
     let init_asset_weight = asset_bank.init_asset_weight;
     let init_liab_weight = liab_bank.init_liab_weight;
@@ -180,12 +189,10 @@ pub fn token_liq_with_token(
     let liqee_assets_native_after = liqee_asset_position.native(asset_bank);
 
     // Update the health cache
+    liqee_health_cache
+        .adjust_token_balance(&liab_bank, cm!(liqee_liab_native_after - liqee_liab_native))?;
     liqee_health_cache.adjust_token_balance(
-        liab_token_index,
-        cm!(liqee_liab_native_after - liqee_liab_native),
-    )?;
-    liqee_health_cache.adjust_token_balance(
-        asset_token_index,
+        &asset_bank,
         cm!(liqee_assets_native_after - liqee_asset_native),
     )?;
 

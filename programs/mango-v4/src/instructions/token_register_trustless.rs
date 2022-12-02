@@ -126,7 +126,9 @@ pub fn token_register_trustless(
             * net_borrows_window_size_ts,
         net_borrows_limit_quote: 1_000_000_000_000, // 1M USD
         net_borrows_in_window: 0,
-        reserved: [0; 2136],
+        borrow_limit_quote: f64::MAX,
+        collateral_limit_quote: f64::MAX,
+        reserved: [0; 2120],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
 
