@@ -130,7 +130,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         a_perp_position.update_and_get_used_settle_limit(&perp_market, now_ts);
     b_perp_position.update_and_get_used_settle_limit(&perp_market, now_ts);
 
-    let a_settleable_pnl = {
+    let a_settleable_pnl = if perp_market.settle_pnl_limit_factor >= 0.0 {
         let realized_pnl = a_perp_position.realized_pnl_native;
         let unrealized_pnl = cm!(a_pnl - realized_pnl);
         let a_base_lots = I80F48::from(a_perp_position.base_position_lots());
@@ -146,6 +146,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         a_pnl
             .min(cm!(realized_pnl + unrealized_pnl_capped_for_window))
             .max(I80F48::ZERO)
+    } else {
+        a_pnl
     };
 
     require!(
@@ -219,7 +221,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     let a_token_position = account_a.token_position_mut(settle_token_index)?.0;
     let b_token_position = account_b.token_position_mut(settle_token_index)?.0;
     bank.deposit(a_token_position, cm!(settlement - fee), now_ts)?;
-    bank.withdraw_with_fee(b_token_position, settlement, now_ts)?;
+    bank.withdraw_with_fee(b_token_position, settlement, now_ts, oracle_price)?;
 
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),

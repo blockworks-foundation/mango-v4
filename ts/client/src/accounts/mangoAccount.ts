@@ -482,29 +482,28 @@ export class MangoAccount {
 
   /**
    * The max amount of given source ui token you can swap to a target token.
-   *  PriceFactor is ratio between A - how many source tokens can be traded for target tokens
-   *  and B - source native oracle price / target native oracle price.
-   *  e.g. a slippage of 5% and some fees which are 1%, then priceFactor = 0.94
-   *  the factor is used to compute how much target can be obtained by swapping source
-   *  in reality, and not only relying on oracle prices, and taking in account e.g. slippage which
-   *  can occur at large size
+   *  Price is simply the source tokens price divided by target tokens price,
+   *  it is supposed to give an indication of how many source tokens can be traded for target tokens,
+   *  it can optionally contain information on slippage and fees.
    * @returns max amount of given source ui token you can swap to a target token, in ui token
    */
   getMaxSourceUiForTokenSwap(
     group: Group,
     sourceMintPk: PublicKey,
     targetMintPk: PublicKey,
-    priceFactor: number,
+    price: number,
   ): number {
     if (sourceMintPk.equals(targetMintPk)) {
       return 0;
     }
+    const s = group.getFirstBankByMint(sourceMintPk);
+    const t = group.getFirstBankByMint(targetMintPk);
     const hc = HealthCache.fromMangoAccount(group, this);
     const maxSource = hc.getMaxSourceForTokenSwap(
-      group.getFirstBankByMint(sourceMintPk),
-      group.getFirstBankByMint(targetMintPk),
+      s,
+      t,
+      I80F48.fromNumber(price * Math.pow(10, t.mintDecimals - s.mintDecimals)),
       I80F48.fromNumber(2), // target 2% health
-      I80F48.fromNumber(priceFactor),
     );
     maxSource.idiv(
       ONE_I80F48().add(
@@ -609,6 +608,8 @@ export class MangoAccount {
   }
 
   /**
+   * TODO REWORK, know to break in binary search, also make work for limit orders
+   *
    * @param group
    * @param externalMarketPk
    * @returns maximum ui quote which can be traded at oracle price for base token given current health
@@ -646,6 +647,7 @@ export class MangoAccount {
   }
 
   /**
+   * TODO REWORK, know to break in binary search, also make work for limit orders
    * @param group
    * @param externalMarketPk
    * @returns maximum ui base which can be traded at oracle price for quote token given current health
@@ -673,7 +675,7 @@ export class MangoAccount {
     // If its a ask then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
     nativeAmount = nativeAmount
-      .div(baseBank.price)
+      // .div(baseBank.price)
       .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
       .div(ONE_I80F48().add(I80F48.fromNumber(group.getSerum3FeeRates(false))));
     return toUiDecimals(
@@ -795,7 +797,10 @@ export class MangoAccount {
   }
 
   /**
+   * TODO: also think about limit orders
    *
+   * The max ui quote you can place a market/ioc bid on the market,
+   * price is the ui price at which you think the order would materialiase.
    * @param group
    * @param perpMarketName
    * @returns maximum ui quote which can be traded at oracle price for quote token given current health
@@ -803,15 +808,13 @@ export class MangoAccount {
   public getMaxQuoteForPerpBidUi(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
+    price: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
-    const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
-      pp
-        ? pp
-        : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
+      I80F48.fromNumber(price),
       PerpOrderSide.bid,
       I80F48.fromNumber(2),
     );
@@ -821,7 +824,10 @@ export class MangoAccount {
   }
 
   /**
+   * TODO: also think about limit orders
    *
+   * The max ui base you can place a market/ioc ask on the market,
+   * price is the ui price at which you think the order would materialiase.
    * @param group
    * @param perpMarketName
    * @param uiPrice ui price at which ask would be placed at
@@ -830,15 +836,13 @@ export class MangoAccount {
   public getMaxBaseForPerpAskUi(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
+    price: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
-    const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
-      pp
-        ? pp
-        : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
+      I80F48.fromNumber(price),
       PerpOrderSide.ask,
       I80F48.fromNumber(2),
     );
@@ -849,6 +853,7 @@ export class MangoAccount {
     group: Group,
     perpMarketIndex: PerpMarketIndex,
     size: number,
+    price: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
@@ -859,8 +864,9 @@ export class MangoAccount {
         pp
           ? pp
           : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
-        perpMarket.uiBaseToLots(size),
         PerpOrderSide.bid,
+        perpMarket.uiBaseToLots(size),
+        I80F48.fromNumber(price),
         HealthType.init,
       )
       .toNumber();
@@ -870,6 +876,7 @@ export class MangoAccount {
     group: Group,
     perpMarketIndex: PerpMarketIndex,
     size: number,
+    price: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
@@ -880,8 +887,9 @@ export class MangoAccount {
         pp
           ? pp
           : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
-        perpMarket.uiBaseToLots(size),
         PerpOrderSide.ask,
+        perpMarket.uiBaseToLots(size),
+        I80F48.fromNumber(price),
         HealthType.init,
       )
       .toNumber();
@@ -1228,6 +1236,7 @@ export class PerpPosition {
     );
   }
 
+  // TODO FUTURE: double check with program side code that this is in sycn with latest changes in program
   public getEntryPrice(perpMarket: PerpMarket): BN {
     if (this.basePositionLots.eq(new BN(0))) {
       return new BN(0);
@@ -1237,6 +1246,7 @@ export class PerpPosition {
       .abs();
   }
 
+  // TODO  FUTURE: double check with program side code that this is in sycn with latest changes in program
   public getBreakEvenPrice(perpMarket: PerpMarket): BN {
     if (this.basePositionLots.eq(new BN(0))) {
       return new BN(0);

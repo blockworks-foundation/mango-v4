@@ -579,7 +579,9 @@ impl HealthCache {
 
         for perp_info in self.perp_infos.iter() {
             if perp_info.trusted_market {
-                let positive_contrib = perp_info.health_contribution(health_type).max(I80F48::ZERO);
+                let positive_contrib = perp_info
+                    .uncapped_health_contribution(health_type)
+                    .max(I80F48::ZERO);
                 cm!(health += positive_contrib);
             }
         }
@@ -758,6 +760,7 @@ mod tests {
                 account.ensure_token_position(4).unwrap().0,
                 I80F48::from(10),
                 DUMMY_NOW_TS,
+                DUMMY_PRICE,
             )
             .unwrap();
 
@@ -841,6 +844,7 @@ mod tests {
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(testcase.token1),
                 DUMMY_NOW_TS,
+                DUMMY_PRICE,
             )
             .unwrap();
         bank2
@@ -849,6 +853,7 @@ mod tests {
                 account.ensure_token_position(4).unwrap().0,
                 I80F48::from(testcase.token2),
                 DUMMY_NOW_TS,
+                DUMMY_PRICE,
             )
             .unwrap();
         bank3
@@ -857,6 +862,7 @@ mod tests {
                 account.ensure_token_position(5).unwrap().0,
                 I80F48::from(testcase.token3),
                 DUMMY_NOW_TS,
+                DUMMY_PRICE,
             )
             .unwrap();
         for (settings, bank) in testcase

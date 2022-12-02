@@ -20,6 +20,7 @@ import { buildVersionedTx } from '../utils';
 // * solana airdrop 1  -k ~/.config/solana/admin.json
 //
 
+// TODO: switch out with devnet openbook markets
 const DEVNET_SERUM3_MARKETS = new Map([
   ['BTC/USDC', 'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB'],
   ['SOL/USDC', '5xWpt56U1NCuHoAEtpLeUrQcxDkEpNfScjfLFaRzLPgR'],
@@ -44,6 +45,7 @@ const DEVNET_ORACLES = new Map([
   ['SRM', '992moaMQKs32GKZ9dxi8keyM2bUmbrwBZpK4p2K6X5Vs'],
 ]);
 
+// TODO: should these constants be baked right into client.ts or even program?
 const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
 const NET_BORROWS_WINDOW_SIZE_TS = 24 * 60 * 60;
 const NET_BORROWS_LIMIT_NATIVE = 1 * Math.pow(10, 7) * Math.pow(10, 6);
@@ -396,6 +398,8 @@ async function main() {
       1000000,
       0.05,
       0,
+      1.0,
+      2 * 60 * 60,
     );
     console.log('done');
   } catch (error) {
@@ -425,9 +429,14 @@ async function main() {
         1,
         1,
         0,
+        null,
+        null,
+        null,
         MIN_VAULT_TO_DEPOSITS_RATIO,
         NET_BORROWS_WINDOW_SIZE_TS,
         NET_BORROWS_LIMIT_NATIVE,
+        false,
+        false,
       );
       console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
       await group.reloadAll(client);
@@ -452,9 +461,14 @@ async function main() {
         1.1,
         1.2,
         0.05,
+        null,
+        null,
+        null,
         MIN_VAULT_TO_DEPOSITS_RATIO,
         NET_BORROWS_WINDOW_SIZE_TS,
         NET_BORROWS_LIMIT_NATIVE,
+        false,
+        false,
       );
       console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
       await group.reloadAll(client);
@@ -479,9 +493,14 @@ async function main() {
         1.1,
         1.2,
         0.05,
+        null,
+        null,
+        null,
         MIN_VAULT_TO_DEPOSITS_RATIO,
         NET_BORROWS_WINDOW_SIZE_TS,
         NET_BORROWS_LIMIT_NATIVE,
+        false,
+        false,
       );
       console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
       await group.reloadAll(client);
@@ -517,6 +536,8 @@ async function main() {
         MIN_VAULT_TO_DEPOSITS_RATIO,
         NET_BORROWS_WINDOW_SIZE_TS,
         NET_BORROWS_LIMIT_NATIVE,
+        1.0,
+        2 * 60 * 60,
       );
       console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
       await group.reloadAll(client);

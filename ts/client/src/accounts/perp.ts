@@ -5,7 +5,12 @@ import Big from 'big.js';
 import { MangoClient } from '../client';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
 import { As, toNative, U64_MAX_BN } from '../utils';
-import { OracleConfig, QUOTE_DECIMALS, TokenIndex } from './bank';
+import {
+  OracleConfig,
+  QUOTE_DECIMALS,
+  StablePriceModel,
+  TokenIndex,
+} from './bank';
 import { Group } from './group';
 import { MangoAccount } from './mangoAccount';
 
@@ -73,6 +78,7 @@ export class PerpMarket {
       settleFeeFlat: number;
       settleFeeAmountThreshold: number;
       settleFeeFractionLowHealth: number;
+      stablePriceModel: StablePriceModel;
     },
   ): PerpMarket {
     return new PerpMarket(
@@ -112,6 +118,7 @@ export class PerpMarket {
       obj.settleFeeFlat,
       obj.settleFeeAmountThreshold,
       obj.settleFeeFractionLowHealth,
+      obj.stablePriceModel,
     );
   }
 
@@ -152,6 +159,7 @@ export class PerpMarket {
     public settleFeeFlat: number,
     public settleFeeAmountThreshold: number,
     public settleFeeFractionLowHealth: number,
+    public stablePriceModel: StablePriceModel,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.maintAssetWeight = I80F48.from(maintAssetWeight);

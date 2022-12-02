@@ -50,8 +50,10 @@ pub fn token_edit(
     stable_price_delay_growth_limit_opt: Option<f32>,
     stable_price_growth_limit_opt: Option<f32>,
     min_vault_to_deposits_ratio_opt: Option<f64>,
-    net_borrows_limit_native_opt: Option<i64>,
+    net_borrows_limit_quote_opt: Option<i64>,
     net_borrows_window_size_ts_opt: Option<u64>,
+    reset_stable_price: bool,
+    reset_net_borrow_limit: bool,
 ) -> Result<()> {
     let mut mint_info = ctx.accounts.mint_info.load_mut()?;
     mint_info.verify_banks_ais(ctx.remaining_accounts)?;
@@ -75,8 +77,9 @@ pub fn token_edit(
         if let Some(oracle) = oracle_opt {
             bank.oracle = oracle;
             mint_info.oracle = oracle;
-
-            require_keys_eq!(oracle, ctx.accounts.oracle.key());
+        }
+        if reset_stable_price {
+            require_keys_eq!(bank.oracle, ctx.accounts.oracle.key());
             let oracle_price =
                 bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
             bank.stable_price_model.reset_to_price(
@@ -148,11 +151,15 @@ pub fn token_edit(
         if let Some(min_vault_to_deposits_ratio) = min_vault_to_deposits_ratio_opt {
             bank.min_vault_to_deposits_ratio = min_vault_to_deposits_ratio;
         }
-        if let Some(net_borrows_limit_native) = net_borrows_limit_native_opt {
-            bank.net_borrows_limit_native = net_borrows_limit_native;
+        if let Some(net_borrows_limit_quote) = net_borrows_limit_quote_opt {
+            bank.net_borrows_limit_quote = net_borrows_limit_quote;
         }
         if let Some(net_borrows_window_size_ts) = net_borrows_window_size_ts_opt {
             bank.net_borrows_window_size_ts = net_borrows_window_size_ts;
+        }
+        if reset_net_borrow_limit {
+            bank.net_borrows_in_window = 0;
+            bank.last_net_borrows_window_start_ts = 0;
         }
 
         // unchanged -

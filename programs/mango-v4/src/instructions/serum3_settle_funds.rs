@@ -165,6 +165,10 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
             &mut base_bank,
             after_base_vault,
             before_base_vault,
+            // Since after >= before, we know this can be a deposit
+            // and no net borrow check will be necessary, meaning
+            // we don't need an oracle price.
+            None,
         )?;
         apply_vault_difference(
             ctx.accounts.account.key(),
@@ -173,6 +177,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
             &mut quote_bank,
             after_quote_vault,
             before_quote_vault,
+            None,
         )?;
     }
 

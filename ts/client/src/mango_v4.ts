@@ -351,7 +351,7 @@ export type MangoV4 = {
           "type": "u64"
         },
         {
-          "name": "netBorrowsLimitNative",
+          "name": "netBorrowsLimitQuote",
           "type": "i64"
         }
       ]
@@ -614,7 +614,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "netBorrowsLimitNativeOpt",
+          "name": "netBorrowsLimitQuoteOpt",
           "type": {
             "option": "i64"
           }
@@ -624,6 +624,14 @@ export type MangoV4 = {
           "type": {
             "option": "u64"
           }
+        },
+        {
+          "name": "resetStablePrice",
+          "type": "bool"
+        },
+        {
+          "name": "resetNetBorrowLimit",
+          "type": "bool"
         }
       ]
     },
@@ -1736,6 +1744,11 @@ export type MangoV4 = {
           ]
         },
         {
+          "name": "payerOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenProgram",
           "isMut": false,
           "isSigner": false
@@ -2450,7 +2463,7 @@ export type MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "settlePnlLimitFactorWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTs",
           "type": "u64"
         }
       ]
@@ -2621,7 +2634,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "settlePnlLimitFactorWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTs",
           "type": {
             "option": "u64"
           }
@@ -3621,30 +3634,70 @@ export type MangoV4 = {
           },
           {
             "name": "minVaultToDepositsRatio",
+            "docs": [
+              "Min fraction of deposits that must remain in the vault when borrowing."
+            ],
             "type": "f64"
           },
           {
             "name": "netBorrowsWindowSizeTs",
+            "docs": [
+              "Size in seconds of a net borrows window"
+            ],
             "type": "u64"
           },
           {
             "name": "lastNetBorrowsWindowStartTs",
+            "docs": [
+              "Timestamp at which the last net borrows window started"
+            ],
             "type": "u64"
           },
           {
-            "name": "netBorrowsLimitNative",
+            "name": "netBorrowsLimitQuote",
+            "docs": [
+              "Net borrow limit per window in quote native; set to -1 to disable."
+            ],
             "type": "i64"
           },
           {
-            "name": "netBorrowsWindowNative",
+            "name": "netBorrowsInWindow",
+            "docs": [
+              "Sum of all deposits and borrows in the last window, in native units."
+            ],
             "type": "i64"
+          },
+          {
+            "name": "borrowLimitQuote",
+            "docs": [
+              "Soft borrow limit in native quote",
+              "",
+              "Once the borrows on the bank exceed this quote value, init_liab_weight is scaled up.",
+              "Set to f64::MAX to disable.",
+              "",
+              "See scaled_init_liab_weight()."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "collateralLimitQuote",
+            "docs": [
+              "Limit for collateral of deposits",
+              "",
+              "Once the deposits in the bank exceed this quote value, init_asset_weight is scaled",
+              "down to keep the total collateral value constant.",
+              "Set to f64::MAX to disable.",
+              "",
+              "See scaled_init_asset_weight()."
+            ],
+            "type": "f64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2136
+                2120
               ]
             }
           }
@@ -4291,10 +4344,17 @@ export type MangoV4 = {
           },
           {
             "name": "settlePnlLimitFactor",
+            "docs": [
+              "Fraction of perp base value that can be settled each window.",
+              "Set to a negative value to disable the limit."
+            ],
             "type": "f32"
           },
           {
-            "name": "settlePnlLimitFactorWindowSizeTs",
+            "name": "settlePnlLimitWindowSizeTs",
+            "docs": [
+              "Window size in seconds for the perp settlement limit"
+            ],
             "type": "u64"
           },
           {
@@ -7550,7 +7610,7 @@ export const IDL: MangoV4 = {
           "type": "u64"
         },
         {
-          "name": "netBorrowsLimitNative",
+          "name": "netBorrowsLimitQuote",
           "type": "i64"
         }
       ]
@@ -7813,7 +7873,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "netBorrowsLimitNativeOpt",
+          "name": "netBorrowsLimitQuoteOpt",
           "type": {
             "option": "i64"
           }
@@ -7823,6 +7883,14 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u64"
           }
+        },
+        {
+          "name": "resetStablePrice",
+          "type": "bool"
+        },
+        {
+          "name": "resetNetBorrowLimit",
+          "type": "bool"
         }
       ]
     },
@@ -8935,6 +9003,11 @@ export const IDL: MangoV4 = {
           ]
         },
         {
+          "name": "payerOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenProgram",
           "isMut": false,
           "isSigner": false
@@ -9649,7 +9722,7 @@ export const IDL: MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "settlePnlLimitFactorWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTs",
           "type": "u64"
         }
       ]
@@ -9820,7 +9893,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "settlePnlLimitFactorWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTs",
           "type": {
             "option": "u64"
           }
@@ -10820,30 +10893,70 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "minVaultToDepositsRatio",
+            "docs": [
+              "Min fraction of deposits that must remain in the vault when borrowing."
+            ],
             "type": "f64"
           },
           {
             "name": "netBorrowsWindowSizeTs",
+            "docs": [
+              "Size in seconds of a net borrows window"
+            ],
             "type": "u64"
           },
           {
             "name": "lastNetBorrowsWindowStartTs",
+            "docs": [
+              "Timestamp at which the last net borrows window started"
+            ],
             "type": "u64"
           },
           {
-            "name": "netBorrowsLimitNative",
+            "name": "netBorrowsLimitQuote",
+            "docs": [
+              "Net borrow limit per window in quote native; set to -1 to disable."
+            ],
             "type": "i64"
           },
           {
-            "name": "netBorrowsWindowNative",
+            "name": "netBorrowsInWindow",
+            "docs": [
+              "Sum of all deposits and borrows in the last window, in native units."
+            ],
             "type": "i64"
+          },
+          {
+            "name": "borrowLimitQuote",
+            "docs": [
+              "Soft borrow limit in native quote",
+              "",
+              "Once the borrows on the bank exceed this quote value, init_liab_weight is scaled up.",
+              "Set to f64::MAX to disable.",
+              "",
+              "See scaled_init_liab_weight()."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "collateralLimitQuote",
+            "docs": [
+              "Limit for collateral of deposits",
+              "",
+              "Once the deposits in the bank exceed this quote value, init_asset_weight is scaled",
+              "down to keep the total collateral value constant.",
+              "Set to f64::MAX to disable.",
+              "",
+              "See scaled_init_asset_weight()."
+            ],
+            "type": "f64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2136
+                2120
               ]
             }
           }
@@ -11490,10 +11603,17 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "settlePnlLimitFactor",
+            "docs": [
+              "Fraction of perp base value that can be settled each window.",
+              "Set to a negative value to disable the limit."
+            ],
             "type": "f32"
           },
           {
-            "name": "settlePnlLimitFactorWindowSizeTs",
+            "name": "settlePnlLimitWindowSizeTs",
+            "docs": [
+              "Window size in seconds for the perp settlement limit"
+            ],
             "type": "u64"
           },
           {

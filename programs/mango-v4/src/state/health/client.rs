@@ -64,7 +64,7 @@ impl HealthCache {
 
         let mut source_bank = source_bank.clone();
         source_bank
-            .withdraw_with_fee(&mut source_position, amount, 0)
+            .withdraw_with_fee(&mut source_position, amount, 0, I80F48::ZERO)
             .unwrap();
         let mut target_bank = target_bank.clone();
         target_bank
@@ -121,6 +121,9 @@ impl HealthCache {
         // If the price is sufficiently good, then health will just increase from swapping:
         // once we've swapped enough, swapping x reduces health by x * source_liab_weight and
         // increases it by x * target_asset_weight * price_factor.
+        // This is just the highest final slope we can get. If the health weights are
+        // scaled because the collateral or borrow limits are exceeded, health will decrease
+        // more quickly than this number.
         let final_health_slope = -source.init_liab_weight * source.prices.liab(health_type)
             + target.init_asset_weight * target.prices.asset(health_type) * price;
         if final_health_slope >= 0 {
@@ -756,6 +759,7 @@ mod tests {
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(100),
                 DUMMY_NOW_TS,
+                DUMMY_PRICE,
             )
             .unwrap();
 
@@ -838,6 +842,7 @@ mod tests {
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(100),
                 DUMMY_NOW_TS,
+                DUMMY_PRICE,
             )
             .unwrap();
         bank1
@@ -846,6 +851,7 @@ mod tests {
                 account2.ensure_token_position(1).unwrap().0,
                 I80F48::from(-100),
                 DUMMY_NOW_TS,
+                DUMMY_PRICE,
             )
             .unwrap();
 

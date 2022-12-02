@@ -33,78 +33,31 @@ async fn test_bank_utilization_based_borrow_limit() -> Result<(), TransportError
     .create(solana)
     .await;
 
-    let account_0 = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 0,
-            token_count: 2,
-            serum3_count: 0,
-            perp_count: 0,
-            perp_oo_count: 0,
-            group,
-            owner,
-            payer,
-        },
-    )
-    .await
-    .unwrap()
-    .account;
-
-    let account_1 = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 1,
-            token_count: 2,
-            serum3_count: 0,
-            perp_count: 0,
-            perp_oo_count: 0,
-            group,
-            owner,
-            payer,
-        },
-    )
-    .await
-    .unwrap()
-    .account;
-
     //
-    // SETUP: Deposit user funds
+    // SETUP: Prepare accounts
     //
-    {
-        let deposit_amount = initial_token_deposit;
-
-        // account_0 deposits mint_0
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: deposit_amount,
-                account: account_0,
-                owner,
-                token_account: payer_mint_accounts[0],
-                token_authority: payer,
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
-        solana.advance_clock().await;
-
-        // account_1 deposits mint_1
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: deposit_amount * 10,
-                account: account_1,
-                owner,
-                token_account: payer_mint_accounts[1],
-                token_authority: payer,
-                bank_index: 1,
-            },
-        )
-        .await
-        .unwrap();
-        solana.advance_clock().await;
-    }
+    let account_0 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        &mints[0..1],
+        initial_token_deposit,
+        0,
+    )
+    .await;
+    let account_1 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        &mints[1..2],
+        initial_token_deposit * 10,
+        1,
+    )
+    .await;
 
     {
         let deposit_amount = initial_token_deposit;
@@ -187,94 +140,55 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
     .create(solana)
     .await;
 
-    let account_0 = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 0,
-            token_count: 2,
-            serum3_count: 0,
-            perp_count: 0,
-            perp_oo_count: 0,
-            group,
-            owner,
-            payer,
-        },
-    )
-    .await
-    .unwrap()
-    .account;
+    let reset_net_borrows = || {
+        let mint = tokens[0].mint.pubkey;
+        async move {
+            send_tx(
+                solana,
+                TokenResetNetBorrows {
+                    group,
+                    admin,
+                    mint,
+                    // we want to test net borrow limits in isolation
+                    min_vault_to_deposits_ratio_opt: Some(0.0),
+                    net_borrows_limit_quote_opt: Some(6000),
+                    net_borrows_window_size_ts_opt: Some(1000),
+                },
+            )
+            .await
+            .unwrap();
+        }
+    };
 
-    let account_1 = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 1,
-            token_count: 2,
-            serum3_count: 0,
-            perp_count: 0,
-            perp_oo_count: 0,
-            group,
-            owner,
-            payer,
-        },
-    )
-    .await
-    .unwrap()
-    .account;
-
-    {
-        send_tx(
-            solana,
-            TokenEditNetBorrows {
-                group,
-                admin,
-                mint: tokens[0].mint.pubkey,
-                // we want to test net borrow limits in isolation
-                min_vault_to_deposits_ratio_opt: Some(0.0),
-                net_borrows_limit_native_opt: Some(6000),
-                net_borrows_window_size_ts_opt: Some(3),
-            },
-        )
-        .await
-        .unwrap();
-    }
+    reset_net_borrows().await;
 
     //
-    // SETUP: Deposit user funds
+    // SETUP: Prepare accounts
     //
-    {
-        // account_0 deposits mint_0
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: 10_000,
-                account: account_0,
-                owner,
-                token_account: payer_mint_accounts[0],
-                token_authority: payer,
-                bank_index: 0,
-            },
-        )
-        .await
-        .unwrap();
+    let account_0 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        &mints[0..1],
+        100_000,
+        0,
+    )
+    .await;
+    let account_1 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        &mints[1..2],
+        1_000_000,
+        1,
+    )
+    .await;
 
-        // account_1 deposits mint_1
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: 10_000 * 10,
-                account: account_1,
-                owner,
-                token_account: payer_mint_accounts[1],
-                token_authority: payer,
-                bank_index: 1,
-            },
-        )
-        .await
-        .unwrap();
-    }
-
-    // Go to the next net borrow limit window
-    solana.advance_clock_to_next_multiple(3).await;
+    reset_net_borrows().await;
 
     {
         // succeeds because borrow is less than net borrow limit
@@ -324,15 +238,68 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
         .unwrap();
     }
 
-    // Go to the next net borrow limit window
-    solana.advance_clock_to_next_multiple(3).await;
+    reset_net_borrows().await;
 
-    // succeeds because borrow is less than net borrow limit in a fresh window
+    //
+    // TEST: If the price goes up, the borrow limit is hit more quickly - it's in USD
+    //
     {
+        // succeeds because borrow is less than net borrow limit in a fresh window
+        {
+            send_tx(
+                solana,
+                TokenWithdrawInstruction {
+                    amount: 1000,
+                    allow_borrow: true,
+                    account: account_1,
+                    owner,
+                    token_account: payer_mint_accounts[0],
+                    bank_index: 0,
+                },
+            )
+            .await
+            .unwrap();
+        }
+
+        set_bank_stub_oracle_price(solana, group, &tokens[0], admin, 10.0).await;
+
+        // cannot borrow anything: net borrowed 1000 * price 10.0 > limit 6000
+        let res = send_tx(
+            solana,
+            TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: true,
+                account: account_1,
+                owner,
+                token_account: payer_mint_accounts[0],
+                bank_index: 0,
+            },
+        )
+        .await;
+        assert!(res.is_err());
+
+        set_bank_stub_oracle_price(solana, group, &tokens[0], admin, 5.0).await;
+
+        // cannot borrow this much: (net borrowed 1000 + new borrow 201) * price 5.0 > limit 6000
+        let res = send_tx(
+            solana,
+            TokenWithdrawInstruction {
+                amount: 201,
+                allow_borrow: true,
+                account: account_1,
+                owner,
+                token_account: payer_mint_accounts[0],
+                bank_index: 0,
+            },
+        )
+        .await;
+        assert!(res.is_err());
+
+        // can borrow smaller amounts: (net borrowed 1000 + new borrow 199) * price 5.0 < limit 6000
         send_tx(
             solana,
             TokenWithdrawInstruction {
-                amount: 1000,
+                amount: 199,
                 allow_borrow: true,
                 account: account_1,
                 owner,
@@ -342,7 +309,6 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
         )
         .await
         .unwrap();
-        solana.advance_clock().await;
     }
 
     Ok(())
