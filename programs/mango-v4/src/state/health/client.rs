@@ -121,6 +121,9 @@ impl HealthCache {
         // If the price is sufficiently good, then health will just increase from swapping:
         // once we've swapped enough, swapping x reduces health by x * source_liab_weight and
         // increases it by x * target_asset_weight * price_factor.
+        // This is just the highest final slope we can get. If the health weights are
+        // scaled because the collateral or borrow limits are exceeded, health will decrease
+        // more quickly than this number.
         let final_health_slope = -source.init_liab_weight * source.prices.liab(health_type)
             + target.init_asset_weight * target.prices.asset(health_type) * price;
         if final_health_slope >= 0 {
