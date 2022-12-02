@@ -43,6 +43,7 @@ const MAINNET_ORACLES = new Map([
 
 // External markets are matched with those in https://github.com/blockworks-foundation/mango-client-v3/blob/main/src/ids.json
 // and verified to have best liquidity for pair on https://openserum.io/
+// TODO: replace with markets from https://github.com/openbook-dex/resources/blob/main/markets.json
 const MAINNET_SERUM3_MARKETS = new Map([
   ['BTC/USDC', 'A8YFbxQYFVqKZaoYJLLUVcQiWP7G2MeEgW5wsAQgMvFw'],
   ['SOL/USDC', '9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT'],

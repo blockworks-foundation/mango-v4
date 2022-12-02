@@ -3668,11 +3668,36 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "borrowLimitQuote",
+            "docs": [
+              "Soft borrow limit in native quote",
+              "",
+              "Once the borrows on the bank exceed this quote value, init_liab_weight is scaled up.",
+              "Set to f64::MAX to disable.",
+              "",
+              "See scaled_init_liab_weight()."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "collateralLimitQuote",
+            "docs": [
+              "Limit for collateral of deposits",
+              "",
+              "Once the deposits in the bank exceed this quote value, init_asset_weight is scaled",
+              "down to keep the total collateral value constant.",
+              "Set to f64::MAX to disable.",
+              "",
+              "See scaled_init_asset_weight()."
+            ],
+            "type": "f64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2136
+                2120
               ]
             }
           }
@@ -4319,10 +4344,17 @@ export type MangoV4 = {
           },
           {
             "name": "settlePnlLimitFactor",
+            "docs": [
+              "Fraction of perp base value that can be settled each window.",
+              "Set to a negative value to disable the limit."
+            ],
             "type": "f32"
           },
           {
             "name": "settlePnlLimitWindowSizeTs",
+            "docs": [
+              "Window size in seconds for the perp settlement limit"
+            ],
             "type": "u64"
           },
           {
@@ -10895,11 +10927,36 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "borrowLimitQuote",
+            "docs": [
+              "Soft borrow limit in native quote",
+              "",
+              "Once the borrows on the bank exceed this quote value, init_liab_weight is scaled up.",
+              "Set to f64::MAX to disable.",
+              "",
+              "See scaled_init_liab_weight()."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "collateralLimitQuote",
+            "docs": [
+              "Limit for collateral of deposits",
+              "",
+              "Once the deposits in the bank exceed this quote value, init_asset_weight is scaled",
+              "down to keep the total collateral value constant.",
+              "Set to f64::MAX to disable.",
+              "",
+              "See scaled_init_asset_weight()."
+            ],
+            "type": "f64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2136
+                2120
               ]
             }
           }
@@ -11546,10 +11603,17 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "settlePnlLimitFactor",
+            "docs": [
+              "Fraction of perp base value that can be settled each window.",
+              "Set to a negative value to disable the limit."
+            ],
             "type": "f32"
           },
           {
             "name": "settlePnlLimitWindowSizeTs",
+            "docs": [
+              "Window size in seconds for the perp settlement limit"
+            ],
             "type": "u64"
           },
           {

@@ -279,8 +279,6 @@ pub mod mango_v4 {
     /// Serum
     ///
 
-    // TODO deposit/withdraw msrm
-
     pub fn serum3_register_market(
         ctx: Context<Serum3RegisterMarket>,
         market_index: Serum3MarketIndex,

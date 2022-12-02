@@ -14,6 +14,18 @@ export type OracleConfig = {
   reserved: number[];
 };
 
+export type StablePriceModel = {
+  stablePrice: number;
+  lastUpdateTimestamp: BN;
+  delayPrices: number[];
+  delayAccumulatorPrice: number;
+  delayAccumulatorTime: number;
+  delayIntervalSeconds: number;
+  delayGrowthLimit: number;
+  stableGrowthLimit: number;
+  lastDelayIntervalIndex: number;
+};
+
 export interface BankForHealth {
   tokenIndex: TokenIndex;
   maintAssetWeight: I80F48;
@@ -21,6 +33,7 @@ export interface BankForHealth {
   maintLiabWeight: I80F48;
   initLiabWeight: I80F48;
   price: I80F48;
+  stablePriceModel: StablePriceModel;
 }
 
 export class Bank implements BankForHealth {
@@ -53,6 +66,7 @@ export class Bank implements BankForHealth {
   static from(
     publicKey: PublicKey,
     obj: {
+      // TODO: rearrange fields to have same order as in bank.rs
       group: PublicKey;
       name: number[];
       mint: PublicKey;
@@ -88,6 +102,14 @@ export class Bank implements BankForHealth {
       tokenIndex: number;
       mintDecimals: number;
       bankNum: number;
+      stablePriceModel: StablePriceModel;
+      minVaultToDepositsRatio: number;
+      netBorrowsWindowSizeTs: BN;
+      lastNetBorrowsWindowStartTs: BN;
+      netBorrowsLimitQuote: BN;
+      netBorrowsInWindow: BN;
+      borrowLimitQuote: number;
+      collateralLimitQuote: number;
     },
   ): Bank {
     return new Bank(
@@ -127,6 +149,14 @@ export class Bank implements BankForHealth {
       obj.tokenIndex as TokenIndex,
       obj.mintDecimals,
       obj.bankNum,
+      obj.stablePriceModel,
+      obj.minVaultToDepositsRatio,
+      obj.netBorrowsWindowSizeTs,
+      obj.lastNetBorrowsWindowStartTs,
+      obj.netBorrowsLimitQuote,
+      obj.netBorrowsInWindow,
+      obj.borrowLimitQuote,
+      obj.collateralLimitQuote,
     );
   }
 
@@ -167,6 +197,14 @@ export class Bank implements BankForHealth {
     public tokenIndex: TokenIndex,
     public mintDecimals: number,
     public bankNum: number,
+    public stablePriceModel: StablePriceModel,
+    minVaultToDepositsRatio: number,
+    netBorrowsWindowSizeTs: BN,
+    lastNetBorrowsWindowStartTs: BN,
+    netBorrowsLimitQuote: BN,
+    netBorrowsInWindow: BN,
+    borrowLimitQuote: number,
+    collateralLimitQuote: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.depositIndex = I80F48.from(depositIndex);

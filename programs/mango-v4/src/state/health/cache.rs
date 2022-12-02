@@ -579,7 +579,9 @@ impl HealthCache {
 
         for perp_info in self.perp_infos.iter() {
             if perp_info.trusted_market {
-                let positive_contrib = perp_info.health_contribution(health_type).max(I80F48::ZERO);
+                let positive_contrib = perp_info
+                    .uncapped_health_contribution(health_type)
+                    .max(I80F48::ZERO);
                 cm!(health += positive_contrib);
             }
         }

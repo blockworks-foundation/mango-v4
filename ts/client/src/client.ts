@@ -285,7 +285,7 @@ export class MangoClient {
   public async tokenEdit(
     group: Group,
     mintPk: PublicKey,
-    oracle: PublicKey | null,
+    oracle: PublicKey, // TODO: do we need an extra param for resetting stable_price_model?
     oracleConfig: OracleConfigParams | null,
     groupInsuranceFund: boolean | null,
     interestRateParams: InterestRateParams | null,
@@ -332,6 +332,7 @@ export class MangoClient {
       )
       .accounts({
         group: group.publicKey,
+        oracle,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         mintInfo: mintInfo.publicKey,
       })
@@ -342,7 +343,7 @@ export class MangoClient {
           isSigner: false,
         } as AccountMeta,
       ])
-      .rpc({ skipPreflight: true });
+      .rpc();
   }
 
   public async tokenDeregister(
@@ -1469,7 +1470,7 @@ export class MangoClient {
   public async perpEditMarket(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
-    oracle: PublicKey | null,
+    oracle: PublicKey, // TODO: do we need an extra param for resetting stable_price_model
     oracleConfig: OracleConfigParams | null,
     baseDecimals: number | null,
     maintAssetWeight: number | null,
@@ -1527,6 +1528,7 @@ export class MangoClient {
       )
       .accounts({
         group: group.publicKey,
+        oracle,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         perpMarket: perpMarket.publicKey,
       })
@@ -1775,7 +1777,7 @@ export class MangoClient {
         new BN(clientOrderId ?? Date.now()),
         orderType ? orderType : PerpOrderType.limit,
         reduceOnly ? reduceOnly : false,
-        new BN(expiryTimestamp ? expiryTimestamp : 0),
+        new BN(expiryTimestamp ?? 0),
         limit ? limit : 10,
         -1,
       )

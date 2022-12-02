@@ -156,7 +156,7 @@ async function main() {
     await client.tokenEdit(
       group,
       buyMint,
-      null,
+      group.getFirstBankByMint(buyMint).oracle,
       null,
       null,
       null,
@@ -196,7 +196,7 @@ async function main() {
       await client.tokenEdit(
         group,
         buyMint,
-        null,
+        group.getFirstBankByMint(buyMint).oracle,
         null,
         null,
         null,
