@@ -303,10 +303,13 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
 
     #[inline]
     fn bank_index(&self, token_index: TokenIndex) -> Result<usize> {
-        Ok(*self
-            .token_index_map
-            .get(&token_index)
-            .ok_or_else(|| error_msg!("token index {} not found", token_index))?)
+        Ok(*self.token_index_map.get(&token_index).ok_or_else(|| {
+            error_msg_typed!(
+                TokenPositionDoesNotExist,
+                "token index {} not found",
+                token_index
+            )
+        })?)
     }
 
     #[inline]

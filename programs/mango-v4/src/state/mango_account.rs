@@ -8,9 +8,7 @@ use fixed::types::I80F48;
 use solana_program::program_memory::sol_memmove;
 use static_assertions::const_assert_eq;
 
-use crate::error::Contextable;
-use crate::error::MangoError;
-use crate::error_msg;
+use crate::error::*;
 
 use super::dynamic_account::*;
 use super::BookSideOrderTree;
@@ -436,7 +434,13 @@ impl<
         self.all_token_positions()
             .enumerate()
             .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| (p, raw_index)))
-            .ok_or_else(|| error_msg!("position for token index {} not found", token_index))
+            .ok_or_else(|| {
+                error_msg_typed!(
+                    TokenPositionDoesNotExist,
+                    "position for token index {} not found",
+                    token_index
+                )
+            })
     }
 
     pub fn token_position(&self, token_index: TokenIndex) -> Result<&TokenPosition> {
@@ -583,7 +587,13 @@ impl<
             .all_token_positions()
             .enumerate()
             .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| raw_index))
-            .ok_or_else(|| error_msg!("position for token index {} not found", token_index))?;
+            .ok_or_else(|| {
+                error_msg_typed!(
+                    TokenPositionDoesNotExist,
+                    "position for token index {} not found",
+                    token_index
+                )
+            })?;
         Ok((self.token_position_mut_by_raw_index(raw_index), raw_index))
     }
 

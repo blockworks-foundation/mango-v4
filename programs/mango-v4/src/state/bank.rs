@@ -1,6 +1,6 @@
 use super::{OracleConfig, TokenIndex, TokenPosition};
 use crate::accounts_zerocopy::KeyedAccountReader;
-use crate::error::{Contextable, MangoError};
+use crate::error::*;
 use crate::state::{oracle, StablePriceModel};
 use crate::util;
 use crate::util::checked_math as cm;
@@ -257,7 +257,7 @@ impl Bank {
         allow_dusting: bool,
         now_ts: u64,
     ) -> Result<bool> {
-        self.update_net_borrows(-native_amount, now_ts, None)?;
+        self.update_net_borrows(-native_amount, now_ts);
         let opening_indexed_position = position.indexed_position;
         let result = self.deposit_internal(position, native_amount, allow_dusting)?;
         self.update_cumulative_interest(position, opening_indexed_position);
@@ -473,7 +473,10 @@ impl Bank {
 
         // net borrows requires updating in only this case, since other branches of the method deal with
         // withdraws and not borrows
-        self.update_net_borrows(native_amount, now_ts, oracle_price)?;
+        self.update_net_borrows(native_amount, now_ts);
+        if let Some(oracle_price) = oracle_price {
+            self.check_net_borrows(oracle_price)?;
+        }
 
         Ok((true, loan_origination_fee))
     }
@@ -534,12 +537,7 @@ impl Bank {
     /// Update the bank's net_borrows fields.
     ///
     /// If oracle_price is set, also do a net borrows check and error if the threshold is exceeded.
-    pub fn update_net_borrows(
-        &mut self,
-        native_amount: I80F48,
-        now_ts: u64,
-        oracle_price: Option<I80F48>,
-    ) -> Result<()> {
+    pub fn update_net_borrows(&mut self, native_amount: I80F48, now_ts: u64) {
         let in_new_window =
             now_ts >= self.last_net_borrows_window_start_ts + self.net_borrows_window_size_ts;
 
@@ -551,24 +549,23 @@ impl Bank {
         } else {
             cm!(self.net_borrows_in_window + native_amount.checked_to_num().unwrap())
         };
+    }
 
-        if native_amount < 0 || self.net_borrows_limit_quote < 0 {
+    pub fn check_net_borrows(&self, oracle_price: I80F48) -> Result<()> {
+        if self.net_borrows_limit_quote < 0 {
             return Ok(());
         }
 
-        if let Some(oracle_price) = oracle_price {
-            let price = oracle_price.max(self.stable_price());
-            let net_borrows_quote = price
-                .checked_mul_int(self.net_borrows_in_window.into())
-                .unwrap();
-            if net_borrows_quote > self.net_borrows_limit_quote {
-                return err!(MangoError::BankNetBorrowsLimitReached).with_context(|| {
-                    format!(
-                        "net_borrows_in_window ({:?}) exceeds net_borrows_limit_quote ({:?}) for last_net_borrows_window_start_ts ({:?}) ",
-                        self.net_borrows_in_window, self.net_borrows_limit_quote, self.last_net_borrows_window_start_ts
-                    )
-                });
-            }
+        let price = oracle_price.max(self.stable_price());
+        let net_borrows_quote = price
+            .checked_mul_int(self.net_borrows_in_window.into())
+            .unwrap();
+        if net_borrows_quote > self.net_borrows_limit_quote {
+            return Err(error_msg_typed!(BankNetBorrowsLimitReached,
+                    "net_borrows_in_window ({:?}) exceeds net_borrows_limit_quote ({:?}) for last_net_borrows_window_start_ts ({:?}) ",
+                    self.net_borrows_in_window, self.net_borrows_limit_quote, self.last_net_borrows_window_start_ts
+
+            ));
         }
 
         Ok(())
