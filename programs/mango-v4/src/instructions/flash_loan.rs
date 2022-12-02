@@ -360,8 +360,8 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     let health_cache = new_health_cache(&account.borrow(), &retriever)?;
     let pre_health = account.check_health_pre(&health_cache)?;
 
-    // Prices for logging
-    let mut prices = vec![];
+    // Prices for logging and net borrow checks
+    let mut oracle_prices = vec![];
     for change in &changes {
         let (_, oracle_price) = retriever.bank_and_oracle(
             &account.fixed.group,
@@ -369,7 +369,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             change.token_index,
         )?;
 
-        prices.push(oracle_price);
+        oracle_prices.push(oracle_price);
     }
     // Drop retriever as mut bank below uses health_ais
     drop(retriever);
@@ -377,7 +377,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     // Apply the vault diffs to the bank positions
     let mut deactivated_token_positions = vec![];
     let mut token_loan_details = Vec::with_capacity(changes.len());
-    for (change, price) in changes.iter().zip(prices.iter()) {
+    for (change, oracle_price) in changes.iter().zip(oracle_prices.iter()) {
         let mut bank = health_ais[change.bank_index].load_mut::<Bank>()?;
         let position = account.token_position_mut_by_raw_index(change.raw_token_index);
         let native = position.native(&bank);
@@ -396,6 +396,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             position,
             cm!(change.amount - loan_origination_fee),
             Clock::get()?.unix_timestamp.try_into().unwrap(),
+            *oracle_price,
         )?;
         if !is_active {
             deactivated_token_positions.push(change.raw_token_index);
@@ -411,7 +412,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             loan_origination_fee: loan_origination_fee.to_bits(),
             deposit_index: bank.deposit_index.to_bits(),
             borrow_index: bank.borrow_index.to_bits(),
-            price: price.to_bits(),
+            price: oracle_price.to_bits(),
         });
 
         emit!(TokenBalanceLog {

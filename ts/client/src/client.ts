@@ -296,9 +296,14 @@ export class MangoClient {
     maintLiabWeight: number | null,
     initLiabWeight: number | null,
     liquidationFee: number | null,
+    stablePriceDelayIntervalSeconds: number | null,
+    stablePriceDelayGrowthLimit: number | null,
+    stablePriceGrowthLimit: number | null,
     minVaultToDepositsRatio: number | null,
-    netBorrowsLimitNative: number | null,
+    netBorrowsLimitQuote: number | null,
     netBorrowsWindowSizeTs: number | null,
+    resetStablePrice: boolean | null,
+    resetNetBorrowLimit: boolean | null,
   ): Promise<TransactionSignature> {
     const bank = group.getFirstBankByMint(mintPk);
     const mintInfo = group.mintInfosMapByTokenIndex.get(bank.tokenIndex)!;
@@ -316,9 +321,14 @@ export class MangoClient {
         maintLiabWeight,
         initLiabWeight,
         liquidationFee,
+        stablePriceDelayIntervalSeconds,
+        stablePriceDelayGrowthLimit,
+        stablePriceGrowthLimit,
         minVaultToDepositsRatio,
-        netBorrowsLimitNative,
-        netBorrowsWindowSizeTs,
+        netBorrowsLimitQuote !== null ? new BN(netBorrowsLimitQuote) : null,
+        netBorrowsWindowSizeTs !== null ? new BN(netBorrowsWindowSizeTs) : null,
+        resetStablePrice ?? false,
+        resetNetBorrowLimit ?? false,
       )
       .accounts({
         group: group.publicKey,
@@ -1377,6 +1387,8 @@ export class MangoClient {
     settleFeeAmountThreshold: number,
     settleFeeFractionLowHealth: number,
     settleTokenIndex: number,
+    settlePnlLimitFactor: number,
+    settlePnlLimitWindowSize: number,
   ): Promise<TransactionSignature> {
     const orderbook = new Keypair();
     const eventQueue = new Keypair();
@@ -1413,6 +1425,8 @@ export class MangoClient {
         settleFeeAmountThreshold,
         settleFeeFractionLowHealth,
         settleTokenIndex,
+        settlePnlLimitFactor,
+        new BN(settlePnlLimitWindowSize),
       )
       .accounts({
         group: group.publicKey,
@@ -1477,6 +1491,8 @@ export class MangoClient {
     stablePriceDelayIntervalSeconds: number | null,
     stablePriceDelayGrowthLimit: number | null,
     stablePriceGrowthLimit: number | null,
+    settlePnlLimitFactor: number | null,
+    settlePnlLimitWindowSize: number | null,
   ): Promise<TransactionSignature> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
 
@@ -1494,7 +1510,7 @@ export class MangoClient {
         takerFee,
         minFunding,
         maxFunding,
-        impactQuantity ? new BN(impactQuantity) : null,
+        impactQuantity !== null ? new BN(impactQuantity) : null,
         groupInsuranceFund,
         trustedMarket,
         feePenalty,
@@ -1504,6 +1520,10 @@ export class MangoClient {
         stablePriceDelayIntervalSeconds,
         stablePriceDelayGrowthLimit,
         stablePriceGrowthLimit,
+        settlePnlLimitFactor,
+        settlePnlLimitWindowSize !== null
+          ? new BN(settlePnlLimitWindowSize)
+          : null,
       )
       .accounts({
         group: group.publicKey,

@@ -10,6 +10,7 @@ use std::rc::Rc;
 use crate::state::*;
 
 pub const DUMMY_NOW_TS: u64 = 0;
+pub const DUMMY_PRICE: I80F48 = I80F48::ZERO;
 
 // Implementing TestAccount directly for ZeroCopy + Owner leads to a conflict
 // because OpenOrders may add impls for those in the future.
@@ -98,7 +99,7 @@ pub fn mock_bank_and_oracle(
     bank.data().collateral_limit_quote = f64::MAX;
     bank.data().borrow_limit_quote = f64::MAX;
     bank.data().net_borrows_window_size_ts = 1; // dummy
-    bank.data().net_borrows_limit_native = i64::MAX; // max since we don't want this to interfere
+    bank.data().net_borrows_limit_quote = i64::MAX; // max since we don't want this to interfere
     (bank, oracle)
 }
 

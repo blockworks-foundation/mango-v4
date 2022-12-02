@@ -602,6 +602,7 @@ impl MangoClient {
                             open_orders,
                             payer_bank: payer_mint_info.first_bank(),
                             payer_vault: payer_mint_info.first_vault(),
+                            payer_oracle: payer_mint_info.oracle,
                             serum_market: s3.market.address,
                             serum_program: s3.market.market.serum_program,
                             serum_market_external: s3.market.market.serum_market_external,

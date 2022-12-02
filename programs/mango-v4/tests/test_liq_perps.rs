@@ -63,7 +63,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
             maker_fee: 0.0,
             taker_fee: 0.0,
             settle_pnl_limit_factor: 0.2,
-            settle_pnl_limit_factor_window_size_ts: 24 * 60 * 60,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, base_token).await
         },
     )
@@ -266,7 +266,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
             taker_fee: 0.0,
             group_insurance_fund: true,
             settle_pnl_limit_factor: 0.2,
-            settle_pnl_limit_factor_window_size_ts: 24 * 60 * 60,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, base_token).await
         },
     )

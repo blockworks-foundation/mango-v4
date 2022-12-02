@@ -98,11 +98,18 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     let amount_i80f48 = I80F48::from(amount);
 
+    let now_slot = Clock::get()?.slot;
+    let oracle_price = bank.oracle_price(
+        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        Some(now_slot),
+    )?;
+
     // Update the bank and position
     let (position_is_active, loan_origination_fee) = bank.withdraw_with_fee(
         position,
         amount_i80f48,
         Clock::get()?.unix_timestamp.try_into().unwrap(),
+        oracle_price,
     )?;
 
     // Provide a readable error message in case the vault doesn't have enough tokens
@@ -123,11 +130,6 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     )?;
 
     let native_position_after = position.native(&bank);
-    let now_slot = Clock::get()?.slot;
-    let oracle_price = bank.oracle_price(
-        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
-        Some(now_slot),
-    )?;
 
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),

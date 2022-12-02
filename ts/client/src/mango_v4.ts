@@ -351,7 +351,7 @@ export type MangoV4 = {
           "type": "u64"
         },
         {
-          "name": "netBorrowsLimitNative",
+          "name": "netBorrowsLimitQuote",
           "type": "i64"
         }
       ]
@@ -614,7 +614,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "netBorrowsLimitNativeOpt",
+          "name": "netBorrowsLimitQuoteOpt",
           "type": {
             "option": "i64"
           }
@@ -624,6 +624,14 @@ export type MangoV4 = {
           "type": {
             "option": "u64"
           }
+        },
+        {
+          "name": "resetStablePrice",
+          "type": "bool"
+        },
+        {
+          "name": "resetNetBorrowLimit",
+          "type": "bool"
         }
       ]
     },
@@ -1736,6 +1744,11 @@ export type MangoV4 = {
           ]
         },
         {
+          "name": "payerOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenProgram",
           "isMut": false,
           "isSigner": false
@@ -2450,7 +2463,7 @@ export type MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "settlePnlLimitFactorWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTs",
           "type": "u64"
         }
       ]
@@ -2621,7 +2634,7 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "settlePnlLimitFactorWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTs",
           "type": {
             "option": "u64"
           }
@@ -3621,22 +3634,37 @@ export type MangoV4 = {
           },
           {
             "name": "minVaultToDepositsRatio",
+            "docs": [
+              "Min fraction of deposits that must remain in the vault when borrowing."
+            ],
             "type": "f64"
           },
           {
             "name": "netBorrowsWindowSizeTs",
+            "docs": [
+              "Size in seconds of a net borrows window"
+            ],
             "type": "u64"
           },
           {
             "name": "lastNetBorrowsWindowStartTs",
+            "docs": [
+              "Timestamp at which the last net borrows window started"
+            ],
             "type": "u64"
           },
           {
-            "name": "netBorrowsLimitNative",
+            "name": "netBorrowsLimitQuote",
+            "docs": [
+              "Net borrow limit per window in quote native; set to -1 to disable."
+            ],
             "type": "i64"
           },
           {
-            "name": "netBorrowsWindowNative",
+            "name": "netBorrowsInWindow",
+            "docs": [
+              "Sum of all deposits and borrows in the last window, in native units."
+            ],
             "type": "i64"
           },
           {
@@ -4294,7 +4322,7 @@ export type MangoV4 = {
             "type": "f32"
           },
           {
-            "name": "settlePnlLimitFactorWindowSizeTs",
+            "name": "settlePnlLimitWindowSizeTs",
             "type": "u64"
           },
           {
@@ -7550,7 +7578,7 @@ export const IDL: MangoV4 = {
           "type": "u64"
         },
         {
-          "name": "netBorrowsLimitNative",
+          "name": "netBorrowsLimitQuote",
           "type": "i64"
         }
       ]
@@ -7813,7 +7841,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "netBorrowsLimitNativeOpt",
+          "name": "netBorrowsLimitQuoteOpt",
           "type": {
             "option": "i64"
           }
@@ -7823,6 +7851,14 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u64"
           }
+        },
+        {
+          "name": "resetStablePrice",
+          "type": "bool"
+        },
+        {
+          "name": "resetNetBorrowLimit",
+          "type": "bool"
         }
       ]
     },
@@ -8935,6 +8971,11 @@ export const IDL: MangoV4 = {
           ]
         },
         {
+          "name": "payerOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "tokenProgram",
           "isMut": false,
           "isSigner": false
@@ -9649,7 +9690,7 @@ export const IDL: MangoV4 = {
           "type": "f32"
         },
         {
-          "name": "settlePnlLimitFactorWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTs",
           "type": "u64"
         }
       ]
@@ -9820,7 +9861,7 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "settlePnlLimitFactorWindowSizeTs",
+          "name": "settlePnlLimitWindowSizeTs",
           "type": {
             "option": "u64"
           }
@@ -10820,22 +10861,37 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "minVaultToDepositsRatio",
+            "docs": [
+              "Min fraction of deposits that must remain in the vault when borrowing."
+            ],
             "type": "f64"
           },
           {
             "name": "netBorrowsWindowSizeTs",
+            "docs": [
+              "Size in seconds of a net borrows window"
+            ],
             "type": "u64"
           },
           {
             "name": "lastNetBorrowsWindowStartTs",
+            "docs": [
+              "Timestamp at which the last net borrows window started"
+            ],
             "type": "u64"
           },
           {
-            "name": "netBorrowsLimitNative",
+            "name": "netBorrowsLimitQuote",
+            "docs": [
+              "Net borrow limit per window in quote native; set to -1 to disable."
+            ],
             "type": "i64"
           },
           {
-            "name": "netBorrowsWindowNative",
+            "name": "netBorrowsInWindow",
+            "docs": [
+              "Sum of all deposits and borrows in the last window, in native units."
+            ],
             "type": "i64"
           },
           {
@@ -11493,7 +11549,7 @@ export const IDL: MangoV4 = {
             "type": "f32"
           },
           {
-            "name": "settlePnlLimitFactorWindowSizeTs",
+            "name": "settlePnlLimitWindowSizeTs",
             "type": "u64"
           },
           {

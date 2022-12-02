@@ -64,7 +64,7 @@ impl HealthCache {
 
         let mut source_bank = source_bank.clone();
         source_bank
-            .withdraw_with_fee(&mut source_position, amount, 0)
+            .withdraw_with_fee(&mut source_position, amount, 0, I80F48::ZERO)
             .unwrap();
         let mut target_bank = target_bank.clone();
         target_bank
@@ -756,6 +756,7 @@ mod tests {
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(100),
                 DUMMY_NOW_TS,
+                DUMMY_PRICE,
             )
             .unwrap();
 
@@ -838,6 +839,7 @@ mod tests {
                 account.ensure_token_position(1).unwrap().0,
                 I80F48::from(100),
                 DUMMY_NOW_TS,
+                DUMMY_PRICE,
             )
             .unwrap();
         bank1
@@ -846,6 +848,7 @@ mod tests {
                 account2.ensure_token_position(1).unwrap().0,
                 I80F48::from(-100),
                 DUMMY_NOW_TS,
+                DUMMY_PRICE,
             )
             .unwrap();
 

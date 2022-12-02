@@ -156,7 +156,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             maker_fee: 0.0002,
             taker_fee: 0.000,
             settle_pnl_limit_factor: 0.2,
-            settle_pnl_limit_factor_window_size_ts: 24 * 60 * 60,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[0]).await
         },
     )
@@ -186,7 +186,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             maker_fee: 0.0002,
             taker_fee: 0.000,
             settle_pnl_limit_factor: 0.2,
-            settle_pnl_limit_factor_window_size_ts: 24 * 60 * 60,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
         },
     )

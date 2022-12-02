@@ -111,8 +111,11 @@ pub struct PerpMarket {
 
     pub stable_price_model: StablePriceModel,
 
+    /// Fraction of perp base value that can be settled each window.
+    /// Set to a negative value to disable the limit.
     pub settle_pnl_limit_factor: f32,
-    pub settle_pnl_limit_factor_window_size_ts: u64,
+    /// Window size in seconds for the perp settlement limit
+    pub settle_pnl_limit_window_size_ts: u64,
 
     pub reserved: [u8; 1944],
 }
@@ -321,7 +324,7 @@ impl PerpMarket {
             settle_fee_fraction_low_health: 0.0,
             stable_price_model: StablePriceModel::default(),
             settle_pnl_limit_factor: 0.2,
-            settle_pnl_limit_factor_window_size_ts: 24 * 60 * 60,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             reserved: [0; 1944],
         }
     }

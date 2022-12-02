@@ -773,7 +773,7 @@ pub struct TokenRegisterInstruction {
     pub liquidation_fee: f32,
 
     pub min_vault_to_deposits_ratio: f64,
-    pub net_borrows_limit_native: i64,
+    pub net_borrows_limit_quote: i64,
     pub net_borrows_window_size_ts: u64,
 
     pub group: Pubkey,
@@ -817,7 +817,7 @@ impl ClientInstruction for TokenRegisterInstruction {
             init_liab_weight: self.init_liab_weight,
             liquidation_fee: self.liquidation_fee,
             min_vault_to_deposits_ratio: self.min_vault_to_deposits_ratio,
-            net_borrows_limit_native: self.net_borrows_limit_native,
+            net_borrows_limit_quote: self.net_borrows_limit_quote,
             net_borrows_window_size_ts: self.net_borrows_window_size_ts,
         };
 
@@ -1062,7 +1062,7 @@ impl ClientInstruction for TokenResetStablePriceModel {
         let mint_info: MintInfo = account_loader.load(&mint_info_key).await.unwrap();
 
         let instruction = Self::Instruction {
-            oracle_opt: Some(mint_info.oracle),
+            oracle_opt: None,
             oracle_config_opt: None,
             group_insurance_fund_opt: None,
             interest_rate_params_opt: None,
@@ -1077,8 +1077,10 @@ impl ClientInstruction for TokenResetStablePriceModel {
             stable_price_delay_growth_limit_opt: None,
             stable_price_growth_limit_opt: None,
             min_vault_to_deposits_ratio_opt: None,
-            net_borrows_limit_native_opt: None,
+            net_borrows_limit_quote_opt: None,
             net_borrows_window_size_ts_opt: None,
+            reset_stable_price: true,
+            reset_net_borrow_limit: false,
         };
 
         let accounts = Self::Accounts {
@@ -1104,17 +1106,17 @@ impl ClientInstruction for TokenResetStablePriceModel {
     }
 }
 
-pub struct TokenEditNetBorrows {
+pub struct TokenResetNetBorrows {
     pub group: Pubkey,
     pub admin: TestKeypair,
     pub mint: Pubkey,
     pub min_vault_to_deposits_ratio_opt: Option<f64>,
-    pub net_borrows_limit_native_opt: Option<i64>,
+    pub net_borrows_limit_quote_opt: Option<i64>,
     pub net_borrows_window_size_ts_opt: Option<u64>,
 }
 
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for TokenEditNetBorrows {
+impl ClientInstruction for TokenResetNetBorrows {
     type Accounts = mango_v4::accounts::TokenEdit;
     type Instruction = mango_v4::instruction::TokenEdit;
     async fn to_instruction(
@@ -1150,8 +1152,10 @@ impl ClientInstruction for TokenEditNetBorrows {
             stable_price_delay_growth_limit_opt: None,
             stable_price_growth_limit_opt: None,
             min_vault_to_deposits_ratio_opt: self.min_vault_to_deposits_ratio_opt,
-            net_borrows_limit_native_opt: self.net_borrows_limit_native_opt,
+            net_borrows_limit_quote_opt: self.net_borrows_limit_quote_opt,
             net_borrows_window_size_ts_opt: self.net_borrows_window_size_ts_opt,
+            reset_stable_price: false,
+            reset_net_borrow_limit: true,
         };
 
         let accounts = Self::Accounts {
@@ -1907,17 +1911,18 @@ impl ClientInstruction for Serum3PlaceOrderInstruction {
         )
         .await;
 
-        let (payer_bank, payer_vault) = match self.side {
-            Serum3Side::Bid => (quote_info.first_bank(), quote_info.first_vault()),
-            Serum3Side::Ask => (base_info.first_bank(), base_info.first_vault()),
+        let payer_info = &match self.side {
+            Serum3Side::Bid => &quote_info,
+            Serum3Side::Ask => &base_info,
         };
 
         let accounts = Self::Accounts {
             group: account.fixed.group,
             account: self.account,
             open_orders,
-            payer_bank,
-            payer_vault,
+            payer_bank: payer_info.first_bank(),
+            payer_vault: payer_info.first_vault(),
+            payer_oracle: payer_info.oracle,
             serum_market: self.serum_market,
             serum_program: serum_market.serum_program,
             serum_market_external: serum_market.serum_market_external,
@@ -2423,7 +2428,7 @@ pub struct PerpCreateMarketInstruction {
     pub settle_fee_amount_threshold: f32,
     pub settle_fee_fraction_low_health: f32,
     pub settle_pnl_limit_factor: f32,
-    pub settle_pnl_limit_factor_window_size_ts: u64,
+    pub settle_pnl_limit_window_size_ts: u64,
 }
 impl PerpCreateMarketInstruction {
     pub async fn with_new_book_and_queue(
@@ -2480,7 +2485,7 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             settle_fee_amount_threshold: self.settle_fee_amount_threshold,
             settle_fee_fraction_low_health: self.settle_fee_fraction_low_health,
             settle_pnl_limit_factor: self.settle_pnl_limit_factor,
-            settle_pnl_limit_factor_window_size_ts: self.settle_pnl_limit_factor_window_size_ts,
+            settle_pnl_limit_window_size_ts: self.settle_pnl_limit_window_size_ts,
         };
 
         let perp_market = Pubkey::find_program_address(
@@ -2555,7 +2560,7 @@ impl ClientInstruction for PerpResetStablePriceModel {
             stable_price_delay_growth_limit_opt: None,
             stable_price_growth_limit_opt: None,
             settle_pnl_limit_factor_opt: None,
-            settle_pnl_limit_factor_window_size_ts: None,
+            settle_pnl_limit_window_size_ts: None,
         };
 
         let accounts = Self::Accounts {

@@ -441,7 +441,7 @@ impl PerpPosition {
     /// Side-effect: updates the windowing
     pub fn update_and_get_used_settle_limit(&mut self, market: &PerpMarket, now_ts: u64) -> i64 {
         assert_eq!(self.market_index, market.perp_market_index);
-        let window_size = market.settle_pnl_limit_factor_window_size_ts;
+        let window_size = market.settle_pnl_limit_window_size_ts;
         let new_window = now_ts >= cm!((self.settle_pnl_limit_window + 1) as u64 * window_size);
         if new_window {
             self.settle_pnl_limit_window = cm!(now_ts / window_size).try_into().unwrap();

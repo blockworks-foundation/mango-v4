@@ -81,7 +81,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             maker_fee: 0.0002,
             taker_fee: 0.000,
             settle_pnl_limit_factor: 0.2,
-            settle_pnl_limit_factor_window_size_ts: 24 * 60 * 60,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
         },
     )
@@ -111,7 +111,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             maker_fee: 0.0002,
             taker_fee: 0.000,
             settle_pnl_limit_factor: 0.2,
-            settle_pnl_limit_factor_window_size_ts: 24 * 60 * 60,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[2]).await
         },
     )
@@ -585,7 +585,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             settle_fee_amount_threshold: 2000.0,
             settle_fee_fraction_low_health: fee_low_health,
             settle_pnl_limit_factor: 0.2,
-            settle_pnl_limit_factor_window_size_ts: 24 * 60 * 60,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
         },
     )
@@ -851,7 +851,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             maker_fee: 0.0002,
             taker_fee: 0.000,
             settle_pnl_limit_factor: 0.2,
-            settle_pnl_limit_factor_window_size_ts: 24 * 60 * 60,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
         },
     )

@@ -188,7 +188,7 @@ pub fn token_liq_bankruptcy(
             let (liqor_liab, liqor_liab_raw_token_index, _) =
                 liqor.ensure_token_position(liab_token_index)?;
             let (liqor_liab_active, loan_origination_fee) =
-                liab_bank.withdraw_with_fee(liqor_liab, liab_transfer, now_ts)?;
+                liab_bank.withdraw_with_fee(liqor_liab, liab_transfer, now_ts, liab_price)?;
 
             // liqor liab
             emit!(TokenBalanceLog {
