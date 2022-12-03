@@ -1104,6 +1104,10 @@ export class PerpPosition {
     return ZERO_I80F48();
   }
 
+  public getEquityUi(perpMarket: PerpMarket): number {
+    return perpMarket.quoteLotsToUi(this.getEquity(perpMarket).getData());
+  }
+
   public getEquity(perpMarket: PerpMarket): I80F48 {
     const lotsToQuote = I80F48.fromI64(perpMarket.baseLotSize).mul(
       perpMarket.price,
