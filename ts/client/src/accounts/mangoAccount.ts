@@ -6,7 +6,7 @@ import { MangoClient } from '../client';
 import { SERUM3_PROGRAM_ID } from '../constants';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
-import { Bank, TokenIndex } from './bank';
+import { Bank, QUOTE_DECIMALS, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
 import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
@@ -1105,7 +1105,8 @@ export class PerpPosition {
   }
 
   public getEquityUi(perpMarket: PerpMarket): number {
-    return perpMarket.quoteLotsToUi(this.getEquity(perpMarket).getData());
+    // This assumes that the settlement token is USDC with 6 decimals.
+    return toUiDecimals(this.getEquity(perpMarket), QUOTE_DECIMALS);
   }
 
   public getEquity(perpMarket: PerpMarket): I80F48 {
