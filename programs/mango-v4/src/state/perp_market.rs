@@ -221,6 +221,7 @@ impl PerpMarket {
             stable_price: self.stable_price().to_bits(),
             fees_accrued: self.fees_accrued.to_bits(),
             open_interest: self.open_interest,
+            instantaneous_funding_rate: diff_price.to_bits(),
         });
 
         Ok(())
