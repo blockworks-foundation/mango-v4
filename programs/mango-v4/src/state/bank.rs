@@ -603,7 +603,7 @@ impl Bank {
         indexed_total_deposits: I80F48,
         indexed_total_borrows: I80F48,
         diff_ts: I80F48,
-    ) -> Result<(I80F48, I80F48, I80F48)> {
+    ) -> Result<(I80F48, I80F48, I80F48, I80F48, I80F48)> {
         // compute index based on utilization
         let native_total_deposits = cm!(self.deposit_index * indexed_total_deposits);
         let native_total_borrows = cm!(self.borrow_index * indexed_total_borrows);
@@ -639,7 +639,13 @@ impl Bank {
         let deposit_index =
             cm!((self.deposit_index * deposit_rate * diff_ts) / YEAR_I80F48 + self.deposit_index);
 
-        Ok((deposit_index, borrow_index, borrow_fees))
+        Ok((
+            deposit_index,
+            borrow_index,
+            borrow_fees,
+            borrow_rate,
+            deposit_rate,
+        ))
     }
 
     /// returns the current interest rate in APR
