@@ -179,6 +179,14 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
                 rate0: rate0.to_bits(),
                 rate1: rate1.to_bits(),
                 max_rate: max_rate.to_bits(),
+                util0: some_bank.util0.to_bits(),
+                util1: some_bank.util1.to_bits(),
+                instantaneous_utilization: some_bank
+                    .compute_instantaneous_utilization(
+                        indexed_total_deposits,
+                        indexed_total_borrows
+                    )
+                    .to_bits()
             });
 
             drop(some_bank);

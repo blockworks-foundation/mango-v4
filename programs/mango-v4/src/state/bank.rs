@@ -598,22 +598,33 @@ impl Bank {
         }
     }
 
+    pub fn compute_instantaneous_utilization(
+        &self,
+        indexed_total_deposits: I80F48,
+        indexed_total_borrows: I80F48,
+    ) -> I80F48 {
+        // compute index based on utilization
+        let native_total_deposits = cm!(self.deposit_index * indexed_total_deposits);
+        let native_total_borrows = cm!(self.borrow_index * indexed_total_borrows);
+
+        // This will be >= 0, but can also be > 1
+        if native_total_deposits == I80F48::ZERO {
+            I80F48::ZERO
+        } else {
+            cm!(native_total_borrows / native_total_deposits)
+        }
+    }
+
     pub fn compute_index(
         &self,
         indexed_total_deposits: I80F48,
         indexed_total_borrows: I80F48,
         diff_ts: I80F48,
     ) -> Result<(I80F48, I80F48, I80F48)> {
-        // compute index based on utilization
-        let native_total_deposits = cm!(self.deposit_index * indexed_total_deposits);
         let native_total_borrows = cm!(self.borrow_index * indexed_total_borrows);
 
-        // This will be >= 0, but can also be > 1
-        let instantaneous_utilization = if native_total_deposits == I80F48::ZERO {
-            I80F48::ZERO
-        } else {
-            cm!(native_total_borrows / native_total_deposits)
-        };
+        let instantaneous_utilization =
+            self.compute_instantaneous_utilization(indexed_total_deposits, indexed_total_borrows);
 
         let borrow_rate = self.compute_interest_rate(instantaneous_utilization);
 
@@ -691,13 +702,8 @@ impl Bank {
             return I80F48::ZERO;
         }
 
-        let native_total_deposits = cm!(self.deposit_index * indexed_total_deposits);
-        let native_total_borrows = cm!(self.borrow_index * indexed_total_borrows);
-        let instantaneous_utilization = if native_total_deposits == I80F48::ZERO {
-            I80F48::ZERO
-        } else {
-            cm!(native_total_borrows / native_total_deposits)
-        };
+        let instantaneous_utilization =
+            self.compute_instantaneous_utilization(indexed_total_deposits, indexed_total_borrows);
 
         // Compute a time-weighted average since bank_rate_last_updated.
         let previous_avg_time =

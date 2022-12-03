@@ -146,9 +146,12 @@ pub struct UpdateIndexLog {
 pub struct UpdateRateLog {
     pub mango_group: Pubkey,
     pub token_index: u16,
-    pub rate0: i128,    // I80F48
-    pub rate1: i128,    // I80F48
-    pub max_rate: i128, // I80F48
+    pub rate0: i128,                     // I80F48
+    pub rate1: i128,                     // I80F48
+    pub max_rate: i128,                  // I80F48
+    pub util0: i128,                     // I80F48
+    pub util1: i128,                     // I80F48
+    pub instantaneous_utilization: i128, // I80F48
 }
 
 #[event]
