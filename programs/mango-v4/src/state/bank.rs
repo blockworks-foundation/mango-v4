@@ -901,7 +901,7 @@ mod tests {
                     cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,
                     padding: Default::default(),
-                    reserved: [0; 8],
+                    reserved: [0; 128],
                 };
 
                 account.indexed_position = indexed(I80F48::from_num(start), &bank);
