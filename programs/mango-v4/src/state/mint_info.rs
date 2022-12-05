@@ -34,8 +34,9 @@ pub struct MintInfo {
 }
 const_assert_eq!(
     size_of::<MintInfo>(),
-    MAX_BANKS * 2 * 32 + 3 * 32 + 2 + 8 + 6 + 2560
+    32 + 2 + 1 + 5 + 32 + MAX_BANKS * 2 * 32 + 32 + 8 + 2560
 );
+const_assert_eq!(size_of::<MintInfo>(), 3056);
 const_assert_eq!(size_of::<MintInfo>() % 8, 0);
 
 impl MintInfo {

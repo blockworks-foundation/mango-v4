@@ -34,6 +34,7 @@ const_assert_eq!(
     size_of::<Serum3Market>(),
     32 + 2 + 2 + 4 + 16 + 2 * 32 + 2 + 1 + 5 + 8 + 128
 );
+const_assert_eq!(size_of::<Serum3Market>(), 264);
 const_assert_eq!(size_of::<Serum3Market>() % 8, 0);
 
 impl Serum3Market {
@@ -52,6 +53,7 @@ pub struct Serum3MarketIndexReservation {
     pub reserved: [u8; 38],
 }
 const_assert_eq!(size_of::<Serum3MarketIndexReservation>(), 32 + 2 + 38);
+const_assert_eq!(size_of::<Serum3MarketIndexReservation>(), 72);
 const_assert_eq!(size_of::<Serum3MarketIndexReservation>() % 8, 0);
 
 #[macro_export]

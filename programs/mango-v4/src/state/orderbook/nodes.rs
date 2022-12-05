@@ -9,7 +9,7 @@ use static_assertions::const_assert_eq;
 use super::order_type::{PostOrderType, Side};
 
 pub type NodeHandle = u32;
-const NODE_SIZE: usize = 96;
+const NODE_SIZE: usize = 120;
 
 #[derive(IntoPrimitive, TryFromPrimitive)]
 #[repr(u32)]
@@ -84,10 +84,11 @@ pub struct InnerNode {
     /// iterate through the whole bookside.
     pub child_earliest_expiry: [u64; 2],
 
-    pub reserved: [u8; 48],
+    pub reserved: [u8; 72],
 }
-const_assert_eq!(size_of::<InnerNode>() % 8, 0);
+const_assert_eq!(size_of::<InnerNode>(), 4 + 4 + 16 + 4 * 2 + 8 * 2 + 72);
 const_assert_eq!(size_of::<InnerNode>(), NODE_SIZE);
+const_assert_eq!(size_of::<InnerNode>() % 8, 0);
 
 impl InnerNode {
     pub fn new(prefix_len: u32, key: u128) -> Self {
@@ -143,10 +144,14 @@ pub struct LeafNode {
     // Only applicable in the oracle_pegged OrderTree
     pub peg_limit: i64,
 
-    pub reserved: [u8; 8],
+    pub reserved: [u8; 32],
 }
-const_assert_eq!(size_of::<LeafNode>() % 8, 0);
+const_assert_eq!(
+    size_of::<LeafNode>(),
+    4 + 1 + 1 + 1 + 1 + 16 + 32 + 8 + 8 + 8 + 8 + 32
+);
 const_assert_eq!(size_of::<LeafNode>(), NODE_SIZE);
+const_assert_eq!(size_of::<LeafNode>() % 8, 0);
 
 impl LeafNode {
     #[allow(clippy::too_many_arguments)]
@@ -173,7 +178,7 @@ impl LeafNode {
             client_order_id,
             timestamp,
             peg_limit,
-            reserved: [0; 8],
+            reserved: [0; 32],
         }
     }
 
@@ -205,15 +210,17 @@ pub struct FreeNode {
     pub(crate) next: NodeHandle,
     pub(crate) reserved: [u8; NODE_SIZE - 8],
 }
+const_assert_eq!(size_of::<FreeNode>(), 4 + 4 + NODE_SIZE - 8);
+const_assert_eq!(size_of::<FreeNode>() % 8, 0);
 
 #[zero_copy]
 #[derive(Pod)]
 pub struct AnyNode {
     pub tag: u32,
-    pub data: [u8; 92], // note: anchor can't parse the struct for IDL when it includes non numbers, NODE_SIZE == 96, 92 == 96 - 4
+    pub data: [u8; 116],
 }
-
 const_assert_eq!(size_of::<AnyNode>(), NODE_SIZE);
+const_assert_eq!(size_of::<AnyNode>() % 8, 0);
 const_assert_eq!(size_of::<AnyNode>(), size_of::<InnerNode>());
 const_assert_eq!(size_of::<AnyNode>(), size_of::<LeafNode>());
 const_assert_eq!(size_of::<AnyNode>(), size_of::<FreeNode>());

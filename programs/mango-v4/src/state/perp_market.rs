@@ -36,17 +36,15 @@ pub struct PerpMarket {
 
     pub name: [u8; 16],
 
-    pub oracle: Pubkey,
-
-    pub oracle_config: OracleConfig,
-
     pub orderbook: Pubkey,
-
     pub event_queue: Pubkey,
+
+    pub oracle: Pubkey,
+    pub oracle_config: OracleConfig,
+    pub stable_price_model: StablePriceModel,
 
     /// Number of quote native that reresents min tick
     pub quote_lot_size: i64,
-
     /// Represents number of base native quantity
     /// e.g. if base decimals for underlying asset are 6, base lot size is 100, and base position is 10000, then
     /// UI position is 1
@@ -59,33 +57,10 @@ pub struct PerpMarket {
     pub maint_liab_weight: I80F48,
     pub init_liab_weight: I80F48,
 
-    // TODO docs
-    pub liquidation_fee: I80F48,
-    pub maker_fee: I80F48,
-    pub taker_fee: I80F48,
-
-    pub min_funding: I80F48,
-    pub max_funding: I80F48,
-    pub impact_quantity: i64,
-    pub long_funding: I80F48,
-    pub short_funding: I80F48,
-    /// timestamp that funding was last updated in
-    pub funding_last_updated: u64,
-
-    ///
     pub open_interest: i64,
 
     /// Total number of orders seen
     pub seq_num: u64,
-
-    /// Fees accrued in native quote currency
-    pub fees_accrued: I80F48,
-
-    /// Liquidity mining metadata
-    /// pub liquidity_mining_info: LiquidityMiningInfo,
-
-    /// Token vault which holds mango tokens to be disbursed as liquidity incentives for this perp market
-    /// pub mngo_vault: Pubkey,
 
     /// PDA bump
     pub bump: u8,
@@ -96,11 +71,26 @@ pub struct PerpMarket {
 
     pub registration_time: u64,
 
+    /// Funding
+    pub min_funding: I80F48,
+    pub max_funding: I80F48,
+    pub impact_quantity: i64,
+    pub long_funding: I80F48,
+    pub short_funding: I80F48,
+    /// timestamp that funding was last updated in
+    pub funding_last_updated: u64,
+
+    /// Fees
+    pub liquidation_fee: I80F48,
+    pub maker_fee: I80F48,
+    pub taker_fee: I80F48,
+    /// Fees accrued in native quote currency
+    pub fees_accrued: I80F48,
     /// Fees settled in native quote currency
     pub fees_settled: I80F48,
-
     pub fee_penalty: f32,
 
+    // Settling incentives
     /// In native units of settlement token, given to each settle call above the
     /// settle_fee_amount_threshold.
     pub settle_fee_flat: f32,
@@ -109,17 +99,50 @@ pub struct PerpMarket {
     /// Fraction of pnl to pay out as fee if +pnl account has low health.
     pub settle_fee_fraction_low_health: f32,
 
-    pub stable_price_model: StablePriceModel,
-
+    // Pnl settling limits
     /// Fraction of perp base value that can be settled each window.
     /// Set to a negative value to disable the limit.
     pub settle_pnl_limit_factor: f32,
+    pub padding3: [u8; 4],
     /// Window size in seconds for the perp settlement limit
     pub settle_pnl_limit_window_size_ts: u64,
 
     pub reserved: [u8; 1944],
 }
 
+const_assert_eq!(
+    size_of::<PerpMarket>(),
+    32 + 2
+        + 2
+        + 1
+        + 1
+        + 2
+        + 16
+        + 32
+        + 32
+        + 32
+        + 96
+        + 288
+        + 8
+        + 8
+        + 16 * 4
+        + 8
+        + 8
+        + 1
+        + 1
+        + 6
+        + 8
+        + 16 * 2
+        + 8
+        + 16 * 2
+        + 8
+        + 16 * 5
+        + 4
+        + 4 * 3
+        + 8
+        + 8
+        + 1944
+);
 const_assert_eq!(size_of::<PerpMarket>(), 2784);
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
 
@@ -287,42 +310,43 @@ impl PerpMarket {
             group_insurance_fund: 0,
             padding1: Default::default(),
             name: Default::default(),
+            orderbook: Pubkey::new_unique(),
+            event_queue: Pubkey::new_unique(),
             oracle: Pubkey::new_unique(),
             oracle_config: OracleConfig {
                 conf_filter: I80F48::ZERO,
                 max_staleness_slots: -1,
                 reserved: [0; 72],
             },
-            orderbook: Pubkey::new_unique(),
-            event_queue: Pubkey::new_unique(),
+            stable_price_model: StablePriceModel::default(),
             quote_lot_size: 1,
             base_lot_size: 1,
             maint_asset_weight: I80F48::from(1),
             init_asset_weight: I80F48::from(1),
             maint_liab_weight: I80F48::from(1),
             init_liab_weight: I80F48::from(1),
-            liquidation_fee: I80F48::ZERO,
-            maker_fee: I80F48::ZERO,
-            taker_fee: I80F48::ZERO,
+            open_interest: 0,
+            seq_num: 0,
+            bump: 0,
+            base_decimals: 0,
+            padding2: Default::default(),
+            registration_time: 0,
             min_funding: I80F48::ZERO,
             max_funding: I80F48::ZERO,
             impact_quantity: 0,
             long_funding: I80F48::ZERO,
             short_funding: I80F48::ZERO,
             funding_last_updated: 0,
-            open_interest: 0,
-            seq_num: 0,
+            liquidation_fee: I80F48::ZERO,
+            maker_fee: I80F48::ZERO,
+            taker_fee: I80F48::ZERO,
             fees_accrued: I80F48::ZERO,
-            bump: 0,
-            base_decimals: 0,
-            padding2: Default::default(),
-            registration_time: 0,
             fees_settled: I80F48::ZERO,
             fee_penalty: 0.0,
             settle_fee_flat: 0.0,
             settle_fee_amount_threshold: 0.0,
             settle_fee_fraction_low_health: 0.0,
-            stable_price_model: StablePriceModel::default(),
+            padding3: Default::default(),
             settle_pnl_limit_factor: 0.2,
             settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             reserved: [0; 1944],

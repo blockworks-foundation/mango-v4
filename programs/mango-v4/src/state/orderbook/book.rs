@@ -19,11 +19,13 @@ const DROP_EXPIRED_ORDER_LIMIT: usize = 5;
 pub struct Orderbook {
     pub bids: BookSide,
     pub asks: BookSide,
+    pub reserved: [u8; 2400],
 }
 const_assert_eq!(
     std::mem::size_of::<Orderbook>(),
-    2 * std::mem::size_of::<BookSide>()
+    2 * std::mem::size_of::<BookSide>() + 2400
 );
+const_assert_eq!(std::mem::size_of::<Orderbook>(), 495040);
 const_assert_eq!(std::mem::size_of::<Orderbook>() % 8, 0);
 
 impl Orderbook {

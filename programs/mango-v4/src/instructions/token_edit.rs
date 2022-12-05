@@ -72,7 +72,6 @@ pub fn token_edit(
 
         if let Some(oracle_config) = oracle_config_opt.as_ref() {
             bank.oracle_config = oracle_config.to_oracle_config();
-            bank.oracle_conf_filter = bank.oracle_config.conf_filter;
         };
         if let Some(oracle) = oracle_opt {
             bank.oracle = oracle;

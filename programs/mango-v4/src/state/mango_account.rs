@@ -204,6 +204,7 @@ pub struct MangoAccountFixed {
     pub reserved: [u8; 240],
 }
 const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 3 * 8 + 240);
+const_assert_eq!(size_of::<MangoAccountFixed>(), 400);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
 
 unsafe impl bytemuck::Pod for MangoAccountFixed {}
@@ -627,7 +628,7 @@ impl<
                     cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,
                     padding: Default::default(),
-                    reserved: [0; 8],
+                    reserved: [0; 128],
                 };
             }
             Ok((v, raw_index, bank_index))

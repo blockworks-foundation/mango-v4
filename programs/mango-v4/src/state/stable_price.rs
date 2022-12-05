@@ -56,6 +56,10 @@ pub struct StablePriceModel {
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 48],
 }
+const_assert_eq!(
+    size_of::<StablePriceModel>(),
+    8 + 8 + 8 * 24 + 8 + 4 + 4 + 4 + 4 + 1 + 7 + 48
+);
 const_assert_eq!(size_of::<StablePriceModel>(), 288);
 const_assert_eq!(size_of::<StablePriceModel>() % 8, 0);
 
