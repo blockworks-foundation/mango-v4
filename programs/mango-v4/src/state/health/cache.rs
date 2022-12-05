@@ -826,8 +826,8 @@ mod tests {
     struct BankSettings {
         deposits: u64,
         borrows: u64,
-        collateral_limit_quote: u64,
-        borrow_limit_quote: u64,
+        deposit_weight_scale_start_quote: u64,
+        borrow_weight_scale_start_quote: u64,
     }
 
     #[derive(Default)]
@@ -885,11 +885,13 @@ mod tests {
             let bank = bank.data();
             bank.indexed_deposits = I80F48::from(settings.deposits) / bank.deposit_index;
             bank.indexed_borrows = I80F48::from(settings.borrows) / bank.borrow_index;
-            if settings.collateral_limit_quote > 0 {
-                bank.collateral_limit_quote = settings.collateral_limit_quote as f64;
+            if settings.deposit_weight_scale_start_quote > 0 {
+                bank.deposit_weight_scale_start_quote =
+                    settings.deposit_weight_scale_start_quote as f64;
             }
-            if settings.borrow_limit_quote > 0 {
-                bank.borrow_limit_quote = settings.borrow_limit_quote as f64;
+            if settings.borrow_weight_scale_start_quote > 0 {
+                bank.borrow_weight_scale_start_quote =
+                    settings.borrow_weight_scale_start_quote as f64;
             }
         }
 
@@ -1064,17 +1066,17 @@ mod tests {
                 bank_settings: [
                     BankSettings {
                         deposits: 100,
-                        collateral_limit_quote: 1000,
+                        deposit_weight_scale_start_quote: 1000,
                         ..BankSettings::default()
                     },
                     BankSettings {
                         deposits: 1500,
-                        collateral_limit_quote: 1000 * 5,
+                        deposit_weight_scale_start_quote: 1000 * 5,
                         ..BankSettings::default()
                     },
                     BankSettings {
                         deposits: 10000,
-                        collateral_limit_quote: 1000 * 10,
+                        deposit_weight_scale_start_quote: 1000 * 10,
                         ..BankSettings::default()
                     },
                 ],
@@ -1094,17 +1096,17 @@ mod tests {
                 bank_settings: [
                     BankSettings {
                         borrows: 100,
-                        borrow_limit_quote: 1000,
+                        borrow_weight_scale_start_quote: 1000,
                         ..BankSettings::default()
                     },
                     BankSettings {
                         borrows: 1500,
-                        borrow_limit_quote: 1000 * 5,
+                        borrow_weight_scale_start_quote: 1000 * 5,
                         ..BankSettings::default()
                     },
                     BankSettings {
                         borrows: 10000,
-                        borrow_limit_quote: 1000 * 10,
+                        borrow_weight_scale_start_quote: 1000 * 10,
                         ..BankSettings::default()
                     },
                 ],

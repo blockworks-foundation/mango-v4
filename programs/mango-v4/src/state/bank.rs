@@ -101,11 +101,11 @@ pub struct Bank {
     pub min_vault_to_deposits_ratio: f64,
 
     /// Size in seconds of a net borrows window
-    pub net_borrows_window_size_ts: u64,
+    pub net_borrow_limit_window_size_ts: u64,
     /// Timestamp at which the last net borrows window started
     pub last_net_borrows_window_start_ts: u64,
     /// Net borrow limit per window in quote native; set to -1 to disable.
-    pub net_borrows_limit_quote: i64,
+    pub net_borrow_limit_per_window_quote: i64,
     /// Sum of all deposits and borrows in the last window, in native units.
     pub net_borrows_in_window: i64,
 
@@ -115,16 +115,16 @@ pub struct Bank {
     /// Set to f64::MAX to disable.
     ///
     /// See scaled_init_liab_weight().
-    pub borrow_limit_quote: f64,
+    pub borrow_weight_scale_start_quote: f64,
 
-    /// Limit for collateral of deposits
+    /// Limit for collateral of deposits in native quote
     ///
     /// Once the deposits in the bank exceed this quote value, init_asset_weight is scaled
     /// down to keep the total collateral value constant.
     /// Set to f64::MAX to disable.
     ///
     /// See scaled_init_asset_weight().
-    pub collateral_limit_quote: f64,
+    pub deposit_weight_scale_start_quote: f64,
 
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 2120],
@@ -208,12 +208,12 @@ impl Bank {
             oracle_config: existing_bank.oracle_config,
             stable_price_model: StablePriceModel::default(),
             min_vault_to_deposits_ratio: existing_bank.min_vault_to_deposits_ratio,
-            net_borrows_limit_quote: existing_bank.net_borrows_limit_quote,
-            net_borrows_window_size_ts: existing_bank.net_borrows_window_size_ts,
+            net_borrow_limit_per_window_quote: existing_bank.net_borrow_limit_per_window_quote,
+            net_borrow_limit_window_size_ts: existing_bank.net_borrow_limit_window_size_ts,
             last_net_borrows_window_start_ts: existing_bank.last_net_borrows_window_start_ts,
             net_borrows_in_window: 0,
-            borrow_limit_quote: f64::MAX,
-            collateral_limit_quote: f64::MAX,
+            borrow_weight_scale_start_quote: f64::MAX,
+            deposit_weight_scale_start_quote: f64::MAX,
             reserved: [0; 2120],
         }
     }
@@ -553,12 +553,12 @@ impl Bank {
     /// If oracle_price is set, also do a net borrows check and error if the threshold is exceeded.
     pub fn update_net_borrows(&mut self, native_amount: I80F48, now_ts: u64) {
         let in_new_window =
-            now_ts >= self.last_net_borrows_window_start_ts + self.net_borrows_window_size_ts;
+            now_ts >= self.last_net_borrows_window_start_ts + self.net_borrow_limit_window_size_ts;
 
         self.net_borrows_in_window = if in_new_window {
             // reset to latest window
-            self.last_net_borrows_window_start_ts =
-                now_ts / self.net_borrows_window_size_ts * self.net_borrows_window_size_ts;
+            self.last_net_borrows_window_start_ts = now_ts / self.net_borrow_limit_window_size_ts
+                * self.net_borrow_limit_window_size_ts;
             native_amount.checked_to_num::<i64>().unwrap()
         } else {
             cm!(self.net_borrows_in_window + native_amount.checked_to_num().unwrap())
@@ -566,7 +566,7 @@ impl Bank {
     }
 
     pub fn check_net_borrows(&self, oracle_price: I80F48) -> Result<()> {
-        if self.net_borrows_limit_quote < 0 {
+        if self.net_borrows_in_window < 0 || self.net_borrow_limit_per_window_quote < 0 {
             return Ok(());
         }
 
@@ -574,10 +574,10 @@ impl Bank {
         let net_borrows_quote = price
             .checked_mul_int(self.net_borrows_in_window.into())
             .unwrap();
-        if net_borrows_quote > self.net_borrows_limit_quote {
+        if net_borrows_quote > self.net_borrow_limit_per_window_quote {
             return Err(error_msg_typed!(BankNetBorrowsLimitReached,
-                    "net_borrows_in_window ({:?}) exceeds net_borrows_limit_quote ({:?}) for last_net_borrows_window_start_ts ({:?}) ",
-                    self.net_borrows_in_window, self.net_borrows_limit_quote, self.last_net_borrows_window_start_ts
+                    "net_borrows_in_window ({:?}) exceeds net_borrow_limit_per_window_quote ({:?}) for last_net_borrows_window_start_ts ({:?}) ",
+                    self.net_borrows_in_window, self.net_borrow_limit_per_window_quote, self.last_net_borrows_window_start_ts
 
             ));
         }
@@ -780,36 +780,36 @@ impl Bank {
     /// such that scaled_init_weight * deposits remains constant.
     #[inline(always)]
     pub fn scaled_init_asset_weight(&self, price: I80F48) -> I80F48 {
-        if self.collateral_limit_quote == f64::MAX {
+        if self.deposit_weight_scale_start_quote == f64::MAX {
             return self.init_asset_weight;
         }
         // The next line is around 500 CU
         let deposits_quote = self.native_deposits().to_num::<f64>() * price.to_num::<f64>();
-        if deposits_quote <= self.collateral_limit_quote {
+        if deposits_quote <= self.deposit_weight_scale_start_quote {
             self.init_asset_weight
         } else {
             // The next line is around 500 CU
-            let scale = self.collateral_limit_quote / deposits_quote;
+            let scale = self.deposit_weight_scale_start_quote / deposits_quote;
             cm!(self.init_asset_weight * I80F48::from_num(scale))
         }
     }
 
     #[inline(always)]
     pub fn scaled_init_liab_weight(&self, price: I80F48) -> I80F48 {
-        if self.borrow_limit_quote == f64::MAX {
+        if self.borrow_weight_scale_start_quote == f64::MAX {
             return self.init_liab_weight;
         }
         // The next line is around 500 CU
         let borrows_quote = self.native_borrows().to_num::<f64>() * price.to_num::<f64>();
-        if borrows_quote <= self.borrow_limit_quote {
+        if borrows_quote <= self.borrow_weight_scale_start_quote {
             self.init_liab_weight
-        } else if self.borrow_limit_quote == 0.0 {
+        } else if self.borrow_weight_scale_start_quote == 0.0 {
             // TODO: will certainly cause overflow, so it's not exactly what is needed; health should be -MAX?
             // maybe handling this case isn't super helpful?
             I80F48::MAX
         } else {
             // The next line is around 500 CU
-            let scale = borrows_quote / self.borrow_limit_quote;
+            let scale = borrows_quote / self.borrow_weight_scale_start_quote;
             cm!(self.init_liab_weight * I80F48::from_num(scale))
         }
     }
@@ -877,8 +877,8 @@ mod tests {
                 //
 
                 let mut bank = Bank::zeroed();
-                bank.net_borrows_window_size_ts = 1; // dummy
-                bank.net_borrows_limit_quote = i64::MAX; // max since we don't want this to interfere
+                bank.net_borrow_limit_window_size_ts = 1; // dummy
+                bank.net_borrow_limit_per_window_quote = i64::MAX; // max since we don't want this to interfere
                 bank.deposit_index = I80F48::from_num(100.0);
                 bank.borrow_index = I80F48::from_num(10.0);
                 bank.loan_origination_fee_rate = I80F48::from_num(0.1);

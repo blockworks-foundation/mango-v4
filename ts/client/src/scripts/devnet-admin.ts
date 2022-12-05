@@ -435,6 +435,8 @@ async function main() {
         MIN_VAULT_TO_DEPOSITS_RATIO,
         NET_BORROWS_WINDOW_SIZE_TS,
         NET_BORROWS_LIMIT_NATIVE,
+        null,
+        null,
         false,
         false,
       );
@@ -467,6 +469,8 @@ async function main() {
         MIN_VAULT_TO_DEPOSITS_RATIO,
         NET_BORROWS_WINDOW_SIZE_TS,
         NET_BORROWS_LIMIT_NATIVE,
+        null,
+        null,
         false,
         false,
       );
@@ -499,6 +503,8 @@ async function main() {
         MIN_VAULT_TO_DEPOSITS_RATIO,
         NET_BORROWS_WINDOW_SIZE_TS,
         NET_BORROWS_LIMIT_NATIVE,
+        null,
+        null,
         false,
         false,
       );

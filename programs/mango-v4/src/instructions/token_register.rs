@@ -91,8 +91,8 @@ pub fn token_register(
     init_liab_weight: f32,
     liquidation_fee: f32,
     min_vault_to_deposits_ratio: f64,
-    net_borrows_window_size_ts: u64,
-    net_borrows_limit_quote: i64,
+    net_borrow_limit_window_size_ts: u64,
+    net_borrow_limit_per_window_quote: i64,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == QUOTE_TOKEN_INDEX {
@@ -143,13 +143,13 @@ pub fn token_register(
         oracle_config: oracle_config.to_oracle_config(),
         stable_price_model: StablePriceModel::default(),
         min_vault_to_deposits_ratio,
-        net_borrows_window_size_ts,
-        last_net_borrows_window_start_ts: now_ts / net_borrows_window_size_ts
-            * net_borrows_window_size_ts,
-        net_borrows_limit_quote,
+        net_borrow_limit_window_size_ts,
+        last_net_borrows_window_start_ts: now_ts / net_borrow_limit_window_size_ts
+            * net_borrow_limit_window_size_ts,
+        net_borrow_limit_per_window_quote,
         net_borrows_in_window: 0,
-        borrow_limit_quote: f64::MAX,
-        collateral_limit_quote: f64::MAX,
+        borrow_weight_scale_start_quote: f64::MAX,
+        deposit_weight_scale_start_quote: f64::MAX,
         reserved: [0; 2120],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);

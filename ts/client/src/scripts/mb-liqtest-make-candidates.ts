@@ -175,6 +175,8 @@ async function main() {
       null,
       null,
       null,
+      null,
+      null,
     );
     try {
       // At a price of $1/ui-SOL we can buy 0.1 ui-SOL for the 100k native-USDC we have.
@@ -204,6 +206,8 @@ async function main() {
         null,
         0.9,
         0.8,
+        null,
+        null,
         null,
         null,
         null,

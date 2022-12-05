@@ -72,7 +72,7 @@ pub fn token_register_trustless(
 ) -> Result<()> {
     require_neq!(token_index, 0);
 
-    let net_borrows_window_size_ts = 24 * 60 * 60 as u64;
+    let net_borrow_limit_window_size_ts = 24 * 60 * 60 as u64;
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
     let mut bank = ctx.accounts.bank.load_init()?;
@@ -118,13 +118,13 @@ pub fn token_register_trustless(
         },
         stable_price_model: StablePriceModel::default(),
         min_vault_to_deposits_ratio: 0.2,
-        net_borrows_window_size_ts,
-        last_net_borrows_window_start_ts: now_ts / net_borrows_window_size_ts
-            * net_borrows_window_size_ts,
-        net_borrows_limit_quote: 1_000_000_000_000, // 1M USD
+        net_borrow_limit_window_size_ts,
+        last_net_borrows_window_start_ts: now_ts / net_borrow_limit_window_size_ts
+            * net_borrow_limit_window_size_ts,
+        net_borrow_limit_per_window_quote: 1_000_000_000_000, // 1M USD
         net_borrows_in_window: 0,
-        borrow_limit_quote: f64::MAX,
-        collateral_limit_quote: f64::MAX,
+        borrow_weight_scale_start_quote: f64::MAX,
+        deposit_weight_scale_start_quote: f64::MAX,
         reserved: [0; 2120],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
