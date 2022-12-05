@@ -84,8 +84,6 @@ pub fn token_register_trustless(
         oracle: ctx.accounts.oracle.key(),
         deposit_index: INDEX_START,
         borrow_index: INDEX_START,
-        cached_indexed_total_deposits: I80F48::ZERO,
-        cached_indexed_total_borrows: I80F48::ZERO,
         indexed_deposits: I80F48::ZERO,
         indexed_borrows: I80F48::ZERO,
         index_last_updated: now_ts,
@@ -113,7 +111,6 @@ pub fn token_register_trustless(
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
-        oracle_conf_filter: I80F48::from_num(0.10),
         oracle_config: OracleConfig {
             conf_filter: I80F48::from_num(0.10),
             max_staleness_slots: -1,

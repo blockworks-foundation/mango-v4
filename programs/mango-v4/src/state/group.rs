@@ -41,6 +41,7 @@ const_assert_eq!(
     size_of::<Group>(),
     32 * 5 + 4 + 4 + 1 + 1 + 6 + 20 * 32 + 1920
 );
+const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);
 
 impl Group {

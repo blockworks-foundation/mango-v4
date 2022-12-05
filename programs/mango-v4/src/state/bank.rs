@@ -32,19 +32,13 @@ pub struct Bank {
     pub vault: Pubkey,
     pub oracle: Pubkey,
 
-    // TODO: Merge with oracle_config once Bank re-layouts are possible
-    pub oracle_conf_filter: I80F48,
+    pub oracle_config: OracleConfig,
+    pub stable_price_model: StablePriceModel,
 
     /// the index used to scale the value of an IndexedPosition
     /// TODO: should always be >= 0, add checks?
     pub deposit_index: I80F48,
     pub borrow_index: I80F48,
-
-    /// total deposits/borrows, only updated during UpdateIndexAndRate
-    /// TODO: These values could be dropped from the bank, they're written in UpdateIndexAndRate
-    ///       and never read.
-    pub cached_indexed_total_deposits: I80F48,
-    pub cached_indexed_total_borrows: I80F48,
 
     /// deposits/borrows for this bank
     ///
@@ -103,10 +97,6 @@ pub struct Bank {
 
     pub bank_num: u32,
 
-    pub oracle_config: OracleConfig,
-
-    pub stable_price_model: StablePriceModel,
-
     /// Min fraction of deposits that must remain in the vault when borrowing.
     pub min_vault_to_deposits_ratio: f64,
 
@@ -139,7 +129,34 @@ pub struct Bank {
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 2120],
 }
-const_assert_eq!(size_of::<Bank>(), 3112);
+const_assert_eq!(
+    size_of::<Bank>(),
+    32 + 16
+        + 32 * 3
+        + 96
+        + 288
+        + 16 * 2
+        + 16 * 2
+        + 8 * 2
+        + 16
+        + 16 * 6
+        + 16 * 3
+        + 16 * 4
+        + 16
+        + 16
+        + 8
+        + 8
+        + 2
+        + 1
+        + 1
+        + 4
+        + 8
+        + 8 * 4
+        + 8
+        + 8
+        + 2120
+);
+const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
 impl Bank {
@@ -168,11 +185,8 @@ impl Bank {
             group: existing_bank.group,
             mint: existing_bank.mint,
             oracle: existing_bank.oracle,
-            oracle_conf_filter: existing_bank.oracle_conf_filter,
             deposit_index: existing_bank.deposit_index,
             borrow_index: existing_bank.borrow_index,
-            cached_indexed_total_deposits: existing_bank.cached_indexed_total_deposits,
-            cached_indexed_total_borrows: existing_bank.cached_indexed_total_borrows,
             index_last_updated: existing_bank.index_last_updated,
             bank_rate_last_updated: existing_bank.bank_rate_last_updated,
             avg_utilization: existing_bank.avg_utilization,
@@ -191,7 +205,7 @@ impl Bank {
             liquidation_fee: existing_bank.liquidation_fee,
             token_index: existing_bank.token_index,
             mint_decimals: existing_bank.mint_decimals,
-            oracle_config: existing_bank.oracle_config.clone(),
+            oracle_config: existing_bank.oracle_config,
             stable_price_model: StablePriceModel::default(),
             min_vault_to_deposits_ratio: existing_bank.min_vault_to_deposits_ratio,
             net_borrows_limit_quote: existing_bank.net_borrows_limit_quote,
@@ -887,7 +901,7 @@ mod tests {
                     cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,
                     padding: Default::default(),
-                    reserved: [0; 8],
+                    reserved: [0; 128],
                 };
 
                 account.indexed_position = indexed(I80F48::from_num(start), &bank);

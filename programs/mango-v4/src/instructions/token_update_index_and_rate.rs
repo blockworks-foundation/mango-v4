@@ -144,20 +144,12 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
         for ai in ctx.remaining_accounts.iter() {
             let mut bank = ai.load_mut::<Bank>()?;
 
-            bank.cached_indexed_total_deposits = indexed_total_deposits;
-            bank.cached_indexed_total_borrows = indexed_total_borrows;
-
             bank.index_last_updated = now_ts;
 
             bank.deposit_index = deposit_index;
             bank.borrow_index = borrow_index;
 
             bank.avg_utilization = new_avg_utilization;
-
-            // This copies the old conf_filter parameter location to the new one
-            // inside OracleConfig.
-            // TODO: remove once fully migrated to OracleConfig
-            bank.oracle_config.conf_filter = bank.oracle_conf_filter;
 
             bank.stable_price_model = stable_price_model.clone();
         }
