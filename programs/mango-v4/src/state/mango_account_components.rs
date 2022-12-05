@@ -31,10 +31,6 @@ pub struct TokenPosition {
     #[derivative(Debug = "ignore")]
     pub padding: [u8; 5],
 
-    // TODO: When re-layouting: move this to the end
-    #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 8],
-
     // bookkeeping variable for onchain interest calculation
     // either deposit_index or borrow_index at last indexed_position change
     pub previous_index: I80F48,
@@ -44,12 +40,19 @@ pub struct TokenPosition {
     // (Display only)
     // Cumulative borrow interest in token native units
     pub cumulative_borrow_interest: f64,
+
+    #[derivative(Debug = "ignore")]
+    pub reserved: [u8; 128],
 }
 
 unsafe impl bytemuck::Pod for TokenPosition {}
 unsafe impl bytemuck::Zeroable for TokenPosition {}
 
-const_assert_eq!(size_of::<TokenPosition>(), 64);
+const_assert_eq!(
+    size_of::<TokenPosition>(),
+    16 + 2 + 1 + 5 + 16 + 8 + 8 + 128
+);
+const_assert_eq!(size_of::<TokenPosition>(), 184);
 const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
 
 impl Default for TokenPosition {
@@ -62,7 +65,7 @@ impl Default for TokenPosition {
             cumulative_borrow_interest: 0.0,
             previous_index: I80F48::ZERO,
             padding: Default::default(),
-            reserved: [0; 8],
+            reserved: [0; 128],
         }
     }
 }
@@ -128,6 +131,7 @@ pub struct Serum3Orders {
     pub reserved: [u8; 64],
 }
 const_assert_eq!(size_of::<Serum3Orders>(), 32 + 8 * 2 + 2 * 3 + 2 + 64);
+const_assert_eq!(size_of::<Serum3Orders>(), 120);
 const_assert_eq!(size_of::<Serum3Orders>() % 8, 0);
 
 unsafe impl bytemuck::Pod for Serum3Orders {}
@@ -163,18 +167,17 @@ impl Default for Serum3Orders {
 #[derivative(Debug)]
 pub struct PerpPosition {
     pub market_index: PerpMarketIndex,
+
     #[derivative(Debug = "ignore")]
     pub padding: [u8; 2],
-
     pub settle_pnl_limit_window: u32,
+    pub settle_pnl_limit_settled_in_current_window_native: i64,
 
     /// Active position size, measured in base lots
     base_position_lots: i64,
     /// Active position in quote (conversation rate is that of the time the order was settled)
     /// measured in native quote
     quote_position_native: I80F48,
-
-    pub settle_pnl_limit_settled_in_current_window_native: i64,
 
     /// Tracks what the position is to calculate average entry & break even price
     pub quote_running_native: i64,
@@ -187,9 +190,6 @@ pub struct PerpPosition {
     pub bids_base_lots: i64,
     /// Base lots in asks
     pub asks_base_lots: i64,
-
-    /// Liquidity mining rewards
-    // pub mngo_accrued: u64,
 
     /// Amount that's on EventQueue waiting to be processed
     pub taker_base_lots: i64,
@@ -214,10 +214,15 @@ pub struct PerpPosition {
     pub avg_entry_price_per_base_lot: f64,
 
     pub realized_pnl_native: I80F48,
-    // #[derivative(Debug = "ignore")]
-    // pub reserved: [u8; 8],
+
+    #[derivative(Debug = "ignore")]
+    pub reserved: [u8; 128],
 }
-const_assert_eq!(size_of::<PerpPosition>(), 176);
+const_assert_eq!(
+    size_of::<PerpPosition>(),
+    2 + 2 + 4 + 8 + 8 + 16 + 8 + 16 * 2 + 8 * 2 + 8 * 2 + 8 * 5 + 8 + 16 + 128
+);
+const_assert_eq!(size_of::<PerpPosition>(), 304);
 const_assert_eq!(size_of::<PerpPosition>() % 8, 0);
 
 unsafe impl bytemuck::Pod for PerpPosition {}
@@ -246,7 +251,7 @@ impl Default for PerpPosition {
             realized_pnl_native: I80F48::ZERO,
             settle_pnl_limit_window: 0,
             settle_pnl_limit_settled_in_current_window_native: 0,
-            //reserved: Default::default(),
+            reserved: [0; 128],
         }
     }
 }
@@ -493,6 +498,9 @@ pub struct PerpOpenOrder {
     pub id: u128,
     pub reserved: [u8; 64],
 }
+const_assert_eq!(size_of::<PerpOpenOrder>(), 1 + 1 + 2 + 4 + 8 + 16 + 64);
+const_assert_eq!(size_of::<PerpOpenOrder>(), 96);
+const_assert_eq!(size_of::<PerpOpenOrder>() % 8, 0);
 
 impl Default for PerpOpenOrder {
     fn default() -> Self {
@@ -510,9 +518,6 @@ impl Default for PerpOpenOrder {
 
 unsafe impl bytemuck::Pod for PerpOpenOrder {}
 unsafe impl bytemuck::Zeroable for PerpOpenOrder {}
-
-const_assert_eq!(size_of::<PerpOpenOrder>(), 1 + 1 + 2 + 4 + 8 + 16 + 64);
-const_assert_eq!(size_of::<PerpOpenOrder>() % 8, 0);
 
 #[macro_export]
 macro_rules! account_seeds {

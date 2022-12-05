@@ -20,7 +20,7 @@ pub struct Order {
     pub reduce_only: bool,
 
     /// Number of seconds the order shall live, 0 meaning forever
-    pub time_in_force: u8,
+    pub time_in_force: u16,
 
     /// Order type specific params
     pub params: OrderParams,
@@ -45,16 +45,16 @@ pub enum OrderParams {
 
 impl Order {
     /// Convert an input expiry timestamp to a time_in_force value
-    pub fn tif_from_expiry(expiry_timestamp: u64) -> Option<u8> {
+    pub fn tif_from_expiry(expiry_timestamp: u64) -> Option<u16> {
         let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
         if expiry_timestamp != 0 {
-            // If expiry is far in the future, clamp to 255 seconds
-            let tif = expiry_timestamp.saturating_sub(now_ts).min(255);
+            // If expiry is far in the future, clamp to u16::MAX seconds
+            let tif = expiry_timestamp.saturating_sub(now_ts).min(u16::MAX.into());
             if tif == 0 {
                 // If expiry is in the past, ignore the order
                 return None;
             }
-            Some(tif as u8)
+            Some(tif as u16)
         } else {
             // Never expire
             Some(0)

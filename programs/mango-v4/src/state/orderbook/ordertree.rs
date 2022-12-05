@@ -31,8 +31,6 @@ pub enum OrderTreeType {
 /// The key encodes the price in the top 64 bits.
 #[zero_copy]
 pub struct OrderTree {
-    // pub meta_data: MetaData,
-    // todo: do we want this type at this level?
     pub order_tree_type: OrderTreeType,
     pub padding: [u8; 3],
     pub bump_index: u32,
@@ -45,8 +43,9 @@ pub struct OrderTree {
 }
 const_assert_eq!(
     std::mem::size_of::<OrderTree>(),
-    1 + 3 + 4 * 2 + 4 + 4 + 4 + 96 * 1024 + 256 // 98584
+    1 + 3 + 4 * 2 + 4 + 4 + 4 + 120 * 1024 + 256
 );
+const_assert_eq!(std::mem::size_of::<OrderTree>(), 123160);
 const_assert_eq!(std::mem::size_of::<OrderTree>() % 8, 0);
 
 impl OrderTree {
@@ -231,8 +230,9 @@ impl OrderTree {
             } else {
                 NodeTag::FreeNode.into()
             },
+            padding: Default::default(),
             next: self.free_list_head,
-            reserved: [0; 88],
+            reserved: [0; 112],
         });
 
         self.free_list_len += 1;
