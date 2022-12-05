@@ -127,11 +127,13 @@ pub struct LeafNode {
     pub owner_slot: u8,
     pub order_type: PostOrderType, // this was added for TradingView move order
 
+    pub padding: [u8; 1],
+
     /// Time in seconds after `timestamp` at which the order expires.
     /// A value of 0 means no expiry.
-    pub time_in_force: u8,
+    pub time_in_force: u16,
 
-    pub padding: [u8; 4],
+    pub padding2: [u8; 2],
 
     /// The binary tree key
     pub key: u128,
@@ -165,15 +167,16 @@ impl LeafNode {
         client_order_id: u64,
         timestamp: u64,
         order_type: PostOrderType,
-        time_in_force: u8,
+        time_in_force: u16,
         peg_limit: i64,
     ) -> Self {
         Self {
             tag: NodeTag::LeafNode.into(),
             owner_slot,
             order_type,
-            time_in_force,
             padding: Default::default(),
+            time_in_force,
+            padding2: Default::default(),
             key,
             owner,
             quantity,

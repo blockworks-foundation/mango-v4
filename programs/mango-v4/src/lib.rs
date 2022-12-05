@@ -545,7 +545,7 @@ pub mod mango_v4 {
         //
         // Send 0 if you want the order to never expire.
         // Timestamps in the past mean the instruction is skipped.
-        // Timestamps in the future are reduced to now + 255s.
+        // Timestamps in the future are reduced to now + 65535s.
         expiry_timestamp: u64,
 
         // Maximum number of orders from the book to fill.
@@ -608,7 +608,7 @@ pub mod mango_v4 {
         //
         // Send 0 if you want the order to never expire.
         // Timestamps in the past mean the instruction is skipped.
-        // Timestamps in the future are reduced to now + 255s.
+        // Timestamps in the future are reduced to now + 65535s.
         expiry_timestamp: u64,
 
         // Maximum number of orders from the book to fill.
