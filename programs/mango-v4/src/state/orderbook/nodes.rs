@@ -12,7 +12,7 @@ pub type NodeHandle = u32;
 const NODE_SIZE: usize = 120;
 
 #[derive(IntoPrimitive, TryFromPrimitive)]
-#[repr(u32)]
+#[repr(u8)]
 pub enum NodeTag {
     Uninitialized = 0,
     InnerNode = 1,
@@ -67,7 +67,8 @@ pub fn fixed_price_lots(price_data: u64) -> i64 {
 #[derive(Copy, Clone, Pod, AnchorSerialize, AnchorDeserialize)]
 #[repr(C)]
 pub struct InnerNode {
-    pub tag: u32,
+    pub tag: u8, // NodeTag
+    pub padding: [u8; 3],
     /// number of highest `key` bits that all children share
     /// e.g. if it's 2, the two highest bits of `key` will be the same on all children
     pub prefix_len: u32,
@@ -94,6 +95,7 @@ impl InnerNode {
     pub fn new(prefix_len: u32, key: u128) -> Self {
         Self {
             tag: NodeTag::InnerNode.into(),
+            padding: Default::default(),
             prefix_len,
             key,
             children: [0; 2],
@@ -121,15 +123,15 @@ impl InnerNode {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Pod, AnchorSerialize, AnchorDeserialize)]
 #[repr(C)]
 pub struct LeafNode {
-    pub tag: u32,
+    pub tag: u8, // NodeTag
     pub owner_slot: u8,
     pub order_type: PostOrderType, // this was added for TradingView move order
-
-    pub padding: [u8; 1],
 
     /// Time in seconds after `timestamp` at which the order expires.
     /// A value of 0 means no expiry.
     pub time_in_force: u8,
+
+    pub padding: [u8; 4],
 
     /// The binary tree key
     pub key: u128,
@@ -170,8 +172,8 @@ impl LeafNode {
             tag: NodeTag::LeafNode.into(),
             owner_slot,
             order_type,
-            padding: [0],
             time_in_force,
+            padding: Default::default(),
             key,
             owner,
             quantity,
@@ -206,7 +208,8 @@ impl LeafNode {
 #[derive(Copy, Clone, Pod)]
 #[repr(C)]
 pub struct FreeNode {
-    pub(crate) tag: u32,
+    pub(crate) tag: u8, // NodeTag
+    pub(crate) padding: [u8; 3],
     pub(crate) next: NodeHandle,
     pub(crate) reserved: [u8; NODE_SIZE - 8],
 }
@@ -216,8 +219,8 @@ const_assert_eq!(size_of::<FreeNode>() % 8, 0);
 #[zero_copy]
 #[derive(Pod)]
 pub struct AnyNode {
-    pub tag: u32,
-    pub data: [u8; 116],
+    pub tag: u8,
+    pub data: [u8; 119],
 }
 const_assert_eq!(size_of::<AnyNode>(), NODE_SIZE);
 const_assert_eq!(size_of::<AnyNode>() % 8, 0);

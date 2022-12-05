@@ -230,6 +230,7 @@ impl OrderTree {
             } else {
                 NodeTag::FreeNode.into()
             },
+            padding: Default::default(),
             next: self.free_list_head,
             reserved: [0; 112],
         });
