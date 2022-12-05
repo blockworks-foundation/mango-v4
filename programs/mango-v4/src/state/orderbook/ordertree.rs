@@ -30,8 +30,9 @@ pub enum OrderTreeType {
 ///
 /// The key encodes the price in the top 64 bits.
 #[zero_copy]
+#[derive(bytemuck::Pod, bytemuck::Zeroable)]
 pub struct OrderTree {
-    pub order_tree_type: OrderTreeType,
+    pub order_tree_type: u8, // OrderTreeType, but that's not POD
     pub padding: [u8; 3],
     pub bump_index: u32,
     pub free_list_len: u32,
@@ -49,6 +50,10 @@ const_assert_eq!(std::mem::size_of::<OrderTree>(), 123160);
 const_assert_eq!(std::mem::size_of::<OrderTree>() % 8, 0);
 
 impl OrderTree {
+    pub fn order_tree_type(&self) -> OrderTreeType {
+        OrderTreeType::try_from(self.order_tree_type).unwrap()
+    }
+
     /// Iterate over all entries, including invalid orders
     ///
     /// smallest to highest for asks
@@ -83,7 +88,7 @@ impl OrderTree {
     }
 
     pub fn remove_worst(&mut self) -> Option<LeafNode> {
-        match self.order_tree_type {
+        match self.order_tree_type() {
             OrderTreeType::Bids => self.remove_min(),
             OrderTreeType::Asks => self.remove_max(),
         }
@@ -420,7 +425,7 @@ mod tests {
 
     fn new_order_tree(order_tree_type: OrderTreeType) -> OrderTree {
         OrderTree {
-            order_tree_type,
+            order_tree_type: order_tree_type.into(),
             padding: [0u8; 3],
             bump_index: 0,
             free_list_len: 0,
@@ -472,7 +477,7 @@ mod tests {
     // check that iteration of order tree has the right order and misses no leaves
     fn verify_order_tree_iteration(order_tree: &OrderTree) {
         let mut total = 0;
-        let ascending = order_tree.order_tree_type == OrderTreeType::Asks;
+        let ascending = order_tree.order_tree_type() == OrderTreeType::Asks;
         let mut last_key = if ascending { 0 } else { u128::MAX };
         for (_, node) in order_tree.iter() {
             let key = node.key;

@@ -15,7 +15,7 @@ pub struct OrderTreeIter<'a> {
 
 impl<'a> OrderTreeIter<'a> {
     pub fn new(order_tree: &'a OrderTree) -> Self {
-        let (left, right) = if order_tree.order_tree_type == OrderTreeType::Bids {
+        let (left, right) = if order_tree.order_tree_type() == OrderTreeType::Bids {
             (1, 0)
         } else {
             (0, 1)

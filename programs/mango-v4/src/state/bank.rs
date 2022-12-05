@@ -20,7 +20,7 @@ pub const MINIMUM_MAX_RATE: I80F48 = I80F48!(0.5);
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-#[account(zero_copy)]
+#[account(zero_copy(safe_bytemuck_derives))]
 pub struct Bank {
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,

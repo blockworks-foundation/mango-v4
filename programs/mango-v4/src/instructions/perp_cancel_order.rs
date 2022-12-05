@@ -37,7 +37,7 @@ pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: u128) -> Resul
             error_msg!("could not find perp order with id {order_id} in perp market orderbook")
         })?;
     let order_id = oo.id;
-    let order_side_and_tree = oo.side_and_tree;
+    let order_side_and_tree = oo.side_and_tree();
 
     book.cancel_order(
         &mut account.borrow_mut(),

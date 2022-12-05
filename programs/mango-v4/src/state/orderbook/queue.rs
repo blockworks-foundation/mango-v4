@@ -22,7 +22,7 @@ pub trait QueueHeader: bytemuck::Pod {
     fn decr_event_id(&mut self, n: u64);
 }
 
-#[account(zero_copy)]
+#[account(zero_copy(safe_bytemuck_derives))]
 pub struct EventQueue {
     pub header: EventQueueHeader,
     pub buf: [AnyEvent; MAX_NUM_EVENTS as usize],
@@ -127,7 +127,7 @@ impl<'a> Iterator for EventQueueIterator<'a> {
 }
 
 #[zero_copy]
-#[derive(Pod)]
+#[derive(bytemuck::Pod, bytemuck::Zeroable)]
 pub struct EventQueueHeader {
     head: u32,
     count: u32,
@@ -161,7 +161,7 @@ impl QueueHeader for EventQueueHeader {
 
 const EVENT_SIZE: usize = 208;
 #[zero_copy]
-#[derive(Debug, Pod)]
+#[derive(Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct AnyEvent {
     pub event_type: u8,
     pub padding: [u8; 207],

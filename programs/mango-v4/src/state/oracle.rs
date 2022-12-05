@@ -57,7 +57,7 @@ pub mod switchboard_v2_mainnet_oracle {
 }
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(AnchorDeserialize, AnchorSerialize, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct OracleConfig {
     pub conf_filter: I80F48,
     pub max_staleness_slots: i64,
@@ -91,7 +91,7 @@ pub enum OracleType {
     SwitchboardV2,
 }
 
-#[account(zero_copy)]
+#[account(zero_copy(safe_bytemuck_derives))]
 pub struct StubOracle {
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,

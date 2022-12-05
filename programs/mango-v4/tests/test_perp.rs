@@ -564,7 +564,10 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
         .get_account::<MangoAccount>(account_0)
         .await
         .perp_open_orders[0];
-    assert_eq!(perp_order.side_and_tree, SideAndOrderTree::BidOraclePegged);
+    assert_eq!(
+        perp_order.side_and_tree(),
+        SideAndOrderTree::BidOraclePegged
+    );
     send_tx(
         solana,
         PerpCancelOrderInstruction {
@@ -836,7 +839,7 @@ async fn assert_no_perp_orders(solana: &SolanaCookie, account_0: Pubkey) {
 
     for oo in mango_account_0.perp_open_orders.iter() {
         assert!(oo.id == 0);
-        assert!(oo.side_and_tree == SideAndOrderTree::BidFixed);
+        assert!(oo.side_and_tree() == SideAndOrderTree::BidFixed);
         assert!(oo.client_id == 0);
         assert!(oo.market == FREE_ORDER_SLOT);
     }

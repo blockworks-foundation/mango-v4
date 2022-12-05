@@ -15,7 +15,7 @@ use super::{orderbook, OracleConfig, Orderbook, StablePriceModel, DAY_I80F48};
 
 pub type PerpMarketIndex = u16;
 
-#[account(zero_copy)]
+#[account(zero_copy(safe_bytemuck_derives))]
 #[derive(Debug)]
 pub struct PerpMarket {
     // ABI: Clients rely on this being at offset 8
