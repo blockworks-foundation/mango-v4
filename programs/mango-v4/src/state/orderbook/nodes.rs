@@ -210,7 +210,7 @@ pub struct FreeNode {
     pub(crate) next: NodeHandle,
     pub(crate) reserved: [u8; NODE_SIZE - 8],
 }
-const_assert_eq!(size_of::<FreeNode>(), 4 + 4 + NODE_SIZE - 8);
+const_assert_eq!(size_of::<FreeNode>(), NODE_SIZE);
 const_assert_eq!(size_of::<FreeNode>() % 8, 0);
 
 #[zero_copy]

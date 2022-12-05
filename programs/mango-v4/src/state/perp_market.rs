@@ -32,7 +32,10 @@ pub struct PerpMarket {
     /// Is this market covered by the group insurance fund?
     pub group_insurance_fund: u8,
 
-    pub padding1: [u8; 2],
+    /// PDA bump
+    pub bump: u8,
+
+    pub base_decimals: u8,
 
     pub name: [u8; 16],
 
@@ -61,13 +64,6 @@ pub struct PerpMarket {
 
     /// Total number of orders seen
     pub seq_num: u64,
-
-    /// PDA bump
-    pub bump: u8,
-
-    pub base_decimals: u8,
-
-    pub padding2: [u8; 6],
 
     pub registration_time: u64,
 
@@ -116,7 +112,6 @@ const_assert_eq!(
         + 2
         + 1
         + 1
-        + 2
         + 16
         + 32
         + 32
@@ -130,7 +125,6 @@ const_assert_eq!(
         + 8
         + 1
         + 1
-        + 6
         + 8
         + 16 * 2
         + 8
@@ -143,7 +137,7 @@ const_assert_eq!(
         + 8
         + 1944
 );
-const_assert_eq!(size_of::<PerpMarket>(), 2784);
+const_assert_eq!(size_of::<PerpMarket>(), 2776);
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
 
 impl PerpMarket {
@@ -308,7 +302,6 @@ impl PerpMarket {
             perp_market_index: 0,
             trusted_market: 0,
             group_insurance_fund: 0,
-            padding1: Default::default(),
             name: Default::default(),
             orderbook: Pubkey::new_unique(),
             event_queue: Pubkey::new_unique(),
@@ -329,7 +322,6 @@ impl PerpMarket {
             seq_num: 0,
             bump: 0,
             base_decimals: 0,
-            padding2: Default::default(),
             registration_time: 0,
             min_funding: I80F48::ZERO,
             max_funding: I80F48::ZERO,
