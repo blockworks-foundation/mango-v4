@@ -225,7 +225,7 @@ mod tests {
 
         let mut fixed = new_order_tree(order_tree_type);
         let mut oracle_pegged = new_order_tree(order_tree_type);
-        let new_node = |key: u128, tif: u8, peg_limit: i64| {
+        let new_node = |key: u128, tif: u16, peg_limit: i64| {
             LeafNode::new(
                 0,
                 key,
@@ -238,11 +238,11 @@ mod tests {
                 peg_limit,
             )
         };
-        let mut add_fixed = |price: i64, tif: u8| {
+        let mut add_fixed = |price: i64, tif: u16| {
             let key = new_node_key(side, fixed_price_data(price).unwrap(), 0);
             fixed.insert_leaf(&new_node(key, tif, -1)).unwrap();
         };
-        let mut add_pegged = |price_offset: i64, tif: u8, peg_limit: i64| {
+        let mut add_pegged = |price_offset: i64, tif: u16, peg_limit: i64| {
             let key = new_node_key(side, oracle_pegged_price_data(price_offset), 0);
             oracle_pegged
                 .insert_leaf(&new_node(key, tif, peg_limit))
