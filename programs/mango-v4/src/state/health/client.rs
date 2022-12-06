@@ -648,7 +648,7 @@ mod tests {
             let mut health_cache = health_cache.clone();
             adjust_by_usdc(&mut health_cache, 1, 100.0);
             let mut banks = banks.clone();
-            banks[0].net_borrows_limit_quote = 50;
+            banks[0].net_borrow_limit_per_window_quote = 50;
 
             // The net borrow limit restricts the amount that can be swapped
             // (tracking happens without decimals)

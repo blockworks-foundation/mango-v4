@@ -75,8 +75,8 @@ pub mod mango_v4 {
         init_liab_weight: f32,
         liquidation_fee: f32,
         min_vault_to_deposits_ratio: f64,
-        net_borrows_window_size_ts: u64,
-        net_borrows_limit_quote: i64,
+        net_borrow_limit_window_size_ts: u64,
+        net_borrow_limit_per_window_quote: i64,
     ) -> Result<()> {
         instructions::token_register(
             ctx,
@@ -92,8 +92,8 @@ pub mod mango_v4 {
             init_liab_weight,
             liquidation_fee,
             min_vault_to_deposits_ratio,
-            net_borrows_window_size_ts,
-            net_borrows_limit_quote,
+            net_borrow_limit_window_size_ts,
+            net_borrow_limit_per_window_quote,
         )
     }
 
@@ -123,8 +123,10 @@ pub mod mango_v4 {
         stable_price_delay_growth_limit_opt: Option<f32>,
         stable_price_growth_limit_opt: Option<f32>,
         min_vault_to_deposits_ratio_opt: Option<f64>,
-        net_borrows_limit_quote_opt: Option<i64>,
-        net_borrows_window_size_ts_opt: Option<u64>,
+        net_borrow_limit_per_window_quote_opt: Option<i64>,
+        net_borrow_limit_window_size_ts_opt: Option<u64>,
+        borrow_weight_scale_start_quote_opt: Option<f64>,
+        deposit_weight_scale_start_quote_opt: Option<f64>,
         reset_stable_price: bool,
         reset_net_borrow_limit: bool,
     ) -> Result<()> {
@@ -145,8 +147,10 @@ pub mod mango_v4 {
             stable_price_delay_growth_limit_opt,
             stable_price_growth_limit_opt,
             min_vault_to_deposits_ratio_opt,
-            net_borrows_limit_quote_opt,
-            net_borrows_window_size_ts_opt,
+            net_borrow_limit_per_window_quote_opt,
+            net_borrow_limit_window_size_ts_opt,
+            borrow_weight_scale_start_quote_opt,
+            deposit_weight_scale_start_quote_opt,
             reset_stable_price,
             reset_net_borrow_limit,
         )

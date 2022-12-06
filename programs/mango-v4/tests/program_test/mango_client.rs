@@ -773,8 +773,8 @@ pub struct TokenRegisterInstruction {
     pub liquidation_fee: f32,
 
     pub min_vault_to_deposits_ratio: f64,
-    pub net_borrows_limit_quote: i64,
-    pub net_borrows_window_size_ts: u64,
+    pub net_borrow_limit_per_window_quote: i64,
+    pub net_borrow_limit_window_size_ts: u64,
 
     pub group: Pubkey,
     pub admin: TestKeypair,
@@ -817,8 +817,8 @@ impl ClientInstruction for TokenRegisterInstruction {
             init_liab_weight: self.init_liab_weight,
             liquidation_fee: self.liquidation_fee,
             min_vault_to_deposits_ratio: self.min_vault_to_deposits_ratio,
-            net_borrows_limit_quote: self.net_borrows_limit_quote,
-            net_borrows_window_size_ts: self.net_borrows_window_size_ts,
+            net_borrow_limit_per_window_quote: self.net_borrow_limit_per_window_quote,
+            net_borrow_limit_window_size_ts: self.net_borrow_limit_window_size_ts,
         };
 
         let bank = Pubkey::find_program_address(
@@ -1077,8 +1077,10 @@ impl ClientInstruction for TokenResetStablePriceModel {
             stable_price_delay_growth_limit_opt: None,
             stable_price_growth_limit_opt: None,
             min_vault_to_deposits_ratio_opt: None,
-            net_borrows_limit_quote_opt: None,
-            net_borrows_window_size_ts_opt: None,
+            net_borrow_limit_per_window_quote_opt: None,
+            net_borrow_limit_window_size_ts_opt: None,
+            borrow_weight_scale_start_quote_opt: None,
+            deposit_weight_scale_start_quote_opt: None,
             reset_stable_price: true,
             reset_net_borrow_limit: false,
         };
@@ -1111,8 +1113,8 @@ pub struct TokenResetNetBorrows {
     pub admin: TestKeypair,
     pub mint: Pubkey,
     pub min_vault_to_deposits_ratio_opt: Option<f64>,
-    pub net_borrows_limit_quote_opt: Option<i64>,
-    pub net_borrows_window_size_ts_opt: Option<u64>,
+    pub net_borrow_limit_per_window_quote_opt: Option<i64>,
+    pub net_borrow_limit_window_size_ts_opt: Option<u64>,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -1152,8 +1154,10 @@ impl ClientInstruction for TokenResetNetBorrows {
             stable_price_delay_growth_limit_opt: None,
             stable_price_growth_limit_opt: None,
             min_vault_to_deposits_ratio_opt: self.min_vault_to_deposits_ratio_opt,
-            net_borrows_limit_quote_opt: self.net_borrows_limit_quote_opt,
-            net_borrows_window_size_ts_opt: self.net_borrows_window_size_ts_opt,
+            net_borrow_limit_per_window_quote_opt: self.net_borrow_limit_per_window_quote_opt,
+            net_borrow_limit_window_size_ts_opt: self.net_borrow_limit_window_size_ts_opt,
+            borrow_weight_scale_start_quote_opt: None,
+            deposit_weight_scale_start_quote_opt: None,
             reset_stable_price: false,
             reset_net_borrow_limit: true,
         };

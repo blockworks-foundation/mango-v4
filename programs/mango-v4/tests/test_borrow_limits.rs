@@ -151,8 +151,8 @@ async fn test_bank_net_borrows_based_borrow_limit() -> Result<(), TransportError
                     mint,
                     // we want to test net borrow limits in isolation
                     min_vault_to_deposits_ratio_opt: Some(0.0),
-                    net_borrows_limit_quote_opt: Some(6000),
-                    net_borrows_window_size_ts_opt: Some(1000),
+                    net_borrow_limit_per_window_quote_opt: Some(6000),
+                    net_borrow_limit_window_size_ts_opt: Some(1000),
                 },
             )
             .await

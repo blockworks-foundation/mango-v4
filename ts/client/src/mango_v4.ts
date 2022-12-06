@@ -347,11 +347,11 @@ export type MangoV4 = {
           "type": "f64"
         },
         {
-          "name": "netBorrowsWindowSizeTs",
+          "name": "netBorrowLimitWindowSizeTs",
           "type": "u64"
         },
         {
-          "name": "netBorrowsLimitQuote",
+          "name": "netBorrowLimitPerWindowQuote",
           "type": "i64"
         }
       ]
@@ -614,15 +614,27 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "netBorrowsLimitQuoteOpt",
+          "name": "netBorrowLimitPerWindowQuoteOpt",
           "type": {
             "option": "i64"
           }
         },
         {
-          "name": "netBorrowsWindowSizeTsOpt",
+          "name": "netBorrowLimitWindowSizeTsOpt",
           "type": {
             "option": "u64"
+          }
+        },
+        {
+          "name": "borrowWeightScaleStartQuoteOpt",
+          "type": {
+            "option": "f64"
+          }
+        },
+        {
+          "name": "depositWeightScaleStartQuoteOpt",
+          "type": {
+            "option": "f64"
           }
         },
         {
@@ -3431,9 +3443,15 @@ export type MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "oracleConfFilter",
+            "name": "oracleConfig",
             "type": {
-              "defined": "I80F48"
+              "defined": "OracleConfig"
+            }
+          },
+          {
+            "name": "stablePriceModel",
+            "type": {
+              "defined": "StablePriceModel"
             }
           },
           {
@@ -3448,23 +3466,6 @@ export type MangoV4 = {
           },
           {
             "name": "borrowIndex",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "cachedIndexedTotalDeposits",
-            "docs": [
-              "total deposits/borrows, only updated during UpdateIndexAndRate",
-              "TODO: These values could be dropped from the bank, they're written in UpdateIndexAndRate",
-              "and never read."
-            ],
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "cachedIndexedTotalBorrows",
             "type": {
               "defined": "I80F48"
             }
@@ -3621,18 +3622,6 @@ export type MangoV4 = {
             "type": "u32"
           },
           {
-            "name": "oracleConfig",
-            "type": {
-              "defined": "OracleConfig"
-            }
-          },
-          {
-            "name": "stablePriceModel",
-            "type": {
-              "defined": "StablePriceModel"
-            }
-          },
-          {
             "name": "minVaultToDepositsRatio",
             "docs": [
               "Min fraction of deposits that must remain in the vault when borrowing."
@@ -3640,7 +3629,7 @@ export type MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "netBorrowsWindowSizeTs",
+            "name": "netBorrowLimitWindowSizeTs",
             "docs": [
               "Size in seconds of a net borrows window"
             ],
@@ -3654,7 +3643,7 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "netBorrowsLimitQuote",
+            "name": "netBorrowLimitPerWindowQuote",
             "docs": [
               "Net borrow limit per window in quote native; set to -1 to disable."
             ],
@@ -3668,7 +3657,7 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "borrowLimitQuote",
+            "name": "borrowWeightScaleStartQuote",
             "docs": [
               "Soft borrow limit in native quote",
               "",
@@ -3680,9 +3669,9 @@ export type MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "collateralLimitQuote",
+            "name": "depositWeightScaleStartQuote",
             "docs": [
-              "Limit for collateral of deposits",
+              "Limit for collateral of deposits in native quote",
               "",
               "Once the deposits in the bank exceed this quote value, init_asset_weight is scaled",
               "down to keep the total collateral value constant.",
@@ -4058,6 +4047,15 @@ export type MangoV4 = {
             "type": {
               "defined": "BookSide"
             }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                2400
+              ]
+            }
           }
         ]
       }
@@ -4081,6 +4079,15 @@ export type MangoV4 = {
                   "defined": "AnyEvent"
                 },
                 488
+              ]
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
               ]
             }
           }
@@ -4122,13 +4129,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding1",
-            "type": {
-              "array": [
-                "u8",
-                2
-              ]
-            }
+            "name": "bump",
+            "docs": [
+              "PDA bump"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "baseDecimals",
+            "type": "u8"
           },
           {
             "name": "name",
@@ -4138,6 +4147,14 @@ export type MangoV4 = {
                 16
               ]
             }
+          },
+          {
+            "name": "orderbook",
+            "type": "publicKey"
+          },
+          {
+            "name": "eventQueue",
+            "type": "publicKey"
           },
           {
             "name": "oracle",
@@ -4150,12 +4167,10 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "orderbook",
-            "type": "publicKey"
-          },
-          {
-            "name": "eventQueue",
-            "type": "publicKey"
+            "name": "stablePriceModel",
+            "type": {
+              "defined": "StablePriceModel"
+            }
           },
           {
             "name": "quoteLotSize",
@@ -4198,25 +4213,25 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "liquidationFee",
-            "type": {
-              "defined": "I80F48"
-            }
+            "name": "openInterest",
+            "type": "i64"
           },
           {
-            "name": "makerFee",
-            "type": {
-              "defined": "I80F48"
-            }
+            "name": "seqNum",
+            "docs": [
+              "Total number of orders seen"
+            ],
+            "type": "u64"
           },
           {
-            "name": "takerFee",
-            "type": {
-              "defined": "I80F48"
-            }
+            "name": "registrationTime",
+            "type": "u64"
           },
           {
             "name": "minFunding",
+            "docs": [
+              "Funding"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -4251,18 +4266,25 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "openInterest",
+            "name": "liquidationFee",
             "docs": [
-              ""
+              "Fees"
             ],
-            "type": "i64"
+            "type": {
+              "defined": "I80F48"
+            }
           },
           {
-            "name": "seqNum",
-            "docs": [
-              "Total number of orders seen"
-            ],
-            "type": "u64"
+            "name": "makerFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "takerFee",
+            "type": {
+              "defined": "I80F48"
+            }
           },
           {
             "name": "feesAccrued",
@@ -4272,34 +4294,6 @@ export type MangoV4 = {
             "type": {
               "defined": "I80F48"
             }
-          },
-          {
-            "name": "bump",
-            "docs": [
-              "Liquidity mining metadata",
-              "pub liquidity_mining_info: LiquidityMiningInfo,",
-              "Token vault which holds mango tokens to be disbursed as liquidity incentives for this perp market",
-              "pub mngo_vault: Pubkey,",
-              "PDA bump"
-            ],
-            "type": "u8"
-          },
-          {
-            "name": "baseDecimals",
-            "type": "u8"
-          },
-          {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                6
-              ]
-            }
-          },
-          {
-            "name": "registrationTime",
-            "type": "u64"
           },
           {
             "name": "feesSettled",
@@ -4337,18 +4331,21 @@ export type MangoV4 = {
             "type": "f32"
           },
           {
-            "name": "stablePriceModel",
-            "type": {
-              "defined": "StablePriceModel"
-            }
-          },
-          {
             "name": "settlePnlLimitFactor",
             "docs": [
               "Fraction of perp base value that can be settled each window.",
               "Set to a negative value to disable the limit."
             ],
             "type": "f32"
+          },
+          {
+            "name": "padding3",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
           },
           {
             "name": "settlePnlLimitWindowSizeTs",
@@ -4855,15 +4852,6 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                8
-              ]
-            }
-          },
-          {
             "name": "previousIndex",
             "type": {
               "defined": "I80F48"
@@ -4876,6 +4864,15 @@ export type MangoV4 = {
           {
             "name": "cumulativeBorrowInterest",
             "type": "f64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                128
+              ]
+            }
           }
         ]
       }
@@ -4964,6 +4961,10 @@ export type MangoV4 = {
             "type": "u32"
           },
           {
+            "name": "settlePnlLimitSettledInCurrentWindowNative",
+            "type": "i64"
+          },
+          {
             "name": "basePositionLots",
             "docs": [
               "Active position size, measured in base lots"
@@ -4979,10 +4980,6 @@ export type MangoV4 = {
             "type": {
               "defined": "I80F48"
             }
-          },
-          {
-            "name": "settlePnlLimitSettledInCurrentWindowNative",
-            "type": "i64"
           },
           {
             "name": "quoteRunningNative",
@@ -5023,7 +5020,6 @@ export type MangoV4 = {
           {
             "name": "takerBaseLots",
             "docs": [
-              "Liquidity mining rewards",
               "Amount that's on EventQueue waiting to be processed"
             ],
             "type": "i64"
@@ -5060,6 +5056,15 @@ export type MangoV4 = {
             "name": "realizedPnlNative",
             "type": {
               "defined": "I80F48"
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                128
+              ]
             }
           }
         ]
@@ -5197,7 +5202,16 @@ export type MangoV4 = {
         "fields": [
           {
             "name": "tag",
-            "type": "u32"
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
           },
           {
             "name": "prefixLen",
@@ -5246,7 +5260,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                48
+                72
               ]
             }
           }
@@ -5263,7 +5277,7 @@ export type MangoV4 = {
         "fields": [
           {
             "name": "tag",
-            "type": "u32"
+            "type": "u8"
           },
           {
             "name": "ownerSlot",
@@ -5290,7 +5304,16 @@ export type MangoV4 = {
               "Time in seconds after `timestamp` at which the order expires.",
               "A value of 0 means no expiry."
             ],
-            "type": "u8"
+            "type": "u16"
+          },
+          {
+            "name": "padding2",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
           },
           {
             "name": "key",
@@ -5324,7 +5347,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                8
+                32
               ]
             }
           }
@@ -5338,14 +5361,14 @@ export type MangoV4 = {
         "fields": [
           {
             "name": "tag",
-            "type": "u32"
+            "type": "u8"
           },
           {
             "name": "data",
             "type": {
               "array": [
                 "u8",
-                92
+                119
               ]
             }
           }
@@ -7606,11 +7629,11 @@ export const IDL: MangoV4 = {
           "type": "f64"
         },
         {
-          "name": "netBorrowsWindowSizeTs",
+          "name": "netBorrowLimitWindowSizeTs",
           "type": "u64"
         },
         {
-          "name": "netBorrowsLimitQuote",
+          "name": "netBorrowLimitPerWindowQuote",
           "type": "i64"
         }
       ]
@@ -7873,15 +7896,27 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "netBorrowsLimitQuoteOpt",
+          "name": "netBorrowLimitPerWindowQuoteOpt",
           "type": {
             "option": "i64"
           }
         },
         {
-          "name": "netBorrowsWindowSizeTsOpt",
+          "name": "netBorrowLimitWindowSizeTsOpt",
           "type": {
             "option": "u64"
+          }
+        },
+        {
+          "name": "borrowWeightScaleStartQuoteOpt",
+          "type": {
+            "option": "f64"
+          }
+        },
+        {
+          "name": "depositWeightScaleStartQuoteOpt",
+          "type": {
+            "option": "f64"
           }
         },
         {
@@ -10690,9 +10725,15 @@ export const IDL: MangoV4 = {
             "type": "publicKey"
           },
           {
-            "name": "oracleConfFilter",
+            "name": "oracleConfig",
             "type": {
-              "defined": "I80F48"
+              "defined": "OracleConfig"
+            }
+          },
+          {
+            "name": "stablePriceModel",
+            "type": {
+              "defined": "StablePriceModel"
             }
           },
           {
@@ -10707,23 +10748,6 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "borrowIndex",
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "cachedIndexedTotalDeposits",
-            "docs": [
-              "total deposits/borrows, only updated during UpdateIndexAndRate",
-              "TODO: These values could be dropped from the bank, they're written in UpdateIndexAndRate",
-              "and never read."
-            ],
-            "type": {
-              "defined": "I80F48"
-            }
-          },
-          {
-            "name": "cachedIndexedTotalBorrows",
             "type": {
               "defined": "I80F48"
             }
@@ -10880,18 +10904,6 @@ export const IDL: MangoV4 = {
             "type": "u32"
           },
           {
-            "name": "oracleConfig",
-            "type": {
-              "defined": "OracleConfig"
-            }
-          },
-          {
-            "name": "stablePriceModel",
-            "type": {
-              "defined": "StablePriceModel"
-            }
-          },
-          {
             "name": "minVaultToDepositsRatio",
             "docs": [
               "Min fraction of deposits that must remain in the vault when borrowing."
@@ -10899,7 +10911,7 @@ export const IDL: MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "netBorrowsWindowSizeTs",
+            "name": "netBorrowLimitWindowSizeTs",
             "docs": [
               "Size in seconds of a net borrows window"
             ],
@@ -10913,7 +10925,7 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "netBorrowsLimitQuote",
+            "name": "netBorrowLimitPerWindowQuote",
             "docs": [
               "Net borrow limit per window in quote native; set to -1 to disable."
             ],
@@ -10927,7 +10939,7 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "borrowLimitQuote",
+            "name": "borrowWeightScaleStartQuote",
             "docs": [
               "Soft borrow limit in native quote",
               "",
@@ -10939,9 +10951,9 @@ export const IDL: MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "collateralLimitQuote",
+            "name": "depositWeightScaleStartQuote",
             "docs": [
-              "Limit for collateral of deposits",
+              "Limit for collateral of deposits in native quote",
               "",
               "Once the deposits in the bank exceed this quote value, init_asset_weight is scaled",
               "down to keep the total collateral value constant.",
@@ -11317,6 +11329,15 @@ export const IDL: MangoV4 = {
             "type": {
               "defined": "BookSide"
             }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                2400
+              ]
+            }
           }
         ]
       }
@@ -11340,6 +11361,15 @@ export const IDL: MangoV4 = {
                   "defined": "AnyEvent"
                 },
                 488
+              ]
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
               ]
             }
           }
@@ -11381,13 +11411,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding1",
-            "type": {
-              "array": [
-                "u8",
-                2
-              ]
-            }
+            "name": "bump",
+            "docs": [
+              "PDA bump"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "baseDecimals",
+            "type": "u8"
           },
           {
             "name": "name",
@@ -11397,6 +11429,14 @@ export const IDL: MangoV4 = {
                 16
               ]
             }
+          },
+          {
+            "name": "orderbook",
+            "type": "publicKey"
+          },
+          {
+            "name": "eventQueue",
+            "type": "publicKey"
           },
           {
             "name": "oracle",
@@ -11409,12 +11449,10 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "orderbook",
-            "type": "publicKey"
-          },
-          {
-            "name": "eventQueue",
-            "type": "publicKey"
+            "name": "stablePriceModel",
+            "type": {
+              "defined": "StablePriceModel"
+            }
           },
           {
             "name": "quoteLotSize",
@@ -11457,25 +11495,25 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "liquidationFee",
-            "type": {
-              "defined": "I80F48"
-            }
+            "name": "openInterest",
+            "type": "i64"
           },
           {
-            "name": "makerFee",
-            "type": {
-              "defined": "I80F48"
-            }
+            "name": "seqNum",
+            "docs": [
+              "Total number of orders seen"
+            ],
+            "type": "u64"
           },
           {
-            "name": "takerFee",
-            "type": {
-              "defined": "I80F48"
-            }
+            "name": "registrationTime",
+            "type": "u64"
           },
           {
             "name": "minFunding",
+            "docs": [
+              "Funding"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -11510,18 +11548,25 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "openInterest",
+            "name": "liquidationFee",
             "docs": [
-              ""
+              "Fees"
             ],
-            "type": "i64"
+            "type": {
+              "defined": "I80F48"
+            }
           },
           {
-            "name": "seqNum",
-            "docs": [
-              "Total number of orders seen"
-            ],
-            "type": "u64"
+            "name": "makerFee",
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "takerFee",
+            "type": {
+              "defined": "I80F48"
+            }
           },
           {
             "name": "feesAccrued",
@@ -11531,34 +11576,6 @@ export const IDL: MangoV4 = {
             "type": {
               "defined": "I80F48"
             }
-          },
-          {
-            "name": "bump",
-            "docs": [
-              "Liquidity mining metadata",
-              "pub liquidity_mining_info: LiquidityMiningInfo,",
-              "Token vault which holds mango tokens to be disbursed as liquidity incentives for this perp market",
-              "pub mngo_vault: Pubkey,",
-              "PDA bump"
-            ],
-            "type": "u8"
-          },
-          {
-            "name": "baseDecimals",
-            "type": "u8"
-          },
-          {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                6
-              ]
-            }
-          },
-          {
-            "name": "registrationTime",
-            "type": "u64"
           },
           {
             "name": "feesSettled",
@@ -11596,18 +11613,21 @@ export const IDL: MangoV4 = {
             "type": "f32"
           },
           {
-            "name": "stablePriceModel",
-            "type": {
-              "defined": "StablePriceModel"
-            }
-          },
-          {
             "name": "settlePnlLimitFactor",
             "docs": [
               "Fraction of perp base value that can be settled each window.",
               "Set to a negative value to disable the limit."
             ],
             "type": "f32"
+          },
+          {
+            "name": "padding3",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
           },
           {
             "name": "settlePnlLimitWindowSizeTs",
@@ -12114,15 +12134,6 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                8
-              ]
-            }
-          },
-          {
             "name": "previousIndex",
             "type": {
               "defined": "I80F48"
@@ -12135,6 +12146,15 @@ export const IDL: MangoV4 = {
           {
             "name": "cumulativeBorrowInterest",
             "type": "f64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                128
+              ]
+            }
           }
         ]
       }
@@ -12223,6 +12243,10 @@ export const IDL: MangoV4 = {
             "type": "u32"
           },
           {
+            "name": "settlePnlLimitSettledInCurrentWindowNative",
+            "type": "i64"
+          },
+          {
             "name": "basePositionLots",
             "docs": [
               "Active position size, measured in base lots"
@@ -12238,10 +12262,6 @@ export const IDL: MangoV4 = {
             "type": {
               "defined": "I80F48"
             }
-          },
-          {
-            "name": "settlePnlLimitSettledInCurrentWindowNative",
-            "type": "i64"
           },
           {
             "name": "quoteRunningNative",
@@ -12282,7 +12302,6 @@ export const IDL: MangoV4 = {
           {
             "name": "takerBaseLots",
             "docs": [
-              "Liquidity mining rewards",
               "Amount that's on EventQueue waiting to be processed"
             ],
             "type": "i64"
@@ -12319,6 +12338,15 @@ export const IDL: MangoV4 = {
             "name": "realizedPnlNative",
             "type": {
               "defined": "I80F48"
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                128
+              ]
             }
           }
         ]
@@ -12456,7 +12484,16 @@ export const IDL: MangoV4 = {
         "fields": [
           {
             "name": "tag",
-            "type": "u32"
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
           },
           {
             "name": "prefixLen",
@@ -12505,7 +12542,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                48
+                72
               ]
             }
           }
@@ -12522,7 +12559,7 @@ export const IDL: MangoV4 = {
         "fields": [
           {
             "name": "tag",
-            "type": "u32"
+            "type": "u8"
           },
           {
             "name": "ownerSlot",
@@ -12549,7 +12586,16 @@ export const IDL: MangoV4 = {
               "Time in seconds after `timestamp` at which the order expires.",
               "A value of 0 means no expiry."
             ],
-            "type": "u8"
+            "type": "u16"
+          },
+          {
+            "name": "padding2",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
           },
           {
             "name": "key",
@@ -12583,7 +12629,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                8
+                32
               ]
             }
           }
@@ -12597,14 +12643,14 @@ export const IDL: MangoV4 = {
         "fields": [
           {
             "name": "tag",
-            "type": "u32"
+            "type": "u8"
           },
           {
             "name": "data",
             "type": {
               "array": [
                 "u8",
-                92
+                119
               ]
             }
           }

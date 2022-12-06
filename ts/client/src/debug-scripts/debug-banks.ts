@@ -113,18 +113,12 @@ async function main(): Promise<void> {
       `\n ${'deposits (sum over all mango accounts)'.padEnd(40)} ${
         (bank as any).indexedDepositsByMangoAccounts
       }` +
-      `\n ${'cachedTotalDeposits'.padEnd(40)} ${(
-        bank as any
-      ).cachedIndexedTotalDeposits.mul(bank.depositIndex)}` +
       `\n ${'borrows'.padEnd(40)} ${bank.indexedBorrows.mul(
         bank.borrowIndex,
       )}` +
       `\n ${'borrows (sum over all mango accounts)'.padEnd(40)} ${
         (bank as any).indexedBorrowsByMangoAccounts
       }` +
-      `\n ${'cachedTotalBorrows'.padEnd(40)} ${(
-        bank as any
-      ).cachedIndexedTotalBorrows.mul(bank.borrowIndex)}` +
       `\n ${'avgUtilization since last rate update'.padEnd(40)} ${(
         100 * bank.avgUtilization.toNumber()
       ).toFixed(1)}%` +

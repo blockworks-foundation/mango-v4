@@ -50,8 +50,10 @@ pub fn token_edit(
     stable_price_delay_growth_limit_opt: Option<f32>,
     stable_price_growth_limit_opt: Option<f32>,
     min_vault_to_deposits_ratio_opt: Option<f64>,
-    net_borrows_limit_quote_opt: Option<i64>,
-    net_borrows_window_size_ts_opt: Option<u64>,
+    net_borrow_limit_per_window_quote_opt: Option<i64>,
+    net_borrow_limit_window_size_ts_opt: Option<u64>,
+    borrow_weight_scale_start_quote_opt: Option<f64>,
+    deposit_weight_scale_start_quote_opt: Option<f64>,
     reset_stable_price: bool,
     reset_net_borrow_limit: bool,
 ) -> Result<()> {
@@ -150,15 +152,22 @@ pub fn token_edit(
         if let Some(min_vault_to_deposits_ratio) = min_vault_to_deposits_ratio_opt {
             bank.min_vault_to_deposits_ratio = min_vault_to_deposits_ratio;
         }
-        if let Some(net_borrows_limit_quote) = net_borrows_limit_quote_opt {
-            bank.net_borrows_limit_quote = net_borrows_limit_quote;
+        if let Some(net_borrow_limit_per_window_quote) = net_borrow_limit_per_window_quote_opt {
+            bank.net_borrow_limit_per_window_quote = net_borrow_limit_per_window_quote;
         }
-        if let Some(net_borrows_window_size_ts) = net_borrows_window_size_ts_opt {
-            bank.net_borrows_window_size_ts = net_borrows_window_size_ts;
+        if let Some(net_borrow_limit_window_size_ts) = net_borrow_limit_window_size_ts_opt {
+            bank.net_borrow_limit_window_size_ts = net_borrow_limit_window_size_ts;
         }
         if reset_net_borrow_limit {
             bank.net_borrows_in_window = 0;
             bank.last_net_borrows_window_start_ts = 0;
+        }
+
+        if let Some(borrow_weight_scale_start_quote) = borrow_weight_scale_start_quote_opt {
+            bank.borrow_weight_scale_start_quote = borrow_weight_scale_start_quote;
+        }
+        if let Some(deposit_weight_scale_start_quote) = deposit_weight_scale_start_quote_opt {
+            bank.deposit_weight_scale_start_quote = deposit_weight_scale_start_quote;
         }
 
         // unchanged -

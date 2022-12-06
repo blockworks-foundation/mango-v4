@@ -42,8 +42,6 @@ export class Bank implements BankForHealth {
   public borrowIndex: I80F48;
   public indexedDeposits: I80F48;
   public indexedBorrows: I80F48;
-  public cachedIndexedTotalDeposits: I80F48;
-  public cachedIndexedTotalBorrows: I80F48;
   public avgUtilization: I80F48;
   public adjustmentFactor: I80F48;
   public maxRate: I80F48;
@@ -75,8 +73,6 @@ export class Bank implements BankForHealth {
       oracleConfig: OracleConfig;
       depositIndex: I80F48Dto;
       borrowIndex: I80F48Dto;
-      cachedIndexedTotalDeposits: I80F48Dto;
-      cachedIndexedTotalBorrows: I80F48Dto;
       indexedDeposits: I80F48Dto;
       indexedBorrows: I80F48Dto;
       indexLastUpdated: BN;
@@ -104,12 +100,12 @@ export class Bank implements BankForHealth {
       bankNum: number;
       stablePriceModel: StablePriceModel;
       minVaultToDepositsRatio: number;
-      netBorrowsWindowSizeTs: BN;
+      netBorrowLimitWindowSizeTs: BN;
       lastNetBorrowsWindowStartTs: BN;
-      netBorrowsLimitQuote: BN;
+      netBorrowLimitPerWindowQuote: BN;
       netBorrowsInWindow: BN;
-      borrowLimitQuote: number;
-      collateralLimitQuote: number;
+      borrowWeightScaleStartQuote: number;
+      depositWeightScaleStartQuote: number;
     },
   ): Bank {
     return new Bank(
@@ -122,8 +118,6 @@ export class Bank implements BankForHealth {
       obj.oracleConfig,
       obj.depositIndex,
       obj.borrowIndex,
-      obj.cachedIndexedTotalDeposits,
-      obj.cachedIndexedTotalBorrows,
       obj.indexedDeposits,
       obj.indexedBorrows,
       obj.indexLastUpdated,
@@ -151,12 +145,12 @@ export class Bank implements BankForHealth {
       obj.bankNum,
       obj.stablePriceModel,
       obj.minVaultToDepositsRatio,
-      obj.netBorrowsWindowSizeTs,
+      obj.netBorrowLimitWindowSizeTs,
       obj.lastNetBorrowsWindowStartTs,
-      obj.netBorrowsLimitQuote,
+      obj.netBorrowLimitPerWindowQuote,
       obj.netBorrowsInWindow,
-      obj.borrowLimitQuote,
-      obj.collateralLimitQuote,
+      obj.borrowWeightScaleStartQuote,
+      obj.depositWeightScaleStartQuote,
     );
   }
 
@@ -170,8 +164,6 @@ export class Bank implements BankForHealth {
     oracleConfig: OracleConfig,
     depositIndex: I80F48Dto,
     borrowIndex: I80F48Dto,
-    indexedTotalDeposits: I80F48Dto,
-    indexedTotalBorrows: I80F48Dto,
     indexedDeposits: I80F48Dto,
     indexedBorrows: I80F48Dto,
     public indexLastUpdated: BN,
@@ -199,20 +191,18 @@ export class Bank implements BankForHealth {
     public bankNum: number,
     public stablePriceModel: StablePriceModel,
     minVaultToDepositsRatio: number,
-    netBorrowsWindowSizeTs: BN,
+    netBorrowLimitWindowSizeTs: BN,
     lastNetBorrowsWindowStartTs: BN,
-    netBorrowsLimitQuote: BN,
+    netBorrowLimitPerWindowQuote: BN,
     netBorrowsInWindow: BN,
-    borrowLimitQuote: number,
-    collateralLimitQuote: number,
+    borrowWeightScaleStartQuote: number,
+    depositWeightScaleStartQuote: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.depositIndex = I80F48.from(depositIndex);
     this.borrowIndex = I80F48.from(borrowIndex);
     this.indexedDeposits = I80F48.from(indexedDeposits);
     this.indexedBorrows = I80F48.from(indexedBorrows);
-    this.cachedIndexedTotalDeposits = I80F48.from(indexedTotalDeposits);
-    this.cachedIndexedTotalBorrows = I80F48.from(indexedTotalBorrows);
     this.avgUtilization = I80F48.from(avgUtilization);
     this.adjustmentFactor = I80F48.from(adjustmentFactor);
     this.maxRate = I80F48.from(maxRate);
@@ -260,10 +250,6 @@ export class Bank implements BankForHealth {
       this.indexedDeposits.toString() +
       '\n indexedBorrows - ' +
       this.indexedBorrows.toString() +
-      '\n cachedIndexedTotalDeposits - ' +
-      this.cachedIndexedTotalDeposits.toString() +
-      '\n cachedIndexedTotalBorrows - ' +
-      this.cachedIndexedTotalBorrows.toString() +
       '\n indexLastUpdated - ' +
       new Date(this.indexLastUpdated.toNumber() * 1000) +
       '\n bankRateLastUpdated - ' +

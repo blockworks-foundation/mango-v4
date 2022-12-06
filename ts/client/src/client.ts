@@ -230,7 +230,7 @@ export class MangoClient {
     initLiabWeight: number,
     liquidationFee: number,
     minVaultToDepositsRatio: number,
-    netBorrowsWindowSizeTs: number,
+    netBorrowLimitWindowSizeTs: number,
     netBorrowsLimitNative: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
@@ -247,7 +247,7 @@ export class MangoClient {
         initLiabWeight,
         liquidationFee,
         minVaultToDepositsRatio,
-        new BN(netBorrowsWindowSizeTs),
+        new BN(netBorrowLimitWindowSizeTs),
         new BN(netBorrowsLimitNative),
       )
       .accounts({
@@ -300,8 +300,10 @@ export class MangoClient {
     stablePriceDelayGrowthLimit: number | null,
     stablePriceGrowthLimit: number | null,
     minVaultToDepositsRatio: number | null,
-    netBorrowsLimitQuote: number | null,
-    netBorrowsWindowSizeTs: number | null,
+    netBorrowLimitPerWindowQuote: number | null,
+    netBorrowLimitWindowSizeTs: number | null,
+    borrowWeightScaleStartQuote: number | null,
+    depositWeightScaleStartQuote: number | null,
     resetStablePrice: boolean | null,
     resetNetBorrowLimit: boolean | null,
   ): Promise<TransactionSignature> {
@@ -325,8 +327,14 @@ export class MangoClient {
         stablePriceDelayGrowthLimit,
         stablePriceGrowthLimit,
         minVaultToDepositsRatio,
-        netBorrowsLimitQuote !== null ? new BN(netBorrowsLimitQuote) : null,
-        netBorrowsWindowSizeTs !== null ? new BN(netBorrowsWindowSizeTs) : null,
+        netBorrowLimitPerWindowQuote !== null
+          ? new BN(netBorrowLimitPerWindowQuote)
+          : null,
+        netBorrowLimitWindowSizeTs !== null
+          ? new BN(netBorrowLimitWindowSizeTs)
+          : null,
+        borrowWeightScaleStartQuote,
+        depositWeightScaleStartQuote,
         resetStablePrice ?? false,
         resetNetBorrowLimit ?? false,
       )
