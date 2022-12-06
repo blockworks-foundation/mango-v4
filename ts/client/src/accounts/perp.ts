@@ -35,6 +35,7 @@ export class PerpMarket {
   public feesSettled: I80F48;
   public _price: I80F48;
   public _uiPrice: number;
+  public confFilter: I80F48;
 
   private priceLotsToUiConverter: number;
   private baseLotsToUiConverter: number;
@@ -131,7 +132,7 @@ export class PerpMarket {
     public groupInsuranceFund: boolean,
     name: number[],
     public oracle: PublicKey,
-    oracleConfig: OracleConfig,
+    public oracleConfig: OracleConfig,
     public bids: PublicKey,
     public asks: PublicKey,
     public eventQueue: PublicKey,
@@ -175,6 +176,7 @@ export class PerpMarket {
     this.shortFunding = I80F48.from(shortFunding);
     this.feesAccrued = I80F48.from(feesAccrued);
     this.feesSettled = I80F48.from(feesSettled);
+    this.confFilter = I80F48.from(oracleConfig.confFilter);
 
     this.priceLotsToUiConverter = new Big(10)
       .pow(baseDecimals - QUOTE_DECIMALS)
