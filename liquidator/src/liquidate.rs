@@ -373,6 +373,9 @@ impl<'a> LiquidateHelper<'a> {
         let health_cache = health_cache::new(&self.client.context, self.account_fetcher, &liqor)
             .expect("always ok");
 
+        let source_bank = self.client.first_bank(source)?;
+        let target_bank = self.client.first_bank(target)?;
+
         let source_price = health_cache.token_info(source).unwrap().prices.oracle;
         let target_price = health_cache.token_info(target).unwrap().prices.oracle;
         // TODO: This is where we could multiply in the liquidation fee factors
@@ -380,8 +383,10 @@ impl<'a> LiquidateHelper<'a> {
 
         let amount = health_cache
             .max_swap_source_for_health_ratio(
-                source,
-                target,
+                &liqor,
+                &source_bank,
+                source_price,
+                &target_bank,
                 oracle_swap_price,
                 self.liqor_min_health_ratio,
             )

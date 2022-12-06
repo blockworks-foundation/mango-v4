@@ -362,7 +362,13 @@ impl HealthCache {
         self.token_infos
             .iter()
             .position(|t| t.token_index == token_index)
-            .ok_or_else(|| error_msg!("token index {} not found", token_index))
+            .ok_or_else(|| {
+                error_msg_typed!(
+                    TokenPositionDoesNotExist,
+                    "token index {} not found",
+                    token_index
+                )
+            })
     }
 
     /// Changes the cached user account token balance.
@@ -609,7 +615,13 @@ pub(crate) fn find_token_info_index(infos: &[TokenInfo], token_index: TokenIndex
     infos
         .iter()
         .position(|ti| ti.token_index == token_index)
-        .ok_or_else(|| error_msg!("token index {} not found", token_index))
+        .ok_or_else(|| {
+            error_msg_typed!(
+                TokenPositionDoesNotExist,
+                "token index {} not found",
+                token_index
+            )
+        })
 }
 
 /// Generate a HealthCache for an account and its health accounts.
