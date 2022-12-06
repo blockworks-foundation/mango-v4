@@ -57,15 +57,21 @@ impl HealthCache {
         amount: I80F48,
         price: I80F48,
     ) -> Result<Self> {
+        use std::time::SystemTime;
+        let now_ts = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("system time after epoch start")
+            .as_secs();
+
         let mut source_position = account.token_position(source_bank.token_index)?.clone();
         let mut target_position = account.token_position(target_bank.token_index)?.clone();
 
         let target_amount = cm!(amount * price);
 
         let mut source_bank = source_bank.clone();
-        source_bank.withdraw_with_fee(&mut source_position, amount, 0, source_oracle_price)?;
+        source_bank.withdraw_with_fee(&mut source_position, amount, now_ts, source_oracle_price)?;
         let mut target_bank = target_bank.clone();
-        target_bank.deposit(&mut target_position, target_amount, 0)?;
+        target_bank.deposit(&mut target_position, target_amount, now_ts)?;
 
         let mut resulting_cache = self.clone();
         resulting_cache.adjust_token_balance(&source_bank, -amount)?;
