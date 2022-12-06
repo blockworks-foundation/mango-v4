@@ -385,12 +385,13 @@ impl<'a> LiquidateHelper<'a> {
             .max_swap_source_for_health_ratio(
                 &liqor,
                 &source_bank,
+                source_price,
                 &target_bank,
                 oracle_swap_price,
                 self.liqor_min_health_ratio,
             )
             .context("getting max_swap_source")?;
-        Ok(I80F48::from(amount))
+        Ok(amount)
     }
 
     fn token_liq(&self) -> anyhow::Result<Option<Signature>> {

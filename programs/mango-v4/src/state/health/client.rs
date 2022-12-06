@@ -52,6 +52,7 @@ impl HealthCache {
         &self,
         account: &MangoAccountValue,
         source_bank: &Bank,
+        source_oracle_price: I80F48,
         target_bank: &Bank,
         amount: I80F48,
         price: I80F48,
@@ -62,7 +63,7 @@ impl HealthCache {
         let target_amount = cm!(amount * price);
 
         let mut source_bank = source_bank.clone();
-        source_bank.withdraw_with_fee(&mut source_position, amount, 0, I80F48::ZERO)?;
+        source_bank.withdraw_with_fee(&mut source_position, amount, 0, source_oracle_price)?;
         let mut target_bank = target_bank.clone();
         target_bank.deposit(&mut target_position, target_amount, 0)?;
 
@@ -87,6 +88,7 @@ impl HealthCache {
         &self,
         account: &MangoAccountValue,
         source_bank: &Bank,
+        source_oracle_price: I80F48,
         target_bank: &Bank,
         price: I80F48,
         min_ratio: I80F48,
@@ -128,8 +130,14 @@ impl HealthCache {
         }
 
         let cache_after_swap = |amount: I80F48| -> Result<Option<HealthCache>> {
-            let maybe_cache =
-                self.cache_after_swap(account, source_bank, target_bank, amount, price);
+            let maybe_cache = self.cache_after_swap(
+                account,
+                source_bank,
+                source_oracle_price,
+                target_bank,
+                amount,
+                price,
+            );
             match maybe_cache {
                 Ok(cache) => Ok(Some(cache)),
                 // Special case net borrow errors: We want to be able to find a good
@@ -472,6 +480,7 @@ mod tests {
                 .max_swap_source_for_health_ratio(
                     &account,
                     &banks[0],
+                    I80F48::from(1),
                     &banks[1],
                     I80F48::from_num(2.0 / 3.0),
                     I80F48::from_num(50.0)
@@ -500,6 +509,7 @@ mod tests {
                 .max_swap_source_for_health_ratio(
                     &account,
                     source_bank,
+                    source_price.oracle,
                     target_bank,
                     swap_price,
                     I80F48::from_num(ratio),
@@ -512,6 +522,7 @@ mod tests {
                 c.cache_after_swap(
                     &account,
                     source_bank,
+                    source_price.oracle,
                     target_bank,
                     I80F48::from(amount),
                     swap_price,
