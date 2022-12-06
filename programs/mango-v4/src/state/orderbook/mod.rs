@@ -232,7 +232,7 @@ mod tests {
         assert_ne!(maker.perp_order_mut_by_raw_index(0).id, 0);
         assert_eq!(maker.perp_order_mut_by_raw_index(0).client_id, 42);
         assert_eq!(
-            maker.perp_order_mut_by_raw_index(0).side_and_tree,
+            maker.perp_order_mut_by_raw_index(0).side_and_tree(),
             SideAndOrderTree::BidFixed
         );
         assert!(order_tree_contains_key(

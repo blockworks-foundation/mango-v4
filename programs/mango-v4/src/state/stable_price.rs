@@ -16,7 +16,7 @@ use std::mem::size_of;
 /// price over every `delay_interval_seconds` (assume 1h) and then applying the
 /// `delay_growth_limit` between intervals.
 #[zero_copy]
-#[derive(Derivative, Debug)]
+#[derive(Derivative, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct StablePriceModel {
     /// Current stable price to use in health
     pub stable_price: f64,

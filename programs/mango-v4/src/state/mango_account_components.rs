@@ -11,7 +11,7 @@ use crate::state::*;
 pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
+#[derive(AnchorDeserialize, AnchorSerialize, Derivative, bytemuck::Pod, bytemuck::Zeroable)]
 #[derivative(Debug)]
 pub struct TokenPosition {
     // TODO: Why did we have deposits and borrows as two different values
@@ -44,9 +44,6 @@ pub struct TokenPosition {
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 128],
 }
-
-unsafe impl bytemuck::Pod for TokenPosition {}
-unsafe impl bytemuck::Zeroable for TokenPosition {}
 
 const_assert_eq!(
     size_of::<TokenPosition>(),
@@ -104,7 +101,7 @@ impl TokenPosition {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod, bytemuck::Zeroable)]
 #[derivative(Debug)]
 pub struct Serum3Orders {
     pub open_orders: Pubkey,
@@ -134,9 +131,6 @@ const_assert_eq!(size_of::<Serum3Orders>(), 32 + 8 * 2 + 2 * 3 + 2 + 64);
 const_assert_eq!(size_of::<Serum3Orders>(), 120);
 const_assert_eq!(size_of::<Serum3Orders>() % 8, 0);
 
-unsafe impl bytemuck::Pod for Serum3Orders {}
-unsafe impl bytemuck::Zeroable for Serum3Orders {}
-
 impl Serum3Orders {
     pub fn is_active(&self) -> bool {
         self.market_index != Serum3MarketIndex::MAX
@@ -163,7 +157,7 @@ impl Default for Serum3Orders {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod, bytemuck::Zeroable)]
 #[derivative(Debug)]
 pub struct PerpPosition {
     pub market_index: PerpMarketIndex,
@@ -224,9 +218,6 @@ const_assert_eq!(
 );
 const_assert_eq!(size_of::<PerpPosition>(), 304);
 const_assert_eq!(size_of::<PerpPosition>() % 8, 0);
-
-unsafe impl bytemuck::Pod for PerpPosition {}
-unsafe impl bytemuck::Zeroable for PerpPosition {}
 
 impl Default for PerpPosition {
     fn default() -> Self {
@@ -488,9 +479,9 @@ impl PerpPosition {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Debug)]
+#[derive(AnchorSerialize, AnchorDeserialize, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct PerpOpenOrder {
-    pub side_and_tree: SideAndOrderTree, // TODO: storing enums isn't POD
+    pub side_and_tree: u8, // SideAndOrderTree -- enums aren't POD
     pub padding1: [u8; 1],
     pub market: PerpMarketIndex,
     pub padding2: [u8; 4],
@@ -505,7 +496,7 @@ const_assert_eq!(size_of::<PerpOpenOrder>() % 8, 0);
 impl Default for PerpOpenOrder {
     fn default() -> Self {
         Self {
-            side_and_tree: SideAndOrderTree::BidFixed,
+            side_and_tree: SideAndOrderTree::BidFixed.into(),
             padding1: Default::default(),
             market: FREE_ORDER_SLOT,
             padding2: Default::default(),
@@ -516,8 +507,11 @@ impl Default for PerpOpenOrder {
     }
 }
 
-unsafe impl bytemuck::Pod for PerpOpenOrder {}
-unsafe impl bytemuck::Zeroable for PerpOpenOrder {}
+impl PerpOpenOrder {
+    pub fn side_and_tree(&self) -> SideAndOrderTree {
+        SideAndOrderTree::try_from(self.side_and_tree).unwrap()
+    }
+}
 
 #[macro_export]
 macro_rules! account_seeds {

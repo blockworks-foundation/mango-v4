@@ -28,6 +28,7 @@ pub struct BookSideOrderHandle {
 }
 
 #[zero_copy]
+#[derive(bytemuck::Pod, bytemuck::Zeroable)]
 pub struct BookSide {
     pub fixed: OrderTree,
     pub oracle_pegged: OrderTree,
@@ -116,7 +117,7 @@ mod tests {
 
     fn new_order_tree(order_tree_type: OrderTreeType) -> OrderTree {
         OrderTree {
-            order_tree_type,
+            order_tree_type: order_tree_type.into(),
             padding: [0u8; 3],
             bump_index: 0,
             free_list_len: 0,

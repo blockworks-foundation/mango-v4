@@ -6,7 +6,7 @@ use std::mem::size_of;
 pub type TokenIndex = u16;
 pub const QUOTE_TOKEN_INDEX: TokenIndex = 0;
 
-#[account(zero_copy)]
+#[account(zero_copy(safe_bytemuck_derives))]
 #[derive(Debug)]
 pub struct Group {
     // ABI: Clients rely on this being at offset 8

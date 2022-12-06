@@ -184,8 +184,8 @@ impl MangoAccount {
 }
 
 // Mango Account fixed part for easy zero copy deserialization
-#[derive(Copy, Clone)]
-#[repr(C)]
+#[zero_copy]
+#[derive(bytemuck::Pod, bytemuck::Zeroable)]
 pub struct MangoAccountFixed {
     pub group: Pubkey,
     pub owner: Pubkey,
@@ -204,9 +204,6 @@ pub struct MangoAccountFixed {
 const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 3 * 8 + 240);
 const_assert_eq!(size_of::<MangoAccountFixed>(), 400);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
-
-unsafe impl bytemuck::Pod for MangoAccountFixed {}
-unsafe impl bytemuck::Zeroable for MangoAccountFixed {}
 
 impl MangoAccountFixed {
     pub fn name(&self) -> &str {
@@ -828,7 +825,7 @@ impl<
 
         let mut oo = self.perp_order_mut_by_raw_index(slot);
         oo.market = perp_market_index;
-        oo.side_and_tree = SideAndOrderTree::new(side, order_tree);
+        oo.side_and_tree = SideAndOrderTree::new(side, order_tree).into();
         oo.id = order.key;
         oo.client_id = order.client_order_id;
         Ok(())
@@ -838,7 +835,7 @@ impl<
         {
             let oo = self.perp_order_mut_by_raw_index(slot);
             require_neq!(oo.market, FREE_ORDER_SLOT);
-            let order_side = oo.side_and_tree.side();
+            let order_side = oo.side_and_tree().side();
             let perp_market_index = oo.market;
             let perp_account = self.perp_position_mut(perp_market_index)?;
 
@@ -856,7 +853,7 @@ impl<
         // release space
         let oo = self.perp_order_mut_by_raw_index(slot);
         oo.market = FREE_ORDER_SLOT;
-        oo.side_and_tree = SideAndOrderTree::BidFixed;
+        oo.side_and_tree = SideAndOrderTree::BidFixed.into();
         oo.id = 0;
         oo.client_id = 0;
         Ok(())

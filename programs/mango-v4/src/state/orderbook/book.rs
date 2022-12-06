@@ -15,7 +15,7 @@ use crate::util::checked_math as cm;
 /// This exists as a guard against excessive compute use.
 const DROP_EXPIRED_ORDER_LIMIT: usize = 5;
 
-#[account(zero_copy)]
+#[account(zero_copy(safe_bytemuck_derives))]
 pub struct Orderbook {
     pub bids: BookSide,
     pub asks: BookSide,
@@ -30,10 +30,10 @@ const_assert_eq!(std::mem::size_of::<Orderbook>() % 8, 0);
 
 impl Orderbook {
     pub fn init(&mut self) {
-        self.bids.fixed.order_tree_type = OrderTreeType::Bids;
-        self.bids.oracle_pegged.order_tree_type = OrderTreeType::Bids;
-        self.asks.fixed.order_tree_type = OrderTreeType::Asks;
-        self.asks.oracle_pegged.order_tree_type = OrderTreeType::Asks;
+        self.bids.fixed.order_tree_type = OrderTreeType::Bids.into();
+        self.bids.oracle_pegged.order_tree_type = OrderTreeType::Bids.into();
+        self.asks.fixed.order_tree_type = OrderTreeType::Asks.into();
+        self.asks.oracle_pegged.order_tree_type = OrderTreeType::Asks.into();
     }
 
     pub fn bookside_mut(&mut self, side: Side) -> &mut BookSide {
@@ -327,7 +327,7 @@ impl Orderbook {
                 continue;
             }
 
-            let order_side_and_tree = oo.side_and_tree;
+            let order_side_and_tree = oo.side_and_tree();
             if let Some(side_to_cancel) = side_to_cancel_option {
                 if side_to_cancel != order_side_and_tree.side() {
                     continue;
