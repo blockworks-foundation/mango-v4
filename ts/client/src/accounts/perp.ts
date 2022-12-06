@@ -285,7 +285,11 @@ export class PerpMarket {
    * @param asks
    * @returns returns funding rate per hour
    */
-  public getCurrentFundingRate(bids: BookSide, asks: BookSide): number {
+  public getCurrentFundingRate(
+    perpMarket: PerpMarket,
+    bids: BookSide,
+    asks: BookSide,
+  ): number {
     const MIN_FUNDING = this.minFunding.toNumber();
     const MAX_FUNDING = this.maxFunding.toNumber();
 
@@ -307,7 +311,7 @@ export class PerpMarket {
     } else {
       funding = 0;
     }
-    return funding / 24;
+    return funding / 24 / Math.pow(10, QUOTE_DECIMALS);
   }
 
   public uiPriceToLots(price: number): BN {
