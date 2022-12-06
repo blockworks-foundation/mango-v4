@@ -48,37 +48,39 @@ export class PerpMarket {
       perpMarketIndex: number;
       trustedMarket: number;
       groupInsuranceFund: number;
+      baseDecimals: number;
       name: number[];
-      oracle: PublicKey;
-      oracleConfig: OracleConfig;
       orderbook: PublicKey;
       eventQueue: PublicKey;
+      oracle: PublicKey;
+      oracleConfig: OracleConfig;
+      stablePriceModel: StablePriceModel;
       quoteLotSize: BN;
       baseLotSize: BN;
       maintAssetWeight: I80F48Dto;
       initAssetWeight: I80F48Dto;
       maintLiabWeight: I80F48Dto;
       initLiabWeight: I80F48Dto;
-      liquidationFee: I80F48Dto;
-      makerFee: I80F48Dto;
-      takerFee: I80F48Dto;
+      openInterest: BN;
+      seqNum: BN;
+      registrationTime: BN;
       minFunding: I80F48Dto;
       maxFunding: I80F48Dto;
       impactQuantity: BN;
       longFunding: I80F48Dto;
       shortFunding: I80F48Dto;
       fundingLastUpdated: BN;
-      openInterest: BN;
-      seqNum: BN;
+      liquidationFee: I80F48Dto;
+      makerFee: I80F48Dto;
+      takerFee: I80F48Dto;
       feesAccrued: I80F48Dto;
-      baseDecimals: number;
-      registrationTime: BN;
       feesSettled: I80F48Dto;
       feePenalty: number;
       settleFeeFlat: number;
       settleFeeAmountThreshold: number;
       settleFeeFractionLowHealth: number;
-      stablePriceModel: StablePriceModel;
+      settlePnlLimitFactor: number;
+      settlePnlLimitWindowSizeTs: BN;
     },
   ): PerpMarket {
     return new PerpMarket(
@@ -88,37 +90,39 @@ export class PerpMarket {
       obj.perpMarketIndex as PerpMarketIndex,
       obj.trustedMarket == 1,
       obj.groupInsuranceFund == 1,
+      obj.baseDecimals,
       obj.name,
-      obj.oracle,
-      obj.oracleConfig,
       obj.orderbook,
       obj.eventQueue,
+      obj.oracle,
+      obj.oracleConfig,
+      obj.stablePriceModel,
       obj.quoteLotSize,
       obj.baseLotSize,
       obj.maintAssetWeight,
       obj.initAssetWeight,
       obj.maintLiabWeight,
       obj.initLiabWeight,
-      obj.liquidationFee,
-      obj.makerFee,
-      obj.takerFee,
+      obj.openInterest,
+      obj.seqNum,
+      obj.registrationTime,
       obj.minFunding,
       obj.maxFunding,
       obj.impactQuantity,
       obj.longFunding,
       obj.shortFunding,
       obj.fundingLastUpdated,
-      obj.openInterest,
-      obj.seqNum,
+      obj.liquidationFee,
+      obj.makerFee,
+      obj.takerFee,
       obj.feesAccrued,
-      obj.baseDecimals,
-      obj.registrationTime,
       obj.feesSettled,
       obj.feePenalty,
       obj.settleFeeFlat,
       obj.settleFeeAmountThreshold,
       obj.settleFeeFractionLowHealth,
-      obj.stablePriceModel,
+      obj.settlePnlLimitFactor,
+      obj.settlePnlLimitWindowSizeTs,
     );
   }
 
@@ -129,37 +133,39 @@ export class PerpMarket {
     public perpMarketIndex: PerpMarketIndex, // TODO rename to marketIndex?
     public trustedMarket: boolean,
     public groupInsuranceFund: boolean,
+    public baseDecimals: number,
     name: number[],
-    public oracle: PublicKey,
-    oracleConfig: OracleConfig,
     public orderbook: PublicKey,
     public eventQueue: PublicKey,
+    public oracle: PublicKey,
+    oracleConfig: OracleConfig,
+    public stablePriceModel: StablePriceModel,
     public quoteLotSize: BN,
     public baseLotSize: BN,
     maintAssetWeight: I80F48Dto,
     initAssetWeight: I80F48Dto,
     maintLiabWeight: I80F48Dto,
     initLiabWeight: I80F48Dto,
-    liquidationFee: I80F48Dto,
-    makerFee: I80F48Dto,
-    takerFee: I80F48Dto,
+    public openInterest: BN,
+    public seqNum: BN,
+    public registrationTime: BN,
     minFunding: I80F48Dto,
     maxFunding: I80F48Dto,
     public impactQuantity: BN,
     longFunding: I80F48Dto,
     shortFunding: I80F48Dto,
     public fundingLastUpdated: BN,
-    public openInterest: BN,
-    public seqNum: BN,
+    liquidationFee: I80F48Dto,
+    makerFee: I80F48Dto,
+    takerFee: I80F48Dto,
     feesAccrued: I80F48Dto,
-    public baseDecimals: number,
-    public registrationTime: BN,
     feesSettled: I80F48Dto,
     public feePenalty: number,
     public settleFeeFlat: number,
     public settleFeeAmountThreshold: number,
     public settleFeeFractionLowHealth: number,
-    public stablePriceModel: StablePriceModel,
+    settlePnlLimitFactor: number,
+    settlePnlLimitWindowSizeTs: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.maintAssetWeight = I80F48.from(maintAssetWeight);

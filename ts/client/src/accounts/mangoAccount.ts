@@ -1107,6 +1107,8 @@ export class Serum3PositionDto {
   constructor(
     public openOrders: PublicKey,
     public marketIndex: number,
+    public baseBorrowsWithoutFee: BN,
+    public quoteBorrowsWithoutFee: BN,
     public baseTokenIndex: number,
     public quoteTokenIndex: number,
     public reserved: number[],
@@ -1118,9 +1120,10 @@ export class PerpPosition {
   static from(dto: PerpPositionDto): PerpPosition {
     return new PerpPosition(
       dto.marketIndex as PerpMarketIndex,
+      dto.settlePnlLimitWindow,
+      dto.settlePnlLimitSettledInCurrentWindowNative,
       dto.basePositionLots,
       I80F48.from(dto.quotePositionNative),
-      dto.quoteEntryNative,
       dto.quoteRunningNative,
       I80F48.from(dto.longSettledFunding),
       I80F48.from(dto.shortSettledFunding),
@@ -1133,6 +1136,8 @@ export class PerpPosition {
       dto.makerVolume,
       dto.takerVolume,
       dto.perpSpotTransfers,
+      dto.avgEntryPricePerBaseLot,
+      I80F48.from(dto.realizedPnlNative),
     );
   }
 
@@ -1141,9 +1146,10 @@ export class PerpPosition {
   ): PerpPosition {
     return new PerpPosition(
       perpMarketIndex,
+      0,
+      new BN(0),
       new BN(0),
       ZERO_I80F48(),
-      new BN(0),
       new BN(0),
       ZERO_I80F48(),
       ZERO_I80F48(),
@@ -1156,14 +1162,17 @@ export class PerpPosition {
       new BN(0),
       new BN(0),
       new BN(0),
+      0,
+      ZERO_I80F48(),
     );
   }
 
   constructor(
     public marketIndex: PerpMarketIndex,
+    public settlePnlLimitWindow: number,
+    public settlePnlLimitSettledInCurrentWindowNative: BN,
     public basePositionLots: BN,
     public quotePositionNative: I80F48,
-    public quoteEntryNative: BN,
     public quoteRunningNative: BN,
     public longSettledFunding: I80F48,
     public shortSettledFunding: I80F48,
@@ -1176,6 +1185,8 @@ export class PerpPosition {
     public makerVolume: BN,
     public takerVolume: BN,
     public perpSpotTransfers: BN,
+    public avgEntryPricePerBaseLot: number,
+    public realizedPnlNative: I80F48,
   ) {}
 
   isActive(): boolean {
@@ -1268,9 +1279,10 @@ export class PerpPosition {
 export class PerpPositionDto {
   constructor(
     public marketIndex: number,
+    public settlePnlLimitWindow: number,
+    public settlePnlLimitSettledInCurrentWindowNative: BN,
     public basePositionLots: BN,
     public quotePositionNative: { val: BN },
-    public quoteEntryNative: BN,
     public quoteRunningNative: BN,
     public longSettledFunding: I80F48Dto,
     public shortSettledFunding: I80F48Dto,
@@ -1283,6 +1295,8 @@ export class PerpPositionDto {
     public makerVolume: BN,
     public takerVolume: BN,
     public perpSpotTransfers: BN,
+    public avgEntryPricePerBaseLot: number,
+    public realizedPnlNative: I80F48Dto,
   ) {}
 }
 

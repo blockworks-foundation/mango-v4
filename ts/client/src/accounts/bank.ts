@@ -71,6 +71,7 @@ export class Bank implements BankForHealth {
       vault: PublicKey;
       oracle: PublicKey;
       oracleConfig: OracleConfig;
+      stablePriceModel: StablePriceModel;
       depositIndex: I80F48Dto;
       borrowIndex: I80F48Dto;
       indexedDeposits: I80F48Dto;
@@ -85,8 +86,8 @@ export class Bank implements BankForHealth {
       rate1: I80F48Dto;
       maxRate: I80F48Dto;
       collectedFeesNative: I80F48Dto;
-      loanFeeRate: I80F48Dto;
       loanOriginationFeeRate: I80F48Dto;
+      loanFeeRate: I80F48Dto;
       maintAssetWeight: I80F48Dto;
       initAssetWeight: I80F48Dto;
       maintLiabWeight: I80F48Dto;
@@ -98,7 +99,6 @@ export class Bank implements BankForHealth {
       tokenIndex: number;
       mintDecimals: number;
       bankNum: number;
-      stablePriceModel: StablePriceModel;
       minVaultToDepositsRatio: number;
       netBorrowLimitWindowSizeTs: BN;
       lastNetBorrowsWindowStartTs: BN;
@@ -110,12 +110,13 @@ export class Bank implements BankForHealth {
   ): Bank {
     return new Bank(
       publicKey,
-      obj.name,
       obj.group,
+      obj.name,
       obj.mint,
       obj.vault,
       obj.oracle,
       obj.oracleConfig,
+      obj.stablePriceModel,
       obj.depositIndex,
       obj.borrowIndex,
       obj.indexedDeposits,
@@ -130,8 +131,8 @@ export class Bank implements BankForHealth {
       obj.rate1,
       obj.maxRate,
       obj.collectedFeesNative,
-      obj.loanFeeRate,
       obj.loanOriginationFeeRate,
+      obj.loanFeeRate,
       obj.maintAssetWeight,
       obj.initAssetWeight,
       obj.maintLiabWeight,
@@ -143,7 +144,6 @@ export class Bank implements BankForHealth {
       obj.tokenIndex as TokenIndex,
       obj.mintDecimals,
       obj.bankNum,
-      obj.stablePriceModel,
       obj.minVaultToDepositsRatio,
       obj.netBorrowLimitWindowSizeTs,
       obj.lastNetBorrowsWindowStartTs,
@@ -156,12 +156,13 @@ export class Bank implements BankForHealth {
 
   constructor(
     public publicKey: PublicKey,
-    name: number[],
     public group: PublicKey,
+    name: number[],
     public mint: PublicKey,
     public vault: PublicKey,
     public oracle: PublicKey,
     oracleConfig: OracleConfig,
+    public stablePriceModel: StablePriceModel,
     depositIndex: I80F48Dto,
     borrowIndex: I80F48Dto,
     indexedDeposits: I80F48Dto,
@@ -176,8 +177,8 @@ export class Bank implements BankForHealth {
     rate1: I80F48Dto,
     maxRate: I80F48Dto,
     collectedFeesNative: I80F48Dto,
-    loanFeeRate: I80F48Dto,
     loanOriginationFeeRate: I80F48Dto,
+    loanFeeRate: I80F48Dto,
     maintAssetWeight: I80F48Dto,
     initAssetWeight: I80F48Dto,
     maintLiabWeight: I80F48Dto,
@@ -189,7 +190,6 @@ export class Bank implements BankForHealth {
     public tokenIndex: TokenIndex,
     public mintDecimals: number,
     public bankNum: number,
-    public stablePriceModel: StablePriceModel,
     minVaultToDepositsRatio: number,
     netBorrowLimitWindowSizeTs: BN,
     lastNetBorrowsWindowStartTs: BN,
