@@ -1,5 +1,7 @@
 import { BN } from '@project-serum/anchor';
 
+export type Modify<T, R> = Omit<T, keyof R> & R;
+
 export class FlashLoanWithdraw {
   static index: number;
   static amount: BN;
