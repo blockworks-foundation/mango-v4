@@ -6,7 +6,7 @@ use crate::{
 use anchor_lang::prelude::*;
 use bytemuck::cast;
 use fixed::types::I80F48;
-use static_assertions::const_assert_eq;
+use std::cell::RefMut;
 
 use super::*;
 use crate::util::checked_math as cm;
@@ -15,20 +15,12 @@ use crate::util::checked_math as cm;
 /// This exists as a guard against excessive compute use.
 const DROP_EXPIRED_ORDER_LIMIT: usize = 5;
 
-#[account(zero_copy(safe_bytemuck_derives))]
-pub struct Orderbook {
-    pub bids: BookSide,
-    pub asks: BookSide,
-    pub reserved: [u8; 2400],
+pub struct Orderbook<'a> {
+    pub bids: RefMut<'a, BookSide>,
+    pub asks: RefMut<'a, BookSide>,
 }
-const_assert_eq!(
-    std::mem::size_of::<Orderbook>(),
-    2 * std::mem::size_of::<BookSide>() + 2400
-);
-const_assert_eq!(std::mem::size_of::<Orderbook>(), 249824);
-const_assert_eq!(std::mem::size_of::<Orderbook>() % 8, 0);
 
-impl Orderbook {
+impl<'a> Orderbook<'a> {
     pub fn init(&mut self) {
         self.bids.nodes.order_tree_type = OrderTreeType::Bids.into();
         self.asks.nodes.order_tree_type = OrderTreeType::Asks.into();

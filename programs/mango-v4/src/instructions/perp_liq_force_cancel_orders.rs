@@ -14,11 +14,14 @@ pub struct PerpLiqForceCancelOrders<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = orderbook,
+        has_one = bids,
+        has_one = asks,
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]
-    pub orderbook: AccountLoader<'info, Orderbook>,
+    pub bids: AccountLoader<'info, BookSide>,
+    #[account(mut)]
+    pub asks: AccountLoader<'info, BookSide>,
 }
 
 pub fn perp_liq_force_cancel_orders(
@@ -62,7 +65,10 @@ pub fn perp_liq_force_cancel_orders(
     //
     {
         let mut perp_market = ctx.accounts.perp_market.load_mut()?;
-        let mut book = ctx.accounts.orderbook.load_mut()?;
+        let mut book = Orderbook {
+            bids: ctx.accounts.bids.load_mut()?,
+            asks: ctx.accounts.asks.load_mut()?,
+        };
 
         book.cancel_all_orders(&mut account.borrow_mut(), &mut perp_market, limit, None)?;
 

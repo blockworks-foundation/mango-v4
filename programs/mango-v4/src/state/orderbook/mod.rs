@@ -26,6 +26,7 @@ mod tests {
     use bytemuck::Zeroable;
     use fixed::types::I80F48;
     use solana_program::pubkey::Pubkey;
+    use std::cell::RefCell;
 
     fn order_tree_leaf_by_key(bookside: &BookSide, key: u128) -> Option<&LeafNode> {
         for component in [BookSideOrderTree::Fixed, BookSideOrderTree::OraclePegged] {
@@ -53,9 +54,32 @@ mod tests {
         false
     }
 
-    fn test_setup(price: f64) -> (PerpMarket, I80F48, EventQueue, Box<Orderbook>) {
-        let mut book = Box::new(Orderbook::zeroed());
-        book.init();
+    struct OrderbookAccounts {
+        bids: Box<RefCell<BookSide>>,
+        asks: Box<RefCell<BookSide>>,
+    }
+
+    impl OrderbookAccounts {
+        fn new() -> Self {
+            let s = Self {
+                bids: Box::new(RefCell::new(BookSide::zeroed())),
+                asks: Box::new(RefCell::new(BookSide::zeroed())),
+            };
+            s.bids.borrow_mut().nodes.order_tree_type = OrderTreeType::Bids.into();
+            s.asks.borrow_mut().nodes.order_tree_type = OrderTreeType::Asks.into();
+            s
+        }
+
+        fn orderbook(&self) -> Orderbook {
+            Orderbook {
+                bids: self.bids.borrow_mut(),
+                asks: self.asks.borrow_mut(),
+            }
+        }
+    }
+
+    fn test_setup(price: f64) -> (PerpMarket, I80F48, EventQueue, OrderbookAccounts) {
+        let book = OrderbookAccounts::new();
 
         let event_queue = EventQueue::zeroed();
 
@@ -75,7 +99,8 @@ mod tests {
     // Check what happens when one side of the book fills up
     #[test]
     fn book_bids_full() {
-        let (mut perp_market, oracle_price, mut event_queue, mut book) = test_setup(5000.0);
+        let (mut perp_market, oracle_price, mut event_queue, book_accs) = test_setup(5000.0);
+        let mut book = book_accs.orderbook();
         let settle_token_index = 0;
 
         let mut new_order = |book: &mut Orderbook,
@@ -212,7 +237,8 @@ mod tests {
 
     #[test]
     fn book_new_order() {
-        let (mut market, oracle_price, mut event_queue, mut book) = test_setup(1000.0);
+        let (mut market, oracle_price, mut event_queue, book_accs) = test_setup(1000.0);
+        let mut book = book_accs.orderbook();
         let settle_token_index = 0;
 
         // Add lots and fees to make sure to exercise unit conversion
@@ -405,7 +431,8 @@ mod tests {
 
     #[test]
     fn test_fee_penalty_applied_only_on_limit_order() -> Result<()> {
-        let (mut market, oracle_price, mut event_queue, mut book) = test_setup(1000.0);
+        let (mut market, oracle_price, mut event_queue, book_accs) = test_setup(1000.0);
+        let mut book = book_accs.orderbook();
 
         let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
         let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
