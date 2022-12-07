@@ -2,7 +2,7 @@ use super::*;
 
 /// Iterate over orders in order (bids=descending, asks=ascending)
 pub struct OrderTreeIter<'a> {
-    order_tree: &'a OrderTree,
+    order_tree: &'a OrderTreeNodes,
     /// InnerNodes where the right side still needs to be iterated on
     stack: Vec<&'a InnerNode>,
     /// To be returned on `next()`
@@ -14,7 +14,7 @@ pub struct OrderTreeIter<'a> {
 }
 
 impl<'a> OrderTreeIter<'a> {
-    pub fn new(order_tree: &'a OrderTree) -> Self {
+    pub fn new(order_tree: &'a OrderTreeNodes, root: &OrderTreeRoot) -> Self {
         let (left, right) = if order_tree.order_tree_type() == OrderTreeType::Bids {
             (1, 0)
         } else {
@@ -29,8 +29,8 @@ impl<'a> OrderTreeIter<'a> {
             left,
             right,
         };
-        if order_tree.leaf_count != 0 {
-            iter.next_leaf = iter.find_leftmost_leaf(order_tree.root_node);
+        if let Some(r) = root.node() {
+            iter.next_leaf = iter.find_leftmost_leaf(r);
         }
         iter
     }
