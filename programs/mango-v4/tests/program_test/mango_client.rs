@@ -2410,7 +2410,8 @@ pub struct PerpCreateMarketInstruction {
     pub group: Pubkey,
     pub admin: TestKeypair,
     pub oracle: Pubkey,
-    pub orderbook: Pubkey,
+    pub bids: Pubkey,
+    pub asks: Pubkey,
     pub event_queue: Pubkey,
     pub payer: TestKeypair,
     pub settle_token_index: TokenIndex,
@@ -2440,8 +2441,11 @@ impl PerpCreateMarketInstruction {
         base: &crate::mango_setup::Token,
     ) -> Self {
         PerpCreateMarketInstruction {
-            orderbook: solana
-                .create_account_for_type::<Orderbook>(&mango_v4::id())
+            bids: solana
+                .create_account_for_type::<BookSide>(&mango_v4::id())
+                .await,
+            asks: solana
+                .create_account_for_type::<BookSide>(&mango_v4::id())
                 .await,
             event_queue: solana
                 .create_account_for_type::<EventQueue>(&mango_v4::id())
@@ -2507,7 +2511,8 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             admin: self.admin.pubkey(),
             oracle: self.oracle,
             perp_market,
-            orderbook: self.orderbook,
+            bids: self.bids,
+            asks: self.asks,
             event_queue: self.event_queue,
             payer: self.payer.pubkey(),
             system_program: System::id(),
@@ -2604,7 +2609,8 @@ impl ClientInstruction for PerpCloseMarketInstruction {
             group: perp_market.group,
             admin: self.admin.pubkey(),
             perp_market: self.perp_market,
-            orderbook: perp_market.orderbook,
+            bids: perp_market.bids,
+            asks: perp_market.asks,
             event_queue: perp_market.event_queue,
             token_program: Token::id(),
             sol_destination: self.sol_destination,
@@ -2701,7 +2707,8 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
             group: account.fixed.group,
             account: self.account,
             perp_market: self.perp_market,
-            orderbook: perp_market.orderbook,
+            bids: perp_market.bids,
+            asks: perp_market.asks,
             event_queue: perp_market.event_queue,
             oracle: perp_market.oracle,
             owner: self.owner.pubkey(),
@@ -2769,7 +2776,8 @@ impl ClientInstruction for PerpPlaceOrderPeggedInstruction {
             group: account.fixed.group,
             account: self.account,
             perp_market: self.perp_market,
-            orderbook: perp_market.orderbook,
+            bids: perp_market.bids,
+            asks: perp_market.asks,
             event_queue: perp_market.event_queue,
             oracle: perp_market.oracle,
             owner: self.owner.pubkey(),
@@ -2808,7 +2816,8 @@ impl ClientInstruction for PerpCancelOrderInstruction {
             group: perp_market.group,
             account: self.account,
             perp_market: self.perp_market,
-            orderbook: perp_market.orderbook,
+            bids: perp_market.bids,
+            asks: perp_market.asks,
             owner: self.owner.pubkey(),
         };
 
@@ -2844,7 +2853,8 @@ impl ClientInstruction for PerpCancelOrderByClientOrderIdInstruction {
             group: perp_market.group,
             account: self.account,
             perp_market: self.perp_market,
-            orderbook: perp_market.orderbook,
+            bids: perp_market.bids,
+            asks: perp_market.asks,
             owner: self.owner.pubkey(),
         };
 
@@ -2877,7 +2887,8 @@ impl ClientInstruction for PerpCancelAllOrdersInstruction {
             group: perp_market.group,
             account: self.account,
             perp_market: self.perp_market,
-            orderbook: perp_market.orderbook,
+            bids: perp_market.bids,
+            asks: perp_market.asks,
             owner: self.owner.pubkey(),
         };
 
@@ -2947,7 +2958,8 @@ impl ClientInstruction for PerpUpdateFundingInstruction {
         let accounts = Self::Accounts {
             group: perp_market.group,
             perp_market: self.perp_market,
-            orderbook: perp_market.orderbook,
+            bids: perp_market.bids,
+            asks: perp_market.asks,
             oracle: self.oracle,
         };
 
@@ -3109,7 +3121,8 @@ impl ClientInstruction for PerpLiqForceCancelOrdersInstruction {
             group: account.fixed.group,
             perp_market: self.perp_market,
             account: self.account,
-            orderbook: perp_market.orderbook,
+            bids: perp_market.bids,
+            asks: perp_market.asks,
         };
         let mut instruction = make_instruction(program_id, &accounts, instruction);
         instruction.accounts.extend(health_check_metas);

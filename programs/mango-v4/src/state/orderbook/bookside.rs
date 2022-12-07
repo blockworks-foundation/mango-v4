@@ -27,8 +27,7 @@ pub struct BookSideOrderHandle {
     pub order_tree: BookSideOrderTree,
 }
 
-#[zero_copy]
-#[derive(bytemuck::Pod, bytemuck::Zeroable)]
+#[account(zero_copy(safe_bytemuck_derives))]
 pub struct BookSide {
     pub roots: [OrderTreeRoot; 2],
     pub reserved_roots: [OrderTreeRoot; 4],

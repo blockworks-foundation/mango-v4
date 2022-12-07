@@ -33,7 +33,9 @@ pub struct PerpCreateMarket<'info> {
     /// Accounts are initialised by client,
     /// anchor discriminator is set first when ix exits,
     #[account(zero)]
-    pub orderbook: AccountLoader<'info, Orderbook>,
+    pub bids: AccountLoader<'info, BookSide>,
+    #[account(zero)]
+    pub asks: AccountLoader<'info, BookSide>,
     #[account(zero)]
     pub event_queue: AccountLoader<'info, EventQueue>,
 
@@ -95,7 +97,8 @@ pub fn perp_create_market(
         bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
         base_decimals,
         name: fill_from_str(&name)?,
-        orderbook: ctx.accounts.orderbook.key(),
+        bids: ctx.accounts.bids.key(),
+        asks: ctx.accounts.asks.key(),
         event_queue: ctx.accounts.event_queue.key(),
         oracle: ctx.accounts.oracle.key(),
         oracle_config: oracle_config.to_oracle_config(),
@@ -136,7 +139,10 @@ pub fn perp_create_market(
         .stable_price_model
         .reset_to_price(oracle_price.to_num(), now_ts);
 
-    let mut orderbook = ctx.accounts.orderbook.load_init()?;
+    let mut orderbook = Orderbook {
+        bids: ctx.accounts.bids.load_init()?,
+        asks: ctx.accounts.asks.load_init()?,
+    };
     orderbook.init();
 
     emit!(PerpMarketMetaDataLog {
