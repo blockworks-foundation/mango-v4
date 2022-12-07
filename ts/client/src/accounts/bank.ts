@@ -314,7 +314,7 @@ export class Bank implements BankForHealth {
       return this.initLiabWeight;
     }
     return this.initLiabWeight.mul(
-      I80F48.fromNumber(this.borrowWeightScaleStartQuote).div(borrowsQuote),
+      borrowsQuote.div(I80F48.fromNumber(this.borrowWeightScaleStartQuote)),
     );
   }
 
