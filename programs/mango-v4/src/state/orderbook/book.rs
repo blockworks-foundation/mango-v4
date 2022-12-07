@@ -25,15 +25,13 @@ const_assert_eq!(
     std::mem::size_of::<Orderbook>(),
     2 * std::mem::size_of::<BookSide>() + 2400
 );
-const_assert_eq!(std::mem::size_of::<Orderbook>(), 495040);
+const_assert_eq!(std::mem::size_of::<Orderbook>(), 249824);
 const_assert_eq!(std::mem::size_of::<Orderbook>() % 8, 0);
 
 impl Orderbook {
     pub fn init(&mut self) {
-        self.bids.fixed.order_tree_type = OrderTreeType::Bids.into();
-        self.bids.oracle_pegged.order_tree_type = OrderTreeType::Bids.into();
-        self.asks.fixed.order_tree_type = OrderTreeType::Asks.into();
-        self.asks.oracle_pegged.order_tree_type = OrderTreeType::Asks.into();
+        self.bids.nodes.order_tree_type = OrderTreeType::Bids.into();
+        self.asks.nodes.order_tree_type = OrderTreeType::Asks.into();
     }
 
     pub fn bookside_mut(&mut self, side: Side) -> &mut BookSide {
@@ -124,7 +122,7 @@ impl Orderbook {
         let opposing_bookside = self.bookside_mut(other_side);
         for best_opposing in opposing_bookside.iter_all_including_invalid(now_ts, oracle_price_lots)
         {
-            if !best_opposing.is_valid {
+            if !best_opposing.is_valid() {
                 // Remove the order from the book unless we've done that enough
                 if number_of_dropped_expired_orders < DROP_EXPIRED_ORDER_LIMIT {
                     number_of_dropped_expired_orders += 1;
@@ -212,7 +210,7 @@ impl Orderbook {
         // Apply changes to matched asks (handles invalidate on delete!)
         for (handle, new_quantity) in matched_order_changes {
             opposing_bookside
-                .node_mut(handle)
+                .node_mut(handle.node)
                 .unwrap()
                 .as_leaf_mut()
                 .unwrap()
@@ -229,10 +227,9 @@ impl Orderbook {
         }
         if let Some(order_tree_target) = post_target {
             let bookside = self.bookside_mut(side);
-            let order_tree = bookside.orders_mut(order_tree_target);
 
             // Drop an expired order if possible
-            if let Some(expired_order) = order_tree.remove_one_expired(now_ts) {
+            if let Some(expired_order) = bookside.remove_one_expired(order_tree_target, now_ts) {
                 let event = OutEvent::new(
                     side,
                     expired_order.owner_slot,
@@ -244,12 +241,13 @@ impl Orderbook {
                 event_queue.push_back(cast(event)).unwrap();
             }
 
-            if order_tree.is_full() {
+            if bookside.is_full() {
                 // If this bid is higher than lowest bid, boot that bid and insert this one
-                let worst_order = order_tree.remove_worst().unwrap();
+                let (worst_order, worst_price) =
+                    bookside.remove_worst(now_ts, oracle_price_lots).unwrap();
                 // MangoErrorCode::OutOfSpace
                 require!(
-                    side.is_price_data_better(price_data, worst_order.price_data()),
+                    side.is_price_better(price_lots, worst_price),
                     MangoError::SomeError
                 );
                 let event = OutEvent::new(
@@ -275,7 +273,7 @@ impl Orderbook {
                 order.time_in_force,
                 order.peg_limit(),
             );
-            let _result = order_tree.insert_leaf(&new_order)?;
+            let _result = bookside.insert_leaf(order_tree_target, &new_order)?;
 
             // TODO OPT remove if PlacePerpOrder needs more compute
             msg!(
@@ -357,8 +355,8 @@ impl Orderbook {
     ) -> Result<LeafNode> {
         let side = side_and_tree.side();
         let book_component = side_and_tree.order_tree();
-        let leaf_node = self.bookside_mut(side).orders_mut(book_component).
-        remove_by_key(order_id).ok_or_else(|| {
+        let leaf_node = self.bookside_mut(side).
+        remove_by_key(book_component, order_id).ok_or_else(|| {
                     error_msg!("invalid perp order id {order_id} for side {side:?} and component {book_component:?}")
                 })?;
         if let Some(owner) = expected_owner {

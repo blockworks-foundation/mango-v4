@@ -4,7 +4,13 @@ pub struct BookSideIterItem<'a> {
     pub handle: BookSideOrderHandle,
     pub node: &'a LeafNode,
     pub price_lots: i64,
-    pub is_valid: bool,
+    pub state: OrderState,
+}
+
+impl<'a> BookSideIterItem<'a> {
+    pub fn is_valid(&self) -> bool {
+        self.state == OrderState::Valid
+    }
 }
 
 /// Iterates the fixed and oracle_pegged OrderTrees simultaneously, allowing users to
@@ -25,8 +31,12 @@ pub struct BookSideIter<'a> {
 impl<'a> BookSideIter<'a> {
     pub fn new(book_side: &'a BookSide, now_ts: u64, oracle_price_lots: i64) -> Self {
         Self {
-            fixed_iter: book_side.fixed.iter(),
-            oracle_pegged_iter: book_side.oracle_pegged.iter(),
+            fixed_iter: book_side
+                .nodes
+                .iter(book_side.root(BookSideOrderTree::Fixed)),
+            oracle_pegged_iter: book_side
+                .nodes
+                .iter(book_side.root(BookSideOrderTree::OraclePegged)),
             now_ts,
             oracle_price_lots,
         }
@@ -34,29 +44,26 @@ impl<'a> BookSideIter<'a> {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum OrderState {
+pub enum OrderState {
     Valid,
     Invalid,
     Skipped,
 }
 
-fn oracle_pegged_price(
-    oracle_price_lots: i64,
-    node: &LeafNode,
-    side: Side,
-) -> (OrderState, Option<i64>) {
+/// For pegged orders with offsets that let the price escape the 1..i64::MAX range,
+/// this function returns Skipped and clamps `price` to that range.
+fn oracle_pegged_price(oracle_price_lots: i64, node: &LeafNode, side: Side) -> (OrderState, i64) {
     let price_data = node.price_data();
     let price_offset = oracle_pegged_price_offset(price_data);
-    if let Some(price) = oracle_price_lots.checked_add(price_offset) {
-        if price >= 1 {
-            if node.peg_limit != -1 && side.is_price_better(price, node.peg_limit) {
-                return (OrderState::Invalid, Some(price));
-            } else {
-                return (OrderState::Valid, Some(price));
-            }
+    let price = oracle_price_lots.saturating_add(price_offset);
+    if price >= 1 && price < i64::MAX {
+        if node.peg_limit != -1 && side.is_price_better(price, node.peg_limit) {
+            return (OrderState::Invalid, price);
+        } else {
+            return (OrderState::Valid, price);
         }
     }
-    (OrderState::Skipped, None)
+    (OrderState::Skipped, price.max(1))
 }
 
 fn key_for_price(key: u128, price_lots: i64) -> u128 {
@@ -66,6 +73,76 @@ fn key_for_price(key: u128, price_lots: i64) -> u128 {
     let upper = (price_data as u128) << 64;
     let lower = (key as u64) as u128;
     upper | lower
+}
+
+fn fixed_to_result(fixed: (NodeHandle, &LeafNode), now_ts: u64) -> BookSideIterItem {
+    let (handle, node) = fixed;
+    let expired = node.is_expired(now_ts);
+    BookSideIterItem {
+        handle: BookSideOrderHandle {
+            order_tree: BookSideOrderTree::Fixed,
+            node: handle,
+        },
+        node,
+        price_lots: fixed_price_lots(node.price_data()),
+        state: if expired {
+            OrderState::Invalid
+        } else {
+            OrderState::Valid
+        },
+    }
+}
+
+fn oracle_pegged_to_result(
+    pegged: (NodeHandle, &LeafNode, i64, OrderState),
+    now_ts: u64,
+) -> BookSideIterItem {
+    let (handle, node, price_lots, state) = pegged;
+    let expired = node.is_expired(now_ts);
+    BookSideIterItem {
+        handle: BookSideOrderHandle {
+            order_tree: BookSideOrderTree::OraclePegged,
+            node: handle,
+        },
+        node,
+        price_lots,
+        state: if expired { OrderState::Invalid } else { state },
+    }
+}
+
+/// Returns (better, worse); will return the same value twice if no second order passed in
+pub fn rank_orders<'a>(
+    side: Side,
+    fixed: Option<(NodeHandle, &'a LeafNode)>,
+    oracle_pegged: Option<(NodeHandle, &'a LeafNode)>,
+    return_worse: bool,
+    now_ts: u64,
+    oracle_price_lots: i64,
+) -> Option<BookSideIterItem<'a>> {
+    // Enrich with data that'll always be needed
+    let oracle_pegged = oracle_pegged.map(|(handle, node)| {
+        let (state, price_lots) = oracle_pegged_price(oracle_price_lots, node, side);
+        (handle, node, price_lots, state)
+    });
+
+    match (fixed, oracle_pegged) {
+        (Some(f), Some(o)) => {
+            let is_better = if side == Side::Bid {
+                |a, b| a > b
+            } else {
+                |a, b| a < b
+            };
+
+            if is_better(f.1.key, key_for_price(o.1.key, o.2)) ^ return_worse {
+                Some(fixed_to_result(f, now_ts))
+            } else {
+                Some(oracle_pegged_to_result(o, now_ts))
+            }
+        }
+        (None, Some(o)) => Some(oracle_pegged_to_result(o, now_ts)),
+        (Some(f), None) => Some(fixed_to_result(f, now_ts)),
+        (None, None) => None,
+    }
 }
 
 impl<'a> Iterator for BookSideIter<'a> {
@@ -85,69 +162,21 @@ impl<'a> Iterator for BookSideIter<'a> {
             o_peek = self.oracle_pegged_iter.next()
         }
 
-        match (self.fixed_iter.peek(), o_peek) {
-            (Some((d_handle, d_node)), Some((o_handle, o_node))) => {
-                let is_better = if side == Side::Bid {
-                    |a, b| a > b
-                } else {
-                    |a, b| a < b
-                };
+        let f_peek = self.fixed_iter.peek();
 
-                let (o_valid, o_price_maybe) =
-                    oracle_pegged_price(self.oracle_price_lots, o_node, side);
-                let o_price = o_price_maybe.unwrap(); // Skipped orders are skipped above
-                if is_better(d_node.key, key_for_price(o_node.key, o_price)) {
-                    self.fixed_iter.next();
-                    Some(Self::Item {
-                        handle: BookSideOrderHandle {
-                            order_tree: BookSideOrderTree::Fixed,
-                            node: d_handle,
-                        },
-                        node: d_node,
-                        price_lots: fixed_price_lots(d_node.price_data()),
-                        is_valid: d_node.is_not_expired(self.now_ts),
-                    })
-                } else {
-                    self.oracle_pegged_iter.next();
-                    Some(Self::Item {
-                        handle: BookSideOrderHandle {
-                            order_tree: BookSideOrderTree::OraclePegged,
-                            node: o_handle,
-                        },
-                        node: o_node,
-                        price_lots: o_price,
-                        is_valid: o_valid == OrderState::Valid
-                            && o_node.is_not_expired(self.now_ts),
-                    })
-                }
-            }
-            (None, Some((handle, node))) => {
-                self.oracle_pegged_iter.next();
-                let (valid, price_maybe) = oracle_pegged_price(self.oracle_price_lots, node, side);
-                let price_lots = price_maybe.unwrap(); // Skipped orders are skipped above
-                Some(Self::Item {
-                    handle: BookSideOrderHandle {
-                        order_tree: BookSideOrderTree::OraclePegged,
-                        node: handle,
-                    },
-                    node,
-                    price_lots,
-                    is_valid: valid == OrderState::Valid && node.is_not_expired(self.now_ts),
-                })
-            }
-            (Some((handle, node)), None) => {
-                self.fixed_iter.next();
-                Some(Self::Item {
-                    handle: BookSideOrderHandle {
-                        order_tree: BookSideOrderTree::Fixed,
-                        node: handle,
-                    },
-                    node,
-                    price_lots: fixed_price_lots(node.price_data()),
-                    is_valid: node.is_not_expired(self.now_ts),
-                })
-            }
-            (None, None) => None,
-        }
+        let better = rank_orders(
+            side,
+            f_peek,
+            o_peek,
+            false,
+            self.now_ts,
+            self.oracle_price_lots,
+        )?;
+        match better.handle.order_tree {
+            BookSideOrderTree::Fixed => self.fixed_iter.next(),
+            BookSideOrderTree::OraclePegged => self.oracle_pegged_iter.next(),
+        };
+
+        Some(better)
     }
 }
