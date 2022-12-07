@@ -1,3 +1,5 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { coder } from '@project-serum/anchor/dist/cjs/spl/token';
 import { Cluster, Connection, Keypair } from '@solana/web3.js';
