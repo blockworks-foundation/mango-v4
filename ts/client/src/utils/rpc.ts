@@ -1,8 +1,10 @@
 import { AnchorProvider } from '@project-serum/anchor';
 import {
   AddressLookupTableAccount,
-  Transaction,
+  MessageV0,
+  Signer,
   TransactionInstruction,
+  VersionedTransaction,
 } from '@solana/web3.js';
 
 export async function sendTransaction(
@@ -17,20 +19,36 @@ export async function sendTransaction(
   );
 
   const payer = (provider as AnchorProvider).wallet;
-  // const tx = await buildVersionedTx(provider, ixs, opts.additionalSigners, alts);
-  const tx = new Transaction();
-  tx.recentBlockhash = latestBlockhash.blockhash;
-  tx.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
-  tx.feePayer = payer.publicKey;
-  tx.add(...ixs);
-  if (opts.additionalSigners?.length > 0) {
-    tx.partialSign(...opts.additionalSigners);
-  }
-  await payer.signTransaction(tx);
 
-  const signature = await connection.sendRawTransaction(tx.serialize(), {
+  const message = MessageV0.compile({
+    payerKey: (provider as AnchorProvider).wallet.publicKey,
+    instructions: ixs,
+    recentBlockhash: latestBlockhash.blockhash,
+    addressLookupTableAccounts: alts,
+  });
+  let vtx = new VersionedTransaction(message);
+  if (opts?.additionalSigners?.length) {
+    vtx.sign([...opts?.additionalSigners]);
+  }
+
+  if (typeof payer.signTransaction === 'function') {
+    vtx = (await payer.signTransaction(
+      vtx as any,
+    )) as unknown as VersionedTransaction;
+  } else {
+    vtx.sign([((provider as AnchorProvider).wallet as any).payer as Signer]);
+  }
+
+  const signature = await connection.sendRawTransaction(vtx.serialize(), {
     skipPreflight: true,
   });
+
+  // const signature = await connection.sendTransactionss(
+  //   vtx as any as VersionedTransaction,
+  //   {
+  //     skipPreflight: true,
+  //   },
+  // );
 
   if (opts.postSendTxCallback) {
     try {
@@ -61,9 +79,10 @@ export async function sendTransaction(
   }
 
   if (status.err) {
+    console.warn('Tx status: ', status);
     throw new MangoError({
       txid: signature,
-      message: `Transaction ${signature} failed (${JSON.stringify(status)})`,
+      message: `${JSON.stringify(status)}`,
     });
   }
 
