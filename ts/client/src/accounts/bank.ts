@@ -34,6 +34,9 @@ export interface BankForHealth {
   initLiabWeight: I80F48;
   price: I80F48;
   stablePriceModel: StablePriceModel;
+
+  scaledInitAssetWeight(): I80F48;
+  scaledInitLiabWeight(): I80F48;
 }
 
 export class Bank implements BankForHealth {
@@ -195,8 +198,8 @@ export class Bank implements BankForHealth {
     lastNetBorrowsWindowStartTs: BN,
     netBorrowLimitPerWindowQuote: BN,
     netBorrowsInWindow: BN,
-    borrowWeightScaleStartQuote: number,
-    depositWeightScaleStartQuote: number,
+    public borrowWeightScaleStartQuote: number,
+    public depositWeightScaleStartQuote: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.depositIndex = I80F48.from(depositIndex);
@@ -290,6 +293,28 @@ export class Bank implements BankForHealth {
       this.getDepositRate().toString() +
       '\n getBorrowRate() - ' +
       this.getBorrowRate().toString()
+    );
+  }
+
+  scaledInitAssetWeight(): I80F48 {
+    const depositsQuote = this.nativeDeposits().mul(this.price);
+    if (
+      depositsQuote.lte(I80F48.fromNumber(this.depositWeightScaleStartQuote))
+    ) {
+      return this.initAssetWeight;
+    }
+    return this.initAssetWeight.mul(
+      I80F48.fromNumber(this.depositWeightScaleStartQuote).div(depositsQuote),
+    );
+  }
+
+  scaledInitLiabWeight(): I80F48 {
+    const borrowsQuote = this.nativeBorrows().mul(this.price);
+    if (borrowsQuote.lte(I80F48.fromNumber(this.borrowWeightScaleStartQuote))) {
+      return this.initLiabWeight;
+    }
+    return this.initLiabWeight.mul(
+      I80F48.fromNumber(this.borrowWeightScaleStartQuote).div(borrowsQuote),
     );
   }
 

@@ -114,6 +114,7 @@ async function refreshState(
     mc.perpMarket = group.getPerpMarketByMarketIndex(
       perpMarket.perpMarketIndex,
     );
+    await perpMarket.loadOrderbook(client, true);
     mc.bids = await perpMarket.loadBids(client);
     mc.asks = await perpMarket.loadAsks(client);
     mc.lastBookUpdate = ts;
@@ -448,6 +449,7 @@ async function makeMarketUpdateInstructions(
   const expiryTimestamp =
     params.tif !== undefined ? Date.now() / 1000 + params.tif : 0;
 
+  // TODO: oracle pegged runs out of free perp open order slots on mango account
   if (params.oraclePegged) {
     const uiOPegBidOffset = fairValue * (-charge + lean + bias + pfQuoteLean);
     const uiOPegAskOffset = fairValue * (charge + lean + bias + pfQuoteLean);

@@ -223,7 +223,7 @@ export class PerpMarket {
     return this.priceLotsToUiConverter;
   }
 
-  private async loadOrderbook(
+  public async loadOrderbook(
     client: MangoClient,
     forceReload = false,
   ): Promise<Orderbook> {
@@ -735,13 +735,13 @@ export class BookSide {
   static toInnerNode(client: MangoClient, data: [number]): InnerNode {
     return (client.program as any)._coder.types.typeLayouts
       .get('InnerNode')
-      .decode(Buffer.from([BookSide.INNER_NODE_TAG, 0, 0, 0].concat(data)));
+      .decode(Buffer.from([BookSide.INNER_NODE_TAG].concat(data)));
   }
   static toLeafNode(client: MangoClient, data: [number]): LeafNode {
     return LeafNode.from(
       (client.program as any)._coder.types.typeLayouts
         .get('LeafNode')
-        .decode(Buffer.from([BookSide.LEAF_NODE_TAG, 0, 0, 0].concat(data))),
+        .decode(Buffer.from([BookSide.LEAF_NODE_TAG].concat(data))),
     );
   }
 }

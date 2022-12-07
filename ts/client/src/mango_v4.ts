@@ -5077,9 +5077,7 @@ export type MangoV4 = {
         "fields": [
           {
             "name": "sideAndTree",
-            "type": {
-              "defined": "SideAndOrderTree"
-            }
+            "type": "u8"
           },
           {
             "name": "padding1",
@@ -5117,6 +5115,81 @@ export type MangoV4 = {
               "array": [
                 "u8",
                 64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MangoAccountFixed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "delegate",
+            "type": "publicKey"
+          },
+          {
+            "name": "accountNum",
+            "type": "u32"
+          },
+          {
+            "name": "beingLiquidated",
+            "type": "u8"
+          },
+          {
+            "name": "inHealthRegion",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                1
+              ]
+            }
+          },
+          {
+            "name": "netDeposits",
+            "type": "i64"
+          },
+          {
+            "name": "perpSpotTransfers",
+            "type": "i64"
+          },
+          {
+            "name": "healthRegionBeginInitHealth",
+            "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                240
               ]
             }
           }
@@ -5387,9 +5460,7 @@ export type MangoV4 = {
         "fields": [
           {
             "name": "orderTreeType",
-            "type": {
-              "defined": "OrderTreeType"
-            }
+            "type": "u8"
           },
           {
             "name": "padding",
@@ -7276,6 +7347,11 @@ export type MangoV4 = {
       "code": 6027,
       "name": "BankNetBorrowsLimitReached",
       "msg": "bank net borrows has reached limit - this is an intermittent error - the limit will reset regularly"
+    },
+    {
+      "code": 6028,
+      "name": "TokenPositionDoesNotExist",
+      "msg": "token position does not exist"
     }
   ]
 };
@@ -12359,9 +12435,7 @@ export const IDL: MangoV4 = {
         "fields": [
           {
             "name": "sideAndTree",
-            "type": {
-              "defined": "SideAndOrderTree"
-            }
+            "type": "u8"
           },
           {
             "name": "padding1",
@@ -12399,6 +12473,81 @@ export const IDL: MangoV4 = {
               "array": [
                 "u8",
                 64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MangoAccountFixed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "publicKey"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "delegate",
+            "type": "publicKey"
+          },
+          {
+            "name": "accountNum",
+            "type": "u32"
+          },
+          {
+            "name": "beingLiquidated",
+            "type": "u8"
+          },
+          {
+            "name": "inHealthRegion",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                1
+              ]
+            }
+          },
+          {
+            "name": "netDeposits",
+            "type": "i64"
+          },
+          {
+            "name": "perpSpotTransfers",
+            "type": "i64"
+          },
+          {
+            "name": "healthRegionBeginInitHealth",
+            "type": "i64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                240
               ]
             }
           }
@@ -12669,9 +12818,7 @@ export const IDL: MangoV4 = {
         "fields": [
           {
             "name": "orderTreeType",
-            "type": {
-              "defined": "OrderTreeType"
-            }
+            "type": "u8"
           },
           {
             "name": "padding",
@@ -14558,6 +14705,11 @@ export const IDL: MangoV4 = {
       "code": 6027,
       "name": "BankNetBorrowsLimitReached",
       "msg": "bank net borrows has reached limit - this is an intermittent error - the limit will reset regularly"
+    },
+    {
+      "code": 6028,
+      "name": "TokenPositionDoesNotExist",
+      "msg": "token position does not exist"
     }
   ]
 };

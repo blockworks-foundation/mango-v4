@@ -23,6 +23,8 @@ function mockBankAndOracle(
     initLiabWeight: I80F48.fromNumber(1 + initWeight),
     price: I80F48.fromNumber(price),
     stablePriceModel: { stablePrice: price } as StablePriceModel,
+    scaledInitAssetWeight: () => I80F48.fromNumber(1 - initWeight),
+    scaledInitLiabWeight: () => I80F48.fromNumber(1 + initWeight),
   };
 }
 

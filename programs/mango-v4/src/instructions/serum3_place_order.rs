@@ -368,6 +368,8 @@ pub fn serum3_place_order(
         account.check_health_post(&health_cache, pre_health)?;
     }
 
+    // TODO: enforce min_vault_to_deposits_ratio
+
     Ok(())
 }
 

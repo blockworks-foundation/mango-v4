@@ -48,7 +48,7 @@ import {
   Serum3SelfTradeBehavior,
   Serum3Side,
 } from './accounts/serum3';
-import { SERUM3_PROGRAM_ID } from './constants';
+import { OPENBOOK_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
@@ -991,7 +991,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
-        serumProgram: SERUM3_PROGRAM_ID[this.cluster],
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3MarketExternalPk,
         baseBank: baseBank.publicKey,
         quoteBank: quoteBank.publicKey,
@@ -1203,7 +1203,7 @@ export class MangoClient {
         openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
-        serumProgram: SERUM3_PROGRAM_ID[this.cluster],
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
         marketBids: serum3MarketExternal.bidsAddress,
         marketAsks: serum3MarketExternal.asksAddress,
@@ -1256,7 +1256,7 @@ export class MangoClient {
         openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
-        serumProgram: SERUM3_PROGRAM_ID[this.cluster],
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
         marketBids: serum3MarketExternal.bidsAddress,
         marketAsks: serum3MarketExternal.asksAddress,
@@ -1301,7 +1301,7 @@ export class MangoClient {
         openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
-        serumProgram: SERUM3_PROGRAM_ID[this.cluster],
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
         marketBaseVault: serum3MarketExternal.decoded.baseVault,
         marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
@@ -1350,7 +1350,7 @@ export class MangoClient {
         openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
-        serumProgram: SERUM3_PROGRAM_ID[this.cluster],
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
         marketBids: serum3MarketExternal.bidsAddress,
         marketAsks: serum3MarketExternal.asksAddress,
