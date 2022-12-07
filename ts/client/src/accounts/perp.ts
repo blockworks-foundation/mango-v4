@@ -7,6 +7,7 @@ import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
 import { As, toNative, U64_MAX_BN } from '../utils';
 import {
   OracleConfig,
+  OracleConfigDto,
   QUOTE_DECIMALS,
   StablePriceModel,
   TokenIndex,
@@ -18,6 +19,7 @@ export type PerpMarketIndex = number & As<'perp-market-index'>;
 
 export class PerpMarket {
   public name: string;
+  public oracleConfig: OracleConfig;
   public maintAssetWeight: I80F48;
   public initAssetWeight: I80F48;
   public maintLiabWeight: I80F48;
@@ -53,7 +55,7 @@ export class PerpMarket {
       orderbook: PublicKey;
       eventQueue: PublicKey;
       oracle: PublicKey;
-      oracleConfig: OracleConfig;
+      oracleConfig: OracleConfigDto;
       stablePriceModel: StablePriceModel;
       quoteLotSize: BN;
       baseLotSize: BN;
@@ -138,7 +140,7 @@ export class PerpMarket {
     public orderbook: PublicKey,
     public eventQueue: PublicKey,
     public oracle: PublicKey,
-    oracleConfig: OracleConfig,
+    oracleConfig: OracleConfigDto,
     public stablePriceModel: StablePriceModel,
     public quoteLotSize: BN,
     public baseLotSize: BN,
@@ -168,6 +170,10 @@ export class PerpMarket {
     settlePnlLimitWindowSizeTs: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
+    this.oracleConfig = {
+      confFilter: I80F48.from(oracleConfig.confFilter),
+      maxStalenessSlots: oracleConfig.maxStalenessSlots,
+    } as OracleConfig;
     this.maintAssetWeight = I80F48.from(maintAssetWeight);
     this.initAssetWeight = I80F48.from(initAssetWeight);
     this.maintLiabWeight = I80F48.from(maintLiabWeight);

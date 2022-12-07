@@ -8,10 +8,14 @@ export const QUOTE_DECIMALS = 6;
 
 export type TokenIndex = number & As<'token-index'>;
 
-export type OracleConfig = {
+export type OracleConfigDto = {
   confFilter: I80F48Dto;
   maxStalenessSlots: BN;
-  reserved: number[];
+};
+
+export type OracleConfig = {
+  confFilter: I80F48;
+  maxStalenessSlots: BN;
 };
 
 export type StablePriceModel = {
@@ -41,6 +45,7 @@ export interface BankForHealth {
 
 export class Bank implements BankForHealth {
   public name: string;
+  public oracleConfig: OracleConfig;
   public depositIndex: I80F48;
   public borrowIndex: I80F48;
   public indexedDeposits: I80F48;
@@ -73,7 +78,7 @@ export class Bank implements BankForHealth {
       mint: PublicKey;
       vault: PublicKey;
       oracle: PublicKey;
-      oracleConfig: OracleConfig;
+      oracleConfig: OracleConfigDto;
       stablePriceModel: StablePriceModel;
       depositIndex: I80F48Dto;
       borrowIndex: I80F48Dto;
@@ -164,7 +169,7 @@ export class Bank implements BankForHealth {
     public mint: PublicKey,
     public vault: PublicKey,
     public oracle: PublicKey,
-    oracleConfig: OracleConfig,
+    oracleConfig: OracleConfigDto,
     public stablePriceModel: StablePriceModel,
     depositIndex: I80F48Dto,
     borrowIndex: I80F48Dto,
@@ -202,6 +207,10 @@ export class Bank implements BankForHealth {
     public depositWeightScaleStartQuote: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
+    this.oracleConfig = {
+      confFilter: I80F48.from(oracleConfig.confFilter),
+      maxStalenessSlots: oracleConfig.maxStalenessSlots,
+    } as OracleConfig;
     this.depositIndex = I80F48.from(depositIndex);
     this.borrowIndex = I80F48.from(borrowIndex);
     this.indexedDeposits = I80F48.from(indexedDeposits);
