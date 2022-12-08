@@ -25,7 +25,7 @@ use state::{
     OracleConfigParams, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side, TokenIndex,
 };
 
-declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
+declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
 
 #[program]
 pub mod mango_v4 {
