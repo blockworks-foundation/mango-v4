@@ -231,7 +231,7 @@ export class MangoClient {
     liquidationFee: number,
     minVaultToDepositsRatio: number,
     netBorrowLimitWindowSizeTs: number,
-    netBorrowsLimitNative: number,
+    netBorrowLimitPerWindowQuote: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
       .tokenRegister(
@@ -248,7 +248,7 @@ export class MangoClient {
         liquidationFee,
         minVaultToDepositsRatio,
         new BN(netBorrowLimitWindowSizeTs),
-        new BN(netBorrowsLimitNative),
+        new BN(netBorrowLimitPerWindowQuote),
       )
       .accounts({
         group: group.publicKey,
@@ -559,8 +559,8 @@ export class MangoClient {
         accountNumber ?? 0,
         tokenCount ?? 8,
         serum3Count ?? 8,
-        perpCount ?? 0,
-        perpOoCount ?? 0,
+        perpCount ?? 8,
+        perpOoCount ?? 8,
         name ?? '',
       )
       .accounts({
