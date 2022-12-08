@@ -388,9 +388,13 @@ export class Group {
   }
 
   public getMintDecimals(mintPk: PublicKey): number {
-    const banks = this.banksMapByMint.get(mintPk.toString());
-    if (!banks) throw new Error(`No bank found for mint ${mintPk}!`);
-    return banks[0].mintDecimals;
+    const bank = this.getFirstBankByMint(mintPk);
+    return bank.mintDecimals;
+  }
+
+  public getMintDecimalsByTokenIndex(tokenIndex: TokenIndex): number {
+    const bank = this.getFirstBankByTokenIndex(tokenIndex);
+    return bank.mintDecimals;
   }
 
   public getInsuranceMintDecimals(): number {
