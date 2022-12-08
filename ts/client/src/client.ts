@@ -1797,7 +1797,8 @@ export class MangoClient {
         settleOracle: bank.oracle,
         settleBank: bank.publicKey,
         settler: settler.publicKey,
-        settlerOwner: this.program.provider.publicKey,
+        settlerOwner: (this.program.provider as AnchorProvider).wallet
+          .publicKey,
       })
       .remainingAccounts(
         healthRemainingAccounts.map(
