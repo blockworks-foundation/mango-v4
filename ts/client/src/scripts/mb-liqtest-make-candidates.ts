@@ -1,8 +1,9 @@
 import { AnchorProvider, BN, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
+import { Bank } from '../accounts/bank';
 import { MangoAccount } from '../accounts/mangoAccount';
-import { PerpOrderSide, PerpOrderType } from '../accounts/perp';
+import { PerpMarket, PerpOrderSide, PerpOrderType } from '../accounts/perp';
 import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
@@ -19,24 +20,18 @@ const GROUP_NUM = Number(process.env.GROUP_NUM || 200);
 
 // native prices
 const PRICES = {
-  BTC: 20000.0,
-  SOL: 0.04,
+  ETH: 1200.0,
+  SOL: 0.015,
   USDC: 1,
-  MNGO: 0.04,
+  MNGO: 0.02,
 };
 
-const MAINNET_MINTS = new Map([
-  ['USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'],
-  ['BTC', '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E'],
-  ['SOL', 'So11111111111111111111111111111111111111112'],
-  ['MNGO', 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac'],
-]);
-
-const TOKEN_SCENARIOS: [string, string, number, string, number][] = [
-  ['LIQTEST, LIQOR', 'USDC', 1000000, 'USDC', 0],
-  ['LIQTEST, A: USDC, L: SOL', 'USDC', 1000 * PRICES.SOL, 'SOL', 920],
-  ['LIQTEST, A: SOL, L: USDC', 'SOL', 1000, 'USDC', 920 * PRICES.SOL],
-  ['LIQTEST, A: BTC, L: SOL', 'BTC', 20, 'SOL', (18 * PRICES.BTC) / PRICES.SOL],
+const TOKEN_SCENARIOS: [string, [string, number][], [string, number][]][] = [
+  ['LIQTEST, FUNDING', [['USDC', 5000000], ['ETH', 100000], ['SOL', 150000000]], []],
+  ['LIQTEST, LIQOR', [['USDC', 1000000]], []],
+  ['LIQTEST, A: USDC, L: SOL', [['USDC', 1000 * PRICES.SOL]], [['SOL', 920]]],
+  ['LIQTEST, A: SOL, L: USDC', [['SOL', 1000]], [['USDC', 920 * PRICES.SOL]]],
+  ['LIQTEST, A: ETH, L: SOL', [['ETH', 20]], [['SOL', (18 * PRICES.ETH) / PRICES.SOL]]],
 ];
 
 async function main() {
@@ -66,17 +61,17 @@ async function main() {
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(group.toString());
 
+  const MAINNET_MINTS = new Map([
+    ['USDC', group.banksMapByName.get('USDC')![0].mint],
+    ['ETH', group.banksMapByName.get('ETH')![0].mint],
+    ['SOL', group.banksMapByName.get('SOL')![0].mint],
+  ]);
+
   const accounts = await client.getMangoAccountsForOwner(
     group,
     admin.publicKey,
   );
   let maxAccountNum = Math.max(0, ...accounts.map((a) => a.accountNum));
-  const fundingAccount = accounts.find(
-    (account) => account.name == 'LIQTEST, FUNDING',
-  );
-  if (!fundingAccount) {
-    throw new Error('could not find funding account');
-  }
 
   async function createMangoAccount(name: string): Promise<MangoAccount> {
     const accountNum = maxAccountNum + 1;
@@ -89,8 +84,73 @@ async function main() {
     ))!;
   }
 
+  async function setBankPrice(bank: Bank, price: number): Promise<void> {
+    await client.stubOracleSet(group, bank.oracle, price);
+    // reset stable price
+    await client.tokenEdit(
+      group,
+      bank.mint,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      true,
+      null,
+    );
+  }
+  async function setPerpPrice(
+    perpMarket: PerpMarket,
+    price: number,
+  ): Promise<void> {
+    await client.stubOracleSet(group, perpMarket.oracle, price);
+    // reset stable price
+    await client.perpEditMarket(
+      group,
+      perpMarket.perpMarketIndex,
+      perpMarket.oracle,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+    );
+  }
+
   for (const scenario of TOKEN_SCENARIOS) {
-    const [name, assetName, assetAmount, liabName, liabAmount] = scenario;
+    const [name, assets, liabs] = scenario;
 
     // create account
     console.log(`Creating mangoaccount...`);
@@ -99,22 +159,24 @@ async function main() {
       `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
     );
 
-    const assetMint = new PublicKey(MAINNET_MINTS.get(assetName)!);
-    const liabMint = new PublicKey(MAINNET_MINTS.get(liabName)!);
+    for (let [assetName, assetAmount] of assets) {
+      const assetMint = new PublicKey(MAINNET_MINTS.get(assetName)!);
+      await client.tokenDepositNative(
+        group,
+        mangoAccount,
+        assetMint,
+        new BN(assetAmount),
+      );
+      await mangoAccount.reload(client);
+    }
 
-    await client.tokenDepositNative(
-      group,
-      mangoAccount,
-      assetMint,
-      new BN(assetAmount),
-    );
-    await mangoAccount.reload(client);
+    for (let [liabName, liabAmount] of liabs) {
+      const liabMint = new PublicKey(MAINNET_MINTS.get(liabName)!);
 
-    if (liabAmount > 0) {
       // temporarily drop the borrowed token value, so the borrow goes through
-      const oracle = group.banksMapByName.get(liabName)![0].oracle;
+      const bank = group.banksMapByName.get(liabName)![0];
       try {
-        await client.stubOracleSet(group, oracle, PRICES[liabName] / 2);
+        await setBankPrice(bank, PRICES[liabName] / 2);
 
         await client.tokenWithdrawNative(
           group,
@@ -125,9 +187,20 @@ async function main() {
         );
       } finally {
         // restore the oracle
-        await client.stubOracleSet(group, oracle, PRICES[liabName]);
+        await setBankPrice(bank, PRICES[liabName]);
       }
     }
+  }
+
+  const accounts2 = await client.getMangoAccountsForOwner(
+    group,
+    admin.publicKey,
+  );
+  const fundingAccount = accounts2.find(
+    (account) => account.name == 'LIQTEST, FUNDING',
+  );
+  if (!fundingAccount) {
+    throw new Error('could not find funding account');
   }
 
   // Serum order scenario
@@ -233,9 +306,8 @@ async function main() {
       `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
     );
 
-    const baseMint = new PublicKey(MAINNET_MINTS.get('MNGO')!);
     const collateralMint = new PublicKey(MAINNET_MINTS.get('SOL')!);
-    const collateralOracle = group.banksMapByName.get('SOL')![0].oracle;
+    const collateralBank = group.banksMapByName.get('SOL')![0];
 
     await client.tokenDepositNative(
       group,
@@ -245,7 +317,7 @@ async function main() {
     ); // valued as $0.004 maint collateral
     await mangoAccount.reload(client);
 
-    await client.stubOracleSet(group, collateralOracle, PRICES['SOL'] * 4);
+    await setBankPrice(collateralBank, PRICES['SOL'] * 4);
 
     try {
       await client.perpPlaceOrder(
@@ -263,7 +335,7 @@ async function main() {
         5,
       );
     } finally {
-      await client.stubOracleSet(group, collateralOracle, PRICES['SOL']);
+      await setBankPrice(collateralBank, PRICES['SOL']);
     }
   }
 
@@ -277,9 +349,8 @@ async function main() {
       `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
     );
 
-    const baseMint = new PublicKey(MAINNET_MINTS.get('MNGO')!);
     const collateralMint = new PublicKey(MAINNET_MINTS.get('SOL')!);
-    const collateralOracle = group.banksMapByName.get('SOL')![0].oracle;
+    const collateralBank = group.banksMapByName.get('SOL')![0];
 
     await client.tokenDepositNative(
       group,
@@ -289,7 +360,7 @@ async function main() {
     ); // valued as $0.004 maint collateral
     await mangoAccount.reload(client);
 
-    await client.stubOracleSet(group, collateralOracle, PRICES['SOL'] * 5);
+    await setBankPrice(collateralBank, PRICES['SOL'] * 5);
 
     try {
       await client.perpPlaceOrder(
@@ -327,7 +398,7 @@ async function main() {
         group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
       );
     } finally {
-      await client.stubOracleSet(group, collateralOracle, PRICES['SOL']);
+      await setBankPrice(collateralBank, PRICES['SOL']);
     }
   }
 
@@ -341,12 +412,10 @@ async function main() {
       `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
     );
 
-    const baseMint = new PublicKey(MAINNET_MINTS.get('MNGO')!);
-    const baseOracle = (await client.getStubOracle(group, baseMint))[0]
-      .publicKey;
+    const perpMarket = group.perpMarketsMapByName.get('MNGO-PERP')!;
     const liabMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
     const collateralMint = new PublicKey(MAINNET_MINTS.get('SOL')!);
-    const collateralOracle = group.banksMapByName.get('SOL')![0].oracle;
+    const collateralBank = group.banksMapByName.get('SOL')![0];
 
     await client.tokenDepositNative(
       group,
@@ -357,7 +426,7 @@ async function main() {
     await mangoAccount.reload(client);
 
     try {
-      await client.stubOracleSet(group, collateralOracle, PRICES['SOL'] * 10);
+      await setBankPrice(collateralBank, PRICES['SOL'] * 10);
 
       // Spot-borrow more than the collateral is worth
       await client.tokenWithdrawNative(
@@ -370,7 +439,7 @@ async function main() {
       await mangoAccount.reload(client);
 
       // Execute two trades that leave the account with +$0.022 positive pnl
-      await client.stubOracleSet(group, baseOracle, PRICES['MNGO'] / 2);
+      await setPerpPrice(perpMarket, PRICES['MNGO'] / 2);
       await client.perpPlaceOrder(
         group,
         fundingAccount,
@@ -404,7 +473,7 @@ async function main() {
         group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
       );
 
-      await client.stubOracleSet(group, baseOracle, PRICES['MNGO']);
+      await setPerpPrice(perpMarket, PRICES['MNGO']);
 
       await client.perpPlaceOrder(
         group,
@@ -439,8 +508,8 @@ async function main() {
         group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
       );
     } finally {
-      await client.stubOracleSet(group, collateralOracle, PRICES['SOL']);
-      await client.stubOracleSet(group, baseOracle, PRICES['MNGO']);
+      await setPerpPrice(perpMarket, PRICES['MNGO']);
+      await setBankPrice(collateralBank, PRICES['SOL']);
     }
   }
 

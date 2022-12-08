@@ -14,23 +14,23 @@ const GROUP_NUM = Number(process.env.GROUP_NUM || 200);
 
 const MAINNET_MINTS = new Map([
   ['USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'],
-  ['BTC', '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E'],
+  ['ETH', '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs'],
   ['SOL', 'So11111111111111111111111111111111111111112'],
   ['MNGO', 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac'],
 ]);
 
 const STUB_PRICES = new Map([
   ['USDC', 1.0],
-  ['BTC', 20000.0], // btc and usdc both have 6 decimals
-  ['SOL', 0.04], // sol has 9 decimals, equivalent to $40 per SOL
-  ['MNGO', 0.04], // same price/decimals as SOL for convenience
+  ['ETH', 1200.0], // eth and usdc both have 6 decimals
+  ['SOL', 0.015], // sol has 9 decimals, equivalent to $15 per SOL
+  ['MNGO', 0.02], // same price/decimals as SOL for convenience
 ]);
 
 // External markets are matched with those in https://github.com/blockworks-foundation/mango-client-v3/blob/main/src/ids.json
 // and verified to have best liquidity for pair on https://openserum.io/
 const MAINNET_SERUM3_MARKETS = new Map([
-  ['BTC/USDC', 'A8YFbxQYFVqKZaoYJLLUVcQiWP7G2MeEgW5wsAQgMvFw'],
-  ['SOL/USDC', '9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT'],
+  ['ETH/USDC', 'FZxi3yWkE5mMjyaZj6utmYL54QQYfMCKMcLaQZq4UwnA'],
+  ['SOL/USDC', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'],
 ]);
 
 const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
@@ -130,17 +130,17 @@ async function main() {
   }
 
   // register token 1
-  console.log(`Registering BTC...`);
-  const btcMainnetMint = new PublicKey(MAINNET_MINTS.get('BTC')!);
-  const btcMainnetOracle = oracles.get('BTC');
+  console.log(`Registering ETH...`);
+  const ethMainnetMint = new PublicKey(MAINNET_MINTS.get('ETH')!);
+  const ethMainnetOracle = oracles.get('ETH');
   try {
     await client.tokenRegister(
       group,
-      btcMainnetMint,
-      btcMainnetOracle,
+      ethMainnetMint,
+      ethMainnetOracle,
       defaultOracleConfig,
       1,
-      'BTC',
+      'ETH',
       defaultInterestRate,
       0.0,
       0.0001,
