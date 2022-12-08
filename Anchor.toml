@@ -1,3 +1,6 @@
+[workspace]
+exclude = ["programs/margin-trade"]
+
 [programs.localnet]
 mango_v4 = "4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg"
 

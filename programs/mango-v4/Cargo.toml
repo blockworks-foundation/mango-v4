@@ -54,7 +54,6 @@ log = "0.4.14"
 env_logger = "0.9.0"
 base64 = "0.13.0"
 async-trait = "0.1.52"
-margin-trade = { path = "../margin-trade", features = ["cpi"] }
 itertools = "0.10.3"
 rand = "0.8.4"
 lazy_static = "1.4.0"
