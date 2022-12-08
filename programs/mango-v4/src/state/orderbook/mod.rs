@@ -383,7 +383,6 @@ mod tests {
         assert_eq!(fill.quantity, match_quantity);
         assert_eq!(fill.price, price_lots);
         assert_eq!(fill.taker_client_order_id, 43);
-        assert_eq!(fill.maker_client_order_id, 42);
         assert_eq!(fill.maker, maker_pk);
         assert_eq!(fill.taker, taker_pk);
         assert_eq!(fill.maker_fee, market.maker_fee);

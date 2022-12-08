@@ -140,7 +140,6 @@ pub struct LeafNode {
 
     pub owner: Pubkey,
     pub quantity: i64,
-    pub client_order_id: u64,
 
     // The time the order was placed
     pub timestamp: u64,
@@ -148,11 +147,11 @@ pub struct LeafNode {
     // Only applicable in the oracle_pegged OrderTree
     pub peg_limit: i64,
 
-    pub reserved: [u8; 32],
+    pub reserved: [u8; 40],
 }
 const_assert_eq!(
     size_of::<LeafNode>(),
-    4 + 1 + 1 + 1 + 1 + 16 + 32 + 8 + 8 + 8 + 8 + 32
+    4 + 1 + 1 + 1 + 1 + 16 + 32 + 8 + 8 + 8 + 40
 );
 const_assert_eq!(size_of::<LeafNode>(), NODE_SIZE);
 const_assert_eq!(size_of::<LeafNode>() % 8, 0);
@@ -164,7 +163,6 @@ impl LeafNode {
         key: u128,
         owner: Pubkey,
         quantity: i64,
-        client_order_id: u64,
         timestamp: u64,
         order_type: PostOrderType,
         time_in_force: u16,
@@ -180,10 +178,9 @@ impl LeafNode {
             key,
             owner,
             quantity,
-            client_order_id,
             timestamp,
             peg_limit,
-            reserved: [0; 32],
+            reserved: [0; 40],
         }
     }
 

@@ -100,7 +100,6 @@ pub struct FillLog {
 
     pub maker: Pubkey,
     pub maker_order_id: u128,
-    pub maker_client_order_id: u64,
     pub maker_fee: i128,
 
     // Timestamp of when the maker order was placed; copied over from the LeafNode

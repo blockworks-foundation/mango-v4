@@ -811,6 +811,7 @@ impl<
         side: Side,
         order_tree: BookSideOrderTree,
         order: &LeafNode,
+        client_order_id: u64,
     ) -> Result<()> {
         let mut perp_account = self.perp_position_mut(perp_market_index)?;
         match side {
@@ -827,7 +828,7 @@ impl<
         oo.market = perp_market_index;
         oo.side_and_tree = SideAndOrderTree::new(side, order_tree).into();
         oo.id = order.key;
-        oo.client_id = order.client_order_id;
+        oo.client_id = client_order_id;
         Ok(())
     }
 
