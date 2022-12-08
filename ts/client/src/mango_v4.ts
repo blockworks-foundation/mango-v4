@@ -5454,10 +5454,6 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "clientOrderId",
-            "type": "u64"
-          },
-          {
             "name": "timestamp",
             "type": "u64"
           },
@@ -5470,7 +5466,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                32
+                40
               ]
             }
           }
@@ -5650,10 +5646,6 @@ export type MangoV4 = {
             "type": "u128"
           },
           {
-            "name": "makerClientOrderId",
-            "type": "u64"
-          },
-          {
             "name": "makerFee",
             "type": {
               "defined": "I80F48"
@@ -5694,7 +5686,7 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                16
+                24
               ]
             }
           }
@@ -6547,11 +6539,6 @@ export type MangoV4 = {
         {
           "name": "makerOrderId",
           "type": "u128",
-          "index": false
-        },
-        {
-          "name": "makerClientOrderId",
-          "type": "u64",
           "index": false
         },
         {
@@ -12854,10 +12841,6 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
-            "name": "clientOrderId",
-            "type": "u64"
-          },
-          {
             "name": "timestamp",
             "type": "u64"
           },
@@ -12870,7 +12853,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                32
+                40
               ]
             }
           }
@@ -13050,10 +13033,6 @@ export const IDL: MangoV4 = {
             "type": "u128"
           },
           {
-            "name": "makerClientOrderId",
-            "type": "u64"
-          },
-          {
             "name": "makerFee",
             "type": {
               "defined": "I80F48"
@@ -13094,7 +13073,7 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                16
+                24
               ]
             }
           }
@@ -13947,11 +13926,6 @@ export const IDL: MangoV4 = {
         {
           "name": "makerOrderId",
           "type": "u128",
-          "index": false
-        },
-        {
-          "name": "makerClientOrderId",
-          "type": "u64",
           "index": false
         },
         {

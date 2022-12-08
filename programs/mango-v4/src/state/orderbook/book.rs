@@ -180,7 +180,6 @@ impl<'a> Orderbook<'a> {
                 event_queue.header.seq_num,
                 best_opposing.node.owner,
                 best_opposing.node.key,
-                best_opposing.node.client_order_id,
                 market.maker_fee,
                 best_opposing.node.timestamp,
                 *mango_account_pk,
@@ -259,7 +258,6 @@ impl<'a> Orderbook<'a> {
                 order_id,
                 *mango_account_pk,
                 book_base_quantity,
-                order.client_order_id,
                 now_ts,
                 PostOrderType::Limit, // TODO: Support order types? needed?
                 order.time_in_force,
@@ -284,6 +282,7 @@ impl<'a> Orderbook<'a> {
                 side,
                 order_tree_target,
                 &new_order,
+                order.client_order_id,
             )?;
         }
 

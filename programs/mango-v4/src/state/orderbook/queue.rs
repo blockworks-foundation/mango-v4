@@ -191,7 +191,6 @@ pub struct FillEvent {
 
     pub maker: Pubkey,
     pub maker_order_id: u128,
-    pub maker_client_order_id: u64,
     pub maker_fee: I80F48,
 
     // Timestamp of when the maker order was placed; copied over from the LeafNode
@@ -204,7 +203,7 @@ pub struct FillEvent {
 
     pub price: i64,
     pub quantity: i64, // number of quote lots
-    pub reserved: [u8; 16],
+    pub reserved: [u8; 24],
 }
 const_assert_eq!(size_of::<FillEvent>() % 8, 0);
 const_assert_eq!(size_of::<FillEvent>(), EVENT_SIZE);
@@ -219,7 +218,6 @@ impl FillEvent {
         seq_num: u64,
         maker: Pubkey,
         maker_order_id: u128,
-        maker_client_order_id: u64,
         maker_fee: I80F48,
         maker_timestamp: u64,
 
@@ -241,7 +239,6 @@ impl FillEvent {
             seq_num,
             maker,
             maker_order_id,
-            maker_client_order_id,
             maker_fee,
             maker_timestamp,
             taker,
@@ -250,7 +247,7 @@ impl FillEvent {
             taker_fee,
             price,
             quantity,
-            reserved: [0; 16],
+            reserved: [0; 24],
         }
     }
 

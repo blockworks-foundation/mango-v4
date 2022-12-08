@@ -130,7 +130,6 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     seq_num: fill.seq_num,
                     maker: fill.maker,
                     maker_order_id: fill.maker_order_id,
-                    maker_client_order_id: fill.maker_client_order_id,
                     maker_fee: fill.maker_fee.to_bits(),
                     maker_timestamp: fill.maker_timestamp,
                     taker: fill.taker,
