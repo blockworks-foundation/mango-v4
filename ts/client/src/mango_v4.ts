@@ -5499,6 +5499,22 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "OrderTreeRoot",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "maybeNode",
+            "type": "u32"
+          },
+          {
+            "name": "leafCount",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
       "name": "OrderTreeNodes",
       "docs": [
         "A binary tree on AnyNode::key()",
@@ -12894,6 +12910,22 @@ export const IDL: MangoV4 = {
                 119
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderTreeRoot",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "maybeNode",
+            "type": "u32"
+          },
+          {
+            "name": "leafCount",
+            "type": "u32"
           }
         ]
       }

@@ -26,8 +26,8 @@ pub enum OrderTreeType {
     Asks,
 }
 
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-#[repr(C)]
+#[zero_copy]
+#[derive(bytemuck::Pod, bytemuck::Zeroable)]
 pub struct OrderTreeRoot {
     pub maybe_node: NodeHandle,
     pub leaf_count: u32,
