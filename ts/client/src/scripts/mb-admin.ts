@@ -97,7 +97,7 @@ async function buildUserClient(
     Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER_KEYPAIR!, 'utf-8'))),
   );
   console.log(`Admin ${admin.publicKey.toBase58()}`);
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   return [client, group, user];
 }
 
@@ -109,7 +109,7 @@ async function createGroup() {
   console.log(`Creating Group...`);
   const insuranceMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
   await client.groupCreate(GROUP_NUM, true, 2, insuranceMint);
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(`...registered group ${group.publicKey}`);
 }
 
@@ -118,7 +118,7 @@ async function registerTokens() {
   const client = result[0];
   const admin = result[1];
 
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
 
   const defaultOracleConfig = {
     confFilter: 0.1,
@@ -300,7 +300,7 @@ async function deregisterTokens() {
   const client = result[0];
   const admin = result[1];
 
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
 
   // change -1 to tokenIndex of choice
   let bank = group.getFirstBankByTokenIndex(-1 as TokenIndex);
@@ -315,7 +315,7 @@ async function registerSerum3Markets() {
   const client = result[0];
   const admin = result[1];
 
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
 
   // Register SOL serum market
   await client.serum3RegisterMarket(
@@ -333,7 +333,7 @@ async function deregisterSerum3Markets() {
   const client = result[0];
   const admin = result[1];
 
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
 
   // change xxx/xxx to market of choice
   let serum3Market = group.getSerum3MarketByName('XXX/XXX');
@@ -463,7 +463,7 @@ async function createAndPopulateAlt() {
   const client = result[0];
   const admin = result[1];
 
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
 
   const connection = client.program.provider.connection;
 
