@@ -1,19 +1,19 @@
-import * as dotenv from 'dotenv';
-dotenv.config();
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { coder } from '@project-serum/anchor/dist/cjs/spl/token';
 import { Cluster, Connection, Keypair } from '@solana/web3.js';
+import * as dotenv from 'dotenv';
 import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 import { I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { toUiDecimals } from '../utils';
+dotenv.config();
 
 const CLUSTER_URL =
   process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;
 const PAYER_KEYPAIR =
   process.env.PAYER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
-const GROUP_NUM = Number(process.env.GROUP_NUM || 2);
+const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
 

@@ -17,6 +17,8 @@ import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 import { buildVersionedTx } from '../utils';
 
+const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
+
 const MAINNET_MINTS = new Map([
   ['USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'], // 0
   ['USDT', 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'], // 1
@@ -106,7 +108,7 @@ async function createGroup() {
 
   console.log(`Creating Group...`);
   const insuranceMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
-  await client.groupCreate(0, true, 2, insuranceMint);
+  await client.groupCreate(GROUP_NUM, true, 2, insuranceMint);
   const group = await client.getGroupForCreator(admin.publicKey, 2);
   console.log(`...registered group ${group.publicKey}`);
 }
