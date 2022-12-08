@@ -3,6 +3,7 @@ use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 
 use crate::error::*;
+use crate::health::*;
 use crate::instructions::{
     apply_vault_difference, charge_loan_origination_fees, OODifference, OpenOrdersAmounts,
     OpenOrdersSlim,

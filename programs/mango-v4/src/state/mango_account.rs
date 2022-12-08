@@ -9,6 +9,9 @@ use solana_program::program_memory::sol_memmove;
 use static_assertions::const_assert_eq;
 
 use crate::error::*;
+use crate::health::{HealthCache, HealthType};
+use crate::logs::{DeactivatePerpPositionLog, DeactivateTokenPositionLog};
+use checked_math as cm;
 
 use super::dynamic_account::*;
 use super::BookSideOrderTree;
@@ -20,11 +23,8 @@ use super::PerpOpenOrder;
 use super::Serum3MarketIndex;
 use super::TokenIndex;
 use super::FREE_ORDER_SLOT;
-use super::{HealthCache, HealthType};
 use super::{PerpPosition, Serum3Orders, TokenPosition};
 use super::{Side, SideAndOrderTree};
-use crate::logs::{DeactivatePerpPositionLog, DeactivateTokenPositionLog};
-use checked_math as cm;
 
 type BorshVecLength = u32;
 const BORSH_VEC_PADDING_BYTES: usize = 4;

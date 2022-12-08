@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
 use crate::error::*;
+use crate::health::*;
 use crate::state::*;
 
 #[derive(Accounts)]

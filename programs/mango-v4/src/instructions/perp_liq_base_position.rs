@@ -4,6 +4,7 @@ use fixed::types::I80F48;
 
 use crate::accounts_zerocopy::*;
 use crate::error::*;
+use crate::health::*;
 use crate::state::*;
 
 use crate::logs::{emit_perp_balances, PerpLiqBasePositionLog};

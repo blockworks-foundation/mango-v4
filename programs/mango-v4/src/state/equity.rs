@@ -5,8 +5,9 @@ use checked_math as cm;
 use fixed::types::I80F48;
 
 use crate::events::{Equity, TokenEquity};
+use crate::health::ScanningAccountRetriever;
 
-use super::{MangoAccountRef, ScanningAccountRetriever};
+use super::MangoAccountRef;
 
 pub fn compute_equity(
     account: &MangoAccountRef,
