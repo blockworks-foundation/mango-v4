@@ -78,7 +78,8 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
         .load()?
         .verify_banks_ais(ctx.remaining_accounts)?;
 
-    let now_ts = Clock::get()?.unix_timestamp;
+    let clock = Clock::get()?;
+    let now_ts: u64 = clock.unix_timestamp.try_into().unwrap();
 
     // compute indexed_total
     let mut indexed_total_deposits = I80F48::ZERO;
@@ -90,6 +91,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
     }
 
     // compute and set latest index and average utilization on each bank
+    // also update moving average prices
     {
         let mut some_bank = ctx.remaining_accounts[0].load_mut::<Bank>()?;
 
@@ -106,8 +108,16 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             now_ts,
         );
 
-        let price =
-            some_bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
+        let price = some_bank.oracle_price(
+            &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+            Some(clock.slot),
+        )?;
+
+        some_bank
+            .stable_price_model
+            .update(now_ts as u64, price.to_num());
+        let stable_price_model = some_bank.stable_price_model.clone();
+
         emit!(UpdateIndexLog {
             mango_group: mint_info.group.key(),
             token_index: mint_info.token_index,
@@ -115,6 +125,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             borrow_index: borrow_index.to_bits(),
             avg_utilization: new_avg_utilization.to_bits(),
             price: price.to_bits(),
+            stable_price: some_bank.stable_price().to_bits(),
             collected_fees: some_bank.collected_fees_native.to_bits(),
             loan_fee_rate: some_bank.loan_fee_rate.to_bits(),
             total_deposits: cm!(deposit_index * indexed_total_deposits).to_bits(),
@@ -133,15 +144,14 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
         for ai in ctx.remaining_accounts.iter() {
             let mut bank = ai.load_mut::<Bank>()?;
 
-            bank.cached_indexed_total_deposits = indexed_total_deposits;
-            bank.cached_indexed_total_borrows = indexed_total_borrows;
-
             bank.index_last_updated = now_ts;
 
             bank.deposit_index = deposit_index;
             bank.borrow_index = borrow_index;
 
             bank.avg_utilization = new_avg_utilization;
+
+            bank.stable_price_model = stable_price_model.clone();
         }
     }
 

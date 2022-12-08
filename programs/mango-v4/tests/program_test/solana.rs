@@ -99,20 +99,29 @@ impl SolanaCookie {
             .unwrap();
     }
 
-    pub async fn advance_clock(&self) {
+    pub async fn advance_clock_to(&self, target: i64) {
         let mut clock = self.get_clock().await;
-        let old_ts = clock.unix_timestamp;
 
         // just advance enough to ensure we get changes over last_updated in various ix
         // if this gets too slow for our tests, remove and replace with manual time offset
         // which is configurable
-        while clock.unix_timestamp <= old_ts {
+        while clock.unix_timestamp <= target {
             self.context
                 .borrow_mut()
                 .warp_to_slot(clock.slot + 50)
                 .unwrap();
             clock = self.get_clock().await;
         }
+    }
+
+    pub async fn advance_clock_to_next_multiple(&self, window: i64) {
+        let ts = self.get_clock().await.unix_timestamp;
+        self.advance_clock_to(ts / window * window + window).await
+    }
+
+    pub async fn advance_clock(&self) {
+        let clock = self.get_clock().await;
+        self.advance_clock_to(clock.unix_timestamp + 1).await
     }
 
     pub async fn get_newest_slot_from_history(&self) -> u64 {
@@ -217,17 +226,16 @@ impl SolanaCookie {
     }
 
     pub async fn get_account_opt<T: AccountDeserialize>(&self, address: Pubkey) -> Option<T> {
-        self.context
-            .borrow_mut()
-            .banks_client
-            .get_account(address)
-            .await
-            .unwrap()
-            .unwrap();
-
         let data = self.get_account_data(address).await?;
         let mut data_slice: &[u8] = &data;
         AccountDeserialize::try_deserialize(&mut data_slice).ok()
+    }
+
+    // Use when accounts are too big for the stack
+    pub async fn get_account_boxed<T: AccountDeserialize>(&self, address: Pubkey) -> Box<T> {
+        let data = self.get_account_data(address).await.unwrap();
+        let mut data_slice: &[u8] = &data;
+        Box::new(AccountDeserialize::try_deserialize(&mut data_slice).unwrap())
     }
 
     pub async fn get_account<T: AccountDeserialize>(&self, address: Pubkey) -> T {

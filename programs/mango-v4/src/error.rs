@@ -51,6 +51,24 @@ pub enum MangoError {
     MaxSettleAmountMustBeGreaterThanZero,
     #[msg("the perp position has open orders or unprocessed fill events")]
     HasOpenPerpOrders,
+    #[msg("an oracle does not reach the confidence threshold")]
+    OracleConfidence,
+    #[msg("an oracle is stale")]
+    OracleStale,
+    #[msg("settlement amount must always be positive")]
+    SettlementAmountMustBePositive,
+    #[msg("bank utilization has reached limit")]
+    BankBorrowLimitReached,
+    #[msg("bank net borrows has reached limit - this is an intermittent error - the limit will reset regularly")]
+    BankNetBorrowsLimitReached,
+    #[msg("token position does not exist")]
+    TokenPositionDoesNotExist,
+}
+
+impl MangoError {
+    pub fn error_code(&self) -> u32 {
+        (*self).into()
+    }
 }
 
 pub trait Contextable {
@@ -123,6 +141,16 @@ macro_rules! error_msg {
     };
 }
 
+/// Creates an Error with a particular message, using format!() style arguments
+///
+/// Example: error_msg!("index {} not found", index)
+#[macro_export]
+macro_rules! error_msg_typed {
+    ($code:ident, $($arg:tt)*) => {
+        error!(MangoError::$code).context(format!($($arg)*))
+    };
+}
+
 /// Like anchor's require!(), but with a customizable message
 ///
 /// Example: require!(condition, "the condition on account {} was violated", account_key);
@@ -136,4 +164,5 @@ macro_rules! require_msg {
 }
 
 pub use error_msg;
+pub use error_msg_typed;
 pub use require_msg;

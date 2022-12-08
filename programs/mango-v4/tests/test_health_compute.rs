@@ -39,7 +39,7 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
     create_funded_account(&solana, group, owner, 0, &context.users[1], mints, 1000, 0).await;
 
     // TODO: actual explicit CU comparisons.
-    // On 2022-5-25 the final deposit costs 36905 CU and each new token increases it by roughly 1600 CU
+    // On 2022-11-29 the final deposit costs 61568 CU and each new token increases it by roughly 3125 CU
 
     Ok(())
 }
@@ -47,7 +47,9 @@ async fn test_health_compute_tokens() -> Result<(), TransportError> {
 // Try to reach compute limits in health checks by having many serum markets in an account
 #[tokio::test]
 async fn test_health_compute_serum() -> Result<(), TransportError> {
-    let context = TestContext::new().await;
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(80_000);
+    let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = TestKeypair::new();
@@ -156,7 +158,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
     }
 
     // TODO: actual explicit CU comparisons.
-    // On 2022-6-21 the final deposit costs 54074 CU and each new market increases it by roughly 4500 CU
+    // On 2022-11-29 the final deposit costs 76029 CU and each new market increases it by roughly 6191 CU
 
     Ok(())
 }
@@ -203,13 +205,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     //
     let mut perp_markets = vec![];
     for (perp_market_index, token) in tokens[1..].iter().enumerate() {
-        let mango_v4::accounts::PerpCreateMarket {
-            perp_market,
-            asks,
-            bids,
-            event_queue,
-            ..
-        } = send_tx(
+        let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
             solana,
             PerpCreateMarketInstruction {
                 group,
@@ -225,24 +221,26 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 liquidation_fee: 0.012,
                 maker_fee: 0.0002,
                 taker_fee: 0.000,
+                settle_pnl_limit_factor: 0.2,
+                settle_pnl_limit_window_size_ts: 24 * 60 * 60,
                 ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &token).await
             },
         )
         .await
         .unwrap();
 
-        perp_markets.push((perp_market, asks, bids, event_queue));
+        perp_markets.push(perp_market);
     }
 
     let price_lots = {
-        let perp_market = solana.get_account::<PerpMarket>(perp_markets[0].0).await;
+        let perp_market = solana.get_account::<PerpMarket>(perp_markets[0]).await;
         perp_market.native_price_to_lot(I80F48::from(1))
     };
 
     //
     // TEST: Create a perp order for each market
     //
-    for (i, &(perp_market, _asks, _bids, _event_queue)) in perp_markets.iter().enumerate() {
+    for (i, &perp_market) in perp_markets.iter().enumerate() {
         println!("adding market {}", i);
         send_tx(
             solana,
@@ -276,7 +274,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
     }
 
     // TODO: actual explicit CU comparisons.
-    // On 2022-5-25 the final deposit costs 32700 CU and each new market increases it by roughly 1500 CU
+    // On 2022-11-29 the final deposit costs 54954 CU and each new market increases it by roughly 3171 CU
 
     Ok(())
 }

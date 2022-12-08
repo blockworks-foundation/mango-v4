@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # WALLET_WITH_FUNDS=~/.config/solana/mango-devnet.json
-# PROGRAM_ID=m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD
+# PROGRAM_ID=4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
 
 cargo run -p anchor-cli -- build
 ./idl-fixup.sh

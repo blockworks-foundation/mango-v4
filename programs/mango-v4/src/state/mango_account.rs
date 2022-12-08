@@ -8,22 +8,21 @@ use fixed::types::I80F48;
 use solana_program::program_memory::sol_memmove;
 use static_assertions::const_assert_eq;
 
-use crate::error::Contextable;
-use crate::error::MangoError;
-use crate::error_msg;
+use crate::error::*;
 
 use super::dynamic_account::*;
+use super::BookSideOrderTree;
 use super::FillEvent;
 use super::LeafNode;
 use super::PerpMarket;
 use super::PerpMarketIndex;
 use super::PerpOpenOrder;
 use super::Serum3MarketIndex;
-use super::Side;
 use super::TokenIndex;
 use super::FREE_ORDER_SLOT;
 use super::{HealthCache, HealthType};
 use super::{PerpPosition, Serum3Orders, TokenPosition};
+use super::{Side, SideAndOrderTree};
 use crate::logs::{DeactivatePerpPositionLog, DeactivateTokenPositionLog};
 use checked_math as cm;
 
@@ -185,8 +184,8 @@ impl MangoAccount {
 }
 
 // Mango Account fixed part for easy zero copy deserialization
-#[derive(Copy, Clone)]
-#[repr(C)]
+#[zero_copy]
+#[derive(bytemuck::Pod, bytemuck::Zeroable)]
 pub struct MangoAccountFixed {
     pub group: Pubkey,
     pub owner: Pubkey,
@@ -203,10 +202,8 @@ pub struct MangoAccountFixed {
     pub reserved: [u8; 240],
 }
 const_assert_eq!(size_of::<MangoAccountFixed>(), 32 * 4 + 8 + 3 * 8 + 240);
+const_assert_eq!(size_of::<MangoAccountFixed>(), 400);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
-
-unsafe impl bytemuck::Pod for MangoAccountFixed {}
-unsafe impl bytemuck::Zeroable for MangoAccountFixed {}
 
 impl MangoAccountFixed {
     pub fn name(&self) -> &str {
@@ -217,6 +214,10 @@ impl MangoAccountFixed {
 
     pub fn is_owner_or_delegate(&self, ix_signer: Pubkey) -> bool {
         self.owner == ix_signer || self.delegate == ix_signer
+    }
+
+    pub fn is_delegate(&self, ix_signer: Pubkey) -> bool {
+        self.delegate == ix_signer
     }
 
     pub fn being_liquidated(&self) -> bool {
@@ -431,7 +432,13 @@ impl<
         self.all_token_positions()
             .enumerate()
             .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| (p, raw_index)))
-            .ok_or_else(|| error_msg!("position for token index {} not found", token_index))
+            .ok_or_else(|| {
+                error_msg_typed!(
+                    TokenPositionDoesNotExist,
+                    "position for token index {} not found",
+                    token_index
+                )
+            })
     }
 
     pub fn token_position(&self, token_index: TokenIndex) -> Result<&TokenPosition> {
@@ -500,7 +507,7 @@ impl<
 
     pub fn perp_next_order_slot(&self) -> Result<usize> {
         self.all_perp_orders()
-            .position(|&oo| oo.order_market == FREE_ORDER_SLOT)
+            .position(|&oo| oo.market == FREE_ORDER_SLOT)
             .ok_or_else(|| error_msg!("no free perp order index"))
     }
 
@@ -508,23 +515,23 @@ impl<
         &self,
         market_index: PerpMarketIndex,
         client_order_id: u64,
-    ) -> Option<(i128, Side)> {
+    ) -> Option<&PerpOpenOrder> {
         for oo in self.all_perp_orders() {
-            if oo.order_market == market_index && oo.client_order_id == client_order_id {
-                return Some((oo.order_id, oo.order_side));
+            if oo.market == market_index && oo.client_id == client_order_id {
+                return Some(&oo);
             }
         }
         None
     }
 
-    pub fn perp_find_order_side(
+    pub fn perp_find_order_with_order_id(
         &self,
         market_index: PerpMarketIndex,
-        order_id: i128,
-    ) -> Option<Side> {
+        order_id: u128,
+    ) -> Option<&PerpOpenOrder> {
         for oo in self.all_perp_orders() {
-            if oo.order_market == market_index && oo.order_id == order_id {
-                return Some(oo.order_side);
+            if oo.market == market_index && oo.id == order_id {
+                return Some(&oo);
             }
         }
         None
@@ -578,7 +585,13 @@ impl<
             .all_token_positions()
             .enumerate()
             .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| raw_index))
-            .ok_or_else(|| error_msg!("position for token index {} not found", token_index))?;
+            .ok_or_else(|| {
+                error_msg_typed!(
+                    TokenPositionDoesNotExist,
+                    "position for token index {} not found",
+                    token_index
+                )
+            })?;
         Ok((self.token_position_mut_by_raw_index(raw_index), raw_index))
     }
 
@@ -622,7 +635,7 @@ impl<
                     cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,
                     padding: Default::default(),
-                    reserved: [0; 8],
+                    reserved: [0; 128],
                 };
             }
             Ok((v, raw_index, bank_index))
@@ -796,6 +809,7 @@ impl<
         &mut self,
         perp_market_index: PerpMarketIndex,
         side: Side,
+        order_tree: BookSideOrderTree,
         order: &LeafNode,
     ) -> Result<()> {
         let mut perp_account = self.perp_position_mut(perp_market_index)?;
@@ -810,19 +824,19 @@ impl<
         let slot = order.owner_slot as usize;
 
         let mut oo = self.perp_order_mut_by_raw_index(slot);
-        oo.order_market = perp_market_index;
-        oo.order_side = side;
-        oo.order_id = order.key;
-        oo.client_order_id = order.client_order_id;
+        oo.market = perp_market_index;
+        oo.side_and_tree = SideAndOrderTree::new(side, order_tree).into();
+        oo.id = order.key;
+        oo.client_id = order.client_order_id;
         Ok(())
     }
 
     pub fn remove_perp_order(&mut self, slot: usize, quantity: i64) -> Result<()> {
         {
             let oo = self.perp_order_mut_by_raw_index(slot);
-            require_neq!(oo.order_market, FREE_ORDER_SLOT);
-            let order_side = oo.order_side;
-            let perp_market_index = oo.order_market;
+            require_neq!(oo.market, FREE_ORDER_SLOT);
+            let order_side = oo.side_and_tree().side();
+            let perp_market_index = oo.market;
             let perp_account = self.perp_position_mut(perp_market_index)?;
 
             // accounting
@@ -838,10 +852,10 @@ impl<
 
         // release space
         let oo = self.perp_order_mut_by_raw_index(slot);
-        oo.order_market = FREE_ORDER_SLOT;
-        oo.order_side = Side::Bid;
-        oo.order_id = 0i128;
-        oo.client_order_id = 0u64;
+        oo.market = FREE_ORDER_SLOT;
+        oo.side_and_tree = SideAndOrderTree::BidFixed.into();
+        oo.id = 0;
+        oo.client_id = 0;
         Ok(())
     }
 
@@ -861,8 +875,8 @@ impl<
         if !fill.market_fees_applied {
             cm!(perp_market.fees_accrued += fees);
         }
-        let quote_change_native = cm!(quote - fees);
-        pa.change_base_and_quote_positions(perp_market, base_change, quote_change_native);
+        pa.record_trade(perp_market, base_change, quote);
+        pa.record_fee(fees);
 
         cm!(pa.maker_volume += quote.abs().to_num::<u64>());
 
@@ -895,7 +909,7 @@ impl<
         // fees are assessed at time of trade; no need to assess fees here
         let quote_change_native =
             cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
-        pa.change_base_and_quote_positions(perp_market, base_change, quote_change_native);
+        pa.record_trade(perp_market, base_change, quote_change_native);
 
         cm!(pa.taker_volume += quote_change_native.abs().to_num::<u64>());
 

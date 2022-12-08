@@ -155,6 +155,8 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             liquidation_fee: 0.012,
             maker_fee: 0.0002,
             taker_fee: 0.000,
+            settle_pnl_limit_factor: 0.2,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[0]).await
         },
     )
@@ -183,6 +185,8 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             liquidation_fee: 0.012,
             maker_fee: 0.0002,
             taker_fee: 0.000,
+            settle_pnl_limit_factor: 0.2,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
         },
     )
@@ -195,18 +199,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     };
 
     // Set the initial oracle price
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[0].pubkey,
-            payer,
-            price: "1000.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, &tokens[0], admin, 1000.0).await;
 
     //
     // Place orders and create a position
@@ -335,18 +328,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     }
 
     // Try and settle with high price
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[0].pubkey,
-            payer,
-            price: "1200.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, &tokens[0], admin, 1200.0).await;
 
     // Account must have a loss
     let result = send_tx(
@@ -387,18 +369,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     // );
 
     // Change the oracle to a more reasonable price
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[0].pubkey,
-            payer,
-            price: "1005.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, &tokens[0], admin, 1005.0).await;
 
     let expected_pnl_0 = I80F48::from(480); // Less due to fees
     let expected_pnl_1 = I80F48::from(-500);

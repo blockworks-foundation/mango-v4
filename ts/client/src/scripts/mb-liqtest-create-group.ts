@@ -33,6 +33,10 @@ const MAINNET_SERUM3_MARKETS = new Map([
   ['SOL/USDC', '9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT'],
 ]);
 
+const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
+const NET_BORROWS_WINDOW_SIZE_TS = 24 * 60 * 60;
+const NET_BORROWS_LIMIT_NATIVE = 1 * Math.pow(10, 7) * Math.pow(10, 6);
+
 async function main() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(process.env.CLUSTER_URL!, options);
@@ -51,8 +55,9 @@ async function main() {
     adminProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
 
   // group
@@ -82,6 +87,19 @@ async function main() {
     oracles.set(name, oracle.publicKey);
   }
 
+  const defaultOracleConfig = {
+    confFilter: 0.1,
+    maxStalenessSlots: null,
+  };
+  const defaultInterestRate = {
+    adjustmentFactor: 0.01,
+    util0: 0.4,
+    rate0: 0.07,
+    util1: 0.8,
+    rate1: 0.9,
+    maxRate: 1.5,
+  };
+
   // register token 0
   console.log(`Registering USDC...`);
   const usdcMainnetMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
@@ -91,15 +109,10 @@ async function main() {
       group,
       usdcMainnetMint,
       usdcMainnetOracle,
-      0.1,
+      defaultOracleConfig,
       0,
       'USDC',
-      0.01,
-      0.4,
-      0.07,
-      0.8,
-      0.9,
-      1.5,
+      defaultInterestRate,
       0.0,
       0.0001,
       1,
@@ -107,6 +120,9 @@ async function main() {
       1,
       1,
       0,
+      MIN_VAULT_TO_DEPOSITS_RATIO,
+      NET_BORROWS_WINDOW_SIZE_TS,
+      NET_BORROWS_LIMIT_NATIVE,
     );
     await group.reloadAll(client);
   } catch (error) {
@@ -122,15 +138,10 @@ async function main() {
       group,
       btcMainnetMint,
       btcMainnetOracle,
-      0.1,
+      defaultOracleConfig,
       1,
       'BTC',
-      0.01,
-      0.4,
-      0.07,
-      0.7,
-      0.88,
-      1.5,
+      defaultInterestRate,
       0.0,
       0.0001,
       0.9,
@@ -138,6 +149,9 @@ async function main() {
       1.1,
       1.2,
       0.05,
+      MIN_VAULT_TO_DEPOSITS_RATIO,
+      NET_BORROWS_WINDOW_SIZE_TS,
+      NET_BORROWS_LIMIT_NATIVE,
     );
     await group.reloadAll(client);
   } catch (error) {
@@ -153,15 +167,10 @@ async function main() {
       group,
       solMainnetMint,
       solMainnetOracle,
-      0.1,
+      defaultOracleConfig,
       2, // tokenIndex
       'SOL',
-      0.01,
-      0.4,
-      0.07,
-      0.8,
-      0.9,
-      1.5,
+      defaultInterestRate,
       0.0,
       0.0001,
       0.9,
@@ -169,6 +178,9 @@ async function main() {
       1.1,
       1.2,
       0.05,
+      MIN_VAULT_TO_DEPOSITS_RATIO,
+      NET_BORROWS_WINDOW_SIZE_TS,
+      NET_BORROWS_LIMIT_NATIVE,
     );
     await group.reloadAll(client);
   } catch (error) {
@@ -202,7 +214,7 @@ async function main() {
       mngoMainnetOracle,
       0,
       'MNGO-PERP',
-      0.1,
+      defaultOracleConfig,
       9,
       10,
       100000, // base lots
@@ -223,6 +235,8 @@ async function main() {
       0,
       0,
       0,
+      1.0,
+      2 * 60 * 60,
     );
   } catch (error) {
     console.log(error);

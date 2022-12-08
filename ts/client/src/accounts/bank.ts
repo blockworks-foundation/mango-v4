@@ -8,8 +8,26 @@ export const QUOTE_DECIMALS = 6;
 
 export type TokenIndex = number & As<'token-index'>;
 
-export type OracleConfig = {
+export type OracleConfigDto = {
   confFilter: I80F48Dto;
+  maxStalenessSlots: BN;
+};
+
+export type OracleConfig = {
+  confFilter: I80F48;
+  maxStalenessSlots: BN;
+};
+
+export type StablePriceModel = {
+  stablePrice: number;
+  lastUpdateTimestamp: BN;
+  delayPrices: number[];
+  delayAccumulatorPrice: number;
+  delayAccumulatorTime: number;
+  delayIntervalSeconds: number;
+  delayGrowthLimit: number;
+  stableGrowthLimit: number;
+  lastDelayIntervalIndex: number;
 };
 
 export interface BankForHealth {
@@ -19,16 +37,19 @@ export interface BankForHealth {
   maintLiabWeight: I80F48;
   initLiabWeight: I80F48;
   price: I80F48;
+  stablePriceModel: StablePriceModel;
+
+  scaledInitAssetWeight(): I80F48;
+  scaledInitLiabWeight(): I80F48;
 }
 
 export class Bank implements BankForHealth {
   public name: string;
+  public oracleConfig: OracleConfig;
   public depositIndex: I80F48;
   public borrowIndex: I80F48;
   public indexedDeposits: I80F48;
   public indexedBorrows: I80F48;
-  public cachedIndexedTotalDeposits: I80F48;
-  public cachedIndexedTotalBorrows: I80F48;
   public avgUtilization: I80F48;
   public adjustmentFactor: I80F48;
   public maxRate: I80F48;
@@ -51,16 +72,16 @@ export class Bank implements BankForHealth {
   static from(
     publicKey: PublicKey,
     obj: {
+      // TODO: rearrange fields to have same order as in bank.rs
       group: PublicKey;
       name: number[];
       mint: PublicKey;
       vault: PublicKey;
       oracle: PublicKey;
-      oracleConfig: OracleConfig;
+      oracleConfig: OracleConfigDto;
+      stablePriceModel: StablePriceModel;
       depositIndex: I80F48Dto;
       borrowIndex: I80F48Dto;
-      cachedIndexedTotalDeposits: I80F48Dto;
-      cachedIndexedTotalBorrows: I80F48Dto;
       indexedDeposits: I80F48Dto;
       indexedBorrows: I80F48Dto;
       indexLastUpdated: BN;
@@ -73,8 +94,8 @@ export class Bank implements BankForHealth {
       rate1: I80F48Dto;
       maxRate: I80F48Dto;
       collectedFeesNative: I80F48Dto;
-      loanFeeRate: I80F48Dto;
       loanOriginationFeeRate: I80F48Dto;
+      loanFeeRate: I80F48Dto;
       maintAssetWeight: I80F48Dto;
       initAssetWeight: I80F48Dto;
       maintLiabWeight: I80F48Dto;
@@ -86,20 +107,26 @@ export class Bank implements BankForHealth {
       tokenIndex: number;
       mintDecimals: number;
       bankNum: number;
+      minVaultToDepositsRatio: number;
+      netBorrowLimitWindowSizeTs: BN;
+      lastNetBorrowsWindowStartTs: BN;
+      netBorrowLimitPerWindowQuote: BN;
+      netBorrowsInWindow: BN;
+      borrowWeightScaleStartQuote: number;
+      depositWeightScaleStartQuote: number;
     },
   ): Bank {
     return new Bank(
       publicKey,
-      obj.name,
       obj.group,
+      obj.name,
       obj.mint,
       obj.vault,
       obj.oracle,
       obj.oracleConfig,
+      obj.stablePriceModel,
       obj.depositIndex,
       obj.borrowIndex,
-      obj.cachedIndexedTotalDeposits,
-      obj.cachedIndexedTotalBorrows,
       obj.indexedDeposits,
       obj.indexedBorrows,
       obj.indexLastUpdated,
@@ -112,8 +139,8 @@ export class Bank implements BankForHealth {
       obj.rate1,
       obj.maxRate,
       obj.collectedFeesNative,
-      obj.loanFeeRate,
       obj.loanOriginationFeeRate,
+      obj.loanFeeRate,
       obj.maintAssetWeight,
       obj.initAssetWeight,
       obj.maintLiabWeight,
@@ -125,21 +152,27 @@ export class Bank implements BankForHealth {
       obj.tokenIndex as TokenIndex,
       obj.mintDecimals,
       obj.bankNum,
+      obj.minVaultToDepositsRatio,
+      obj.netBorrowLimitWindowSizeTs,
+      obj.lastNetBorrowsWindowStartTs,
+      obj.netBorrowLimitPerWindowQuote,
+      obj.netBorrowsInWindow,
+      obj.borrowWeightScaleStartQuote,
+      obj.depositWeightScaleStartQuote,
     );
   }
 
   constructor(
     public publicKey: PublicKey,
-    name: number[],
     public group: PublicKey,
+    name: number[],
     public mint: PublicKey,
     public vault: PublicKey,
     public oracle: PublicKey,
-    oracleConfig: OracleConfig,
+    oracleConfig: OracleConfigDto,
+    public stablePriceModel: StablePriceModel,
     depositIndex: I80F48Dto,
     borrowIndex: I80F48Dto,
-    indexedTotalDeposits: I80F48Dto,
-    indexedTotalBorrows: I80F48Dto,
     indexedDeposits: I80F48Dto,
     indexedBorrows: I80F48Dto,
     public indexLastUpdated: BN,
@@ -152,8 +185,8 @@ export class Bank implements BankForHealth {
     rate1: I80F48Dto,
     maxRate: I80F48Dto,
     collectedFeesNative: I80F48Dto,
-    loanFeeRate: I80F48Dto,
     loanOriginationFeeRate: I80F48Dto,
+    loanFeeRate: I80F48Dto,
     maintAssetWeight: I80F48Dto,
     initAssetWeight: I80F48Dto,
     maintLiabWeight: I80F48Dto,
@@ -165,14 +198,23 @@ export class Bank implements BankForHealth {
     public tokenIndex: TokenIndex,
     public mintDecimals: number,
     public bankNum: number,
+    minVaultToDepositsRatio: number,
+    netBorrowLimitWindowSizeTs: BN,
+    lastNetBorrowsWindowStartTs: BN,
+    netBorrowLimitPerWindowQuote: BN,
+    netBorrowsInWindow: BN,
+    public borrowWeightScaleStartQuote: number,
+    public depositWeightScaleStartQuote: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
+    this.oracleConfig = {
+      confFilter: I80F48.from(oracleConfig.confFilter),
+      maxStalenessSlots: oracleConfig.maxStalenessSlots,
+    } as OracleConfig;
     this.depositIndex = I80F48.from(depositIndex);
     this.borrowIndex = I80F48.from(borrowIndex);
     this.indexedDeposits = I80F48.from(indexedDeposits);
     this.indexedBorrows = I80F48.from(indexedBorrows);
-    this.cachedIndexedTotalDeposits = I80F48.from(indexedTotalDeposits);
-    this.cachedIndexedTotalBorrows = I80F48.from(indexedTotalBorrows);
     this.avgUtilization = I80F48.from(avgUtilization);
     this.adjustmentFactor = I80F48.from(adjustmentFactor);
     this.maxRate = I80F48.from(maxRate);
@@ -220,10 +262,6 @@ export class Bank implements BankForHealth {
       this.indexedDeposits.toString() +
       '\n indexedBorrows - ' +
       this.indexedBorrows.toString() +
-      '\n cachedIndexedTotalDeposits - ' +
-      this.cachedIndexedTotalDeposits.toString() +
-      '\n cachedIndexedTotalBorrows - ' +
-      this.cachedIndexedTotalBorrows.toString() +
       '\n indexLastUpdated - ' +
       new Date(this.indexLastUpdated.toNumber() * 1000) +
       '\n bankRateLastUpdated - ' +
@@ -264,6 +302,28 @@ export class Bank implements BankForHealth {
       this.getDepositRate().toString() +
       '\n getBorrowRate() - ' +
       this.getBorrowRate().toString()
+    );
+  }
+
+  scaledInitAssetWeight(): I80F48 {
+    const depositsQuote = this.nativeDeposits().mul(this.price);
+    if (
+      depositsQuote.lte(I80F48.fromNumber(this.depositWeightScaleStartQuote))
+    ) {
+      return this.initAssetWeight;
+    }
+    return this.initAssetWeight.mul(
+      I80F48.fromNumber(this.depositWeightScaleStartQuote).div(depositsQuote),
+    );
+  }
+
+  scaledInitLiabWeight(): I80F48 {
+    const borrowsQuote = this.nativeBorrows().mul(this.price);
+    if (borrowsQuote.lte(I80F48.fromNumber(this.borrowWeightScaleStartQuote))) {
+      return this.initLiabWeight;
+    }
+    return this.initLiabWeight.mul(
+      borrowsQuote.div(I80F48.fromNumber(this.borrowWeightScaleStartQuote)),
     );
   }
 

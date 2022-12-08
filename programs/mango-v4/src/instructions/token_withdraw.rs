@@ -93,16 +93,24 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         amount
     };
 
-    require!(
-        allow_borrow || amount <= native_position,
-        MangoError::SomeError
-    );
+    let is_borrow = amount > native_position;
+    require!(allow_borrow || !is_borrow, MangoError::SomeError);
 
     let amount_i80f48 = I80F48::from(amount);
 
+    let now_slot = Clock::get()?.slot;
+    let oracle_price = bank.oracle_price(
+        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        Some(now_slot),
+    )?;
+
     // Update the bank and position
-    let (position_is_active, loan_origination_fee) =
-        bank.withdraw_with_fee(position, amount_i80f48)?;
+    let (position_is_active, loan_origination_fee) = bank.withdraw_with_fee(
+        position,
+        amount_i80f48,
+        Clock::get()?.unix_timestamp.try_into().unwrap(),
+        oracle_price,
+    )?;
 
     // Provide a readable error message in case the vault doesn't have enough tokens
     if ctx.accounts.vault.amount < amount {
@@ -122,7 +130,6 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     )?;
 
     let native_position_after = position.native(&bank);
-    let oracle_price = bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
 
     emit!(TokenBalanceLog {
         mango_group: ctx.accounts.group.key(),
@@ -141,8 +148,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     // Health check
     //
     if let Some((mut health_cache, pre_health)) = pre_health_opt {
-        health_cache
-            .adjust_token_balance(token_index, cm!(native_position_after - native_position))?;
+        health_cache.adjust_token_balance(&bank, cm!(native_position_after - native_position))?;
         account.check_health_post(&health_cache, pre_health)?;
     }
 
@@ -172,6 +178,22 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             loan_origination_fee: loan_origination_fee.to_bits(),
             instruction: LoanOriginationFeeInstruction::TokenWithdraw,
         });
+    }
+
+    // Prevent borrowing away the full bank vault. Keep some in reserve to satisfy non-borrow withdraws
+    let bank_native_deposits = bank.native_deposits();
+    if bank_native_deposits != I80F48::ZERO && is_borrow {
+        ctx.accounts.vault.reload()?;
+        let bank_native_deposits: f64 = bank_native_deposits.checked_to_num().unwrap();
+        let vault_amount = ctx.accounts.vault.amount as f64;
+        if vault_amount < bank.min_vault_to_deposits_ratio * bank_native_deposits {
+            return err!(MangoError::BankBorrowLimitReached).with_context(|| {
+                format!(
+                    "vault_amount ({:?}) below min_vault_to_deposits_ratio * bank_native_deposits ({:?})",
+                    vault_amount, bank.min_vault_to_deposits_ratio * bank_native_deposits,
+                )
+            });
+        }
     }
 
     Ok(())

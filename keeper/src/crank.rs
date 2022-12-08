@@ -19,11 +19,15 @@ use tokio::time;
 pub async fn runner(
     mango_client: Arc<MangoClient>,
     debugging_handle: impl Future,
+    interval_update_banks: u64,
+    interval_consume_events: u64,
+    interval_update_funding: u64,
 ) -> Result<(), anyhow::Error> {
     let handles1 = mango_client
         .context
         .tokens
         .keys()
+        // TODO: grouping tokens whose oracle might have less confidencen e.g. ORCA with the rest, fails whole ix
         // TokenUpdateIndexAndRate is known to take max 71k cu
         // from cargo test-bpf local tests
         // chunk size of 8 seems to be max before encountering "VersionedTransaction too large" issues
@@ -33,6 +37,7 @@ pub async fn runner(
             loop_update_index_and_rate(
                 mango_client.clone(),
                 chunk.copied().collect::<Vec<TokenIndex>>(),
+                interval_update_banks,
             )
         })
         .collect::<Vec<_>>();
@@ -41,14 +46,28 @@ pub async fn runner(
         .context
         .perp_markets
         .values()
-        .map(|perp| loop_consume_events(mango_client.clone(), perp.address, perp.market))
+        .map(|perp| {
+            loop_consume_events(
+                mango_client.clone(),
+                perp.address,
+                perp.market,
+                interval_consume_events,
+            )
+        })
         .collect::<Vec<_>>();
 
     let handles3 = mango_client
         .context
         .perp_markets
         .values()
-        .map(|perp| loop_update_funding(mango_client.clone(), perp.address, perp.market))
+        .map(|perp| {
+            loop_update_funding(
+                mango_client.clone(),
+                perp.address,
+                perp.market,
+                interval_update_funding,
+            )
+        })
         .collect::<Vec<_>>();
 
     futures::join!(
@@ -64,8 +83,9 @@ pub async fn runner(
 pub async fn loop_update_index_and_rate(
     mango_client: Arc<MangoClient>,
     token_indices: Vec<TokenIndex>,
+    interval: u64,
 ) {
-    let mut interval = time::interval(Duration::from_secs(60));
+    let mut interval = time::interval(Duration::from_secs(interval));
     loop {
         interval.tick().await;
 
@@ -154,8 +174,9 @@ pub async fn loop_consume_events(
     mango_client: Arc<MangoClient>,
     pk: Pubkey,
     perp_market: PerpMarket,
+    interval: u64,
 ) {
-    let mut interval = time::interval(Duration::from_secs(5));
+    let mut interval = time::interval(Duration::from_secs(interval));
     loop {
         interval.tick().await;
 
@@ -271,8 +292,9 @@ pub async fn loop_update_funding(
     mango_client: Arc<MangoClient>,
     pk: Pubkey,
     perp_market: PerpMarket,
+    interval: u64,
 ) {
-    let mut interval = time::interval(Duration::from_secs(5));
+    let mut interval = time::interval(Duration::from_secs(interval));
     loop {
         interval.tick().await;
 
@@ -288,8 +310,8 @@ pub async fn loop_update_funding(
                         &mango_v4::accounts::PerpUpdateFunding {
                             group: perp_market.group,
                             perp_market: pk,
-                            asks: perp_market.asks,
                             bids: perp_market.bids,
+                            asks: perp_market.asks,
                             oracle: perp_market.oracle,
                         },
                         None,

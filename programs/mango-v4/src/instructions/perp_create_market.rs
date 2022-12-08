@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
+use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
 use crate::state::*;
 use crate::util::fill_from_str;
@@ -50,7 +51,7 @@ pub fn perp_create_market(
     settle_token_index: TokenIndex,
     perp_market_index: PerpMarketIndex,
     name: String,
-    oracle_config: OracleConfig,
+    oracle_config: OracleConfigParams,
     base_decimals: u8,
     quote_lot_size: i64,
     base_lot_size: i64,
@@ -70,6 +71,8 @@ pub fn perp_create_market(
     settle_fee_flat: f32,
     settle_fee_amount_threshold: f32,
     settle_fee_fraction_low_health: f32,
+    settle_pnl_limit_factor: f32,
+    settle_pnl_limit_window_size_ts: u64,
 ) -> Result<()> {
     // Settlement tokens that aren't USDC aren't fully implemented, the main missing steps are:
     // - In health: the perp health needs to be adjusted by the settlement token weights.
@@ -82,55 +85,65 @@ pub fn perp_create_market(
         "settlement tokens != USDC are not fully implemented"
     );
 
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+
     let mut perp_market = ctx.accounts.perp_market.load_init()?;
     *perp_market = PerpMarket {
         group: ctx.accounts.group.key(),
         settle_token_index,
         perp_market_index,
-        group_insurance_fund: if group_insurance_fund { 1 } else { 0 },
-        trusted_market: if trusted_market { 1 } else { 0 },
+        trusted_market: u8::from(trusted_market),
+        group_insurance_fund: u8::from(group_insurance_fund),
+        bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
+        base_decimals,
         name: fill_from_str(&name)?,
-        oracle: ctx.accounts.oracle.key(),
-        oracle_config,
         bids: ctx.accounts.bids.key(),
         asks: ctx.accounts.asks.key(),
         event_queue: ctx.accounts.event_queue.key(),
+        oracle: ctx.accounts.oracle.key(),
+        oracle_config: oracle_config.to_oracle_config(),
+        stable_price_model: StablePriceModel::default(),
         quote_lot_size,
         base_lot_size,
         maint_asset_weight: I80F48::from_num(maint_asset_weight),
         init_asset_weight: I80F48::from_num(init_asset_weight),
         maint_liab_weight: I80F48::from_num(maint_liab_weight),
         init_liab_weight: I80F48::from_num(init_liab_weight),
-        liquidation_fee: I80F48::from_num(liquidation_fee),
-        maker_fee: I80F48::from_num(maker_fee),
-        taker_fee: I80F48::from_num(taker_fee),
+        open_interest: 0,
+        seq_num: 0,
+        registration_time: now_ts,
         min_funding: I80F48::from_num(min_funding),
         max_funding: I80F48::from_num(max_funding),
         impact_quantity,
         long_funding: I80F48::ZERO,
         short_funding: I80F48::ZERO,
-        funding_last_updated: Clock::get()?.unix_timestamp,
-        open_interest: 0,
-        seq_num: 0,
+        funding_last_updated: now_ts,
+        liquidation_fee: I80F48::from_num(liquidation_fee),
+        maker_fee: I80F48::from_num(maker_fee),
+        taker_fee: I80F48::from_num(taker_fee),
         fees_accrued: I80F48::ZERO,
         fees_settled: I80F48::ZERO,
-        bump: *ctx.bumps.get("perp_market").ok_or(MangoError::SomeError)?,
-        base_decimals,
-        registration_time: Clock::get()?.unix_timestamp,
-        padding1: Default::default(),
-        padding2: Default::default(),
         fee_penalty,
         settle_fee_flat,
         settle_fee_amount_threshold,
         settle_fee_fraction_low_health,
-        reserved: [0; 92],
+        settle_pnl_limit_factor,
+        padding3: Default::default(),
+        settle_pnl_limit_window_size_ts,
+        reserved: [0; 1944],
     };
 
-    let mut bids = ctx.accounts.bids.load_init()?;
-    bids.book_side_type = BookSideType::Bids;
+    let oracle_price =
+        perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
+    perp_market
+        .stable_price_model
+        .reset_to_price(oracle_price.to_num(), now_ts);
 
-    let mut asks = ctx.accounts.asks.load_init()?;
-    asks.book_side_type = BookSideType::Asks;
+    let mut orderbook = Orderbook {
+        bids: ctx.accounts.bids.load_init()?,
+        asks: ctx.accounts.asks.load_init()?,
+    };
+    orderbook.init();
 
     emit!(PerpMarketMetaDataLog {
         mango_group: ctx.accounts.group.key(),

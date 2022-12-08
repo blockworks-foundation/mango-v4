@@ -6,7 +6,8 @@ import { MangoAccount } from '../../accounts/mangoAccount';
 import { PerpMarket, PerpOrderSide, PerpOrderType } from '../../accounts/perp';
 import { MangoClient } from '../../client';
 import { MANGO_V4_ID } from '../../constants';
-import { toUiDecimalsForQuote } from '../../utils';
+import { ZERO_I80F48 } from '../../numbers/I80F48';
+import { toNativeI80F48, toUiDecimalsForQuote } from '../../utils';
 
 // For easy switching between mainnet and devnet, default is mainnet
 const CLUSTER: Cluster =
@@ -16,6 +17,89 @@ const CLUSTER_URL =
 const USER_KEYPAIR =
   process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
 const MANGO_ACCOUNT_PK = process.env.MANGO_ACCOUNT_PK || '';
+
+async function settlePnl(
+  mangoAccount: MangoAccount,
+  perpMarket: PerpMarket,
+  client: MangoClient,
+  group: Group,
+) {
+  if (!mangoAccount.perpPositionExistsForMarket(perpMarket)) {
+    return;
+  }
+
+  const pp = mangoAccount
+    .perpActive()
+    .find((pp) => pp.marketIndex === perpMarket.perpMarketIndex)!;
+  const pnl = pp.getPnl(perpMarket);
+
+  console.log(
+    `Avg entry price - ${pp.getAverageEntryPriceUi(
+      perpMarket,
+    )}, Breakeven price - ${pp.getBreakEvenPriceUi(perpMarket)}`,
+  );
+
+  let profitableAccount, unprofitableAccount;
+
+  if (pnl.abs().gt(toNativeI80F48(1, 6))) {
+    console.log(`- Settling pnl ${toUiDecimalsForQuote(pnl)} ...`);
+  } else {
+    console.log(
+      `- Skipping Settling pnl ${toUiDecimalsForQuote(pnl)}, too small`,
+    );
+    return;
+  }
+
+  if (pnl.gt(ZERO_I80F48())) {
+    console.log(`- Settling profit pnl...`);
+    profitableAccount = mangoAccount;
+    const candidates = await perpMarket.getSettlePnlCandidates(
+      client,
+      group,
+      'negative',
+    );
+    if (candidates.length === 0) {
+      return;
+    }
+    unprofitableAccount = candidates[0].account;
+    const sig = await client.perpSettlePnl(
+      group,
+      profitableAccount,
+      unprofitableAccount,
+      mangoAccount,
+      perpMarket.perpMarketIndex,
+    );
+    console.log(
+      `- Settled pnl, sig https://explorer.solana.com/tx/${sig}?cluster=${
+        CLUSTER == 'devnet' ? 'devnet' : ''
+      }`,
+    );
+  } else if (pnl.lt(ZERO_I80F48())) {
+    unprofitableAccount = mangoAccount;
+    const candidates = await perpMarket.getSettlePnlCandidates(
+      client,
+      group,
+      'positive',
+    );
+    if (candidates.length === 0) {
+      return;
+    }
+    profitableAccount = candidates[0].account;
+    console.log(`- Settling loss pnl...`);
+    let sig = await client.perpSettlePnl(
+      group,
+      profitableAccount,
+      unprofitableAccount,
+      mangoAccount,
+      perpMarket.perpMarketIndex,
+    );
+    console.log(
+      `- Settled pnl, sig https://explorer.solana.com/tx/${sig}?cluster=${
+        CLUSTER == 'devnet' ? 'devnet' : ''
+      }`,
+    );
+  }
+}
 
 async function takeOrder(
   client: MangoClient,
@@ -32,7 +116,7 @@ async function takeOrder(
       ? perpMarket.uiPrice * 1.01
       : perpMarket.uiPrice * 0.99;
   console.log(
-    `${perpMarket.name} taking with a ${
+    `- ${perpMarket.name} taking with a ${
       side === PerpOrderSide.bid ? 'bid' : 'ask'
     } at  price ${price.toFixed(4)} and size ${size.toFixed(6)}`,
   );
@@ -40,7 +124,7 @@ async function takeOrder(
   const oldPosition = mangoAccount.getPerpPosition(perpMarket.perpMarketIndex);
   if (oldPosition) {
     console.log(
-      `- before base: ${perpMarket.baseLotsToUi(
+      `-- before base: ${perpMarket.baseLotsToUi(
         oldPosition.basePositionLots,
       )}, quote: ${toUiDecimalsForQuote(oldPosition.quotePositionNative)}`,
     );
@@ -56,6 +140,7 @@ async function takeOrder(
     undefined,
     Date.now(),
     PerpOrderType.market,
+    false,
     0,
     10,
   );
@@ -66,7 +151,7 @@ async function takeOrder(
   const newPosition = mangoAccount.getPerpPosition(perpMarket.perpMarketIndex);
   if (newPosition) {
     console.log(
-      `- after base: ${perpMarket.baseLotsToUi(
+      `-- after base: ${perpMarket.baseLotsToUi(
         newPosition.basePositionLots,
       )}, quote: ${toUiDecimalsForQuote(newPosition.quotePositionNative)}`,
     );
@@ -86,8 +171,9 @@ async function main() {
     userProvider,
     CLUSTER,
     MANGO_V4_ID[CLUSTER],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
 
   // Load mango account
@@ -103,6 +189,11 @@ async function main() {
   // Take on OB
   const perpMarket = group.getPerpMarketByName('BTC-PERP');
   while (true) {
+    await group.reloadAll(client);
+
+    // Settle pnl
+    await settlePnl(mangoAccount, perpMarket, client, group);
+
     await takeOrder(client, group, mangoAccount, perpMarket, PerpOrderSide.bid);
     await takeOrder(client, group, mangoAccount, perpMarket, PerpOrderSide.ask);
   }

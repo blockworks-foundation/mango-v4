@@ -56,8 +56,9 @@ async function main() {
     userProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
@@ -155,7 +156,7 @@ async function main() {
     await client.tokenEdit(
       group,
       buyMint,
-      null,
+      group.getFirstBankByMint(buyMint).oracle,
       null,
       null,
       null,
@@ -163,6 +164,16 @@ async function main() {
       null,
       1.0,
       1.0,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
       null,
       null,
       null,
@@ -187,7 +198,7 @@ async function main() {
       await client.tokenEdit(
         group,
         buyMint,
-        null,
+        group.getFirstBankByMint(buyMint).oracle,
         null,
         null,
         null,
@@ -195,6 +206,16 @@ async function main() {
         null,
         0.9,
         0.8,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
         null,
         null,
         null,
@@ -237,6 +258,7 @@ async function main() {
         0.044, // ui quote quantity
         4200,
         PerpOrderType.limit,
+        false,
         0,
         5,
       );
@@ -280,6 +302,7 @@ async function main() {
         0.044, // ui quote quantity
         4200,
         PerpOrderType.limit,
+        false,
         0,
         5,
       );
@@ -294,6 +317,7 @@ async function main() {
         0.044, // ui quote quantity
         4200,
         PerpOrderType.market,
+        false,
         0,
         5,
       );
@@ -357,6 +381,7 @@ async function main() {
         0.022, // ui quote quantity
         4200,
         PerpOrderType.limit,
+        false,
         0,
         5,
       );
@@ -370,6 +395,7 @@ async function main() {
         0.022, // ui quote quantity
         4200,
         PerpOrderType.market,
+        false,
         0,
         5,
       );
@@ -390,6 +416,7 @@ async function main() {
         0.044, // ui quote quantity
         4201,
         PerpOrderType.limit,
+        false,
         0,
         5,
       );
@@ -403,6 +430,7 @@ async function main() {
         0.044, // ui quote quantity
         4201,
         PerpOrderType.market,
+        false,
         0,
         5,
       );

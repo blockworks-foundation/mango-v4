@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
 
 use crate::error::MangoError;
-use crate::state::{AccountLoaderDynamic, Book, BookSide, Group, MangoAccount, PerpMarket, Side};
+use crate::state::{
+    AccountLoaderDynamic, BookSide, Group, MangoAccount, Orderbook, PerpMarket, Side,
+};
 
 #[derive(Accounts)]
 pub struct PerpCancelAllOrdersBySide<'info> {
@@ -15,13 +17,13 @@ pub struct PerpCancelAllOrdersBySide<'info> {
         mut,
         has_one = group,
         has_one = bids,
-        has_one = asks
+        has_one = asks,
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]
-    pub asks: AccountLoader<'info, BookSide>,
-    #[account(mut)]
     pub bids: AccountLoader<'info, BookSide>,
+    #[account(mut)]
+    pub asks: AccountLoader<'info, BookSide>,
 }
 
 pub fn perp_cancel_all_orders_by_side(
@@ -37,9 +39,10 @@ pub fn perp_cancel_all_orders_by_side(
     );
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
-    let bids = ctx.accounts.bids.load_mut()?;
-    let asks = ctx.accounts.asks.load_mut()?;
-    let mut book = Book::new(bids, asks);
+    let mut book = Orderbook {
+        bids: ctx.accounts.bids.load_init()?,
+        asks: ctx.accounts.asks.load_init()?,
+    };
 
     book.cancel_all_orders(
         &mut account.borrow_mut(),

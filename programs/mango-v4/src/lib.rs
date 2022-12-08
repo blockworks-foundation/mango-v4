@@ -3,6 +3,7 @@ use fixed::types::I80F48;
 #[macro_use]
 pub mod util;
 
+extern crate core;
 extern crate static_assertions;
 
 use anchor_lang::prelude::*;
@@ -13,21 +14,21 @@ pub mod accounts_zerocopy;
 pub mod address_lookup_table_program;
 pub mod error;
 pub mod events;
+pub mod i80f48;
 pub mod instructions;
 pub mod logs;
 pub mod serum3_cpi;
 pub mod state;
 pub mod types;
 
-use state::{OracleConfig, OrderType, PerpMarketIndex, Serum3MarketIndex, Side, TokenIndex};
+use state::{
+    OracleConfigParams, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side, TokenIndex,
+};
 
-declare_id!("m43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD");
+declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
 
 #[program]
 pub mod mango_v4 {
-
-    use crate::state::OracleConfig;
-
     use super::*;
 
     pub fn group_create(
@@ -64,7 +65,7 @@ pub mod mango_v4 {
         ctx: Context<TokenRegister>,
         token_index: TokenIndex,
         name: String,
-        oracle_config: OracleConfig,
+        oracle_config: OracleConfigParams,
         interest_rate_params: InterestRateParams,
         loan_fee_rate: f32,
         loan_origination_fee_rate: f32,
@@ -73,6 +74,9 @@ pub mod mango_v4 {
         maint_liab_weight: f32,
         init_liab_weight: f32,
         liquidation_fee: f32,
+        min_vault_to_deposits_ratio: f64,
+        net_borrow_limit_window_size_ts: u64,
+        net_borrow_limit_per_window_quote: i64,
     ) -> Result<()> {
         instructions::token_register(
             ctx,
@@ -87,6 +91,9 @@ pub mod mango_v4 {
             maint_liab_weight,
             init_liab_weight,
             liquidation_fee,
+            min_vault_to_deposits_ratio,
+            net_borrow_limit_window_size_ts,
+            net_borrow_limit_per_window_quote,
         )
     }
 
@@ -102,7 +109,7 @@ pub mod mango_v4 {
     pub fn token_edit(
         ctx: Context<TokenEdit>,
         oracle_opt: Option<Pubkey>,
-        oracle_config_opt: Option<OracleConfig>,
+        oracle_config_opt: Option<OracleConfigParams>,
         group_insurance_fund_opt: Option<bool>,
         interest_rate_params_opt: Option<InterestRateParams>,
         loan_fee_rate_opt: Option<f32>,
@@ -112,6 +119,16 @@ pub mod mango_v4 {
         maint_liab_weight_opt: Option<f32>,
         init_liab_weight_opt: Option<f32>,
         liquidation_fee_opt: Option<f32>,
+        stable_price_delay_interval_seconds_opt: Option<u32>,
+        stable_price_delay_growth_limit_opt: Option<f32>,
+        stable_price_growth_limit_opt: Option<f32>,
+        min_vault_to_deposits_ratio_opt: Option<f64>,
+        net_borrow_limit_per_window_quote_opt: Option<i64>,
+        net_borrow_limit_window_size_ts_opt: Option<u64>,
+        borrow_weight_scale_start_quote_opt: Option<f64>,
+        deposit_weight_scale_start_quote_opt: Option<f64>,
+        reset_stable_price: bool,
+        reset_net_borrow_limit: bool,
     ) -> Result<()> {
         instructions::token_edit(
             ctx,
@@ -126,6 +143,16 @@ pub mod mango_v4 {
             maint_liab_weight_opt,
             init_liab_weight_opt,
             liquidation_fee_opt,
+            stable_price_delay_interval_seconds_opt,
+            stable_price_delay_growth_limit_opt,
+            stable_price_growth_limit_opt,
+            min_vault_to_deposits_ratio_opt,
+            net_borrow_limit_per_window_quote_opt,
+            net_borrow_limit_window_size_ts_opt,
+            borrow_weight_scale_start_quote_opt,
+            deposit_weight_scale_start_quote_opt,
+            reset_stable_price,
+            reset_net_borrow_limit,
         )
     }
 
@@ -256,8 +283,6 @@ pub mod mango_v4 {
     /// Serum
     ///
 
-    // TODO deposit/withdraw msrm
-
     pub fn serum3_register_market(
         ctx: Context<Serum3RegisterMarket>,
         market_index: Serum3MarketIndex,
@@ -384,7 +409,7 @@ pub mod mango_v4 {
         ctx: Context<PerpCreateMarket>,
         perp_market_index: PerpMarketIndex,
         name: String,
-        oracle_config: OracleConfig,
+        oracle_config: OracleConfigParams,
         base_decimals: u8,
         quote_lot_size: i64,
         base_lot_size: i64,
@@ -405,6 +430,8 @@ pub mod mango_v4 {
         settle_fee_amount_threshold: f32,
         settle_fee_fraction_low_health: f32,
         settle_token_index: TokenIndex,
+        settle_pnl_limit_factor: f32,
+        settle_pnl_limit_window_size_ts: u64,
     ) -> Result<()> {
         instructions::perp_create_market(
             ctx,
@@ -431,6 +458,8 @@ pub mod mango_v4 {
             settle_fee_flat,
             settle_fee_amount_threshold,
             settle_fee_fraction_low_health,
+            settle_pnl_limit_factor,
+            settle_pnl_limit_window_size_ts,
         )
     }
 
@@ -438,7 +467,7 @@ pub mod mango_v4 {
     pub fn perp_edit_market(
         ctx: Context<PerpEditMarket>,
         oracle_opt: Option<Pubkey>,
-        oracle_config_opt: Option<OracleConfig>,
+        oracle_config_opt: Option<OracleConfigParams>,
         base_decimals_opt: Option<u8>,
         maint_asset_weight_opt: Option<f32>,
         init_asset_weight_opt: Option<f32>,
@@ -456,6 +485,11 @@ pub mod mango_v4 {
         settle_fee_flat_opt: Option<f32>,
         settle_fee_amount_threshold_opt: Option<f32>,
         settle_fee_fraction_low_health_opt: Option<f32>,
+        stable_price_delay_interval_seconds_opt: Option<u32>,
+        stable_price_delay_growth_limit_opt: Option<f32>,
+        stable_price_growth_limit_opt: Option<f32>,
+        settle_pnl_limit_factor_opt: Option<f32>,
+        settle_pnl_limit_window_size_ts: Option<u64>,
     ) -> Result<()> {
         instructions::perp_edit_market(
             ctx,
@@ -478,14 +512,17 @@ pub mod mango_v4 {
             settle_fee_flat_opt,
             settle_fee_amount_threshold_opt,
             settle_fee_fraction_low_health_opt,
+            stable_price_delay_interval_seconds_opt,
+            stable_price_delay_growth_limit_opt,
+            stable_price_growth_limit_opt,
+            settle_pnl_limit_factor_opt,
+            settle_pnl_limit_window_size_ts,
         )
     }
 
     pub fn perp_close_market(ctx: Context<PerpCloseMarket>) -> Result<()> {
         instructions::perp_close_market(ctx)
     }
-
-    // TODO perp_change_perp_market_params
 
     pub fn perp_deactivate_position(ctx: Context<PerpDeactivatePosition>) -> Result<()> {
         instructions::perp_deactivate_position(ctx)
@@ -495,28 +532,129 @@ pub mod mango_v4 {
     pub fn perp_place_order(
         ctx: Context<PerpPlaceOrder>,
         side: Side,
+
+        // The price in lots (quote lots per base lots)
+        // - fill orders on the book up to this price or
+        // - place an order on the book at this price.
+        // - ignored for Market orders and potentially adjusted for PostOnlySlide orders.
         price_lots: i64,
+
         max_base_lots: i64,
         max_quote_lots: i64,
         client_order_id: u64,
-        order_type: OrderType,
+        order_type: PlaceOrderType,
+        reduce_only: bool,
+
+        // Timestamp of when order expires
+        //
+        // Send 0 if you want the order to never expire.
+        // Timestamps in the past mean the instruction is skipped.
+        // Timestamps in the future are reduced to now + 65535s.
         expiry_timestamp: u64,
+
+        // Maximum number of orders from the book to fill.
+        //
+        // Use this to limit compute used during order matching.
+        // When the limit is reached, processing stops and the instruction succeeds.
         limit: u8,
     ) -> Result<()> {
-        instructions::perp_place_order(
-            ctx,
+        require_gte!(price_lots, 0);
+
+        use crate::state::{Order, OrderParams};
+        let time_in_force = match Order::tif_from_expiry(expiry_timestamp) {
+            Some(t) => t,
+            None => {
+                msg!("Order is already expired");
+                return Ok(());
+            }
+        };
+        let order = Order {
             side,
-            price_lots,
             max_base_lots,
             max_quote_lots,
             client_order_id,
-            order_type,
-            expiry_timestamp,
-            limit,
-        )
+            reduce_only,
+            time_in_force,
+            params: match order_type {
+                PlaceOrderType::Market => OrderParams::Market,
+                PlaceOrderType::ImmediateOrCancel => OrderParams::ImmediateOrCancel { price_lots },
+                _ => OrderParams::Fixed {
+                    price_lots,
+                    order_type: order_type.to_post_order_type()?,
+                },
+            },
+        };
+        instructions::perp_place_order(ctx, order, limit)
     }
 
-    pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: i128) -> Result<()> {
+    #[allow(clippy::too_many_arguments)]
+    pub fn perp_place_order_pegged(
+        ctx: Context<PerpPlaceOrder>,
+        side: Side,
+
+        // The adjustment from the oracle price, in lots (quote lots per base lots).
+        // Orders on the book may be filled at oracle + adjustment (depends on order type).
+        price_offset_lots: i64,
+
+        // The limit at which the pegged order shall expire.
+        // May be -1 to denote no peg limit.
+        //
+        // Example: An bid pegged to -20 with peg_limit 100 would expire if the oracle hits 121.
+        peg_limit: i64,
+
+        max_base_lots: i64,
+        max_quote_lots: i64,
+        client_order_id: u64,
+        order_type: PlaceOrderType,
+        reduce_only: bool,
+
+        // Timestamp of when order expires
+        //
+        // Send 0 if you want the order to never expire.
+        // Timestamps in the past mean the instruction is skipped.
+        // Timestamps in the future are reduced to now + 65535s.
+        expiry_timestamp: u64,
+
+        // Maximum number of orders from the book to fill.
+        //
+        // Use this to limit compute used during order matching.
+        // When the limit is reached, processing stops and the instruction succeeds.
+        limit: u8,
+
+        // Oracle staleness limit, in slots. Set to -1 to disable.
+        //
+        // WARNING: Not currently implemented.
+        max_oracle_staleness_slots: i32,
+    ) -> Result<()> {
+        require_gte!(peg_limit, -1);
+        require_eq!(max_oracle_staleness_slots, -1); // unimplemented
+
+        use crate::state::{Order, OrderParams};
+        let time_in_force = match Order::tif_from_expiry(expiry_timestamp) {
+            Some(t) => t,
+            None => {
+                msg!("Order is already expired");
+                return Ok(());
+            }
+        };
+        let order = Order {
+            side,
+            max_base_lots,
+            max_quote_lots,
+            client_order_id,
+            reduce_only,
+            time_in_force,
+            params: OrderParams::OraclePegged {
+                price_offset_lots,
+                order_type: order_type.to_post_order_type()?,
+                peg_limit,
+                max_oracle_staleness_slots,
+            },
+        };
+        instructions::perp_place_order(ctx, order, limit)
+    }
+
+    pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: u128) -> Result<()> {
         instructions::perp_cancel_order(ctx, order_id)
     }
 

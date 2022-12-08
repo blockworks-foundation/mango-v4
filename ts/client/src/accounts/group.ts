@@ -14,7 +14,7 @@ import {
 } from '@solana/web3.js';
 import BN from 'bn.js';
 import { MangoClient } from '../client';
-import { SERUM3_PROGRAM_ID } from '../constants';
+import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
 import { I80F48, ONE_I80F48 } from '../numbers/I80F48';
 import { toNative, toNativeI80F48, toUiDecimals } from '../utils';
@@ -95,17 +95,7 @@ export class Group {
     public vaultAmountsMap: Map<string, BN>,
   ) {}
 
-  public async reloadAll(client: MangoClient): Promise<void> {
-    let ids: Id | undefined = undefined;
-
-    if (client.idsSource === 'api') {
-      ids = await Id.fromApi(this.publicKey);
-    } else if (client.idsSource === 'static') {
-      ids = Id.fromIdsByPk(this.publicKey);
-    } else {
-      ids = undefined;
-    }
-
+  public async reloadAll(client: MangoClient, ids?: Id): Promise<void> {
     // console.time('group.reload');
     await Promise.all([
       this.reloadAlts(client),
@@ -235,7 +225,7 @@ export class Group {
           client.program.provider.connection,
           serum3Market.serumMarketExternal,
           { commitment: client.program.provider.connection.commitment },
-          SERUM3_PROGRAM_ID[client.cluster],
+          OPENBOOK_PROGRAM_ID[client.cluster],
         ),
       ),
     );

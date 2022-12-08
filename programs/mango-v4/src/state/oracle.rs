@@ -57,12 +57,31 @@ pub mod switchboard_v2_mainnet_oracle {
 }
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(AnchorDeserialize, AnchorSerialize, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct OracleConfig {
     pub conf_filter: I80F48,
+    pub max_staleness_slots: i64,
+    pub reserved: [u8; 72],
 }
-const_assert_eq!(size_of::<OracleConfig>(), 16);
+const_assert_eq!(size_of::<OracleConfig>(), 16 + 8 + 72);
+const_assert_eq!(size_of::<OracleConfig>(), 96);
 const_assert_eq!(size_of::<OracleConfig>() % 8, 0);
+
+#[derive(AnchorDeserialize, AnchorSerialize, Debug)]
+pub struct OracleConfigParams {
+    pub conf_filter: f32,
+    pub max_staleness_slots: Option<u32>,
+}
+
+impl OracleConfigParams {
+    pub fn to_oracle_config(&self) -> OracleConfig {
+        OracleConfig {
+            conf_filter: I80F48::from_num(self.conf_filter),
+            max_staleness_slots: self.max_staleness_slots.map(|v| v as i64).unwrap_or(-1),
+            reserved: [0; 72],
+        }
+    }
+}
 
 #[derive(PartialEq)]
 pub enum OracleType {
@@ -72,7 +91,7 @@ pub enum OracleType {
     SwitchboardV2,
 }
 
-#[account(zero_copy)]
+#[account(zero_copy(safe_bytemuck_derives))]
 pub struct StubOracle {
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
@@ -83,6 +102,7 @@ pub struct StubOracle {
     pub reserved: [u8; 128],
 }
 const_assert_eq!(size_of::<StubOracle>(), 32 + 32 + 16 + 8 + 128);
+const_assert_eq!(size_of::<StubOracle>(), 216);
 const_assert_eq!(size_of::<StubOracle>() % 8, 0);
 
 pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<OracleType> {
@@ -113,33 +133,59 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
 /// Example: The for SOL at 40 USDC/SOL it would return 0.04 (the unit is USDC-native/SOL-native)
 ///
 /// This currently assumes that quote decimals is 6, like for USDC.
+///
+/// Pass `staleness_slot` = None to skip the staleness check
 pub fn oracle_price(
     acc_info: &impl KeyedAccountReader,
-    oracle_conf_filter: I80F48,
+    config: &OracleConfig,
     base_decimals: u8,
+    staleness_slot: Option<u64>,
 ) -> Result<I80F48> {
     let data = &acc_info.data();
     let oracle_type = determine_oracle_type(acc_info)?;
+    let staleness_slot = staleness_slot.unwrap_or(0);
 
     Ok(match oracle_type {
         OracleType::Stub => acc_info.load::<StubOracle>()?.price,
         OracleType::Pyth => {
-            let price_account = pyth_sdk_solana::load_price(data).unwrap();
-            let price = I80F48::from_num(price_account.price);
+            let price_account = pyth_sdk_solana::state::load_price_account(data).unwrap();
+            let price_data = price_account.to_price();
+            let price = I80F48::from_num(price_data.price);
 
             // Filter out bad prices
-            if I80F48::from_num(price_account.conf) > cm!(oracle_conf_filter * price) {
+            if I80F48::from_num(price_data.conf) > cm!(config.conf_filter * price) {
                 msg!(
-                    "Pyth conf interval too high; pubkey {} price: {} price_account.conf: {}",
+                    "Pyth conf interval too high; pubkey {} price: {} price_data.conf: {}",
                     acc_info.key(),
                     price.to_num::<f64>(),
-                    price_account.conf
+                    price_data.conf
                 );
 
                 // future: in v3, we had pricecache, and in case of luna, when there were no updates, we used last known value from cache
                 // we'll have to add a CachedOracle that is based on one of the oracle types, needs a separate keeper and supports
                 // maintaining this "last known good value"
-                return Err(MangoError::SomeError.into());
+                return Err(MangoError::OracleConfidence.into());
+            }
+
+            // The aggregation pub slot is the time that the aggregate was computed from published data
+            // that was at most 25 slots old. That means it underestimates the actual staleness, potentially
+            // significantly.
+            let agg_pub_slot = price_account.agg.pub_slot;
+            if config.max_staleness_slots >= 0
+                && price_account
+                    .agg
+                    .pub_slot
+                    .saturating_add(config.max_staleness_slots as u64)
+                    < staleness_slot
+            {
+                msg!(
+                    "Pyth price too stale; pubkey {} price: {} pub slot: {}",
+                    acc_info.key(),
+                    price.to_num::<f64>(),
+                    agg_pub_slot,
+                );
+
+                return Err(MangoError::OracleStale.into());
             }
 
             let decimals = cm!((price_account.expo as i8) + QUOTE_DECIMALS - (base_decimals as i8));
@@ -162,14 +208,30 @@ pub fn oracle_price(
                 .std_deviation
                 .try_into()
                 .map_err(from_foreign_error)?;
-            if I80F48::from_num(std_deviation_decimal) > cm!(oracle_conf_filter * price) {
+            if I80F48::from_num(std_deviation_decimal) > cm!(config.conf_filter * price) {
                 msg!(
                     "Switchboard v2 std deviation too high; pubkey {} price: {} latest_confirmed_round.std_deviation: {}",
                     acc_info.key(),
                     price.to_num::<f64>(),
                     std_deviation_decimal
                 );
-                return Err(MangoError::SomeError.into());
+                return Err(MangoError::OracleConfidence.into());
+            }
+
+            // The round_open_slot is an overestimate of the oracle staleness: Reporters will see
+            // the round opening and only then start executing the price tasks.
+            let round_open_slot = feed.latest_confirmed_round.round_open_slot;
+            if config.max_staleness_slots >= 0
+                && round_open_slot.saturating_add(config.max_staleness_slots as u64)
+                    < staleness_slot
+            {
+                msg!(
+                    "Switchboard v2 price too stale; pubkey {} price: {} latest_confirmed_round.round_open_slot: {}",
+                    acc_info.key(),
+                    price.to_num::<f64>(),
+                    round_open_slot,
+                );
+                return Err(MangoError::OracleConfidence.into());
             }
 
             let decimals = cm!(QUOTE_DECIMALS - (base_decimals as i8));
@@ -183,7 +245,7 @@ pub fn oracle_price(
             // Filter out bad prices
             let min_response = I80F48::from_num(result.result.min_response);
             let max_response = I80F48::from_num(result.result.max_response);
-            if cm!(max_response - min_response) > cm!(oracle_conf_filter * price) {
+            if cm!(max_response - min_response) > cm!(config.conf_filter * price) {
                 msg!(
                     "Switchboard v1 min-max response gap too wide; pubkey {} price: {} min_response: {} max_response {}",
                     acc_info.key(),
@@ -191,7 +253,21 @@ pub fn oracle_price(
                     min_response,
                     max_response
                 );
-                return Err(MangoError::SomeError.into());
+                return Err(MangoError::OracleConfidence.into());
+            }
+
+            let round_open_slot = result.result.round_open_slot;
+            if config.max_staleness_slots >= 0
+                && round_open_slot.saturating_add(config.max_staleness_slots as u64)
+                    < staleness_slot
+            {
+                msg!(
+                    "Switchboard v1 price too stale; pubkey {} price: {} round_open_slot: {}",
+                    acc_info.key(),
+                    price.to_num::<f64>(),
+                    round_open_slot,
+                );
+                return Err(MangoError::OracleConfidence.into());
             }
 
             let decimals = cm!(QUOTE_DECIMALS - (base_decimals as i8));

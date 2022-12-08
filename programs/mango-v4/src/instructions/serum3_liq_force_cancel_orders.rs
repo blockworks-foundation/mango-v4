@@ -217,8 +217,9 @@ pub fn serum3_liq_force_cancel_orders(
         &mut base_bank,
         after_base_vault,
         before_base_vault,
+        None, // guaranteed to deposit into bank
     )?
-    .adjust_health_cache(&mut health_cache)?;
+    .adjust_health_cache(&mut health_cache, &base_bank)?;
     apply_vault_difference(
         ctx.accounts.account.key(),
         &mut account.borrow_mut(),
@@ -226,8 +227,9 @@ pub fn serum3_liq_force_cancel_orders(
         &mut quote_bank,
         after_quote_vault,
         before_quote_vault,
+        None, // guaranteed to deposit into bank
     )?
-    .adjust_health_cache(&mut health_cache)?;
+    .adjust_health_cache(&mut health_cache, &quote_bank)?;
 
     //
     // Health check at the end

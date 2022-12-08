@@ -12,3 +12,7 @@ members = [
 [patch.crates-io]
 # for gzip encoded responses
 jsonrpc-core-client = { git = "https://github.com/ckamm/jsonrpc.git", branch = "ckamm/http-with-gzip" }
+# these patch anchor to use solana 1.10.35 in order to fix dependency conflicts in switchboard-v2
+# downstream applications may need to copy these patches to their own workspace
+anchor-spl = { path = "./anchor/spl/" }
+anchor-lang = { path = "./anchor/lang/" }

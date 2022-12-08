@@ -1,6 +1,7 @@
 use super::{OracleConfig, TokenIndex, TokenPosition};
 use crate::accounts_zerocopy::KeyedAccountReader;
-use crate::state::oracle;
+use crate::error::*;
+use crate::state::{oracle, StablePriceModel};
 use crate::util;
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
@@ -19,7 +20,7 @@ pub const MINIMUM_MAX_RATE: I80F48 = I80F48!(0.5);
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-#[account(zero_copy)]
+#[account(zero_copy(safe_bytemuck_derives))]
 pub struct Bank {
     // ABI: Clients rely on this being at offset 8
     pub group: Pubkey,
@@ -32,17 +33,12 @@ pub struct Bank {
     pub oracle: Pubkey,
 
     pub oracle_config: OracleConfig,
+    pub stable_price_model: StablePriceModel,
 
     /// the index used to scale the value of an IndexedPosition
     /// TODO: should always be >= 0, add checks?
     pub deposit_index: I80F48,
     pub borrow_index: I80F48,
-
-    /// total deposits/borrows, only updated during UpdateIndexAndRate
-    /// TODO: These values could be dropped from the bank, they're written in UpdateIndexAndRate
-    ///       and never read.
-    pub cached_indexed_total_deposits: I80F48,
-    pub cached_indexed_total_borrows: I80F48,
 
     /// deposits/borrows for this bank
     ///
@@ -56,8 +52,8 @@ pub struct Bank {
     pub indexed_deposits: I80F48,
     pub indexed_borrows: I80F48,
 
-    pub index_last_updated: i64,
-    pub bank_rate_last_updated: i64,
+    pub index_last_updated: u64,
+    pub bank_rate_last_updated: u64,
 
     pub avg_utilization: I80F48,
 
@@ -101,13 +97,66 @@ pub struct Bank {
 
     pub bank_num: u32,
 
+    /// Min fraction of deposits that must remain in the vault when borrowing.
+    pub min_vault_to_deposits_ratio: f64,
+
+    /// Size in seconds of a net borrows window
+    pub net_borrow_limit_window_size_ts: u64,
+    /// Timestamp at which the last net borrows window started
+    pub last_net_borrows_window_start_ts: u64,
+    /// Net borrow limit per window in quote native; set to -1 to disable.
+    pub net_borrow_limit_per_window_quote: i64,
+    /// Sum of all deposits and borrows in the last window, in native units.
+    pub net_borrows_in_window: i64,
+
+    /// Soft borrow limit in native quote
+    ///
+    /// Once the borrows on the bank exceed this quote value, init_liab_weight is scaled up.
+    /// Set to f64::MAX to disable.
+    ///
+    /// See scaled_init_liab_weight().
+    pub borrow_weight_scale_start_quote: f64,
+
+    /// Limit for collateral of deposits in native quote
+    ///
+    /// Once the deposits in the bank exceed this quote value, init_asset_weight is scaled
+    /// down to keep the total collateral value constant.
+    /// Set to f64::MAX to disable.
+    ///
+    /// See scaled_init_asset_weight().
+    pub deposit_weight_scale_start_quote: f64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2560],
+    pub reserved: [u8; 2120],
 }
 const_assert_eq!(
     size_of::<Bank>(),
-    32 + 16 + 32 * 3 + 16 + 16 * 6 + 8 * 2 + 16 * 16 + 8 * 2 + 2 + 1 + 1 + 4 + 2560
+    32 + 16
+        + 32 * 3
+        + 96
+        + 288
+        + 16 * 2
+        + 16 * 2
+        + 8 * 2
+        + 16
+        + 16 * 6
+        + 16 * 3
+        + 16 * 4
+        + 16
+        + 16
+        + 8
+        + 8
+        + 2
+        + 1
+        + 1
+        + 4
+        + 8
+        + 8 * 4
+        + 8
+        + 8
+        + 2120
 );
+const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
 
 impl Bank {
@@ -136,11 +185,8 @@ impl Bank {
             group: existing_bank.group,
             mint: existing_bank.mint,
             oracle: existing_bank.oracle,
-            oracle_config: existing_bank.oracle_config,
             deposit_index: existing_bank.deposit_index,
             borrow_index: existing_bank.borrow_index,
-            cached_indexed_total_deposits: existing_bank.cached_indexed_total_deposits,
-            cached_indexed_total_borrows: existing_bank.cached_indexed_total_borrows,
             index_last_updated: existing_bank.index_last_updated,
             bank_rate_last_updated: existing_bank.bank_rate_last_updated,
             avg_utilization: existing_bank.avg_utilization,
@@ -159,7 +205,16 @@ impl Bank {
             liquidation_fee: existing_bank.liquidation_fee,
             token_index: existing_bank.token_index,
             mint_decimals: existing_bank.mint_decimals,
-            reserved: [0; 2560],
+            oracle_config: existing_bank.oracle_config,
+            stable_price_model: StablePriceModel::default(),
+            min_vault_to_deposits_ratio: existing_bank.min_vault_to_deposits_ratio,
+            net_borrow_limit_per_window_quote: existing_bank.net_borrow_limit_per_window_quote,
+            net_borrow_limit_window_size_ts: existing_bank.net_borrow_limit_window_size_ts,
+            last_net_borrows_window_start_ts: existing_bank.last_net_borrows_window_start_ts,
+            net_borrows_in_window: 0,
+            borrow_weight_scale_start_quote: f64::MAX,
+            deposit_weight_scale_start_quote: f64::MAX,
+            reserved: [0; 2120],
         }
     }
 
@@ -169,12 +224,14 @@ impl Bank {
             .trim_matches(char::from(0))
     }
 
+    #[inline(always)]
     pub fn native_borrows(&self) -> I80F48 {
-        self.borrow_index * self.indexed_borrows
+        cm!(self.borrow_index * self.indexed_borrows)
     }
 
+    #[inline(always)]
     pub fn native_deposits(&self) -> I80F48 {
-        self.deposit_index * self.indexed_deposits
+        cm!(self.deposit_index * self.indexed_deposits)
     }
 
     /// Deposits `native_amount`.
@@ -185,8 +242,13 @@ impl Bank {
     ///
     /// native_amount must be >= 0
     /// fractional deposits can be relevant during liquidation, for example
-    pub fn deposit(&mut self, position: &mut TokenPosition, native_amount: I80F48) -> Result<bool> {
-        self.deposit_internal(position, native_amount, !position.is_in_use())
+    pub fn deposit(
+        &mut self,
+        position: &mut TokenPosition,
+        native_amount: I80F48,
+        now_ts: u64,
+    ) -> Result<bool> {
+        self.deposit_internal_wrapper(position, native_amount, !position.is_in_use(), now_ts)
     }
 
     /// Like `deposit()`, but allows dusting of in-use accounts.
@@ -196,9 +258,24 @@ impl Bank {
         &mut self,
         position: &mut TokenPosition,
         native_amount: I80F48,
+        now_ts: u64,
     ) -> Result<bool> {
-        self.deposit_internal(position, native_amount, true)
+        self.deposit_internal_wrapper(position, native_amount, true, now_ts)
             .map(|not_dusted| not_dusted || position.is_in_use())
+    }
+
+    pub fn deposit_internal_wrapper(
+        &mut self,
+        position: &mut TokenPosition,
+        native_amount: I80F48,
+        allow_dusting: bool,
+        now_ts: u64,
+    ) -> Result<bool> {
+        self.update_net_borrows(-native_amount, now_ts);
+        let opening_indexed_position = position.indexed_position;
+        let result = self.deposit_internal(position, native_amount, allow_dusting)?;
+        self.update_cumulative_interest(position, opening_indexed_position);
+        Ok(result)
     }
 
     /// Internal function to deposit funds
@@ -209,8 +286,8 @@ impl Bank {
         allow_dusting: bool,
     ) -> Result<bool> {
         require_gte!(native_amount, 0);
+
         let native_position = position.native(self);
-        let opening_indexed_position = position.indexed_position;
 
         // Adding DELTA to amount/index helps because (amount/index)*index <= amount, but
         // we want to ensure that users can withdraw the same amount they have deposited, so
@@ -236,14 +313,12 @@ impl Bank {
                 // pay back borrows only, leaving a negative position
                 cm!(self.indexed_borrows -= indexed_change);
                 position.indexed_position = new_indexed_value;
-                self.update_cumulative_interest(position, opening_indexed_position);
                 return Ok(true);
             } else if new_native_position < I80F48::ONE && allow_dusting {
                 // if there's less than one token deposited, zero the position
                 cm!(self.dust += new_native_position);
                 cm!(self.indexed_borrows += position.indexed_position);
                 position.indexed_position = I80F48::ZERO;
-                self.update_cumulative_interest(position, opening_indexed_position);
                 return Ok(false);
             }
 
@@ -259,7 +334,6 @@ impl Bank {
         let indexed_change = div_rounding_up(native_amount, self.deposit_index);
         cm!(self.indexed_deposits += indexed_change);
         cm!(position.indexed_position += indexed_change);
-        self.update_cumulative_interest(position, opening_indexed_position);
 
         Ok(true)
     }
@@ -276,9 +350,17 @@ impl Bank {
         &mut self,
         position: &mut TokenPosition,
         native_amount: I80F48,
+        now_ts: u64,
+        oracle_price: I80F48,
     ) -> Result<bool> {
-        let (position_is_active, _) =
-            self.withdraw_internal(position, native_amount, false, !position.is_in_use())?;
+        let (position_is_active, _) = self.withdraw_internal_wrapper(
+            position,
+            native_amount,
+            false,
+            !position.is_in_use(),
+            now_ts,
+            Some(oracle_price),
+        )?;
 
         Ok(position_is_active)
     }
@@ -290,9 +372,18 @@ impl Bank {
         &mut self,
         position: &mut TokenPosition,
         native_amount: I80F48,
+        now_ts: u64,
+        oracle_price: I80F48,
     ) -> Result<bool> {
-        self.withdraw_internal(position, native_amount, false, true)
-            .map(|(not_dusted, _)| not_dusted || position.is_in_use())
+        self.withdraw_internal_wrapper(
+            position,
+            native_amount,
+            false,
+            true,
+            now_ts,
+            Some(oracle_price),
+        )
+        .map(|(not_dusted, _)| not_dusted || position.is_in_use())
     }
 
     /// Withdraws `native_amount` while applying the loan origination fee if a borrow is created.
@@ -307,8 +398,40 @@ impl Bank {
         &mut self,
         position: &mut TokenPosition,
         native_amount: I80F48,
+        now_ts: u64,
+        oracle_price: I80F48,
     ) -> Result<(bool, I80F48)> {
-        self.withdraw_internal(position, native_amount, true, !position.is_in_use())
+        self.withdraw_internal_wrapper(
+            position,
+            native_amount,
+            true,
+            !position.is_in_use(),
+            now_ts,
+            Some(oracle_price),
+        )
+    }
+
+    /// Internal function to withdraw funds
+    fn withdraw_internal_wrapper(
+        &mut self,
+        position: &mut TokenPosition,
+        native_amount: I80F48,
+        with_loan_origination_fee: bool,
+        allow_dusting: bool,
+        now_ts: u64,
+        oracle_price: Option<I80F48>,
+    ) -> Result<(bool, I80F48)> {
+        let opening_indexed_position = position.indexed_position;
+        let res = self.withdraw_internal(
+            position,
+            native_amount,
+            with_loan_origination_fee,
+            allow_dusting,
+            now_ts,
+            oracle_price,
+        );
+        self.update_cumulative_interest(position, opening_indexed_position);
+        res
     }
 
     /// Internal function to withdraw funds
@@ -318,10 +441,11 @@ impl Bank {
         mut native_amount: I80F48,
         with_loan_origination_fee: bool,
         allow_dusting: bool,
+        now_ts: u64,
+        oracle_price: Option<I80F48>,
     ) -> Result<(bool, I80F48)> {
         require_gte!(native_amount, 0);
         let native_position = position.native(self);
-        let opening_indexed_position = position.indexed_position;
 
         if native_position.is_positive() {
             let new_native_position = cm!(native_position - native_amount);
@@ -332,14 +456,12 @@ impl Bank {
                     cm!(self.dust += new_native_position);
                     cm!(self.indexed_deposits -= position.indexed_position);
                     position.indexed_position = I80F48::ZERO;
-                    self.update_cumulative_interest(position, opening_indexed_position);
                     return Ok((false, I80F48::ZERO));
                 } else {
                     // withdraw some deposits leaving a positive balance
                     let indexed_change = cm!(native_amount / self.deposit_index);
                     cm!(self.indexed_deposits -= indexed_change);
                     cm!(position.indexed_position -= indexed_change);
-                    self.update_cumulative_interest(position, opening_indexed_position);
                     return Ok((true, I80F48::ZERO));
                 }
             }
@@ -362,7 +484,13 @@ impl Bank {
         let indexed_change = cm!(native_amount / self.borrow_index);
         cm!(self.indexed_borrows += indexed_change);
         cm!(position.indexed_position -= indexed_change);
-        self.update_cumulative_interest(position, opening_indexed_position);
+
+        // net borrows requires updating in only this case, since other branches of the method deal with
+        // withdraws and not borrows
+        self.update_net_borrows(native_amount, now_ts);
+        if let Some(oracle_price) = oracle_price {
+            self.check_net_borrows(oracle_price)?;
+        }
 
         Ok((true, loan_origination_fee))
     }
@@ -372,13 +500,20 @@ impl Bank {
         &mut self,
         position: &mut TokenPosition,
         already_borrowed_native_amount: I80F48,
+        now_ts: u64,
     ) -> Result<(bool, I80F48)> {
         let loan_origination_fee =
             cm!(self.loan_origination_fee_rate * already_borrowed_native_amount);
         cm!(self.collected_fees_native += loan_origination_fee);
 
-        let (position_is_active, _) =
-            self.withdraw_internal(position, loan_origination_fee, false, !position.is_in_use())?;
+        let (position_is_active, _) = self.withdraw_internal_wrapper(
+            position,
+            loan_origination_fee,
+            false,
+            !position.is_in_use(),
+            now_ts,
+            None,
+        )?;
 
         Ok((position_is_active, loan_origination_fee))
     }
@@ -388,11 +523,13 @@ impl Bank {
         &mut self,
         position: &mut TokenPosition,
         native_amount: I80F48,
+        now_ts: u64,
+        oracle_price: I80F48,
     ) -> Result<bool> {
         if native_amount >= 0 {
-            self.deposit(position, native_amount)
+            self.deposit(position, native_amount, now_ts)
         } else {
-            self.withdraw_without_fee(position, -native_amount)
+            self.withdraw_without_fee(position, -native_amount, now_ts, oracle_price)
         }
     }
 
@@ -401,12 +538,51 @@ impl Bank {
         &mut self,
         position: &mut TokenPosition,
         native_amount: I80F48,
+        now_ts: u64,
+        oracle_price: I80F48,
     ) -> Result<(bool, I80F48)> {
         if native_amount >= 0 {
-            Ok((self.deposit(position, native_amount)?, I80F48::ZERO))
+            Ok((self.deposit(position, native_amount, now_ts)?, I80F48::ZERO))
         } else {
-            self.withdraw_with_fee(position, -native_amount)
+            self.withdraw_with_fee(position, -native_amount, now_ts, oracle_price)
         }
+    }
+
+    /// Update the bank's net_borrows fields.
+    ///
+    /// If oracle_price is set, also do a net borrows check and error if the threshold is exceeded.
+    pub fn update_net_borrows(&mut self, native_amount: I80F48, now_ts: u64) {
+        let in_new_window =
+            now_ts >= self.last_net_borrows_window_start_ts + self.net_borrow_limit_window_size_ts;
+
+        self.net_borrows_in_window = if in_new_window {
+            // reset to latest window
+            self.last_net_borrows_window_start_ts = now_ts / self.net_borrow_limit_window_size_ts
+                * self.net_borrow_limit_window_size_ts;
+            native_amount.checked_to_num::<i64>().unwrap()
+        } else {
+            cm!(self.net_borrows_in_window + native_amount.checked_to_num().unwrap())
+        };
+    }
+
+    pub fn check_net_borrows(&self, oracle_price: I80F48) -> Result<()> {
+        if self.net_borrows_in_window < 0 || self.net_borrow_limit_per_window_quote < 0 {
+            return Ok(());
+        }
+
+        let price = oracle_price.max(self.stable_price());
+        let net_borrows_quote = price
+            .checked_mul_int(self.net_borrows_in_window.into())
+            .unwrap();
+        if net_borrows_quote > self.net_borrow_limit_per_window_quote {
+            return Err(error_msg_typed!(BankNetBorrowsLimitReached,
+                    "net_borrows_in_window ({:?}) exceeds net_borrow_limit_per_window_quote ({:?}) for last_net_borrows_window_start_ts ({:?}) ",
+                    self.net_borrows_in_window, self.net_borrow_limit_per_window_quote, self.last_net_borrows_window_start_ts
+
+            ));
+        }
+
+        Ok(())
     }
 
     pub fn update_cumulative_interest(
@@ -520,9 +696,9 @@ impl Bank {
         &self,
         indexed_total_deposits: I80F48,
         indexed_total_borrows: I80F48,
-        now_ts: i64,
+        now_ts: u64,
     ) -> I80F48 {
-        if now_ts <= 0 {
+        if now_ts == 0 {
             return I80F48::ZERO;
         }
 
@@ -579,13 +755,63 @@ impl Bank {
         }
     }
 
-    pub fn oracle_price(&self, oracle_acc: &impl KeyedAccountReader) -> Result<I80F48> {
+    pub fn oracle_price(
+        &self,
+        oracle_acc: &impl KeyedAccountReader,
+        staleness_slot: Option<u64>,
+    ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc.key());
         oracle::oracle_price(
             oracle_acc,
-            self.oracle_config.conf_filter,
+            &self.oracle_config,
             self.mint_decimals,
+            staleness_slot,
         )
+    }
+
+    pub fn stable_price(&self) -> I80F48 {
+        I80F48::from_num(self.stable_price_model.stable_price)
+    }
+
+    /// Returns the init asset weight, adjusted for the number of deposits on the bank.
+    ///
+    /// If max_collateral is 0, then the scaled init weight will be 0.
+    /// Otherwise the weight is unadjusted until max_collateral and then scaled down
+    /// such that scaled_init_weight * deposits remains constant.
+    #[inline(always)]
+    pub fn scaled_init_asset_weight(&self, price: I80F48) -> I80F48 {
+        if self.deposit_weight_scale_start_quote == f64::MAX {
+            return self.init_asset_weight;
+        }
+        // The next line is around 500 CU
+        let deposits_quote = self.native_deposits().to_num::<f64>() * price.to_num::<f64>();
+        if deposits_quote <= self.deposit_weight_scale_start_quote {
+            self.init_asset_weight
+        } else {
+            // The next line is around 500 CU
+            let scale = self.deposit_weight_scale_start_quote / deposits_quote;
+            cm!(self.init_asset_weight * I80F48::from_num(scale))
+        }
+    }
+
+    #[inline(always)]
+    pub fn scaled_init_liab_weight(&self, price: I80F48) -> I80F48 {
+        if self.borrow_weight_scale_start_quote == f64::MAX {
+            return self.init_liab_weight;
+        }
+        // The next line is around 500 CU
+        let borrows_quote = self.native_borrows().to_num::<f64>() * price.to_num::<f64>();
+        if borrows_quote <= self.borrow_weight_scale_start_quote {
+            self.init_liab_weight
+        } else if self.borrow_weight_scale_start_quote == 0.0 {
+            // TODO: will certainly cause overflow, so it's not exactly what is needed; health should be -MAX?
+            // maybe handling this case isn't super helpful?
+            I80F48::MAX
+        } else {
+            // The next line is around 500 CU
+            let scale = borrows_quote / self.borrow_weight_scale_start_quote;
+            cm!(self.init_liab_weight * I80F48::from_num(scale))
+        }
     }
 }
 
@@ -651,6 +877,8 @@ mod tests {
                 //
 
                 let mut bank = Bank::zeroed();
+                bank.net_borrow_limit_window_size_ts = 1; // dummy
+                bank.net_borrow_limit_per_window_quote = i64::MAX; // max since we don't want this to interfere
                 bank.deposit_index = I80F48::from_num(100.0);
                 bank.borrow_index = I80F48::from_num(10.0);
                 bank.loan_origination_fee_rate = I80F48::from_num(0.1);
@@ -670,7 +898,7 @@ mod tests {
                     cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,
                     padding: Default::default(),
-                    reserved: [0; 8],
+                    reserved: [0; 128],
                 };
 
                 account.indexed_position = indexed(I80F48::from_num(start), &bank);
@@ -688,7 +916,10 @@ mod tests {
                 //
 
                 let change = I80F48::from(change);
-                let (is_active, _) = bank.change_with_fee(&mut account, change)?;
+                let dummy_now_ts = 1 as u64;
+                let dummy_price = I80F48::ZERO;
+                let (is_active, _) =
+                    bank.change_with_fee(&mut account, change, dummy_now_ts, dummy_price)?;
 
                 let mut expected_native = start_native + change;
                 if expected_native >= 0.0 && expected_native < 1.0 && !is_in_use {
@@ -729,7 +960,7 @@ mod tests {
         bank.index_last_updated = 1000;
 
         let compute_new_avg_utilization_runner =
-            |bank: &mut Bank, utilization: I80F48, now_ts: i64| {
+            |bank: &mut Bank, utilization: I80F48, now_ts: u64| {
                 bank.avg_utilization =
                     bank.compute_new_avg_utilization(I80F48::ONE, utilization, now_ts);
                 bank.index_last_updated = now_ts;

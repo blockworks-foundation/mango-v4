@@ -122,18 +122,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
     //
     // TEST: Change the oracle to make health go negative
     //
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: base_token.mint.pubkey,
-            payer,
-            price: "10.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, base_token, admin, 10.0).await;
 
     // can't withdraw
     assert!(send_tx(
@@ -184,7 +173,9 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
 
 #[tokio::test]
 async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
-    let context = TestContext::new().await;
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(85_000); // LiqTokenWithToken needs 79k
+    let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = TestKeypair::new();
@@ -324,18 +315,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     //
     // SETUP: Change the oracle to make health go negative
     //
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: borrow_token1.mint.pubkey,
-            payer,
-            price: "2.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, borrow_token1, admin, 2.0).await;
 
     //
     // TEST: liquidate borrow2 against too little collateral2
@@ -465,18 +445,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     //
 
     // Setup: make collateral really valueable, remove nearly all of it
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: collateral_token1.mint.pubkey,
-            payer,
-            price: "100000.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, collateral_token1, admin, 100000.0).await;
     send_tx(
         solana,
         TokenWithdrawInstruction {
@@ -493,18 +462,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     // Setup: reduce collateral value to trigger liquidatability
     // We have -93 borrows, so -93*2*1.4 = -260.4 health from that
     // And 1-2 collateral, so max 2*0.6*X health; say X=150 for max 180 health
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: collateral_token1.mint.pubkey,
-            payer,
-            price: "150.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, collateral_token1, admin, 150.0).await;
 
     send_tx(
         solana,

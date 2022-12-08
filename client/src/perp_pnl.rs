@@ -14,6 +14,7 @@ pub enum Direction {
 }
 
 /// Returns up to `count` accounts with highest abs pnl (by `direction`) in descending order.
+/// Note: keep in sync with perp.ts:getSettlePnlCandidates
 pub fn fetch_top(
     context: &crate::context::MangoGroupContext,
     account_fetcher: &impl AccountFetcher,
@@ -25,8 +26,10 @@ pub fn fetch_top(
     let perp_market =
         account_fetcher_fetch_anchor_account::<PerpMarket>(account_fetcher, &perp.address)?;
     let oracle_acc = account_fetcher.fetch_raw_account(&perp_market.oracle)?;
-    let oracle_price =
-        perp_market.oracle_price(&KeyedAccountSharedData::new(perp_market.oracle, oracle_acc))?;
+    let oracle_price = perp_market.oracle_price(
+        &KeyedAccountSharedData::new(perp_market.oracle, oracle_acc),
+        None,
+    )?;
 
     let accounts =
         account_fetcher.fetch_program_accounts(&mango_v4::id(), MangoAccount::discriminator())?;
@@ -45,8 +48,7 @@ pub fn fetch_top(
                 return None;
             }
             let perp_pos = perp_pos.unwrap();
-            let pnl = perp_pos.base_position_native(&perp_market) * oracle_price
-                + perp_pos.quote_position_native();
+            let pnl = perp_pos.pnl_for_price(&perp_market, oracle_price).unwrap();
             if pnl >= 0 && direction == Direction::MaxNegative
                 || pnl <= 0 && direction == Direction::MaxPositive
             {

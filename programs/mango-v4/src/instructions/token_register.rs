@@ -3,6 +3,7 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
+use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
 use crate::state::*;
 use crate::util::fill_from_str;
@@ -80,7 +81,7 @@ pub fn token_register(
     ctx: Context<TokenRegister>,
     token_index: TokenIndex,
     name: String,
-    oracle_config: OracleConfig,
+    oracle_config: OracleConfigParams,
     interest_rate_params: InterestRateParams,
     loan_fee_rate: f32,
     loan_origination_fee_rate: f32,
@@ -89,6 +90,9 @@ pub fn token_register(
     maint_liab_weight: f32,
     init_liab_weight: f32,
     liquidation_fee: f32,
+    min_vault_to_deposits_ratio: f64,
+    net_borrow_limit_window_size_ts: u64,
+    net_borrow_limit_per_window_quote: i64,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == QUOTE_TOKEN_INDEX {
@@ -98,6 +102,8 @@ pub fn token_register(
         );
     }
 
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
         group: ctx.accounts.group.key(),
@@ -105,15 +111,12 @@ pub fn token_register(
         mint: ctx.accounts.mint.key(),
         vault: ctx.accounts.vault.key(),
         oracle: ctx.accounts.oracle.key(),
-        oracle_config,
         deposit_index: INDEX_START,
         borrow_index: INDEX_START,
-        cached_indexed_total_deposits: I80F48::ZERO,
-        cached_indexed_total_borrows: I80F48::ZERO,
         indexed_deposits: I80F48::ZERO,
         indexed_borrows: I80F48::ZERO,
-        index_last_updated: Clock::get()?.unix_timestamp,
-        bank_rate_last_updated: Clock::get()?.unix_timestamp,
+        index_last_updated: now_ts,
+        bank_rate_last_updated: now_ts,
         // TODO: add a require! verifying relation between the parameters
         avg_utilization: I80F48::ZERO,
         adjustment_factor: I80F48::from_num(interest_rate_params.adjustment_factor),
@@ -137,9 +140,24 @@ pub fn token_register(
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
-        reserved: [0; 2560],
+        oracle_config: oracle_config.to_oracle_config(),
+        stable_price_model: StablePriceModel::default(),
+        min_vault_to_deposits_ratio,
+        net_borrow_limit_window_size_ts,
+        last_net_borrows_window_start_ts: now_ts / net_borrow_limit_window_size_ts
+            * net_borrow_limit_window_size_ts,
+        net_borrow_limit_per_window_quote,
+        net_borrows_in_window: 0,
+        borrow_weight_scale_start_quote: f64::MAX,
+        deposit_weight_scale_start_quote: f64::MAX,
+        reserved: [0; 2120],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
+
+    let oracle_price =
+        bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
+    bank.stable_price_model
+        .reset_to_price(oracle_price.to_num(), now_ts.try_into().unwrap());
 
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {
@@ -151,7 +169,7 @@ pub fn token_register(
         banks: Default::default(),
         vaults: Default::default(),
         oracle: ctx.accounts.oracle.key(),
-        registration_time: Clock::get()?.unix_timestamp,
+        registration_time: Clock::get()?.unix_timestamp.try_into().unwrap(),
         reserved: [0; 2560],
     };
 

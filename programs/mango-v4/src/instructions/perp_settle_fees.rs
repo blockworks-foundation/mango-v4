@@ -54,8 +54,10 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     );
 
     // Get oracle price for market. Price is validated inside
-    let oracle_price =
-        perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?)?;
+    let oracle_price = perp_market.oracle_price(
+        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        None, // staleness checked in health
+    )?;
 
     // Fetch perp positions for accounts
     let perp_position = account.perp_position_mut(perp_market.perp_market_index)?;
@@ -63,9 +65,8 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     // Settle funding before settling any PnL
     perp_position.settle_funding(&perp_market);
 
-    // Calculate PnL for each account
-    let base_native = perp_position.base_position_native(&perp_market);
-    let pnl: I80F48 = cm!(perp_position.quote_position_native() + base_native * oracle_price);
+    // Calculate PnL
+    let pnl = perp_position.pnl_for_price(&perp_market, oracle_price)?;
 
     // Account perp position must have a loss to be able to settle against the fee account
     require!(pnl.is_negative(), MangoError::ProfitabilityMismatch);
@@ -79,7 +80,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         .abs()
         .min(perp_market.fees_accrued.abs())
         .min(I80F48::from(max_settle_amount));
-    perp_position.change_quote_position(settlement);
+    perp_position.record_settle(-settlement); // settle the negative pnl on the user perp position
     perp_market.fees_accrued = cm!(perp_market.fees_accrued - settlement);
 
     emit_perp_balances(
@@ -92,6 +93,13 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
 
     // Update the account's perp_spot_transfers with the new PnL
     let settlement_i64 = settlement.round().checked_to_num::<i64>().unwrap();
+
+    // Safety check to prevent any accidental negative transfer
+    require!(
+        settlement_i64 >= 0,
+        MangoError::SettlementAmountMustBePositive
+    );
+
     cm!(perp_position.perp_spot_transfers -= settlement_i64);
     cm!(account.fixed.perp_spot_transfers -= settlement_i64);
 
@@ -99,7 +107,12 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     let token_position = account
         .token_position_mut(perp_market.settle_token_index)?
         .0;
-    bank.withdraw_with_fee(token_position, settlement)?;
+    bank.withdraw_with_fee(
+        token_position,
+        settlement,
+        Clock::get()?.unix_timestamp.try_into().unwrap(),
+        oracle_price,
+    )?;
     // Update the settled balance on the market itself
     perp_market.fees_settled = cm!(perp_market.fees_settled + settlement);
 

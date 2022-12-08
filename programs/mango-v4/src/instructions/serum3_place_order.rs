@@ -1,3 +1,4 @@
+use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
 
 use crate::logs::{Serum3OpenOrdersBalanceLog, TokenBalanceLog};
@@ -190,6 +191,9 @@ pub struct Serum3PlaceOrder<'info> {
     /// The bank vault that pays for the order, if necessary
     #[account(mut)]
     pub payer_vault: Box<Account<'info, TokenAccount>>,
+    /// CHECK: The oracle can be one of several different account types
+    #[account(address = payer_bank.load()?.oracle)]
+    pub payer_oracle: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
 }
@@ -306,6 +310,7 @@ pub fn serum3_place_order(
         order_type: u8::try_from(order_type).unwrap().try_into().unwrap(),
         client_order_id,
         limit,
+        max_ts: i64::MAX,
     };
     cpi_place_order(ctx.accounts, order)?;
 
@@ -339,8 +344,10 @@ pub fn serum3_place_order(
     require_gte!(before_vault, after_vault);
 
     // Charge the difference in vault balance to the user's account
+    let mut payer_bank = ctx.accounts.payer_bank.load_mut()?;
     let vault_difference = {
-        let mut payer_bank = ctx.accounts.payer_bank.load_mut()?;
+        let oracle_price =
+            payer_bank.oracle_price(&AccountInfoRef::borrow(&ctx.accounts.payer_oracle)?, None)?;
         apply_vault_difference(
             ctx.accounts.account.key(),
             &mut account.borrow_mut(),
@@ -348,6 +355,7 @@ pub fn serum3_place_order(
             &mut payer_bank,
             after_vault,
             before_vault,
+            Some(oracle_price),
         )?
     };
 
@@ -355,10 +363,12 @@ pub fn serum3_place_order(
     // Health check
     //
     if let Some((mut health_cache, pre_health)) = pre_health_opt {
-        vault_difference.adjust_health_cache(&mut health_cache)?;
+        vault_difference.adjust_health_cache(&mut health_cache, &payer_bank)?;
         oo_difference.adjust_health_cache(&mut health_cache, &serum_market)?;
         account.check_health_post(&health_cache, pre_health)?;
     }
+
+    // TODO: enforce min_vault_to_deposits_ratio
 
     Ok(())
 }
@@ -407,8 +417,9 @@ pub struct VaultDifference {
 }
 
 impl VaultDifference {
-    pub fn adjust_health_cache(&self, health_cache: &mut HealthCache) -> Result<()> {
-        health_cache.adjust_token_balance(self.token_index, self.native_change)?;
+    pub fn adjust_health_cache(&self, health_cache: &mut HealthCache, bank: &Bank) -> Result<()> {
+        assert_eq!(bank.token_index, self.token_index);
+        health_cache.adjust_token_balance(bank, self.native_change)?;
         Ok(())
     }
 }
@@ -423,12 +434,23 @@ pub fn apply_vault_difference(
     bank: &mut Bank,
     vault_after: u64,
     vault_before: u64,
+    oracle_price: Option<I80F48>,
 ) -> Result<VaultDifference> {
     let needed_change = cm!(I80F48::from(vault_after) - I80F48::from(vault_before));
 
     let (position, _) = account.token_position_mut(bank.token_index)?;
     let native_before = position.native(bank);
-    bank.change_without_fee(position, needed_change)?;
+    let now_ts = Clock::get()?.unix_timestamp.try_into().unwrap();
+    if needed_change >= 0 {
+        bank.deposit(position, needed_change, now_ts)?;
+    } else {
+        bank.withdraw_without_fee(
+            position,
+            -needed_change,
+            now_ts,
+            oracle_price.unwrap(), // required for withdraws
+        )?;
+    }
     let native_after = position.native(bank);
     let native_change = cm!(native_after - native_before);
     let new_borrows = native_change

@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use fixed::types::I80F48;
 
+use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
 use crate::instructions::INDEX_START;
 use crate::state::*;
@@ -71,6 +72,9 @@ pub fn token_register_trustless(
 ) -> Result<()> {
     require_neq!(token_index, 0);
 
+    let net_borrow_limit_window_size_ts = 24 * 60 * 60 as u64;
+    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+
     let mut bank = ctx.accounts.bank.load_init()?;
     *bank = Bank {
         group: ctx.accounts.group.key(),
@@ -78,17 +82,12 @@ pub fn token_register_trustless(
         mint: ctx.accounts.mint.key(),
         vault: ctx.accounts.vault.key(),
         oracle: ctx.accounts.oracle.key(),
-        oracle_config: OracleConfig {
-            conf_filter: I80F48::from_num(0.10),
-        },
         deposit_index: INDEX_START,
         borrow_index: INDEX_START,
-        cached_indexed_total_deposits: I80F48::ZERO,
-        cached_indexed_total_borrows: I80F48::ZERO,
         indexed_deposits: I80F48::ZERO,
         indexed_borrows: I80F48::ZERO,
-        index_last_updated: Clock::get()?.unix_timestamp,
-        bank_rate_last_updated: Clock::get()?.unix_timestamp,
+        index_last_updated: now_ts,
+        bank_rate_last_updated: now_ts,
         avg_utilization: I80F48::ZERO,
         // 10% daily adjustment at 0% or 100% utilization
         adjustment_factor: I80F48::from_num(0.004),
@@ -112,9 +111,28 @@ pub fn token_register_trustless(
         bump: *ctx.bumps.get("bank").ok_or(MangoError::SomeError)?,
         mint_decimals: ctx.accounts.mint.decimals,
         bank_num: 0,
-        reserved: [0; 2560],
+        oracle_config: OracleConfig {
+            conf_filter: I80F48::from_num(0.10),
+            max_staleness_slots: -1,
+            reserved: [0; 72],
+        },
+        stable_price_model: StablePriceModel::default(),
+        min_vault_to_deposits_ratio: 0.2,
+        net_borrow_limit_window_size_ts,
+        last_net_borrows_window_start_ts: now_ts / net_borrow_limit_window_size_ts
+            * net_borrow_limit_window_size_ts,
+        net_borrow_limit_per_window_quote: 1_000_000_000_000, // 1M USD
+        net_borrows_in_window: 0,
+        borrow_weight_scale_start_quote: f64::MAX,
+        deposit_weight_scale_start_quote: f64::MAX,
+        reserved: [0; 2120],
     };
     require_gt!(bank.max_rate, MINIMUM_MAX_RATE);
+
+    let oracle_price =
+        bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
+    bank.stable_price_model
+        .reset_to_price(oracle_price.to_num(), now_ts.try_into().unwrap());
 
     let mut mint_info = ctx.accounts.mint_info.load_init()?;
     *mint_info = MintInfo {
@@ -126,7 +144,7 @@ pub fn token_register_trustless(
         banks: Default::default(),
         vaults: Default::default(),
         oracle: ctx.accounts.oracle.key(),
-        registration_time: Clock::get()?.unix_timestamp,
+        registration_time: Clock::get()?.unix_timestamp.try_into().unwrap(),
         reserved: [0; 2560],
     };
 

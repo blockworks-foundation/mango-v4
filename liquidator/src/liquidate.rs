@@ -161,10 +161,10 @@ impl<'a> LiquidateHelper<'a> {
                 let oracle = self
                     .account_fetcher
                     .fetch_raw_account(&perp.market.oracle)?;
-                let price = perp.market.oracle_price(&KeyedAccountSharedData::new(
-                    perp.market.oracle,
-                    oracle.into(),
-                ))?;
+                let price = perp.market.oracle_price(
+                    &KeyedAccountSharedData::new(perp.market.oracle, oracle.into()),
+                    None,
+                )?;
                 Ok(Some((
                     pp.market_index,
                     base_lots,
@@ -182,7 +182,6 @@ impl<'a> LiquidateHelper<'a> {
 
         // Liquidate the highest-value perp base position
         let (perp_market_index, base_lots, price, _) = perp_base_positions.last().unwrap();
-        let perp = self.client.context.perp(*perp_market_index);
 
         let (side, side_signum) = if *base_lots > 0 {
             (Side::Bid, 1)
@@ -203,7 +202,6 @@ impl<'a> LiquidateHelper<'a> {
             health_cache.max_perp_for_health_ratio(
                 *perp_market_index,
                 *price,
-                perp.market.base_lot_size,
                 side,
                 self.liqor_min_health_ratio,
             )?
@@ -342,10 +340,10 @@ impl<'a> LiquidateHelper<'a> {
                 let oracle = self
                     .account_fetcher
                     .fetch_raw_account(&token.mint_info.oracle)?;
-                let price = bank.oracle_price(&KeyedAccountSharedData::new(
-                    token.mint_info.oracle,
-                    oracle.into(),
-                ))?;
+                let price = bank.oracle_price(
+                    &KeyedAccountSharedData::new(token.mint_info.oracle, oracle.into()),
+                    None,
+                )?;
                 Ok((
                     token_position.token_index,
                     price,
@@ -375,15 +373,20 @@ impl<'a> LiquidateHelper<'a> {
         let health_cache = health_cache::new(&self.client.context, self.account_fetcher, &liqor)
             .expect("always ok");
 
-        let source_price = health_cache.token_info(source).unwrap().oracle_price;
-        let target_price = health_cache.token_info(target).unwrap().oracle_price;
+        let source_bank = self.client.first_bank(source)?;
+        let target_bank = self.client.first_bank(target)?;
+
+        let source_price = health_cache.token_info(source).unwrap().prices.oracle;
+        let target_price = health_cache.token_info(target).unwrap().prices.oracle;
         // TODO: This is where we could multiply in the liquidation fee factors
         let oracle_swap_price = source_price / target_price;
 
         let amount = health_cache
             .max_swap_source_for_health_ratio(
-                source,
-                target,
+                &liqor,
+                &source_bank,
+                source_price,
+                &target_bank,
                 oracle_swap_price,
                 self.liqor_min_health_ratio,
             )

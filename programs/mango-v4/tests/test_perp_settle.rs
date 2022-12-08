@@ -80,6 +80,8 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             liquidation_fee: 0.012,
             maker_fee: 0.0002,
             taker_fee: 0.000,
+            settle_pnl_limit_factor: 0.2,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
         },
     )
@@ -108,6 +110,8 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
             liquidation_fee: 0.012,
             maker_fee: 0.0002,
             taker_fee: 0.000,
+            settle_pnl_limit_factor: 0.2,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[2]).await
         },
     )
@@ -120,18 +124,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     };
 
     // Set the initial oracle price
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "1000.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1000.0).await;
 
     //
     // Place orders and create a position
@@ -270,18 +263,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     }
 
     // Try and settle with high price
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "1200.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1200.0).await;
 
     // Account a must be the profitable one
     let result = send_tx(
@@ -304,18 +286,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     );
 
     // Change the oracle to a more reasonable price
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "1005.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1005.0).await;
 
     let expected_pnl_0 = I80F48::from(480); // Less due to fees
     let expected_pnl_1 = I80F48::from(-500);
@@ -335,18 +306,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     }
 
     // Change the oracle to a very high price, such that the pnl exceeds the account funding
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "1500.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1500.0).await;
 
     let expected_pnl_0 = I80F48::from(50000 - 20);
     let expected_pnl_1 = I80F48::from(-50000);
@@ -431,18 +391,7 @@ async fn test_perp_settle_pnl() -> Result<(), TransportError> {
     }
 
     // Change the oracle to a reasonable price in other direction
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "995.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 995.0).await;
 
     let expected_pnl_0 = I80F48::from(-8520);
     let expected_pnl_1 = I80F48::from(8500);
@@ -635,6 +584,8 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             settle_fee_flat: flat_fee as f32,
             settle_fee_amount_threshold: 2000.0,
             settle_fee_fraction_low_health: fee_low_health,
+            settle_pnl_limit_factor: 0.2,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
         },
     )
@@ -647,18 +598,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     };
 
     // Set the initial oracle price
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "1000.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1000.0).await;
 
     //
     // SETUP: Create a perp base position
@@ -721,18 +661,7 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     //
     // TEST: Settle (health is high)
     //
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "1050.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1050.0).await;
 
     let expected_pnl = 5000;
 
@@ -795,34 +724,12 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[2].pubkey,
-            payer,
-            price: "10700.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, &tokens[2], admin, 10700.0).await;
 
     //
     // TEST: Settle (health is low)
     //
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            payer,
-            price: "1100.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1100.0).await;
 
     let expected_pnl = 5000;
 
@@ -868,6 +775,218 @@ async fn test_perp_settle_pnl_fees() -> Result<(), TransportError> {
             total_fees_paid
         );
     }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..=2];
+
+    let initial_token_deposit = 1000_000;
+
+    //
+    // SETUP: Create a group and an account
+    //
+
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let settler =
+        create_funded_account(&solana, group, owner, 251, &context.users[1], &[], 0, 0).await;
+    let settler_owner = owner.clone();
+
+    let account_0 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        &mints[0..1],
+        initial_token_deposit,
+        0,
+    )
+    .await;
+    let account_1 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        &mints[0..1],
+        initial_token_deposit * 100, // Fund 100x, so that this is not the bound for what account_0 can settle
+        0,
+    )
+    .await;
+
+    //
+    // TEST: Create a perp market
+    //
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
+        solana,
+        PerpCreateMarketInstruction {
+            group,
+            admin,
+            payer,
+            perp_market_index: 0,
+            quote_lot_size: 10,
+            base_lot_size: 100,
+            maint_asset_weight: 0.975,
+            init_asset_weight: 0.95,
+            maint_liab_weight: 1.025,
+            init_liab_weight: 1.05,
+            liquidation_fee: 0.012,
+            maker_fee: 0.0002,
+            taker_fee: 0.000,
+            settle_pnl_limit_factor: 0.2,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
+            ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
+        },
+    )
+    .await
+    .unwrap();
+
+    let price_lots = {
+        let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
+        perp_market.native_price_to_lot(I80F48::from(1000))
+    };
+
+    // Set the initial oracle price
+    send_tx(
+        solana,
+        StubOracleSetInstruction {
+            group,
+            admin,
+            mint: mints[1].pubkey,
+            price: 1000.0,
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // Place orders and create a position
+    //
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+            side: Side::Bid,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            side: Side::Ask,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            client_order_id: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        PerpConsumeEventsInstruction {
+            perp_market,
+            mango_accounts: vec![account_0, account_1],
+        },
+    )
+    .await
+    .unwrap();
+
+    // Manipulate the price
+    send_tx(
+        solana,
+        StubOracleSetInstruction {
+            group,
+            admin,
+            mint: mints[1].pubkey,
+            price: 10000.0, // 10x original price
+        },
+    )
+    .await
+    .unwrap();
+
+    // Settle Pnl
+    // attempt 1 - settle max possible,
+    // since b has very large deposits, b's health will not interfere,
+    // the pnl cap enforced would be relative to the avg_entry_price
+    let market = solana.get_account::<PerpMarket>(perp_market).await;
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+    let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+    let mango_account_1_expected_qpn_after_settle = mango_account_1.perps[0]
+        .quote_position_native()
+        + (market.settle_pnl_limit_factor()
+            * I80F48::from_num(mango_account_0.perps[0].avg_entry_price(&market))
+            * mango_account_0.perps[0].base_position_native(&market))
+        .abs()
+        // fees
+        - I80F48::from_num(1000.0 * 100.0 * 0.0002);
+    send_tx(
+        solana,
+        PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
+            account_a: account_0,
+            account_b: account_1,
+            perp_market,
+            settle_bank: tokens[0].bank,
+        },
+    )
+    .await
+    .unwrap();
+    let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+    assert_eq!(
+        mango_account_1.perps[0].quote_position_native().round(),
+        mango_account_1_expected_qpn_after_settle.round()
+    );
+    // attempt 2 - as we are in the same window, and we settled max. possible in previous attempt,
+    // we can't settle anymore amount
+    send_tx(
+        solana,
+        PerpSettlePnlInstruction {
+            settler,
+            settler_owner,
+            account_a: account_0,
+            account_b: account_1,
+            perp_market,
+            settle_bank: tokens[0].bank,
+        },
+    )
+    .await
+    .unwrap();
+    let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+    assert_eq!(
+        mango_account_1.perps[0].quote_position_native().round(),
+        mango_account_1_expected_qpn_after_settle.round()
+    );
 
     Ok(())
 }

@@ -72,8 +72,7 @@ impl<'a> GroupWithTokensConfig {
                     group,
                     admin,
                     mint: mint.pubkey,
-                    payer,
-                    price: "1.0",
+                    price: 1.0,
                 },
             )
             .await
@@ -106,6 +105,9 @@ impl<'a> GroupWithTokensConfig {
                     admin,
                     mint: mint.pubkey,
                     payer,
+                    min_vault_to_deposits_ratio: 0.2,
+                    net_borrow_limit_per_window_quote: 1_000_000_000_000,
+                    net_borrow_limit_window_size_ts: 24 * 60 * 60,
                 },
             )
             .await

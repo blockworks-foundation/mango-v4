@@ -26,7 +26,7 @@ anchor-spl = { path = "../../anchor/spl" }
 arrayref = "0.3.6"
 bincode = "1.3.3"
 borsh = { version = "0.9.3", features = ["const-generics"] }
-bytemuck = "^1.7.2"
+bytemuck = { version = "^1.7.2", features = ["min_const_generics"] }
 checked_math = { path = "../../lib/checked_math" }
 derivative = "2.2.0"
 fixed = { version = "=1.11.0", features = ["serde", "borsh"] } # todo: higher versions don't work
@@ -35,19 +35,19 @@ mango-macro = { path = "../../mango-macro" }
 num_enum = "0.5.1"
 pyth-sdk-solana = "0.1.0"
 serde = "^1.0"
-serum_dex = { version = "0.4.0", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false,features = ["no-entrypoint", "program"] }
-solana-address-lookup-table-program = "~1.10.29"
-solana-program = "~1.10.29"
-solana-sdk = { version = "~1.10.29", default-features = false, optional = true }
+serum_dex = { version = "0.5.6", git = "https://github.com/blockworks-foundation/serum-dex.git", default-features=false,features = ["no-entrypoint", "program"], branch = "ckamm/find_by_key" }
+solana-address-lookup-table-program = "~1.10.35"
+solana-program = "~1.10.35"
+solana-sdk = { version = "~1.10.35", default-features = false, optional = true }
 static_assertions = "1.1"
 switchboard-program = ">=0.2.0"
 switchboard-utils = ">=0.1.36"
-switchboard-v2 = "0.1.10"
+switchboard-v2 = "0.1.12"
 
 [dev-dependencies]
-solana-sdk = { version = "~1.10.29", default-features = false }
-solana-program-test = "~1.10.29"
-solana-logger = "~1.10.29"
+solana-sdk = { version = "~1.10.35", default-features = false }
+solana-program-test = "~1.10.35"
+solana-logger = "~1.10.35"
 spl-token = { version = "^3.0.0", features = ["no-entrypoint"] }
 spl-associated-token-account = { version = "^1.0.3", features = ["no-entrypoint"] }
 bincode = "^1.3.1"
@@ -59,3 +59,4 @@ margin-trade = { path = "../margin-trade", features = ["cpi"] }
 itertools = "0.10.3"
 rand = "0.8.4"
 lazy_static = "1.4.0"
+num = "0.4.0"

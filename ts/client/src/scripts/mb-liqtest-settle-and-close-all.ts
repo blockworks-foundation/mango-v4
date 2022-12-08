@@ -31,8 +31,9 @@ async function main() {
     userProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 

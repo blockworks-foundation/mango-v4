@@ -2,13 +2,19 @@ name: Publish Docker Image to GCR
 
 on:
   push:
-    branches: [dev]
+    branches: [dev,main]
+    paths: ['.github/ci-docker-publish.yml',
+            'programs/**',
+            'client/**',
+            'keeper/**',
+            'liquidator/**']
   workflow_call:
     secrets:
       GCR_PROJECT:
         required: true
       GCR_SA_KEY:
         required: true
+  workflow_dispatch:
 
 env:
   PROJECT_ID: ${{ secrets.GCR_PROJECT }}
@@ -56,8 +62,8 @@ jobs:
           tags: |
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:${{ github.sha }}
             us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:latest
-          cache-from: type=registry,ref=us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:buildcache
-          cache-to: type=registry,ref=us-docker.pkg.dev/${{ env.PROJECT_ID }}/gcr.io/${{ env.IMAGE }}:buildcache,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       # Build and push the liquidator runtime image
       - name: Build and Push Liquidator
         uses: docker/build-push-action@v2

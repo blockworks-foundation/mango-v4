@@ -101,9 +101,18 @@ pub fn token_liq_with_token(
     let liqee_liab_native = liqee_liab_position.native(liab_bank);
     require!(liqee_liab_native.is_negative(), MangoError::SomeError);
 
-    // TODO why sum of both tokens liquidation fees? Add comment
-    let fee_factor = I80F48::ONE + asset_bank.liquidation_fee + liab_bank.liquidation_fee;
-    let liab_price_adjusted = liab_price * fee_factor;
+    // Liquidation fees work by giving the liqor more assets than the oracle price would
+    // indicate. Specifically we choose
+    //   assets =
+    //     liabs * liab_price/asset_price * (1 + liab_liq_fee + asset_liq_fee)
+    // Which means that we use a increased liab price and reduced asset price for the conversion.
+    // It would be more fully correct to use (1+liab_liq_fee)*(1+asset_liq_fee), but for small
+    // fee amounts that is nearly identical.
+    // For simplicity we write
+    //   assets = liabs * liab_price / asset_price * fee_factor
+    //   assets = liabs * liab_price_adjusted / asset_price
+    let fee_factor = cm!(I80F48::ONE + asset_bank.liquidation_fee + liab_bank.liquidation_fee);
+    let liab_price_adjusted = cm!(liab_price * fee_factor);
 
     let init_asset_weight = asset_bank.init_asset_weight;
     let init_liab_weight = liab_bank.init_liab_weight;
@@ -142,34 +151,48 @@ pub fn token_liq_with_token(
 
     // Apply the balance changes to the liqor and liqee accounts
     let liqee_liab_position = liqee.token_position_mut_by_raw_index(liqee_liab_raw_index);
-    let liqee_liab_active = liab_bank.deposit_with_dusting(liqee_liab_position, liab_transfer)?;
+    let liqee_liab_active = liab_bank.deposit_with_dusting(
+        liqee_liab_position,
+        liab_transfer,
+        Clock::get()?.unix_timestamp.try_into().unwrap(),
+    )?;
     let liqee_liab_indexed_position = liqee_liab_position.indexed_position;
 
     let (liqor_liab_position, liqor_liab_raw_index, _) =
         liqor.ensure_token_position(liab_token_index)?;
-    let (liqor_liab_active, loan_origination_fee) =
-        liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer)?;
+    let (liqor_liab_active, loan_origination_fee) = liab_bank.withdraw_with_fee(
+        liqor_liab_position,
+        liab_transfer,
+        Clock::get()?.unix_timestamp.try_into().unwrap(),
+        liab_price,
+    )?;
     let liqor_liab_indexed_position = liqor_liab_position.indexed_position;
     let liqee_liab_native_after = liqee_liab_position.native(liab_bank);
 
     let (liqor_asset_position, liqor_asset_raw_index, _) =
         liqor.ensure_token_position(asset_token_index)?;
-    let liqor_asset_active = asset_bank.deposit(liqor_asset_position, asset_transfer)?;
+    let liqor_asset_active = asset_bank.deposit(
+        liqor_asset_position,
+        asset_transfer,
+        Clock::get()?.unix_timestamp.try_into().unwrap(),
+    )?;
     let liqor_asset_indexed_position = liqor_asset_position.indexed_position;
 
     let liqee_asset_position = liqee.token_position_mut_by_raw_index(liqee_asset_raw_index);
-    let liqee_asset_active =
-        asset_bank.withdraw_without_fee_with_dusting(liqee_asset_position, asset_transfer)?;
+    let liqee_asset_active = asset_bank.withdraw_without_fee_with_dusting(
+        liqee_asset_position,
+        asset_transfer,
+        Clock::get()?.unix_timestamp.try_into().unwrap(),
+        asset_price,
+    )?;
     let liqee_asset_indexed_position = liqee_asset_position.indexed_position;
     let liqee_assets_native_after = liqee_asset_position.native(asset_bank);
 
     // Update the health cache
+    liqee_health_cache
+        .adjust_token_balance(&liab_bank, cm!(liqee_liab_native_after - liqee_liab_native))?;
     liqee_health_cache.adjust_token_balance(
-        liab_token_index,
-        cm!(liqee_liab_native_after - liqee_liab_native),
-    )?;
-    liqee_health_cache.adjust_token_balance(
-        asset_token_index,
+        &asset_bank,
         cm!(liqee_assets_native_after - liqee_asset_native),
     )?;
 

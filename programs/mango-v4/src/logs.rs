@@ -99,7 +99,7 @@ pub struct FillLog {
     pub seq_num: u64, // note: usize same as u64
 
     pub maker: Pubkey,
-    pub maker_order_id: i128,
+    pub maker_order_id: u128,
     pub maker_client_order_id: u64,
     pub maker_fee: i128,
 
@@ -107,7 +107,7 @@ pub struct FillLog {
     pub maker_timestamp: u64,
 
     pub taker: Pubkey,
-    pub taker_order_id: i128,
+    pub taker_order_id: u128,
     pub taker_client_order_id: u64,
     pub taker_fee: i128,
 
@@ -122,6 +122,7 @@ pub struct PerpUpdateFundingLog {
     pub long_funding: i128,
     pub short_funding: i128,
     pub price: i128,
+    pub stable_price: i128,
     pub fees_accrued: i128,
     pub open_interest: i64,
 }
@@ -134,6 +135,7 @@ pub struct UpdateIndexLog {
     pub borrow_index: i128,    // I80F48
     pub avg_utilization: i128, // I80F48
     pub price: i128,           // I80F48
+    pub stable_price: i128,    // I80F48
     pub collected_fees: i128,  // I80F48
     pub loan_fee_rate: i128,   // I80F48
     pub total_borrows: i128,

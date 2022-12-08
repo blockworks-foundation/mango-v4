@@ -2,13 +2,9 @@ import { AnchorProvider, BN, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { expect } from 'chai';
 import fs from 'fs';
+import { Group } from '../accounts/group';
 import { HealthType } from '../accounts/mangoAccount';
-import { BookSide, PerpOrderSide, PerpOrderType } from '../accounts/perp';
-import {
-  Serum3OrderType,
-  Serum3SelfTradeBehavior,
-  Serum3Side,
-} from '../accounts/serum3';
+import { PerpOrderSide, PerpOrderType } from '../accounts/perp';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 import { toUiDecimalsForQuote } from '../utils';
@@ -54,8 +50,9 @@ async function main() {
     userProvider,
     'devnet',
     MANGO_V4_ID['devnet'],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
@@ -107,25 +104,18 @@ async function main() {
     mangoAccount.tokens.length < 16 ||
     mangoAccount.serum3.length < 8 ||
     mangoAccount.perps.length < 8 ||
-    mangoAccount.perpOpenOrders.length < 64
+    mangoAccount.perpOpenOrders.length < 8
   ) {
     console.log(
-      `...expanding mango account to max 16 token positions, 8 serum3, 8 perp position and 64 perp oo slots, previous (tokens ${mangoAccount.tokens.length}, serum3 ${mangoAccount.serum3.length}, perps ${mangoAccount.perps.length}, perps oo ${mangoAccount.perpOpenOrders.length})`,
+      `...expanding mango account to max 16 token positions, 8 serum3, 8 perp position and 8 perp oo slots, previous (tokens ${mangoAccount.tokens.length}, serum3 ${mangoAccount.serum3.length}, perps ${mangoAccount.perps.length}, perps oo ${mangoAccount.perpOpenOrders.length})`,
     );
-    let sig = await client.expandMangoAccount(
-      group,
-      mangoAccount,
-      16,
-      8,
-      8,
-      64,
-    );
+    let sig = await client.expandMangoAccount(group, mangoAccount, 16, 8, 8, 8);
     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
     await mangoAccount.reload(client);
     expect(mangoAccount.tokens.length).equals(16);
     expect(mangoAccount.serum3.length).equals(8);
     expect(mangoAccount.perps.length).equals(8);
-    expect(mangoAccount.perpOpenOrders.length).equals(64);
+    expect(mangoAccount.perpOpenOrders.length).equals(8);
   }
 
   // deposit and withdraw
@@ -198,131 +188,132 @@ async function main() {
     await mangoAccount.reload(client);
   }
 
-  if (true) {
-    // serum3
-    const asks = await group.loadSerum3AsksForMarket(
-      client,
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-    );
-    const lowestAsk = Array.from(asks!)[0];
-    const bids = await group.loadSerum3BidsForMarket(
-      client,
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-    );
-    const highestBid = Array.from(bids!)![0];
+  // Note: Disable for now until we have openbook devnet markets
+  // if (true) {
+  //   // serum3
+  //   const asks = await group.loadSerum3AsksForMarket(
+  //     client,
+  //     DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+  //   );
+  //   const lowestAsk = Array.from(asks!)[0];
+  //   const bids = await group.loadSerum3BidsForMarket(
+  //     client,
+  //     DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+  //   );
+  //   const highestBid = Array.from(bids!)![0];
 
-    console.log(`...cancelling all existing serum3 orders`);
-    if (
-      Array.from(mangoAccount.serum3OosMapByMarketIndex.values()).length > 0
-    ) {
-      await client.serum3CancelAllOrders(
-        group,
-        mangoAccount,
-        DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-        10,
-      );
-    }
+  //   console.log(`...cancelling all existing serum3 orders`);
+  //   if (
+  //     Array.from(mangoAccount.serum3OosMapByMarketIndex.values()).length > 0
+  //   ) {
+  //     await client.serum3CancelAllOrders(
+  //       group,
+  //       mangoAccount,
+  //       DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+  //       10,
+  //     );
+  //   }
 
-    let price = 20;
-    let qty = 0.0001;
-    console.log(
-      `...placing serum3 bid which would not be settled since its relatively low then midprice at ${price} for ${qty}`,
-    );
-    await client.serum3PlaceOrder(
-      group,
-      mangoAccount,
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-      Serum3Side.bid,
-      price,
-      qty,
-      Serum3SelfTradeBehavior.decrementTake,
-      Serum3OrderType.limit,
-      Date.now(),
-      10,
-    );
-    await mangoAccount.reload(client);
-    let orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
-      client,
-      group,
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-    );
-    expect(orders[0].price).equals(20);
-    expect(orders[0].size).equals(qty);
+  //   let price = 20;
+  //   let qty = 0.0001;
+  //   console.log(
+  //     `...placing serum3 bid which would not be settled since its relatively low then midprice at ${price} for ${qty}`,
+  //   );
+  //   await client.serum3PlaceOrder(
+  //     group,
+  //     mangoAccount,
+  //     DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+  //     Serum3Side.bid,
+  //     price,
+  //     qty,
+  //     Serum3SelfTradeBehavior.decrementTake,
+  //     Serum3OrderType.limit,
+  //     Date.now(),
+  //     10,
+  //   );
+  //   await mangoAccount.reload(client);
+  //   let orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
+  //     client,
+  //     group,
+  //     DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+  //   );
+  //   expect(orders[0].price).equals(20);
+  //   expect(orders[0].size).equals(qty);
 
-    price = lowestAsk.price + lowestAsk.price / 2;
-    qty = 0.0001;
-    console.log(
-      `...placing serum3 bid way above midprice at ${price} for ${qty}`,
-    );
-    await client.serum3PlaceOrder(
-      group,
-      mangoAccount,
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-      Serum3Side.bid,
-      price,
-      qty,
-      Serum3SelfTradeBehavior.decrementTake,
-      Serum3OrderType.limit,
-      Date.now(),
-      10,
-    );
-    await mangoAccount.reload(client);
+  //   price = lowestAsk.price + lowestAsk.price / 2;
+  //   qty = 0.0001;
+  //   console.log(
+  //     `...placing serum3 bid way above midprice at ${price} for ${qty}`,
+  //   );
+  //   await client.serum3PlaceOrder(
+  //     group,
+  //     mangoAccount,
+  //     DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+  //     Serum3Side.bid,
+  //     price,
+  //     qty,
+  //     Serum3SelfTradeBehavior.decrementTake,
+  //     Serum3OrderType.limit,
+  //     Date.now(),
+  //     10,
+  //   );
+  //   await mangoAccount.reload(client);
 
-    price = highestBid.price - highestBid.price / 2;
-    qty = 0.0001;
-    console.log(
-      `...placing serum3 ask way below midprice at ${price} for ${qty}`,
-    );
-    await client.serum3PlaceOrder(
-      group,
-      mangoAccount,
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-      Serum3Side.ask,
-      price,
-      qty,
-      Serum3SelfTradeBehavior.decrementTake,
-      Serum3OrderType.limit,
-      Date.now(),
-      10,
-    );
+  //   price = highestBid.price - highestBid.price / 2;
+  //   qty = 0.0001;
+  //   console.log(
+  //     `...placing serum3 ask way below midprice at ${price} for ${qty}`,
+  //   );
+  //   await client.serum3PlaceOrder(
+  //     group,
+  //     mangoAccount,
+  //     DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+  //     Serum3Side.ask,
+  //     price,
+  //     qty,
+  //     Serum3SelfTradeBehavior.decrementTake,
+  //     Serum3OrderType.limit,
+  //     Date.now(),
+  //     10,
+  //   );
 
-    console.log(`...current own orders on OB`);
-    orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
-      client,
-      group,
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-    );
-    for (const order of orders) {
-      console.log(
-        `  - order orderId ${order.orderId}, ${order.side}, ${order.price}, ${order.size}`,
-      );
-      console.log(`  - cancelling order with ${order.orderId}`);
-      await client.serum3CancelOrder(
-        group,
-        mangoAccount,
-        DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-        order.side === 'buy' ? Serum3Side.bid : Serum3Side.ask,
-        order.orderId,
-      );
-    }
+  //   console.log(`...current own orders on OB`);
+  //   orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
+  //     client,
+  //     group,
+  //     DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+  //   );
+  //   for (const order of orders) {
+  //     console.log(
+  //       `  - order orderId ${order.orderId}, ${order.side}, ${order.price}, ${order.size}`,
+  //     );
+  //     console.log(`  - cancelling order with ${order.orderId}`);
+  //     await client.serum3CancelOrder(
+  //       group,
+  //       mangoAccount,
+  //       DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+  //       order.side === 'buy' ? Serum3Side.bid : Serum3Side.ask,
+  //       order.orderId,
+  //     );
+  //   }
 
-    console.log(`...current own orders on OB`);
-    orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
-      client,
-      group,
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-    );
-    for (const order of orders) {
-      console.log(order);
-    }
+  //   console.log(`...current own orders on OB`);
+  //   orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
+  //     client,
+  //     group,
+  //     DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+  //   );
+  //   for (const order of orders) {
+  //     console.log(order);
+  //   }
 
-    console.log(`...settling funds`);
-    await client.serum3SettleFunds(
-      group,
-      mangoAccount,
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-    );
-  }
+  //   console.log(`...settling funds`);
+  //   await client.serum3SettleFunds(
+  //     group,
+  //     mangoAccount,
+  //     DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+  //   );
+  // }
 
   if (true) {
     await mangoAccount.reload(client);
@@ -416,7 +407,7 @@ async function main() {
   // perps
   if (true) {
     let sig;
-    const perpMarket = group.getPerpMarketByName('BTC-PERP');
+    let perpMarket = group.getPerpMarketByName('BTC-PERP');
     const orders = await mangoAccount.loadPerpOpenOrdersForMarket(
       client,
       group,
@@ -428,6 +419,68 @@ async function main() {
       );
     }
     console.log(`...cancelling all perp orders`);
+    sig = await client.perpCancelAllOrders(
+      group,
+      mangoAccount,
+      perpMarket.perpMarketIndex,
+      10,
+    );
+    console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+
+    // oracle pegged
+    try {
+      const clientId = Math.floor(Math.random() * 99999);
+      const price = group.banksMapByName.get('BTC')![0].uiPrice!;
+      console.log(
+        `...placing perp pegged bid ${clientId} at oracle price ${perpMarket.uiPrice}`,
+      );
+      const sig = await client.perpPlaceOrderPegged(
+        group,
+        mangoAccount,
+        perpMarket.perpMarketIndex,
+        PerpOrderSide.bid,
+        -5,
+        perpMarket.uiPrice + 5,
+        0.01,
+        price * 0.011,
+        clientId,
+        PerpOrderType.limit,
+        false,
+        0,
+        1,
+      );
+      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    } catch (error) {
+      console.log(error);
+    }
+    try {
+      const clientId = Math.floor(Math.random() * 99999);
+      const price = group.banksMapByName.get('BTC')![0].uiPrice!;
+      console.log(
+        `...placing perp pegged bid ${clientId} at oracle price ${perpMarket.uiPrice}`,
+      );
+      const sig = await client.perpPlaceOrderPegged(
+        group,
+        mangoAccount,
+        perpMarket.perpMarketIndex,
+        PerpOrderSide.ask,
+        5,
+        perpMarket.uiPrice - 5,
+        0.01,
+        price * 0.011,
+        clientId,
+        PerpOrderType.limit,
+        false,
+        0,
+        1,
+      );
+      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    } catch (error) {
+      console.log(error);
+    }
+
+    await logBidsAndAsks(client, group);
+
     sig = await client.perpCancelAllOrders(
       group,
       mangoAccount,
@@ -448,6 +501,7 @@ async function main() {
       const quoteQty = mangoAccount.getMaxQuoteForPerpBidUi(
         group,
         perpMarket.perpMarketIndex,
+        perpMarket.uiPrice,
       );
       const baseQty = quoteQty / price;
       console.log(
@@ -455,6 +509,7 @@ async function main() {
           group,
           perpMarket.perpMarketIndex,
           baseQty,
+          perpMarket.uiPrice,
         )}`,
       );
       console.log(
@@ -470,6 +525,7 @@ async function main() {
         quoteQty,
         clientId,
         PerpOrderType.limit,
+        false,
         0, //Date.now() + 200,
         1,
       );
@@ -496,6 +552,7 @@ async function main() {
         mangoAccount.getMaxQuoteForPerpBidUi(
           group,
           perpMarket.perpMarketIndex,
+          perpMarket.uiPrice,
         ) * 1.02;
 
       const baseQty = quoteQty / price;
@@ -512,6 +569,7 @@ async function main() {
         quoteQty,
         clientId,
         PerpOrderType.limit,
+        false,
         0, //Date.now() + 200,
         1,
       );
@@ -530,12 +588,14 @@ async function main() {
       const baseQty = mangoAccount.getMaxBaseForPerpAskUi(
         group,
         perpMarket.perpMarketIndex,
+        perpMarket.uiPrice,
       );
       console.log(
         ` simHealthRatioWithPerpAskUiChanges - ${mangoAccount.simHealthRatioWithPerpAskUiChanges(
           group,
           perpMarket.perpMarketIndex,
           baseQty,
+          perpMarket.uiPrice,
         )}`,
       );
       const quoteQty = baseQty * price;
@@ -552,6 +612,7 @@ async function main() {
         quoteQty,
         clientId,
         PerpOrderType.limit,
+        false,
         0, //Date.now() + 200,
         1,
       );
@@ -567,8 +628,11 @@ async function main() {
         group.banksMapByName.get('BTC')![0].uiPrice! +
         Math.floor(Math.random() * 100);
       const baseQty =
-        mangoAccount.getMaxBaseForPerpAskUi(group, perpMarket.perpMarketIndex) *
-        1.02;
+        mangoAccount.getMaxBaseForPerpAskUi(
+          group,
+          perpMarket.perpMarketIndex,
+          perpMarket.uiPrice,
+        ) * 1.02;
       const quoteQty = baseQty * price;
       console.log(
         `...placing max qty perp ask * 1.02 clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
@@ -583,6 +647,7 @@ async function main() {
         quoteQty,
         clientId,
         PerpOrderType.limit,
+        false,
         0, //Date.now() + 200,
         1,
       );
@@ -617,6 +682,7 @@ async function main() {
         price * 0.01,
         clientId,
         PerpOrderType.limit,
+        false,
         0, //Date.now() + 200,
         1,
       );
@@ -638,6 +704,7 @@ async function main() {
         price * 0.011,
         clientId,
         PerpOrderType.limit,
+        false,
         0, //Date.now() + 200,
         1,
       );
@@ -649,11 +716,6 @@ async function main() {
     // console.log(`...cancelling all perp orders`);
     // sig = await client.perpCancelAllOrders(group, mangoAccount, perpMarket.perpMarketIndex, 10);
     // console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-
-    const bids: BookSide = await perpMarket?.loadBids(client)!;
-    console.log(`bids - ${Array.from(bids.items())}`);
-    const asks: BookSide = await perpMarket?.loadAsks(client)!;
-    console.log(`asks - ${Array.from(asks.items())}`);
 
     await perpMarket?.loadEventQueue(client)!;
     const fr = perpMarket?.getCurrentFundingRate(
@@ -677,6 +739,18 @@ async function main() {
   }
 
   process.exit();
+}
+
+async function logBidsAndAsks(client: MangoClient, group: Group) {
+  await group.reloadAll(client);
+  const perpMarket = group.getPerpMarketByName('BTC-PERP');
+  const res = [
+    (await perpMarket?.loadBids(client)).items(),
+    (await perpMarket?.loadAsks(client)!).items(),
+  ];
+  console.log(`bids ${JSON.stringify(Array.from(res[0]), null, 2)}`);
+  console.log(`asks ${JSON.stringify(Array.from(res[1]), null, 2)}`);
+  return res;
 }
 
 main();

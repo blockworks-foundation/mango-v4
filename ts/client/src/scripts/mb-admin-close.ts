@@ -27,8 +27,9 @@ async function main() {
     adminProvider,
     'mainnet-beta',
     MANGO_V4_ID['mainnet-beta'],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
 
   const groups = await (async () => {

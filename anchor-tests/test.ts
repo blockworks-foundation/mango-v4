@@ -1,5 +1,5 @@
 import * as anchor from '@project-serum/anchor';
-import { AnchorProvider, Program } from '@project-serum/anchor';
+import { AnchorProvider, BN, Program } from '@project-serum/anchor';
 import NodeWallet from '@project-serum/anchor/dist/cjs/nodewallet';
 import * as spl from '@solana/spl-token';
 import {
@@ -29,7 +29,7 @@ enum MINTS {
   BTC = 'BTC',
 }
 const NUM_USERS = 4;
-const PROGRAM_ID = 'm43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD';
+const PROGRAM_ID = '4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg';
 
 interface TestUser {
   keypair: anchor.web3.Keypair;
@@ -42,9 +42,8 @@ async function createMints(
   program: anchor.Program<MangoV4>,
   payer: anchor.web3.Keypair,
   admin,
-) {
-  let mintsMap: Partial<Record<keyof typeof MINTS, spl.Token>>;
-  let mints: spl.Token[] = [];
+): Promise<Partial<Record<keyof typeof MINTS, spl.Token>>> {
+  const mints: spl.Token[] = [];
   for (let i = 0; i < 2; i++) {
     mints.push(
       await spl.Token.createMint(
@@ -57,7 +56,7 @@ async function createMints(
       ),
     );
   }
-  mintsMap = {
+  const mintsMap = {
     USDC: mints[0],
     BTC: mints[1],
   };
@@ -72,20 +71,20 @@ async function createUsers(
   group: Group,
   connection: Connection,
   programId: PublicKey,
-) {
-  let users: TestUser[] = [];
+): Promise<TestUser[]> {
+  const users: TestUser[] = [];
   for (let i = 0; i < NUM_USERS; i++) {
-    let user = anchor.web3.Keypair.generate();
+    const user = anchor.web3.Keypair.generate();
 
     await provider.connection.requestAirdrop(
       user.publicKey,
       LAMPORTS_PER_SOL * 1000,
     );
 
-    let tokenAccounts: spl.AccountInfo[] = [];
-    for (let mintKey in mintsMap) {
-      let mint: spl.Token = mintsMap[mintKey];
-      let tokenAccount = await mint.getOrCreateAssociatedAccountInfo(
+    const tokenAccounts: spl.AccountInfo[] = [];
+    for (const mintKey in mintsMap) {
+      const mint: spl.Token = mintsMap[mintKey];
+      const tokenAccount = await mint.getOrCreateAssociatedAccountInfo(
         user.publicKey,
       );
       await mint.mintTo(tokenAccount.address, payer, [], 1_000_000_000_000_000);
@@ -100,14 +99,10 @@ async function createUsers(
       ),
       'devnet',
       programId,
-      {},
-      'get-program-accounts',
+      { idsSource: 'get-program-accounts' },
     );
 
-    const mangoAccount = await client.getOrCreateMangoAccount(
-      group,
-      user.publicKey,
-    );
+    const mangoAccount = await client.getOrCreateMangoAccount(group);
     await mangoAccount!.reload(client);
 
     console.log('created user ' + i);
@@ -123,12 +118,12 @@ async function createUsers(
 }
 
 describe('mango-v4', () => {
-  let programId = new PublicKey(PROGRAM_ID);
+  const programId = new PublicKey(PROGRAM_ID);
   // Configure the client to use the local cluster.
   const envProvider = anchor.AnchorProvider.env();
   anchor.setProvider(envProvider);
-  let envProviderWallet = envProvider.wallet;
-  let envProviderPayer = (envProviderWallet as NodeWallet).payer;
+  const envProviderWallet = envProvider.wallet;
+  const envProviderPayer = (envProviderWallet as NodeWallet).payer;
 
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
@@ -158,13 +153,9 @@ describe('mango-v4', () => {
 
     // Passing devnet as the cluster here - client cannot accept localnet
     // I think this is only for getting the serum market though?
-    envClient = await MangoClient.connect(
-      envProvider,
-      'devnet',
-      programId,
-      {},
-      'get-program-accounts',
-    );
+    envClient = await MangoClient.connect(envProvider, 'devnet', programId, {
+      idsSource: 'get-program-accounts',
+    });
     await envClient.groupCreate(groupNum, true, 1, insuranceMintPk);
     group = await envClient.getGroupForCreator(adminPk, groupNum);
 
@@ -358,14 +349,10 @@ describe('mango-v4', () => {
       ),
       'devnet',
       programId,
-      {},
-      'get-program-accounts',
+      { idsSource: 'get-program-accounts' },
     );
 
-    const mangoAccount = await client.getOrCreateMangoAccount(
-      group,
-      users[0].keypair.publicKey,
-    );
+    const mangoAccount = await client.getOrCreateMangoAccount(group);
     await mangoAccount!.reload(client);
 
     await client.tokenDeposit(
@@ -384,7 +371,7 @@ describe('mango-v4', () => {
     );
     await mangoAccount!.reload(client);
 
-    let banks = await envClient.getBanksForGroup(group);
+    const banks = await envClient.getBanksForGroup(group);
     assert.equal(
       mangoAccount!.getTokenBalanceUi(banks[0]),
       100.5,
@@ -524,21 +511,19 @@ describe('mango-v4', () => {
     assert.equal(makerOrders.length, 1, 'Maker still has one open order');
     assert.equal(makerOrders[0].uiSize, 1.0, 'Size reduced');
 
-    let makerPerps = makerAccount.perpActive();
+    const makerPerps = makerAccount.perpActive();
     assert.equal(makerPerps.length, 1, 'Maker has perp position');
     assert.equal(makerPerps[0].marketIndex, 0, 'Market index matches');
-    assert.equal(
-      makerPerps[0].basePositionLots,
-      10000,
+    assert.isTrue(
+      makerPerps[0].basePositionLots.eq(new anchor.BN(10000)),
       'base position correct',
     );
 
-    let takerPerps = takerAccount.perpActive();
+    const takerPerps = takerAccount.perpActive();
     assert.equal(takerPerps.length, 1, 'Taker has perp position');
     assert.equal(takerPerps[0].marketIndex, 0, 'Market index matches');
-    assert.equal(
-      takerPerps[0].basePositionLots,
-      -10000,
+    assert.isTrue(
+      takerPerps[0].basePositionLots.eq(new anchor.BN(-10000)),
       'base position correct',
     );
 
@@ -744,6 +729,51 @@ describe('mango-v4', () => {
     assert.isTrue(
       bank.indexLastUpdated > lastUpdated,
       'Index timestamp updated',
+    );
+  });
+
+  it('calculates entry and break even price correctly', async () => {
+    const { client: clientA, mangoAccount: accountA } = users[2];
+    const { client: clientB, mangoAccount: accountB } = users[3];
+
+    await accountA!.reload(clientA);
+    await accountB!.reload(clientB);
+
+    const btcPerp = (await envClient.perpGetMarkets(group))[0];
+    const positionA = accountA.getPerpPosition(btcPerp.perpMarketIndex)!;
+    const positionB = accountB.getPerpPosition(btcPerp.perpMarketIndex)!;
+
+    assert.equal(
+      positionA.getBasePositionUi(btcPerp),
+      1,
+      'Position is long'
+    );
+    assert.equal(
+      positionB.getBasePositionUi(btcPerp),
+      -1,
+      'Position is short'
+    );
+
+    assert.isTrue(
+      positionA.getEntryPrice(btcPerp)
+                      .eq(new BN(99.0)),
+      'long entry price matches'
+    );
+    assert.isTrue(
+      positionB.getEntryPrice(btcPerp)
+                      .eq(new BN(99.0)),
+      'short entry price matches'
+    );
+
+    assert.isTrue(
+      positionA.getBreakEvenPrice(btcPerp)
+                      .eq(new BN(99.0)),
+      'long break even price matches'
+    );
+    assert.isTrue(
+      positionB.getBreakEvenPrice(btcPerp)
+                      .eq(new BN(99.0)),
+      'short break even price matches'
     );
   });
 });

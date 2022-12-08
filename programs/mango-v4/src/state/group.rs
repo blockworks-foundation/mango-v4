@@ -6,7 +6,7 @@ use std::mem::size_of;
 pub type TokenIndex = u16;
 pub const QUOTE_TOKEN_INDEX: TokenIndex = 0;
 
-#[account(zero_copy)]
+#[account(zero_copy(safe_bytemuck_derives))]
 #[derive(Debug)]
 pub struct Group {
     // ABI: Clients rely on this being at offset 8
@@ -41,6 +41,7 @@ const_assert_eq!(
     size_of::<Group>(),
     32 * 5 + 4 + 4 + 1 + 1 + 6 + 20 * 32 + 1920
 );
+const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);
 
 impl Group {

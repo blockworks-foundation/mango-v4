@@ -1,0 +1,523 @@
+use anchor_lang::prelude::*;
+use anchor_lang::ZeroCopy;
+
+use fixed::types::I80F48;
+use serum_dex::state::OpenOrders;
+
+use std::cell::Ref;
+use std::collections::HashMap;
+
+use crate::accounts_zerocopy::*;
+use crate::error::*;
+use crate::serum3_cpi;
+use crate::state::{Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, TokenIndex};
+use crate::util::checked_math as cm;
+
+/// This trait abstracts how to find accounts needed for the health computation.
+///
+/// There are different ways they are retrieved from remainingAccounts, based
+/// on the instruction:
+/// - FixedOrderAccountRetriever requires the remainingAccounts to be in a well
+///   defined order and is the fastest. It's used where possible.
+/// - ScanningAccountRetriever does a linear scan for each account it needs.
+///   It needs more compute, but works when a union of bank/oracle/market accounts
+///   are passed because health needs to be computed for different baskets in
+///   one instruction (such as for liquidation instructions).
+pub trait AccountRetriever {
+    fn bank_and_oracle(
+        &self,
+        group: &Pubkey,
+        active_token_position_index: usize,
+        token_index: TokenIndex,
+    ) -> Result<(&Bank, I80F48)>;
+
+    fn serum_oo(&self, active_serum_oo_index: usize, key: &Pubkey) -> Result<&OpenOrders>;
+
+    fn perp_market_and_oracle_price(
+        &self,
+        group: &Pubkey,
+        active_perp_position_index: usize,
+        perp_market_index: PerpMarketIndex,
+    ) -> Result<(&PerpMarket, I80F48)>;
+}
+
+/// Assumes the account infos needed for the health computation follow a strict order.
+///
+/// 1. n_banks Bank account, in the order of account.token_iter_active()
+/// 2. n_banks oracle accounts, one for each bank in the same order
+/// 3. PerpMarket accounts, in the order of account.perps.iter_active_accounts()
+/// 4. PerpMarket oracle accounts, in the order of the perp market accounts
+/// 5. serum3 OpenOrders accounts, in the order of account.serum3.iter_active()
+pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
+    pub ais: Vec<T>,
+    pub n_banks: usize,
+    pub n_perps: usize,
+    pub begin_perp: usize,
+    pub begin_serum3: usize,
+    pub staleness_slot: Option<u64>,
+}
+
+pub fn new_fixed_order_account_retriever<'a, 'info>(
+    ais: &'a [AccountInfo<'info>],
+    account: &MangoAccountRef,
+) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
+    let active_token_len = account.active_token_positions().count();
+    let active_serum3_len = account.active_serum3_orders().count();
+    let active_perp_len = account.active_perp_positions().count();
+    let expected_ais = cm!(active_token_len * 2 // banks + oracles
+        + active_perp_len * 2 // PerpMarkets + Oracles
+        + active_serum3_len); // open_orders
+    require_eq!(ais.len(), expected_ais);
+
+    Ok(FixedOrderAccountRetriever {
+        ais: AccountInfoRef::borrow_slice(ais)?,
+        n_banks: active_token_len,
+        n_perps: active_perp_len,
+        begin_perp: cm!(active_token_len * 2),
+        begin_serum3: cm!(active_token_len * 2 + active_perp_len * 2),
+        staleness_slot: Some(Clock::get()?.slot),
+    })
+}
+
+impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
+    fn bank(&self, group: &Pubkey, account_index: usize, token_index: TokenIndex) -> Result<&Bank> {
+        let bank = self.ais[account_index].load::<Bank>()?;
+        require_keys_eq!(bank.group, *group);
+        require_eq!(bank.token_index, token_index);
+        Ok(bank)
+    }
+
+    fn perp_market(
+        &self,
+        group: &Pubkey,
+        account_index: usize,
+        perp_market_index: PerpMarketIndex,
+    ) -> Result<&PerpMarket> {
+        let market_ai = &self.ais[account_index];
+        let market = market_ai.load::<PerpMarket>()?;
+        require_keys_eq!(market.group, *group);
+        require_eq!(market.perp_market_index, perp_market_index);
+        Ok(market)
+    }
+
+    fn oracle_price_bank(&self, account_index: usize, bank: &Bank) -> Result<I80F48> {
+        let oracle = &self.ais[account_index];
+        bank.oracle_price(oracle, self.staleness_slot)
+    }
+
+    fn oracle_price_perp(&self, account_index: usize, perp_market: &PerpMarket) -> Result<I80F48> {
+        let oracle = &self.ais[account_index];
+        perp_market.oracle_price(oracle, self.staleness_slot)
+    }
+}
+
+impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
+    fn bank_and_oracle(
+        &self,
+        group: &Pubkey,
+        active_token_position_index: usize,
+        token_index: TokenIndex,
+    ) -> Result<(&Bank, I80F48)> {
+        let bank_account_index = active_token_position_index;
+        let bank = self
+            .bank(group, bank_account_index, token_index)
+            .with_context(|| {
+                format!(
+                    "loading bank with health account index {}, token index {}, passed account {}",
+                    bank_account_index,
+                    token_index,
+                    self.ais[bank_account_index].key(),
+                )
+            })?;
+
+        let oracle_index = cm!(self.n_banks + active_token_position_index);
+        let oracle_price = self.oracle_price_bank(oracle_index, bank).with_context(|| {
+            format!(
+                "getting oracle for bank with health account index {} and token index {}, passed account {}",
+                bank_account_index,
+                token_index,
+                self.ais[oracle_index].key(),
+            )
+        })?;
+
+        Ok((bank, oracle_price))
+    }
+
+    fn perp_market_and_oracle_price(
+        &self,
+        group: &Pubkey,
+        active_perp_position_index: usize,
+        perp_market_index: PerpMarketIndex,
+    ) -> Result<(&PerpMarket, I80F48)> {
+        let perp_index = cm!(self.begin_perp + active_perp_position_index);
+        let perp_market = self
+            .perp_market(group, perp_index, perp_market_index)
+            .with_context(|| {
+                format!(
+                    "loading perp market with health account index {} and perp market index {}, passed account {}",
+                    perp_index,
+                    perp_market_index,
+                    self.ais[perp_index].key(),
+                )
+            })?;
+
+        let oracle_index = cm!(perp_index + self.n_perps);
+        let oracle_price = self.oracle_price_perp(oracle_index, perp_market).with_context(|| {
+            format!(
+                "getting oracle for perp market with health account index {} and perp market index {}, passed account {}",
+                oracle_index,
+                perp_market_index,
+                self.ais[oracle_index].key(),
+            )
+        })?;
+        Ok((perp_market, oracle_price))
+    }
+
+    fn serum_oo(&self, active_serum_oo_index: usize, key: &Pubkey) -> Result<&OpenOrders> {
+        let serum_oo_index = cm!(self.begin_serum3 + active_serum_oo_index);
+        let ai = &self.ais[serum_oo_index];
+        (|| {
+            require_keys_eq!(*key, *ai.key());
+            serum3_cpi::load_open_orders(ai)
+        })()
+        .with_context(|| {
+            format!(
+                "loading serum open orders with health account index {}, passed account {}",
+                serum_oo_index,
+                ai.key(),
+            )
+        })
+    }
+}
+
+/// Takes a list of account infos containing
+/// - an unknown number of Banks in any order, followed by
+/// - the same number of oracles in the same order as the banks, followed by
+/// - an unknown number of PerpMarket accounts
+/// - the same number of oracles in the same order as the perp markets
+/// - an unknown number of serum3 OpenOrders accounts
+/// and retrieves accounts needed for the health computation by doing a linear
+/// scan for each request.
+pub struct ScanningAccountRetriever<'a, 'info> {
+    banks: Vec<AccountInfoRefMut<'a, 'info>>,
+    oracles: Vec<AccountInfoRef<'a, 'info>>,
+    perp_markets: Vec<AccountInfoRef<'a, 'info>>,
+    perp_oracles: Vec<AccountInfoRef<'a, 'info>>,
+    serum3_oos: Vec<AccountInfoRef<'a, 'info>>,
+    token_index_map: HashMap<TokenIndex, usize>,
+    perp_index_map: HashMap<PerpMarketIndex, usize>,
+    staleness_slot: Option<u64>,
+}
+
+/// Returns None if `ai` doesn't have the owner or discriminator for T.
+/// Forwards "can't borrow" error, so it can be raised immediately.
+fn can_load_as<'a, T: ZeroCopy + Owner>(
+    (i, ai): (usize, &'a AccountInfo),
+) -> Option<(usize, Result<Ref<'a, T>>)> {
+    let load_result = ai.load::<T>();
+    match load_result {
+        Err(Error::AnchorError(error))
+            if error.error_code_number == ErrorCode::AccountDiscriminatorMismatch as u32
+                || error.error_code_number == ErrorCode::AccountDiscriminatorNotFound as u32
+                || error.error_code_number == ErrorCode::AccountOwnedByWrongProgram as u32 =>
+        {
+            return None;
+        }
+        _ => {}
+    };
+    Some((i, load_result))
+}
+
+impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
+    pub fn new(ais: &'a [AccountInfo<'info>], group: &Pubkey) -> Result<Self> {
+        Self::new_with_staleness(ais, group, Some(Clock::get()?.slot))
+    }
+
+    pub fn new_with_staleness(
+        ais: &'a [AccountInfo<'info>],
+        group: &Pubkey,
+        staleness_slot: Option<u64>,
+    ) -> Result<Self> {
+        // find all Bank accounts
+        let mut token_index_map = HashMap::with_capacity(ais.len() / 2);
+        ais.iter()
+            .enumerate()
+            .map_while(can_load_as::<Bank>)
+            .try_for_each(|(i, loaded)| {
+                (|| {
+                    let bank = loaded?;
+                    require_keys_eq!(bank.group, *group);
+                    let previous = token_index_map.insert(bank.token_index, i);
+                    require_msg!(
+                        previous.is_none(),
+                        "duplicate bank for token index {}",
+                        bank.token_index
+                    );
+                    Ok(())
+                })()
+                .with_context(|| format!("scanning banks, health account index {}", i))
+            })?;
+        let n_banks = token_index_map.len();
+
+        // skip all banks and oracles, then find number of PerpMarket accounts
+        let perps_start = n_banks * 2;
+        let mut perp_index_map = HashMap::with_capacity(ais.len().saturating_sub(perps_start));
+        ais[perps_start..]
+            .iter()
+            .enumerate()
+            .map_while(can_load_as::<PerpMarket>)
+            .try_for_each(|(i, loaded)| {
+                (|| {
+                    let perp_market = loaded?;
+                    require_keys_eq!(perp_market.group, *group);
+                    let previous = perp_index_map.insert(perp_market.perp_market_index, i);
+                    require_msg!(
+                        previous.is_none(),
+                        "duplicate perp market for perp market index {}",
+                        perp_market.perp_market_index
+                    );
+                    Ok(())
+                })()
+                .with_context(|| {
+                    format!(
+                        "scanning perp markets, health account index {}",
+                        i + perps_start
+                    )
+                })
+            })?;
+        let n_perps = perp_index_map.len();
+        let perp_oracles_start = perps_start + n_perps;
+        let serum3_start = perp_oracles_start + n_perps;
+
+        Ok(Self {
+            banks: AccountInfoRefMut::borrow_slice(&ais[..n_banks])?,
+            oracles: AccountInfoRef::borrow_slice(&ais[n_banks..perps_start])?,
+            perp_markets: AccountInfoRef::borrow_slice(&ais[perps_start..perp_oracles_start])?,
+            perp_oracles: AccountInfoRef::borrow_slice(&ais[perp_oracles_start..serum3_start])?,
+            serum3_oos: AccountInfoRef::borrow_slice(&ais[serum3_start..])?,
+            token_index_map,
+            perp_index_map,
+            staleness_slot,
+        })
+    }
+
+    #[inline]
+    fn bank_index(&self, token_index: TokenIndex) -> Result<usize> {
+        Ok(*self.token_index_map.get(&token_index).ok_or_else(|| {
+            error_msg_typed!(
+                TokenPositionDoesNotExist,
+                "token index {} not found",
+                token_index
+            )
+        })?)
+    }
+
+    #[inline]
+    fn perp_market_index(&self, perp_market_index: PerpMarketIndex) -> Result<usize> {
+        Ok(*self
+            .perp_index_map
+            .get(&perp_market_index)
+            .ok_or_else(|| error_msg!("perp market index {} not found", perp_market_index))?)
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn banks_mut_and_oracles(
+        &mut self,
+        token_index1: TokenIndex,
+        token_index2: TokenIndex,
+    ) -> Result<(&mut Bank, I80F48, Option<(&mut Bank, I80F48)>)> {
+        if token_index1 == token_index2 {
+            let index = self.bank_index(token_index1)?;
+            let bank = self.banks[index].load_mut_fully_unchecked::<Bank>()?;
+            let oracle = &self.oracles[index];
+            let price = bank.oracle_price(oracle, self.staleness_slot)?;
+            return Ok((bank, price, None));
+        }
+        let index1 = self.bank_index(token_index1)?;
+        let index2 = self.bank_index(token_index2)?;
+        let (first, second, swap) = if index1 < index2 {
+            (index1, index2, false)
+        } else {
+            (index2, index1, true)
+        };
+
+        // split_at_mut after the first bank and after the second bank
+        let (first_bank_part, second_bank_part) = self.banks.split_at_mut(first + 1);
+
+        let bank1 = first_bank_part[first].load_mut_fully_unchecked::<Bank>()?;
+        let bank2 = second_bank_part[second - (first + 1)].load_mut_fully_unchecked::<Bank>()?;
+        let oracle1 = &self.oracles[first];
+        let oracle2 = &self.oracles[second];
+        let price1 = bank1.oracle_price(oracle1, self.staleness_slot)?;
+        let price2 = bank2.oracle_price(oracle2, self.staleness_slot)?;
+        if swap {
+            Ok((bank2, price2, Some((bank1, price1))))
+        } else {
+            Ok((bank1, price1, Some((bank2, price2))))
+        }
+    }
+
+    pub fn scanned_bank_and_oracle(&self, token_index: TokenIndex) -> Result<(&Bank, I80F48)> {
+        let index = self.bank_index(token_index)?;
+        // The account was already loaded successfully during construction
+        let bank = self.banks[index].load_fully_unchecked::<Bank>()?;
+        let oracle = &self.oracles[index];
+        let price = bank.oracle_price(oracle, self.staleness_slot)?;
+        Ok((bank, price))
+    }
+
+    pub fn scanned_perp_market_and_oracle(
+        &self,
+        perp_market_index: PerpMarketIndex,
+    ) -> Result<(&PerpMarket, I80F48)> {
+        let index = self.perp_market_index(perp_market_index)?;
+        // The account was already loaded successfully during construction
+        let perp_market = self.perp_markets[index].load_fully_unchecked::<PerpMarket>()?;
+        let oracle_acc = &self.perp_oracles[index];
+        let price = perp_market.oracle_price(oracle_acc, self.staleness_slot)?;
+        Ok((perp_market, price))
+    }
+
+    pub fn scanned_serum_oo(&self, key: &Pubkey) -> Result<&OpenOrders> {
+        let oo = self
+            .serum3_oos
+            .iter()
+            .find(|ai| ai.key == key)
+            .ok_or_else(|| error_msg!("no serum3 open orders for key {}", key))?;
+        serum3_cpi::load_open_orders(oo)
+    }
+}
+
+impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
+    fn bank_and_oracle(
+        &self,
+        _group: &Pubkey,
+        _account_index: usize,
+        token_index: TokenIndex,
+    ) -> Result<(&Bank, I80F48)> {
+        self.scanned_bank_and_oracle(token_index)
+    }
+
+    fn perp_market_and_oracle_price(
+        &self,
+        _group: &Pubkey,
+        _account_index: usize,
+        perp_market_index: PerpMarketIndex,
+    ) -> Result<(&PerpMarket, I80F48)> {
+        self.scanned_perp_market_and_oracle(perp_market_index)
+    }
+
+    fn serum_oo(&self, _account_index: usize, key: &Pubkey) -> Result<&OpenOrders> {
+        self.scanned_serum_oo(key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::test::*;
+    use super::*;
+    use serum_dex::state::OpenOrders;
+    use std::convert::identity;
+
+    #[test]
+    fn test_scanning_account_retriever() {
+        let oracle1_price = 1.0;
+        let oracle2_price = 5.0;
+        let group = Pubkey::new_unique();
+
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 1, oracle1_price, 0.2, 0.1);
+        let (mut bank2, mut oracle2) = mock_bank_and_oracle(group, 4, oracle2_price, 0.5, 0.3);
+        let (mut bank3, _) = mock_bank_and_oracle(group, 5, 1.0, 0.5, 0.3);
+
+        // bank3 reuses the bank2 oracle, to ensure the ScanningAccountRetriever doesn't choke on that
+        bank3.data().oracle = oracle2.pubkey;
+
+        let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
+        let oo1key = oo1.pubkey;
+        oo1.data().native_pc_total = 20;
+
+        let mut perp1 = mock_perp_market(group, oracle2.pubkey, oracle2_price, 9, 0.2, 0.1);
+        let mut perp2 = mock_perp_market(group, oracle1.pubkey, oracle1_price, 8, 0.2, 0.1);
+
+        let oracle1_account_info = oracle1.as_account_info();
+        let oracle2_account_info = oracle2.as_account_info();
+        let ais = vec![
+            bank1.as_account_info(),
+            bank2.as_account_info(),
+            bank3.as_account_info(),
+            oracle1_account_info.clone(),
+            oracle2_account_info.clone(),
+            oracle2_account_info.clone(),
+            perp1.as_account_info(),
+            perp2.as_account_info(),
+            oracle2_account_info,
+            oracle1_account_info,
+            oo1.as_account_info(),
+        ];
+
+        let mut retriever =
+            ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
+
+        assert_eq!(retriever.banks.len(), 3);
+        assert_eq!(retriever.token_index_map.len(), 3);
+        assert_eq!(retriever.oracles.len(), 3);
+        assert_eq!(retriever.perp_markets.len(), 2);
+        assert_eq!(retriever.perp_oracles.len(), 2);
+        assert_eq!(retriever.perp_index_map.len(), 2);
+        assert_eq!(retriever.serum3_oos.len(), 1);
+
+        {
+            let (b1, o1, opt_b2o2) = retriever.banks_mut_and_oracles(1, 4).unwrap();
+            let (b2, o2) = opt_b2o2.unwrap();
+            assert_eq!(b1.token_index, 1);
+            assert_eq!(o1, I80F48::ONE);
+            assert_eq!(b2.token_index, 4);
+            assert_eq!(o2, 5 * I80F48::ONE);
+        }
+
+        {
+            let (b1, o1, opt_b2o2) = retriever.banks_mut_and_oracles(4, 1).unwrap();
+            let (b2, o2) = opt_b2o2.unwrap();
+            assert_eq!(b1.token_index, 4);
+            assert_eq!(o1, 5 * I80F48::ONE);
+            assert_eq!(b2.token_index, 1);
+            assert_eq!(o2, I80F48::ONE);
+        }
+
+        {
+            let (b1, o1, opt_b2o2) = retriever.banks_mut_and_oracles(4, 4).unwrap();
+            assert!(opt_b2o2.is_none());
+            assert_eq!(b1.token_index, 4);
+            assert_eq!(o1, 5 * I80F48::ONE);
+        }
+
+        retriever.banks_mut_and_oracles(4, 2).unwrap_err();
+
+        {
+            let (b, o) = retriever.scanned_bank_and_oracle(5).unwrap();
+            assert_eq!(b.token_index, 5);
+            assert_eq!(o, 5 * I80F48::ONE);
+        }
+
+        let oo = retriever.serum_oo(0, &oo1key).unwrap();
+        assert_eq!(identity(oo.native_pc_total), 20);
+
+        assert!(retriever.serum_oo(1, &Pubkey::default()).is_err());
+
+        let (perp, oracle_price) = retriever
+            .perp_market_and_oracle_price(&group, 0, 9)
+            .unwrap();
+        assert_eq!(identity(perp.perp_market_index), 9);
+        assert_eq!(oracle_price, oracle2_price);
+
+        let (perp, oracle_price) = retriever
+            .perp_market_and_oracle_price(&group, 1, 8)
+            .unwrap();
+        assert_eq!(identity(perp.perp_market_index), 8);
+        assert_eq!(oracle_price, oracle1_price);
+
+        assert!(retriever
+            .perp_market_and_oracle_price(&group, 1, 5)
+            .is_err());
+    }
+}

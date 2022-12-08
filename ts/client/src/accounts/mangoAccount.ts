@@ -1,12 +1,12 @@
 import { AnchorProvider, BN } from '@project-serum/anchor';
 import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
-import { AccountInfo, PublicKey } from '@solana/web3.js';
+import { AccountInfo, PublicKey, TransactionSignature } from '@solana/web3.js';
 import { MangoClient } from '../client';
-import { SERUM3_PROGRAM_ID } from '../constants';
+import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
-import { Bank, QUOTE_DECIMALS, TokenIndex } from './bank';
+import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
 import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
@@ -118,7 +118,7 @@ export class MangoAccount {
           const oo = OpenOrders.fromAccountInfo(
             serum3Active[i].openOrders,
             ai,
-            SERUM3_PROGRAM_ID[client.cluster],
+            OPENBOOK_PROGRAM_ID[client.cluster],
           );
           return [serum3Active[i].marketIndex, oo];
         }),
@@ -140,6 +140,12 @@ export class MangoAccount {
 
   public serum3Active(): Serum3Orders[] {
     return this.serum3.filter((serum3) => serum3.isActive());
+  }
+
+  public perpPositionExistsForMarket(perpMarket: PerpMarket): boolean {
+    return this.perps.some(
+      (pp) => pp.isActive() && pp.marketIndex == perpMarket.perpMarketIndex,
+    );
   }
 
   public perpActive(): PerpPosition[] {
@@ -268,6 +274,11 @@ export class MangoAccount {
     return hc.health(healthType);
   }
 
+  public getPerpSettleHealth(group: Group): I80F48 {
+    const hc = HealthCache.fromMangoAccount(group, this);
+    return hc.perpSettleHealth();
+  }
+
   /**
    * Health ratio, which is computed so `100 * (assets-liabs)/liabs`
    * Note: health ratio is technically ∞ if liabs are 0
@@ -370,8 +381,48 @@ export class MangoAccount {
   }
 
   /**
+   * @returns token cumulative interest, in native token units. Sum of deposit and borrow interest.
+   * Caveat: This will only return cumulative interest since the tokenPosition was last opened.
+   * If the tokenPosition was closed and reopened multiple times it is necessary to add this result to
+   * cumulative interest at each of the prior tokenPosition closings (from mango API) to get the all time
+   * cumulative interest.
+   */
+  getCumulativeInterest(bank: Bank): number {
+    const token = this.getToken(bank.tokenIndex);
+
+    if (token === undefined) {
+      // tokenPosition does not exist on mangoAccount so no cumulative interest
+      return 0;
+    } else {
+      if (token.indexedPosition.isPos()) {
+        const interest = bank.depositIndex
+          .sub(token.previousIndex)
+          .mul(token.indexedPosition)
+          .toNumber();
+        return (
+          interest +
+          token.cumulativeDepositInterest +
+          token.cumulativeBorrowInterest
+        );
+      } else {
+        const interest = bank.borrowIndex
+          .sub(token.previousIndex)
+          .mul(token.indexedPosition)
+          .toNumber();
+        return (
+          interest +
+          token.cumulativeDepositInterest +
+          token.cumulativeBorrowInterest
+        );
+      }
+    }
+  }
+
+  /**
    * The amount of given native token you can withdraw including borrows, considering all existing assets as collateral.
    * @returns amount of given native token you can borrow, considering all existing assets as collateral, in native token
+   *
+   * TODO: take into account net_borrow_limit and min_vault_to_deposits_ratio
    */
   public getMaxWithdrawWithBorrowForToken(
     group: Group,
@@ -433,29 +484,28 @@ export class MangoAccount {
 
   /**
    * The max amount of given source ui token you can swap to a target token.
-   *  PriceFactor is ratio between A - how many source tokens can be traded for target tokens
-   *  and B - source native oracle price / target native oracle price.
-   *  e.g. a slippage of 5% and some fees which are 1%, then priceFactor = 0.94
-   *  the factor is used to compute how much target can be obtained by swapping source
-   *  in reality, and not only relying on oracle prices, and taking in account e.g. slippage which
-   *  can occur at large size
+   *  Price is simply the source tokens price divided by target tokens price,
+   *  it is supposed to give an indication of how many source tokens can be traded for target tokens,
+   *  it can optionally contain information on slippage and fees.
    * @returns max amount of given source ui token you can swap to a target token, in ui token
    */
   getMaxSourceUiForTokenSwap(
     group: Group,
     sourceMintPk: PublicKey,
     targetMintPk: PublicKey,
-    priceFactor: number,
+    price: number,
   ): number {
     if (sourceMintPk.equals(targetMintPk)) {
       return 0;
     }
+    const s = group.getFirstBankByMint(sourceMintPk);
+    const t = group.getFirstBankByMint(targetMintPk);
     const hc = HealthCache.fromMangoAccount(group, this);
     const maxSource = hc.getMaxSourceForTokenSwap(
-      group.getFirstBankByMint(sourceMintPk),
-      group.getFirstBankByMint(targetMintPk),
+      s,
+      t,
+      I80F48.fromNumber(price * Math.pow(10, t.mintDecimals - s.mintDecimals)),
       I80F48.fromNumber(2), // target 2% health
-      I80F48.fromNumber(priceFactor),
     );
     maxSource.idiv(
       ONE_I80F48().add(
@@ -515,7 +565,7 @@ export class MangoAccount {
       return OpenOrders.fromAccountInfo(
         this.serum3[index].openOrders,
         acc,
-        SERUM3_PROGRAM_ID[client.cluster],
+        OPENBOOK_PROGRAM_ID[client.cluster],
       );
     });
   }
@@ -560,6 +610,8 @@ export class MangoAccount {
   }
 
   /**
+   * TODO REWORK, know to break in binary search, also make work for limit orders
+   *
    * @param group
    * @param externalMarketPk
    * @returns maximum ui quote which can be traded at oracle price for base token given current health
@@ -597,6 +649,7 @@ export class MangoAccount {
   }
 
   /**
+   * TODO REWORK, know to break in binary search, also make work for limit orders
    * @param group
    * @param externalMarketPk
    * @returns maximum ui base which can be traded at oracle price for quote token given current health
@@ -624,7 +677,7 @@ export class MangoAccount {
     // If its a ask then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
     nativeAmount = nativeAmount
-      .div(baseBank.price)
+      // .div(baseBank.price)
       .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
       .div(ONE_I80F48().add(I80F48.fromNumber(group.getSerum3FeeRates(false))));
     return toUiDecimals(
@@ -709,8 +762,47 @@ export class MangoAccount {
       .toNumber();
   }
 
+  // TODO: don't send a settle instruction if there's nothing to settle
+  public async serum3SettleFundsForAllMarkets(
+    client: MangoClient,
+    group: Group,
+  ): Promise<TransactionSignature[]> {
+    // Future: collect ixs, batch them, and send them in fewer txs
+    return await Promise.all(
+      this.serum3Active().map((s) => {
+        const serum3Market = group.getSerum3MarketByMarketIndex(s.marketIndex);
+        return client.serum3SettleFunds(
+          group,
+          this,
+          serum3Market.serumMarketExternal,
+        );
+      }),
+    );
+  }
+
+  // TODO: cancel until all are cancelled
+  public async serum3CancelAllOrdersForAllMarkets(
+    client: MangoClient,
+    group: Group,
+  ): Promise<TransactionSignature[]> {
+    // Future: collect ixs, batch them, and send them in in fewer txs
+    return await Promise.all(
+      this.serum3Active().map((s) => {
+        const serum3Market = group.getSerum3MarketByMarketIndex(s.marketIndex);
+        return client.serum3CancelAllOrders(
+          group,
+          this,
+          serum3Market.serumMarketExternal,
+        );
+      }),
+    );
+  }
+
   /**
+   * TODO: also think about limit orders
    *
+   * The max ui quote you can place a market/ioc bid on the market,
+   * price is the ui price at which you think the order would materialiase.
    * @param group
    * @param perpMarketName
    * @returns maximum ui quote which can be traded at oracle price for quote token given current health
@@ -718,15 +810,13 @@ export class MangoAccount {
   public getMaxQuoteForPerpBidUi(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
+    price: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
-    const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
-      pp
-        ? pp
-        : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
+      I80F48.fromNumber(price),
       PerpOrderSide.bid,
       I80F48.fromNumber(2),
     );
@@ -736,7 +826,10 @@ export class MangoAccount {
   }
 
   /**
+   * TODO: also think about limit orders
    *
+   * The max ui base you can place a market/ioc ask on the market,
+   * price is the ui price at which you think the order would materialiase.
    * @param group
    * @param perpMarketName
    * @param uiPrice ui price at which ask would be placed at
@@ -745,15 +838,13 @@ export class MangoAccount {
   public getMaxBaseForPerpAskUi(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
+    price: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
-    const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
-      pp
-        ? pp
-        : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
+      I80F48.fromNumber(price),
       PerpOrderSide.ask,
       I80F48.fromNumber(2),
     );
@@ -764,6 +855,7 @@ export class MangoAccount {
     group: Group,
     perpMarketIndex: PerpMarketIndex,
     size: number,
+    price: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
@@ -774,8 +866,9 @@ export class MangoAccount {
         pp
           ? pp
           : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
-        perpMarket.uiBaseToLots(size),
         PerpOrderSide.bid,
+        perpMarket.uiBaseToLots(size),
+        I80F48.fromNumber(price),
         HealthType.init,
       )
       .toNumber();
@@ -785,6 +878,7 @@ export class MangoAccount {
     group: Group,
     perpMarketIndex: PerpMarketIndex,
     size: number,
+    price: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
@@ -795,8 +889,9 @@ export class MangoAccount {
         pp
           ? pp
           : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
-        perpMarket.uiBaseToLots(size),
         PerpOrderSide.ask,
+        perpMarket.uiBaseToLots(size),
+        I80F48.fromNumber(price),
         HealthType.init,
       )
       .toNumber();
@@ -870,6 +965,9 @@ export class TokenPosition {
       I80F48.from(dto.indexedPosition),
       dto.tokenIndex as TokenIndex,
       dto.inUseCount,
+      I80F48.from(dto.previousIndex),
+      dto.cumulativeDepositInterest,
+      dto.cumulativeBorrowInterest,
     );
   }
 
@@ -877,6 +975,9 @@ export class TokenPosition {
     public indexedPosition: I80F48,
     public tokenIndex: TokenIndex,
     public inUseCount: number,
+    public previousIndex: I80F48,
+    public cumulativeDepositInterest: number,
+    public cumulativeBorrowInterest: number,
   ) {}
 
   public isActive(): boolean {
@@ -975,6 +1076,9 @@ export class TokenPositionDto {
     public tokenIndex: number,
     public inUseCount: number,
     public reserved: number[],
+    public previousIndex: I80F48Dto,
+    public cumulativeDepositInterest: number,
+    public cumulativeBorrowInterest: number,
   ) {}
 }
 
@@ -1005,6 +1109,8 @@ export class Serum3PositionDto {
   constructor(
     public openOrders: PublicKey,
     public marketIndex: number,
+    public baseBorrowsWithoutFee: BN,
+    public quoteBorrowsWithoutFee: BN,
     public baseTokenIndex: number,
     public quoteTokenIndex: number,
     public reserved: number[],
@@ -1016,9 +1122,10 @@ export class PerpPosition {
   static from(dto: PerpPositionDto): PerpPosition {
     return new PerpPosition(
       dto.marketIndex as PerpMarketIndex,
+      dto.settlePnlLimitWindow,
+      dto.settlePnlLimitSettledInCurrentWindowNative,
       dto.basePositionLots,
       I80F48.from(dto.quotePositionNative),
-      dto.quoteEntryNative,
       dto.quoteRunningNative,
       I80F48.from(dto.longSettledFunding),
       I80F48.from(dto.shortSettledFunding),
@@ -1031,6 +1138,8 @@ export class PerpPosition {
       dto.makerVolume,
       dto.takerVolume,
       dto.perpSpotTransfers,
+      dto.avgEntryPricePerBaseLot,
+      I80F48.from(dto.realizedPnlNative),
     );
   }
 
@@ -1039,9 +1148,10 @@ export class PerpPosition {
   ): PerpPosition {
     return new PerpPosition(
       perpMarketIndex,
+      0,
+      new BN(0),
       new BN(0),
       ZERO_I80F48(),
-      new BN(0),
       new BN(0),
       ZERO_I80F48(),
       ZERO_I80F48(),
@@ -1054,14 +1164,17 @@ export class PerpPosition {
       new BN(0),
       new BN(0),
       new BN(0),
+      0,
+      ZERO_I80F48(),
     );
   }
 
   constructor(
     public marketIndex: PerpMarketIndex,
+    public settlePnlLimitWindow: number,
+    public settlePnlLimitSettledInCurrentWindowNative: BN,
     public basePositionLots: BN,
     public quotePositionNative: I80F48,
-    public quoteEntryNative: BN,
     public quoteRunningNative: BN,
     public longSettledFunding: I80F48,
     public shortSettledFunding: I80F48,
@@ -1074,6 +1187,8 @@ export class PerpPosition {
     public makerVolume: BN,
     public takerVolume: BN,
     public perpSpotTransfers: BN,
+    public avgEntryPricePerBaseLot: number,
+    public realizedPnlNative: I80F48,
   ) {}
 
   isActive(): boolean {
@@ -1102,11 +1217,6 @@ export class PerpPosition {
         .mul(I80F48.fromI64(this.basePositionLots));
     }
     return ZERO_I80F48();
-  }
-
-  public getEquityUi(perpMarket: PerpMarket): number {
-    // This assumes that the settlement token is USDC with 6 decimals.
-    return toUiDecimals(this.getEquity(perpMarket), QUOTE_DECIMALS);
   }
 
   public getEquity(perpMarket: PerpMarket): I80F48 {
@@ -1139,31 +1249,42 @@ export class PerpPosition {
     );
   }
 
-  public getEntryPrice(perpMarket: PerpMarket): BN {
-    if (this.basePositionLots.eq(new BN(0))) {
-      return new BN(0);
-    }
-    return this.quoteEntryNative
-      .div(this.basePositionLots.mul(perpMarket.baseLotSize))
-      .abs();
+  public getAverageEntryPriceUi(perpMarket: PerpMarket): number {
+    return perpMarket.priceLotsToUi(
+      new BN(this.avgEntryPricePerBaseLot / perpMarket.baseLotSize.toNumber()),
+    );
   }
 
-  public getBreakEvenPrice(perpMarket: PerpMarket): BN {
+  public getBreakEvenPriceUi(perpMarket: PerpMarket): number {
     if (this.basePositionLots.eq(new BN(0))) {
-      return new BN(0);
+      return 0;
     }
-    return this.quoteRunningNative
-      .div(this.basePositionLots.mul(perpMarket.baseLotSize))
-      .abs();
+    return perpMarket.priceLotsToUi(
+      new BN(
+        this.quoteRunningNative
+          .neg()
+          .div(this.basePositionLots.mul(perpMarket.baseLotSize))
+          .toNumber(),
+      ),
+    );
+  }
+
+  public getPnl(perpMarket: PerpMarket): I80F48 {
+    return this.quotePositionNative.add(
+      I80F48.fromI64(this.basePositionLots.mul(perpMarket.baseLotSize)).mul(
+        perpMarket.price,
+      ),
+    );
   }
 }
 
 export class PerpPositionDto {
   constructor(
     public marketIndex: number,
+    public settlePnlLimitWindow: number,
+    public settlePnlLimitSettledInCurrentWindowNative: BN,
     public basePositionLots: BN,
     public quotePositionNative: { val: BN },
-    public quoteEntryNative: BN,
     public quoteRunningNative: BN,
     public longSettledFunding: I80F48Dto,
     public shortSettledFunding: I80F48Dto,
@@ -1176,6 +1297,8 @@ export class PerpPositionDto {
     public makerVolume: BN,
     public takerVolume: BN,
     public perpSpotTransfers: BN,
+    public avgEntryPricePerBaseLot: number,
+    public realizedPnlNative: I80F48Dto,
   ) {}
 }
 

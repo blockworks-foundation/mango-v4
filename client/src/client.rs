@@ -602,6 +602,7 @@ impl MangoClient {
                             open_orders,
                             payer_bank: payer_mint_info.first_bank(),
                             payer_vault: payer_mint_info.first_vault(),
+                            payer_oracle: payer_mint_info.oracle,
                             serum_market: s3.market.address,
                             serum_program: s3.market.market.serum_program,
                             serum_market_external: s3.market.market.serum_market_external,
@@ -869,9 +870,8 @@ impl MangoClient {
                             group: self.group(),
                             account: *liqee.0,
                             perp_market: perp.address,
-                            asks: perp.market.asks,
                             bids: perp.market.bids,
-                            oracle: perp.market.oracle,
+                            asks: perp.market.asks,
                         },
                         None,
                     );
@@ -1276,6 +1276,8 @@ impl MangoClient {
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
                     &mango_v4::accounts::FlashLoanBegin {
+                        account: self.mango_account_address,
+                        owner: self.owner(),
                         token_program: Token::id(),
                         instructions: solana_sdk::sysvar::instructions::id(),
                     },
@@ -1444,7 +1446,10 @@ fn create_associated_token_account_idempotent(
     mint: &Pubkey,
 ) -> Instruction {
     let mut instr = spl_associated_token_account::instruction::create_associated_token_account(
-        funder, owner, mint,
+        funder,
+        owner,
+        mint,
+        &spl_associated_token_account::ID,
     );
     instr.data = vec![0x1]; // CreateIdempotent
     instr

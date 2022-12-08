@@ -22,11 +22,15 @@ pub trait QueueHeader: bytemuck::Pod {
     fn decr_event_id(&mut self, n: u64);
 }
 
-#[account(zero_copy)]
+#[account(zero_copy(safe_bytemuck_derives))]
 pub struct EventQueue {
     pub header: EventQueueHeader,
     pub buf: [AnyEvent; MAX_NUM_EVENTS as usize],
+    pub reserved: [u8; 64],
 }
+const_assert_eq!(std::mem::size_of::<EventQueue>(), 16 + 488 * 208 + 64);
+const_assert_eq!(std::mem::size_of::<EventQueue>(), 101584);
+const_assert_eq!(std::mem::size_of::<EventQueue>() % 8, 0);
 
 impl EventQueue {
     pub fn len(&self) -> usize {
@@ -123,12 +127,14 @@ impl<'a> Iterator for EventQueueIterator<'a> {
 }
 
 #[zero_copy]
-#[derive(Pod)]
+#[derive(bytemuck::Pod, bytemuck::Zeroable)]
 pub struct EventQueueHeader {
     head: u32,
     count: u32,
     pub seq_num: u64,
 }
+const_assert_eq!(std::mem::size_of::<EventQueueHeader>(), 16);
+const_assert_eq!(std::mem::size_of::<EventQueueHeader>() % 8, 0);
 
 impl QueueHeader for EventQueueHeader {
     type Item = AnyEvent;
@@ -153,15 +159,12 @@ impl QueueHeader for EventQueueHeader {
     }
 }
 
-const_assert_eq!(std::mem::size_of::<EventQueue>(), 4 * 2 + 8 + 488 * 208);
-const_assert_eq!(std::mem::size_of::<EventQueue>() % 8, 0);
-
 const EVENT_SIZE: usize = 208;
 #[zero_copy]
-#[derive(Debug, Pod)]
+#[derive(Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct AnyEvent {
     pub event_type: u8,
-    pub padding: [u8; 207], // note: anchor can't parse the struct for IDL when it includes non numbers, EVENT_SIZE == 208, 207 == 208 - 1
+    pub padding: [u8; 207],
 }
 
 const_assert_eq!(size_of::<AnyEvent>(), EVENT_SIZE);
@@ -187,7 +190,7 @@ pub struct FillEvent {
     pub seq_num: u64,
 
     pub maker: Pubkey,
-    pub maker_order_id: i128,
+    pub maker_order_id: u128,
     pub maker_client_order_id: u64,
     pub maker_fee: I80F48,
 
@@ -195,7 +198,7 @@ pub struct FillEvent {
     pub maker_timestamp: u64,
 
     pub taker: Pubkey,
-    pub taker_order_id: i128,
+    pub taker_order_id: u128,
     pub taker_client_order_id: u64,
     pub taker_fee: I80F48,
 
@@ -215,13 +218,13 @@ impl FillEvent {
         timestamp: u64,
         seq_num: u64,
         maker: Pubkey,
-        maker_order_id: i128,
+        maker_order_id: u128,
         maker_client_order_id: u64,
         maker_fee: I80F48,
         maker_timestamp: u64,
 
         taker: Pubkey,
-        taker_order_id: i128,
+        taker_order_id: u128,
         taker_client_order_id: u64,
         taker_fee: I80F48,
         price: i64,

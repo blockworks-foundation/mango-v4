@@ -13,7 +13,9 @@ mod program_test;
 
 #[tokio::test]
 async fn test_health_wrap() -> Result<(), TransportError> {
-    let context = TestContext::new().await;
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(100000);
+    let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = TestKeypair::new();
@@ -36,7 +38,7 @@ async fn test_health_wrap() -> Result<(), TransportError> {
     .await;
 
     // SETUP: Create an account with deposits, so the second account can borrow more than it has
-    create_funded_account(&solana, group, owner, 0, &context.users[1], mints, 1000, 0).await;
+    create_funded_account(&solana, group, owner, 0, &context.users[1], mints, 2000, 0).await;
 
     // SETUP: Make a second account
     let account = send_tx(

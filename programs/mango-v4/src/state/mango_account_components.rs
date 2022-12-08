@@ -11,7 +11,7 @@ use crate::state::*;
 pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
+#[derive(AnchorDeserialize, AnchorSerialize, Derivative, bytemuck::Pod, bytemuck::Zeroable)]
 #[derivative(Debug)]
 pub struct TokenPosition {
     // TODO: Why did we have deposits and borrows as two different values
@@ -31,9 +31,6 @@ pub struct TokenPosition {
     #[derivative(Debug = "ignore")]
     pub padding: [u8; 5],
 
-    #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 8],
-
     // bookkeeping variable for onchain interest calculation
     // either deposit_index or borrow_index at last indexed_position change
     pub previous_index: I80F48,
@@ -43,12 +40,16 @@ pub struct TokenPosition {
     // (Display only)
     // Cumulative borrow interest in token native units
     pub cumulative_borrow_interest: f64,
+
+    #[derivative(Debug = "ignore")]
+    pub reserved: [u8; 128],
 }
 
-unsafe impl bytemuck::Pod for TokenPosition {}
-unsafe impl bytemuck::Zeroable for TokenPosition {}
-
-const_assert_eq!(size_of::<TokenPosition>(), 64);
+const_assert_eq!(
+    size_of::<TokenPosition>(),
+    16 + 2 + 1 + 5 + 16 + 8 + 8 + 128
+);
+const_assert_eq!(size_of::<TokenPosition>(), 184);
 const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
 
 impl Default for TokenPosition {
@@ -61,7 +62,7 @@ impl Default for TokenPosition {
             cumulative_borrow_interest: 0.0,
             previous_index: I80F48::ZERO,
             padding: Default::default(),
-            reserved: [0; 8],
+            reserved: [0; 128],
         }
     }
 }
@@ -100,7 +101,7 @@ impl TokenPosition {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod, bytemuck::Zeroable)]
 #[derivative(Debug)]
 pub struct Serum3Orders {
     pub open_orders: Pubkey,
@@ -127,10 +128,8 @@ pub struct Serum3Orders {
     pub reserved: [u8; 64],
 }
 const_assert_eq!(size_of::<Serum3Orders>(), 32 + 8 * 2 + 2 * 3 + 2 + 64);
+const_assert_eq!(size_of::<Serum3Orders>(), 120);
 const_assert_eq!(size_of::<Serum3Orders>() % 8, 0);
-
-unsafe impl bytemuck::Pod for Serum3Orders {}
-unsafe impl bytemuck::Zeroable for Serum3Orders {}
 
 impl Serum3Orders {
     pub fn is_active(&self) -> bool {
@@ -158,12 +157,15 @@ impl Default for Serum3Orders {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative, bytemuck::Pod, bytemuck::Zeroable)]
 #[derivative(Debug)]
 pub struct PerpPosition {
     pub market_index: PerpMarketIndex,
+
     #[derivative(Debug = "ignore")]
-    pub padding: [u8; 6],
+    pub padding: [u8; 2],
+    pub settle_pnl_limit_window: u32,
+    pub settle_pnl_limit_settled_in_current_window_native: i64,
 
     /// Active position size, measured in base lots
     base_position_lots: i64,
@@ -172,7 +174,6 @@ pub struct PerpPosition {
     quote_position_native: I80F48,
 
     /// Tracks what the position is to calculate average entry & break even price
-    pub quote_entry_native: i64,
     pub quote_running_native: i64,
 
     /// Already settled funding
@@ -184,15 +185,9 @@ pub struct PerpPosition {
     /// Base lots in asks
     pub asks_base_lots: i64,
 
-    /// Liquidity mining rewards
-    // pub mngo_accrued: u64,
-
     /// Amount that's on EventQueue waiting to be processed
     pub taker_base_lots: i64,
     pub taker_quote_lots: i64,
-
-    #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 24],
 
     // (Display only)
     // Cumulative long funding in base native units
@@ -209,12 +204,20 @@ pub struct PerpPosition {
     // (Display only)
     // Cumulative realized pnl in quote native units
     pub perp_spot_transfers: i64,
-}
-const_assert_eq!(size_of::<PerpPosition>(), 8 + 7 * 8 + 3 * 16 + 64);
-const_assert_eq!(size_of::<PerpPosition>() % 8, 0);
 
-unsafe impl bytemuck::Pod for PerpPosition {}
-unsafe impl bytemuck::Zeroable for PerpPosition {}
+    pub avg_entry_price_per_base_lot: f64,
+
+    pub realized_pnl_native: I80F48,
+
+    #[derivative(Debug = "ignore")]
+    pub reserved: [u8; 128],
+}
+const_assert_eq!(
+    size_of::<PerpPosition>(),
+    2 + 2 + 4 + 8 + 8 + 16 + 8 + 16 * 2 + 8 * 2 + 8 * 2 + 8 * 5 + 8 + 16 + 128
+);
+const_assert_eq!(size_of::<PerpPosition>(), 304);
+const_assert_eq!(size_of::<PerpPosition>() % 8, 0);
 
 impl Default for PerpPosition {
     fn default() -> Self {
@@ -222,13 +225,11 @@ impl Default for PerpPosition {
             market_index: PerpMarketIndex::MAX,
             base_position_lots: 0,
             quote_position_native: I80F48::ZERO,
-            quote_entry_native: 0,
             quote_running_native: 0,
             bids_base_lots: 0,
             asks_base_lots: 0,
             taker_base_lots: 0,
             taker_quote_lots: 0,
-            reserved: [0; 24],
             long_settled_funding: I80F48::ZERO,
             short_settled_funding: I80F48::ZERO,
             padding: Default::default(),
@@ -237,6 +238,11 @@ impl Default for PerpPosition {
             maker_volume: 0,
             taker_volume: 0,
             perp_spot_transfers: 0,
+            avg_entry_price_per_base_lot: 0.0,
+            realized_pnl_native: I80F48::ZERO,
+            settle_pnl_limit_window: 0,
+            settle_pnl_limit_settled_in_current_window_native: 0,
+            reserved: [0; 128],
         }
     }
 }
@@ -308,6 +314,7 @@ impl PerpPosition {
     pub fn settle_funding(&mut self, perp_market: &PerpMarket) {
         let funding = self.unsettled_funding(perp_market);
         cm!(self.quote_position_native -= funding);
+        cm!(self.realized_pnl_native -= funding);
 
         if self.base_position_lots.is_positive() {
             self.cumulative_long_funding += funding.to_num::<f64>();
@@ -319,51 +326,79 @@ impl PerpPosition {
         self.short_settled_funding = perp_market.short_funding;
     }
 
-    /// Update the quote entry position
-    fn update_entry_price(&mut self, base_change: i64, quote_change_native: i64) {
+    /// Updates entry price, breakeven price, realized pnl
+    fn update_trade_stats(&mut self, base_change: i64, quote_change_native: I80F48) {
         if base_change == 0 {
             return;
         }
+
         let old_position = self.base_position_lots;
-        let is_increasing = old_position == 0 || old_position.signum() == base_change.signum();
-        cm!(self.quote_running_native += quote_change_native);
-        match is_increasing {
-            true => {
-                cm!(self.quote_entry_native += quote_change_native);
-            }
-            false => {
-                let new_position = cm!(old_position + base_change);
-                let changes_side = old_position.signum() == -new_position.signum();
-                self.quote_entry_native = if changes_side {
-                    cm!(((new_position as f64) * (quote_change_native as f64)
-                        / (base_change as f64))
-                        .round()) as i64
-                } else {
-                    let remaining_frac =
-                        (1f64 - (base_change.abs() as f64) / (old_position.abs() as f64)).max(0f64);
-                    let initial_entry = self.quote_entry_native as f64;
-                    (initial_entry * remaining_frac).round() as i64
-                }
+        let new_position = cm!(old_position + base_change);
+
+        if new_position == 0 {
+            // clear out entry and break-even prices
+            self.avg_entry_price_per_base_lot = 0.0;
+            self.quote_running_native = 0;
+
+            // There can't be unrealized pnl without a base position, so fix the
+            // realized pnl to cover the whole quote position.
+            self.realized_pnl_native = cm!(self.quote_position_native + quote_change_native);
+        } else if old_position.signum() != new_position.signum() {
+            // If the base position changes sign, we've crossed base_pos == 0 (or old_position == 0)
+            let old_position = old_position as f64;
+            let new_position = new_position as f64;
+            let base_change = base_change as f64;
+            let old_avg_entry = self.avg_entry_price_per_base_lot;
+            let new_avg_entry = (quote_change_native.to_num::<f64>() / base_change).abs();
+
+            // Award realized pnl based on the old_position size
+            let new_realized_pnl = I80F48::from_num(old_position * (new_avg_entry - old_avg_entry));
+            cm!(self.realized_pnl_native += new_realized_pnl);
+
+            // Set entry and break-even based on the new_position entered
+            self.avg_entry_price_per_base_lot = new_avg_entry;
+            self.quote_running_native = (-new_position * new_avg_entry) as i64;
+        } else {
+            // The old and new position have the same sign
+
+            cm!(self.quote_running_native += quote_change_native
+                .round_to_zero()
+                .checked_to_num::<i64>()
+                .unwrap());
+
+            let is_increasing = old_position.signum() == base_change.signum();
+            if is_increasing {
+                // Increasing position: avg entry price updates, no new realized pnl
+                let old_position_abs = old_position.abs() as f64;
+                let new_position_abs = new_position.abs() as f64;
+                let old_avg_entry = self.avg_entry_price_per_base_lot;
+                let new_position_quote_value =
+                    old_position_abs * old_avg_entry + quote_change_native.to_num::<f64>().abs();
+                self.avg_entry_price_per_base_lot = new_position_quote_value / new_position_abs;
+            } else {
+                // Decreasing position: pnl is realized, avg entry price does not change
+                let avg_entry = I80F48::from_num(self.avg_entry_price_per_base_lot);
+                let new_realized_pnl =
+                    cm!(quote_change_native + I80F48::from(base_change) * avg_entry);
+                cm!(self.realized_pnl_native += new_realized_pnl);
             }
         }
     }
 
     /// Change the base and quote positions as the result of a trade
-    pub fn change_base_and_quote_positions(
+    pub fn record_trade(
         &mut self,
         perp_market: &mut PerpMarket,
         base_change: i64,
         quote_change_native: I80F48,
     ) {
-        self.update_entry_price(
-            base_change,
-            quote_change_native.round().checked_to_num().unwrap(),
-        );
+        assert_eq!(perp_market.perp_market_index, self.market_index);
+        self.update_trade_stats(base_change, quote_change_native);
         self.change_base_position(perp_market, base_change);
         self.change_quote_position(quote_change_native);
     }
 
-    pub fn change_quote_position(&mut self, quote_change_native: I80F48) {
+    fn change_quote_position(&mut self, quote_change_native: I80F48) {
         cm!(self.quote_position_native += quote_change_native);
     }
 
@@ -375,54 +410,108 @@ impl PerpPosition {
             || self.taker_quote_lots != 0
     }
 
-    /// Calculate the average entry price of the position
-    pub fn avg_entry_price(&self) -> I80F48 {
-        if self.base_position_lots == 0 {
-            return I80F48::ZERO; // TODO: What should this actually return? Error? NaN?
-        }
-        (I80F48::from(self.quote_entry_native) / I80F48::from(self.base_position_lots)).abs()
+    /// Calculate the average entry price of the position, in native/native units
+    pub fn avg_entry_price(&self, market: &PerpMarket) -> f64 {
+        assert_eq!(self.market_index, market.perp_market_index);
+        self.avg_entry_price_per_base_lot / (market.base_lot_size as f64)
     }
 
-    /// Calculate the break even price of the position
-    pub fn break_even_price(&self) -> I80F48 {
+    /// Calculate the break even price of the position, in native/native units
+    pub fn break_even_price(&self, market: &PerpMarket) -> f64 {
         if self.base_position_lots == 0 {
-            return I80F48::ZERO; // TODO: What should this actually return? Error? NaN?
+            return 0.0;
         }
-        (I80F48::from(self.quote_running_native) / I80F48::from(self.base_position_lots)).abs()
+        assert_eq!(self.market_index, market.perp_market_index);
+        -(self.quote_running_native as f64)
+            / (cm!(self.base_position_lots * market.base_lot_size) as f64)
+    }
+
+    /// Calculate the PnL of the position for a given price
+    pub fn pnl_for_price(&self, perp_market: &PerpMarket, price: I80F48) -> Result<I80F48> {
+        require_eq!(self.market_index, perp_market.perp_market_index);
+        let base_native = self.base_position_native(&perp_market);
+        let pnl: I80F48 = cm!(self.quote_position_native() + base_native * price);
+        Ok(pnl)
+    }
+
+    /// Side-effect: updates the windowing
+    pub fn update_and_get_used_settle_limit(&mut self, market: &PerpMarket, now_ts: u64) -> i64 {
+        assert_eq!(self.market_index, market.perp_market_index);
+        let window_size = market.settle_pnl_limit_window_size_ts;
+        let new_window = now_ts >= cm!((self.settle_pnl_limit_window + 1) as u64 * window_size);
+        if new_window {
+            self.settle_pnl_limit_window = cm!(now_ts / window_size).try_into().unwrap();
+            self.settle_pnl_limit_settled_in_current_window_native = 0;
+        }
+        self.settle_pnl_limit_settled_in_current_window_native
+    }
+
+    /// Update the perp position for pnl settlement
+    ///
+    /// If `pnl` is positive, then that is settled away, deducting from the quote position.
+    pub fn record_settle(&mut self, pnl: I80F48) {
+        self.change_quote_position(-pnl);
+
+        let pnl_i64 = pnl.round_to_zero().checked_to_num::<i64>().unwrap();
+        cm!(self.settle_pnl_limit_settled_in_current_window_native += pnl_i64);
+
+        let used_realized = if pnl > 0 {
+            // Example: settling 100 positive pnl, with 60 realized:
+            // pnl = 100 -> used_realized = 60
+            pnl.min(self.realized_pnl_native).max(I80F48::ZERO)
+        } else {
+            // Example: settling 100 negative pnl, with -60 realized:
+            // pnl = -100 -> used_realized = -60
+            pnl.max(self.realized_pnl_native).min(I80F48::ZERO)
+        };
+        cm!(self.realized_pnl_native -= used_realized);
+    }
+
+    pub fn record_fee(&mut self, fee: I80F48) {
+        self.change_quote_position(-fee);
+        cm!(self.realized_pnl_native -= fee);
+    }
+
+    pub fn record_bankruptcy_quote_change(&mut self, change: I80F48) {
+        self.change_quote_position(change);
+        cm!(self.realized_pnl_native += change);
     }
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Debug)]
+#[derive(AnchorSerialize, AnchorDeserialize, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct PerpOpenOrder {
-    pub order_side: Side, // TODO: storing enums isn't POD
+    pub side_and_tree: u8, // SideAndOrderTree -- enums aren't POD
     pub padding1: [u8; 1],
-    pub order_market: PerpMarketIndex,
+    pub market: PerpMarketIndex,
     pub padding2: [u8; 4],
-    pub client_order_id: u64,
-    pub order_id: i128,
+    pub client_id: u64,
+    pub id: u128,
     pub reserved: [u8; 64],
 }
+const_assert_eq!(size_of::<PerpOpenOrder>(), 1 + 1 + 2 + 4 + 8 + 16 + 64);
+const_assert_eq!(size_of::<PerpOpenOrder>(), 96);
+const_assert_eq!(size_of::<PerpOpenOrder>() % 8, 0);
 
 impl Default for PerpOpenOrder {
     fn default() -> Self {
         Self {
-            order_side: Side::Bid,
+            side_and_tree: SideAndOrderTree::BidFixed.into(),
             padding1: Default::default(),
-            order_market: FREE_ORDER_SLOT,
+            market: FREE_ORDER_SLOT,
             padding2: Default::default(),
-            client_order_id: 0,
-            order_id: 0,
+            client_id: 0,
+            id: 0,
             reserved: [0; 64],
         }
     }
 }
 
-unsafe impl bytemuck::Pod for PerpOpenOrder {}
-unsafe impl bytemuck::Zeroable for PerpOpenOrder {}
-
-const_assert_eq!(size_of::<PerpOpenOrder>(), 1 + 1 + 2 + 4 + 8 + 16 + 64);
-const_assert_eq!(size_of::<PerpOpenOrder>() % 8, 0);
+impl PerpOpenOrder {
+    pub fn side_and_tree(&self) -> SideAndOrderTree {
+        SideAndOrderTree::try_from(self.side_and_tree).unwrap()
+    }
+}
 
 #[macro_export]
 macro_rules! account_seeds {
@@ -447,171 +536,285 @@ mod tests {
 
     use super::PerpPosition;
 
-    fn create_perp_position(base_pos: i64, quote_pos: i64, entry_pos: i64) -> PerpPosition {
+    fn create_perp_position(market: &PerpMarket, base_pos: i64, quote_pos: i64) -> PerpPosition {
         let mut pos = PerpPosition::default();
+        pos.market_index = market.perp_market_index;
         pos.base_position_lots = base_pos;
         pos.quote_position_native = I80F48::from(quote_pos);
-        pos.quote_entry_native = entry_pos;
         pos.quote_running_native = quote_pos;
+        pos.avg_entry_price_per_base_lot = if base_pos != 0 {
+            ((quote_pos as f64) / (base_pos as f64)).abs()
+        } else {
+            0.0
+        };
         pos
     }
 
     #[test]
     fn test_quote_entry_long_increasing_from_zero() {
         let mut market = PerpMarket::default_for_tests();
-        let mut pos = create_perp_position(0, 0, 0);
+        let mut pos = create_perp_position(&market, 0, 0);
         // Go long 10 @ 10
-        pos.change_base_and_quote_positions(&mut market, 10, I80F48::from(-100));
-        assert_eq!(pos.quote_entry_native, -100);
+        pos.record_trade(&mut market, 10, I80F48::from(-100));
         assert_eq!(pos.quote_running_native, -100);
-        assert_eq!(pos.avg_entry_price(), I80F48::from(10));
+        assert_eq!(pos.avg_entry_price(&market), 10.0);
+        assert_eq!(pos.break_even_price(&market), 10.0);
+        assert_eq!(pos.realized_pnl_native, I80F48::from(0));
     }
 
     #[test]
     fn test_quote_entry_short_increasing_from_zero() {
         let mut market = PerpMarket::default_for_tests();
-        let mut pos = create_perp_position(0, 0, 0);
+        let mut pos = create_perp_position(&market, 0, 0);
         // Go short 10 @ 10
-        pos.change_base_and_quote_positions(&mut market, -10, I80F48::from(100));
-        assert_eq!(pos.quote_entry_native, 100);
+        pos.record_trade(&mut market, -10, I80F48::from(100));
         assert_eq!(pos.quote_running_native, 100);
-        assert_eq!(pos.avg_entry_price(), I80F48::from(10));
+        assert_eq!(pos.avg_entry_price(&market), 10.0);
+        assert_eq!(pos.break_even_price(&market), 10.0);
+        assert_eq!(pos.realized_pnl_native, I80F48::from(0));
     }
 
     #[test]
     fn test_quote_entry_long_increasing_from_long() {
         let mut market = PerpMarket::default_for_tests();
-        let mut pos = create_perp_position(10, -100, -100);
+        let mut pos = create_perp_position(&market, 10, -100);
         // Go long 10 @ 30
-        pos.change_base_and_quote_positions(&mut market, 10, I80F48::from(-300));
-        assert_eq!(pos.quote_entry_native, -400);
+        pos.record_trade(&mut market, 10, I80F48::from(-300));
         assert_eq!(pos.quote_running_native, -400);
-        assert_eq!(pos.avg_entry_price(), I80F48::from(20));
+        assert_eq!(pos.avg_entry_price(&market), 20.0);
+        assert_eq!(pos.break_even_price(&market), 20.0);
+        assert_eq!(pos.realized_pnl_native, I80F48::from(0));
     }
 
     #[test]
     fn test_quote_entry_short_increasing_from_short() {
         let mut market = PerpMarket::default_for_tests();
-        let mut pos = create_perp_position(-10, 100, 100);
+        let mut pos = create_perp_position(&market, -10, 100);
         // Go short 10 @ 10
-        pos.change_base_and_quote_positions(&mut market, -10, I80F48::from(300));
-        assert_eq!(pos.quote_entry_native, 400);
+        pos.record_trade(&mut market, -10, I80F48::from(300));
         assert_eq!(pos.quote_running_native, 400);
-        assert_eq!(pos.avg_entry_price(), I80F48::from(20));
+        assert_eq!(pos.avg_entry_price(&market), 20.0);
+        assert_eq!(pos.break_even_price(&market), 20.0);
+        assert_eq!(pos.realized_pnl_native, I80F48::from(0));
     }
 
     #[test]
     fn test_quote_entry_long_decreasing_from_short() {
         let mut market = PerpMarket::default_for_tests();
-        let mut pos = create_perp_position(-10, 100, 100);
+        let mut pos = create_perp_position(&market, -10, 100);
         // Go long 5 @ 50
-        pos.change_base_and_quote_positions(&mut market, 5, I80F48::from(-250));
-        assert_eq!(pos.quote_entry_native, 50);
+        pos.record_trade(&mut market, 5, I80F48::from(-250));
         assert_eq!(pos.quote_running_native, -150);
-        assert_eq!(pos.avg_entry_price(), I80F48::from(10)); // Entry price remains the same when decreasing
+        assert_eq!(pos.avg_entry_price(&market), 10.0); // Entry price remains the same when decreasing
+        assert_eq!(pos.break_even_price(&market), -30.0); // Already broke even
+        assert_eq!(pos.realized_pnl_native, I80F48::from(-200));
     }
 
     #[test]
     fn test_quote_entry_short_decreasing_from_long() {
         let mut market = PerpMarket::default_for_tests();
-        let mut pos = create_perp_position(10, -100, -100);
+        let mut pos = create_perp_position(&market, 10, -100);
         // Go short 5 @ 50
-        pos.change_base_and_quote_positions(&mut market, -5, I80F48::from(250));
-        assert_eq!(pos.quote_entry_native, -50);
+        pos.record_trade(&mut market, -5, I80F48::from(250));
         assert_eq!(pos.quote_running_native, 150);
-        assert_eq!(pos.avg_entry_price(), I80F48::from(10)); // Entry price remains the same when decreasing
+        assert_eq!(pos.avg_entry_price(&market), 10.0); // Entry price remains the same when decreasing
+        assert_eq!(pos.break_even_price(&market), -30.0); // Already broke even
+        assert_eq!(pos.realized_pnl_native, I80F48::from(200));
     }
 
     #[test]
     fn test_quote_entry_long_close_with_short() {
         let mut market = PerpMarket::default_for_tests();
-        let mut pos = create_perp_position(10, -100, -100);
-        // Go short 10 @ 50
-        pos.change_base_and_quote_positions(&mut market, -10, I80F48::from(250));
-        assert_eq!(pos.quote_entry_native, 0);
-        assert_eq!(pos.quote_running_native, 150);
-        assert_eq!(pos.avg_entry_price(), I80F48::from(0)); // Entry price zero when no position
+        let mut pos = create_perp_position(&market, 10, -100);
+        // Go short 10 @ 25
+        pos.record_trade(&mut market, -10, I80F48::from(250));
+        assert_eq!(pos.quote_running_native, 0);
+        assert_eq!(pos.avg_entry_price(&market), 0.0); // Entry price zero when no position
+        assert_eq!(pos.break_even_price(&market), 0.0);
+        assert_eq!(pos.realized_pnl_native, I80F48::from(150));
     }
 
     #[test]
     fn test_quote_entry_short_close_with_long() {
         let mut market = PerpMarket::default_for_tests();
-        let mut pos = create_perp_position(-10, 100, 100);
-        // Go long 10 @ 50
-        pos.change_base_and_quote_positions(&mut market, 10, I80F48::from(-250));
-        assert_eq!(pos.quote_entry_native, 0);
-        assert_eq!(pos.quote_running_native, -150);
-        assert_eq!(pos.avg_entry_price(), I80F48::from(0)); // Entry price zero when no position
+        let mut pos = create_perp_position(&market, -10, 100);
+        // Go long 10 @ 25
+        pos.record_trade(&mut market, 10, I80F48::from(-250));
+        assert_eq!(pos.quote_running_native, 0);
+        assert_eq!(pos.avg_entry_price(&market), 0.0); // Entry price zero when no position
+        assert_eq!(pos.break_even_price(&market), 0.0);
+        assert_eq!(pos.realized_pnl_native, I80F48::from(-150));
     }
 
     #[test]
     fn test_quote_entry_long_close_short_with_overflow() {
         let mut market = PerpMarket::default_for_tests();
-        let mut pos = create_perp_position(10, -100, -100);
+        let mut pos = create_perp_position(&market, 10, -100);
         // Go short 15 @ 20
-        pos.change_base_and_quote_positions(&mut market, -15, I80F48::from(300));
-        assert_eq!(pos.quote_entry_native, 100);
-        assert_eq!(pos.quote_running_native, 200);
-        assert_eq!(pos.avg_entry_price(), I80F48::from(20)); // Entry price zero when no position
+        pos.record_trade(&mut market, -15, I80F48::from(300));
+        assert_eq!(pos.quote_running_native, 100);
+        assert_eq!(pos.avg_entry_price(&market), 20.0);
+        assert_eq!(pos.break_even_price(&market), 20.0);
+        assert_eq!(pos.realized_pnl_native, I80F48::from(100));
     }
 
     #[test]
     fn test_quote_entry_short_close_long_with_overflow() {
         let mut market = PerpMarket::default_for_tests();
-        let mut pos = create_perp_position(-10, 100, 100);
-        // Go short 15 @ 20
-        pos.change_base_and_quote_positions(&mut market, 15, I80F48::from(-300));
-        assert_eq!(pos.quote_entry_native, -100);
-        assert_eq!(pos.quote_running_native, -200);
-        assert_eq!(pos.avg_entry_price(), I80F48::from(20)); // Entry price zero when no position
+        let mut pos = create_perp_position(&market, -10, 100);
+        // Go long 15 @ 20
+        pos.record_trade(&mut market, 15, I80F48::from(-300));
+        assert_eq!(pos.quote_running_native, -100);
+        assert_eq!(pos.avg_entry_price(&market), 20.0);
+        assert_eq!(pos.break_even_price(&market), 20.0);
+        assert_eq!(pos.realized_pnl_native, I80F48::from(-100));
     }
 
     #[test]
     fn test_quote_entry_break_even_price() {
         let mut market = PerpMarket::default_for_tests();
-        let mut pos = create_perp_position(0, 0, 0);
+        let mut pos = create_perp_position(&market, 0, 0);
         // Buy 11 @ 10,000
-        pos.change_base_and_quote_positions(&mut market, 11, I80F48::from(-11 * 10_000));
+        pos.record_trade(&mut market, 11, I80F48::from(-11 * 10_000));
         // Sell 1 @ 12,000
-        pos.change_base_and_quote_positions(&mut market, -1, I80F48::from(12_000));
-        assert_eq!(pos.quote_entry_native, -10 * 10_000);
+        pos.record_trade(&mut market, -1, I80F48::from(12_000));
         assert_eq!(pos.quote_running_native, -98_000);
         assert_eq!(pos.base_position_lots, 10);
-        assert_eq!(pos.break_even_price(), I80F48::from(9_800)); // We made 2k on the trade, so we can sell our contract up to a loss of 200 each
+        assert_eq!(pos.break_even_price(&market), 9_800.0); // We made 2k on the trade, so we can sell our contract up to a loss of 200 each
+        assert_eq!(pos.realized_pnl_native, I80F48::from(2_000));
     }
 
     #[test]
-    fn test_quote_entry_multiple_and_reversed_changes_return_entry_to_zero() {
+    fn test_entry_and_break_even_prices_with_lots() {
         let mut market = PerpMarket::default_for_tests();
-        let mut pos = create_perp_position(0, 0, 0);
+        market.base_lot_size = 10;
+
+        let mut pos = create_perp_position(&market, 0, 0);
+        // Buy 110 @ 10,000
+        pos.record_trade(&mut market, 11, I80F48::from(-11 * 10 * 10_000));
+        // Sell 10 @ 12,000
+        pos.record_trade(&mut market, -1, I80F48::from(1 * 10 * 12_000));
+        assert_eq!(pos.quote_running_native, -980_000);
+        assert_eq!(pos.base_position_lots, 10);
+        assert_eq!(pos.avg_entry_price_per_base_lot, 100_000.0);
+        assert_eq!(pos.avg_entry_price(&market), 10_000.0);
+        assert_eq!(pos.break_even_price(&market), 9_800.0);
+        assert_eq!(pos.realized_pnl_native, I80F48::from(20_000));
+    }
+
+    #[test]
+    fn test_realized_pnl_fractional() {
+        let mut market = PerpMarket::default_for_tests();
+        let mut pos = create_perp_position(&market, 0, 0);
+        pos.quote_position_native += I80F48::from_num(0.1);
+
+        // Buy 1 @ 1
+        pos.record_trade(&mut market, 1, I80F48::from(-1));
+        // Buy 2 @ 2
+        pos.record_trade(&mut market, 2, I80F48::from(-2 * 2));
+
+        assert!((pos.avg_entry_price(&market) - 1.66666).abs() < 0.001);
+        assert_eq!(pos.realized_pnl_native, I80F48::from(0));
+
+        // Sell 2 @ 4
+        pos.record_trade(&mut market, -2, I80F48::from(2 * 4));
+
+        assert!((pos.avg_entry_price(&market) - 1.66666).abs() < 0.001);
+        assert!((pos.realized_pnl_native.to_num::<f64>() - 4.6666).abs() < 0.01);
+
+        // Sell 1 @ 2
+        pos.record_trade(&mut market, -1, I80F48::from(2));
+
+        assert_eq!(pos.avg_entry_price(&market), 0.0);
+        assert!((pos.quote_position_native.to_num::<f64>() - 5.1).abs() < 0.001);
+        assert!((pos.realized_pnl_native.to_num::<f64>() - 5.1).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_perp_entry_multiple_random_long() {
+        let mut market = PerpMarket::default_for_tests();
+        let mut pos = create_perp_position(&market, 0, 0);
 
         // Generate array of random trades
         let mut rng = rand::thread_rng();
         let mut trades: Vec<[i64; 2]> = Vec::with_capacity(500);
         for _ in 0..trades.capacity() {
-            let qty: i64 = rng.gen_range(-1000..=1000);
+            let qty: i64 = rng.gen_range(1..=1000);
             let px: f64 = rng.gen_range(0.1..=100.0);
             let quote: i64 = (-qty as f64 * px).round() as i64;
             trades.push([qty, quote]);
         }
         // Apply all of the trades going forward
+        let mut total_qty = 0;
+        let mut total_quote = 0;
         trades.iter().for_each(|[qty, quote]| {
-            pos.change_base_and_quote_positions(&mut market, *qty, I80F48::from(*quote));
+            pos.record_trade(&mut market, *qty, I80F48::from(*quote));
+            total_qty += qty.abs();
+            total_quote += quote.abs();
+            let entry_actual = pos.avg_entry_price(&market);
+            let entry_expected = total_quote as f64 / total_qty as f64;
+            assert!(((entry_actual - entry_expected) / entry_expected).abs() < 10.0 * f64::EPSILON);
         });
         // base_position should be sum of all base quantities
-        assert_eq!(
-            pos.base_position_lots,
-            trades.iter().map(|[qty, _]| qty).sum::<i64>()
-        );
+        assert_eq!(pos.base_position_lots, total_qty);
         // Reverse out all the trades
         trades.iter().for_each(|[qty, quote]| {
-            pos.change_base_and_quote_positions(&mut market, -*qty, I80F48::from(-*quote));
+            pos.record_trade(&mut market, -*qty, I80F48::from(-*quote));
         });
-        // base position should be 0
         assert_eq!(pos.base_position_lots, 0);
-        // quote entry position should be 0
-        assert_eq!(pos.quote_entry_native, 0);
-        // running quote should be 0
         assert_eq!(pos.quote_running_native, 0);
+        assert_eq!(pos.avg_entry_price_per_base_lot, 0.0);
+    }
+
+    #[test]
+    fn test_perp_position_pnl_returns_correct_pnl_for_oracle_price() {
+        let mut market = PerpMarket::default_for_tests();
+        market.base_lot_size = 10;
+
+        let long_pos = create_perp_position(&market, 50, -5000);
+        let pnl = long_pos.pnl_for_price(&market, I80F48::from(11)).unwrap();
+        assert_eq!(pnl, I80F48::from(50 * 10 * 1), "long profitable");
+        let pnl = long_pos.pnl_for_price(&market, I80F48::from(9)).unwrap();
+        assert_eq!(pnl, I80F48::from(50 * 10 * -1), "long unprofitable");
+
+        let short_pos = create_perp_position(&market, -50, 5000);
+        let pnl = short_pos.pnl_for_price(&market, I80F48::from(11)).unwrap();
+        assert_eq!(pnl, I80F48::from(50 * 10 * -1), "short unprofitable");
+        let pnl = short_pos.pnl_for_price(&market, I80F48::from(9)).unwrap();
+        assert_eq!(pnl, I80F48::from(50 * 10 * 1), "short profitable");
+    }
+
+    #[test]
+    fn test_perp_realized_pnl_consumption() {
+        let market = PerpMarket::default_for_tests();
+
+        let mut pos = create_perp_position(&market, 0, 0);
+        assert_eq!(pos.realized_pnl_native, I80F48::from(0));
+
+        pos.record_settle(I80F48::from(10));
+        assert_eq!(pos.realized_pnl_native, I80F48::from(0));
+
+        pos.record_settle(I80F48::from(-20));
+        assert_eq!(pos.realized_pnl_native, I80F48::from(0));
+
+        pos.realized_pnl_native = I80F48::from(5);
+        pos.record_settle(I80F48::from(-20));
+        assert_eq!(pos.realized_pnl_native, I80F48::from(5));
+
+        pos.record_settle(I80F48::from(2));
+        assert_eq!(pos.realized_pnl_native, I80F48::from(3));
+
+        pos.record_settle(I80F48::from(10));
+        assert_eq!(pos.realized_pnl_native, I80F48::from(0));
+
+        pos.realized_pnl_native = I80F48::from(-5);
+        pos.record_settle(I80F48::from(20));
+        assert_eq!(pos.realized_pnl_native, I80F48::from(-5));
+
+        pos.record_settle(I80F48::from(-2));
+        assert_eq!(pos.realized_pnl_native, I80F48::from(-3));
+
+        pos.record_settle(I80F48::from(-10));
+        assert_eq!(pos.realized_pnl_native, I80F48::from(0));
     }
 }

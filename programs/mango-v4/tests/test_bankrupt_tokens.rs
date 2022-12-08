@@ -13,7 +13,9 @@ mod program_test;
 
 #[tokio::test]
 async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
-    let context = TestContext::new().await;
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(85_000); // TokenLiqWithToken needs 84k
+    let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = TestKeypair::new();
@@ -53,11 +55,12 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     )
     .await;
 
-    // also add a tiny amount to bank0 for borrow_token1, so we can test multi-bank socialized loss
+    // Also add a tiny amount to bank0 for borrow_token1, so we can test multi-bank socialized loss.
+    // It must be enough to not trip the borrow limits on the bank.
     send_tx(
         solana,
         TokenDepositInstruction {
-            amount: 10,
+            amount: 20,
             account: vault_account,
             owner,
             token_account: payer_mint_accounts[0],
@@ -164,18 +167,7 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     //
     // SETUP: Change the oracle to make health go very negative
     //
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: borrow_token1.mint.pubkey,
-            payer,
-            price: "20.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, borrow_token1, admin, 20.0).await;
 
     //
     // SETUP: liquidate all the collateral against borrow1
@@ -285,7 +277,9 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
 
 #[tokio::test]
 async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
-    let context = TestContext::new().await;
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(85_000); // TokenLiqWithToken needs 84k
+    let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
     let admin = TestKeypair::new();
@@ -367,11 +361,12 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
         .unwrap();
     }
 
-    // also add a tiny amount to bank0 for borrow_token1, so we can test multi-bank socialized loss
+    // Also add a tiny amount to bank0 for borrow_token1, so we can test multi-bank socialized loss.
+    // It must be enough to not trip the borrow limits on the bank.
     send_tx(
         solana,
         TokenDepositInstruction {
-            amount: 10,
+            amount: 20,
             account: vault_account,
             owner,
             token_account: payer_mint_accounts[0],
@@ -478,18 +473,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     //
     // SETUP: Change the oracle to make health go very negative
     //
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: borrow_token2.mint.pubkey,
-            payer,
-            price: "20.0",
-        },
-    )
-    .await
-    .unwrap();
+    set_bank_stub_oracle_price(solana, group, borrow_token2, admin, 20.0).await;
 
     //
     // SETUP: liquidate all the collateral against borrow2

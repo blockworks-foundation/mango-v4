@@ -48,11 +48,11 @@ import {
   Serum3SelfTradeBehavior,
   Serum3Side,
 } from './accounts/serum3';
-import { SERUM3_PROGRAM_ID } from './constants';
+import { OPENBOOK_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
-import { FlashLoanType, InterestRateParams } from './types';
+import { FlashLoanType, InterestRateParams, OracleConfigParams } from './types';
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
@@ -68,8 +68,15 @@ enum AccountRetriever {
 
 export type IdsSource = 'api' | 'static' | 'get-program-accounts';
 
+export type MangoClientOptions = {
+  idsSource?: IdsSource;
+  postSendTxCallback?: ({ txid }: { txid: string }) => void;
+  prioritizationFee?: number;
+};
+
 // TODO: replace ui values with native as input wherever possible
 export class MangoClient {
+  private idsSource: IdsSource;
   private postSendTxCallback?: ({ txid }) => void;
   private prioritizationFee: number;
 
@@ -77,12 +84,9 @@ export class MangoClient {
     public program: Program<MangoV4>,
     public programId: PublicKey,
     public cluster: Cluster,
-    public opts: {
-      postSendTxCallback?: ({ txid }: { txid: string }) => void;
-      prioritizationFee?: number;
-    } = {},
-    public idsSource: IdsSource = 'api',
+    public opts: MangoClientOptions = {},
   ) {
+    this.idsSource = opts?.idsSource || 'api';
     this.prioritizationFee = opts?.prioritizationFee || 0;
     this.postSendTxCallback = opts?.postSendTxCallback;
     // TODO: evil side effect, but limited backtraces are a nightmare
@@ -112,10 +116,10 @@ export class MangoClient {
 
   public async groupEdit(
     group: Group,
-    admin: PublicKey | undefined,
-    fastListingAdmin: PublicKey | undefined,
-    testing: number | undefined,
-    version: number | undefined,
+    admin?: PublicKey,
+    fastListingAdmin?: PublicKey,
+    testing?: number,
+    version?: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
       .groupEdit(
@@ -148,7 +152,8 @@ export class MangoClient {
   public async getGroup(groupPk: PublicKey): Promise<Group> {
     const groupAccount = await this.program.account.group.fetch(groupPk);
     const group = Group.from(groupPk, groupAccount);
-    await group.reloadAll(this);
+    const ids: Id | undefined = await this.getIds(groupPk);
+    await group.reloadAll(this, ids);
     return group;
   }
 
@@ -196,21 +201,27 @@ export class MangoClient {
     return groups[0];
   }
 
+  public async getIds(groupPk: PublicKey): Promise<Id | undefined> {
+    switch (this.idsSource) {
+      case 'api':
+        return await Id.fromApi(groupPk);
+      case 'get-program-accounts':
+        return undefined;
+      case 'static':
+        return Id.fromIdsByPk(groupPk);
+    }
+  }
+
   // Tokens/Banks
 
   public async tokenRegister(
     group: Group,
     mintPk: PublicKey,
     oraclePk: PublicKey,
-    oracleConfFilter: number,
+    oracleConfig: OracleConfigParams,
     tokenIndex: number,
     name: string,
-    adjustmentFactor: number,
-    util0: number,
-    rate0: number,
-    util1: number,
-    rate1: number,
-    maxRate: number,
+    interestRateParams: InterestRateParams,
     loanFeeRate: number,
     loanOriginationFeeRate: number,
     maintAssetWeight: number,
@@ -218,17 +229,16 @@ export class MangoClient {
     maintLiabWeight: number,
     initLiabWeight: number,
     liquidationFee: number,
+    minVaultToDepositsRatio: number,
+    netBorrowLimitWindowSizeTs: number,
+    netBorrowLimitPerWindowQuote: number,
   ): Promise<TransactionSignature> {
     return await this.program.methods
       .tokenRegister(
         tokenIndex,
         name,
-        {
-          confFilter: {
-            val: I80F48.fromNumber(oracleConfFilter).getData(),
-          },
-        } as any, // future: nested custom types dont typecheck, fix if possible?
-        { adjustmentFactor, util0, rate0, util1, rate1, maxRate },
+        oracleConfig,
+        interestRateParams,
         loanFeeRate,
         loanOriginationFeeRate,
         maintAssetWeight,
@@ -236,6 +246,9 @@ export class MangoClient {
         maintLiabWeight,
         initLiabWeight,
         liquidationFee,
+        minVaultToDepositsRatio,
+        new BN(netBorrowLimitWindowSizeTs),
+        new BN(netBorrowLimitPerWindowQuote),
       )
       .accounts({
         group: group.publicKey,
@@ -272,8 +285,8 @@ export class MangoClient {
   public async tokenEdit(
     group: Group,
     mintPk: PublicKey,
-    oracle: PublicKey | null,
-    oracleConfFilter: number | null,
+    oracle: PublicKey, // TODO: do we need an extra param for resetting stable_price_model?
+    oracleConfig: OracleConfigParams | null,
     groupInsuranceFund: boolean | null,
     interestRateParams: InterestRateParams | null,
     loanFeeRate: number | null,
@@ -283,25 +296,24 @@ export class MangoClient {
     maintLiabWeight: number | null,
     initLiabWeight: number | null,
     liquidationFee: number | null,
+    stablePriceDelayIntervalSeconds: number | null,
+    stablePriceDelayGrowthLimit: number | null,
+    stablePriceGrowthLimit: number | null,
+    minVaultToDepositsRatio: number | null,
+    netBorrowLimitPerWindowQuote: number | null,
+    netBorrowLimitWindowSizeTs: number | null,
+    borrowWeightScaleStartQuote: number | null,
+    depositWeightScaleStartQuote: number | null,
+    resetStablePrice: boolean | null,
+    resetNetBorrowLimit: boolean | null,
   ): Promise<TransactionSignature> {
     const bank = group.getFirstBankByMint(mintPk);
     const mintInfo = group.mintInfosMapByTokenIndex.get(bank.tokenIndex)!;
 
-    let oracleConf;
-    if (oracleConfFilter !== null) {
-      oracleConf = {
-        confFilter: {
-          val: I80F48.fromNumber(oracleConfFilter).getData(),
-        },
-      } as any; // future: nested custom types dont typecheck, fix if possible?
-    } else {
-      oracleConf = null;
-    }
-
     return await this.program.methods
       .tokenEdit(
         oracle,
-        oracleConf,
+        oracleConfig,
         groupInsuranceFund,
         interestRateParams,
         loanFeeRate,
@@ -311,9 +323,24 @@ export class MangoClient {
         maintLiabWeight,
         initLiabWeight,
         liquidationFee,
+        stablePriceDelayIntervalSeconds,
+        stablePriceDelayGrowthLimit,
+        stablePriceGrowthLimit,
+        minVaultToDepositsRatio,
+        netBorrowLimitPerWindowQuote !== null
+          ? new BN(netBorrowLimitPerWindowQuote)
+          : null,
+        netBorrowLimitWindowSizeTs !== null
+          ? new BN(netBorrowLimitWindowSizeTs)
+          : null,
+        borrowWeightScaleStartQuote,
+        depositWeightScaleStartQuote,
+        resetStablePrice ?? false,
+        resetNetBorrowLimit ?? false,
       )
       .accounts({
         group: group.publicKey,
+        oracle,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         mintInfo: mintInfo.publicKey,
       })
@@ -324,7 +351,7 @@ export class MangoClient {
           isSigner: false,
         } as AccountMeta,
       ])
-      .rpc({ skipPreflight: true });
+      .rpc();
   }
 
   public async tokenDeregister(
@@ -471,7 +498,6 @@ export class MangoClient {
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         oracle: oraclePk,
-        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .rpc();
   }
@@ -533,8 +559,8 @@ export class MangoClient {
         accountNumber ?? 0,
         tokenCount ?? 8,
         serum3Count ?? 8,
-        perpCount ?? 0,
-        perpOoCount ?? 0,
+        perpCount ?? 8,
+        perpOoCount ?? 8,
         name ?? '',
       )
       .accounts({
@@ -965,7 +991,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
-        serumProgram: SERUM3_PROGRAM_ID[this.cluster],
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3MarketExternalPk,
         baseBank: baseBank.publicKey,
         quoteBank: quoteBank.publicKey,
@@ -1177,7 +1203,7 @@ export class MangoClient {
         openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
-        serumProgram: SERUM3_PROGRAM_ID[this.cluster],
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
         marketBids: serum3MarketExternal.bidsAddress,
         marketAsks: serum3MarketExternal.asksAddress,
@@ -1211,7 +1237,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-    limit: number,
+    limit?: number,
   ): Promise<TransactionSignature> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
@@ -1222,7 +1248,7 @@ export class MangoClient {
     )!;
 
     const ix = await this.program.methods
-      .serum3CancelAllOrders(limit)
+      .serum3CancelAllOrders(limit ? limit : 10)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -1230,7 +1256,7 @@ export class MangoClient {
         openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
-        serumProgram: SERUM3_PROGRAM_ID[this.cluster],
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
         marketBids: serum3MarketExternal.bidsAddress,
         marketAsks: serum3MarketExternal.asksAddress,
@@ -1275,7 +1301,7 @@ export class MangoClient {
         openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
-        serumProgram: SERUM3_PROGRAM_ID[this.cluster],
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
         marketBaseVault: serum3MarketExternal.decoded.baseVault,
         marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
@@ -1324,7 +1350,7 @@ export class MangoClient {
         openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
           ?.openOrders,
         serumMarket: serum3Market.publicKey,
-        serumProgram: SERUM3_PROGRAM_ID[this.cluster],
+        serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
         marketBids: serum3MarketExternal.bidsAddress,
         marketAsks: serum3MarketExternal.asksAddress,
@@ -1349,7 +1375,7 @@ export class MangoClient {
     oraclePk: PublicKey,
     perpMarketIndex: number,
     name: string,
-    oracleConfFilter: number,
+    oracleConfig: OracleConfigParams,
     baseDecimals: number,
     quoteLotSize: number,
     baseLotSize: number,
@@ -1370,6 +1396,8 @@ export class MangoClient {
     settleFeeAmountThreshold: number,
     settleFeeFractionLowHealth: number,
     settleTokenIndex: number,
+    settlePnlLimitFactor: number,
+    settlePnlLimitWindowSize: number,
   ): Promise<TransactionSignature> {
     const bids = new Keypair();
     const asks = new Keypair();
@@ -1386,11 +1414,7 @@ export class MangoClient {
       .perpCreateMarket(
         perpMarketIndex,
         name,
-        {
-          confFilter: {
-            val: I80F48.fromNumber(oracleConfFilter).getData(),
-          },
-        } as any, // future: nested custom types dont typecheck, fix if possible?
+        oracleConfig,
         baseDecimals,
         new BN(quoteLotSize),
         new BN(baseLotSize),
@@ -1411,6 +1435,8 @@ export class MangoClient {
         settleFeeAmountThreshold,
         settleFeeFractionLowHealth,
         settleTokenIndex,
+        settlePnlLimitFactor,
+        new BN(settlePnlLimitWindowSize),
       )
       .accounts({
         group: group.publicKey,
@@ -1465,36 +1491,37 @@ export class MangoClient {
   public async perpEditMarket(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
-    oracle: PublicKey,
-    oracleConfFilter: number,
-    baseDecimals: number,
-    maintAssetWeight: number,
-    initAssetWeight: number,
-    maintLiabWeight: number,
-    initLiabWeight: number,
-    liquidationFee: number,
-    makerFee: number,
-    takerFee: number,
-    feePenalty: number,
-    minFunding: number,
-    maxFunding: number,
-    impactQuantity: number,
-    groupInsuranceFund: boolean,
-    trustedMarket: boolean,
-    settleFeeFlat: number,
-    settleFeeAmountThreshold: number,
-    settleFeeFractionLowHealth: number,
+    oracle: PublicKey, // TODO: do we need an extra param for resetting stable_price_model
+    oracleConfig: OracleConfigParams | null,
+    baseDecimals: number | null,
+    maintAssetWeight: number | null,
+    initAssetWeight: number | null,
+    maintLiabWeight: number | null,
+    initLiabWeight: number | null,
+    liquidationFee: number | null,
+    makerFee: number | null,
+    takerFee: number | null,
+    feePenalty: number | null,
+    minFunding: number | null,
+    maxFunding: number | null,
+    impactQuantity: number | null,
+    groupInsuranceFund: boolean | null,
+    trustedMarket: boolean | null,
+    settleFeeFlat: number | null,
+    settleFeeAmountThreshold: number | null,
+    settleFeeFractionLowHealth: number | null,
+    stablePriceDelayIntervalSeconds: number | null,
+    stablePriceDelayGrowthLimit: number | null,
+    stablePriceGrowthLimit: number | null,
+    settlePnlLimitFactor: number | null,
+    settlePnlLimitWindowSize: number | null,
   ): Promise<TransactionSignature> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
 
     return await this.program.methods
       .perpEditMarket(
         oracle,
-        {
-          confFilter: {
-            val: I80F48.fromNumber(oracleConfFilter).getData(),
-          },
-        } as any, // future: nested custom types dont typecheck, fix if possible?
+        oracleConfig,
         baseDecimals,
         maintAssetWeight,
         initAssetWeight,
@@ -1505,16 +1532,24 @@ export class MangoClient {
         takerFee,
         minFunding,
         maxFunding,
-        new BN(impactQuantity),
+        impactQuantity !== null ? new BN(impactQuantity) : null,
         groupInsuranceFund,
         trustedMarket,
         feePenalty,
         settleFeeFlat,
         settleFeeAmountThreshold,
         settleFeeFractionLowHealth,
+        stablePriceDelayIntervalSeconds,
+        stablePriceDelayGrowthLimit,
+        stablePriceGrowthLimit,
+        settlePnlLimitFactor,
+        settlePnlLimitWindowSize !== null
+          ? new BN(settlePnlLimitWindowSize)
+          : null,
       )
       .accounts({
         group: group.publicKey,
+        oracle,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         perpMarket: perpMarket.publicKey,
       })
@@ -1533,8 +1568,8 @@ export class MangoClient {
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         perpMarket: perpMarket.publicKey,
-        asks: perpMarket.asks,
         bids: perpMarket.bids,
+        asks: perpMarket.asks,
         eventQueue: perpMarket.eventQueue,
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
@@ -1598,11 +1633,12 @@ export class MangoClient {
     side: PerpOrderSide,
     price: number,
     quantity: number,
-    maxQuoteQuantity: number | undefined,
-    clientOrderId: number | undefined,
-    orderType: PerpOrderType | undefined,
-    expiryTimestamp: number | undefined,
-    limit: number | undefined,
+    maxQuoteQuantity?: number,
+    clientOrderId?: number,
+    orderType?: PerpOrderType,
+    reduceOnly?: boolean,
+    expiryTimestamp?: number,
+    limit?: number,
   ): Promise<TransactionSignature> {
     return await sendTransaction(
       this.program.provider as AnchorProvider,
@@ -1617,6 +1653,7 @@ export class MangoClient {
           maxQuoteQuantity,
           clientOrderId,
           orderType,
+          reduceOnly,
           expiryTimestamp,
           limit,
         ),
@@ -1638,6 +1675,7 @@ export class MangoClient {
     maxQuoteQuantity?: number,
     clientOrderId?: number,
     orderType?: PerpOrderType,
+    reduceOnly?: boolean,
     expiryTimestamp?: number,
     limit?: number,
   ): Promise<TransactionInstruction> {
@@ -1661,6 +1699,7 @@ export class MangoClient {
           : I64_MAX_BN,
         new BN(clientOrderId ? clientOrderId : Date.now()),
         orderType ? orderType : PerpOrderType.limit,
+        reduceOnly ? reduceOnly : false,
         new BN(expiryTimestamp ? expiryTimestamp : 0),
         limit ? limit : 10,
       )
@@ -1668,8 +1707,109 @@ export class MangoClient {
         group: group.publicKey,
         account: mangoAccount.publicKey,
         perpMarket: perpMarket.publicKey,
-        asks: perpMarket.asks,
         bids: perpMarket.bids,
+        asks: perpMarket.asks,
+        eventQueue: perpMarket.eventQueue,
+        oracle: perpMarket.oracle,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
+  }
+
+  public async perpPlaceOrderPegged(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    side: PerpOrderSide,
+    priceOffset: number,
+    pegLimit: number,
+    quantity: number,
+    maxQuoteQuantity?: number,
+    clientOrderId?: number,
+    orderType?: PerpOrderType,
+    reduceOnly?: boolean,
+    expiryTimestamp?: number,
+    limit?: number,
+  ): Promise<TransactionSignature> {
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      [
+        await this.perpPlaceOrderPeggedIx(
+          group,
+          mangoAccount,
+          perpMarketIndex,
+          side,
+          priceOffset,
+          pegLimit,
+          quantity,
+          maxQuoteQuantity,
+          clientOrderId,
+          orderType,
+          reduceOnly,
+          expiryTimestamp,
+          limit,
+        ),
+      ],
+      group.addressLookupTablesList,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
+  }
+
+  public async perpPlaceOrderPeggedIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    side: PerpOrderSide,
+    priceOffset: number,
+    pegLimit: number,
+    quantity: number,
+    maxQuoteQuantity?: number,
+    clientOrderId?: number,
+    orderType?: PerpOrderType,
+    reduceOnly?: boolean,
+    expiryTimestamp?: number,
+    limit?: number,
+  ): Promise<TransactionInstruction> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        AccountRetriever.Fixed,
+        group,
+        [mangoAccount],
+        // Settlement token bank, because a position for it may be created
+        [group.getFirstBankByTokenIndex(0 as TokenIndex)],
+        [perpMarket],
+      );
+    return await this.program.methods
+      .perpPlaceOrderPegged(
+        side,
+        perpMarket.uiPriceToLots(priceOffset),
+        perpMarket.uiPriceToLots(pegLimit),
+        perpMarket.uiBaseToLots(quantity),
+        maxQuoteQuantity
+          ? perpMarket.uiQuoteToLots(maxQuoteQuantity)
+          : I64_MAX_BN,
+        new BN(clientOrderId ?? Date.now()),
+        orderType ? orderType : PerpOrderType.limit,
+        reduceOnly ? reduceOnly : false,
+        new BN(expiryTimestamp ?? 0),
+        limit ? limit : 10,
+        -1,
+      )
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        perpMarket: perpMarket.publicKey,
+        bids: perpMarket.bids,
+        asks: perpMarket.asks,
         eventQueue: perpMarket.eventQueue,
         oracle: perpMarket.oracle,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -1697,8 +1837,8 @@ export class MangoClient {
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         perpMarket: perpMarket.publicKey,
-        asks: perpMarket.asks,
         bids: perpMarket.bids,
+        asks: perpMarket.asks,
       })
       .instruction();
   }
@@ -1762,8 +1902,8 @@ export class MangoClient {
         group: group.publicKey,
         account: mangoAccount.publicKey,
         perpMarket: perpMarket.publicKey,
-        asks: perpMarket.asks,
         bids: perpMarket.bids,
+        asks: perpMarket.asks,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
@@ -2037,7 +2177,6 @@ export class MangoClient {
       .flashLoanEnd(flashLoanType)
       .accounts({
         account: mangoAccount.publicKey,
-        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .remainingAccounts([
         ...parsedHealthAccounts,
@@ -2061,6 +2200,8 @@ export class MangoClient {
         ) /* we don't care about borrowing the target amount, this is just a dummy */,
       ])
       .accounts({
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       })
       .remainingAccounts([
@@ -2282,8 +2423,7 @@ export class MangoClient {
     provider: Provider,
     cluster: Cluster,
     programId: PublicKey,
-    opts: any = {},
-    getIdsFromApi: IdsSource = 'api',
+    opts?: MangoClientOptions,
   ): MangoClient {
     const idl = IDL;
 
@@ -2292,7 +2432,6 @@ export class MangoClient {
       programId,
       cluster,
       opts,
-      getIdsFromApi,
     );
   }
 

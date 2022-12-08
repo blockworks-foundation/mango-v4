@@ -12,7 +12,7 @@ pub const MAX_BANKS: usize = 6;
 // the accounts that are relevant for this mint. The idea is that clients
 // can load this account to figure out which address maps to use when calling
 // instructions that need banks/oracles for all active positions.
-#[account(zero_copy)]
+#[account(zero_copy(safe_bytemuck_derives))]
 #[derive(Debug)]
 pub struct MintInfo {
     // ABI: Clients rely on this being at offset 8
@@ -28,14 +28,15 @@ pub struct MintInfo {
     pub vaults: [Pubkey; MAX_BANKS],
     pub oracle: Pubkey,
 
-    pub registration_time: i64,
+    pub registration_time: u64,
 
     pub reserved: [u8; 2560],
 }
 const_assert_eq!(
     size_of::<MintInfo>(),
-    MAX_BANKS * 2 * 32 + 3 * 32 + 2 + 8 + 6 + 2560
+    32 + 2 + 1 + 5 + 32 + MAX_BANKS * 2 * 32 + 32 + 8 + 2560
 );
+const_assert_eq!(size_of::<MintInfo>(), 3056);
 const_assert_eq!(size_of::<MintInfo>() % 8, 0);
 
 impl MintInfo {

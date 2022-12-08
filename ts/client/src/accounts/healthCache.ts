@@ -7,6 +7,7 @@ import {
   I80F48,
   I80F48Dto,
   MAX_I80F48,
+  ONE_I80F48,
   ZERO_I80F48,
 } from '../numbers/I80F48';
 import { Bank, BankForHealth, TokenIndex } from './bank';
@@ -111,6 +112,53 @@ export class HealthCache {
     );
   }
 
+  computeSerum3Reservations(healthType: HealthType): {
+    tokenMaxReserved: I80F48[];
+    serum3Reserved: Serum3Reserved[];
+  } {
+    // For each token, compute the sum of serum-reserved amounts over all markets.
+    const tokenMaxReserved = new Array(this.tokenInfos.length)
+      .fill(null)
+      .map((ignored) => ZERO_I80F48());
+
+    // For each serum market, compute what happened if reserved_base was converted to quote
+    // or reserved_quote was converted to base.
+    const serum3Reserved: Serum3Reserved[] = [];
+
+    for (const info of this.serum3Infos) {
+      const quote = this.tokenInfos[info.quoteIndex];
+      const base = this.tokenInfos[info.baseIndex];
+
+      const reservedBase = info.reservedBase;
+      const reservedQuote = info.reservedQuote;
+
+      const quoteAsset = quote.prices.asset(healthType);
+      const baseLiab = base.prices.liab(healthType);
+      const allReservedAsBase = reservedBase.add(
+        reservedQuote.mul(quoteAsset).div(baseLiab),
+      );
+      const baseAsset = base.prices.asset(healthType);
+      const quoteLiab = quote.prices.liab(healthType);
+      const allReservedAsQuote = reservedQuote.add(
+        reservedBase.mul(baseAsset).div(quoteLiab),
+      );
+
+      const baseMaxReserved = tokenMaxReserved[info.baseIndex];
+      baseMaxReserved.iadd(allReservedAsBase);
+      const quoteMaxReserved = tokenMaxReserved[info.quoteIndex];
+      quoteMaxReserved.iadd(allReservedAsQuote);
+
+      serum3Reserved.push(
+        new Serum3Reserved(allReservedAsBase, allReservedAsQuote),
+      );
+    }
+
+    return {
+      tokenMaxReserved: tokenMaxReserved,
+      serum3Reserved: serum3Reserved,
+    };
+  }
+
   public health(healthType: HealthType): I80F48 {
     const health = ZERO_I80F48();
     for (const tokenInfo of this.tokenInfos) {
@@ -118,10 +166,13 @@ export class HealthCache {
       // console.log(` - ti ${contrib}`);
       health.iadd(contrib);
     }
-    for (const serum3Info of this.serum3Infos) {
+    const res = this.computeSerum3Reservations(healthType);
+    for (const [index, serum3Info] of this.serum3Infos.entries()) {
       const contrib = serum3Info.healthContribution(
         healthType,
         this.tokenInfos,
+        res.tokenMaxReserved,
+        res.serum3Reserved[index],
       );
       // console.log(` - si ${contrib}`);
       health.iadd(contrib);
@@ -134,6 +185,37 @@ export class HealthCache {
     return health;
   }
 
+  // Note: only considers positive perp pnl contributions, see program code for more reasoning
+  public perpSettleHealth(): I80F48 {
+    const health = ZERO_I80F48();
+    for (const tokenInfo of this.tokenInfos) {
+      const contrib = tokenInfo.healthContribution(HealthType.maint);
+      // console.log(` - ti ${contrib}`);
+      health.iadd(contrib);
+    }
+    const res = this.computeSerum3Reservations(HealthType.maint);
+    for (const [index, serum3Info] of this.serum3Infos.entries()) {
+      const contrib = serum3Info.healthContribution(
+        HealthType.maint,
+        this.tokenInfos,
+        res.tokenMaxReserved,
+        res.serum3Reserved[index],
+      );
+      // console.log(` - si ${contrib}`);
+      health.iadd(contrib);
+    }
+    for (const perpInfo of this.perpInfos) {
+      if (perpInfo.trustedMarket) {
+        const positiveContrib = perpInfo
+          .uncappedHealthContribution(HealthType.maint)
+          .max(ZERO_I80F48());
+        // console.log(` - pi ${positiveContrib}`);
+        health.iadd(positiveContrib);
+      }
+    }
+    return health;
+  }
+
   public assets(healthType: HealthType): I80F48 {
     const assets = ZERO_I80F48();
     for (const tokenInfo of this.tokenInfos) {
@@ -142,10 +224,13 @@ export class HealthCache {
         assets.iadd(contrib);
       }
     }
-    for (const serum3Info of this.serum3Infos) {
+    const res = this.computeSerum3Reservations(HealthType.maint);
+    for (const [index, serum3Info] of this.serum3Infos.entries()) {
       const contrib = serum3Info.healthContribution(
         healthType,
         this.tokenInfos,
+        res.tokenMaxReserved,
+        res.serum3Reserved[index],
       );
       if (contrib.isPos()) {
         assets.iadd(contrib);
@@ -168,10 +253,13 @@ export class HealthCache {
         liabs.isub(contrib);
       }
     }
-    for (const serum3Info of this.serum3Infos) {
+    const res = this.computeSerum3Reservations(HealthType.maint);
+    for (const [index, serum3Info] of this.serum3Infos.entries()) {
       const contrib = serum3Info.healthContribution(
         healthType,
         this.tokenInfos,
+        res.tokenMaxReserved,
+        res.serum3Reserved[index],
       );
       if (contrib.isNeg()) {
         liabs.isub(contrib);
@@ -198,10 +286,13 @@ export class HealthCache {
         liabs.isub(contrib);
       }
     }
-    for (const serum3Info of this.serum3Infos) {
+    const res = this.computeSerum3Reservations(HealthType.maint);
+    for (const [index, serum3Info] of this.serum3Infos.entries()) {
       const contrib = serum3Info.healthContribution(
         healthType,
         this.tokenInfos,
+        res.tokenMaxReserved,
+        res.serum3Reserved[index],
       );
       if (contrib.isPos()) {
         assets.iadd(contrib);
@@ -217,6 +308,8 @@ export class HealthCache {
         liabs.isub(contrib);
       }
     }
+
+    // console.log(` - assets ${assets}, liabs ${liabs}`);
 
     if (liabs.gt(I80F48.fromNumber(0.001))) {
       return HUNDRED_I80F48().mul(assets.sub(liabs).div(liabs));
@@ -252,8 +345,9 @@ export class HealthCache {
     for (const change of nativeTokenChanges) {
       const bank: Bank = group.getFirstBankByMint(change.mintPk);
       const changeIndex = adjustedCache.getOrCreateTokenInfoIndex(bank);
-      adjustedCache.tokenInfos[changeIndex].balance.iadd(
-        change.nativeTokenAmount.mul(bank.price),
+      // TODO: this will no longer work as easily because of the health weight changes
+      adjustedCache.tokenInfos[changeIndex].balanceNative.iadd(
+        change.nativeTokenAmount,
       );
     }
     // HealthCache.logHealthCache('afterChange', adjustedCache);
@@ -299,16 +393,11 @@ export class HealthCache {
     const quoteEntryIndex = this.getOrCreateTokenInfoIndex(quoteBank);
 
     const baseEntry = this.tokenInfos[baseEntryIndex];
-    const reservedAmount = reservedBaseChange.mul(baseEntry.oraclePrice);
-
     const quoteEntry = this.tokenInfos[quoteEntryIndex];
-    reservedAmount.iadd(reservedQuoteChange.mul(quoteEntry.oraclePrice));
 
     // Apply it to the tokens
-    baseEntry.serum3MaxReserved.iadd(reservedAmount);
-    baseEntry.balance.iadd(freeBaseChange.mul(baseEntry.oraclePrice));
-    quoteEntry.serum3MaxReserved.iadd(reservedAmount);
-    quoteEntry.balance.iadd(freeQuoteChange.mul(quoteEntry.oraclePrice));
+    baseEntry.balanceNative.iadd(freeBaseChange);
+    quoteEntry.balanceNative.iadd(freeQuoteChange);
 
     // Apply it to the serum3 info
     const index = this.getOrCreateSerum3InfoIndex(
@@ -317,7 +406,8 @@ export class HealthCache {
       serum3Market,
     );
     const serum3Info = this.serum3Infos[index];
-    serum3Info.reserved = serum3Info.reserved.add(reservedAmount);
+    serum3Info.reservedBase.iadd(reservedBaseChange);
+    serum3Info.reservedQuote.iadd(reservedQuoteChange);
   }
 
   simHealthRatioWithSerum3BidChanges(
@@ -329,14 +419,13 @@ export class HealthCache {
   ): I80F48 {
     const adjustedCache: HealthCache = _.cloneDeep(this);
     const quoteIndex = adjustedCache.getOrCreateTokenInfoIndex(quoteBank);
-    const quote = adjustedCache.tokenInfos[quoteIndex];
 
     // Move token balance to reserved funds in open orders,
     // essentially simulating a place order
 
     // Reduce token balance for quote
-    adjustedCache.tokenInfos[quoteIndex].balance.isub(
-      bidNativeQuoteAmount.mul(quote.oraclePrice),
+    adjustedCache.tokenInfos[quoteIndex].balanceNative.isub(
+      bidNativeQuoteAmount,
     );
 
     // Increase reserved in Serum3Info for quote
@@ -361,15 +450,12 @@ export class HealthCache {
   ): I80F48 {
     const adjustedCache: HealthCache = _.cloneDeep(this);
     const baseIndex = adjustedCache.getOrCreateTokenInfoIndex(baseBank);
-    const base = adjustedCache.tokenInfos[baseIndex];
 
     // Move token balance to reserved funds in open orders,
     // essentially simulating a place order
 
     // Reduce token balance for base
-    adjustedCache.tokenInfos[baseIndex].balance.isub(
-      askNativeBaseAmount.mul(base.oraclePrice),
-    );
+    adjustedCache.tokenInfos[baseIndex].balanceNative.isub(askNativeBaseAmount);
 
     // Increase reserved in Serum3Info for base
     adjustedCache.adjustSerum3Reserved(
@@ -398,66 +484,67 @@ export class HealthCache {
     return this.findPerpInfoIndex(perpMarket.perpMarketIndex);
   }
 
-  recomputePerpInfo(
-    perpMarket: PerpMarket,
+  adjustPerpInfo(
     perpInfoIndex: number,
-    clonedExistingPerpPosition: PerpPosition,
+    price: I80F48,
     side: PerpOrderSide,
     newOrderBaseLots: BN,
   ): void {
     if (side == PerpOrderSide.bid) {
-      clonedExistingPerpPosition.bidsBaseLots.iadd(newOrderBaseLots);
+      this.perpInfos[perpInfoIndex].baseLots.iadd(newOrderBaseLots);
+      this.perpInfos[perpInfoIndex].quote.isub(
+        I80F48.fromI64(newOrderBaseLots)
+          .mul(I80F48.fromI64(this.perpInfos[perpInfoIndex].baseLotSize))
+          .mul(price),
+      );
     } else {
-      clonedExistingPerpPosition.asksBaseLots.iadd(newOrderBaseLots);
+      this.perpInfos[perpInfoIndex].baseLots.isub(newOrderBaseLots);
+      this.perpInfos[perpInfoIndex].quote.iadd(
+        I80F48.fromI64(newOrderBaseLots)
+          .mul(I80F48.fromI64(this.perpInfos[perpInfoIndex].baseLotSize))
+          .mul(price),
+      );
     }
-    this.perpInfos[perpInfoIndex] = PerpInfo.fromPerpPosition(
-      perpMarket,
-      clonedExistingPerpPosition,
-    );
   }
 
   simHealthRatioWithPerpOrderChanges(
     perpMarket: PerpMarket,
     existingPerpPosition: PerpPosition,
-    baseLots: BN,
     side: PerpOrderSide,
+    baseLots: BN,
+    price: I80F48,
     healthType: HealthType = HealthType.init,
   ): I80F48 {
     const clonedHealthCache: HealthCache = _.cloneDeep(this);
-    const clonedExistingPosition: PerpPosition =
-      _.cloneDeep(existingPerpPosition);
     const perpInfoIndex =
       clonedHealthCache.getOrCreatePerpInfoIndex(perpMarket);
-    clonedHealthCache.recomputePerpInfo(
-      perpMarket,
-      perpInfoIndex,
-      clonedExistingPosition,
-      side,
-      baseLots,
-    );
+    clonedHealthCache.adjustPerpInfo(perpInfoIndex, price, side, baseLots);
     return clonedHealthCache.healthRatio(healthType);
   }
 
-  public static logHealthCache(debug: string, healthCache: HealthCache): void {
+  public logHealthCache(debug: string): void {
     if (debug) console.log(debug);
-    for (const token of healthCache.tokenInfos) {
+    for (const token of this.tokenInfos) {
       console.log(` ${token.toString()}`);
     }
-    for (const serum3Info of healthCache.serum3Infos) {
-      console.log(` ${serum3Info.toString(healthCache.tokenInfos)}`);
+    const res = this.computeSerum3Reservations(HealthType.maint);
+    for (const [index, serum3Info] of this.serum3Infos.entries()) {
+      console.log(
+        ` ${serum3Info.toString(
+          this.tokenInfos,
+          res.tokenMaxReserved,
+          res.serum3Reserved[index],
+        )}`,
+      );
     }
     console.log(
-      ` assets ${healthCache.assets(
+      ` assets ${this.assets(HealthType.init)}, liabs ${this.liabs(
         HealthType.init,
-      )}, liabs ${healthCache.liabs(HealthType.init)}, `,
+      )}, `,
     );
+    console.log(` health(HealthType.init) ${this.health(HealthType.init)}`);
     console.log(
-      ` health(HealthType.init) ${healthCache.health(HealthType.init)}`,
-    );
-    console.log(
-      ` healthRatio(HealthType.init) ${healthCache.healthRatio(
-        HealthType.init,
-      )}`,
+      ` healthRatio(HealthType.init) ${this.healthRatio(HealthType.init)}`,
     );
   }
 
@@ -467,9 +554,10 @@ export class HealthCache {
     right: I80F48,
     rightRatio: I80F48,
     targetRatio: I80F48,
+    minStep: I80F48,
     healthRatioAfterActionFn: (I80F48) => I80F48,
   ): I80F48 {
-    const maxIterations = 40;
+    const maxIterations = 20;
     const targetError = I80F48.fromNumber(0.1);
 
     if (
@@ -486,6 +574,9 @@ export class HealthCache {
     let newAmount;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     for (const key of Array(maxIterations).fill(0).keys()) {
+      if (right.sub(left).abs().lt(minStep)) {
+        return left;
+      }
       newAmount = left.add(right).mul(I80F48.fromNumber(0.5));
       const newAmountRatio = healthRatioAfterActionFn(newAmount);
       const error = newAmountRatio.sub(targetRatio);
@@ -494,11 +585,20 @@ export class HealthCache {
       }
       if (newAmountRatio.gt(targetRatio) != rightRatio.gt(targetRatio)) {
         left = newAmount;
+        leftRatio = newAmountRatio;
       } else {
         right = newAmount;
         rightRatio = newAmountRatio;
       }
+      // console.log(
+      //   ` -- ${left.toNumber().toFixed(3)} (${leftRatio
+      //     .toNumber()
+      //     .toFixed(3)}) ${right.toNumber().toFixed(3)} (${rightRatio
+      //     .toNumber()
+      //     .toFixed(3)})`,
+      // );
     }
+
     console.error(
       `Unable to get targetRatio within ${maxIterations} iterations`,
     );
@@ -508,8 +608,8 @@ export class HealthCache {
   getMaxSourceForTokenSwap(
     sourceBank: BankForHealth,
     targetBank: BankForHealth,
+    price: I80F48,
     minRatio: I80F48,
-    priceFactor: I80F48,
   ): I80F48 {
     if (
       sourceBank.initLiabWeight
@@ -535,21 +635,27 @@ export class HealthCache {
       return ZERO_I80F48();
     }
 
-    // If the price is sufficiently good, then health will just increase from swapping:
-    // once we've swapped enough, swapping x reduces health by x * source_liab_weight and
-    // increases it by x * target_asset_weight * price_factor.
-    const finalHealthSlope = sourceBank.initLiabWeight
-      .neg()
-      .add(targetBank.initAssetWeight.mul(priceFactor));
-    if (finalHealthSlope.gte(ZERO_I80F48())) {
-      return MAX_I80F48();
-    }
-
     const healthCacheClone: HealthCache = _.cloneDeep(this);
     const sourceIndex = healthCacheClone.getOrCreateTokenInfoIndex(sourceBank);
     const targetIndex = healthCacheClone.getOrCreateTokenInfoIndex(targetBank);
     const source = healthCacheClone.tokenInfos[sourceIndex];
     const target = healthCacheClone.tokenInfos[targetIndex];
+
+    // If the price is sufficiently good, then health will just increase from swapping:
+    // once we've swapped enough, swapping x reduces health by x * source_liab_weight and
+    // increases it by x * target_asset_weight * price_factor.
+    const finalHealthSlope = source.initLiabWeight
+      .neg()
+      .mul(source.prices.liab(HealthType.init))
+      .add(
+        target.initAssetWeight
+          .mul(target.prices.asset(HealthType.init))
+          .mul(price),
+      );
+
+    if (finalHealthSlope.gte(ZERO_I80F48())) {
+      return MAX_I80F48();
+    }
 
     // There are two key slope changes: Assume source.balance > 0 and target.balance < 0. Then
     // initially health ratio goes up. When one of balances flips sign, the health ratio slope
@@ -559,12 +665,14 @@ export class HealthCache {
 
     function cacheAfterSwap(amount: I80F48): HealthCache {
       const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
-      // HealthCache.logHealthCache('beforeSwap', adjustedCache);
-      adjustedCache.tokenInfos[sourceIndex].balance.isub(amount);
-      adjustedCache.tokenInfos[targetIndex].balance.iadd(
-        amount.mul(priceFactor),
+      // adjustedCache.logHealthCache('beforeSwap', adjustedCache);
+      // TODO: make a copy of the bank, apply amount, recompute weights,
+      // and set the new weights on the tokenInfos
+      adjustedCache.tokenInfos[sourceIndex].balanceNative.isub(amount);
+      adjustedCache.tokenInfos[targetIndex].balanceNative.iadd(
+        amount.mul(price),
       );
-      // HealthCache.logHealthCache('afterSwap', adjustedCache);
+      // adjustedCache.logHealthCache('afterSwap', adjustedCache);
       return adjustedCache;
     }
 
@@ -572,19 +680,24 @@ export class HealthCache {
       return cacheAfterSwap(amount).healthRatio(HealthType.init);
     }
 
+    function healthAfterSwap(amount: I80F48): I80F48 {
+      return cacheAfterSwap(amount).health(HealthType.init);
+    }
+
     // There are two key slope changes: Assume source.balance > 0 and target.balance < 0.
     // When these values flip sign, the health slope decreases, but could still be positive.
     // After point1 it's definitely negative (due to finalHealthSlope check above).
     // The maximum health ratio will be at 0 or at one of these points (ignoring serum3 effects).
-    const sourceForZeroTargetBalance = target.balance.neg().div(priceFactor);
-    const point0Amount = source.balance
+    const sourceForZeroTargetBalance = target.balanceNative.neg().div(price);
+    const point0Amount = source.balanceNative
       .min(sourceForZeroTargetBalance)
       .max(ZERO_I80F48());
-    const point1Amount = source.balance
+    const point1Amount = source.balanceNative
       .max(sourceForZeroTargetBalance)
       .max(ZERO_I80F48());
     const cache0 = cacheAfterSwap(point0Amount);
     const point0Ratio = cache0.healthRatio(HealthType.init);
+    const point0Health = cache0.health(HealthType.init);
     const cache1 = cacheAfterSwap(point1Amount);
     const point1Ratio = cache1.healthRatio(HealthType.init);
     const point1Health = cache1.health(HealthType.init);
@@ -620,12 +733,15 @@ export class HealthCache {
         point1Health.div(finalHealthSlope),
       );
       const zeroHealthRatio = healthRatioAfterSwap(zeroHealthAmount);
+      const zeroHealth = healthAfterSwap(zeroHealthAmount);
+
       amount = HealthCache.binaryApproximationSearch(
         point1Amount,
         point1Ratio,
         zeroHealthAmount,
         zeroHealthRatio,
         minRatio,
+        ZERO_I80F48(),
         healthRatioAfterSwap,
       );
     } else if (point0Ratio.gte(minRatio)) {
@@ -636,6 +752,7 @@ export class HealthCache {
         point1Amount,
         point1Ratio,
         minRatio,
+        ZERO_I80F48(),
         healthRatioAfterSwap,
       );
     } else {
@@ -646,11 +763,12 @@ export class HealthCache {
         point0Amount,
         point0Ratio,
         minRatio,
+        ZERO_I80F48(),
         healthRatioAfterSwap,
       );
     }
 
-    return amount.div(source.oraclePrice);
+    return amount;
   }
 
   getMaxSerum3OrderForHealthRatio(
@@ -686,10 +804,12 @@ export class HealthCache {
     // and when its a bid, then quote->bid
     let zeroAmount;
     if (side == Serum3Side.ask) {
-      const quoteBorrows = quote.balance.lt(ZERO_I80F48())
-        ? quote.balance.abs()
+      const quoteBorrows = quote.balanceNative.lt(ZERO_I80F48())
+        ? quote.balanceNative.abs().mul(quote.prices.liab(HealthType.init))
         : ZERO_I80F48();
-      const max = base.balance.max(quoteBorrows);
+      const max = base.balanceNative
+        .mul(base.prices.asset(HealthType.init))
+        .max(quoteBorrows);
       zeroAmount = max.add(
         initialHealth
           .add(max.mul(quote.initLiabWeight.sub(base.initAssetWeight)))
@@ -700,10 +820,12 @@ export class HealthCache {
           ),
       );
     } else {
-      const baseBorrows = base.balance.lt(ZERO_I80F48())
-        ? base.balance.abs()
+      const baseBorrows = base.balanceNative.lt(ZERO_I80F48())
+        ? base.balanceNative.abs().mul(base.prices.liab(HealthType.init))
         : ZERO_I80F48();
-      const max = quote.balance.max(baseBorrows);
+      const max = quote.balanceNative
+        .mul(quote.prices.asset(HealthType.init))
+        .max(baseBorrows);
       zeroAmount = max.add(
         initialHealth
           .add(max.mul(base.initLiabWeight.sub(quote.initAssetWeight)))
@@ -722,20 +844,30 @@ export class HealthCache {
 
     function cacheAfterPlacingOrder(amount: I80F48): HealthCache {
       const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
-
+      // adjustedCache.logHealthCache(` before placing order ${amount}`);
+      // TODO: there should also be some issue with oracle vs stable price here;
+      // probably better to pass in not the quote amount but the base or quote native amount
       side === Serum3Side.ask
-        ? adjustedCache.tokenInfos[baseIndex].balance.isub(amount)
-        : adjustedCache.tokenInfos[quoteIndex].balance.isub(amount);
-
+        ? adjustedCache.tokenInfos[baseIndex].balanceNative.isub(
+            amount.div(base.prices.oracle),
+          )
+        : adjustedCache.tokenInfos[quoteIndex].balanceNative.isub(
+            amount.div(quote.prices.oracle),
+          );
       adjustedCache.adjustSerum3Reserved(
         baseBank,
         quoteBank,
         serum3Market,
-        side === Serum3Side.ask ? amount.div(base.oraclePrice) : ZERO_I80F48(),
+        side === Serum3Side.ask
+          ? amount.div(base.prices.oracle)
+          : ZERO_I80F48(),
         ZERO_I80F48(),
-        side === Serum3Side.bid ? amount.div(quote.oraclePrice) : ZERO_I80F48(),
+        side === Serum3Side.bid
+          ? amount.div(quote.prices.oracle)
+          : ZERO_I80F48(),
         ZERO_I80F48(),
       );
+      // adjustedCache.logHealthCache(' after placing order');
 
       return adjustedCache;
     }
@@ -750,6 +882,7 @@ export class HealthCache {
       zeroAmount,
       zeroAmountRatio,
       minRatio,
+      ONE_I80F48(),
       healthRatioAfterPlacingOrder,
     );
 
@@ -758,7 +891,7 @@ export class HealthCache {
 
   getMaxPerpForHealthRatio(
     perpMarket: PerpMarket,
-    existingPerpPosition: PerpPosition,
+    price,
     side: PerpOrderSide,
     minRatio: I80F48,
   ): I80F48 {
@@ -773,46 +906,41 @@ export class HealthCache {
 
     const perpInfoIndex = healthCacheClone.getOrCreatePerpInfoIndex(perpMarket);
     const perpInfo = healthCacheClone.perpInfos[perpInfoIndex];
-    const oraclePrice = perpInfo.oraclePrice;
+    const prices = perpInfo.prices;
     const baseLotSize = I80F48.fromI64(perpMarket.baseLotSize);
 
     // If the price is sufficiently good then health will just increase from trading
     const finalHealthSlope =
       direction == 1
-        ? perpInfo.initAssetWeight.mul(oraclePrice).sub(oraclePrice)
-        : oraclePrice.sub(perpInfo.initLiabWeight.mul(oraclePrice));
+        ? perpInfo.initAssetWeight.mul(prices.asset(HealthType.init)).sub(price)
+        : price.sub(perpInfo.initLiabWeight.mul(prices.liab(HealthType.init)));
     if (finalHealthSlope.gte(ZERO_I80F48())) {
       return MAX_I80F48();
     }
 
-    function cacheAfterPlaceOrder(baseLots: BN): HealthCache {
+    function cacheAfterTrade(baseLots: BN): HealthCache {
       const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
-      const adjustedExistingPerpPosition: PerpPosition =
-        _.cloneDeep(existingPerpPosition);
-      adjustedCache.recomputePerpInfo(
-        perpMarket,
-        perpInfoIndex,
-        adjustedExistingPerpPosition,
-        side,
-        baseLots,
-      );
+      // adjustedCache.logHealthCache(' -- before trade');
+      adjustedCache.adjustPerpInfo(perpInfoIndex, price, side, baseLots);
+      // adjustedCache.logHealthCache(' -- after trade');
       return adjustedCache;
     }
 
     function healthAfterTrade(baseLots: I80F48): I80F48 {
-      return cacheAfterPlaceOrder(new BN(baseLots.toNumber())).health(
+      return cacheAfterTrade(new BN(baseLots.toNumber())).health(
         HealthType.init,
       );
     }
     function healthRatioAfterTrade(baseLots: I80F48): I80F48 {
-      return cacheAfterPlaceOrder(new BN(baseLots.toNumber())).healthRatio(
+      return cacheAfterTrade(new BN(baseLots.toNumber())).healthRatio(
         HealthType.init,
       );
     }
+    function healthRatioAfterTradeTrunc(baseLots: I80F48): I80F48 {
+      return healthRatioAfterTrade(baseLots.floor());
+    }
 
-    const initialBaseLots = perpInfo.base
-      .div(perpInfo.oraclePrice)
-      .div(baseLotSize);
+    const initialBaseLots = I80F48.fromU64(perpInfo.baseLots);
 
     // There are two cases:
     // 1. We are increasing abs(baseLots)
@@ -840,21 +968,36 @@ export class HealthCache {
       }
     } else if (case1StartRatio.gte(minRatio)) {
       // Must reach minRatio to the right of case1Start
-      const case1StartHealth = healthAfterTrade(case1Start);
-      if (case1StartHealth.lte(ZERO_I80F48())) {
+
+      // Need to figure out how many lots to trade to reach zero health (zero_health_amount).
+      // We do this by looking at the starting health and the health slope per
+      // traded base lot (final_health_slope).
+      const startCache = cacheAfterTrade(new BN(case1Start.toNumber()));
+      const startHealth = startCache.health(HealthType.init);
+      if (startHealth.lte(ZERO_I80F48())) {
         return ZERO_I80F48();
       }
-      const zeroHealthAmount = case1Start.sub(
-        case1StartHealth.div(finalHealthSlope).div(baseLotSize),
-      );
-      const zeroHealthRatio = healthRatioAfterTrade(zeroHealthAmount);
+
+      // The perp market's contribution to the health above may be capped. But we need to trade
+      // enough to fully reduce any positive-pnl buffer. Thus get the uncapped health:
+      const perpInfo = startCache.perpInfos[perpInfoIndex];
+      const startHealthUncapped = startHealth
+        .sub(perpInfo.healthContribution(HealthType.init))
+        .add(perpInfo.uncappedHealthContribution(HealthType.init));
+
+      const zeroHealthAmount = case1Start
+        .sub(startHealthUncapped.div(finalHealthSlope).div(baseLotSize))
+        .add(ONE_I80F48());
+      const zeroHealthRatio = healthRatioAfterTradeTrunc(zeroHealthAmount);
+
       baseLots = HealthCache.binaryApproximationSearch(
         case1Start,
         case1StartRatio,
         zeroHealthAmount,
         zeroHealthRatio,
         minRatio,
-        healthRatioAfterTrade,
+        ONE_I80F48(),
+        healthRatioAfterTradeTrunc,
       );
     } else {
       // Between 0 and case1Start
@@ -864,11 +1007,30 @@ export class HealthCache {
         case1Start,
         case1StartRatio,
         minRatio,
-        healthRatioAfterTrade,
+        ONE_I80F48(),
+        healthRatioAfterTradeTrunc,
       );
     }
 
     return baseLots.floor();
+  }
+}
+
+export class Prices {
+  constructor(public oracle: I80F48, public stable: I80F48) {}
+
+  public liab(healthType: HealthType): I80F48 {
+    if (healthType == HealthType.maint) {
+      return this.oracle;
+    }
+    return this.oracle.max(this.stable);
+  }
+
+  public asset(healthType: HealthType): I80F48 {
+    if (healthType == HealthType.maint) {
+      return this.oracle;
+    }
+    return this.oracle.min(this.stable);
   }
 }
 
@@ -879,12 +1041,8 @@ export class TokenInfo {
     public initAssetWeight: I80F48,
     public maintLiabWeight: I80F48,
     public initLiabWeight: I80F48,
-    // native/native
-    public oraclePrice: I80F48,
-    // in health-reference-token native units
-    public balance: I80F48,
-    // in health-reference-token native units
-    public serum3MaxReserved: I80F48,
+    public prices: Prices,
+    public balanceNative: I80F48,
   ) {}
 
   static fromDto(dto: TokenInfoDto): TokenInfo {
@@ -894,26 +1052,26 @@ export class TokenInfo {
       I80F48.from(dto.initAssetWeight),
       I80F48.from(dto.maintLiabWeight),
       I80F48.from(dto.initLiabWeight),
-      I80F48.from(dto.oraclePrice),
-      I80F48.from(dto.balance),
-      I80F48.from(dto.serum3MaxReserved),
+      new Prices(
+        I80F48.from(dto.prices.oracle),
+        I80F48.from(dto.prices.stable),
+      ),
+      I80F48.from(dto.balanceNative),
     );
   }
 
-  static fromBank(
-    bank: BankForHealth,
-    nativeBalance?: I80F48,
-    serum3MaxReserved?: I80F48,
-  ): TokenInfo {
+  static fromBank(bank: BankForHealth, nativeBalance?: I80F48): TokenInfo {
     return new TokenInfo(
       bank.tokenIndex,
       bank.maintAssetWeight,
-      bank.initAssetWeight,
+      bank.scaledInitAssetWeight(),
       bank.maintLiabWeight,
-      bank.initLiabWeight,
-      bank.price,
-      nativeBalance ? nativeBalance.mul(bank.price) : ZERO_I80F48(),
-      serum3MaxReserved ? serum3MaxReserved : ZERO_I80F48(),
+      bank.scaledInitLiabWeight(),
+      new Prices(
+        bank.price,
+        I80F48.fromNumber(bank.stablePriceModel.stablePrice),
+      ),
+      nativeBalance ? nativeBalance : ZERO_I80F48(),
     );
   }
 
@@ -930,25 +1088,35 @@ export class TokenInfo {
   }
 
   healthContribution(healthType: HealthType): I80F48 {
-    return (
-      this.balance.isNeg()
-        ? this.liabWeight(healthType)
-        : this.assetWeight(healthType)
-    ).mul(this.balance);
+    let weight, price;
+    if (this.balanceNative.isNeg()) {
+      weight = this.liabWeight(healthType);
+      price = this.prices.liab(healthType);
+    } else {
+      weight = this.assetWeight(healthType);
+      price = this.prices.asset(healthType);
+    }
+    return this.balanceNative.mul(weight).mul(price);
   }
 
   toString(): string {
-    return `  tokenIndex: ${this.tokenIndex}, balance: ${
-      this.balance
-    }, serum3MaxReserved: ${
-      this.serum3MaxReserved
+    return `  tokenIndex: ${this.tokenIndex}, balanceNative: ${
+      this.balanceNative
     }, initHealth ${this.healthContribution(HealthType.init)}`;
   }
 }
 
+export class Serum3Reserved {
+  constructor(
+    public allReservedAsBase: I80F48,
+    public allReservedAsQuote: I80F48,
+  ) {}
+}
+
 export class Serum3Info {
   constructor(
-    public reserved: I80F48,
+    public reservedBase: I80F48,
+    public reservedQuote: I80F48,
     public baseIndex: number,
     public quoteIndex: number,
     public marketIndex: MarketIndex,
@@ -956,7 +1124,8 @@ export class Serum3Info {
 
   static fromDto(dto: Serum3InfoDto): Serum3Info {
     return new Serum3Info(
-      I80F48.from(dto.reserved),
+      I80F48.from(dto.reservedBase),
+      I80F48.from(dto.reservedQuote),
       dto.baseIndex,
       dto.quoteIndex,
       dto.marketIndex as MarketIndex,
@@ -969,6 +1138,7 @@ export class Serum3Info {
     quoteEntryIndex: number,
   ): Serum3Info {
     return new Serum3Info(
+      ZERO_I80F48(),
       ZERO_I80F48(),
       baseEntryIndex,
       quoteEntryIndex,
@@ -984,90 +1154,117 @@ export class Serum3Info {
     marketIndex: MarketIndex,
     oo: OpenOrders,
   ): Serum3Info {
-    // add the amounts that are freely settleable
+    // add the amounts that are freely settleable immediately to token balances
     const baseFree = I80F48.fromI64(oo.baseTokenFree);
     // NOTE: referrerRebatesAccrued is not declared on oo class, but the layout
     // is aware of it
     const quoteFree = I80F48.fromI64(
       oo.quoteTokenFree.add((oo as any).referrerRebatesAccrued),
     );
-    baseInfo.balance.iadd(baseFree.mul(baseInfo.oraclePrice));
-    quoteInfo.balance.iadd(quoteFree.mul(quoteInfo.oraclePrice));
+    baseInfo.balanceNative.iadd(baseFree);
+    quoteInfo.balanceNative.iadd(quoteFree);
 
-    // add the reserved amount to both sides, to have the worst-case covered
+    // track the reserved amounts
     const reservedBase = I80F48.fromI64(
       oo.baseTokenTotal.sub(oo.baseTokenFree),
     );
     const reservedQuote = I80F48.fromI64(
       oo.quoteTokenTotal.sub(oo.quoteTokenFree),
     );
-    const reservedBalance = reservedBase
-      .mul(baseInfo.oraclePrice)
-      .add(reservedQuote.mul(quoteInfo.oraclePrice));
-    baseInfo.serum3MaxReserved.iadd(reservedBalance);
-    quoteInfo.serum3MaxReserved.iadd(reservedBalance);
 
-    return new Serum3Info(reservedBalance, baseIndex, quoteIndex, marketIndex);
+    return new Serum3Info(
+      reservedBase,
+      reservedQuote,
+      baseIndex,
+      quoteIndex,
+      marketIndex,
+    );
   }
 
-  healthContribution(healthType: HealthType, tokenInfos: TokenInfo[]): I80F48 {
-    const baseInfo = tokenInfos[this.baseIndex];
-    const quoteInfo = tokenInfos[this.quoteIndex];
-    const reserved = this.reserved;
-    // console.log(`  - reserved ${reserved}`);
-    // console.log(`  - this.baseIndex ${this.baseIndex}`);
-    // console.log(`  - this.quoteIndex ${this.quoteIndex}`);
-
-    if (reserved.isZero()) {
+  healthContribution(
+    healthType: HealthType,
+    tokenInfos: TokenInfo[],
+    tokenMaxReserved: I80F48[],
+    marketReserved: Serum3Reserved,
+  ): I80F48 {
+    if (
+      marketReserved.allReservedAsBase.isZero() ||
+      marketReserved.allReservedAsQuote.isZero()
+    ) {
       return ZERO_I80F48();
     }
 
+    const baseInfo = tokenInfos[this.baseIndex];
+    const quoteInfo = tokenInfos[this.quoteIndex];
+    const baseMaxReserved = tokenMaxReserved[this.baseIndex];
+    const quoteMaxReserved = tokenMaxReserved[this.quoteIndex];
+
     // How much the health would increase if the reserved balance were applied to the passed
     // token info?
-    const computeHealthEffect = function (tokenInfo: TokenInfo): I80F48 {
+    const computeHealthEffect = function (
+      tokenInfo: TokenInfo,
+      tokenMaxReserved: I80F48,
+      marketReserved: I80F48,
+    ): I80F48 {
       // This balance includes all possible reserved funds from markets that relate to the
-      // token, including this market itself: `reserved` is already included in `max_balance`.
-      const maxBalance = tokenInfo.balance.add(tokenInfo.serum3MaxReserved);
+      // token, including this market itself: `tokenMaxReserved` is already included in `maxBalance`.
+      const maxBalance = tokenInfo.balanceNative.add(tokenMaxReserved);
 
       // Assuming `reserved` was added to `max_balance` last (because that gives the smallest
       // health effects): how much did health change because of it?
       let assetPart, liabPart;
-      if (maxBalance.gte(reserved)) {
-        assetPart = reserved;
+      if (maxBalance.gte(marketReserved)) {
+        assetPart = marketReserved;
         liabPart = ZERO_I80F48();
       } else if (maxBalance.isNeg()) {
         assetPart = ZERO_I80F48();
-        liabPart = reserved;
+        liabPart = marketReserved;
       } else {
         assetPart = maxBalance;
-        liabPart = reserved.sub(maxBalance);
+        liabPart = marketReserved.sub(maxBalance);
       }
       const assetWeight = tokenInfo.assetWeight(healthType);
       const liabWeight = tokenInfo.liabWeight(healthType);
+      const assetPrice = tokenInfo.prices.asset(healthType);
+      const liabPrice = tokenInfo.prices.liab(healthType);
 
-      // console.log(`  - tokenInfo.index ${tokenInfo.tokenIndex}`);
-      // console.log(`  - tokenInfo.balance ${tokenInfo.balance}`);
-      // console.log(
-      //   `  - tokenInfo.serum3MaxReserved ${tokenInfo.serum3MaxReserved}`,
-      // );
-      // console.log(`  - assetPart ${assetPart}`);
-      // console.log(`  - liabPart ${liabPart}`);
-      return assetWeight.mul(assetPart).add(liabWeight.mul(liabPart));
+      return assetWeight
+        .mul(assetPart)
+        .mul(assetPrice)
+        .add(liabWeight.mul(liabPart).mul(liabPrice));
     };
 
-    const reservedAsBase = computeHealthEffect(baseInfo);
-    const reservedAsQuote = computeHealthEffect(quoteInfo);
-    // console.log(` - reservedAsBase ${reservedAsBase}`);
-    // console.log(` - reservedAsQuote ${reservedAsQuote}`);
-    return reservedAsBase.min(reservedAsQuote);
+    const healthBase = computeHealthEffect(
+      baseInfo,
+      baseMaxReserved,
+      marketReserved.allReservedAsBase,
+    );
+    const healthQuote = computeHealthEffect(
+      quoteInfo,
+      quoteMaxReserved,
+      marketReserved.allReservedAsQuote,
+    );
+
+    return healthBase.min(healthQuote);
   }
 
-  toString(tokenInfos: TokenInfo[]): string {
+  toString(
+    tokenInfos: TokenInfo[],
+    tokenMaxReserved: I80F48[],
+    marketReserved: Serum3Reserved,
+  ): string {
     return `  marketIndex: ${this.marketIndex}, baseIndex: ${
       this.baseIndex
-    }, quoteIndex: ${this.quoteIndex}, reserved: ${
-      this.reserved
-    }, initHealth ${this.healthContribution(HealthType.init, tokenInfos)}`;
+    }, quoteIndex: ${this.quoteIndex}, reservedBase: ${
+      this.reservedBase
+    }, reservedQuote: ${
+      this.reservedQuote
+    }, initHealth ${this.healthContribution(
+      HealthType.init,
+      tokenInfos,
+      tokenMaxReserved,
+      marketReserved,
+    )}`;
   }
 }
 
@@ -1078,9 +1275,12 @@ export class PerpInfo {
     public initAssetWeight: I80F48,
     public maintLiabWeight: I80F48,
     public initLiabWeight: I80F48,
-    public base: I80F48,
+    public baseLotSize: BN,
+    public baseLots: BN,
+    public bidsBaseLots: BN,
+    public asksBaseLots: BN,
     public quote: I80F48,
-    public oraclePrice: I80F48,
+    public prices: Prices,
     public hasOpenOrders: boolean,
     public trustedMarket: boolean,
   ) {}
@@ -1092,9 +1292,15 @@ export class PerpInfo {
       I80F48.from(dto.initAssetWeight),
       I80F48.from(dto.maintLiabWeight),
       I80F48.from(dto.initLiabWeight),
-      I80F48.from(dto.base),
+      dto.baseLotSize,
+      dto.baseLots,
+      dto.bidsBaseLots,
+      dto.asksBaseLots,
       I80F48.from(dto.quote),
-      I80F48.from(dto.oraclePrice),
+      new Prices(
+        I80F48.from(dto.prices.oracle),
+        I80F48.from(dto.prices.stable),
+      ),
       dto.hasOpenOrders,
       dto.trustedMarket,
     );
@@ -1104,11 +1310,9 @@ export class PerpInfo {
     perpMarket: PerpMarket,
     perpPosition: PerpPosition,
   ): PerpInfo {
-    const baseLotSize = I80F48.fromI64(perpMarket.baseLotSize);
-    const baseLots = I80F48.fromI64(
-      perpPosition.basePositionLots.add(perpPosition.takerBaseLots),
+    const baseLots = perpPosition.basePositionLots.add(
+      perpPosition.takerBaseLots,
     );
-
     const unsettledFunding = perpPosition.getUnsettledFunding(perpMarket);
 
     const takerQuote = I80F48.fromI64(
@@ -1118,109 +1322,87 @@ export class PerpInfo {
       .sub(unsettledFunding)
       .add(takerQuote);
 
-    // Two scenarios:
-    // 1. The price goes low and all bids execute, converting to base.
-    //    That means the perp position is increased by `bids` and the quote position
-    //    is decreased by `bids * baseLotSize * price`.
-    //    The health for this case is:
-    //        (weighted(baseLots + bids) - bids) * baseLotSize * price + quote
-    // 2. The price goes high and all asks execute, converting to quote.
-    //    The health for this case is:
-    //        (weighted(baseLots - asks) + asks) * baseLotSize * price + quote
-    //
-    // Comparing these makes it clear we need to pick the worse subfactor
-    //    weighted(baseLots + bids) - bids =: scenario1
-    // or
-    //    weighted(baseLots - asks) + asks =: scenario2
-    //
-    // Additionally, we want this scenario choice to be the same no matter whether we're
-    // computing init or maint health. This can be guaranteed by requiring the weights
-    // to satisfy the property (P):
-    //
-    //     (1 - initAssetWeight) / (initLiabWeight - 1)
-    //  == (1 - maintAssetWeight) / (maintLiabWeight - 1)
-    //
-    // Derivation:
-    //   Set asksNetLots := baseLots - asks, bidsNetLots := baseLots + bids.
-    //   Now
-    //     scenario1 = weighted(bidsNetLots) - bidsNetLots + baseLots and
-    //     scenario2 = weighted(asksNetLots) - asksNetLots + baseLots
-    //   So with expanding weigthed(a) = weightFactorForA * a, the question
-    //     scenario1 < scenario2
-    //   becomes:
-    //     (weightFactorForBidsNetLots - 1) * bidsNetLots
-    //       < (weightFactorForAsksNetLots - 1) * asksNetLots
-    //   Since asksNetLots < 0 and bidsNetLots > 0 is the only interesting case, (P) follows.
-    //
-    // We satisfy (P) by requiring
-    //   assetWeight = 1 - x and liabWeight = 1 + x
-    //
-    // And with that assumption the scenario choice condition further simplifies to:
-    //            scenario1 < scenario2
-    //   iff  abs(bidsNetLots) > abs(asksNetLots)
-
-    const bidsNetLots = baseLots.add(I80F48.fromI64(perpPosition.bidsBaseLots));
-    const asksNetLots = baseLots.sub(I80F48.fromI64(perpPosition.asksBaseLots));
-
-    const lotsToQuote = baseLotSize.mul(perpMarket.price);
-
-    let base, quote;
-    if (bidsNetLots.abs().gt(asksNetLots.abs())) {
-      const bidsBaseLots = I80F48.fromI64(perpPosition.bidsBaseLots);
-      base = bidsNetLots.mul(lotsToQuote);
-      quote = quoteCurrent.sub(bidsBaseLots.mul(lotsToQuote));
-    } else {
-      const asksBaseLots = I80F48.fromI64(perpPosition.asksBaseLots);
-      base = asksNetLots.mul(lotsToQuote);
-      quote = quoteCurrent.add(asksBaseLots.mul(lotsToQuote));
-    }
-
-    // console.log(`bidsNetLots ${bidsNetLots}`);
-    // console.log(`asksNetLots ${asksNetLots}`);
-    // console.log(`quoteCurrent ${quoteCurrent}`);
-    // console.log(`base ${base}`);
-    // console.log(`quote ${quote}`);
-
     return new PerpInfo(
       perpMarket.perpMarketIndex,
       perpMarket.maintAssetWeight,
       perpMarket.initAssetWeight,
       perpMarket.maintLiabWeight,
       perpMarket.initLiabWeight,
-      base,
-      quote,
-      perpMarket.price,
+      perpMarket.baseLotSize,
+      baseLots,
+      perpPosition.bidsBaseLots,
+      perpPosition.asksBaseLots,
+      quoteCurrent,
+      new Prices(
+        perpMarket.price,
+        I80F48.fromNumber(perpMarket.stablePriceModel.stablePrice),
+      ),
       perpPosition.hasOpenOrders(),
       perpMarket.trustedMarket,
     );
   }
 
   healthContribution(healthType: HealthType): I80F48 {
-    let weight;
-    if (healthType == HealthType.init && this.base.isNeg()) {
-      weight = this.initLiabWeight;
-    } else if (healthType == HealthType.init && !this.base.isNeg()) {
-      weight = this.initAssetWeight;
-    }
-    if (healthType == HealthType.maint && this.base.isNeg()) {
-      weight = this.maintLiabWeight;
-    }
-    if (healthType == HealthType.maint && !this.base.isNeg()) {
-      weight = this.maintAssetWeight;
+    return this.trustedMarket
+      ? this.uncappedHealthContribution(healthType)
+      : this.uncappedHealthContribution(healthType).min(ZERO_I80F48());
+  }
+
+  uncappedHealthContribution(healthType: HealthType): I80F48 {
+    function orderExecutionCase(
+      pi: PerpInfo,
+      ordersBaseLots: BN,
+      orderPrice: I80F48,
+    ): I80F48 {
+      const netBaseNative = I80F48.fromU64(
+        pi.baseLots.add(ordersBaseLots).mul(pi.baseLotSize),
+      );
+
+      let weight, basePrice;
+      if (healthType == HealthType.init) {
+        if (netBaseNative.isNeg()) {
+          weight = pi.initLiabWeight;
+          basePrice = pi.prices.liab(healthType);
+        } else {
+          weight = pi.initAssetWeight;
+          basePrice = pi.prices.asset(healthType);
+        }
+      } else {
+        if (netBaseNative.isNeg()) {
+          weight = pi.maintLiabWeight;
+          basePrice = pi.prices.liab(healthType);
+        } else {
+          weight = pi.maintAssetWeight;
+          basePrice = pi.prices.asset(healthType);
+        }
+      }
+
+      // Total value of the order-execution adjusted base position
+      const baseHealth = netBaseNative.mul(weight).mul(basePrice);
+
+      const ordersBaseNative = I80F48.fromU64(
+        ordersBaseLots.mul(pi.baseLotSize),
+      );
+      // The quote change from executing the bids/asks
+      const orderQuote = ordersBaseNative.neg().mul(orderPrice);
+
+      return baseHealth.add(orderQuote);
     }
 
-    // console.log(` - this.quote ${this.quote}`);
-    // console.log(` - weight ${weight}`);
-    // console.log(` - this.base ${this.base}`);
-    // console.log(` - weight.mul(this.base) ${weight.mul(this.base)}`);
+    // What is worse: Executing all bids at oracle_price.liab, or executing all asks at oracle_price.asset?
+    const bidsCase = orderExecutionCase(
+      this,
+      this.bidsBaseLots,
+      this.prices.liab(healthType),
+    );
+    const asksCase = orderExecutionCase(
+      this,
+      this.asksBaseLots.neg(),
+      this.prices.asset(healthType),
+    );
+    const worstCase = bidsCase.min(asksCase);
 
-    const uncappedHealthContribution = this.quote.add(weight.mul(this.base));
-    // console.log(` - uncappedHealthContribution ${uncappedHealthContribution}`);
-    if (this.trustedMarket) {
-      return uncappedHealthContribution;
-    } else {
-      return uncappedHealthContribution.min(ZERO_I80F48());
-    }
+    return this.quote.add(worstCase);
   }
 
   static emptyFromPerpMarket(perpMarket: PerpMarket): PerpInfo {
@@ -1230,9 +1412,15 @@ export class PerpInfo {
       perpMarket.initAssetWeight,
       perpMarket.maintLiabWeight,
       perpMarket.initLiabWeight,
+      perpMarket.baseLotSize,
+      new BN(0),
+      new BN(0),
+      new BN(0),
       ZERO_I80F48(),
-      ZERO_I80F48(),
-      perpMarket.price,
+      new Prices(
+        perpMarket.price,
+        I80F48.fromNumber(perpMarket.stablePriceModel.stablePrice),
+      ),
       false,
       perpMarket.trustedMarket,
     );
@@ -1240,10 +1428,12 @@ export class PerpInfo {
 
   toString(): string {
     return `  perpMarketIndex: ${this.perpMarketIndex}, base: ${
-      this.base
+      this.baseLots
     }, quote: ${this.quote}, oraclePrice: ${
-      this.oraclePrice
-    }, initHealth ${this.healthContribution(HealthType.init)}`;
+      this.prices.oracle
+    }, uncapped health contribution ${this.uncappedHealthContribution(
+      HealthType.init,
+    )}`;
   }
 }
 
@@ -1258,11 +1448,8 @@ export class TokenInfoDto {
   initAssetWeight: I80F48Dto;
   maintLiabWeight: I80F48Dto;
   initLiabWeight: I80F48Dto;
-  oraclePrice: I80F48Dto; // native/native
-  // in health-reference-token native units
-  balance: I80F48Dto;
-  // in health-reference-token native units
-  serum3MaxReserved: I80F48Dto;
+  prices: { oracle: I80F48Dto; stable: I80F48Dto };
+  balanceNative: I80F48Dto;
 
   constructor(
     tokenIndex: number,
@@ -1270,29 +1457,34 @@ export class TokenInfoDto {
     initAssetWeight: I80F48Dto,
     maintLiabWeight: I80F48Dto,
     initLiabWeight: I80F48Dto,
-    oraclePrice: I80F48Dto,
-    balance: I80F48Dto,
-    serum3MaxReserved: I80F48Dto,
+    prices: { oracle: I80F48Dto; stable: I80F48Dto },
+    balanceNative: I80F48Dto,
   ) {
     this.tokenIndex = tokenIndex;
     this.maintAssetWeight = maintAssetWeight;
     this.initAssetWeight = initAssetWeight;
     this.maintLiabWeight = maintLiabWeight;
     this.initLiabWeight = initLiabWeight;
-    this.oraclePrice = oraclePrice;
-    this.balance = balance;
-    this.serum3MaxReserved = serum3MaxReserved;
+    this.prices = prices;
+    this.balanceNative = balanceNative;
   }
 }
 
 export class Serum3InfoDto {
-  reserved: I80F48Dto;
+  reservedBase: I80F48Dto;
+  reservedQuote: I80F48Dto;
   baseIndex: number;
   quoteIndex: number;
   marketIndex: number;
 
-  constructor(reserved: I80F48Dto, baseIndex: number, quoteIndex: number) {
-    this.reserved = reserved;
+  constructor(
+    reservedBase: I80F48Dto,
+    reservedQuote: I80F48Dto,
+    baseIndex: number,
+    quoteIndex: number,
+  ) {
+    this.reservedBase = reservedBase;
+    this.reservedQuote = reservedQuote;
     this.baseIndex = baseIndex;
     this.quoteIndex = quoteIndex;
   }
@@ -1304,9 +1496,12 @@ export class PerpInfoDto {
   initAssetWeight: I80F48Dto;
   maintLiabWeight: I80F48Dto;
   initLiabWeight: I80F48Dto;
-  base: I80F48Dto;
+  public baseLotSize: BN;
+  public baseLots: BN;
+  public bidsBaseLots: BN;
+  public asksBaseLots: BN;
   quote: I80F48Dto;
-  oraclePrice: I80F48Dto;
+  prices: { oracle: I80F48Dto; stable: I80F48Dto };
   hasOpenOrders: boolean;
   trustedMarket: boolean;
 }

@@ -1,5 +1,6 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Cluster, Connection, Keypair } from '@solana/web3.js';
+import { expect } from 'chai';
 import fs from 'fs';
 import { Group } from '../accounts/group';
 import { HealthCache } from '../accounts/healthCache';
@@ -95,50 +96,83 @@ async function debugUser(
     await getMaxWithdrawWithBorrowForTokenUiWrapper(srcToken);
   }
 
-  function simHealthRatioWithTokenPositionChangesWrapper(debug, change): void {
-    console.log(
-      `mangoAccount.simHealthRatioWithTokenPositionChanges ${debug}` +
-        mangoAccount.simHealthRatioWithTokenPositionUiChanges(group, [change]),
-    );
-  }
-  for (const srcToken of Array.from(group.banksMapByName.keys())) {
-    simHealthRatioWithTokenPositionChangesWrapper(`${srcToken} 1  `, {
-      mintPk: group.banksMapByName.get(srcToken)![0].mint,
-      uiTokenAmount: 1,
-    });
-    simHealthRatioWithTokenPositionChangesWrapper(`${srcToken} -1  `, {
-      mintPk: group.banksMapByName.get(srcToken)![0].mint,
-      uiTokenAmount: -1,
-    });
-  }
-
   function getMaxSourceForTokenSwapWrapper(src, tgt): void {
+    const maxSourceUi = mangoAccount.getMaxSourceUiForTokenSwap(
+      group,
+      group.banksMapByName.get(src)![0].mint,
+      group.banksMapByName.get(tgt)![0].mint,
+      group.banksMapByName.get(src)![0].uiPrice /
+        group.banksMapByName.get(tgt)![0].uiPrice,
+    );
+    const maxTargetUi =
+      maxSourceUi *
+      (group.banksMapByName.get(src)![0].uiPrice /
+        group.banksMapByName.get(tgt)![0].uiPrice);
+    const sim = mangoAccount.simHealthRatioWithTokenPositionUiChanges(group, [
+      {
+        mintPk: group.banksMapByName.get(src)![0].mint,
+        uiTokenAmount: -maxSourceUi,
+      },
+      {
+        mintPk: group.banksMapByName.get(tgt)![0].mint,
+        uiTokenAmount: maxTargetUi,
+      },
+    ]);
+    if (maxSourceUi > 0) {
+      expect(sim).gt(2);
+      expect(sim).lt(3);
+    }
     console.log(
       `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
-        mangoAccount.getMaxSourceUiForTokenSwap(
-          group,
-          group.banksMapByName.get(src)![0].mint,
-          group.banksMapByName.get(tgt)![0].mint,
-          1,
-        ),
+        maxSourceUi.toFixed(3).padStart(10) +
+        `, health ratio after (${sim.toFixed(3).padStart(10)})`,
     );
   }
-  for (const srcToken of Array.from(group.banksMapByName.keys())) {
-    for (const tgtToken of Array.from(group.banksMapByName.keys())) {
-      // if (srcToken === 'SOL')
-      // if (tgtToken === 'MSOL')
+  for (const srcToken of Array.from(group.banksMapByName.keys()).sort()) {
+    for (const tgtToken of Array.from(group.banksMapByName.keys()).sort()) {
       getMaxSourceForTokenSwapWrapper(srcToken, tgtToken);
     }
   }
 
   function getMaxForPerpWrapper(perpMarket: PerpMarket): void {
-    console.log(
-      `getMaxQuoteForPerpBidUi ${perpMarket.perpMarketIndex} ` +
-        mangoAccount.getMaxQuoteForPerpBidUi(group, perpMarket.perpMarketIndex),
+    const maxQuoteUi = mangoAccount.getMaxQuoteForPerpBidUi(
+      group,
+      perpMarket.perpMarketIndex,
+      perpMarket.uiPrice,
     );
+    const simMaxQuote = mangoAccount.simHealthRatioWithPerpBidUiChanges(
+      group,
+      perpMarket.perpMarketIndex,
+      maxQuoteUi / perpMarket.uiPrice,
+      perpMarket.uiPrice,
+    );
+    expect(simMaxQuote).gt(2);
+    expect(simMaxQuote).lt(3);
+    const maxBaseUi = mangoAccount.getMaxBaseForPerpAskUi(
+      group,
+      perpMarket.perpMarketIndex,
+      perpMarket.uiPrice,
+    );
+    const simMaxBase = mangoAccount.simHealthRatioWithPerpAskUiChanges(
+      group,
+      perpMarket.perpMarketIndex,
+      maxBaseUi,
+      perpMarket.uiPrice,
+    );
+    expect(simMaxBase).gt(2);
+    expect(simMaxBase).lt(3);
     console.log(
-      `getMaxBaseForPerpAskUi ${perpMarket.perpMarketIndex} ` +
-        mangoAccount.getMaxBaseForPerpAskUi(group, perpMarket.perpMarketIndex),
+      `getMaxPerp ${perpMarket.name.padStart(
+        10,
+      )} getMaxQuoteForPerpBidUi ${maxQuoteUi
+        .toFixed(3)
+        .padStart(10)} health ratio after (${simMaxQuote
+        .toFixed(3)
+        .padStart(10)}), getMaxBaseForPerpAskUi ${maxBaseUi
+        .toFixed(3)
+        .padStart(10)} health ratio after (${simMaxBase
+        .toFixed(3)
+        .padStart(10)})`,
     );
   }
   for (const perpMarket of Array.from(
@@ -148,7 +182,6 @@ async function debugUser(
   }
 
   function getMaxForSerum3Wrapper(serum3Market: Serum3Market): void {
-    // if (serum3Market.name !== 'SOL/USDC') return;
     console.log(
       `getMaxQuoteForSerum3BidUi ${serum3Market.name} ` +
         mangoAccount.getMaxQuoteForSerum3BidUi(
@@ -186,8 +219,9 @@ async function main(): Promise<void> {
     adminProvider,
     CLUSTER,
     MANGO_V4_ID[CLUSTER],
-    {},
-    'get-program-accounts',
+    {
+      idsSource: 'get-program-accounts',
+    },
   );
 
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
@@ -215,9 +249,7 @@ async function main(): Promise<void> {
 
     for (const mangoAccount of mangoAccounts) {
       console.log(`MangoAccount ${mangoAccount.publicKey}`);
-      if (mangoAccount.name === 'PnL Test') {
-        await debugUser(client, group, mangoAccount);
-      }
+      await debugUser(client, group, mangoAccount);
     }
   }
 
