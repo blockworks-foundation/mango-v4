@@ -1399,11 +1399,12 @@ export class MangoClient {
     settlePnlLimitFactor: number,
     settlePnlLimitWindowSize: number,
   ): Promise<TransactionSignature> {
-    const orderbook = new Keypair();
+    const bids = new Keypair();
+    const asks = new Keypair();
     const eventQueue = new Keypair();
 
-    const orderbookSize = (this.program as any)._coder.accounts.size(
-      (this.program.account.orderbook as any)._idlAccount,
+    const bookSideSize = (this.program as any)._coder.accounts.size(
+      (this.program.account.bookSide as any)._idlAccount,
     );
     const eventQueueSize = (this.program as any)._coder.accounts.size(
       (this.program.account.eventQueue as any)._idlAccount,
@@ -1441,7 +1442,8 @@ export class MangoClient {
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         oracle: oraclePk,
-        orderbook: orderbook.publicKey,
+        bids: bids.publicKey,
+        asks: asks.publicKey,
         eventQueue: eventQueue.publicKey,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
@@ -1449,14 +1451,25 @@ export class MangoClient {
         // book sides
         SystemProgram.createAccount({
           programId: this.program.programId,
-          space: orderbookSize,
+          space: bookSideSize,
           lamports:
             await this.program.provider.connection.getMinimumBalanceForRentExemption(
-              orderbookSize,
+              bookSideSize,
             ),
           fromPubkey: (this.program.provider as AnchorProvider).wallet
             .publicKey,
-          newAccountPubkey: orderbook.publicKey,
+          newAccountPubkey: bids.publicKey,
+        }),
+        SystemProgram.createAccount({
+          programId: this.program.programId,
+          space: bookSideSize,
+          lamports:
+            await this.program.provider.connection.getMinimumBalanceForRentExemption(
+              bookSideSize,
+            ),
+          fromPubkey: (this.program.provider as AnchorProvider).wallet
+            .publicKey,
+          newAccountPubkey: asks.publicKey,
         }),
         // event queue
         SystemProgram.createAccount({
@@ -1471,7 +1484,7 @@ export class MangoClient {
           newAccountPubkey: eventQueue.publicKey,
         }),
       ])
-      .signers([orderbook, eventQueue])
+      .signers([bids, asks, eventQueue])
       .rpc();
   }
 
@@ -1555,7 +1568,8 @@ export class MangoClient {
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         perpMarket: perpMarket.publicKey,
-        orderbook: perpMarket.orderbook,
+        bids: perpMarket.bids,
+        asks: perpMarket.asks,
         eventQueue: perpMarket.eventQueue,
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
@@ -1693,7 +1707,8 @@ export class MangoClient {
         group: group.publicKey,
         account: mangoAccount.publicKey,
         perpMarket: perpMarket.publicKey,
-        orderbook: perpMarket.orderbook,
+        bids: perpMarket.bids,
+        asks: perpMarket.asks,
         eventQueue: perpMarket.eventQueue,
         oracle: perpMarket.oracle,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -1793,7 +1808,8 @@ export class MangoClient {
         group: group.publicKey,
         account: mangoAccount.publicKey,
         perpMarket: perpMarket.publicKey,
-        orderbook: perpMarket.orderbook,
+        bids: perpMarket.bids,
+        asks: perpMarket.asks,
         eventQueue: perpMarket.eventQueue,
         oracle: perpMarket.oracle,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -1821,7 +1837,8 @@ export class MangoClient {
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         perpMarket: perpMarket.publicKey,
-        orderbook: perpMarket.orderbook,
+        bids: perpMarket.bids,
+        asks: perpMarket.asks,
       })
       .instruction();
   }
@@ -1885,7 +1902,8 @@ export class MangoClient {
         group: group.publicKey,
         account: mangoAccount.publicKey,
         perpMarket: perpMarket.publicKey,
-        orderbook: perpMarket.orderbook,
+        bids: perpMarket.bids,
+        asks: perpMarket.asks,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();

@@ -2351,13 +2351,18 @@ export type MangoV4 = {
           }
         },
         {
-          "name": "orderbook",
+          "name": "bids",
           "isMut": true,
           "isSigner": false,
           "docs": [
             "Accounts are initialised by client,",
             "anchor discriminator is set first when ix exits,"
           ]
+        },
+        {
+          "name": "asks",
+          "isMut": true,
+          "isSigner": false
         },
         {
           "name": "eventQueue",
@@ -2672,7 +2677,12 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         },
@@ -2744,7 +2754,12 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         },
@@ -2826,7 +2841,12 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         },
@@ -2916,7 +2936,12 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         }
@@ -2952,7 +2977,12 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         }
@@ -2988,7 +3018,12 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         }
@@ -3024,7 +3059,12 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         }
@@ -3084,7 +3124,12 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         },
@@ -3248,7 +3293,12 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         }
@@ -4032,20 +4082,30 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "orderbook",
+      "name": "bookSide",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "bids",
+            "name": "roots",
             "type": {
-              "defined": "BookSide"
+              "array": [
+                {
+                  "defined": "OrderTreeRoot"
+                },
+                2
+              ]
             }
           },
           {
-            "name": "asks",
+            "name": "reservedRoots",
             "type": {
-              "defined": "BookSide"
+              "array": [
+                {
+                  "defined": "OrderTreeRoot"
+                },
+                4
+              ]
             }
           },
           {
@@ -4053,8 +4113,14 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                2400
+                256
               ]
+            }
+          },
+          {
+            "name": "nodes",
+            "type": {
+              "defined": "OrderTreeNodes"
             }
           }
         ]
@@ -4149,7 +4215,11 @@ export type MangoV4 = {
             }
           },
           {
-            "name": "orderbook",
+            "name": "bids",
+            "type": "publicKey"
+          },
+          {
+            "name": "asks",
             "type": "publicKey"
           },
           {
@@ -5242,26 +5312,6 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "BookSide",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "fixed",
-            "type": {
-              "defined": "OrderTree"
-            }
-          },
-          {
-            "name": "oraclePegged",
-            "type": {
-              "defined": "OrderTree"
-            }
-          }
-        ]
-      }
-    },
-    {
       "name": "InnerNode",
       "docs": [
         "InnerNodes and LeafNodes compose the binary tree of orders.",
@@ -5449,7 +5499,7 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "OrderTree",
+      "name": "OrderTreeNodes",
       "docs": [
         "A binary tree on AnyNode::key()",
         "",
@@ -5484,12 +5534,13 @@ export type MangoV4 = {
             "type": "u32"
           },
           {
-            "name": "rootNode",
-            "type": "u32"
-          },
-          {
-            "name": "leafCount",
-            "type": "u32"
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                512
+              ]
+            }
           },
           {
             "name": "nodes",
@@ -5499,15 +5550,6 @@ export type MangoV4 = {
                   "defined": "AnyNode"
                 },
                 1024
-              ]
-            }
-          },
-          {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                256
               ]
             }
           }
@@ -9709,13 +9751,18 @@ export const IDL: MangoV4 = {
           }
         },
         {
-          "name": "orderbook",
+          "name": "bids",
           "isMut": true,
           "isSigner": false,
           "docs": [
             "Accounts are initialised by client,",
             "anchor discriminator is set first when ix exits,"
           ]
+        },
+        {
+          "name": "asks",
+          "isMut": true,
+          "isSigner": false
         },
         {
           "name": "eventQueue",
@@ -10030,7 +10077,12 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         },
@@ -10102,7 +10154,12 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         },
@@ -10184,7 +10241,12 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         },
@@ -10274,7 +10336,12 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         }
@@ -10310,7 +10377,12 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         }
@@ -10346,7 +10418,12 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         }
@@ -10382,7 +10459,12 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         }
@@ -10442,7 +10524,12 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         },
@@ -10606,7 +10693,12 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
-          "name": "orderbook",
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
           "isMut": true,
           "isSigner": false
         }
@@ -11390,20 +11482,30 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "orderbook",
+      "name": "bookSide",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "bids",
+            "name": "roots",
             "type": {
-              "defined": "BookSide"
+              "array": [
+                {
+                  "defined": "OrderTreeRoot"
+                },
+                2
+              ]
             }
           },
           {
-            "name": "asks",
+            "name": "reservedRoots",
             "type": {
-              "defined": "BookSide"
+              "array": [
+                {
+                  "defined": "OrderTreeRoot"
+                },
+                4
+              ]
             }
           },
           {
@@ -11411,8 +11513,14 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                2400
+                256
               ]
+            }
+          },
+          {
+            "name": "nodes",
+            "type": {
+              "defined": "OrderTreeNodes"
             }
           }
         ]
@@ -11507,7 +11615,11 @@ export const IDL: MangoV4 = {
             }
           },
           {
-            "name": "orderbook",
+            "name": "bids",
+            "type": "publicKey"
+          },
+          {
+            "name": "asks",
             "type": "publicKey"
           },
           {
@@ -12600,26 +12712,6 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "BookSide",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "fixed",
-            "type": {
-              "defined": "OrderTree"
-            }
-          },
-          {
-            "name": "oraclePegged",
-            "type": {
-              "defined": "OrderTree"
-            }
-          }
-        ]
-      }
-    },
-    {
       "name": "InnerNode",
       "docs": [
         "InnerNodes and LeafNodes compose the binary tree of orders.",
@@ -12807,7 +12899,7 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "OrderTree",
+      "name": "OrderTreeNodes",
       "docs": [
         "A binary tree on AnyNode::key()",
         "",
@@ -12842,12 +12934,13 @@ export const IDL: MangoV4 = {
             "type": "u32"
           },
           {
-            "name": "rootNode",
-            "type": "u32"
-          },
-          {
-            "name": "leafCount",
-            "type": "u32"
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                512
+              ]
+            }
           },
           {
             "name": "nodes",
@@ -12857,15 +12950,6 @@ export const IDL: MangoV4 = {
                   "defined": "AnyNode"
                 },
                 1024
-              ]
-            }
-          },
-          {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                256
               ]
             }
           }

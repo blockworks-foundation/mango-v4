@@ -26,37 +26,60 @@ mod tests {
     use bytemuck::Zeroable;
     use fixed::types::I80F48;
     use solana_program::pubkey::Pubkey;
+    use std::cell::RefCell;
 
-    fn order_tree_leaf_by_key(order_tree: &OrderTree, key: u128) -> Option<&LeafNode> {
-        for (_, leaf) in order_tree.iter() {
-            if leaf.key == key {
-                return Some(leaf);
+    fn order_tree_leaf_by_key(bookside: &BookSide, key: u128) -> Option<&LeafNode> {
+        for component in [BookSideOrderTree::Fixed, BookSideOrderTree::OraclePegged] {
+            for (_, leaf) in bookside.nodes.iter(bookside.root(component)) {
+                if leaf.key == key {
+                    return Some(leaf);
+                }
             }
         }
         None
     }
 
-    fn order_tree_contains_key(order_tree: &OrderTree, key: u128) -> bool {
-        for (_, leaf) in order_tree.iter() {
-            if leaf.key == key {
-                return true;
+    fn order_tree_contains_key(bookside: &BookSide, key: u128) -> bool {
+        order_tree_leaf_by_key(bookside, key).is_some()
+    }
+
+    fn order_tree_contains_price(bookside: &BookSide, price_data: u64) -> bool {
+        for component in [BookSideOrderTree::Fixed, BookSideOrderTree::OraclePegged] {
+            for (_, leaf) in bookside.nodes.iter(bookside.root(component)) {
+                if leaf.price_data() == price_data {
+                    return true;
+                }
             }
         }
         false
     }
 
-    fn order_tree_contains_price(order_tree: &OrderTree, price_data: u64) -> bool {
-        for (_, leaf) in order_tree.iter() {
-            if leaf.price_data() == price_data {
-                return true;
-            }
-        }
-        false
+    struct OrderbookAccounts {
+        bids: Box<RefCell<BookSide>>,
+        asks: Box<RefCell<BookSide>>,
     }
 
-    fn test_setup(price: f64) -> (PerpMarket, I80F48, EventQueue, Box<Orderbook>) {
-        let mut book = Box::new(Orderbook::zeroed());
-        book.init();
+    impl OrderbookAccounts {
+        fn new() -> Self {
+            let s = Self {
+                bids: Box::new(RefCell::new(BookSide::zeroed())),
+                asks: Box::new(RefCell::new(BookSide::zeroed())),
+            };
+            s.bids.borrow_mut().nodes.order_tree_type = OrderTreeType::Bids.into();
+            s.asks.borrow_mut().nodes.order_tree_type = OrderTreeType::Asks.into();
+            s
+        }
+
+        fn orderbook(&self) -> Orderbook {
+            Orderbook {
+                bids: self.bids.borrow_mut(),
+                asks: self.asks.borrow_mut(),
+            }
+        }
+    }
+
+    fn test_setup(price: f64) -> (PerpMarket, I80F48, EventQueue, OrderbookAccounts) {
+        let book = OrderbookAccounts::new();
 
         let event_queue = EventQueue::zeroed();
 
@@ -76,7 +99,8 @@ mod tests {
     // Check what happens when one side of the book fills up
     #[test]
     fn book_bids_full() {
-        let (mut perp_market, oracle_price, mut event_queue, mut book) = test_setup(5000.0);
+        let (mut perp_market, oracle_price, mut event_queue, book_accs) = test_setup(5000.0);
+        let mut book = book_accs.orderbook();
         let settle_token_index = 0;
 
         let mut new_order = |book: &mut Orderbook,
@@ -137,46 +161,84 @@ mod tests {
                 1000 + i as i64,
                 1000011 as u64,
             );
-            if book.bids.fixed.is_full() {
+            if book.bids.is_full() {
                 break;
             }
         }
-        assert!(book.bids.fixed.is_full());
-        assert_eq!(book.bids.fixed.min_leaf().unwrap().price_data(), 1001);
+        assert!(book.bids.is_full());
         assert_eq!(
-            fixed_price_lots(book.bids.fixed.max_leaf().unwrap().price_data()),
-            (1000 + book.bids.fixed.leaf_count) as i64
+            book.bids
+                .nodes
+                .min_leaf(&book.bids.roots[0])
+                .unwrap()
+                .1
+                .price_data(),
+            1001
+        );
+        assert_eq!(
+            fixed_price_lots(
+                book.bids
+                    .nodes
+                    .max_leaf(&book.bids.roots[0])
+                    .unwrap()
+                    .1
+                    .price_data()
+            ),
+            (1000 + book.bids.roots[0].leaf_count) as i64
         );
 
         // add another bid at a higher price before expiry, replacing the lowest-price one (1001)
         new_order(&mut book, &mut event_queue, Side::Bid, 1005, 1000000 - 1);
-        assert_eq!(book.bids.fixed.min_leaf().unwrap().price_data(), 1002);
+        assert_eq!(
+            book.bids
+                .nodes
+                .min_leaf(&book.bids.roots[0])
+                .unwrap()
+                .1
+                .price_data(),
+            1002
+        );
         assert_eq!(event_queue.len(), 1);
 
         // adding another bid after expiry removes the soonest-expiring order (1005)
         new_order(&mut book, &mut event_queue, Side::Bid, 999, 2000000);
-        assert_eq!(book.bids.fixed.min_leaf().unwrap().price_data(), 999);
-        assert!(!order_tree_contains_key(&book.bids.fixed, 1005));
+        assert_eq!(
+            book.bids
+                .nodes
+                .min_leaf(&book.bids.roots[0])
+                .unwrap()
+                .1
+                .price_data(),
+            999
+        );
+        assert!(!order_tree_contains_key(&book.bids, 1005));
         assert_eq!(event_queue.len(), 2);
 
         // adding an ask will wipe up to three expired bids at the top of the book
-        let bids_max = book.bids.fixed.max_leaf().unwrap().price_data();
-        let bids_count = book.bids.fixed.leaf_count;
+        let bids_max = book
+            .bids
+            .nodes
+            .max_leaf(&book.bids.roots[0])
+            .unwrap()
+            .1
+            .price_data();
+        let bids_count = book.bids.roots[0].leaf_count;
         new_order(&mut book, &mut event_queue, Side::Ask, 6000, 1500000);
-        assert_eq!(book.bids.fixed.leaf_count, bids_count - 5);
-        assert_eq!(book.asks.fixed.leaf_count, 1);
+        assert_eq!(book.bids.roots[0].leaf_count, bids_count - 5);
+        assert_eq!(book.asks.roots[0].leaf_count, 1);
         assert_eq!(event_queue.len(), 2 + 5);
-        assert!(!order_tree_contains_price(&book.bids.fixed, bids_max));
-        assert!(!order_tree_contains_price(&book.bids.fixed, bids_max - 1));
-        assert!(!order_tree_contains_price(&book.bids.fixed, bids_max - 2));
-        assert!(!order_tree_contains_price(&book.bids.fixed, bids_max - 3));
-        assert!(!order_tree_contains_price(&book.bids.fixed, bids_max - 4));
-        assert!(order_tree_contains_price(&book.bids.fixed, bids_max - 5));
+        assert!(!order_tree_contains_price(&book.bids, bids_max));
+        assert!(!order_tree_contains_price(&book.bids, bids_max - 1));
+        assert!(!order_tree_contains_price(&book.bids, bids_max - 2));
+        assert!(!order_tree_contains_price(&book.bids, bids_max - 3));
+        assert!(!order_tree_contains_price(&book.bids, bids_max - 4));
+        assert!(order_tree_contains_price(&book.bids, bids_max - 5));
     }
 
     #[test]
     fn book_new_order() {
-        let (mut market, oracle_price, mut event_queue, mut book) = test_setup(1000.0);
+        let (mut market, oracle_price, mut event_queue, book_accs) = test_setup(1000.0);
+        let mut book = book_accs.orderbook();
         let settle_token_index = 0;
 
         // Add lots and fees to make sure to exercise unit conversion
@@ -236,13 +298,10 @@ mod tests {
             SideAndOrderTree::BidFixed
         );
         assert!(order_tree_contains_key(
-            &book.bids.fixed,
+            &book.bids,
             maker.perp_order_mut_by_raw_index(0).id
         ));
-        assert!(order_tree_contains_price(
-            &book.bids.fixed,
-            price_lots as u64
-        ));
+        assert!(order_tree_contains_price(&book.bids, price_lots as u64));
         assert_eq!(
             maker.perp_position_by_raw_index(0).bids_base_lots,
             bid_quantity
@@ -287,7 +346,7 @@ mod tests {
         // the remainder of the maker order is still on the book
         // (the maker account is unchanged: it was not even passed in)
         let order =
-            order_tree_leaf_by_key(&book.bids.fixed, maker.perp_order_by_raw_index(0).id).unwrap();
+            order_tree_leaf_by_key(&book.bids, maker.perp_order_by_raw_index(0).id).unwrap();
         assert_eq!(fixed_price_lots(order.price_data()), price_lots);
         assert_eq!(order.quantity, bid_quantity - match_quantity);
 
@@ -372,7 +431,8 @@ mod tests {
 
     #[test]
     fn test_fee_penalty_applied_only_on_limit_order() -> Result<()> {
-        let (mut market, oracle_price, mut event_queue, mut book) = test_setup(1000.0);
+        let (mut market, oracle_price, mut event_queue, book_accs) = test_setup(1000.0);
+        let mut book = book_accs.orderbook();
 
         let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
         let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();

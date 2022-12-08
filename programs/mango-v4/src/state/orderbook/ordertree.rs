@@ -26,30 +26,47 @@ pub enum OrderTreeType {
     Asks,
 }
 
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct OrderTreeRoot {
+    pub maybe_node: NodeHandle,
+    pub leaf_count: u32,
+}
+const_assert_eq!(std::mem::size_of::<OrderTreeRoot>(), 8);
+const_assert_eq!(std::mem::size_of::<OrderTreeRoot>() % 8, 0);
+
+impl OrderTreeRoot {
+    pub fn node(&self) -> Option<NodeHandle> {
+        if self.leaf_count == 0 {
+            None
+        } else {
+            Some(self.maybe_node)
+        }
+    }
+}
+
 /// A binary tree on AnyNode::key()
 ///
 /// The key encodes the price in the top 64 bits.
 #[zero_copy]
 #[derive(bytemuck::Pod, bytemuck::Zeroable)]
-pub struct OrderTree {
+pub struct OrderTreeNodes {
     pub order_tree_type: u8, // OrderTreeType, but that's not POD
     pub padding: [u8; 3],
     pub bump_index: u32,
     pub free_list_len: u32,
     pub free_list_head: NodeHandle,
-    pub root_node: NodeHandle,
-    pub leaf_count: u32,
+    pub reserved: [u8; 512],
     pub nodes: [AnyNode; MAX_ORDERTREE_NODES],
-    pub reserved: [u8; 256],
 }
 const_assert_eq!(
-    std::mem::size_of::<OrderTree>(),
-    1 + 3 + 4 * 2 + 4 + 4 + 4 + 120 * 1024 + 256
+    std::mem::size_of::<OrderTreeNodes>(),
+    1 + 3 + 4 * 2 + 4 + 512 + 120 * 1024
 );
-const_assert_eq!(std::mem::size_of::<OrderTree>(), 123160);
-const_assert_eq!(std::mem::size_of::<OrderTree>() % 8, 0);
+const_assert_eq!(std::mem::size_of::<OrderTreeNodes>(), 123408);
+const_assert_eq!(std::mem::size_of::<OrderTreeNodes>() % 8, 0);
 
-impl OrderTree {
+impl OrderTreeNodes {
     pub fn order_tree_type(&self) -> OrderTreeType {
         OrderTreeType::try_from(self.order_tree_type).unwrap()
     }
@@ -58,20 +75,20 @@ impl OrderTree {
     ///
     /// smallest to highest for asks
     /// highest to smallest for bids
-    pub fn iter(&self) -> OrderTreeIter {
-        OrderTreeIter::new(self)
+    pub fn iter(&self, root: &OrderTreeRoot) -> OrderTreeIter {
+        OrderTreeIter::new(self, root)
     }
 
-    pub fn node_mut(&mut self, key: NodeHandle) -> Option<&mut AnyNode> {
-        let node = &mut self.nodes[key as usize];
+    pub fn node_mut(&mut self, handle: NodeHandle) -> Option<&mut AnyNode> {
+        let node = &mut self.nodes[handle as usize];
         let tag = NodeTag::try_from(node.tag);
         match tag {
             Ok(NodeTag::InnerNode) | Ok(NodeTag::LeafNode) => Some(node),
             _ => None,
         }
     }
-    pub fn node(&self, key: NodeHandle) -> Option<&AnyNode> {
-        let node = &self.nodes[key as usize];
+    pub fn node(&self, handle: NodeHandle) -> Option<&AnyNode> {
+        let node = &self.nodes[handle as usize];
         let tag = NodeTag::try_from(node.tag);
         match tag {
             Ok(NodeTag::InnerNode) | Ok(NodeTag::LeafNode) => Some(node),
@@ -79,45 +96,37 @@ impl OrderTree {
         }
     }
 
-    pub fn remove_min(&mut self) -> Option<LeafNode> {
-        self.remove_by_key(self.min_leaf()?.key)
+    pub fn remove_worst(&mut self, root: &mut OrderTreeRoot) -> Option<LeafNode> {
+        self.remove_by_key(root, self.find_worst(root)?.1.key)
     }
 
-    pub fn remove_max(&mut self) -> Option<LeafNode> {
-        self.remove_by_key(self.max_leaf()?.key)
-    }
-
-    pub fn remove_worst(&mut self) -> Option<LeafNode> {
+    pub fn find_worst(&self, root: &OrderTreeRoot) -> Option<(NodeHandle, &LeafNode)> {
         match self.order_tree_type() {
-            OrderTreeType::Bids => self.remove_min(),
-            OrderTreeType::Asks => self.remove_max(),
+            OrderTreeType::Bids => self.min_leaf(root),
+            OrderTreeType::Asks => self.max_leaf(root),
         }
     }
 
     /// Remove the order with the lowest expiry timestamp, if that's < now_ts.
-    pub fn remove_one_expired(&mut self, now_ts: u64) -> Option<LeafNode> {
-        let (expired_h, expires_at) = self.find_earliest_expiry()?;
+    pub fn remove_one_expired(
+        &mut self,
+        root: &mut OrderTreeRoot,
+        now_ts: u64,
+    ) -> Option<LeafNode> {
+        let (handle, expires_at) = self.find_earliest_expiry(root)?;
         if expires_at < now_ts {
-            self.remove_by_key(self.node(expired_h)?.key()?)
+            self.remove_by_key(root, self.node(handle)?.key()?)
         } else {
             None
-        }
-    }
-
-    pub fn root(&self) -> Option<NodeHandle> {
-        if self.leaf_count == 0 {
-            None
-        } else {
-            Some(self.root_node)
         }
     }
 
     // only for fixed-price ordertrees
     #[cfg(test)]
     #[allow(dead_code)]
-    fn to_price_quantity_vec(&self, reverse: bool) -> Vec<(i64, i64)> {
+    fn to_price_quantity_vec(&self, root: &OrderTreeRoot, reverse: bool) -> Vec<(i64, i64)> {
         let mut pqs = vec![];
-        let mut current: NodeHandle = match self.root() {
+        let mut current: NodeHandle = match root.node() {
             None => return pqs,
             Some(node_handle) => node_handle,
         };
@@ -147,41 +156,49 @@ impl OrderTree {
         }
     }
 
-    pub fn min_leaf(&self) -> Option<&LeafNode> {
-        self.leaf_min_max(false)
+    pub fn min_leaf(&self, root: &OrderTreeRoot) -> Option<(NodeHandle, &LeafNode)> {
+        self.leaf_min_max(false, root)
     }
 
-    pub fn max_leaf(&self) -> Option<&LeafNode> {
-        self.leaf_min_max(true)
+    pub fn max_leaf(&self, root: &OrderTreeRoot) -> Option<(NodeHandle, &LeafNode)> {
+        self.leaf_min_max(true, root)
     }
-    fn leaf_min_max(&self, find_max: bool) -> Option<&LeafNode> {
-        let mut root: NodeHandle = self.root()?;
+    fn leaf_min_max(
+        &self,
+        find_max: bool,
+        root: &OrderTreeRoot,
+    ) -> Option<(NodeHandle, &LeafNode)> {
+        let mut node_handle: NodeHandle = root.node()?;
 
         let i = if find_max { 1 } else { 0 };
         loop {
-            let root_contents = self.node(root)?;
-            match root_contents.case()? {
+            let node_contents = self.node(node_handle)?;
+            match node_contents.case()? {
                 NodeRef::Inner(inner) => {
-                    root = inner.children[i];
+                    node_handle = inner.children[i];
                 }
                 NodeRef::Leaf(leaf) => {
-                    return Some(leaf);
+                    return Some((node_handle, leaf));
                 }
             }
         }
     }
 
-    pub fn remove_by_key(&mut self, search_key: u128) -> Option<LeafNode> {
+    pub fn remove_by_key(
+        &mut self,
+        root: &mut OrderTreeRoot,
+        search_key: u128,
+    ) -> Option<LeafNode> {
         // path of InnerNode handles that lead to the removed leaf
         let mut stack: Vec<(NodeHandle, bool)> = vec![];
 
         // special case potentially removing the root
-        let mut parent_h = self.root()?;
+        let mut parent_h = root.node()?;
         let (mut child_h, mut crit_bit) = match self.node(parent_h).unwrap().case().unwrap() {
             NodeRef::Leaf(&leaf) if leaf.key == search_key => {
-                assert_eq!(self.leaf_count, 1);
-                self.root_node = 0;
-                self.leaf_count = 0;
+                assert_eq!(root.leaf_count, 1);
+                root.maybe_node = 0;
+                root.leaf_count = 0;
                 let _old_root = self.remove(parent_h).unwrap();
                 return Some(leaf);
             }
@@ -215,7 +232,7 @@ impl OrderTree {
         let other_child_node_contents = self.remove(other_child_h).unwrap();
         let new_expiry = other_child_node_contents.earliest_expiry();
         *self.node_mut(parent_h).unwrap() = other_child_node_contents;
-        self.leaf_count -= 1;
+        root.leaf_count -= 1;
         let removed_leaf: LeafNode = cast(self.remove(child_h).unwrap());
 
         // update child min expiry back up to the root
@@ -226,7 +243,8 @@ impl OrderTree {
         Some(removed_leaf)
     }
 
-    pub fn remove(&mut self, key: NodeHandle) -> Option<AnyNode> {
+    /// Internal: Removes only the node, does not remove any links etc, use remove_key()
+    fn remove(&mut self, key: NodeHandle) -> Option<AnyNode> {
         let val = *self.node(key)?;
 
         self.nodes[key as usize] = cast(FreeNode {
@@ -245,7 +263,8 @@ impl OrderTree {
         Some(val)
     }
 
-    pub fn insert(&mut self, val: &AnyNode) -> Result<NodeHandle> {
+    /// Internal: Adds only the node, does not add parent links etc, use insert_leaf()
+    fn insert(&mut self, val: &AnyNode) -> Result<NodeHandle> {
         match NodeTag::try_from(val.tag) {
             Ok(NodeTag::InnerNode) | Ok(NodeTag::LeafNode) => (),
             _ => unreachable!(),
@@ -279,18 +298,23 @@ impl OrderTree {
         *node = *val;
         Ok(key)
     }
-    pub fn insert_leaf(&mut self, new_leaf: &LeafNode) -> Result<(NodeHandle, Option<LeafNode>)> {
+
+    pub fn insert_leaf(
+        &mut self,
+        root: &mut OrderTreeRoot,
+        new_leaf: &LeafNode,
+    ) -> Result<(NodeHandle, Option<LeafNode>)> {
         // path of InnerNode handles that lead to the new leaf
         let mut stack: Vec<(NodeHandle, bool)> = vec![];
 
         // deal with inserts into an empty tree
-        let mut root: NodeHandle = match self.root() {
+        let mut parent_handle: NodeHandle = match root.node() {
             Some(h) => h,
             None => {
                 // create a new root if none exists
                 let handle = self.insert(new_leaf.as_ref())?;
-                self.root_node = handle;
-                self.leaf_count = 1;
+                root.maybe_node = handle;
+                root.leaf_count = 1;
                 return Ok((handle, None));
             }
         };
@@ -298,46 +322,46 @@ impl OrderTree {
         // walk down the tree until we find the insert location
         loop {
             // require if the new node will be a child of the root
-            let root_contents = *self.node(root).unwrap();
-            let root_key = root_contents.key().unwrap();
-            if root_key == new_leaf.key {
+            let parent_contents = *self.node(parent_handle).unwrap();
+            let parent_key = parent_contents.key().unwrap();
+            if parent_key == new_leaf.key {
                 // This should never happen because key should never match
-                if let Some(NodeRef::Leaf(&old_root_as_leaf)) = root_contents.case() {
+                if let Some(NodeRef::Leaf(&old_parent_as_leaf)) = parent_contents.case() {
                     // clobber the existing leaf
-                    *self.node_mut(root).unwrap() = *new_leaf.as_ref();
+                    *self.node_mut(parent_handle).unwrap() = *new_leaf.as_ref();
                     self.update_parent_earliest_expiry(
                         &stack,
-                        old_root_as_leaf.expiry(),
+                        old_parent_as_leaf.expiry(),
                         new_leaf.expiry(),
                     );
-                    return Ok((root, Some(old_root_as_leaf)));
+                    return Ok((parent_handle, Some(old_parent_as_leaf)));
                 }
                 // InnerNodes have a random child's key, so matching can happen and is fine
             }
-            let shared_prefix_len: u32 = (root_key ^ new_leaf.key).leading_zeros();
-            match root_contents.case() {
+            let shared_prefix_len: u32 = (parent_key ^ new_leaf.key).leading_zeros();
+            match parent_contents.case() {
                 None => unreachable!(),
                 Some(NodeRef::Inner(inner)) => {
-                    let keep_old_root = shared_prefix_len >= inner.prefix_len;
-                    if keep_old_root {
+                    let keep_old_parent = shared_prefix_len >= inner.prefix_len;
+                    if keep_old_parent {
                         let (child, crit_bit) = inner.walk_down(new_leaf.key);
-                        stack.push((root, crit_bit));
-                        root = child;
+                        stack.push((parent_handle, crit_bit));
+                        parent_handle = child;
                         continue;
                     };
                 }
                 _ => (),
             };
-            // implies root is a Leaf or Inner where shared_prefix_len < prefix_len
-            // we'll replace root with a new InnerNode that has new_leaf and root as children
+            // implies parent is a Leaf or Inner where shared_prefix_len < prefix_len
+            // we'll replace parent with a new InnerNode that has new_leaf and parent as children
 
-            // change the root in place to represent the LCA of [new_leaf] and [root]
+            // change the parent in place to represent the LCA of [new_leaf] and [parent]
             let crit_bit_mask: u128 = 1u128 << (127 - shared_prefix_len);
             let new_leaf_crit_bit = (crit_bit_mask & new_leaf.key) != 0;
-            let old_root_crit_bit = !new_leaf_crit_bit;
+            let old_parent_crit_bit = !new_leaf_crit_bit;
 
             let new_leaf_handle = self.insert(new_leaf.as_ref())?;
-            let moved_root_handle = match self.insert(&root_contents) {
+            let moved_parent_handle = match self.insert(&parent_contents) {
                 Ok(h) => h,
                 Err(e) => {
                     self.remove(new_leaf_handle).unwrap();
@@ -345,23 +369,23 @@ impl OrderTree {
                 }
             };
 
-            let new_root: &mut InnerNode = cast_mut(self.node_mut(root).unwrap());
-            *new_root = InnerNode::new(shared_prefix_len, new_leaf.key);
+            let new_parent: &mut InnerNode = cast_mut(self.node_mut(parent_handle).unwrap());
+            *new_parent = InnerNode::new(shared_prefix_len, new_leaf.key);
 
-            new_root.children[new_leaf_crit_bit as usize] = new_leaf_handle;
-            new_root.children[old_root_crit_bit as usize] = moved_root_handle;
+            new_parent.children[new_leaf_crit_bit as usize] = new_leaf_handle;
+            new_parent.children[old_parent_crit_bit as usize] = moved_parent_handle;
 
             let new_leaf_expiry = new_leaf.expiry();
-            let old_root_expiry = root_contents.earliest_expiry();
-            new_root.child_earliest_expiry[new_leaf_crit_bit as usize] = new_leaf_expiry;
-            new_root.child_earliest_expiry[old_root_crit_bit as usize] = old_root_expiry;
+            let old_parent_expiry = parent_contents.earliest_expiry();
+            new_parent.child_earliest_expiry[new_leaf_crit_bit as usize] = new_leaf_expiry;
+            new_parent.child_earliest_expiry[old_parent_crit_bit as usize] = old_parent_expiry;
 
             // walk up the stack and fix up the new min if needed
-            if new_leaf_expiry < old_root_expiry {
-                self.update_parent_earliest_expiry(&stack, old_root_expiry, new_leaf_expiry);
+            if new_leaf_expiry < old_parent_expiry {
+                self.update_parent_earliest_expiry(&stack, old_parent_expiry, new_leaf_expiry);
             }
 
-            self.leaf_count += 1;
+            root.leaf_count += 1;
             return Ok((new_leaf_handle, None));
         }
     }
@@ -394,8 +418,8 @@ impl OrderTree {
     }
 
     /// Returns the handle of the node with the lowest expiry timestamp, and this timestamp
-    pub fn find_earliest_expiry(&self) -> Option<(NodeHandle, u64)> {
-        let mut current: NodeHandle = match self.root() {
+    pub fn find_earliest_expiry(&self, root: &OrderTreeRoot) -> Option<(NodeHandle, u64)> {
+        let mut current: NodeHandle = match root.node() {
             Some(h) => h,
             None => return None,
         };
@@ -423,34 +447,21 @@ mod tests {
     use super::*;
     use bytemuck::Zeroable;
 
-    fn new_order_tree(order_tree_type: OrderTreeType) -> OrderTree {
-        OrderTree {
-            order_tree_type: order_tree_type.into(),
-            padding: [0u8; 3],
-            bump_index: 0,
-            free_list_len: 0,
-            free_list_head: 0,
-            root_node: 0,
-            leaf_count: 0,
-            nodes: [AnyNode::zeroed(); MAX_ORDERTREE_NODES],
-            reserved: [0; 256],
-        }
+    fn new_order_tree(order_tree_type: OrderTreeType) -> OrderTreeNodes {
+        let mut ot = OrderTreeNodes::zeroed();
+        ot.order_tree_type = order_tree_type.into();
+        ot
     }
 
-    fn verify_order_tree(order_tree: &OrderTree) {
-        verify_order_tree_invariant(order_tree);
-        verify_order_tree_iteration(order_tree);
-        verify_order_tree_expiry(order_tree);
+    fn verify_order_tree(order_tree: &OrderTreeNodes, root: &OrderTreeRoot) {
+        verify_order_tree_invariant(order_tree, root);
+        verify_order_tree_iteration(order_tree, root);
+        verify_order_tree_expiry(order_tree, root);
     }
 
     // check that BookSide binary tree key invariant holds
-    fn verify_order_tree_invariant(order_tree: &OrderTree) {
-        let r = match order_tree.root() {
-            Some(h) => h,
-            None => return,
-        };
-
-        fn recursive_check(order_tree: &OrderTree, h: NodeHandle) {
+    fn verify_order_tree_invariant(order_tree: &OrderTreeNodes, root: &OrderTreeRoot) {
+        fn recursive_check(order_tree: &OrderTreeNodes, h: NodeHandle) {
             match order_tree.node(h).unwrap().case().unwrap() {
                 NodeRef::Inner(&inner) => {
                     let left = order_tree.node(inner.children[0]).unwrap().key().unwrap();
@@ -471,15 +482,18 @@ mod tests {
                 _ => {}
             }
         }
-        recursive_check(order_tree, r);
+
+        if let Some(r) = root.node() {
+            recursive_check(order_tree, r);
+        }
     }
 
     // check that iteration of order tree has the right order and misses no leaves
-    fn verify_order_tree_iteration(order_tree: &OrderTree) {
+    fn verify_order_tree_iteration(order_tree: &OrderTreeNodes, root: &OrderTreeRoot) {
         let mut total = 0;
         let ascending = order_tree.order_tree_type() == OrderTreeType::Asks;
         let mut last_key = if ascending { 0 } else { u128::MAX };
-        for (_, node) in order_tree.iter() {
+        for (_, node) in order_tree.iter(root) {
             let key = node.key;
             if ascending {
                 assert!(key >= last_key);
@@ -489,17 +503,12 @@ mod tests {
             last_key = key;
             total += 1;
         }
-        assert_eq!(order_tree.leaf_count, total);
+        assert_eq!(root.leaf_count, total);
     }
 
     // check that BookSide::child_expiry invariant holds
-    fn verify_order_tree_expiry(order_tree: &OrderTree) {
-        let r = match order_tree.root() {
-            Some(h) => h,
-            None => return,
-        };
-
-        fn recursive_check(order_tree: &OrderTree, h: NodeHandle) {
+    fn verify_order_tree_expiry(order_tree: &OrderTreeNodes, root: &OrderTreeRoot) {
+        fn recursive_check(order_tree: &OrderTreeNodes, h: NodeHandle) {
             match order_tree.node(h).unwrap().case().unwrap() {
                 NodeRef::Inner(&inner) => {
                     let left = order_tree
@@ -521,7 +530,9 @@ mod tests {
                 _ => {}
             }
         }
-        recursive_check(order_tree, r);
+        if let Some(r) = root.node() {
+            recursive_check(order_tree, r);
+        }
     }
 
     #[test]
@@ -541,26 +552,38 @@ mod tests {
             )
         };
 
-        assert!(bids.find_earliest_expiry().is_none());
+        let mut root = OrderTreeRoot::zeroed();
 
-        bids.insert_leaf(&new_expiring_leaf(0, 5000)).unwrap();
-        assert_eq!(bids.find_earliest_expiry().unwrap(), (bids.root_node, 5000));
-        verify_order_tree(&bids);
+        assert!(bids.find_earliest_expiry(&root).is_none());
 
-        let (new4000_h, _) = bids.insert_leaf(&new_expiring_leaf(1, 4000)).unwrap();
-        assert_eq!(bids.find_earliest_expiry().unwrap(), (new4000_h, 4000));
-        verify_order_tree(&bids);
+        bids.insert_leaf(&mut root, &new_expiring_leaf(0, 5000))
+            .unwrap();
+        assert_eq!(
+            bids.find_earliest_expiry(&root).unwrap(),
+            (root.maybe_node, 5000)
+        );
+        verify_order_tree(&bids, &root);
 
-        let (_new4500_h, _) = bids.insert_leaf(&new_expiring_leaf(2, 4500)).unwrap();
-        assert_eq!(bids.find_earliest_expiry().unwrap(), (new4000_h, 4000));
-        verify_order_tree(&bids);
+        let (new4000_h, _) = bids
+            .insert_leaf(&mut root, &new_expiring_leaf(1, 4000))
+            .unwrap();
+        assert_eq!(bids.find_earliest_expiry(&root).unwrap(), (new4000_h, 4000));
+        verify_order_tree(&bids, &root);
 
-        let (new3500_h, _) = bids.insert_leaf(&new_expiring_leaf(3, 3500)).unwrap();
-        assert_eq!(bids.find_earliest_expiry().unwrap(), (new3500_h, 3500));
-        verify_order_tree(&bids);
+        let (_new4500_h, _) = bids
+            .insert_leaf(&mut root, &new_expiring_leaf(2, 4500))
+            .unwrap();
+        assert_eq!(bids.find_earliest_expiry(&root).unwrap(), (new4000_h, 4000));
+        verify_order_tree(&bids, &root);
+
+        let (new3500_h, _) = bids
+            .insert_leaf(&mut root, &new_expiring_leaf(3, 3500))
+            .unwrap();
+        assert_eq!(bids.find_earliest_expiry(&root).unwrap(), (new3500_h, 3500));
+        verify_order_tree(&bids, &root);
         // the first two levels of the tree are innernodes, with 0;1 on one side and 2;3 on the other
         assert_eq!(
-            bids.node_mut(bids.root_node)
+            bids.node_mut(root.maybe_node)
                 .unwrap()
                 .as_inner_mut()
                 .unwrap()
@@ -568,37 +591,37 @@ mod tests {
             [4000, 3500]
         );
 
-        bids.remove_by_key(3).unwrap();
-        verify_order_tree(&bids);
+        bids.remove_by_key(&mut root, 3).unwrap();
+        verify_order_tree(&bids, &root);
         assert_eq!(
-            bids.node_mut(bids.root_node)
+            bids.node_mut(root.maybe_node)
                 .unwrap()
                 .as_inner_mut()
                 .unwrap()
                 .child_earliest_expiry,
             [4000, 4500]
         );
-        assert_eq!(bids.find_earliest_expiry().unwrap().1, 4000);
+        assert_eq!(bids.find_earliest_expiry(&root).unwrap().1, 4000);
 
-        bids.remove_by_key(0).unwrap();
-        verify_order_tree(&bids);
+        bids.remove_by_key(&mut root, 0).unwrap();
+        verify_order_tree(&bids, &root);
         assert_eq!(
-            bids.node_mut(bids.root_node)
+            bids.node_mut(root.maybe_node)
                 .unwrap()
                 .as_inner_mut()
                 .unwrap()
                 .child_earliest_expiry,
             [4000, 4500]
         );
-        assert_eq!(bids.find_earliest_expiry().unwrap().1, 4000);
+        assert_eq!(bids.find_earliest_expiry(&root).unwrap().1, 4000);
 
-        bids.remove_by_key(1).unwrap();
-        verify_order_tree(&bids);
-        assert_eq!(bids.find_earliest_expiry().unwrap().1, 4500);
+        bids.remove_by_key(&mut root, 1).unwrap();
+        verify_order_tree(&bids, &root);
+        assert_eq!(bids.find_earliest_expiry(&root).unwrap().1, 4500);
 
-        bids.remove_by_key(2).unwrap();
-        verify_order_tree(&bids);
-        assert!(bids.find_earliest_expiry().is_none());
+        bids.remove_by_key(&mut root, 2).unwrap();
+        verify_order_tree(&bids, &root);
+        assert!(bids.find_earliest_expiry(&root).is_none());
     }
 
     #[test]
@@ -606,6 +629,7 @@ mod tests {
         use rand::Rng;
         let mut rng = rand::thread_rng();
 
+        let mut root = OrderTreeRoot::zeroed();
         let mut bids = new_order_tree(OrderTreeType::Bids);
         let new_expiring_leaf = |key: u128, expiry: u64| {
             LeafNode::new(
@@ -630,8 +654,9 @@ mod tests {
             }
             let expiry = rng.gen_range(1..200); // give good chance of duplicate expiry times
             keys.push(key);
-            bids.insert_leaf(&new_expiring_leaf(key, expiry)).unwrap();
-            verify_order_tree(&bids);
+            bids.insert_leaf(&mut root, &new_expiring_leaf(key, expiry))
+                .unwrap();
+            verify_order_tree(&bids, &root);
         }
 
         // remove 50 at random
@@ -640,9 +665,9 @@ mod tests {
                 break;
             }
             let k = keys[rng.gen_range(0..keys.len())];
-            bids.remove_by_key(k).unwrap();
+            bids.remove_by_key(&mut root, k).unwrap();
             keys.retain(|v| *v != k);
-            verify_order_tree(&bids);
+            verify_order_tree(&bids, &root);
         }
     }
 }

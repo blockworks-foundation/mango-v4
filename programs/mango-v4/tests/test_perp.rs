@@ -66,9 +66,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     // TEST: Create a perp market
     //
     let mango_v4::accounts::PerpCreateMarket {
-        perp_market,
-        orderbook,
-        ..
+        perp_market, bids, ..
     } = send_tx(
         solana,
         PerpCreateMarketInstruction {
@@ -118,8 +116,8 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
     .unwrap();
     check_prev_instruction_post_health(&solana, account_0).await;
 
-    let orderbook_data = solana.get_account_boxed::<Orderbook>(orderbook).await;
-    assert_eq!(orderbook_data.bids.fixed.leaf_count, 1);
+    let bids_data = solana.get_account_boxed::<BookSide>(bids).await;
+    assert_eq!(bids_data.roots[0].leaf_count, 1);
     let order_id_to_cancel = solana
         .get_account::<MangoAccount>(account_0)
         .await
@@ -504,9 +502,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     // SETUP: Create a perp market
     //
     let mango_v4::accounts::PerpCreateMarket {
-        perp_market,
-        orderbook,
-        ..
+        perp_market, bids, ..
     } = send_tx(
         solana,
         PerpCreateMarketInstruction {
@@ -558,8 +554,8 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
     .unwrap();
     check_prev_instruction_post_health(&solana, account_0).await;
 
-    let orderbook_data = solana.get_account_boxed::<Orderbook>(orderbook).await;
-    assert_eq!(orderbook_data.bids.oracle_pegged.leaf_count, 1);
+    let bids_data = solana.get_account_boxed::<BookSide>(bids).await;
+    assert_eq!(bids_data.roots[1].leaf_count, 1);
     let perp_order = solana
         .get_account::<MangoAccount>(account_0)
         .await

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::error::*;
-use crate::state::{AccountLoaderDynamic, Group, MangoAccount, Orderbook, PerpMarket};
+use crate::state::{AccountLoaderDynamic, BookSide, Group, MangoAccount, Orderbook, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpCancelOrderByClientOrderId<'info> {
@@ -14,11 +14,14 @@ pub struct PerpCancelOrderByClientOrderId<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = orderbook,
+        has_one = bids,
+        has_one = asks,
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]
-    pub orderbook: AccountLoader<'info, Orderbook>,
+    pub bids: AccountLoader<'info, BookSide>,
+    #[account(mut)]
+    pub asks: AccountLoader<'info, BookSide>,
 }
 
 pub fn perp_cancel_order_by_client_order_id(
@@ -32,7 +35,10 @@ pub fn perp_cancel_order_by_client_order_id(
     );
 
     let perp_market = ctx.accounts.perp_market.load_mut()?;
-    let mut book = ctx.accounts.orderbook.load_mut()?;
+    let mut book = Orderbook {
+        bids: ctx.accounts.bids.load_mut()?,
+        asks: ctx.accounts.asks.load_mut()?,
+    };
 
     let oo = account
         .perp_find_order_with_client_order_id(perp_market.perp_market_index, client_order_id)

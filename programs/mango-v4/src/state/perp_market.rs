@@ -39,7 +39,8 @@ pub struct PerpMarket {
 
     pub name: [u8; 16],
 
-    pub orderbook: Pubkey,
+    pub bids: Pubkey,
+    pub asks: Pubkey,
     pub event_queue: Pubkey,
 
     pub oracle: Pubkey,
@@ -116,6 +117,7 @@ const_assert_eq!(
         + 32
         + 32
         + 32
+        + 32
         + 96
         + 288
         + 8
@@ -137,7 +139,7 @@ const_assert_eq!(
         + 8
         + 1944
 );
-const_assert_eq!(size_of::<PerpMarket>(), 2776);
+const_assert_eq!(size_of::<PerpMarket>(), 2808);
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
 
 impl PerpMarket {
@@ -303,7 +305,8 @@ impl PerpMarket {
             trusted_market: 0,
             group_insurance_fund: 0,
             name: Default::default(),
-            orderbook: Pubkey::new_unique(),
+            bids: Pubkey::new_unique(),
+            asks: Pubkey::new_unique(),
             event_queue: Pubkey::new_unique(),
             oracle: Pubkey::new_unique(),
             oracle_config: OracleConfig {

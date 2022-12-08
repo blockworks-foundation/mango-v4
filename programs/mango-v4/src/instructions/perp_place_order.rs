@@ -4,8 +4,8 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::state::MangoAccount;
 use crate::state::{
-    new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, EventQueue, Group,
-    Order, Orderbook, PerpMarket,
+    new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, BookSide,
+    EventQueue, Group, Order, Orderbook, PerpMarket,
 };
 
 #[derive(Accounts)]
@@ -19,13 +19,16 @@ pub struct PerpPlaceOrder<'info> {
     #[account(
         mut,
         has_one = group,
-        has_one = orderbook,
+        has_one = bids,
+        has_one = asks,
         has_one = event_queue,
         has_one = oracle,
     )]
     pub perp_market: AccountLoader<'info, PerpMarket>,
     #[account(mut)]
-    pub orderbook: AccountLoader<'info, Orderbook>,
+    pub bids: AccountLoader<'info, BookSide>,
+    #[account(mut)]
+    pub asks: AccountLoader<'info, BookSide>,
     #[account(mut)]
     pub event_queue: AccountLoader<'info, EventQueue>,
 
@@ -48,7 +51,10 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, order: Order, limit: u8) -
     // before triggering the funding computation.
     {
         let mut perp_market = ctx.accounts.perp_market.load_mut()?;
-        let book = ctx.accounts.orderbook.load_mut()?;
+        let book = Orderbook {
+            bids: ctx.accounts.bids.load_mut()?,
+            asks: ctx.accounts.asks.load_mut()?,
+        };
 
         oracle_price = perp_market.oracle_price(
             &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
@@ -94,7 +100,10 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, order: Order, limit: u8) -
     };
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
-    let mut book = ctx.accounts.orderbook.load_mut()?;
+    let mut book = Orderbook {
+        bids: ctx.accounts.bids.load_mut()?,
+        asks: ctx.accounts.asks.load_mut()?,
+    };
 
     let mut event_queue = ctx.accounts.event_queue.load_mut()?;
 

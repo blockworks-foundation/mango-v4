@@ -870,7 +870,8 @@ impl MangoClient {
                             group: self.group(),
                             account: *liqee.0,
                             perp_market: perp.address,
-                            orderbook: perp.market.orderbook,
+                            bids: perp.market.bids,
+                            asks: perp.market.asks,
                         },
                         None,
                     );

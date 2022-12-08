@@ -114,9 +114,8 @@ async function refreshState(
     mc.perpMarket = group.getPerpMarketByMarketIndex(
       perpMarket.perpMarketIndex,
     );
-    await perpMarket.loadOrderbook(client, true);
-    mc.bids = await perpMarket.loadBids(client);
-    mc.asks = await perpMarket.loadAsks(client);
+    mc.bids = await perpMarket.loadBids(client, true);
+    mc.asks = await perpMarket.loadAsks(client, true);
     mc.lastBookUpdate = ts;
 
     mc.binanceAsk = parseFloat((result[i + 2] as any).asks[0].price);
