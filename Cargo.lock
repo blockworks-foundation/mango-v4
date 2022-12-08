@@ -3109,7 +3109,6 @@ dependencies = [
  "itertools 0.10.5",
  "lazy_static",
  "log 0.4.17",
- "margin-trade",
  "num 0.4.0",
  "num_enum",
  "pyth-sdk-solana",
@@ -3127,15 +3126,6 @@ dependencies = [
  "switchboard-program",
  "switchboard-utils",
  "switchboard-v2",
-]
-
-[[package]]
-name = "margin-trade"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "solana-program",
 ]
 
 [[package]]
