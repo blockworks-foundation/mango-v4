@@ -6,11 +6,11 @@ use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
 
 use crate::error::*;
+use crate::state::Side as PerpOrderSide;
 use crate::state::{Bank, MangoAccountValue, PerpMarketIndex};
 use crate::util::checked_math as cm;
 
 use super::*;
-use crate::state::orderbook::Side as PerpOrderSide;
 
 impl HealthCache {
     pub fn can_call_spot_bankruptcy(&self) -> bool {

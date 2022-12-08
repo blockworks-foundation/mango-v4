@@ -1,12 +1,10 @@
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::group_seeds;
+use crate::health::{new_fixed_order_account_retriever, new_health_cache, AccountRetriever};
 use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
 use crate::state::MangoAccount;
-use crate::state::{
-    new_fixed_order_account_retriever, new_health_cache, AccountLoaderDynamic, AccountRetriever,
-    Bank, Group, TokenIndex,
-};
+use crate::state::{AccountLoaderDynamic, Bank, Group, TokenIndex};
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;

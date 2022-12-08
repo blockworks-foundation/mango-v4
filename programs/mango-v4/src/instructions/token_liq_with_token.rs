@@ -3,11 +3,11 @@ use fixed::types::I80F48;
 use std::cmp::min;
 
 use crate::error::*;
+use crate::health::*;
 use crate::logs::{
     LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqWithTokenLog,
     WithdrawLoanOriginationFeeLog,
 };
-use crate::state::ScanningAccountRetriever;
 use crate::state::*;
 use crate::util::checked_math as cm;
 

@@ -4589,74 +4589,6 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "InterestRateParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "util0",
-            "type": "f32"
-          },
-          {
-            "name": "rate0",
-            "type": "f32"
-          },
-          {
-            "name": "util1",
-            "type": "f32"
-          },
-          {
-            "name": "rate1",
-            "type": "f32"
-          },
-          {
-            "name": "maxRate",
-            "type": "f32"
-          },
-          {
-            "name": "adjustmentFactor",
-            "type": "f32"
-          }
-        ]
-      }
-    },
-    {
-      "name": "FlashLoanTokenDetail",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "tokenIndex",
-            "type": "u16"
-          },
-          {
-            "name": "changeAmount",
-            "type": "i128"
-          },
-          {
-            "name": "loan",
-            "type": "i128"
-          },
-          {
-            "name": "loanOriginationFee",
-            "type": "i128"
-          },
-          {
-            "name": "depositIndex",
-            "type": "i128"
-          },
-          {
-            "name": "borrowIndex",
-            "type": "i128"
-          },
-          {
-            "name": "price",
-            "type": "i128"
-          }
-        ]
-      }
-    },
-    {
       "name": "Prices",
       "docs": [
         "Information about prices for a bank or perp market."
@@ -4869,6 +4801,74 @@ export type MangoV4 = {
           {
             "name": "beingLiquidated",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InterestRateParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "util0",
+            "type": "f32"
+          },
+          {
+            "name": "rate0",
+            "type": "f32"
+          },
+          {
+            "name": "util1",
+            "type": "f32"
+          },
+          {
+            "name": "rate1",
+            "type": "f32"
+          },
+          {
+            "name": "maxRate",
+            "type": "f32"
+          },
+          {
+            "name": "adjustmentFactor",
+            "type": "f32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FlashLoanTokenDetail",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "changeAmount",
+            "type": "i128"
+          },
+          {
+            "name": "loan",
+            "type": "i128"
+          },
+          {
+            "name": "loanOriginationFee",
+            "type": "i128"
+          },
+          {
+            "name": "depositIndex",
+            "type": "i128"
+          },
+          {
+            "name": "borrowIndex",
+            "type": "i128"
+          },
+          {
+            "name": "price",
+            "type": "i128"
           }
         ]
       }
@@ -5872,6 +5872,28 @@ export type MangoV4 = {
           {
             "name": "val",
             "type": "i128"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HealthType",
+      "docs": [
+        "There are two types of health, initial health used for opening new positions and maintenance",
+        "health used for liquidations. They are both calculated as a weighted sum of the assets",
+        "minus the liabilities but the maint. health uses slightly larger weights for assets and",
+        "slightly smaller weights for the liabilities. Zero is used as the bright line for both",
+        "i.e. if your init health falls below zero, you cannot open new positions and if your maint. health",
+        "falls below zero you will be liquidated."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Init"
+          },
+          {
+            "name": "Maint"
           }
         ]
       }
@@ -11933,74 +11955,6 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "InterestRateParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "util0",
-            "type": "f32"
-          },
-          {
-            "name": "rate0",
-            "type": "f32"
-          },
-          {
-            "name": "util1",
-            "type": "f32"
-          },
-          {
-            "name": "rate1",
-            "type": "f32"
-          },
-          {
-            "name": "maxRate",
-            "type": "f32"
-          },
-          {
-            "name": "adjustmentFactor",
-            "type": "f32"
-          }
-        ]
-      }
-    },
-    {
-      "name": "FlashLoanTokenDetail",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "tokenIndex",
-            "type": "u16"
-          },
-          {
-            "name": "changeAmount",
-            "type": "i128"
-          },
-          {
-            "name": "loan",
-            "type": "i128"
-          },
-          {
-            "name": "loanOriginationFee",
-            "type": "i128"
-          },
-          {
-            "name": "depositIndex",
-            "type": "i128"
-          },
-          {
-            "name": "borrowIndex",
-            "type": "i128"
-          },
-          {
-            "name": "price",
-            "type": "i128"
-          }
-        ]
-      }
-    },
-    {
       "name": "Prices",
       "docs": [
         "Information about prices for a bank or perp market."
@@ -12213,6 +12167,74 @@ export const IDL: MangoV4 = {
           {
             "name": "beingLiquidated",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InterestRateParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "util0",
+            "type": "f32"
+          },
+          {
+            "name": "rate0",
+            "type": "f32"
+          },
+          {
+            "name": "util1",
+            "type": "f32"
+          },
+          {
+            "name": "rate1",
+            "type": "f32"
+          },
+          {
+            "name": "maxRate",
+            "type": "f32"
+          },
+          {
+            "name": "adjustmentFactor",
+            "type": "f32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FlashLoanTokenDetail",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenIndex",
+            "type": "u16"
+          },
+          {
+            "name": "changeAmount",
+            "type": "i128"
+          },
+          {
+            "name": "loan",
+            "type": "i128"
+          },
+          {
+            "name": "loanOriginationFee",
+            "type": "i128"
+          },
+          {
+            "name": "depositIndex",
+            "type": "i128"
+          },
+          {
+            "name": "borrowIndex",
+            "type": "i128"
+          },
+          {
+            "name": "price",
+            "type": "i128"
           }
         ]
       }
@@ -13216,6 +13238,28 @@ export const IDL: MangoV4 = {
           {
             "name": "val",
             "type": "i128"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HealthType",
+      "docs": [
+        "There are two types of health, initial health used for opening new positions and maintenance",
+        "health used for liquidations. They are both calculated as a weighted sum of the assets",
+        "minus the liabilities but the maint. health uses slightly larger weights for assets and",
+        "slightly smaller weights for the liabilities. Zero is used as the bright line for both",
+        "i.e. if your init health falls below zero, you cannot open new positions and if your maint. health",
+        "falls below zero you will be liquidated."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Init"
+          },
+          {
+            "name": "Maint"
           }
         ]
       }

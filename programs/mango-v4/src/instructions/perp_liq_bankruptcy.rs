@@ -5,7 +5,7 @@ use anchor_spl::token::TokenAccount;
 use fixed::types::I80F48;
 
 use crate::error::*;
-use crate::state::ScanningAccountRetriever;
+use crate::health::*;
 use crate::state::*;
 use crate::util::checked_math as cm;
 

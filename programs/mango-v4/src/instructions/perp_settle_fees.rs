@@ -4,10 +4,8 @@ use fixed::types::I80F48;
 
 use crate::accounts_zerocopy::*;
 use crate::error::*;
-use crate::state::compute_health;
-use crate::state::new_fixed_order_account_retriever;
+use crate::health::{compute_health, new_fixed_order_account_retriever, HealthType};
 use crate::state::Bank;
-use crate::state::HealthType;
 use crate::state::MangoAccount;
 use crate::state::{AccountLoaderDynamic, Group, PerpMarket};
 

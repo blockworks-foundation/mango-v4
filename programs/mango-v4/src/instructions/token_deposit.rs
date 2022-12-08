@@ -6,6 +6,7 @@ use fixed::types::I80F48;
 
 use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
+use crate::health::*;
 use crate::state::*;
 use crate::util::checked_math as cm;
 

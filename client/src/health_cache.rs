@@ -1,7 +1,8 @@
 use crate::{AccountFetcher, MangoGroupContext};
 use anyhow::Context;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
-use mango_v4::state::{FixedOrderAccountRetriever, HealthCache, MangoAccountValue};
+use mango_v4::health::{FixedOrderAccountRetriever, HealthCache};
+use mango_v4::state::MangoAccountValue;
 
 pub fn new(
     context: &MangoGroupContext,
@@ -30,5 +31,5 @@ pub fn new(
         begin_serum3: active_token_len * 2 + active_perp_len * 2,
         staleness_slot: None,
     };
-    mango_v4::state::new_health_cache(&account.borrow(), &retriever).context("make health cache")
+    mango_v4::health::new_health_cache(&account.borrow(), &retriever).context("make health cache")
 }
