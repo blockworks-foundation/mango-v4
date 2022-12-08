@@ -86,7 +86,7 @@ export class MangoClient {
     public cluster: Cluster,
     public opts: MangoClientOptions = {},
   ) {
-    this.idsSource = opts?.idsSource || 'api';
+    this.idsSource = opts?.idsSource || 'get-program-accounts';
     this.prioritizationFee = opts?.prioritizationFee || 0;
     this.postSendTxCallback = opts?.postSendTxCallback;
     // TODO: evil side effect, but limited backtraces are a nightmare
