@@ -3090,15 +3090,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mango-macro"
-version = "0.0.1"
-dependencies = [
- "bytemuck",
- "quote 1.0.21",
- "syn 1.0.103",
-]
-
-[[package]]
 name = "mango-v4"
 version = "0.1.0"
 dependencies = [
@@ -3118,7 +3109,6 @@ dependencies = [
  "itertools 0.10.5",
  "lazy_static",
  "log 0.4.17",
- "mango-macro",
  "margin-trade",
  "num 0.4.0",
  "num_enum",

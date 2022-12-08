@@ -955,7 +955,6 @@ export interface FillEvent extends Event {
   takerSide: PerpOrderType;
   makerOut: boolean;
   makerSlot: number;
-  marketFeesApplied: boolean;
   timestamp: BN;
   seqNum: BN;
   maker: PublicKey;

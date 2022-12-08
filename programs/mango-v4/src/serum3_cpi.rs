@@ -65,13 +65,11 @@ pub fn load_market_state<'a>(
 }
 
 /// Copied over from serum dex
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
 #[repr(C, packed)]
 pub struct OrderBookStateHeader {
     pub account_flags: u64, // Initialized, (Bids or Asks)
 }
-unsafe impl bytemuck::Zeroable for OrderBookStateHeader {}
-unsafe impl bytemuck::Pod for OrderBookStateHeader {}
 
 pub fn load_bids_mut<'a>(
     sm: &serum_dex::state::MarketState,
