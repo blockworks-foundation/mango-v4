@@ -6,6 +6,7 @@ import {
   PublicKey,
 } from '@solana/web3.js';
 import fs from 'fs';
+import { PerpMarketIndex } from '../accounts/perp';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
 import { buildVersionedTx } from '../utils';
@@ -20,29 +21,20 @@ import { buildVersionedTx } from '../utils';
 // * solana airdrop 1  -k ~/.config/solana/admin.json
 //
 
-// TODO: switch out with devnet openbook markets
+// https://github.com/blockworks-foundation/mango-client-v3/blob/main/src/serum.json#L70
 const DEVNET_SERUM3_MARKETS = new Map([
-  ['BTC/USDC', 'DW83EpHFywBxCHmyARxwj3nzxJd7MUdSeznmrdzZKNZB'],
-  ['SOL/USDC', '5xWpt56U1NCuHoAEtpLeUrQcxDkEpNfScjfLFaRzLPgR'],
-  ['ETH/USDC', 'BkAraCyL9TTLbeMY3L1VWrPcv32DvSi5QDDQjik1J6Ac'],
-  ['SRM/USDC', '249LDNPLLL29nRq8kjBTg9hKdXMcZf4vK2UvxszZYcuZ'],
+  ['SOL/USDC', '82iPEvGiTceyxYpeLK3DhSwga3R5m4Yfyoydd13CukQ9'],
 ]);
 const DEVNET_MINTS = new Map([
   ['USDC', '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN'], // use devnet usdc
-  ['BTC', '3UNBZ6o52WTWwjac2kPUb4FyodhU1vFkRJheu1Sh2TvU'],
   ['SOL', 'So11111111111111111111111111111111111111112'],
-  ['ORCA', 'orcarKHSqC5CDDsGbho8GKvwExejWHxTqGzXgcewB9L'],
   ['MNGO', 'Bb9bsTQa1bGEtQ5KagGkvSHyuLqDWumFUcRqFusFNJWC'],
-  ['ETH', 'Cu84KB3tDL6SbFgToHMLYVDJJXdJjenNzSKikeAvzmkA'],
-  ['SRM', 'AvtB6w9xboLwA145E221vhof5TddhqsChYcx7Fy3xVMH'],
 ]);
 const DEVNET_ORACLES = new Map([
-  ['BTC', 'HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J'],
   ['SOL', 'J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix'],
-  ['ORCA', 'A1WttWF7X3Rg6ZRpB2YQUFHCRh1kiXV8sKKLV3S9neJV'],
   ['MNGO', '8k7F9Xb36oFJsjpCKpsXvg4cgBRoZtwNTc3EzG5Ttd2o'],
+  ['BTC', 'HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J'],
   ['ETH', 'EdVCmQ9FSPcVe5YySXDPCRmc8aDQLKJ9xvYBMZPie1Vw'],
-  ['SRM', '992moaMQKs32GKZ9dxi8keyM2bUmbrwBZpK4p2K6X5Vs'],
 ]);
 
 // TODO: should these constants be baked right into client.ts or even program?
@@ -53,6 +45,8 @@ const NET_BORROWS_LIMIT_NATIVE = 1 * Math.pow(10, 7) * Math.pow(10, 6);
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 
 async function main() {
+  let sig;
+
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(
     'https://mango.devnet.rpcpool.com',
@@ -100,20 +94,19 @@ async function main() {
     maxRate: 2.0,
   };
 
-  // stub oracle + register token 0
+  // stub usdc oracle + register token 0
   console.log(`Registering USDC...`);
   const usdcDevnetMint = new PublicKey(DEVNET_MINTS.get('USDC')!);
   try {
-    await client.stubOracleCreate(group, usdcDevnetMint, 1.0);
-  } catch (error) {
-    console.log(error);
-  }
-  const usdcDevnetOracle = (
-    await client.getStubOracle(group, usdcDevnetMint)
-  )[0];
-  console.log(`...created stub oracle ${usdcDevnetOracle.publicKey}`);
-  try {
-    await client.tokenRegister(
+    sig = await client.stubOracleCreate(group, usdcDevnetMint, 1.0);
+    const usdcDevnetOracle = (
+      await client.getStubOracle(group, usdcDevnetMint)
+    )[0];
+    console.log(
+      `...registered stub oracle ${usdcDevnetOracle}, https://explorer.solana.com/tx/${sig}?cluster=devnet`,
+    );
+
+    sig = await client.tokenRegister(
       group,
       usdcDevnetMint,
       usdcDevnetOracle.publicKey,
@@ -133,48 +126,24 @@ async function main() {
       NET_BORROWS_LIMIT_NATIVE,
     );
     await group.reloadAll(client);
+    const bank = group.getFirstBankByMint(usdcDevnetMint);
+    console.log(
+      `...registered token bank ${bank.publicKey}, https://explorer.solana.com/tx/${sig}?cluster=devnet`,
+    );
+    await group.reloadAll(client);
   } catch (error) {}
 
   // register token 1
-  console.log(`Registering BTC...`);
-  const btcDevnetMint = new PublicKey(DEVNET_MINTS.get('BTC')!);
-  const btcDevnetOracle = new PublicKey(DEVNET_ORACLES.get('BTC')!);
-  try {
-    await client.tokenRegister(
-      group,
-      btcDevnetMint,
-      btcDevnetOracle,
-      defaultOracleConfig,
-      1, // tokenIndex
-      'BTC',
-      defaultInterestRate,
-      0.005,
-      0.0005,
-      0.9,
-      0.8,
-      1.1,
-      1.2,
-      0.05,
-      MIN_VAULT_TO_DEPOSITS_RATIO,
-      NET_BORROWS_WINDOW_SIZE_TS,
-      NET_BORROWS_LIMIT_NATIVE,
-    );
-    await group.reloadAll(client);
-  } catch (error) {
-    console.log(error);
-  }
-
-  // register token 2
   console.log(`Registering SOL...`);
   const solDevnetMint = new PublicKey(DEVNET_MINTS.get('SOL')!);
   const solDevnetOracle = new PublicKey(DEVNET_ORACLES.get('SOL')!);
   try {
-    await client.tokenRegister(
+    sig = await client.tokenRegister(
       group,
       solDevnetMint,
       solDevnetOracle,
       defaultOracleConfig,
-      2, // tokenIndex
+      1, // tokenIndex
       'SOL',
       defaultInterestRate,
       0.005,
@@ -189,100 +158,10 @@ async function main() {
       NET_BORROWS_LIMIT_NATIVE,
     );
     await group.reloadAll(client);
-  } catch (error) {
-    console.log(error);
-  }
-
-  // register token 3
-  console.log(`Registering ORCA...`);
-  const orcaDevnetMint = new PublicKey(DEVNET_MINTS.get('ORCA')!);
-  const orcaDevnetOracle = new PublicKey(DEVNET_ORACLES.get('ORCA')!);
-  try {
-    await client.tokenRegister(
-      group,
-      orcaDevnetMint,
-      orcaDevnetOracle,
-      defaultOracleConfig,
-      3, // tokenIndex
-      'ORCA',
-      {
-        adjustmentFactor: 0.01,
-        util0: 0.4,
-        rate0: 0.07,
-        util1: 0.8,
-        rate1: 0.9,
-        maxRate: 0.63, // weird?
-      },
-      0.0005,
-      0.0005,
-      0.8,
-      0.6,
-      1.2,
-      1.4,
-      0.02,
-      MIN_VAULT_TO_DEPOSITS_RATIO,
-      NET_BORROWS_WINDOW_SIZE_TS,
-      NET_BORROWS_LIMIT_NATIVE,
+    const bank = group.getFirstBankByMint(solDevnetMint);
+    console.log(
+      `...registered token bank ${bank.publicKey}, https://explorer.solana.com/tx/${sig}?cluster=devnet`,
     );
-    await group.reloadAll(client);
-  } catch (error) {
-    console.log(error);
-  }
-
-  // register token 7
-  console.log(`Registering ETH...`);
-  const ethDevnetMint = new PublicKey(DEVNET_MINTS.get('ETH')!);
-  const ethDevnetOracle = new PublicKey(DEVNET_ORACLES.get('ETH')!);
-  try {
-    await client.tokenRegister(
-      group,
-      ethDevnetMint,
-      ethDevnetOracle,
-      defaultOracleConfig,
-      7, // tokenIndex
-      'ETH',
-      defaultInterestRate,
-      0.005,
-      0.0005,
-      0.9,
-      0.8,
-      1.1,
-      1.2,
-      0.05,
-      MIN_VAULT_TO_DEPOSITS_RATIO,
-      NET_BORROWS_WINDOW_SIZE_TS,
-      NET_BORROWS_LIMIT_NATIVE,
-    );
-    await group.reloadAll(client);
-  } catch (error) {
-    console.log(error);
-  }
-
-  // register token 5
-  console.log(`Registering SRM...`);
-  const srmDevnetMint = new PublicKey(DEVNET_MINTS.get('SRM')!);
-  const srmDevnetOracle = new PublicKey(DEVNET_ORACLES.get('SRM')!);
-  try {
-    await client.tokenRegister(
-      group,
-      srmDevnetMint,
-      srmDevnetOracle,
-      defaultOracleConfig,
-      5, // tokenIndex
-      'SRM',
-      defaultInterestRate,
-      0.005,
-      0.0005,
-      0.9,
-      0.8,
-      1.1,
-      1.2,
-      0.05,
-      MIN_VAULT_TO_DEPOSITS_RATIO,
-      NET_BORROWS_WINDOW_SIZE_TS,
-      NET_BORROWS_LIMIT_NATIVE,
-    );
-    await group.reloadAll(client);
   } catch (error) {
     console.log(error);
   }
@@ -290,91 +169,70 @@ async function main() {
   console.log(
     `Editing group, setting existing admin as fastListingAdmin to be able to add MNGO truslessly...`,
   );
-  let sig = await client.groupEdit(
+  sig = await client.groupEdit(
     group,
     group.admin,
     group.admin,
     undefined,
     undefined,
   );
-  console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+  console.log(
+    `...edited group, https://explorer.solana.com/tx/${sig}?cluster=devnet`,
+  );
   console.log(`Registering MNGO...`);
   const mngoDevnetMint = new PublicKey(DEVNET_MINTS.get('MNGO')!);
   const mngoDevnetOracle = new PublicKey(DEVNET_ORACLES.get('MNGO')!);
   try {
-    await client.tokenRegisterTrustless(
+    sig = await client.tokenRegisterTrustless(
       group,
       mngoDevnetMint,
       mngoDevnetOracle,
-      4,
+      2,
       'MNGO',
     );
     await group.reloadAll(client);
+    const bank = group.getFirstBankByMint(mngoDevnetMint);
+    console.log(
+      `...registered token bank ${bank.publicKey}, https://explorer.solana.com/tx/${sig}?cluster=devnet`,
+    );
   } catch (error) {
     console.log(error);
   }
 
+  // DEBUGGING
   // log tokens/banks
-  group.consoleLogBanks();
+  // group.consoleLogBanks();
 
-  // register serum market
-  console.log(`Registering serum3 market...`);
-  let serumMarketExternalPk = new PublicKey(
-    DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-  );
-  try {
-    await client.serum3RegisterMarket(
-      group,
-      serumMarketExternalPk,
-      group.getFirstBankByMint(btcDevnetMint),
-      group.getFirstBankByMint(usdcDevnetMint),
-      0,
-      'BTC/USDC',
-    );
-  } catch (error) {
-    console.log(error);
-  }
-  const markets = await client.serum3GetMarkets(
-    group,
-    group.getFirstBankByMint(btcDevnetMint).tokenIndex,
-    group.getFirstBankByMint(usdcDevnetMint).tokenIndex,
-  );
-  console.log(`...registered serum3 market ${markets[0].publicKey}`);
-
-  serumMarketExternalPk = new PublicKey(DEVNET_SERUM3_MARKETS.get('ETH/USDC')!);
-  try {
-    await client.serum3RegisterMarket(
-      group,
-      serumMarketExternalPk,
-      group.getFirstBankByMint(ethDevnetMint),
-      group.getFirstBankByMint(usdcDevnetMint),
-      1,
-      'ETH/USDC',
-    );
-  } catch (error) {
-    console.log(error);
-  }
-
-  serumMarketExternalPk = new PublicKey(DEVNET_SERUM3_MARKETS.get('SRM/USDC')!);
-  try {
-    await client.serum3RegisterMarket(
-      group,
-      serumMarketExternalPk,
-      group.getFirstBankByMint(srmDevnetMint),
-      group.getFirstBankByMint(usdcDevnetMint),
-      2,
-      'SRM/USDC',
-    );
-  } catch (error) {
-    console.log(error);
-  }
+  // // register serum market
+  // const serumMarketExternalPk = new PublicKey(
+  //   DEVNET_SERUM3_MARKETS.get('SOL/USDC')!,
+  // );
+  // try {
+  //   sig = await client.serum3RegisterMarket(
+  //     group,
+  //     serumMarketExternalPk,
+  //     group.getFirstBankByMint(solDevnetMint),
+  //     group.getFirstBankByMint(usdcDevnetMint),
+  //     0,
+  //     'SOL/USDC',
+  //   );
+  //   await group.reloadAll(client);
+  //   const serum3Market = group.getSerum3MarketByExternalMarket(
+  //     serumMarketExternalPk,
+  //   );
+  //   console.log(
+  //     `...registered serum market ${serum3Market.publicKey}, https://explorer.solana.com/tx/${sig}?cluster=devnet`,
+  //   );
+  // } catch (error) {
+  //   console.log(error);
+  // }
 
   // register perp market
   console.log(`Registering perp market...`);
   try {
-    await client.perpCreateMarket(
+    sig = await client.perpCreateMarket(
       group,
-      btcDevnetOracle,
+      new PublicKey(DEVNET_ORACLES.get('BTC')!),
       0,
       'BTC-PERP',
       defaultOracleConfig,
@@ -401,164 +259,20 @@ async function main() {
       1.0,
       2 * 60 * 60,
     );
-    console.log('done');
+    await group.reloadAll(client);
+    const perpMarket = group.getPerpMarketByMarketIndex(0 as PerpMarketIndex);
+    console.log(
+      `...registered perp market ${perpMarket.publicKey}, https://explorer.solana.com/tx/${sig}?cluster=devnet`,
+    );
   } catch (error) {
     console.log(error);
   }
   const perpMarkets = await client.perpGetMarkets(group);
   console.log(`...created perp market ${perpMarkets[0].publicKey}`);
 
-  //
-  // edit
-  //
-
-  if (true) {
-    console.log(`Editing USDC...`);
+  if (group.addressLookupTables[0].equals(PublicKey.default)) {
     try {
-      let sig = await client.tokenEdit(
-        group,
-        usdcDevnetMint,
-        usdcDevnetOracle.publicKey,
-        defaultOracleConfig,
-        null,
-        defaultInterestRate,
-        0.005,
-        0.0005,
-        1,
-        1,
-        1,
-        1,
-        0,
-        null,
-        null,
-        null,
-        MIN_VAULT_TO_DEPOSITS_RATIO,
-        NET_BORROWS_WINDOW_SIZE_TS,
-        NET_BORROWS_LIMIT_NATIVE,
-        null,
-        null,
-        false,
-        false,
-      );
-      console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-      await group.reloadAll(client);
-      console.log(group.getFirstBankByMint(btcDevnetMint).toString());
-    } catch (error) {
-      throw error;
-    }
-
-    console.log(`Editing BTC...`);
-    try {
-      let sig = await client.tokenEdit(
-        group,
-        usdcDevnetMint,
-        usdcDevnetOracle.publicKey,
-        defaultOracleConfig,
-        null,
-        defaultInterestRate,
-        0.005,
-        0.0005,
-        0.9,
-        0.8,
-        1.1,
-        1.2,
-        0.05,
-        null,
-        null,
-        null,
-        MIN_VAULT_TO_DEPOSITS_RATIO,
-        NET_BORROWS_WINDOW_SIZE_TS,
-        NET_BORROWS_LIMIT_NATIVE,
-        null,
-        null,
-        false,
-        false,
-      );
-      console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-      await group.reloadAll(client);
-      console.log(group.getFirstBankByMint(btcDevnetMint).toString());
-    } catch (error) {
-      throw error;
-    }
-
-    console.log(`Editing SOL...`);
-    try {
-      let sig = await client.tokenEdit(
-        group,
-        usdcDevnetMint,
-        usdcDevnetOracle.publicKey,
-        defaultOracleConfig,
-        null,
-        defaultInterestRate,
-        0.005,
-        0.0005,
-        0.9,
-        0.8,
-        1.1,
-        1.2,
-        0.05,
-        null,
-        null,
-        null,
-        MIN_VAULT_TO_DEPOSITS_RATIO,
-        NET_BORROWS_WINDOW_SIZE_TS,
-        NET_BORROWS_LIMIT_NATIVE,
-        null,
-        null,
-        false,
-        false,
-      );
-      console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-      await group.reloadAll(client);
-      console.log(group.getFirstBankByMint(btcDevnetMint).toString());
-    } catch (error) {
-      throw error;
-    }
-
-    console.log(`Editing BTC-PERP...`);
-    try {
-      let sig = await client.perpEditMarket(
-        group,
-        group.getPerpMarketByName('BTC-PERP').perpMarketIndex,
-        btcDevnetOracle,
-        defaultOracleConfig,
-        6,
-        0.975,
-        0.95,
-        1.025,
-        1.05,
-        0.012,
-        0.0002,
-        0.0,
-        0,
-        0.05,
-        0.05,
-        100,
-        true,
-        true,
-        1000,
-        1000000,
-        0.05,
-        MIN_VAULT_TO_DEPOSITS_RATIO,
-        NET_BORROWS_WINDOW_SIZE_TS,
-        NET_BORROWS_LIMIT_NATIVE,
-        1.0,
-        2 * 60 * 60,
-      );
-      console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-      await group.reloadAll(client);
-      console.log(group.getFirstBankByMint(btcDevnetMint).toString());
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  if (
-    // true
-    group.addressLookupTables[0].equals(PublicKey.default)
-  ) {
-    try {
-      console.log(`ALT: Creating`);
+      console.log(`ALT...`);
       const createIx = AddressLookupTableProgram.createLookupTable({
         authority: admin.publicKey,
         payer: admin.publicKey,
@@ -568,37 +282,20 @@ async function main() {
         client.program.provider as AnchorProvider,
         [createIx[0]],
       );
-      let sig = await connection.sendTransaction(createTx);
+      sig = await connection.sendTransaction(createTx);
       console.log(
         `...created ALT ${createIx[1]} https://explorer.solana.com/tx/${sig}?cluster=devnet`,
       );
 
-      console.log(`ALT: set at index 0 for group...`);
       sig = await client.altSet(
         group,
         new PublicKey('EmN5RjHUFsoag7tZ2AyBL2N8JrhV7nLMKgNbpCfzC81D'),
         0,
       );
-      console.log(`...https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-
-      // Extend using a mango v4 program ix
-      // Throws > Instruction references an unknown account 11111111111111111111111111111111 atm
-      //
       console.log(
-        `ALT: extending using mango v4 program with bank publick keys and oracles`,
+        `...set at index 0 for group https://explorer.solana.com/tx/${sig}?cluster=devnet`,
       );
-      // let sig = await client.altExtend(
-      //   group,
-      //   new PublicKey('EmN5RjHUFsoag7tZ2AyBL2N8JrhV7nLMKgNbpCfzC81D'),
-      //   0,
-      //   Array.from(group.banksMapByMint.values())
-      //     .flat()
-      //     .map((bank) => [bank.publicKey, bank.oracle])
-      //     .flat(),
-      // );
-      // console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
 
-      console.log(`ALT: extending manually with bank publick keys and oracles`);
       const extendIx = AddressLookupTableProgram.extendLookupTable({
         lookupTable: createIx[1],
         payer: admin.publicKey,
@@ -613,7 +310,9 @@ async function main() {
         [extendIx],
       );
       sig = await client.program.provider.connection.sendTransaction(extendTx);
-      console.log(`https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+      console.log(
+        `...extended ALT with pks, https://explorer.solana.com/tx/${sig}?cluster=devnet`,
+      );
     } catch (error) {
       console.log(error);
     }

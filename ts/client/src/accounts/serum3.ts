@@ -3,7 +3,7 @@ import { Market, Orderbook } from '@project-serum/serum/lib/market';
 import { Cluster, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { MangoClient } from '../client';
-import { SERUM3_PROGRAM_ID } from '../constants';
+import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { As } from '../utils';
 import { TokenIndex } from './bank';
@@ -163,6 +163,6 @@ export async function generateSerum3MarketExternalVaultSignerAddress(
         8,
       ),
     ],
-    SERUM3_PROGRAM_ID[cluster],
+    OPENBOOK_PROGRAM_ID[cluster],
   );
 }

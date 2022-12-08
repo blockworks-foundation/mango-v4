@@ -666,6 +666,8 @@ export class HealthCache {
     function cacheAfterSwap(amount: I80F48): HealthCache {
       const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
       // adjustedCache.logHealthCache('beforeSwap', adjustedCache);
+      // TODO: make a copy of the bank, apply amount, recompute weights,
+      // and set the new weights on the tokenInfos
       adjustedCache.tokenInfos[sourceIndex].balanceNative.isub(amount);
       adjustedCache.tokenInfos[targetIndex].balanceNative.iadd(
         amount.mul(price),
@@ -1062,9 +1064,9 @@ export class TokenInfo {
     return new TokenInfo(
       bank.tokenIndex,
       bank.maintAssetWeight,
-      bank.initAssetWeight,
+      bank.scaledInitAssetWeight(),
       bank.maintLiabWeight,
-      bank.initLiabWeight,
+      bank.scaledInitLiabWeight(),
       new Prices(
         bank.price,
         I80F48.fromNumber(bank.stablePriceModel.stablePrice),

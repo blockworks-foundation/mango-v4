@@ -1,10 +1,11 @@
-import * as dotenv from 'dotenv';
-dotenv.config();
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Connection, Keypair } from '@solana/web3.js';
+import * as dotenv from 'dotenv';
 import fs from 'fs';
+import { PerpMarket } from '../accounts/perp';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
+dotenv.config();
 
 //
 // (untested?) script which closes a mango account cleanly, first closes all positions, withdraws all tokens and then closes it
@@ -32,13 +33,16 @@ async function editPerpMarket(perpMarketName: string) {
   const group = await client.getGroupForCreator(admin.publicKey, 2);
   console.log(`Found group ${group.publicKey.toBase58()}`);
 
-  const pm = group.getPerpMarketByName(perpMarketName);
+  const pm: PerpMarket = group.getPerpMarketByName(perpMarketName);
 
   const signature = await client.perpEditMarket(
     group,
     pm.perpMarketIndex,
     pm.oracle,
-    pm.confFilter.toNumber(),
+    {
+      confFilter: pm.oracleConfig.confFilter.toNumber(),
+      maxStalenessSlots: null,
+    },
     pm.baseDecimals,
     pm.maintAssetWeight.toNumber(),
     pm.initAssetWeight.toNumber(),
@@ -57,6 +61,11 @@ async function editPerpMarket(perpMarketName: string) {
     pm.settleFeeFlat,
     pm.settleFeeAmountThreshold,
     pm.settleFeeFractionLowHealth,
+    null,
+    null,
+    null,
+    null,
+    null,
   );
 
   console.log('Tx Successful:', signature);

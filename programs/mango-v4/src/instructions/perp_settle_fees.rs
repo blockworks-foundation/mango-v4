@@ -65,7 +65,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     // Settle funding before settling any PnL
     perp_position.settle_funding(&perp_market);
 
-    // Calculate PnL for each account
+    // Calculate PnL
     let pnl = perp_position.pnl_for_price(&perp_market, oracle_price)?;
 
     // Account perp position must have a loss to be able to settle against the fee account

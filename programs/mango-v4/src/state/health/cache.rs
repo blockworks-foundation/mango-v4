@@ -376,6 +376,8 @@ impl HealthCache {
         let entry_index = self.token_info_index(bank.token_index)?;
         let mut entry = &mut self.token_infos[entry_index];
 
+        // Note: resetting the weights here assumes that the change has been applied to
+        // the passed in bank already
         entry.init_asset_weight =
             bank.scaled_init_asset_weight(entry.prices.asset(HealthType::Init));
         entry.init_liab_weight = bank.scaled_init_liab_weight(entry.prices.liab(HealthType::Init));
@@ -385,16 +387,6 @@ impl HealthCache {
         // brings it to exactly zero.
         let removed_contribution = -change;
         cm!(entry.balance_native -= removed_contribution);
-        Ok(())
-    }
-
-    /// Recomputes the dynamic init weights for the bank's current deposits/borrows.
-    pub fn recompute_token_weights(&mut self, bank: &Bank) -> Result<()> {
-        let entry_index = self.token_info_index(bank.token_index)?;
-        let mut entry = &mut self.token_infos[entry_index];
-        entry.init_asset_weight =
-            bank.scaled_init_asset_weight(entry.prices.asset(HealthType::Init));
-        entry.init_liab_weight = bank.scaled_init_liab_weight(entry.prices.liab(HealthType::Init));
         Ok(())
     }
 

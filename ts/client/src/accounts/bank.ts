@@ -8,10 +8,14 @@ export const QUOTE_DECIMALS = 6;
 
 export type TokenIndex = number & As<'token-index'>;
 
-export type OracleConfig = {
+export type OracleConfigDto = {
   confFilter: I80F48Dto;
   maxStalenessSlots: BN;
-  reserved: number[];
+};
+
+export type OracleConfig = {
+  confFilter: I80F48;
+  maxStalenessSlots: BN;
 };
 
 export type StablePriceModel = {
@@ -34,10 +38,14 @@ export interface BankForHealth {
   initLiabWeight: I80F48;
   price: I80F48;
   stablePriceModel: StablePriceModel;
+
+  scaledInitAssetWeight(): I80F48;
+  scaledInitLiabWeight(): I80F48;
 }
 
 export class Bank implements BankForHealth {
   public name: string;
+  public oracleConfig: OracleConfig;
   public depositIndex: I80F48;
   public borrowIndex: I80F48;
   public indexedDeposits: I80F48;
@@ -70,7 +78,7 @@ export class Bank implements BankForHealth {
       mint: PublicKey;
       vault: PublicKey;
       oracle: PublicKey;
-      oracleConfig: OracleConfig;
+      oracleConfig: OracleConfigDto;
       stablePriceModel: StablePriceModel;
       depositIndex: I80F48Dto;
       borrowIndex: I80F48Dto;
@@ -161,7 +169,7 @@ export class Bank implements BankForHealth {
     public mint: PublicKey,
     public vault: PublicKey,
     public oracle: PublicKey,
-    oracleConfig: OracleConfig,
+    oracleConfig: OracleConfigDto,
     public stablePriceModel: StablePriceModel,
     depositIndex: I80F48Dto,
     borrowIndex: I80F48Dto,
@@ -195,10 +203,14 @@ export class Bank implements BankForHealth {
     lastNetBorrowsWindowStartTs: BN,
     netBorrowLimitPerWindowQuote: BN,
     netBorrowsInWindow: BN,
-    borrowWeightScaleStartQuote: number,
-    depositWeightScaleStartQuote: number,
+    public borrowWeightScaleStartQuote: number,
+    public depositWeightScaleStartQuote: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
+    this.oracleConfig = {
+      confFilter: I80F48.from(oracleConfig.confFilter),
+      maxStalenessSlots: oracleConfig.maxStalenessSlots,
+    } as OracleConfig;
     this.depositIndex = I80F48.from(depositIndex);
     this.borrowIndex = I80F48.from(borrowIndex);
     this.indexedDeposits = I80F48.from(indexedDeposits);
@@ -290,6 +302,28 @@ export class Bank implements BankForHealth {
       this.getDepositRate().toString() +
       '\n getBorrowRate() - ' +
       this.getBorrowRate().toString()
+    );
+  }
+
+  scaledInitAssetWeight(): I80F48 {
+    const depositsQuote = this.nativeDeposits().mul(this.price);
+    if (
+      depositsQuote.lte(I80F48.fromNumber(this.depositWeightScaleStartQuote))
+    ) {
+      return this.initAssetWeight;
+    }
+    return this.initAssetWeight.mul(
+      I80F48.fromNumber(this.depositWeightScaleStartQuote).div(depositsQuote),
+    );
+  }
+
+  scaledInitLiabWeight(): I80F48 {
+    const borrowsQuote = this.nativeBorrows().mul(this.price);
+    if (borrowsQuote.lte(I80F48.fromNumber(this.borrowWeightScaleStartQuote))) {
+      return this.initLiabWeight;
+    }
+    return this.initLiabWeight.mul(
+      borrowsQuote.div(I80F48.fromNumber(this.borrowWeightScaleStartQuote)),
     );
   }
 

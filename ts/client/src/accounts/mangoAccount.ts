@@ -3,7 +3,7 @@ import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { AccountInfo, PublicKey, TransactionSignature } from '@solana/web3.js';
 import { MangoClient } from '../client';
-import { SERUM3_PROGRAM_ID } from '../constants';
+import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
 import { Bank, TokenIndex } from './bank';
@@ -118,7 +118,7 @@ export class MangoAccount {
           const oo = OpenOrders.fromAccountInfo(
             serum3Active[i].openOrders,
             ai,
-            SERUM3_PROGRAM_ID[client.cluster],
+            OPENBOOK_PROGRAM_ID[client.cluster],
           );
           return [serum3Active[i].marketIndex, oo];
         }),
@@ -421,6 +421,8 @@ export class MangoAccount {
   /**
    * The amount of given native token you can withdraw including borrows, considering all existing assets as collateral.
    * @returns amount of given native token you can borrow, considering all existing assets as collateral, in native token
+   *
+   * TODO: take into account net_borrow_limit and min_vault_to_deposits_ratio
    */
   public getMaxWithdrawWithBorrowForToken(
     group: Group,
@@ -563,7 +565,7 @@ export class MangoAccount {
       return OpenOrders.fromAccountInfo(
         this.serum3[index].openOrders,
         acc,
-        SERUM3_PROGRAM_ID[client.cluster],
+        OPENBOOK_PROGRAM_ID[client.cluster],
       );
     });
   }
@@ -1247,24 +1249,24 @@ export class PerpPosition {
     );
   }
 
-  // TODO FUTURE: double check with program side code that this is in sycn with latest changes in program
-  public getEntryPrice(perpMarket: PerpMarket): BN {
-    if (this.basePositionLots.eq(new BN(0))) {
-      return new BN(0);
-    }
-    return this.quoteEntryNative
-      .div(this.basePositionLots.mul(perpMarket.baseLotSize))
-      .abs();
+  public getAverageEntryPriceUi(perpMarket: PerpMarket): number {
+    return perpMarket.priceLotsToUi(
+      new BN(this.avgEntryPricePerBaseLot / perpMarket.baseLotSize.toNumber()),
+    );
   }
 
-  // TODO  FUTURE: double check with program side code that this is in sycn with latest changes in program
-  public getBreakEvenPrice(perpMarket: PerpMarket): BN {
+  public getBreakEvenPriceUi(perpMarket: PerpMarket): number {
     if (this.basePositionLots.eq(new BN(0))) {
-      return new BN(0);
+      return 0;
     }
-    return this.quoteRunningNative
-      .div(this.basePositionLots.mul(perpMarket.baseLotSize))
-      .abs();
+    return perpMarket.priceLotsToUi(
+      new BN(
+        this.quoteRunningNative
+          .neg()
+          .div(this.basePositionLots.mul(perpMarket.baseLotSize))
+          .toNumber(),
+      ),
+    );
   }
 
   public getPnl(perpMarket: PerpMarket): I80F48 {

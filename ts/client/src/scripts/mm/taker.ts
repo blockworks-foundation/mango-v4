@@ -7,7 +7,7 @@ import { PerpMarket, PerpOrderSide, PerpOrderType } from '../../accounts/perp';
 import { MangoClient } from '../../client';
 import { MANGO_V4_ID } from '../../constants';
 import { ZERO_I80F48 } from '../../numbers/I80F48';
-import { toUiDecimalsForQuote } from '../../utils';
+import { toNativeI80F48, toUiDecimalsForQuote } from '../../utils';
 
 // For easy switching between mainnet and devnet, default is mainnet
 const CLUSTER: Cluster =
@@ -33,13 +33,35 @@ async function settlePnl(
     .find((pp) => pp.marketIndex === perpMarket.perpMarketIndex)!;
   const pnl = pp.getPnl(perpMarket);
 
+  console.log(
+    `Avg entry price - ${pp.getAverageEntryPriceUi(
+      perpMarket,
+    )}, Breakeven price - ${pp.getBreakEvenPriceUi(perpMarket)}`,
+  );
+
   let profitableAccount, unprofitableAccount;
 
+  if (pnl.abs().gt(toNativeI80F48(1, 6))) {
+    console.log(`- Settling pnl ${toUiDecimalsForQuote(pnl)} ...`);
+  } else {
+    console.log(
+      `- Skipping Settling pnl ${toUiDecimalsForQuote(pnl)}, too small`,
+    );
+    return;
+  }
+
   if (pnl.gt(ZERO_I80F48())) {
+    console.log(`- Settling profit pnl...`);
     profitableAccount = mangoAccount;
-    unprofitableAccount = (
-      await perpMarket.getSettlePnlCandidates(client, group, 'negative')
-    )[0].account;
+    const candidates = await perpMarket.getSettlePnlCandidates(
+      client,
+      group,
+      'negative',
+    );
+    if (candidates.length === 0) {
+      return;
+    }
+    unprofitableAccount = candidates[0].account;
     const sig = await client.perpSettlePnl(
       group,
       profitableAccount,
@@ -48,16 +70,23 @@ async function settlePnl(
       perpMarket.perpMarketIndex,
     );
     console.log(
-      `Settled pnl, sig https://explorer.solana.com/tx/${sig}?cluster=${
+      `- Settled pnl, sig https://explorer.solana.com/tx/${sig}?cluster=${
         CLUSTER == 'devnet' ? 'devnet' : ''
       }`,
     );
   } else if (pnl.lt(ZERO_I80F48())) {
     unprofitableAccount = mangoAccount;
-    profitableAccount = (
-      await perpMarket.getSettlePnlCandidates(client, group, 'positive')
-    )[0].account;
-    const sig = await client.perpSettlePnl(
+    const candidates = await perpMarket.getSettlePnlCandidates(
+      client,
+      group,
+      'positive',
+    );
+    if (candidates.length === 0) {
+      return;
+    }
+    profitableAccount = candidates[0].account;
+    console.log(`- Settling loss pnl...`);
+    let sig = await client.perpSettlePnl(
       group,
       profitableAccount,
       unprofitableAccount,
@@ -65,7 +94,7 @@ async function settlePnl(
       perpMarket.perpMarketIndex,
     );
     console.log(
-      `Settled pnl, sig https://explorer.solana.com/tx/${sig}?cluster=${
+      `- Settled pnl, sig https://explorer.solana.com/tx/${sig}?cluster=${
         CLUSTER == 'devnet' ? 'devnet' : ''
       }`,
     );
@@ -87,7 +116,7 @@ async function takeOrder(
       ? perpMarket.uiPrice * 1.01
       : perpMarket.uiPrice * 0.99;
   console.log(
-    `${perpMarket.name} taking with a ${
+    `- ${perpMarket.name} taking with a ${
       side === PerpOrderSide.bid ? 'bid' : 'ask'
     } at  price ${price.toFixed(4)} and size ${size.toFixed(6)}`,
   );
@@ -95,7 +124,7 @@ async function takeOrder(
   const oldPosition = mangoAccount.getPerpPosition(perpMarket.perpMarketIndex);
   if (oldPosition) {
     console.log(
-      `- before base: ${perpMarket.baseLotsToUi(
+      `-- before base: ${perpMarket.baseLotsToUi(
         oldPosition.basePositionLots,
       )}, quote: ${toUiDecimalsForQuote(oldPosition.quotePositionNative)}`,
     );
@@ -122,7 +151,7 @@ async function takeOrder(
   const newPosition = mangoAccount.getPerpPosition(perpMarket.perpMarketIndex);
   if (newPosition) {
     console.log(
-      `- after base: ${perpMarket.baseLotsToUi(
+      `-- after base: ${perpMarket.baseLotsToUi(
         newPosition.basePositionLots,
       )}, quote: ${toUiDecimalsForQuote(newPosition.quotePositionNative)}`,
     );

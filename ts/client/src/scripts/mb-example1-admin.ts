@@ -20,9 +20,7 @@ import { buildVersionedTx } from '../utils';
 const MAINNET_MINTS = new Map([
   ['USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'],
   ['USDT', 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'],
-  ['BTC', '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E'], // Wrapped Bitcoin (Sollet)
   ['ETH', '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs'], // Ether (Portal)
-  ['soETH', '2FPyTwcZLUg1MDrwsyoP4D6s1tM7hAkHYRjkNb5w6Pxk'], // Wrapped Ethereum (Sollet)
   ['SOL', 'So11111111111111111111111111111111111111112'], // Wrapped SOL
   ['MSOL', 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So'],
   ['MNGO', 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac'],
@@ -33,7 +31,6 @@ const MAINNET_ORACLES = new Map([
   ['USDT', '3vxLXJqLqF3JG5TCbYycbKWRBbCJQLxQmBGCkyqEEefL'],
   ['BTC', 'GVXRSBjFk6e6J3NbVPXohDJetcTjaeeuykUpbQF8UoMU'],
   ['ETH', 'JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB'],
-  ['soETH', 'JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB'],
   ['SOL', 'H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG'],
   ['MSOL', 'E4v1BBgoso9s64TQvmyownAVJbhbEPGyzA3qn4n46qj9'],
   ['MNGO', '79wm3jjcPr6RaNQ4DGvP5KxG1mNd3gEBsg6FsNVFezK4'],
@@ -41,14 +38,9 @@ const MAINNET_ORACLES = new Map([
   ['DUST', 'C5tuUPi7xJHBHZGZX6wWYf1Svm6jtTVwYrYrBCiEVejK'],
 ]);
 
-// External markets are matched with those in https://github.com/blockworks-foundation/mango-client-v3/blob/main/src/ids.json
-// and verified to have best liquidity for pair on https://openserum.io/
-// TODO: replace with markets from https://github.com/openbook-dex/resources/blob/main/markets.json
+// External markets are matched with those in https://github.com/openbook-dex/openbook-ts/blob/master/packages/serum/src/markets.json
 const MAINNET_SERUM3_MARKETS = new Map([
-  ['BTC/USDC', 'A8YFbxQYFVqKZaoYJLLUVcQiWP7G2MeEgW5wsAQgMvFw'],
   ['SOL/USDC', '9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT'],
-  ['RAY/SOL', 'C6tp2RVZnxBPFbnAsfTjis8BN9tycESAT4SgDQgbbrsA'],
-  ['DUST/SOL', '8WCzJpSNcLUYXPYeUDAXpH4hgqxFJpkYkVT6GJDSpcGx'],
 ]);
 
 const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
@@ -193,29 +185,6 @@ async function registerTokens() {
     NET_BORROWS_LIMIT_NATIVE,
   );
 
-  console.log(`Registering BTC...`);
-  const btcMainnetMint = new PublicKey(MAINNET_MINTS.get('BTC')!);
-  const btcMainnetOracle = new PublicKey(MAINNET_ORACLES.get('BTC')!);
-  await client.tokenRegister(
-    group,
-    btcMainnetMint,
-    btcMainnetOracle,
-    defaultOracleConfig,
-    2,
-    'BTC',
-    defaultInterestRate,
-    0.005,
-    0.0005,
-    0.9,
-    0.8,
-    1.1,
-    1.2,
-    0.05,
-    MIN_VAULT_TO_DEPOSITS_RATIO,
-    NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROWS_LIMIT_NATIVE,
-  );
-
   console.log(`Registering ETH...`);
   const ethMainnetMint = new PublicKey(MAINNET_MINTS.get('ETH')!);
   const ethMainnetOracle = new PublicKey(MAINNET_ORACLES.get('ETH')!);
@@ -226,29 +195,6 @@ async function registerTokens() {
     defaultOracleConfig,
     3,
     'ETH',
-    defaultInterestRate,
-    0.005,
-    0.0005,
-    0.9,
-    0.8,
-    1.1,
-    1.2,
-    0.05,
-    MIN_VAULT_TO_DEPOSITS_RATIO,
-    NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROWS_LIMIT_NATIVE,
-  );
-
-  console.log(`Registering soETH...`);
-  const soEthMainnetMint = new PublicKey(MAINNET_MINTS.get('soETH')!);
-  const soEthMainnetOracle = new PublicKey(MAINNET_ORACLES.get('soETH')!);
-  await client.tokenRegister(
-    group,
-    soEthMainnetMint,
-    soEthMainnetOracle,
-    defaultOracleConfig,
-    4,
-    'soETH',
     defaultInterestRate,
     0.005,
     0.0005,
@@ -404,15 +350,8 @@ async function registerSerum3Markets() {
     1,
   );
 
-  // Register BTC and SOL markets
-  await client.serum3RegisterMarket(
-    group,
-    new PublicKey(MAINNET_SERUM3_MARKETS.get('BTC/USDC')!),
-    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('BTC')!)),
-    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDC')!)),
-    0,
-    'BTC/USDC',
-  );
+  // Register SOL serum market
+
   await client.serum3RegisterMarket(
     group,
     new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
@@ -420,24 +359,6 @@ async function registerSerum3Markets() {
     group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDC')!)),
     1,
     'SOL/USDC',
-  );
-
-  // Register RAY and DUST markets
-  await client.serum3RegisterMarket(
-    group,
-    new PublicKey(MAINNET_SERUM3_MARKETS.get('RAY/SOL')!),
-    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('RAY')!)),
-    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('SOL')!)),
-    2,
-    'RAY/SOL',
-  );
-  await client.serum3RegisterMarket(
-    group,
-    new PublicKey(MAINNET_SERUM3_MARKETS.get('DUST/SOL')!),
-    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('DUST')!)),
-    group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('SOL')!)),
-    3,
-    'DUST/SOL',
   );
 }
 
