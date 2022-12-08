@@ -201,8 +201,8 @@ export class Bank implements BankForHealth {
     minVaultToDepositsRatio: number,
     netBorrowLimitWindowSizeTs: BN,
     lastNetBorrowsWindowStartTs: BN,
-    netBorrowLimitPerWindowQuote: BN,
-    netBorrowsInWindow: BN,
+    public netBorrowLimitPerWindowQuote: BN,
+    public netBorrowsInWindow: BN,
     public borrowWeightScaleStartQuote: number,
     public depositWeightScaleStartQuote: number,
   ) {

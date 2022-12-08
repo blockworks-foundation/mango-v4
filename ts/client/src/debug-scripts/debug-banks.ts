@@ -109,6 +109,10 @@ async function main(): Promise<void> {
       `\n ${'error'.padEnd(40)} ${error}` +
       `\n ${'collectedFeesNative'.padEnd(40)} ${bank.collectedFeesNative}` +
       `\n ${'dust'.padEnd(40)} ${bank.dust}` +
+      `\n ${'vault balance'.padEnd(40)} ${toUiDecimals(
+        vault,
+        bank.mintDecimals,
+      )}, ${vault} native` +
       `\n ${'deposits'.padEnd(40)} ${bank.indexedDeposits.mul(
         bank.depositIndex,
       )}` +
@@ -137,16 +141,15 @@ async function main(): Promise<void> {
       `\n ${'borrowRate'.padEnd(40)} ${(
         100 * bank.getBorrowRate().toNumber()
       ).toFixed(2)}%` +
-      `\n ${'vault balance'.padEnd(40)} ${toUiDecimals(
-        vault,
-        bank.mintDecimals,
-      )}, ${vault} native` +
       `\n ${'last index update'.padEnd(40)} ${new Date(
         1000 * bank.indexLastUpdated.toNumber(),
       )}` +
       `\n ${'last rates update'.padEnd(40)} ${new Date(
         1000 * bank.bankRateLastUpdated.toNumber(),
-      )}`;
+      )}` +
+      `\n ${'net borrows in window'.padEnd(
+        40,
+      )} ${bank.netBorrowsInWindow.toNumber()} / ${bank.netBorrowLimitPerWindowQuote.toNumber()}`;
 
     console.log(`${res}`);
   }
