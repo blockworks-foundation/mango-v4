@@ -15,7 +15,7 @@ import {
 } from '../accounts/serum3';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
-import { buildVersionedTx } from '../utils';
+import { buildVersionedTx, toNative } from '../utils';
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 
@@ -29,7 +29,7 @@ const MAINNET_MINTS = new Map([
   ['MNGO', 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac'], // 6
 ]);
 const MAINNET_ORACLES = new Map([
-  // USDC - stub
+  // USDC - stub oracle
   ['USDT', '3vxLXJqLqF3JG5TCbYycbKWRBbCJQLxQmBGCkyqEEefL'],
   ['DAI', 'CtJ8EkqLmeYyGB8s4jevpeNsvmD4dxVR2krfsDLcvV8Y'],
   ['ETH', 'JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB'],
@@ -46,7 +46,7 @@ const MAINNET_SERUM3_MARKETS = new Map([
 
 const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
 const NET_BORROWS_WINDOW_SIZE_TS = 24 * 60 * 60;
-const NET_BORROW_LIMIT_PER_WINDOW_QUOTE = 1 * Math.pow(10, 7) * Math.pow(10, 6);
+const NET_BORROW_LIMIT_PER_WINDOW_QUOTE = toNative(1000000, 6).toNumber();
 
 const { MB_CLUSTER_URL, MB_PAYER_KEYPAIR, MB_USER_KEYPAIR, MB_USER2_KEYPAIR } =
   process.env;
