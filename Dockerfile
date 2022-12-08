@@ -17,9 +17,8 @@ RUN cargo chef prepare --bin liquidator --recipe-path recipe-liquidator.json
 
 FROM base as build
 COPY --from=plan /app/recipe-*.json .
-RUN cargo chef cook --release --recipe-path recipe-keeper.json --bin keeper
-RUN cargo chef cook --release --recipe-path recipe-liquidator.json --bin liquidator
-COPY . .
+# RUN cargo chef cook --release --recipe-path recipe-keeper.json --bin keeper
+# RUN cargo chef cook --release --recipe-path recipe-liquidator.json --bin liquidator
 RUN cargo build --release --bin keeper --bin liquidator
 
 FROM debian:bullseye-slim as run
