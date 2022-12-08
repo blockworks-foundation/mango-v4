@@ -650,7 +650,9 @@ export class MangoClient {
     );
   }
 
-  public async getMangoAccount(mangoAccount: MangoAccount | PublicKey) {
+  public async getMangoAccount(
+    mangoAccount: MangoAccount | PublicKey,
+  ): Promise<MangoAccount> {
     const mangoAccountPk =
       mangoAccount instanceof MangoAccount
         ? mangoAccount.publicKey

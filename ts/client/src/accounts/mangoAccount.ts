@@ -1192,7 +1192,7 @@ export class PerpPosition {
   ) {}
 
   isActive(): boolean {
-    return this.marketIndex != PerpPosition.PerpMarketIndexUnset;
+    return this.marketIndex !== PerpPosition.PerpMarketIndexUnset;
   }
 
   public getBasePositionUi(
@@ -1312,27 +1312,22 @@ export class PerpPositionDto {
 export class PerpOo {
   static OrderMarketUnset = 65535;
   static from(dto: PerpOoDto): PerpOo {
-    return new PerpOo(
-      dto.orderSide,
-      dto.orderMarket,
-      dto.clientOrderId,
-      dto.orderId,
-    );
+    return new PerpOo(dto.sideAndTree, dto.market, dto.clientId, dto.id);
   }
 
   constructor(
-    public orderSide: any,
+    public sideAndTree: any,
     public orderMarket: 0,
-    public clientOrderId: BN,
-    public orderId: BN,
+    public clientId: BN,
+    public id: BN,
   ) {}
 }
 export class PerpOoDto {
   constructor(
-    public orderSide: any,
-    public orderMarket: 0,
-    public clientOrderId: BN,
-    public orderId: BN,
+    public sideAndTree: any,
+    public market: 0,
+    public clientId: BN,
+    public id: BN,
   ) {}
 }
 
