@@ -5397,9 +5397,7 @@ export type MangoV4 = {
           },
           {
             "name": "orderType",
-            "type": {
-              "defined": "PostOrderType"
-            }
+            "type": "u8"
           },
           {
             "name": "padding",
@@ -5609,28 +5607,22 @@ export type MangoV4 = {
           },
           {
             "name": "takerSide",
-            "type": {
-              "defined": "Side"
-            }
+            "type": "u8"
           },
           {
             "name": "makerOut",
-            "type": "bool"
+            "type": "u8"
           },
           {
             "name": "makerSlot",
             "type": "u8"
           },
           {
-            "name": "marketFeesApplied",
-            "type": "bool"
-          },
-          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                3
+                4
               ]
             }
           },
@@ -5709,9 +5701,7 @@ export type MangoV4 = {
           },
           {
             "name": "side",
-            "type": {
-              "defined": "Side"
-            }
+            "type": "u8"
           },
           {
             "name": "ownerSlot",
@@ -6488,11 +6478,6 @@ export type MangoV4 = {
         {
           "name": "makerSlot",
           "type": "u8",
-          "index": false
-        },
-        {
-          "name": "marketFeesApplied",
-          "type": "bool",
           "index": false
         },
         {
@@ -12763,9 +12748,7 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "orderType",
-            "type": {
-              "defined": "PostOrderType"
-            }
+            "type": "u8"
           },
           {
             "name": "padding",
@@ -12975,28 +12958,22 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "takerSide",
-            "type": {
-              "defined": "Side"
-            }
+            "type": "u8"
           },
           {
             "name": "makerOut",
-            "type": "bool"
+            "type": "u8"
           },
           {
             "name": "makerSlot",
             "type": "u8"
           },
           {
-            "name": "marketFeesApplied",
-            "type": "bool"
-          },
-          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                3
+                4
               ]
             }
           },
@@ -13075,9 +13052,7 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "side",
-            "type": {
-              "defined": "Side"
-            }
+            "type": "u8"
           },
           {
             "name": "ownerSlot",
@@ -13854,11 +13829,6 @@ export const IDL: MangoV4 = {
         {
           "name": "makerSlot",
           "type": "u8",
-          "index": false
-        },
-        {
-          "name": "marketFeesApplied",
-          "type": "bool",
           "index": false
         },
         {

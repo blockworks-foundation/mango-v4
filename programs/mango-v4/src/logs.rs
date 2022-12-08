@@ -93,7 +93,6 @@ pub struct FillLog {
     pub market_index: u16,
     pub taker_side: u8, // side from the taker's POV
     pub maker_slot: u8,
-    pub market_fees_applied: bool,
     pub maker_out: bool, // true if maker order quantity == 0
     pub timestamp: u64,
     pub seq_num: u64, // note: usize same as u64

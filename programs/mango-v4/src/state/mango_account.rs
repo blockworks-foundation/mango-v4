@@ -869,19 +869,16 @@ impl<
         let pa = self.perp_position_mut(perp_market_index)?;
         pa.settle_funding(perp_market);
 
-        let side = fill.taker_side.invert_side();
+        let side = fill.taker_side().invert_side();
         let (base_change, quote_change) = fill.base_quote_change(side);
         let quote = cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
         let fees = cm!(quote.abs() * fill.maker_fee);
-        if !fill.market_fees_applied {
-            cm!(perp_market.fees_accrued += fees);
-        }
         pa.record_trade(perp_market, base_change, quote);
         pa.record_fee(fees);
 
         cm!(pa.maker_volume += quote.abs().to_num::<u64>());
 
-        if fill.maker_out {
+        if fill.maker_out() {
             self.remove_perp_order(fill.maker_slot as usize, base_change.abs())
         } else {
             match side {
@@ -905,7 +902,7 @@ impl<
         let pa = self.perp_position_mut(perp_market_index)?;
         pa.settle_funding(perp_market);
 
-        let (base_change, quote_change) = fill.base_quote_change(fill.taker_side);
+        let (base_change, quote_change) = fill.base_quote_change(fill.taker_side());
         pa.remove_taker_trade(base_change, quote_change);
         // fees are assessed at time of trade; no need to assess fees here
         let quote_change_native =

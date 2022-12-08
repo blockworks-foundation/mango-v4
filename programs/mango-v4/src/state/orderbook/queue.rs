@@ -1,7 +1,6 @@
 use crate::error::MangoError;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
-use mango_macro::Pod;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
@@ -177,15 +176,16 @@ pub enum EventType {
     Liquidate,
 }
 
-#[derive(Copy, Clone, Debug, Pod, AnchorSerialize, AnchorDeserialize)]
+#[derive(
+    Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, AnchorSerialize, AnchorDeserialize,
+)]
 #[repr(C)]
 pub struct FillEvent {
     pub event_type: u8,
-    pub taker_side: Side, // side from the taker's POV
-    pub maker_out: bool,  // true if maker order quantity == 0
+    pub taker_side: u8, // Side, from the taker's POV
+    pub maker_out: u8,  // 1 if maker order quantity == 0
     pub maker_slot: u8,
-    pub market_fees_applied: bool,
-    pub padding: [u8; 3],
+    pub padding: [u8; 4],
     pub timestamp: u64,
     pub seq_num: u64,
 
@@ -230,10 +230,9 @@ impl FillEvent {
     ) -> FillEvent {
         Self {
             event_type: EventType::Fill as u8,
-            taker_side,
-            maker_out,
+            taker_side: taker_side.into(),
+            maker_out: maker_out.into(),
             maker_slot,
-            market_fees_applied: true, // Since mango v3.3.5, market fees are adjusted at matching time
             padding: Default::default(),
             timestamp,
             seq_num,
@@ -263,13 +262,22 @@ impl FillEvent {
             ),
         }
     }
+
+    pub fn taker_side(&self) -> Side {
+        self.taker_side.try_into().unwrap()
+    }
+    pub fn maker_out(&self) -> bool {
+        self.maker_out == 1
+    }
 }
 
-#[derive(Copy, Clone, Debug, Pod, AnchorSerialize, AnchorDeserialize)]
+#[derive(
+    Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, AnchorSerialize, AnchorDeserialize,
+)]
 #[repr(C)]
 pub struct OutEvent {
     pub event_type: u8,
-    pub side: Side,
+    pub side: u8, // Side
     pub owner_slot: u8,
     padding0: [u8; 5],
     pub timestamp: u64,
@@ -292,7 +300,7 @@ impl OutEvent {
     ) -> Self {
         Self {
             event_type: EventType::Out.into(),
-            side,
+            side: side.into(),
             owner_slot,
             padding0: [0; 5],
             timestamp,
@@ -301,5 +309,9 @@ impl OutEvent {
             quantity,
             padding1: [0; EVENT_SIZE - 64],
         }
+    }
+
+    pub fn side(&self) -> Side {
+        self.side.try_into().unwrap()
     }
 }

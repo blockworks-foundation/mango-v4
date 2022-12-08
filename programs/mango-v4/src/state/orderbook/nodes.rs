@@ -2,7 +2,6 @@ use std::mem::size_of;
 
 use anchor_lang::prelude::*;
 use bytemuck::{cast_mut, cast_ref};
-use mango_macro::Pod;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use static_assertions::const_assert_eq;
 
@@ -64,7 +63,7 @@ pub fn fixed_price_lots(price_data: u64) -> i64 {
 /// Each InnerNode has exactly two children, which are either InnerNodes themselves,
 /// or LeafNodes. The children share the top `prefix_len` bits of `key`. The left
 /// child has a 0 in the next bit, and the right a 1.
-#[derive(Copy, Clone, Pod, AnchorSerialize, AnchorDeserialize)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, AnchorSerialize, AnchorDeserialize)]
 #[repr(C)]
 pub struct InnerNode {
     pub tag: u8, // NodeTag
@@ -120,12 +119,22 @@ impl InnerNode {
 }
 
 /// LeafNodes represent an order in the binary tree
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Pod, AnchorSerialize, AnchorDeserialize)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    bytemuck::Pod,
+    bytemuck::Zeroable,
+    AnchorSerialize,
+    AnchorDeserialize,
+)]
 #[repr(C)]
 pub struct LeafNode {
     pub tag: u8, // NodeTag
     pub owner_slot: u8,
-    pub order_type: PostOrderType, // this was added for TradingView move order
+    pub order_type: u8, // PostOrderType, this was added for TradingView move order
 
     pub padding: [u8; 1],
 
@@ -171,7 +180,7 @@ impl LeafNode {
         Self {
             tag: NodeTag::LeafNode.into(),
             owner_slot,
-            order_type,
+            order_type: order_type.into(),
             padding: Default::default(),
             time_in_force,
             padding2: Default::default(),
@@ -205,7 +214,7 @@ impl LeafNode {
     }
 }
 
-#[derive(Copy, Clone, Pod)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub struct FreeNode {
     pub(crate) tag: u8, // NodeTag
