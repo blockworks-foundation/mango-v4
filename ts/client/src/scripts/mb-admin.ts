@@ -15,39 +15,40 @@ import {
 } from '../accounts/serum3';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
-import { buildVersionedTx } from '../utils';
+import { buildVersionedTx, toNative } from '../utils';
+
+const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 
 const MAINNET_MINTS = new Map([
-  ['USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'],
-  ['USDT', 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'],
-  ['ETH', '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs'], // Ether (Portal)
-  ['SOL', 'So11111111111111111111111111111111111111112'], // Wrapped SOL
-  ['MSOL', 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So'],
-  ['MNGO', 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac'],
-  ['RAY', '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R'],
-  ['DUST', 'DUSTawucrTsGU8hcqRdHDCbuYhCPADMLM2VcCb8VnFnQ'],
+  ['USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'], // 0
+  ['USDT', 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'], // 1
+  ['DAI', 'EjmyN6qEC1Tf1JxiG1ae7UTJhUxSwk1TCWNWqxWV4J6o'], // 2
+  ['ETH', '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs'], // 3 Ether (Portal)
+  ['SOL', 'So11111111111111111111111111111111111111112'], // 4 Wrapped SOL
+  ['MSOL', 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So'], // 5
+  ['MNGO', 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac'], // 6
 ]);
 const MAINNET_ORACLES = new Map([
+  // USDC - stub oracle
   ['USDT', '3vxLXJqLqF3JG5TCbYycbKWRBbCJQLxQmBGCkyqEEefL'],
-  ['BTC', 'GVXRSBjFk6e6J3NbVPXohDJetcTjaeeuykUpbQF8UoMU'],
+  ['DAI', 'CtJ8EkqLmeYyGB8s4jevpeNsvmD4dxVR2krfsDLcvV8Y'],
   ['ETH', 'JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB'],
   ['SOL', 'H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG'],
   ['MSOL', 'E4v1BBgoso9s64TQvmyownAVJbhbEPGyzA3qn4n46qj9'],
   ['MNGO', '79wm3jjcPr6RaNQ4DGvP5KxG1mNd3gEBsg6FsNVFezK4'],
-  ['RAY', 'AnLf8tVYCM816gmBjiy8n53eXKKEDydT5piYjjQDPgTB'],
-  ['DUST', 'C5tuUPi7xJHBHZGZX6wWYf1Svm6jtTVwYrYrBCiEVejK'],
+  ['BTC', 'GVXRSBjFk6e6J3NbVPXohDJetcTjaeeuykUpbQF8UoMU'],
 ]);
 
 // External markets are matched with those in https://github.com/openbook-dex/openbook-ts/blob/master/packages/serum/src/markets.json
 const MAINNET_SERUM3_MARKETS = new Map([
-  ['SOL/USDC', '9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT'],
+  ['SOL/USDC', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'],
 ]);
 
 const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
 const NET_BORROWS_WINDOW_SIZE_TS = 24 * 60 * 60;
-const NET_BORROWS_LIMIT_NATIVE = 1 * Math.pow(10, 7) * Math.pow(10, 6);
+const NET_BORROW_LIMIT_PER_WINDOW_QUOTE = toNative(1000000, 6).toNumber();
 
-const { MB_CLUSTER_URL, MB_PAYER_KEYPAIR, MB_USER_KEYPAIR, MB_USER2_KEYPAIR } =
+const { MB_CLUSTER_URL, MB_PAYER_KEYPAIR, MB_USER_KEYPAIR, MB_USER4_KEYPAIR } =
   process.env;
 
 async function buildAdminClient(): Promise<[MangoClient, Keypair]> {
@@ -96,7 +97,7 @@ async function buildUserClient(
     Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER_KEYPAIR!, 'utf-8'))),
   );
   console.log(`Admin ${admin.publicKey.toBase58()}`);
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   return [client, group, user];
 }
 
@@ -107,8 +108,8 @@ async function createGroup() {
 
   console.log(`Creating Group...`);
   const insuranceMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
-  await client.groupCreate(2, true, 0, insuranceMint);
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  await client.groupCreate(GROUP_NUM, true, 2, insuranceMint);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(`...registered group ${group.publicKey}`);
 }
 
@@ -117,7 +118,7 @@ async function registerTokens() {
   const client = result[0];
   const admin = result[1];
 
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
 
   const defaultOracleConfig = {
     confFilter: 0.1,
@@ -159,7 +160,7 @@ async function registerTokens() {
     0,
     MIN_VAULT_TO_DEPOSITS_RATIO,
     NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROWS_LIMIT_NATIVE,
+    NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
   );
 
   console.log(`Registering USDT...`);
@@ -182,7 +183,30 @@ async function registerTokens() {
     0.025,
     MIN_VAULT_TO_DEPOSITS_RATIO,
     NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROWS_LIMIT_NATIVE,
+    NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
+  );
+
+  console.log(`Registering DAI...`);
+  const daiMainnetMint = new PublicKey(MAINNET_MINTS.get('DAI')!);
+  const daiMainnetOracle = new PublicKey(MAINNET_ORACLES.get('DAI')!);
+  await client.tokenRegister(
+    group,
+    daiMainnetMint,
+    daiMainnetOracle,
+    defaultOracleConfig,
+    2,
+    'DAI',
+    defaultInterestRate,
+    0.005,
+    0.0005,
+    0.95,
+    0.9,
+    1.05,
+    1.1,
+    0.025,
+    MIN_VAULT_TO_DEPOSITS_RATIO,
+    NET_BORROWS_WINDOW_SIZE_TS,
+    NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
   );
 
   console.log(`Registering ETH...`);
@@ -205,7 +229,7 @@ async function registerTokens() {
     0.05,
     MIN_VAULT_TO_DEPOSITS_RATIO,
     NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROWS_LIMIT_NATIVE,
+    NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
   );
 
   console.log(`Registering SOL...`);
@@ -216,7 +240,7 @@ async function registerTokens() {
     solMainnetMint,
     solMainnetOracle,
     defaultOracleConfig,
-    5,
+    4,
     'SOL',
     defaultInterestRate,
     0.005,
@@ -228,7 +252,7 @@ async function registerTokens() {
     0.05,
     MIN_VAULT_TO_DEPOSITS_RATIO,
     NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROWS_LIMIT_NATIVE,
+    NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
   );
 
   console.log(`Registering MSOL...`);
@@ -239,7 +263,7 @@ async function registerTokens() {
     msolMainnetMint,
     msolMainnetOracle,
     defaultOracleConfig,
-    6,
+    5,
     'MSOL',
     defaultInterestRate,
     0.005,
@@ -251,87 +275,28 @@ async function registerTokens() {
     0.05,
     MIN_VAULT_TO_DEPOSITS_RATIO,
     NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROWS_LIMIT_NATIVE,
-  );
-  console.log(`Registering RAY...`);
-  const rayMainnetMint = new PublicKey(MAINNET_MINTS.get('RAY')!);
-  const rayMainnetOracle = new PublicKey(MAINNET_ORACLES.get('RAY')!);
-  await client.tokenRegister(
-    group,
-    rayMainnetMint,
-    rayMainnetOracle,
-    defaultOracleConfig,
-    7,
-    'RAY',
-    {
-      adjustmentFactor: 0.004,
-      util0: 0.7,
-      rate0: 0.2,
-      util1: 0.85,
-      rate1: 0.4,
-      maxRate: 4.0,
-    },
-    0.005,
-    0.0005,
-    7 / 8,
-    3 / 4,
-    8 / 7,
-    4 / 3,
-    1 / 16,
-    MIN_VAULT_TO_DEPOSITS_RATIO,
-    NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROWS_LIMIT_NATIVE,
+    NET_BORROW_LIMIT_PER_WINDOW_QUOTE,
   );
 
-  console.log(`Registering DUST...`);
-  const dustMainnetMint = new PublicKey(MAINNET_MINTS.get('DUST')!);
-  const dustMainnetOracle = new PublicKey(MAINNET_ORACLES.get('DUST')!);
-  await client.tokenRegister(
+  console.log(`Registering MNGO...`);
+  await client.groupEdit(group, group.admin, group.admin);
+  const mngoMainnetMint = new PublicKey(MAINNET_MINTS.get('MNGO')!);
+  const mngoMainnetOracle = new PublicKey(MAINNET_ORACLES.get('MNGO')!);
+  await client.tokenRegisterTrustless(
     group,
-    dustMainnetMint,
-    dustMainnetOracle,
-    defaultOracleConfig,
-    8,
-    'DUST',
-    {
-      adjustmentFactor: 0.004,
-      util0: 0.7,
-      rate0: 0.3,
-      util1: 0.85,
-      rate1: 0.6,
-      maxRate: 6.0,
-    },
-    0.005,
-    0.0005,
-    0, // no asset weight for isolation
-    0,
-    81 / 80,
-    41 / 40, // 40x leverage so we can test something
-    1 / 160, // no liquidation fee
-    MIN_VAULT_TO_DEPOSITS_RATIO,
-    NET_BORROWS_WINDOW_SIZE_TS,
-    NET_BORROWS_LIMIT_NATIVE,
+    mngoMainnetMint,
+    mngoMainnetOracle,
+    6,
+    'MNGO',
   );
 
   // log tokens/banks
   await group.reloadAll(client);
-  for (const bank of await Array.from(group.banksMapByMint.values()).flat()) {
+  for (const bank of await Array.from(group.banksMapByMint.values())
+    .flat()
+    .sort((a, b) => a.tokenIndex - b.tokenIndex)) {
     console.log(`${bank.toString()}`);
   }
-}
-
-async function unregisterTokens() {
-  const result = await buildAdminClient();
-  const client = result[0];
-  const admin = result[1];
-
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
-
-  let bank = group.getFirstBankByTokenIndex(8 as TokenIndex);
-  let sig = await client.tokenDeregister(group, bank.mint);
-  console.log(
-    `Removed token ${bank.name}, sig https://explorer.solana.com/tx/${sig}`,
-  );
 }
 
 async function registerSerum3Markets() {
@@ -339,55 +304,18 @@ async function registerSerum3Markets() {
   const client = result[0];
   const admin = result[1];
 
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
-
-  // Bump version to 1 to unlock serum3 feature
-  await client.groupEdit(
-    group,
-    group.admin,
-    group.fastListingAdmin,
-    undefined,
-    1,
-  );
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
 
   // Register SOL serum market
-
   await client.serum3RegisterMarket(
     group,
     new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
     group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('SOL')!)),
     group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDC')!)),
-    1,
+    0,
     'SOL/USDC',
   );
 }
-
-async function unregisterSerum3Markets() {
-  const result = await buildAdminClient();
-  const client = result[0];
-  const admin = result[1];
-
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
-
-  let serum3Market = group.getSerum3MarketByName('RAY/SOL');
-  let sig = await client.serum3deregisterMarket(
-    group,
-    serum3Market.serumMarketExternal,
-  );
-  console.log(
-    `Deregistered serum market ${serum3Market.name}, sig https://explorer.solana.com/tx/${sig}`,
-  );
-
-  serum3Market = group.getSerum3MarketByName('DUST/SOL');
-  sig = await client.serum3deregisterMarket(
-    group,
-    serum3Market.serumMarketExternal,
-  );
-  console.log(
-    `Deregistered serum market ${serum3Market.name}, sig https://explorer.solana.com/tx/${sig}`,
-  );
-}
-
 async function createUser(userKeypair: string) {
   const result = await buildUserClient(userKeypair);
   const client = result[0];
@@ -421,89 +349,49 @@ async function createUser(userKeypair: string) {
   console.log(`...deposited 1 SOL`);
 }
 
-async function expandMangoAccount(userKeypair: string) {
-  const result = await buildUserClient(userKeypair);
-  const client = result[0];
-  const group = result[1];
-  const user = result[2];
-
-  const mangoAccounts = await client.getMangoAccountsForOwner(
-    group,
-    user.publicKey,
-  );
-  if (!mangoAccounts) {
-    throw new Error(`MangoAccounts not found for user ${user.publicKey}`);
+async function main() {
+  try {
+    // await createGroup();
+  } catch (error) {
+    console.log(error);
+  }
+  try {
+    // await registerTokens();
+  } catch (error) {
+    console.log(error);
+  }
+  try {
+    // await registerSerum3Markets();
+  } catch (error) {
+    console.log(error);
+  }
+  try {
+    await createUser(MB_USER_KEYPAIR!);
+    await createUser(MB_USER4_KEYPAIR!);
+  } catch (error) {
+    console.log(error);
   }
 
-  for (const mangoAccount of mangoAccounts) {
-    console.log(`...found MangoAccount ${mangoAccount.publicKey.toBase58()}`);
-    await client.expandMangoAccount(group, mangoAccount, 8, 2, 0, 0);
-  }
+  try {
+  } catch (error) {}
 }
 
-async function placeSerum3TradeAndCancelIt(userKeypair: string) {
-  const result = await buildUserClient(userKeypair);
-  const client = result[0];
-  const group = result[1];
-  const user = result[2];
-
-  const mangoAccounts = await client.getMangoAccountsForOwner(
-    group,
-    user.publicKey,
-  );
-  if (!mangoAccounts) {
-    throw new Error(`MangoAccounts not found for user ${user.publicKey}`);
-  }
-
-  for (const mangoAccount of mangoAccounts) {
-    console.log(`...found MangoAccount ${mangoAccount.publicKey.toBase58()}`);
-    console.log(`...placing serum3 order`);
-    await client.serum3PlaceOrder(
-      group,
-      mangoAccount,
-      new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
-      Serum3Side.bid,
-      1,
-      1,
-      Serum3SelfTradeBehavior.decrementTake,
-      Serum3OrderType.limit,
-      Date.now(),
-      10,
-    );
-    console.log(`...current own orders on OB`);
-    let orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
-      client,
-      group,
-      new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
-    );
-    for (const order of orders) {
-      console.log(order);
-    }
-    console.log(`...cancelling serum3 orders`);
-    await client.serum3CancelAllOrders(
-      group,
-      mangoAccount,
-      new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
-      10,
-    );
-    console.log(`...current own orders on OB`);
-    orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
-      client,
-      group,
-      new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
-    );
-    for (const order of orders) {
-      console.log(order);
-    }
-  }
+try {
+  main();
+} catch (error) {
+  console.log(error);
 }
+
+////////////////////////////////////////////////////////////
+/// UNUSED /////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
 
 async function createAndPopulateAlt() {
   const result = await buildAdminClient();
   const client = result[0];
   const admin = result[1];
 
-  const group = await client.getGroupForCreator(admin.publicKey, 2);
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
 
   const connection = client.program.provider.connection;
 
@@ -618,40 +506,114 @@ async function createAndPopulateAlt() {
   }
 }
 
-async function main() {
-  try {
-    // await createGroup();
-  } catch (error) {
-    console.log(error);
-  }
-  try {
-    // await registerTokens();
-    // await unregisterTokens();
-  } catch (error) {
-    console.log(error);
-  }
-  try {
-    // await registerSerum3Markets();
-    // await unregisterSerum3Markets();
-  } catch (error) {
-    console.log(error);
-  }
-  try {
-    // await createUser(MB_USER_KEYPAIR!);
-    // await createUser(MB_USER2_KEYPAIR!);
-    // await expandMangoAccount(MB_USER_KEYPAIR!);
-    // await placeSerum3TradeAndCancelIt(MB_USER_KEYPAIR!);
-  } catch (error) {
-    console.log(error);
+async function expandMangoAccount(userKeypair: string) {
+  const result = await buildUserClient(userKeypair);
+  const client = result[0];
+  const group = result[1];
+  const user = result[2];
+
+  const mangoAccounts = await client.getMangoAccountsForOwner(
+    group,
+    user.publicKey,
+  );
+  if (!mangoAccounts) {
+    throw new Error(`MangoAccounts not found for user ${user.publicKey}`);
   }
 
-  try {
-    // await createAndPopulateAlt();
-  } catch (error) {}
+  for (const mangoAccount of mangoAccounts) {
+    console.log(
+      `...expanding MangoAccount ${mangoAccount.publicKey.toBase58()}`,
+    );
+    await client.expandMangoAccount(group, mangoAccount, 8, 8, 8, 8);
+  }
 }
 
-try {
-  main();
-} catch (error) {
-  console.log(error);
+async function placeSerum3TradeAndCancelIt(userKeypair: string) {
+  const result = await buildUserClient(userKeypair);
+  const client = result[0];
+  const group = result[1];
+  const user = result[2];
+
+  const mangoAccounts = await client.getMangoAccountsForOwner(
+    group,
+    user.publicKey,
+  );
+  if (!mangoAccounts) {
+    throw new Error(`MangoAccounts not found for user ${user.publicKey}`);
+  }
+
+  for (const mangoAccount of mangoAccounts) {
+    console.log(`...found MangoAccount ${mangoAccount.publicKey.toBase58()}`);
+    console.log(`...placing serum3 order`);
+    await client.serum3PlaceOrder(
+      group,
+      mangoAccount,
+      new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
+      Serum3Side.bid,
+      1,
+      1,
+      Serum3SelfTradeBehavior.decrementTake,
+      Serum3OrderType.limit,
+      Date.now(),
+      10,
+    );
+    console.log(`...current own orders on OB`);
+    let orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
+      client,
+      group,
+      new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
+    );
+    for (const order of orders) {
+      console.log(order);
+    }
+    console.log(`...cancelling serum3 orders`);
+    await client.serum3CancelAllOrders(
+      group,
+      mangoAccount,
+      new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
+      10,
+    );
+    console.log(`...current own orders on OB`);
+    orders = await mangoAccount.loadSerum3OpenOrdersForMarket(
+      client,
+      group,
+      new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
+    );
+    for (const order of orders) {
+      console.log(order);
+    }
+  }
+}
+
+async function deregisterSerum3Markets() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+
+  // change xxx/xxx to market of choice
+  let serum3Market = group.getSerum3MarketByName('XXX/XXX');
+  let sig = await client.serum3deregisterMarket(
+    group,
+    serum3Market.serumMarketExternal,
+  );
+  console.log(
+    `...deregistered serum market ${serum3Market.name}, sig https://explorer.solana.com/tx/${sig}`,
+  );
+}
+
+async function deregisterTokens() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+
+  // change -1 to tokenIndex of choice
+  let bank = group.getFirstBankByTokenIndex(-1 as TokenIndex);
+  let sig = await client.tokenDeregister(group, bank.mint);
+  console.log(
+    `...removed token ${bank.name}, sig https://explorer.solana.com/tx/${sig}`,
+  );
 }
