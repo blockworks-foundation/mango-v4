@@ -1,4 +1,5 @@
 import { AnchorProvider } from '@project-serum/anchor';
+import NodeWallet from '@project-serum/anchor/dist/cjs/nodewallet';
 import {
   AddressLookupTableAccount,
   MessageV0,
@@ -31,12 +32,16 @@ export async function sendTransaction(
     vtx.sign([...opts?.additionalSigners]);
   }
 
-  if (typeof payer.signTransaction === 'function') {
+  if (
+    typeof payer.signTransaction === 'function' &&
+    !(payer instanceof NodeWallet)
+  ) {
     vtx = (await payer.signTransaction(
       vtx as any,
     )) as unknown as VersionedTransaction;
   } else {
-    vtx.sign([((provider as AnchorProvider).wallet as any).payer as Signer]);
+    // Maybe this path is only correct for NodeWallet?
+    vtx.sign([(payer as any).payer as Signer]);
   }
 
   const signature = await connection.sendRawTransaction(vtx.serialize(), {
