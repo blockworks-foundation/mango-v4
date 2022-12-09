@@ -1120,14 +1120,15 @@ impl MangoClient {
     ) -> anyhow::Result<jupiter::QueryRoute> {
         let quote = self
             .http_client
-            .get("https://quote-api.jup.ag/v1/quote")
+            .get("https://quote-api.jup.ag/v3/quote")
             .query(&[
                 ("inputMint", input_mint.to_string()),
                 ("outputMint", output_mint.to_string()),
                 ("amount", format!("{}", amount)),
                 ("onlyDirectRoutes", "true".into()),
+                ("enforceSingleTx", "true".into()),
                 ("filterTopNResult", "10".into()),
-                ("slippage", format!("{}", slippage)),
+                ("slippageBps", format!("{}", slippage)),
                 (
                     "swapMode",
                     match swap_mode {
@@ -1180,7 +1181,7 @@ impl MangoClient {
 
         let swap = self
             .http_client
-            .post("https://quote-api.jup.ag/v1/swap")
+            .post("https://quote-api.jup.ag/v3/swap")
             .json(&jupiter::SwapRequest {
                 route: route.clone(),
                 user_public_key: self.owner.pubkey().to_string(),
@@ -1248,7 +1249,7 @@ impl MangoClient {
             match swap_mode {
                 JupiterSwapMode::ExactIn => amount,
                 // in amount + slippage
-                JupiterSwapMode::ExactOut => route.other_amount_threshold,
+                JupiterSwapMode::ExactOut => u64::from_str(&route.other_amount_threshold).unwrap(),
             },
             0u64,
         ];
