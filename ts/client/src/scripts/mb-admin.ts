@@ -44,12 +44,26 @@ const MAINNET_SERUM3_MARKETS = new Map([
   ['SOL/USDC', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'],
 ]);
 
+const { MB_CLUSTER_URL, MB_PAYER_KEYPAIR, MB_USER_KEYPAIR, MB_USER4_KEYPAIR } =
+  process.env;
+
 const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
 const NET_BORROWS_WINDOW_SIZE_TS = 24 * 60 * 60;
 const NET_BORROW_LIMIT_PER_WINDOW_QUOTE = toNative(1000000, 6).toNumber();
 
-const { MB_CLUSTER_URL, MB_PAYER_KEYPAIR, MB_USER_KEYPAIR, MB_USER4_KEYPAIR } =
-  process.env;
+const defaultOracleConfig = {
+  confFilter: 0.1,
+  maxStalenessSlots: null,
+};
+// hoping that dynamic rate parameter adjustment would be enough to tune their rates to the markets needs
+const defaultInterestRate = {
+  adjustmentFactor: 0.004, // rate parameters are chosen to be the same for all high asset weight tokens,
+  util0: 0.7,
+  rate0: 0.1,
+  util1: 0.85,
+  rate1: 0.2,
+  maxRate: 2.0,
+};
 
 async function buildAdminClient(): Promise<[MangoClient, Keypair]> {
   const admin = Keypair.fromSecretKey(
@@ -119,20 +133,6 @@ async function registerTokens() {
   const admin = result[1];
 
   const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
-
-  const defaultOracleConfig = {
-    confFilter: 0.1,
-    maxStalenessSlots: null,
-  };
-  // hoping that dynamic rate parameter adjustment would be enough to tune their rates to the markets needs
-  const defaultInterestRate = {
-    adjustmentFactor: 0.004, // rate parameters are chosen to be the same for all high asset weight tokens,
-    util0: 0.7,
-    rate0: 0.1,
-    util1: 0.85,
-    rate1: 0.2,
-    maxRate: 2.0,
-  };
 
   console.log(`Creating USDC stub oracle...`);
   const usdcMainnetMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
@@ -349,6 +349,74 @@ async function createUser(userKeypair: string) {
   console.log(`...deposited 1 SOL`);
 }
 
+async function registerPerpMarket() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+
+  await client.perpCreateMarket(
+    group,
+    new PublicKey(MAINNET_ORACLES.get('BTC')!),
+    0,
+    'BTC-PERP',
+    defaultOracleConfig,
+    6,
+    10, // 0.1$ is the min tick
+    100, // if btc price is 20k, one base lot would be 2$
+    0.975,
+    0.95,
+    1.025,
+    1.05,
+    0.0125,
+    -0.0001,
+    0.0004,
+    5, // note: quote native
+    -0.05,
+    0.05,
+    100, // if btc is at 20k, this is 200$
+    true,
+    true,
+    1000, // solana tx fee is currently 50 native quote at a sol price of 10$
+    1000000,
+    0.01, // less than liquidationFee
+    0,
+    1.0,
+    2 * 60 * 60,
+  );
+
+  await client.perpCreateMarket(
+    group,
+    new PublicKey(MAINNET_ORACLES.get('MNGO')!),
+    1,
+    'MNGO-PERP',
+    defaultOracleConfig,
+    6,
+    100, // 0.0001$ is the min tick
+    1000000, // if mngo price is 1 cent, one base lot would be 1 cent
+    0.995,
+    0.99, // 100x leverage
+    1.005,
+    1.01,
+    0.0025,
+    -0.0001,
+    0.0004,
+    5,
+    -0.05,
+    0.05,
+    1000, // if mngo price 1 cent, this is 10$
+    false,
+    false,
+    1000,
+    1000000,
+    0.001, // less than liquidationFee
+    0,
+    1.0,
+    2 * 60 * 60,
+  );
+}
+
 async function main() {
   try {
     // await createGroup();
@@ -365,9 +433,15 @@ async function main() {
   } catch (error) {
     console.log(error);
   }
+
   try {
-    await createUser(MB_USER_KEYPAIR!);
-    await createUser(MB_USER4_KEYPAIR!);
+    await registerPerpMarket();
+  } catch (error) {
+    console.log(error);
+  }
+  try {
+    // await createUser(MB_USER_KEYPAIR!);
+    // await createUser(MB_USER4_KEYPAIR!);
   } catch (error) {
     console.log(error);
   }
