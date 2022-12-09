@@ -233,6 +233,7 @@ impl<'a> LiquidateHelper<'a> {
                     return None;
                 }
                 let pnl = pp.quote_position_native();
+                log::info!("{} {perp_settle_health} {pnl}", pp.market_index);
                 let settleable_pnl = if pnl > 0 {
                     pnl
                 } else if pnl < 0 && perp_settle_health > 0 {
@@ -270,7 +271,8 @@ impl<'a> LiquidateHelper<'a> {
             self.pubkey);
                 continue;
             }
-            let (counter_key, counter_acc, _) = counters.first().unwrap();
+            let (counter_key, counter_acc, counter_pnl) = counters.first().unwrap();
+            log::info!("Trying to settle perp pnl account: {} market_index: {perp_index} amount: {pnl} against {counter_key} with pnl: {counter_pnl}", self.pubkey);
 
             let (account_a, account_b) = if pnl > 0 {
                 ((self.pubkey, self.liqee), (counter_key, counter_acc))

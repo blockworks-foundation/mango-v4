@@ -313,8 +313,8 @@ async function main() {
       group,
       mangoAccount,
       collateralMint,
-      new BN(100000),
-    ); // valued as $0.004 maint collateral
+      new BN(300000),
+    ); // valued as 0.0003 SOL, $0.0045 maint collateral
     await mangoAccount.reload(client);
 
     await setBankPrice(collateralBank, PRICES['SOL'] * 4);
@@ -326,8 +326,8 @@ async function main() {
         group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
         PerpOrderSide.bid,
         1, // ui price that won't get hit
-        0.0011, // ui base quantity, 11 base lots, $0.044
-        0.044, // ui quote quantity
+        0.0011, // ui base quantity, 11 base lots, 1.1 MNGO, $0.022
+        0.022, // ui quote quantity
         4200,
         PerpOrderType.limit,
         false,
@@ -356,8 +356,8 @@ async function main() {
       group,
       mangoAccount,
       collateralMint,
-      new BN(100000),
-    ); // valued as $0.004 maint collateral
+      new BN(300000),
+    ); // valued as 0.0003 SOL, $0.0045 maint collateral
     await mangoAccount.reload(client);
 
     await setBankPrice(collateralBank, PRICES['SOL'] * 5);
@@ -369,8 +369,8 @@ async function main() {
         group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
         PerpOrderSide.ask,
         40,
-        0.0011, // ui base quantity, 11 base lots, $0.044
-        0.044, // ui quote quantity
+        0.0011, // ui base quantity, 11 base lots, $0.022
+        0.022, // ui quote quantity
         4200,
         PerpOrderType.limit,
         false,
@@ -384,8 +384,8 @@ async function main() {
         group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
         PerpOrderSide.bid,
         40,
-        0.0011, // ui base quantity, 11 base lots, $0.044
-        0.044, // ui quote quantity
+        0.0011, // ui base quantity, 11 base lots, $0.022
+        0.022, // ui quote quantity
         4200,
         PerpOrderType.market,
         false,
@@ -421,8 +421,8 @@ async function main() {
       group,
       mangoAccount,
       collateralMint,
-      new BN(100000),
-    ); // valued as $0.004 maint collateral
+      new BN(300000),
+    ); // valued as $0.0045 maint collateral
     await mangoAccount.reload(client);
 
     try {
@@ -438,7 +438,7 @@ async function main() {
       );
       await mangoAccount.reload(client);
 
-      // Execute two trades that leave the account with +$0.022 positive pnl
+      // Execute two trades that leave the account with +$0.011 positive pnl
       await setPerpPrice(perpMarket, PRICES['MNGO'] / 2);
       await client.perpPlaceOrder(
         group,
@@ -446,8 +446,8 @@ async function main() {
         group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
         PerpOrderSide.ask,
         20,
-        0.0011, // ui base quantity, 11 base lots, $0.022
-        0.022, // ui quote quantity
+        0.0011, // ui base quantity, 11 base lots, $0.011
+        0.011, // ui quote quantity
         4200,
         PerpOrderType.limit,
         false,
@@ -460,8 +460,8 @@ async function main() {
         group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
         PerpOrderSide.bid,
         20,
-        0.0011, // ui base quantity, 11 base lots, $0.022
-        0.022, // ui quote quantity
+        0.0011, // ui base quantity, 11 base lots, $0.011
+        0.011, // ui quote quantity
         4200,
         PerpOrderType.market,
         false,
@@ -481,8 +481,8 @@ async function main() {
         group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
         PerpOrderSide.bid,
         40,
-        0.0011, // ui base quantity, 11 base lots, $0.044
-        0.044, // ui quote quantity
+        0.0011, // ui base quantity, 11 base lots, $0.022
+        0.022, // ui quote quantity
         4201,
         PerpOrderType.limit,
         false,
@@ -495,8 +495,8 @@ async function main() {
         group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
         PerpOrderSide.ask,
         40,
-        0.0011, // ui base quantity, 11 base lots, $0.044
-        0.044, // ui quote quantity
+        0.0011, // ui base quantity, 11 base lots, $0.022
+        0.022, // ui quote quantity
         4201,
         PerpOrderType.market,
         false,
