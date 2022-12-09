@@ -349,7 +349,7 @@ async function createUser(userKeypair: string) {
   console.log(`...deposited 1 SOL`);
 }
 
-async function registerPerpMarket() {
+async function registerPerpMarkets() {
   const result = await buildAdminClient();
   const client = result[0];
   const admin = result[1];
@@ -435,7 +435,7 @@ async function main() {
   }
 
   try {
-    await registerPerpMarket();
+    // await registerPerpMarkets();
   } catch (error) {
     console.log(error);
   }
