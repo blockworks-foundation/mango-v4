@@ -4,11 +4,7 @@ import {
   initializeAccount,
   WRAPPED_SOL_MINT,
 } from '@project-serum/serum/lib/token-instructions';
-import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  createAssociatedTokenAccountInstruction,
-  TOKEN_PROGRAM_ID,
-} from '@solana/spl-token';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import {
   AccountMeta,
   Cluster,
@@ -19,7 +15,6 @@ import {
   SystemProgram,
   SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
-  Transaction,
   TransactionInstruction,
   TransactionSignature,
 } from '@solana/web3.js';
@@ -365,22 +360,18 @@ export class MangoClient {
     const ai = await this.program.provider.connection.getAccountInfo(
       dustVaultPk,
     );
+    const preInstructions: TransactionInstruction[] = [];
     if (!ai) {
-      const tx = new Transaction();
-      tx.add(
-        createAssociatedTokenAccountInstruction(
-          ASSOCIATED_TOKEN_PROGRAM_ID,
-          TOKEN_PROGRAM_ID,
+      preInstructions.push(
+        await createAssociatedTokenAccountIdempotentInstruction(
+          adminPk,
+          adminPk,
           bank.mint,
-          dustVaultPk,
-          adminPk,
-          adminPk,
         ),
       );
-      await (this.program.provider as AnchorProvider).sendAndConfirm(tx);
     }
 
-    return await this.program.methods
+    const ix = await this.program.methods
       .tokenDeregister()
       .accounts({
         group: group.publicKey,
@@ -397,7 +388,19 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: true, isSigner: false } as AccountMeta),
         ),
       )
-      .rpc();
+      .instruction();
+
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      [
+        ...preInstructions,
+        ix,
+      ],
+      group.addressLookupTablesList,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
   }
 
   public async getBanksForGroup(group: Group): Promise<Bank[]> {

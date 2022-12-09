@@ -46,14 +46,6 @@ async function main() {
 
     let sig;
 
-    // close all banks
-    for (const banks of group.banksMapByMint.values()) {
-      sig = await client.tokenDeregister(group, banks[0].mint);
-      console.log(
-        `Removed token ${banks[0].name}, sig https://explorer.solana.com/tx/${sig}`,
-      );
-    }
-
     // deregister all serum markets
     for (const market of group.serum3MarketsMapByExternal.values()) {
       sig = await client.serum3deregisterMarket(
@@ -70,6 +62,15 @@ async function main() {
       sig = await client.perpCloseMarket(group, market.perpMarketIndex);
       console.log(
         `Closed perp market ${market.name}, sig https://explorer.solana.com/tx/${sig}`,
+      );
+    }
+
+    // close all banks
+    for (const banks of group.banksMapByMint.values()) {
+      console.log(banks[0].toString());
+      sig = await client.tokenDeregister(group, banks[0].mint);
+      console.log(
+        `Removed token ${banks[0].name}, sig https://explorer.solana.com/tx/${sig}`,
       );
     }
 
