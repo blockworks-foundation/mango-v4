@@ -299,9 +299,9 @@ export class PerpMarket {
     res += `  ${this.name} OrderBook`;
     let orders = await this?.loadAsks(client);
     for (const order of orders!.items()) {
-      res += `\n  ${order.clientId.toString()}  ${order.uiPrice
-        .toFixed(5)
-        .padStart(10)}, ${order.uiSize.toString().padStart(10)} ${
+      res += `\n ${order.uiPrice.toFixed(5).padStart(10)}, ${order.uiSize
+        .toString()
+        .padStart(10)} ${
         order.isOraclePegged && order.oraclePeggedProperties
           ? order.oraclePeggedProperties.pegLimit.toNumber() + ' (PegLimit)'
           : ''
@@ -310,9 +310,9 @@ export class PerpMarket {
     res += `\n  asks ↑ --------- ↓ bids`;
     orders = await this?.loadBids(client);
     for (const order of orders!.items()) {
-      res += `\n  ${order.clientId.toString()} ${order.uiPrice
-        .toFixed(5)
-        .padStart(10)}, ${order.uiSize.toString().padStart(10)} ${
+      res += `\n  ${order.uiPrice.toFixed(5).padStart(10)}, ${order.uiSize
+        .toString()
+        .padStart(10)} ${
         order.isOraclePegged && order.oraclePeggedProperties
           ? order.oraclePeggedProperties.pegLimit.toNumber() + ' (PegLimit)'
           : ''
@@ -508,7 +508,7 @@ export class BookSide {
     bookSideType: BookSideType,
     obj: {
       roots: OrderTreeRoot[];
-      orderTree: OrderTreeNodes;
+      nodes: OrderTreeNodes;
     },
   ): BookSide {
     return new BookSide(
@@ -517,7 +517,7 @@ export class BookSide {
       bookSideType,
       obj.roots[0],
       obj.roots[1],
-      obj.orderTree,
+      obj.nodes,
     );
   }
 
@@ -527,14 +527,14 @@ export class BookSide {
     public type: BookSideType,
     public rootFixed: OrderTreeRoot,
     public rootOraclePegged: OrderTreeRoot,
-    public orderTree: OrderTreeNodes,
+    public orderTreeNodes: OrderTreeNodes,
     maxBookDelay?: number,
   ) {
     // Determine the maxTimestamp found on the book to use for tif
     // If maxBookDelay is not provided, use 3600 as a very large number
     maxBookDelay = maxBookDelay === undefined ? 3600 : maxBookDelay;
     let maxTimestamp = new BN(new Date().getTime() / 1000 - maxBookDelay);
-    for (const node of this.orderTree.nodes) {
+    for (const node of this.orderTreeNodes.nodes) {
       if (node.tag !== BookSide.LEAF_NODE_TAG) {
         continue;
       }
@@ -629,7 +629,7 @@ export class BookSide {
 
     while (stack.length > 0) {
       const index = stack.pop()!;
-      const node = this.orderTree.nodes[index];
+      const node = this.orderTreeNodes.nodes[index];
       if (node.tag === BookSide.INNER_NODE_TAG) {
         const innerNode = BookSide.toInnerNode(this.client, node.data);
         stack.push(innerNode.children[right], innerNode.children[left]);
@@ -659,7 +659,7 @@ export class BookSide {
 
     while (stack.length > 0) {
       const index = stack.pop()!;
-      const node = this.orderTree.nodes[index];
+      const node = this.orderTreeNodes.nodes[index];
       if (node.tag === BookSide.INNER_NODE_TAG) {
         const innerNode = BookSide.toInnerNode(this.client, node.data);
         stack.push(innerNode.children[right], innerNode.children[left]);
@@ -754,7 +754,6 @@ export class LeafNode {
     key: BN;
     owner: PublicKey;
     quantity: BN;
-    clientOrderId: BN;
     timestamp: BN;
     pegLimit: BN;
   }): LeafNode {
@@ -765,7 +764,6 @@ export class LeafNode {
       obj.key,
       obj.owner,
       obj.quantity,
-      obj.clientOrderId,
       obj.timestamp,
       obj.pegLimit,
     );
@@ -778,7 +776,6 @@ export class LeafNode {
     public key: BN,
     public owner: PublicKey,
     public quantity: BN,
-    public clientOrderId: BN,
     public timestamp: BN,
     public pegLimit: BN,
   ) {}
@@ -843,7 +840,6 @@ export class PerpOrder {
         ? new BN('18446744073709551615').sub(leafNode.key.maskn(64))
         : leafNode.key.maskn(64),
       leafNode.key,
-      leafNode.clientOrderId,
       leafNode.owner,
       leafNode.ownerSlot,
       0,
@@ -864,7 +860,6 @@ export class PerpOrder {
   constructor(
     public seqNum: BN,
     public orderId: BN,
-    public clientId: BN,
     public owner: PublicKey,
     public openOrdersSlot: number,
     public feeTier: 0,

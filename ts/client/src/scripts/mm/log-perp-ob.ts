@@ -42,10 +42,16 @@ async function main() {
     await new Promise((r) => setTimeout(r, 2000));
     console.clear();
     await group.reloadAll(client);
-    const perpMarket = group.getPerpMarketByName('BTC-PERP');
-    console.log(`  perpMarket.uiPrice ${perpMarket.uiPrice}`);
+    const btcPerpMarket = group.getPerpMarketByName('BTC-PERP');
+    console.log(`  perpMarket.uiPrice ${btcPerpMarket.uiPrice}`);
     console.log(``);
-    console.log(await perpMarket.logOb(client));
+    console.log(await btcPerpMarket.logOb(client));
+    console.log(``);
+
+    const mngoPerpMarket = group.getPerpMarketByName('MNGO-PERP');
+    console.log(`  perpMarket.uiPrice ${mngoPerpMarket.uiPrice}`);
+    console.log(``);
+    console.log(await mngoPerpMarket.logOb(client));
     console.log(``);
   }
 }

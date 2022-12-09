@@ -8,6 +8,7 @@ import {
 } from '@solana/web3.js';
 import Binance from 'binance-api-node';
 import fs from 'fs';
+import { Kraken } from 'node-kraken-api';
 import path from 'path';
 import { Group } from '../../accounts/group';
 import { MangoAccount } from '../../accounts/mangoAccount';
@@ -68,8 +69,11 @@ type MarketContext = {
   asks: BookSide;
   lastBookUpdate: number;
 
-  binanceBid: number | undefined;
-  binanceAsk: number | undefined;
+  krakenBid: number | undefined;
+  krakenAsk: number | undefined;
+
+  // binanceBid: number | undefined;
+  // binanceAsk: number | undefined;
 
   sequenceAccount: PublicKey;
   sequenceAccountBump: number;
@@ -80,6 +84,7 @@ type MarketContext = {
 };
 
 const binanceClient = Binance();
+const krakenClient = new Kraken();
 
 function getPerpMarketAssetsToTradeOn(group: Group) {
   const allMangoGroupPerpMarketAssets = Array.from(
@@ -102,10 +107,14 @@ async function refreshState(
   const result = await Promise.all([
     group.reloadAll(client),
     mangoAccount.reload(client),
-    ...Array.from(marketContexts.values()).map((mc) =>
-      binanceClient.book({
-        symbol: mc.perpMarket.name.replace('-PERP', 'USDT'),
-      }),
+    ...Array.from(marketContexts.values()).map(
+      (mc) =>
+        krakenClient.depth({
+          pair: mc.params.krakenCode,
+        }),
+      // binanceClient.book({
+      //   symbol: mc.perpMarket.name.replace('-PERP', 'USDT'),
+      // }),
     ),
   ]);
 
@@ -118,8 +127,12 @@ async function refreshState(
     mc.asks = await perpMarket.loadAsks(client, true);
     mc.lastBookUpdate = ts;
 
-    mc.binanceAsk = parseFloat((result[i + 2] as any).asks[0].price);
-    mc.binanceBid = parseFloat((result[i + 2] as any).bids[0].price);
+    mc.krakenAsk = parseFloat(
+      (result[i + 2] as any)[mc.params.krakenCode].asks[0][0],
+    );
+    mc.krakenBid = parseFloat(
+      (result[i + 2] as any)[mc.params.krakenCode].bids[0][0],
+    );
   });
 
   return {
@@ -284,8 +297,8 @@ async function fullMarketMaker() {
       sentAskPrice: 0,
       lastOrderUpdate: 0,
 
-      binanceBid: undefined,
-      binanceAsk: undefined,
+      krakenBid: undefined,
+      krakenAsk: undefined,
     });
   }
 
@@ -322,7 +335,7 @@ async function fullMarketMaker() {
         const pos = mangoAccount.perpPositionExistsForMarket(mc.perpMarket)
           ? mangoAccount.getPerpPositionUi(group, mc.perpMarket.perpMarketIndex)
           : 0;
-        const mid = (mc.binanceBid! + mc.binanceAsk!) / 2;
+        const mid = (mc.krakenBid! + mc.krakenAsk!) / 2;
         if (mid) {
           pfQuoteValue += pos * mid;
         } else {
@@ -387,8 +400,8 @@ async function makeMarketUpdateInstructions(
   const perpMarketIndex = mc.perpMarket.perpMarketIndex;
   const perpMarket = mc.perpMarket;
 
-  const aggBid = mc.binanceBid;
-  const aggAsk = mc.binanceAsk;
+  const aggBid = mc.krakenBid;
+  const aggAsk = mc.krakenAsk;
   if (aggBid === undefined || aggAsk === undefined) {
     console.log(`No Aggregate Book for ${mc.perpMarket.name}!`);
     return [];
@@ -622,6 +635,10 @@ async function makeMarketUpdateInstructions(
         expiryTimestamp,
         20,
       );
+
+      // console.log(
+      //   `basePos ${basePos}, posAsTradeSizes ${posAsTradeSizes}, size ${size}`,
+      // );
 
       const posAsTradeSizes = basePos / size;
 

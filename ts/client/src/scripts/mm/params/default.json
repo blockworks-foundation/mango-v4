@@ -10,7 +10,19 @@
         "bias": 0.0,
         "requoteThresh": 0.0002,
         "takeSpammers": true,
-        "spammerCharge": 2
+        "spammerCharge": 2,
+        "krakenCode": "XXBTZUSD"
+      }
+    },
+    "MNGO": {
+      "perp": {
+        "sizePerc": 0.05,
+        "leanCoeff": 0.00025,
+        "bias": 0.0,
+        "requoteThresh": 0.0002,
+        "takeSpammers": true,
+        "spammerCharge": 2,
+        "krakenCode": "MNGOUSD"
       }
     }
   }

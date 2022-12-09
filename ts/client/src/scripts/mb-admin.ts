@@ -316,6 +316,7 @@ async function registerSerum3Markets() {
     'SOL/USDC',
   );
 }
+
 async function createUser(userKeypair: string) {
   const result = await buildUserClient(userKeypair);
   const client = result[0];
@@ -329,24 +330,28 @@ async function createUser(userKeypair: string) {
   }
 
   console.log(`...created MangoAccount ${mangoAccount.publicKey.toBase58()}`);
+}
+
+async function depositForUser(userKeypair: string) {
+  const result = await buildUserClient(userKeypair);
+  const client = result[0];
+  const group = result[1];
+  const user = result[2];
+
+  const mangoAccount = await client.getMangoAccountForOwner(
+    group,
+    user.publicKey,
+    0,
+  )!;
 
   await client.tokenDeposit(
     group,
-    mangoAccount,
+    mangoAccount!,
     new PublicKey(MAINNET_MINTS.get('USDC')!),
     10,
   );
-  await mangoAccount.reload(client);
+  await mangoAccount!.reload(client);
   console.log(`...deposited 10 USDC`);
-
-  await client.tokenDeposit(
-    group,
-    mangoAccount,
-    new PublicKey(MAINNET_MINTS.get('SOL')!),
-    1,
-  );
-  await mangoAccount.reload(client);
-  console.log(`...deposited 1 SOL`);
 }
 
 async function registerPerpMarkets() {
@@ -441,7 +446,7 @@ async function main() {
   }
   try {
     // await createUser(MB_USER_KEYPAIR!);
-    // await createUser(MB_USER4_KEYPAIR!);
+    // depositForUser(MB_USER_KEYPAIR!);
   } catch (error) {
     console.log(error);
   }

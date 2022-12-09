@@ -3855,6 +3855,17 @@ export type MangoV4 = {
           },
           {
             "name": "beingLiquidated",
+            "docs": [
+              "Tracks that this account should be liquidated until init_health >= 0.",
+              "",
+              "Normally accounts can not be liquidated while maint_health >= 0. But when an account",
+              "reaches maint_health < 0, liquidators will call a liquidation instruction and thereby",
+              "set this flag. Now the account may be liquidated until init_health >= 0.",
+              "",
+              "Many actions should be disabled while the account is being liquidated, even if",
+              "its maint health has recovered to positive. Creating new open orders would, for example,",
+              "confuse liquidators."
+            ],
             "type": "u8"
           },
           {
@@ -5746,6 +5757,19 @@ export type MangoV4 = {
     },
     {
       "name": "StablePriceModel",
+      "docs": [
+        "Maintains a \"stable_price\" based on the oracle price.",
+        "",
+        "The stable price follows the oracle price, but its relative rate of",
+        "change is limited (to `stable_growth_limit`) and futher reduced if",
+        "the oracle price is far from the `delay_price`.",
+        "",
+        "Conceptually the `delay_price` is itself a time delayed",
+        "(`24 * delay_interval_seconds`, assume 24h) and relative rate of change limited",
+        "function of the oracle price. It is implemented as averaging the oracle",
+        "price over every `delay_interval_seconds` (assume 1h) and then applying the",
+        "`delay_growth_limit` between intervals."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -5762,6 +5786,13 @@ export type MangoV4 = {
           },
           {
             "name": "delayPrices",
+            "docs": [
+              "Stored delay_price for each delay_interval.",
+              "If we want the delay_price to be 24h delayed, we would store one for each hour.",
+              "This is used in a cyclical way: We use the maximally-delayed value at delay_interval_index",
+              "and once enough time passes to move to the next delay interval, that gets overwritten and",
+              "we use the next one."
+            ],
             "type": {
               "array": [
                 "f64",
@@ -5771,26 +5802,46 @@ export type MangoV4 = {
           },
           {
             "name": "delayAccumulatorPrice",
+            "docs": [
+              "The delay price is based on an average over each delay_interval. The contributions",
+              "to the average are summed up here."
+            ],
             "type": "f64"
           },
           {
             "name": "delayAccumulatorTime",
+            "docs": [
+              "Accumulating the total time for the above average."
+            ],
             "type": "u32"
           },
           {
             "name": "delayIntervalSeconds",
+            "docs": [
+              "Length of a delay_interval"
+            ],
             "type": "u32"
           },
           {
             "name": "delayGrowthLimit",
+            "docs": [
+              "Maximal relative difference between two delay_price in consecutive intervals."
+            ],
             "type": "f32"
           },
           {
             "name": "stableGrowthLimit",
+            "docs": [
+              "Maximal per-second relative difference of the stable price.",
+              "It gets further reduced if stable and delay price disagree."
+            ],
             "type": "f32"
           },
           {
             "name": "lastDelayIntervalIndex",
+            "docs": [
+              "The delay_interval_index that update() was last called on."
+            ],
             "type": "u8"
           },
           {
@@ -5978,20 +6029,6 @@ export type MangoV4 = {
           },
           {
             "name": "TokenWithdraw"
-          }
-        ]
-      }
-    },
-    {
-      "name": "HealthType",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Init"
-          },
-          {
-            "name": "Maint"
           }
         ]
       }
@@ -6589,6 +6626,11 @@ export type MangoV4 = {
           "name": "openInterest",
           "type": "i64",
           "index": false
+        },
+        {
+          "name": "instantaneousFundingRate",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -6647,6 +6689,16 @@ export type MangoV4 = {
         },
         {
           "name": "totalDeposits",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "borrowRate",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "depositRate",
           "type": "i128",
           "index": false
         }
@@ -11206,6 +11258,17 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "beingLiquidated",
+            "docs": [
+              "Tracks that this account should be liquidated until init_health >= 0.",
+              "",
+              "Normally accounts can not be liquidated while maint_health >= 0. But when an account",
+              "reaches maint_health < 0, liquidators will call a liquidation instruction and thereby",
+              "set this flag. Now the account may be liquidated until init_health >= 0.",
+              "",
+              "Many actions should be disabled while the account is being liquidated, even if",
+              "its maint health has recovered to positive. Creating new open orders would, for example,",
+              "confuse liquidators."
+            ],
             "type": "u8"
           },
           {
@@ -13097,6 +13160,19 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "StablePriceModel",
+      "docs": [
+        "Maintains a \"stable_price\" based on the oracle price.",
+        "",
+        "The stable price follows the oracle price, but its relative rate of",
+        "change is limited (to `stable_growth_limit`) and futher reduced if",
+        "the oracle price is far from the `delay_price`.",
+        "",
+        "Conceptually the `delay_price` is itself a time delayed",
+        "(`24 * delay_interval_seconds`, assume 24h) and relative rate of change limited",
+        "function of the oracle price. It is implemented as averaging the oracle",
+        "price over every `delay_interval_seconds` (assume 1h) and then applying the",
+        "`delay_growth_limit` between intervals."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -13113,6 +13189,13 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "delayPrices",
+            "docs": [
+              "Stored delay_price for each delay_interval.",
+              "If we want the delay_price to be 24h delayed, we would store one for each hour.",
+              "This is used in a cyclical way: We use the maximally-delayed value at delay_interval_index",
+              "and once enough time passes to move to the next delay interval, that gets overwritten and",
+              "we use the next one."
+            ],
             "type": {
               "array": [
                 "f64",
@@ -13122,26 +13205,46 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "delayAccumulatorPrice",
+            "docs": [
+              "The delay price is based on an average over each delay_interval. The contributions",
+              "to the average are summed up here."
+            ],
             "type": "f64"
           },
           {
             "name": "delayAccumulatorTime",
+            "docs": [
+              "Accumulating the total time for the above average."
+            ],
             "type": "u32"
           },
           {
             "name": "delayIntervalSeconds",
+            "docs": [
+              "Length of a delay_interval"
+            ],
             "type": "u32"
           },
           {
             "name": "delayGrowthLimit",
+            "docs": [
+              "Maximal relative difference between two delay_price in consecutive intervals."
+            ],
             "type": "f32"
           },
           {
             "name": "stableGrowthLimit",
+            "docs": [
+              "Maximal per-second relative difference of the stable price.",
+              "It gets further reduced if stable and delay price disagree."
+            ],
             "type": "f32"
           },
           {
             "name": "lastDelayIntervalIndex",
+            "docs": [
+              "The delay_interval_index that update() was last called on."
+            ],
             "type": "u8"
           },
           {
@@ -13329,20 +13432,6 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "TokenWithdraw"
-          }
-        ]
-      }
-    },
-    {
-      "name": "HealthType",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Init"
-          },
-          {
-            "name": "Maint"
           }
         ]
       }
@@ -13940,6 +14029,11 @@ export const IDL: MangoV4 = {
           "name": "openInterest",
           "type": "i64",
           "index": false
+        },
+        {
+          "name": "instantaneousFundingRate",
+          "type": "i128",
+          "index": false
         }
       ]
     },
@@ -13998,6 +14092,16 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "totalDeposits",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "borrowRate",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "depositRate",
           "type": "i128",
           "index": false
         }
