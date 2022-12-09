@@ -434,8 +434,9 @@ impl PerpPosition {
         Ok(pnl)
     }
 
-    /// Side-effect: updates the windowing
-    pub fn update_and_get_used_settle_limit(&mut self, market: &PerpMarket, now_ts: u64) -> i64 {
+    /// Updates the perp pnl limit time windowing, resetting the amount
+    /// of used settle-pnl budget if necessary
+    pub fn update_settle_limit(&mut self, market: &PerpMarket, now_ts: u64) {
         assert_eq!(self.market_index, market.perp_market_index);
         let window_size = market.settle_pnl_limit_window_size_ts;
         let new_window = now_ts >= cm!((self.settle_pnl_limit_window + 1) as u64 * window_size);
@@ -443,7 +444,40 @@ impl PerpPosition {
             self.settle_pnl_limit_window = cm!(now_ts / window_size).try_into().unwrap();
             self.settle_pnl_limit_settled_in_current_window_native = 0;
         }
-        self.settle_pnl_limit_settled_in_current_window_native
+    }
+
+    /// Returns the quote-native amount of unrealized pnl that may still be settled.
+    /// Always >= 0.
+    pub fn available_settle_limit(&self, market: &PerpMarket) -> i64 {
+        assert_eq!(self.market_index, market.perp_market_index);
+        if market.settle_pnl_limit_factor < 0.0 {
+            return i64::MAX;
+        }
+
+        let position_value =
+            (self.avg_entry_price_per_base_lot * self.base_position_lots as f64).abs();
+        let max_allowed_in_window =
+            (market.settle_pnl_limit_factor as f64 * position_value).min(i64::MAX as f64) as i64;
+
+        (max_allowed_in_window - self.settle_pnl_limit_settled_in_current_window_native).max(0)
+    }
+
+    /// Given some pnl, applies the positive unrealized pnl settle limit and returns
+    /// the reduced pnl. Note that the result can have a different sign from `pnl`.
+    pub fn apply_pnl_settle_limit(&self, pnl: I80F48, market: &PerpMarket) -> I80F48 {
+        if market.settle_pnl_limit_factor < 0.0 {
+            return pnl;
+        }
+
+        let available_settle_limit = self.available_settle_limit(&market);
+        let realized_pnl = self.realized_pnl_native;
+        let unrealized_pnl = cm!(pnl - realized_pnl);
+
+        // The settle limit caps only positive unrealized pnl
+        let unrealized_pnl_capped_for_window =
+            unrealized_pnl.min(I80F48::from(available_settle_limit));
+
+        pnl.min(cm!(realized_pnl + unrealized_pnl_capped_for_window))
     }
 
     /// Update the perp position for pnl settlement
@@ -816,5 +850,37 @@ mod tests {
 
         pos.record_settle(I80F48::from(-10));
         assert_eq!(pos.realized_pnl_native, I80F48::from(0));
+    }
+
+    #[test]
+    fn test_perp_settle_limit() {
+        let market = PerpMarket::default_for_tests();
+
+        let mut pos = create_perp_position(&market, 100, -50);
+        pos.realized_pnl_native = I80F48::from(5);
+
+        let limited_pnl = |pos: &PerpPosition, pnl: i64| {
+            pos.apply_pnl_settle_limit(I80F48::from(pnl), &market)
+                .to_num::<f64>()
+        };
+
+        assert_eq!(pos.available_settle_limit(&market), 10); // 0.2 factor * 0.5 entry price * 100 lots
+        assert_eq!(limited_pnl(&pos, 100), 15.0);
+        assert_eq!(limited_pnl(&pos, -100), -100.0);
+
+        pos.settle_pnl_limit_settled_in_current_window_native = 2;
+        assert_eq!(pos.available_settle_limit(&market), 8);
+        assert_eq!(limited_pnl(&pos, 100), 13.0);
+        assert_eq!(limited_pnl(&pos, -100), -100.0);
+
+        pos.settle_pnl_limit_settled_in_current_window_native = 11;
+        assert_eq!(pos.available_settle_limit(&market), 0);
+        assert_eq!(limited_pnl(&pos, 100), 5.0);
+        assert_eq!(limited_pnl(&pos, -100), -100.0);
+
+        pos.realized_pnl_native = I80F48::from(-10);
+        pos.settle_pnl_limit_settled_in_current_window_native = 2;
+        assert_eq!(limited_pnl(&pos, 100), -2.0);
+        assert_eq!(limited_pnl(&pos, -100), -100.0);
     }
 }

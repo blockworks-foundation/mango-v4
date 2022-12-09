@@ -22,6 +22,12 @@ pub fn fetch_top(
     direction: Direction,
     count: usize,
 ) -> anyhow::Result<Vec<(Pubkey, MangoAccountValue, I80F48)>> {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let now_ts: u64 = SystemTime::now()
+        .duration_since(UNIX_EPOCH)?
+        .as_millis()
+        .try_into()?;
+
     let perp = context.perp(perp_market_index);
     let perp_market =
         account_fetcher_fetch_anchor_account::<PerpMarket>(account_fetcher, &perp.address)?;
@@ -47,14 +53,16 @@ pub fn fetch_top(
             if perp_pos.is_err() {
                 return None;
             }
-            let perp_pos = perp_pos.unwrap();
+            let mut perp_pos = perp_pos.unwrap().clone();
+            perp_pos.update_settle_limit(&perp_market, now_ts);
             let pnl = perp_pos.pnl_for_price(&perp_market, oracle_price).unwrap();
-            if pnl >= 0 && direction == Direction::MaxNegative
-                || pnl <= 0 && direction == Direction::MaxPositive
+            let limited_pnl = perp_pos.apply_pnl_settle_limit(pnl, &perp_market);
+            if limited_pnl >= 0 && direction == Direction::MaxNegative
+                || limited_pnl <= 0 && direction == Direction::MaxPositive
             {
                 return None;
             }
-            Some((*pk, mango_acc, pnl))
+            Some((*pk, mango_acc, limited_pnl))
         })
         .collect::<Vec<_>>();
 
