@@ -280,7 +280,7 @@ export class MangoClient {
   public async tokenEdit(
     group: Group,
     mintPk: PublicKey,
-    oracle: PublicKey, // TODO: do we need an extra param for resetting stable_price_model?
+    oracle: PublicKey | null,
     oracleConfig: OracleConfigParams | null,
     groupInsuranceFund: boolean | null,
     interestRateParams: InterestRateParams | null,
@@ -335,7 +335,7 @@ export class MangoClient {
       )
       .accounts({
         group: group.publicKey,
-        oracle,
+        oracle: oracle ?? bank.oracle,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         mintInfo: mintInfo.publicKey,
       })
@@ -392,10 +392,7 @@ export class MangoClient {
 
     return await sendTransaction(
       this.program.provider as AnchorProvider,
-      [
-        ...preInstructions,
-        ix,
-      ],
+      [...preInstructions, ix],
       group.addressLookupTablesList,
       {
         postSendTxCallback: this.postSendTxCallback,
@@ -1496,7 +1493,7 @@ export class MangoClient {
   public async perpEditMarket(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
-    oracle: PublicKey, // TODO: do we need an extra param for resetting stable_price_model
+    oracle: PublicKey | null, // TODO: stable price resetting should be a separate flag
     oracleConfig: OracleConfigParams | null,
     baseDecimals: number | null,
     maintAssetWeight: number | null,
@@ -1554,7 +1551,7 @@ export class MangoClient {
       )
       .accounts({
         group: group.publicKey,
-        oracle,
+        oracle: oracle ?? perpMarket.oracle,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         perpMarket: perpMarket.publicKey,
       })
