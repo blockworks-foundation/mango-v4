@@ -293,14 +293,18 @@ impl MangoGroupContext {
             .active_serum3_orders()
             .chain(account1.active_serum3_orders())
             .map(|&s| s.open_orders);
-        let perp_markets = account2
+        let perp_market_indexes = account2
             .active_perp_positions()
             .chain(account1.active_perp_positions())
-            .map(|&pa| self.perp_market_address(pa.market_index));
-        let perp_oracles = account2
-            .active_perp_positions()
-            .chain(account1.active_perp_positions())
-            .map(|&pa| self.perp(pa.market_index).market.oracle);
+            .map(|&pa| pa.market_index)
+            .unique()
+            .collect::<Vec<_>>();
+        let perp_markets = perp_market_indexes
+            .iter()
+            .map(|&index| self.perp_market_address(index));
+        let perp_oracles = perp_market_indexes
+            .iter()
+            .map(|&index| self.perp(index).market.oracle);
 
         let to_account_meta = |pubkey| AccountMeta {
             pubkey,
