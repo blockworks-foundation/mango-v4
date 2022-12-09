@@ -468,22 +468,18 @@ impl PerpPosition {
             return pnl;
         }
 
-        let available_settle_limit = self.available_settle_limit(&market);
+        let available_settle_limit = I80F48::from(self.available_settle_limit(&market));
         let realized_pnl = self.realized_pnl_native;
-        let unrealized_pnl = cm!(pnl - realized_pnl);
-
-        // The settle limit caps only positive unrealized pnl
-        let unrealized_pnl_capped_for_window =
-            unrealized_pnl.min(I80F48::from(available_settle_limit));
-
-        let limited_pnl = pnl.min(cm!(realized_pnl + unrealized_pnl_capped_for_window));
-
-        // Never change sign. Just because settling is impossible doesn't mean one may
-        // settle in the other direction.
-        if pnl >= 0 {
-            limited_pnl.max(I80F48::ZERO)
+        if realized_pnl < 0 {
+            // If realized pnl is negative, we just need to cap the total pnl to the
+            // settle limit if it ends up positive
+            pnl.min(available_settle_limit)
         } else {
-            limited_pnl.min(I80F48::ZERO)
+            // If realized is positive, apply the limit only to the unrealized part
+            let unrealized_pnl = cm!(pnl - realized_pnl);
+            let unrealized_pnl_capped_for_window =
+                unrealized_pnl.min(I80F48::from(available_settle_limit));
+            cm!(realized_pnl + unrealized_pnl_capped_for_window)
         }
     }
 
@@ -887,7 +883,20 @@ mod tests {
 
         pos.realized_pnl_native = I80F48::from(-10);
         pos.settle_pnl_limit_settled_in_current_window_native = 2;
-        assert_eq!(limited_pnl(&pos, 100), 0.0);
+        assert_eq!(limited_pnl(&pos, 100), 8.0);
         assert_eq!(limited_pnl(&pos, -100), -100.0);
+
+        pos.settle_pnl_limit_settled_in_current_window_native = -2;
+        assert_eq!(limited_pnl(&pos, 100), 12.0);
+        assert_eq!(limited_pnl(&pos, -100), -100.0);
+
+        pos.settle_pnl_limit_settled_in_current_window_native = 2;
+        pos.realized_pnl_native = I80F48::from(-100);
+        assert_eq!(limited_pnl(&pos, 10), 8.0);
+        assert_eq!(limited_pnl(&pos, -10), -10.0);
+
+        pos.realized_pnl_native = I80F48::from(100);
+        assert_eq!(limited_pnl(&pos, 10), 10.0);
+        assert_eq!(limited_pnl(&pos, -10), -10.0);
     }
 }
