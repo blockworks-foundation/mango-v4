@@ -462,8 +462,7 @@ impl PerpPosition {
         (max_allowed_in_window - self.settle_pnl_limit_settled_in_current_window_native).max(0)
     }
 
-    /// Given some pnl, applies the positive unrealized pnl settle limit and returns
-    /// the reduced pnl. Note that the result can have a different sign from `pnl`.
+    /// Given some pnl, applies the positive unrealized pnl settle limit and returns the reduced pnl.
     pub fn apply_pnl_settle_limit(&self, pnl: I80F48, market: &PerpMarket) -> I80F48 {
         if market.settle_pnl_limit_factor < 0.0 {
             return pnl;
@@ -477,7 +476,15 @@ impl PerpPosition {
         let unrealized_pnl_capped_for_window =
             unrealized_pnl.min(I80F48::from(available_settle_limit));
 
-        pnl.min(cm!(realized_pnl + unrealized_pnl_capped_for_window))
+        let limited_pnl = pnl.min(cm!(realized_pnl + unrealized_pnl_capped_for_window));
+
+        // Never change sign. Just because settling is impossible doesn't mean one may
+        // settle in the other direction.
+        if pnl >= 0 {
+            limited_pnl.max(I80F48::ZERO)
+        } else {
+            limited_pnl.min(I80F48::ZERO)
+        }
     }
 
     /// Update the perp position for pnl settlement
@@ -880,7 +887,7 @@ mod tests {
 
         pos.realized_pnl_native = I80F48::from(-10);
         pos.settle_pnl_limit_settled_in_current_window_native = 2;
-        assert_eq!(limited_pnl(&pos, 100), -2.0);
+        assert_eq!(limited_pnl(&pos, 100), 0.0);
         assert_eq!(limited_pnl(&pos, -100), -100.0);
     }
 }
