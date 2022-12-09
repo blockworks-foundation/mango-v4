@@ -1187,6 +1187,8 @@ export class MangoClient {
       }
     })();
 
+    const payerBank = group.getFirstBankByTokenIndex(payerTokenIndex);
+
     const ix = await this.program.methods
       .serum3PlaceOrder(
         side,
@@ -1214,8 +1216,9 @@ export class MangoClient {
         marketBaseVault: serum3MarketExternal.decoded.baseVault,
         marketQuoteVault: serum3MarketExternal.decoded.quoteVault,
         marketVaultSigner: serum3MarketExternalVaultSigner,
-        payerBank: group.getFirstBankByTokenIndex(payerTokenIndex).publicKey,
-        payerVault: group.getFirstBankByTokenIndex(payerTokenIndex).vault,
+        payerBank: payerBank.publicKey,
+        payerVault: payerBank.vault,
+        payerOracle: payerBank.oracle,
       })
       .remainingAccounts(
         healthRemainingAccounts.map(
