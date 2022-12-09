@@ -308,6 +308,7 @@ export class Bank implements BankForHealth {
   scaledInitAssetWeight(): I80F48 {
     const depositsQuote = this.nativeDeposits().mul(this.price);
     if (
+      this.depositWeightScaleStartQuote >= Number.MAX_SAFE_INTEGER ||
       depositsQuote.lte(I80F48.fromNumber(this.depositWeightScaleStartQuote))
     ) {
       return this.initAssetWeight;
@@ -319,7 +320,10 @@ export class Bank implements BankForHealth {
 
   scaledInitLiabWeight(): I80F48 {
     const borrowsQuote = this.nativeBorrows().mul(this.price);
-    if (borrowsQuote.lte(I80F48.fromNumber(this.borrowWeightScaleStartQuote))) {
+    if (
+      this.borrowWeightScaleStartQuote >= Number.MAX_SAFE_INTEGER ||
+      borrowsQuote.lte(I80F48.fromNumber(this.borrowWeightScaleStartQuote))
+    ) {
       return this.initLiabWeight;
     }
     return this.initLiabWeight.mul(
