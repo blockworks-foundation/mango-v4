@@ -384,10 +384,11 @@ impl MangoClient {
 
         self.program()
             .request()
-            .instruction(create_associated_token_account_idempotent(
+            .instruction(spl_associated_token_account::instruction::create_associated_token_account_idempotent(
                 &self.owner(),
                 &self.owner(),
                 &mint,
+                &Token::id(),
             ))
             .instruction(Instruction {
                 program_id: mango_v4::id(),
@@ -1261,16 +1262,22 @@ impl MangoClient {
         let program = self.program();
         let mut builder = program.request();
 
-        builder = builder.instruction(create_associated_token_account_idempotent(
-            &self.owner.pubkey(),
-            &self.owner.pubkey(),
-            &source_token.mint_info.mint,
-        ));
-        builder = builder.instruction(create_associated_token_account_idempotent(
-            &self.owner.pubkey(),
-            &self.owner.pubkey(),
-            &target_token.mint_info.mint,
-        ));
+        builder = builder.instruction(
+            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
+                &self.owner.pubkey(),
+                &self.owner.pubkey(),
+                &source_token.mint_info.mint,
+                &Token::id(),
+            ),
+        );
+        builder = builder.instruction(
+            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
+                &self.owner.pubkey(),
+                &self.owner.pubkey(),
+                &target_token.mint_info.mint,
+                &Token::id(),
+            ),
+        );
         builder = builder.instruction(Instruction {
             program_id: mango_v4::id(),
             accounts: {
@@ -1436,21 +1443,4 @@ fn to_writable_account_meta(pubkey: Pubkey) -> AccountMeta {
         is_writable: true,
         is_signer: false,
     }
-}
-
-// FUTURE: use spl_associated_token_account::instruction::create_associated_token_account_idempotent
-// Right now anchor depends on an earlier version of this package...
-fn create_associated_token_account_idempotent(
-    funder: &Pubkey,
-    owner: &Pubkey,
-    mint: &Pubkey,
-) -> Instruction {
-    let mut instr = spl_associated_token_account::instruction::create_associated_token_account(
-        funder,
-        owner,
-        mint,
-        &spl_associated_token_account::ID,
-    );
-    instr.data = vec![0x1]; // CreateIdempotent
-    instr
 }
