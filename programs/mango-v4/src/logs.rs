@@ -123,6 +123,7 @@ pub struct PerpUpdateFundingLog {
     pub stable_price: i128,
     pub fees_accrued: i128,
     pub open_interest: i64,
+    pub instantaneous_funding_rate: i128,
 }
 
 #[event]
@@ -138,6 +139,8 @@ pub struct UpdateIndexLog {
     pub loan_fee_rate: i128,   // I80F48
     pub total_borrows: i128,
     pub total_deposits: i128,
+    pub borrow_rate: i128,
+    pub deposit_rate: i128,
 }
 
 #[event]

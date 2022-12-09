@@ -97,7 +97,7 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
 
         let diff_ts = I80F48::from_num(cm!(now_ts - some_bank.index_last_updated));
 
-        let (deposit_index, borrow_index, borrow_fees) =
+        let (deposit_index, borrow_index, borrow_fees, borrow_rate, deposit_rate) =
             some_bank.compute_index(indexed_total_deposits, indexed_total_borrows, diff_ts)?;
 
         cm!(some_bank.collected_fees_native += borrow_fees);
@@ -130,6 +130,8 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             loan_fee_rate: some_bank.loan_fee_rate.to_bits(),
             total_deposits: cm!(deposit_index * indexed_total_deposits).to_bits(),
             total_borrows: cm!(borrow_index * indexed_total_borrows).to_bits(),
+            borrow_rate: borrow_rate.to_bits(),
+            deposit_rate: deposit_rate.to_bits(),
         });
 
         drop(some_bank);
