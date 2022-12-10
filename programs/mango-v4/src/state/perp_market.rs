@@ -97,7 +97,8 @@ pub struct PerpMarket {
     pub settle_fee_fraction_low_health: f32,
 
     // Pnl settling limits
-    /// Fraction of perp base value that can be settled each window.
+    /// Fraction of perp base value (i.e. base_lots * entry_price_in_lots) of unrealized
+    /// positive pnl that can be settled each window.
     /// Set to a negative value to disable the limit.
     pub settle_pnl_limit_factor: f32,
     pub padding3: [u8; 4],

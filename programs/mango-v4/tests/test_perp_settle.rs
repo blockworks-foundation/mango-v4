@@ -946,9 +946,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
         + (market.settle_pnl_limit_factor()
             * I80F48::from_num(mango_account_0.perps[0].avg_entry_price(&market))
             * mango_account_0.perps[0].base_position_native(&market))
-        .abs()
-        // fees
-        - I80F48::from_num(1000.0 * 100.0 * 0.0002);
+        .abs();
     send_tx(
         solana,
         PerpSettlePnlInstruction {
@@ -969,7 +967,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     );
     // attempt 2 - as we are in the same window, and we settled max. possible in previous attempt,
     // we can't settle anymore amount
-    send_tx(
+    let result = send_tx(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -980,12 +978,11 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             settle_bank: tokens[0].bank,
         },
     )
-    .await
-    .unwrap();
-    let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
-    assert_eq!(
-        mango_account_1.perps[0].quote_position_native().round(),
-        mango_account_1_expected_qpn_after_settle.round()
+    .await;
+    assert_mango_error(
+        &result,
+        MangoError::ProfitabilityMismatch.into(),
+        "Account A has no settleable positive pnl left".to_string(),
     );
 
     Ok(())
