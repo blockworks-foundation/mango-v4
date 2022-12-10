@@ -3,12 +3,9 @@ use jsonrpc_core_client::transports::http;
 use solana_account_decoder::{UiAccount, UiAccountEncoding};
 use solana_client::{
     rpc_config::{RpcAccountInfoConfig, RpcContextConfig, RpcProgramAccountsConfig},
-    rpc_response::{Response, RpcKeyedAccount},
+    rpc_response::{OptionalContext, Response, RpcKeyedAccount},
 };
-use solana_rpc::{
-    rpc::OptionalContext,
-    rpc::{rpc_accounts::AccountsDataClient, rpc_minimal::MinimalClient},
-};
+use solana_rpc::rpc::{rpc_accounts::AccountsDataClient, rpc_minimal::MinimalClient};
 use solana_sdk::{account::AccountSharedData, commitment_config::CommitmentConfig, pubkey::Pubkey};
 
 use anyhow::Context;
