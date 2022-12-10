@@ -5,8 +5,8 @@ use anchor_client::{Client, ClientError, Cluster, Program};
 use anchor_lang::__private::bytemuck;
 
 use mango_v4::state::{
-    MangoAccountValue, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market, Serum3MarketIndex,
-    TokenIndex,
+    Group, MangoAccountValue, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market,
+    Serum3MarketIndex, TokenIndex,
 };
 
 use fixed::types::I80F48;
@@ -64,6 +64,8 @@ pub struct MangoGroupContext {
 
     pub perp_markets: HashMap<PerpMarketIndex, PerpMarketContext>,
     pub perp_market_indexes_by_name: HashMap<String, PerpMarketIndex>,
+
+    pub address_lookup_tables: Vec<Pubkey>,
 }
 
 impl MangoGroupContext {
@@ -196,6 +198,14 @@ impl MangoGroupContext {
             .map(|(i, p)| (p.market.name().to_string(), *i))
             .collect::<HashMap<_, _>>();
 
+        let group_data = program.account::<Group>(group)?;
+        let address_lookup_tables = group_data
+            .address_lookup_tables
+            .iter()
+            .filter(|&&k| k != Pubkey::default())
+            .cloned()
+            .collect::<Vec<Pubkey>>();
+
         Ok(MangoGroupContext {
             group,
             tokens,
@@ -204,6 +214,7 @@ impl MangoGroupContext {
             serum3_market_indexes_by_name,
             perp_markets,
             perp_market_indexes_by_name,
+            address_lookup_tables,
         })
     }
 

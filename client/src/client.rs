@@ -20,8 +20,10 @@ use mango_v4::state::{
     Bank, Group, MangoAccountValue, PerpMarketIndex, Serum3MarketIndex, TokenIndex,
 };
 
+use solana_address_lookup_table_program::state::AddressLookupTable;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_client::rpc_client::RpcClient;
+use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
 use solana_sdk::signer::keypair;
 
 use crate::account_fetcher::*;
@@ -1259,10 +1261,9 @@ impl MangoClient {
             )
             .context("building health accounts")?;
 
-        let program = self.program();
-        let mut builder = program.request();
+        let mut instructions = Vec::new();
 
-        builder = builder.instruction(
+        instructions.push(
             spl_associated_token_account::instruction::create_associated_token_account_idempotent(
                 &self.owner.pubkey(),
                 &self.owner.pubkey(),
@@ -1270,7 +1271,7 @@ impl MangoClient {
                 &Token::id(),
             ),
         );
-        builder = builder.instruction(
+        instructions.push(
             spl_associated_token_account::instruction::create_associated_token_account_idempotent(
                 &self.owner.pubkey(),
                 &self.owner.pubkey(),
@@ -1278,7 +1279,7 @@ impl MangoClient {
                 &Token::id(),
             ),
         );
-        builder = builder.instruction(Instruction {
+        instructions.push(Instruction {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
@@ -1301,9 +1302,9 @@ impl MangoClient {
             }),
         });
         for ix in jup_ixs {
-            builder = builder.instruction(ix.clone());
+            instructions.push(ix.clone());
         }
-        builder = builder.instruction(Instruction {
+        instructions.push(Instruction {
             program_id: mango_v4::id(),
             accounts: {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
@@ -1326,11 +1327,44 @@ impl MangoClient {
         });
 
         let rpc = self.client.rpc_async();
-        builder
-            .signer(&self.owner)
-            .send_rpc_async(&rpc)
+        let recent_blockhash = rpc.get_latest_blockhash().await?;
+        let address_lookup_tables = self.mango_address_lookup_tables()?;
+
+        let payer = self.owner.pubkey(); // maybe use fee_payer? but usually it's the same
+        let v0_message = solana_sdk::message::v0::Message::try_compile(
+            &payer,
+            &instructions,
+            &address_lookup_tables,
+            recent_blockhash,
+        )?;
+        let versioned_message = solana_sdk::message::VersionedMessage::V0(v0_message);
+        let signers = [&self.owner];
+        let tx =
+            solana_sdk::transaction::VersionedTransaction::try_new(versioned_message, &signers)?;
+
+        rpc.send_and_confirm_transaction(&tx)
             .await
-            .map_err(prettify_client_error)
+            .map_err(prettify_solana_client_error)
+    }
+
+    fn fetch_address_lookup_table(
+        &self,
+        address: Pubkey,
+    ) -> anyhow::Result<AddressLookupTableAccount> {
+        let raw = self.account_fetcher.fetch_raw_account(&address)?;
+        let data = AddressLookupTable::deserialize(&raw.data())?;
+        Ok(AddressLookupTableAccount {
+            key: address,
+            addresses: data.addresses.to_vec(),
+        })
+    }
+
+    fn mango_address_lookup_tables(&self) -> anyhow::Result<Vec<AddressLookupTableAccount>> {
+        self.context
+            .address_lookup_tables
+            .iter()
+            .map(|&k| self.fetch_address_lookup_table(k))
+            .collect::<anyhow::Result<Vec<_>>>()
     }
 
     fn invoke<T, F: std::future::Future<Output = T>>(&self, f: F) -> T {
@@ -1380,25 +1414,29 @@ pub enum MangoClientError {
 /// instead of showing the actual log messages. This unpacks the error to provide more useful
 /// output.
 pub fn prettify_client_error(err: anchor_client::ClientError) -> anyhow::Error {
+    match err {
+        anchor_client::ClientError::SolanaClientError(c) => prettify_solana_client_error(c),
+        _ => err.into(),
+    }
+}
+
+pub fn prettify_solana_client_error(
+    err: solana_client::client_error::ClientError,
+) -> anyhow::Error {
     use solana_client::client_error::ClientErrorKind;
     use solana_client::rpc_request::{RpcError, RpcResponseErrorData};
-    match &err {
-        anchor_client::ClientError::SolanaClientError(c) => {
-            match c.kind() {
-                ClientErrorKind::RpcError(RpcError::RpcResponseError { data, .. }) => match data {
-                    RpcResponseErrorData::SendTransactionPreflightFailure(s) => {
-                        if let Some(logs) = s.logs.as_ref() {
-                            return MangoClientError::SendTransactionPreflightFailure {
-                                logs: logs.iter().join("; "),
-                            }
-                            .into();
-                        }
+    match err.kind() {
+        ClientErrorKind::RpcError(RpcError::RpcResponseError { data, .. }) => match data {
+            RpcResponseErrorData::SendTransactionPreflightFailure(s) => {
+                if let Some(logs) = s.logs.as_ref() {
+                    return MangoClientError::SendTransactionPreflightFailure {
+                        logs: logs.iter().join("; "),
                     }
-                    _ => {}
-                },
-                _ => {}
-            };
-        }
+                    .into();
+                }
+            }
+            _ => {}
+        },
         _ => {}
     };
     err.into()

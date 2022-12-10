@@ -1132,6 +1132,7 @@ dependencies = [
  "serum_dex 0.5.6",
  "shellexpand",
  "solana-account-decoder",
+ "solana-address-lookup-table-program",
  "solana-client",
  "solana-sdk",
  "spl-associated-token-account",
