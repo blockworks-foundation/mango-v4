@@ -65,15 +65,12 @@ impl AccountFetcher for RpcAccountFetcher {
     ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
         use solana_account_decoder::UiAccountEncoding;
         use solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
-        use solana_client::rpc_filter::{
-            Memcmp, MemcmpEncodedBytes, MemcmpEncoding, RpcFilterType,
-        };
+        use solana_client::rpc_filter::{Memcmp, RpcFilterType};
         let config = RpcProgramAccountsConfig {
-            filters: Some(vec![RpcFilterType::Memcmp(Memcmp {
-                offset: 0,
-                bytes: MemcmpEncodedBytes::Bytes(discriminator.to_vec()),
-                encoding: Some(MemcmpEncoding::Binary),
-            })]),
+            filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+                0,
+                discriminator.to_vec(),
+            ))]),
             account_config: RpcAccountInfoConfig {
                 encoding: Some(UiAccountEncoding::Base64),
                 commitment: Some(self.rpc.commitment()),
