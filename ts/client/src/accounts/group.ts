@@ -569,8 +569,8 @@ export class Group {
     }
   }
 
-  public toUiPrice(price: I80F48, baseDecimals: number): number {
-    return toUiDecimals(price, baseDecimals - this.getInsuranceMintDecimals());
+  public toUiPrice(price: I80F48 | number, baseDecimals: number): number {
+    return toUiDecimals(price, this.getInsuranceMintDecimals() - baseDecimals);
   }
 
   public toNativePrice(uiPrice: number, baseDecimals: number): I80F48 {
