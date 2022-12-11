@@ -1120,7 +1120,7 @@ impl MangoClient {
     ) -> anyhow::Result<jupiter::QueryRoute> {
         let quote = self
             .http_client
-            .get("https://quote-api.jup.ag/v3/quote")
+            .get("https://quote-api.jup.ag/v4/quote")
             .query(&[
                 ("inputMint", input_mint.to_string()),
                 ("outputMint", output_mint.to_string()),
@@ -1181,7 +1181,7 @@ impl MangoClient {
 
         let swap = self
             .http_client
-            .post("https://quote-api.jup.ag/v3/swap")
+            .post("https://quote-api.jup.ag/v4/swap")
             .json(&jupiter::SwapRequest {
                 route: route.clone(),
                 user_public_key: self.owner.pubkey().to_string(),
@@ -1200,11 +1200,10 @@ impl MangoClient {
             );
         }
 
-        // TODO: deal with versioned transaction!
         let jup_tx = bincode::options()
             .with_fixint_encoding()
             .reject_trailing_bytes()
-            .deserialize::<solana_sdk::transaction::Transaction>(
+            .deserialize::<solana_sdk::transaction::VersionedTransaction>(
                 &base64::decode(&swap.swap_transaction)
                     .context("base64 decoding jupiter transaction")?,
             )
@@ -1212,7 +1211,8 @@ impl MangoClient {
         let ata_program = anchor_spl::associated_token::ID;
         let token_program = anchor_spl::token::ID;
         let is_setup_ix = |k: Pubkey| -> bool { k == ata_program || k == token_program };
-        let jup_ixs = deserialize_instructions(&jup_tx.message)
+        let (jup_ixs, jup_alts) = self.deserialize_instructions_and_alts(&jup_tx.message)?;
+        let filtered_jup_ix = jup_ixs
             .into_iter()
             .filter(|ix| !is_setup_ix(ix.program_id))
             .collect::<Vec<_>>();
@@ -1302,7 +1302,7 @@ impl MangoClient {
                 loan_amounts,
             }),
         });
-        for ix in jup_ixs {
+        for ix in filtered_jup_ix {
             instructions.push(ix.clone());
         }
         instructions.push(Instruction {
@@ -1329,7 +1329,8 @@ impl MangoClient {
 
         let rpc = self.client.rpc_async();
         let recent_blockhash = rpc.get_latest_blockhash().await?;
-        let address_lookup_tables = self.mango_address_lookup_tables()?;
+        let mut address_lookup_tables = self.mango_address_lookup_tables()?;
+        address_lookup_tables.extend(jup_alts.into_iter());
 
         let payer = self.owner.pubkey(); // maybe use fee_payer? but usually it's the same
         let v0_message = solana_sdk::message::v0::Message::try_compile(
@@ -1368,32 +1369,61 @@ impl MangoClient {
             .collect::<anyhow::Result<Vec<_>>>()
     }
 
+    fn deserialize_instructions_and_alts(
+        &self,
+        message: &solana_sdk::message::VersionedMessage,
+    ) -> anyhow::Result<(Vec<Instruction>, Vec<AddressLookupTableAccount>)> {
+        let lookups = message.address_table_lookups().unwrap_or_default();
+        let address_lookup_tables = lookups
+            .iter()
+            .map(|a| self.fetch_address_lookup_table(a.account_key))
+            .collect::<anyhow::Result<Vec<_>>>()?;
+
+        let mut account_keys = message.static_account_keys().to_vec();
+        for (lookups, table) in lookups.iter().zip(address_lookup_tables.iter()) {
+            account_keys.extend(
+                lookups
+                    .writable_indexes
+                    .iter()
+                    .map(|&index| table.addresses[index as usize]),
+            );
+        }
+        for (lookups, table) in lookups.iter().zip(address_lookup_tables.iter()) {
+            account_keys.extend(
+                lookups
+                    .readonly_indexes
+                    .iter()
+                    .map(|&index| table.addresses[index as usize]),
+            );
+        }
+
+        let compiled_ix = message
+            .instructions()
+            .iter()
+            .map(|ci| solana_sdk::instruction::Instruction {
+                program_id: *ci.program_id(&account_keys),
+                accounts: ci
+                    .accounts
+                    .iter()
+                    .map(|&index| AccountMeta {
+                        pubkey: account_keys[index as usize],
+                        is_signer: message.is_signer(index.into()),
+                        is_writable: message.is_maybe_writable(index.into()),
+                    })
+                    .collect(),
+                data: ci.data.clone(),
+            })
+            .collect();
+
+        Ok((compiled_ix, address_lookup_tables))
+    }
+
     fn invoke<T, F: std::future::Future<Output = T>>(&self, f: F) -> T {
         // `block_on()` panics if called within an asynchronous execution context. Whereas
         // `block_in_place()` only panics if called from a current_thread runtime, which is the
         // lesser evil.
         tokio::task::block_in_place(move || self.runtime.as_ref().expect("runtime").block_on(f))
     }
-}
-
-fn deserialize_instructions(message: &solana_sdk::message::Message) -> Vec<Instruction> {
-    message
-        .instructions
-        .iter()
-        .map(|ci| solana_sdk::instruction::Instruction {
-            program_id: *ci.program_id(&message.account_keys),
-            accounts: ci
-                .accounts
-                .iter()
-                .map(|&index| AccountMeta {
-                    pubkey: message.account_keys[index as usize],
-                    is_signer: message.is_signer(index.into()),
-                    is_writable: message.is_writable(index.into()),
-                })
-                .collect(),
-            data: ci.data.clone(),
-        })
-        .collect()
 }
 
 struct Serum3Data<'a> {
