@@ -644,6 +644,14 @@ pub async fn maybe_liquidate_account(
 
     let maint_health = health_cache.health(HealthType::Maint);
 
+    let all_token_mints = HashSet::from_iter(
+        mango_client
+            .context
+            .tokens
+            .values()
+            .map(|c| c.mint_info.mint),
+    );
+
     // try liquidating
     let txsig = LiquidateHelper {
         client: mango_client,
@@ -653,8 +661,8 @@ pub async fn maybe_liquidate_account(
         health_cache: &health_cache,
         maint_health,
         liqor_min_health_ratio,
-        allowed_asset_tokens: HashSet::default(),
-        allowed_liab_tokens: HashSet::default(),
+        allowed_asset_tokens: all_token_mints.clone(),
+        allowed_liab_tokens: all_token_mints,
     }
     .send_liq_tx()
     .await?;
