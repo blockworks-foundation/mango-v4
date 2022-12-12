@@ -104,18 +104,23 @@ async function debugUser(
       group.banksMapByName.get(src)![0].uiPrice /
         group.banksMapByName.get(tgt)![0].uiPrice,
     );
-    const maxTargetUi =
-      maxSourceUi *
+
+    const maxSourceWoFees =
+      -maxSourceUi *
+      (1 + group.banksMapByName.get(src)![0].loanOriginationFeeRate.toNumber());
+    const maxTargetWoFees =
+      -maxSourceWoFees *
       (group.banksMapByName.get(src)![0].uiPrice /
         group.banksMapByName.get(tgt)![0].uiPrice);
+
     const sim = mangoAccount.simHealthRatioWithTokenPositionUiChanges(group, [
       {
         mintPk: group.banksMapByName.get(src)![0].mint,
-        uiTokenAmount: -maxSourceUi,
+        uiTokenAmount: maxSourceWoFees,
       },
       {
         mintPk: group.banksMapByName.get(tgt)![0].mint,
-        uiTokenAmount: maxTargetUi,
+        uiTokenAmount: maxTargetWoFees,
       },
     ]);
     console.log(
