@@ -123,7 +123,7 @@ async function debugUser(
         maxSourceUi.toFixed(3).padStart(10) +
         `, health ratio after (${sim.toFixed(3).padStart(10)})`,
     );
-    if (maxSourceUi > 0) {
+    if (maxSourceUi > 0 && src !== tgt) {
       expect(sim).gt(2);
       expect(sim).lt(3);
     }
@@ -146,8 +146,6 @@ async function debugUser(
       maxQuoteUi / perpMarket.uiPrice,
       perpMarket.uiPrice,
     );
-    expect(simMaxQuote).gt(2);
-    expect(simMaxQuote).lt(3);
     const maxBaseUi = mangoAccount.getMaxBaseForPerpAskUi(
       group,
       perpMarket.perpMarketIndex,
@@ -159,8 +157,6 @@ async function debugUser(
       maxBaseUi,
       perpMarket.uiPrice,
     );
-    expect(simMaxBase).gt(2);
-    expect(simMaxBase).lt(3);
     console.log(
       `getMaxPerp ${perpMarket.name.padStart(
         10,
@@ -174,6 +170,8 @@ async function debugUser(
         .toFixed(3)
         .padStart(10)})`,
     );
+    expect(simMaxQuote).gt(2);
+    expect(simMaxQuote).lt(3);
   }
   for (const perpMarket of Array.from(
     group.perpMarketsMapByMarketIndex.values(),
