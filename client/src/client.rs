@@ -1355,7 +1355,9 @@ impl MangoClient {
         &self,
         address: Pubkey,
     ) -> anyhow::Result<AddressLookupTableAccount> {
-        let raw = self.account_fetcher.fetch_raw_account(&address)?;
+        let raw = self
+            .account_fetcher
+            .fetch_raw_account_lookup_table(&address)?;
         let data = AddressLookupTable::deserialize(&raw.data())?;
         Ok(AddressLookupTableAccount {
             key: address,

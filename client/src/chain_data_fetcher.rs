@@ -142,7 +142,20 @@ impl crate::AccountFetcher for AccountFetcher {
         &self,
         address: &Pubkey,
     ) -> anyhow::Result<solana_sdk::account::AccountSharedData> {
-        self.fetch_raw(&address)
+        self.fetch_raw(address)
+    }
+
+    fn fetch_raw_account_lookup_table(
+        &self,
+        address: &Pubkey,
+    ) -> anyhow::Result<AccountSharedData> {
+        // Fetch data via RPC if missing: the chain data updater doesn't know about all the
+        // lookup talbes we may need.
+        if let Ok(alt) = self.fetch_raw(address) {
+            return Ok(alt);
+        }
+        self.refresh_account_via_rpc(address)?;
+        self.fetch_raw(address)
     }
 
     fn fetch_program_accounts(

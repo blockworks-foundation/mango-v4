@@ -14,6 +14,12 @@ use mango_v4::state::MangoAccountValue;
 
 pub trait AccountFetcher: Sync + Send {
     fn fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData>;
+    fn fetch_raw_account_lookup_table(
+        &self,
+        address: &Pubkey,
+    ) -> anyhow::Result<AccountSharedData> {
+        self.fetch_raw_account(address)
+    }
     fn fetch_program_accounts(
         &self,
         program: &Pubkey,
