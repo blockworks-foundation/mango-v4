@@ -118,15 +118,15 @@ async function debugUser(
         uiTokenAmount: maxTargetUi,
       },
     ]);
-    if (maxSourceUi > 0) {
-      expect(sim).gt(2);
-      expect(sim).lt(3);
-    }
     console.log(
       `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
         maxSourceUi.toFixed(3).padStart(10) +
         `, health ratio after (${sim.toFixed(3).padStart(10)})`,
     );
+    if (maxSourceUi > 0) {
+      expect(sim).gt(2);
+      expect(sim).lt(3);
+    }
   }
   for (const srcToken of Array.from(group.banksMapByName.keys()).sort()) {
     for (const tgtToken of Array.from(group.banksMapByName.keys()).sort()) {
