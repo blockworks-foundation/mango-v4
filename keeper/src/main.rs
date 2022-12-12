@@ -62,7 +62,9 @@ enum Command {
     Crank {},
     Taker {},
 }
-fn main() -> Result<(), anyhow::Error> {
+
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
     env_logger::init_from_env(
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
     );
@@ -87,21 +89,19 @@ fn main() -> Result<(), anyhow::Error> {
         Command::Taker { .. } => CommitmentConfig::confirmed(),
     };
 
-    let mango_client = Arc::new(MangoClient::new_for_existing_account(
-        Client::new(
-            cluster,
-            commitment,
-            &owner,
-            Some(Duration::from_secs(cli.timeout)),
-        ),
-        cli.mango_account,
-        owner,
-    )?);
-
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap();
+    let mango_client = Arc::new(
+        MangoClient::new_for_existing_account(
+            Client::new(
+                cluster,
+                commitment,
+                &owner,
+                Some(Duration::from_secs(cli.timeout)),
+            ),
+            cli.mango_account,
+            owner,
+        )
+        .await?,
+    );
 
     let debugging_handle = async {
         let mut interval = time::interval(time::Duration::from_secs(5));
@@ -120,17 +120,18 @@ fn main() -> Result<(), anyhow::Error> {
     match cli.command {
         Command::Crank { .. } => {
             let client = mango_client.clone();
-            rt.block_on(crank::runner(
+            crank::runner(
                 client,
                 debugging_handle,
                 cli.interval_update_banks,
                 cli.interval_consume_events,
                 cli.interval_update_funding,
-            ))
+            )
+            .await
         }
         Command::Taker { .. } => {
             let client = mango_client.clone();
-            rt.block_on(taker::runner(client, debugging_handle))
+            taker::runner(client, debugging_handle).await
         }
     }
 }

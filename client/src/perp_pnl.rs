@@ -15,7 +15,7 @@ pub enum Direction {
 
 /// Returns up to `count` accounts with highest abs pnl (by `direction`) in descending order.
 /// Note: keep in sync with perp.ts:getSettlePnlCandidates
-pub fn fetch_top(
+pub async fn fetch_top(
     context: &crate::context::MangoGroupContext,
     account_fetcher: &impl AccountFetcher,
     perp_market_index: PerpMarketIndex,
@@ -30,15 +30,18 @@ pub fn fetch_top(
 
     let perp = context.perp(perp_market_index);
     let perp_market =
-        account_fetcher_fetch_anchor_account::<PerpMarket>(account_fetcher, &perp.address)?;
-    let oracle_acc = account_fetcher.fetch_raw_account(&perp_market.oracle)?;
+        account_fetcher_fetch_anchor_account::<PerpMarket>(account_fetcher, &perp.address).await?;
+    let oracle_acc = account_fetcher
+        .fetch_raw_account(&perp_market.oracle)
+        .await?;
     let oracle_price = perp_market.oracle_price(
         &KeyedAccountSharedData::new(perp_market.oracle, oracle_acc),
         None,
     )?;
 
-    let accounts =
-        account_fetcher.fetch_program_accounts(&mango_v4::id(), MangoAccount::discriminator())?;
+    let accounts = account_fetcher
+        .fetch_program_accounts(&mango_v4::id(), MangoAccount::discriminator())
+        .await?;
 
     let mut accounts_pnl = accounts
         .iter()
@@ -88,8 +91,9 @@ pub fn fetch_top(
             } else {
                 I80F48::ZERO
             };
-            let perp_settle_health =
-                crate::health_cache::new(context, account_fetcher, &acc)?.perp_settle_health();
+            let perp_settle_health = crate::health_cache::new(context, account_fetcher, &acc)
+                .await?
+                .perp_settle_health();
             let settleable_pnl = if perp_settle_health > 0 && !acc.being_liquidated() {
                 (*pnl).max(-perp_settle_health)
             } else {

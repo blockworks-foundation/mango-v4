@@ -1,10 +1,11 @@
 use crate::{AccountFetcher, MangoGroupContext};
 use anyhow::Context;
+use futures::{stream, StreamExt, TryStreamExt};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::{FixedOrderAccountRetriever, HealthCache};
 use mango_v4::state::MangoAccountValue;
 
-pub fn new(
+pub async fn new(
     context: &MangoGroupContext,
     account_fetcher: &impl AccountFetcher,
     account: &MangoAccountValue,
@@ -13,18 +14,18 @@ pub fn new(
     let active_perp_len = account.active_perp_positions().count();
 
     let metas = context.derive_health_check_remaining_account_metas(account, vec![], false)?;
-    let accounts = metas
-        .iter()
-        .map(|meta| {
+    let accounts: anyhow::Result<Vec<KeyedAccountSharedData>> = stream::iter(metas.iter())
+        .then(|meta| async {
             Ok(KeyedAccountSharedData::new(
                 meta.pubkey,
-                account_fetcher.fetch_raw_account(&meta.pubkey)?,
+                account_fetcher.fetch_raw_account(&meta.pubkey).await?,
             ))
         })
-        .collect::<anyhow::Result<Vec<_>>>()?;
+        .try_collect()
+        .await;
 
     let retriever = FixedOrderAccountRetriever {
-        ais: accounts,
+        ais: accounts?,
         n_banks: active_token_len,
         n_perps: active_perp_len,
         begin_perp: active_token_len * 2,

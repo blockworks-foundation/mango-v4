@@ -11,7 +11,7 @@ use mango_v4::state::{MangoAccount, MangoAccountValue};
 
 use anyhow::Context;
 
-use solana_client::rpc_client::RpcClient;
+use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
 use solana_sdk::clock::Slot;
 use solana_sdk::pubkey::Pubkey;
@@ -19,7 +19,7 @@ use solana_sdk::signature::Signature;
 
 pub struct AccountFetcher {
     pub chain_data: Arc<RwLock<ChainData>>,
-    pub rpc: RpcClient,
+    pub rpc: RpcClientAsync,
 }
 
 impl AccountFetcher {
@@ -55,16 +55,19 @@ impl AccountFetcher {
     }
 
     // fetches via RPC, stores in ChainData, returns new version
-    pub fn fetch_fresh<T: anchor_lang::ZeroCopy + anchor_lang::Owner>(
+    pub async fn fetch_fresh<T: anchor_lang::ZeroCopy + anchor_lang::Owner>(
         &self,
         address: &Pubkey,
     ) -> anyhow::Result<T> {
-        self.refresh_account_via_rpc(address)?;
+        self.refresh_account_via_rpc(address).await?;
         self.fetch(address)
     }
 
-    pub fn fetch_fresh_mango_account(&self, address: &Pubkey) -> anyhow::Result<MangoAccountValue> {
-        self.refresh_account_via_rpc(address)?;
+    pub async fn fetch_fresh_mango_account(
+        &self,
+        address: &Pubkey,
+    ) -> anyhow::Result<MangoAccountValue> {
+        self.refresh_account_via_rpc(address).await?;
         self.fetch_mango_account(address)
     }
 
@@ -76,10 +79,11 @@ impl AccountFetcher {
             .clone())
     }
 
-    pub fn refresh_account_via_rpc(&self, address: &Pubkey) -> anyhow::Result<Slot> {
+    pub async fn refresh_account_via_rpc(&self, address: &Pubkey) -> anyhow::Result<Slot> {
         let response = self
             .rpc
             .get_account_with_commitment(address, self.rpc.commitment())
+            .await
             .with_context(|| format!("refresh account {} via rpc", address))?;
         let slot = response.context.slot;
         let account = response
@@ -100,8 +104,8 @@ impl AccountFetcher {
     }
 
     /// Return the maximum slot reported for the processing of the signatures
-    pub fn transaction_max_slot(&self, signatures: &[Signature]) -> anyhow::Result<Slot> {
-        let statuses = self.rpc.get_signature_statuses(signatures)?.value;
+    pub async fn transaction_max_slot(&self, signatures: &[Signature]) -> anyhow::Result<Slot> {
+        let statuses = self.rpc.get_signature_statuses(signatures).await?.value;
         Ok(statuses
             .iter()
             .map(|status_opt| status_opt.as_ref().map(|status| status.slot).unwrap_or(0))
@@ -110,7 +114,7 @@ impl AccountFetcher {
     }
 
     /// Return success once all addresses have data >= min_slot
-    pub fn refresh_accounts_via_rpc_until_slot(
+    pub async fn refresh_accounts_via_rpc_until_slot(
         &self,
         addresses: &[Pubkey],
         min_slot: Slot,
@@ -126,7 +130,7 @@ impl AccountFetcher {
                         min_slot
                     );
                 }
-                let data_slot = self.refresh_account_via_rpc(address)?;
+                let data_slot = self.refresh_account_via_rpc(address).await?;
                 if data_slot >= min_slot {
                     break;
                 }
@@ -137,15 +141,16 @@ impl AccountFetcher {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl crate::AccountFetcher for AccountFetcher {
-    fn fetch_raw_account(
+    async fn fetch_raw_account(
         &self,
         address: &Pubkey,
     ) -> anyhow::Result<solana_sdk::account::AccountSharedData> {
         self.fetch_raw(address)
     }
 
-    fn fetch_raw_account_lookup_table(
+    async fn fetch_raw_account_lookup_table(
         &self,
         address: &Pubkey,
     ) -> anyhow::Result<AccountSharedData> {
@@ -154,11 +159,11 @@ impl crate::AccountFetcher for AccountFetcher {
         if let Ok(alt) = self.fetch_raw(address) {
             return Ok(alt);
         }
-        self.refresh_account_via_rpc(address)?;
+        self.refresh_account_via_rpc(address).await?;
         self.fetch_raw(address)
     }
 
-    fn fetch_program_accounts(
+    async fn fetch_program_accounts(
         &self,
         program: &Pubkey,
         discriminator: [u8; 8],

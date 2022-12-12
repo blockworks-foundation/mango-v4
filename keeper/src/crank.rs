@@ -4,7 +4,6 @@ use crate::MangoClient;
 use itertools::Itertools;
 
 use anchor_lang::{__private::bytemuck::cast_ref, solana_program};
-use client::prettify_client_error;
 use futures::Future;
 use mango_v4::state::{EventQueue, EventType, FillEvent, OutEvent, PerpMarket, TokenIndex};
 use solana_sdk::{
@@ -93,79 +92,63 @@ pub async fn loop_update_index_and_rate(
 
         let token_indices_clone = token_indices.clone();
 
-        let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-            let token_names = token_indices_clone
+        let token_names = token_indices_clone
+            .iter()
+            .map(|token_index| client.context.token(*token_index).name.to_owned())
+            .join(",");
+
+        let mut instructions = vec![ComputeBudgetInstruction::set_compute_unit_price(1)];
+        for token_index in token_indices_clone.iter() {
+            let token = client.context.token(*token_index);
+            let banks_for_a_token = token.mint_info.banks();
+            let oracle = token.mint_info.oracle;
+
+            let mut ix = Instruction {
+                program_id: mango_v4::id(),
+                accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::TokenUpdateIndexAndRate {
+                        group: token.mint_info.group,
+                        mint_info: token.mint_info_address,
+                        oracle,
+                        instructions: solana_program::sysvar::instructions::id(),
+                    },
+                    None,
+                ),
+                data: anchor_lang::InstructionData::data(
+                    &mango_v4::instruction::TokenUpdateIndexAndRate {},
+                ),
+            };
+            let mut banks = banks_for_a_token
                 .iter()
-                .map(|token_index| client.context.token(*token_index).name.to_owned())
-                .join(",");
+                .map(|bank_pubkey| AccountMeta {
+                    pubkey: *bank_pubkey,
+                    is_signer: false,
+                    is_writable: true,
+                })
+                .collect::<Vec<_>>();
+            ix.accounts.append(&mut banks);
+            instructions.push(ix);
+        }
+        let pre = Instant::now();
+        let sig_result = client
+            .send_and_confirm_permissionless_tx(instructions)
+            .await;
 
-            let program = client.program();
-            let mut req = program.request();
-            req = req.instruction(ComputeBudgetInstruction::set_compute_unit_price(1));
-            for token_index in token_indices_clone.iter() {
-                let token = client.context.token(*token_index);
-                let banks_for_a_token = token.mint_info.banks();
-                let oracle = token.mint_info.oracle;
-
-                let mut ix = Instruction {
-                    program_id: mango_v4::id(),
-                    accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                        &mango_v4::accounts::TokenUpdateIndexAndRate {
-                            group: token.mint_info.group,
-                            mint_info: token.mint_info_address,
-                            oracle,
-                            instructions: solana_program::sysvar::instructions::id(),
-                        },
-                        None,
-                    ),
-                    data: anchor_lang::InstructionData::data(
-                        &mango_v4::instruction::TokenUpdateIndexAndRate {},
-                    ),
-                };
-                let mut banks = banks_for_a_token
-                    .iter()
-                    .map(|bank_pubkey| AccountMeta {
-                        pubkey: *bank_pubkey,
-                        is_signer: false,
-                        is_writable: true,
-                    })
-                    .collect::<Vec<_>>();
-                ix.accounts.append(&mut banks);
-                req = req.instruction(ix);
-            }
-            let pre = Instant::now();
-            let sig_result = req.send().map_err(prettify_client_error);
-
-            if let Err(e) = sig_result {
-                log::info!(
-                    "metricName=UpdateTokensV4Failure tokens={} durationMs={} error={}",
-                    token_names,
-                    pre.elapsed().as_millis(),
-                    e
-                );
-                log::error!("{:?}", e)
-            } else {
-                log::info!(
-                    "metricName=UpdateTokensV4Success tokens={} durationMs={}",
-                    token_names,
-                    pre.elapsed().as_millis(),
-                );
-                log::info!("{:?}", sig_result);
-            }
-
-            Ok(())
-        })
-        .await;
-
-        match res {
-            Ok(inner_res) => {
-                if inner_res.is_err() {
-                    log::error!("{}", inner_res.unwrap_err());
-                }
-            }
-            Err(join_error) => {
-                log::error!("{}", join_error);
-            }
+        if let Err(e) = sig_result {
+            log::info!(
+                "metricName=UpdateTokensV4Failure tokens={} durationMs={} error={}",
+                token_names,
+                pre.elapsed().as_millis(),
+                e
+            );
+            log::error!("{:?}", e)
+        } else {
+            log::info!(
+                "metricName=UpdateTokensV4Success tokens={} durationMs={}",
+                token_names,
+                pre.elapsed().as_millis(),
+            );
+            log::info!("{:?}", sig_result);
         }
     }
 }
@@ -181,11 +164,14 @@ pub async fn loop_consume_events(
         interval.tick().await;
 
         let client = mango_client.clone();
-        let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-            let mut event_queue: EventQueue =
-                client.program().account(perp_market.event_queue).unwrap();
 
-            let mut ams_ = vec![];
+        let prepare_ams = || async {
+            let mut event_queue: EventQueue = client
+                .client
+                .rpc_anchor_account(&perp_market.event_queue)
+                .await?;
+
+            let mut event_ams = vec![];
             let mut num_of_events = 0;
 
             // TODO: future, choose better constant of how many max events to pack
@@ -198,12 +184,12 @@ pub async fn loop_consume_events(
                 match EventType::try_from(event.event_type)? {
                     EventType::Fill => {
                         let fill: &FillEvent = cast_ref(event);
-                        ams_.push(AccountMeta {
+                        event_ams.push(AccountMeta {
                             pubkey: fill.maker,
                             is_signer: false,
                             is_writable: true,
                         });
-                        ams_.push(AccountMeta {
+                        event_ams.push(AccountMeta {
                             pubkey: fill.taker,
                             is_signer: false,
                             is_writable: true,
@@ -211,7 +197,7 @@ pub async fn loop_consume_events(
                     }
                     EventType::Out => {
                         let out: &OutEvent = cast_ref(event);
-                        ams_.push(AccountMeta {
+                        event_ams.push(AccountMeta {
                             pubkey: out.owner,
                             is_signer: false,
                             is_writable: true,
@@ -220,70 +206,66 @@ pub async fn loop_consume_events(
                     EventType::Liquidate => {}
                 }
                 event_queue.pop_front()?;
-                num_of_events+=1;
+                num_of_events += 1;
             }
 
             if num_of_events == 0 {
-                return Ok(());
+                return Ok(None);
             }
 
-            let pre = Instant::now();
-            let sig_result = client
-                .program()
-                .request()
-                .instruction(Instruction {
-                    program_id: mango_v4::id(),
-                    accounts: {
-                        let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                            &mango_v4::accounts::PerpConsumeEvents {
-                                group: perp_market.group,
-                                perp_market: pk,
-                                event_queue: perp_market.event_queue,
-                            },
-                            None,
-                        );
-                        ams.append(&mut ams_);
-                        ams
+            Ok(Some((event_ams, num_of_events)))
+        };
+
+        let event_info: anyhow::Result<Option<(Vec<AccountMeta>, u32)>> = prepare_ams().await;
+
+        let (mut event_ams, num_of_events) = match event_info {
+            Ok(Some(x)) => x,
+            Ok(None) => continue,
+            Err(err) => {
+                log::error!("preparing consume_events ams: {err:?}");
+                continue;
+            }
+        };
+
+        let pre = Instant::now();
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::PerpConsumeEvents {
+                        group: perp_market.group,
+                        perp_market: pk,
+                        event_queue: perp_market.event_queue,
                     },
-                    data: anchor_lang::InstructionData::data(
-                        &mango_v4::instruction::PerpConsumeEvents { limit: 10 },
-                    ),
-                })
-                .send()
-                .map_err(prettify_client_error);
-
-            if let Err(e) = sig_result {
-                log::info!(
-                    "metricName=ConsumeEventsV4Failure market={} durationMs={} consumed={} error={}",
-                    perp_market.name(),
-                    pre.elapsed().as_millis(),
-                    num_of_events,
-                    e.to_string()
+                    None,
                 );
-                log::error!("{:?}", e)
-            } else {
-                log::info!(
-                    "metricName=ConsumeEventsV4Success market={} durationMs={} consumed={}",
-                    perp_market.name(),
-                    pre.elapsed().as_millis(),
-                    num_of_events,
-                );
-                log::info!("{:?}", sig_result);
-            }
+                ams.append(&mut event_ams);
+                ams
+            },
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpConsumeEvents {
+                limit: 10,
+            }),
+        };
 
-            Ok(())
-        })
-        .await;
+        let sig_result = client.send_and_confirm_permissionless_tx(vec![ix]).await;
 
-        match res {
-            Ok(inner_res) => {
-                if inner_res.is_err() {
-                    log::error!("{}", inner_res.unwrap_err());
-                }
-            }
-            Err(join_error) => {
-                log::error!("{}", join_error);
-            }
+        if let Err(e) = sig_result {
+            log::info!(
+                "metricName=ConsumeEventsV4Failure market={} durationMs={} consumed={} error={}",
+                perp_market.name(),
+                pre.elapsed().as_millis(),
+                num_of_events,
+                e.to_string()
+            );
+            log::error!("{:?}", e)
+        } else {
+            log::info!(
+                "metricName=ConsumeEventsV4Success market={} durationMs={} consumed={}",
+                perp_market.name(),
+                pre.elapsed().as_millis(),
+                num_of_events,
+            );
+            log::info!("{:?}", sig_result);
         }
     }
 }
@@ -299,59 +281,39 @@ pub async fn loop_update_funding(
         interval.tick().await;
 
         let client = mango_client.clone();
-        let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-            let pre = Instant::now();
-            let sig_result = client
-                .program()
-                .request()
-                .instruction(Instruction {
-                    program_id: mango_v4::id(),
-                    accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                        &mango_v4::accounts::PerpUpdateFunding {
-                            group: perp_market.group,
-                            perp_market: pk,
-                            bids: perp_market.bids,
-                            asks: perp_market.asks,
-                            oracle: perp_market.oracle,
-                        },
-                        None,
-                    ),
-                    data: anchor_lang::InstructionData::data(
-                        &mango_v4::instruction::PerpUpdateFunding {},
-                    ),
-                })
-                .send()
-                .map_err(prettify_client_error);
-            if let Err(e) = sig_result {
-                log::error!(
-                    "metricName=UpdateFundingV4Error market={} durationMs={} error={}",
-                    perp_market.name(),
-                    pre.elapsed().as_millis(),
-                    e.to_string()
-                );
-                log::error!("{:?}", e)
-            } else {
-                log::info!(
-                    "metricName=UpdateFundingV4Success market={} durationMs={}",
-                    perp_market.name(),
-                    pre.elapsed().as_millis(),
-                );
-                log::info!("{:?}", sig_result);
-            }
 
-            Ok(())
-        })
-        .await;
+        let pre = Instant::now();
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                &mango_v4::accounts::PerpUpdateFunding {
+                    group: perp_market.group,
+                    perp_market: pk,
+                    bids: perp_market.bids,
+                    asks: perp_market.asks,
+                    oracle: perp_market.oracle,
+                },
+                None,
+            ),
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpUpdateFunding {}),
+        };
+        let sig_result = client.send_and_confirm_permissionless_tx(vec![ix]).await;
 
-        match res {
-            Ok(inner_res) => {
-                if inner_res.is_err() {
-                    log::error!("{}", inner_res.unwrap_err());
-                }
-            }
-            Err(join_error) => {
-                log::error!("{}", join_error);
-            }
+        if let Err(e) = sig_result {
+            log::error!(
+                "metricName=UpdateFundingV4Error market={} durationMs={} error={}",
+                perp_market.name(),
+                pre.elapsed().as_millis(),
+                e.to_string()
+            );
+            log::error!("{:?}", e)
+        } else {
+            log::info!(
+                "metricName=UpdateFundingV4Success market={} durationMs={}",
+                perp_market.name(),
+                pre.elapsed().as_millis(),
+            );
+            log::info!("{:?}", sig_result);
         }
     }
 }
