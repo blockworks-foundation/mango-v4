@@ -25,7 +25,7 @@ pub async fn fetch_top(
     use std::time::{SystemTime, UNIX_EPOCH};
     let now_ts: u64 = SystemTime::now()
         .duration_since(UNIX_EPOCH)?
-        .as_millis()
+        .as_secs()
         .try_into()?;
 
     let perp = context.perp(perp_market_index);
@@ -57,6 +57,7 @@ pub async fn fetch_top(
                 return None;
             }
             let mut perp_pos = perp_pos.unwrap().clone();
+            perp_pos.settle_funding(&perp_market);
             perp_pos.update_settle_limit(&perp_market, now_ts);
             let pnl = perp_pos.pnl_for_price(&perp_market, oracle_price).unwrap();
             let limited_pnl = perp_pos.apply_pnl_settle_limit(pnl, &perp_market);
@@ -65,6 +66,7 @@ pub async fn fetch_top(
             {
                 return None;
             }
+            log::info!("{pk} {pnl} {limited_pnl} {oracle_price}");
             Some((*pk, mango_acc, limited_pnl))
         })
         .collect::<Vec<_>>();

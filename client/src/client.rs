@@ -1119,7 +1119,6 @@ impl MangoClient {
                     .context("base64 decoding jupiter transaction")?,
             )
             .context("parsing jupiter transaction")?;
-        log::info!("jup: {jup_tx:#?}");
         let ata_program = anchor_spl::associated_token::ID;
         let token_program = anchor_spl::token::ID;
         let is_setup_ix = |k: Pubkey| -> bool { k == ata_program || k == token_program };
