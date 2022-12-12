@@ -735,6 +735,8 @@ export class HealthCache {
       const zeroHealthRatio = healthRatioAfterSwap(zeroHealthAmount);
       const zeroHealth = healthAfterSwap(zeroHealthAmount);
 
+      console.log(` - zeroHealth ${zeroHealth}`);
+
       amount = HealthCache.binaryApproximationSearch(
         point1Amount,
         point1Ratio,
