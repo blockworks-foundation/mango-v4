@@ -114,13 +114,15 @@ async fn main() -> anyhow::Result<()> {
     // Reading accounts from chain_data
     let account_fetcher = Arc::new(chain_data::AccountFetcher {
         chain_data: chain_data.clone(),
-        rpc: client.rpc(),
+        rpc: client.rpc_async(),
     });
 
-    let mango_account = account_fetcher.fetch_fresh_mango_account(&cli.liqor_mango_account)?;
+    let mango_account = account_fetcher
+        .fetch_fresh_mango_account(&cli.liqor_mango_account)
+        .await?;
     let mango_group = mango_account.fixed.group;
 
-    let group_context = MangoGroupContext::new_from_rpc(mango_group, cluster.clone(), commitment)?;
+    let group_context = MangoGroupContext::new_from_rpc(&client.rpc_async(), mango_group).await?;
 
     let mango_oracles = group_context
         .tokens
@@ -258,7 +260,7 @@ async fn main() -> anyhow::Result<()> {
                             std::iter::once(&account_write.pubkey),
                             &liq_config,
                             &rebalance_config,
-                        )?;
+                        ).await?;
                     }
 
                     if is_mango_bank(&account_write.account, &mango_program, &mango_group).is_some() || oracles.contains(&account_write.pubkey) {
@@ -280,7 +282,7 @@ async fn main() -> anyhow::Result<()> {
                             mango_accounts.iter(),
                             &liq_config,
                             &rebalance_config,
-                        )?;
+                        ).await?;
                     }
                 }
             },
@@ -313,12 +315,12 @@ async fn main() -> anyhow::Result<()> {
                     mango_accounts.iter(),
                     &liq_config,
                     &rebalance_config,
-                )?;
+                ).await?;
             },
 
             _ = rebalance_interval.tick() => {
                 if one_snapshot_done {
-                    if let Err(err) = rebalance::zero_all_non_quote(&mango_client, &account_fetcher, &cli.liqor_mango_account, &rebalance_config) {
+                    if let Err(err) = rebalance::zero_all_non_quote(&mango_client, &account_fetcher, &cli.liqor_mango_account, &rebalance_config).await {
                         log::error!("failed to rebalance liqor: {:?}", err);
 
                         // Workaround: We really need a sequence enforcer in the liquidator since we don't want to
@@ -332,20 +334,20 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-fn liquidate<'a>(
+async fn liquidate<'a>(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     accounts: impl Iterator<Item = &'a Pubkey>,
     config: &liquidate::Config,
     rebalance_config: &rebalance::Config,
 ) -> anyhow::Result<()> {
-    if !liquidate::maybe_liquidate_one(mango_client, account_fetcher, accounts, config) {
+    if !liquidate::maybe_liquidate_one(mango_client, account_fetcher, accounts, config).await {
         return Ok(());
     }
 
     let liqor = &mango_client.mango_account_address;
     if let Err(err) =
-        rebalance::zero_all_non_quote(mango_client, account_fetcher, liqor, rebalance_config)
+        rebalance::zero_all_non_quote(mango_client, account_fetcher, liqor, rebalance_config).await
     {
         log::error!("failed to rebalance liqor: {:?}", err);
     }

@@ -119,7 +119,8 @@ impl Rpc {
     }
 }
 
-fn main() -> Result<(), anyhow::Error> {
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
     env_logger::init_from_env(
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
     );
@@ -137,7 +138,7 @@ fn main() -> Result<(), anyhow::Error> {
                 num
             } else {
                 // find free account_num
-                let accounts = MangoClient::find_accounts(&client, group, &owner)?;
+                let accounts = MangoClient::find_accounts(&client, group, &owner).await?;
                 if accounts.is_empty() {
                     0
                 } else {
@@ -149,14 +150,9 @@ fn main() -> Result<(), anyhow::Error> {
                         + 1
                 }
             };
-            let (account, txsig) = MangoClient::create_account(
-                &client,
-                group,
-                &owner,
-                &owner,
-                account_num,
-                &cmd.name,
-            )?;
+            let (account, txsig) =
+                MangoClient::create_account(&client, group, &owner, &owner, account_num, &cmd.name)
+                    .await?;
             println!("{}", account);
             println!("{}", txsig);
         }
@@ -165,8 +161,8 @@ fn main() -> Result<(), anyhow::Error> {
             let account = client::pubkey_from_cli(&cmd.account);
             let owner = client::keypair_from_cli(&cmd.owner);
             let mint = client::pubkey_from_cli(&cmd.mint);
-            let client = MangoClient::new_for_existing_account(client, account, owner)?;
-            let txsig = client.token_deposit(mint, cmd.amount)?;
+            let client = MangoClient::new_for_existing_account(client, account, owner).await?;
+            let txsig = client.token_deposit(mint, cmd.amount).await?;
             println!("{}", txsig);
         }
         Command::JupiterSwap(cmd) => {
@@ -175,14 +171,16 @@ fn main() -> Result<(), anyhow::Error> {
             let owner = client::keypair_from_cli(&cmd.owner);
             let input_mint = client::pubkey_from_cli(&cmd.input_mint);
             let output_mint = client::pubkey_from_cli(&cmd.output_mint);
-            let client = MangoClient::new_for_existing_account(client, account, owner)?;
-            let txsig = client.jupiter_swap(
-                input_mint,
-                output_mint,
-                cmd.amount,
-                cmd.slippage,
-                client::JupiterSwapMode::ExactIn,
-            )?;
+            let client = MangoClient::new_for_existing_account(client, account, owner).await?;
+            let txsig = client
+                .jupiter_swap(
+                    input_mint,
+                    output_mint,
+                    cmd.amount,
+                    cmd.slippage,
+                    client::JupiterSwapMode::ExactIn,
+                )
+                .await?;
             println!("{}", txsig);
         }
         Command::GroupAddress { creator, num } => {

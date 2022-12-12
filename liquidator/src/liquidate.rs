@@ -1,15 +1,15 @@
+use std::collections::HashSet;
 use std::time::Duration;
 
 use client::{chain_data, health_cache, AccountFetcher, MangoClient, MangoClientError};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::{HealthCache, HealthType};
 use mango_v4::state::{
-    Bank, MangoAccountValue, PerpMarketIndex, Serum3Orders, Side, TokenIndex, QUOTE_TOKEN_INDEX,
+    Bank, MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX,
 };
 use solana_sdk::signature::Signature;
 
 use futures::{stream, StreamExt, TryStreamExt};
-use itertools::Itertools;
 use rand::seq::SliceRandom;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
@@ -82,6 +82,8 @@ struct LiquidateHelper<'a> {
     health_cache: &'a HealthCache,
     maint_health: I80F48,
     liqor_min_health_ratio: I80F48,
+    allowed_asset_tokens: HashSet<Pubkey>,
+    allowed_liab_tokens: HashSet<Pubkey>,
 }
 
 impl<'a> LiquidateHelper<'a> {
@@ -439,8 +441,9 @@ impl<'a> LiquidateHelper<'a> {
             .rev()
             .find(|(asset_token_index, _asset_price, asset_usdc_equivalent)| {
                 asset_usdc_equivalent.is_positive()
-                    && jupiter_market_can_sell(self.client, *asset_token_index, QUOTE_TOKEN_INDEX)
-                        .await
+                    && self
+                        .allowed_asset_tokens
+                        .contains(&self.client.context.token(*asset_token_index).mint_info.mint)
             })
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -454,8 +457,9 @@ impl<'a> LiquidateHelper<'a> {
             .iter()
             .find(|(liab_token_index, _liab_price, liab_usdc_equivalent)| {
                 liab_usdc_equivalent.is_negative()
-                    && jupiter_market_can_buy(self.client, *liab_token_index, QUOTE_TOKEN_INDEX)
-                        .await
+                    && self
+                        .allowed_liab_tokens
+                        .contains(&self.client.context.token(*liab_token_index).mint_info.mint)
             })
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -468,6 +472,7 @@ impl<'a> LiquidateHelper<'a> {
 
         let max_liab_transfer = self
             .max_token_liab_transfer(liab_token_index, asset_token_index)
+            .await
             .context("getting max_liab_transfer")?;
 
         //
@@ -482,6 +487,7 @@ impl<'a> LiquidateHelper<'a> {
                 liab_token_index,
                 max_liab_transfer,
             )
+            .await
             .context("sending liq_token_with_token")?;
         log::info!(
             "Liquidated token with token for {}, maint_health was {}, tx sig {:?}",
@@ -492,12 +498,12 @@ impl<'a> LiquidateHelper<'a> {
         Ok(Some(sig))
     }
 
-    fn token_liq_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
+    async fn token_liq_bankruptcy(&self) -> anyhow::Result<Option<Signature>> {
         if !self.health_cache.can_call_spot_bankruptcy() {
             return Ok(None);
         }
 
-        let tokens = self.tokens()?;
+        let tokens = self.tokens().await?;
 
         if tokens.is_empty() {
             anyhow::bail!(
@@ -509,7 +515,9 @@ impl<'a> LiquidateHelper<'a> {
             .iter()
             .find(|(liab_token_index, _liab_price, liab_usdc_equivalent)| {
                 liab_usdc_equivalent.is_negative()
-                    && jupiter_market_can_buy(self.client, *liab_token_index, QUOTE_TOKEN_INDEX)
+                    && self
+                        .allowed_liab_tokens
+                        .contains(&self.client.context.token(*liab_token_index).mint_info.mint)
             })
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -521,8 +529,9 @@ impl<'a> LiquidateHelper<'a> {
             .0;
 
         let quote_token_index = 0;
-        let max_liab_transfer =
-            self.max_token_liab_transfer(liab_token_index, quote_token_index)?;
+        let max_liab_transfer = self
+            .max_token_liab_transfer(liab_token_index, quote_token_index)
+            .await?;
 
         let sig = self
             .client
@@ -531,6 +540,7 @@ impl<'a> LiquidateHelper<'a> {
                 liab_token_index,
                 max_liab_transfer,
             )
+            .await
             .context("sending liq_token_bankruptcy")?;
         log::info!(
             "Liquidated bankruptcy for {}, maint_health was {}, tx sig {:?}",
@@ -541,7 +551,7 @@ impl<'a> LiquidateHelper<'a> {
         Ok(Some(sig))
     }
 
-    fn send_liq_tx(&self) -> anyhow::Result<Signature> {
+    async fn send_liq_tx(&self) -> anyhow::Result<Signature> {
         // TODO: Should we make an attempt to settle positive PNL first?
         // The problem with it is that small market movements can continuously create
         // small amounts of new positive PNL while base_position > 0.
@@ -552,14 +562,14 @@ impl<'a> LiquidateHelper<'a> {
         // }
 
         // Try to close orders before touching the user's positions
-        if let Some(txsig) = self.perp_close_orders()? {
+        if let Some(txsig) = self.perp_close_orders().await? {
             return Ok(txsig);
         }
-        if let Some(txsig) = self.serum3_close_orders()? {
+        if let Some(txsig) = self.serum3_close_orders().await? {
             return Ok(txsig);
         }
 
-        if let Some(txsig) = self.perp_liq_base_position()? {
+        if let Some(txsig) = self.perp_liq_base_position().await? {
             return Ok(txsig);
         }
 
@@ -568,21 +578,21 @@ impl<'a> LiquidateHelper<'a> {
         // It's possible that some positive pnl can't be settled (if there's
         // no liquid counterparty) and that some negative pnl can't be settled
         // (if the liqee isn't liquid enough).
-        if let Some(txsig) = self.perp_settle_pnl()? {
+        if let Some(txsig) = self.perp_settle_pnl().await? {
             return Ok(txsig);
         }
 
-        if let Some(txsig) = self.token_liq()? {
+        if let Some(txsig) = self.token_liq().await? {
             return Ok(txsig);
         }
 
         // Socialize/insurance fund unsettleable negative pnl
-        if let Some(txsig) = self.perp_liq_bankruptcy()? {
+        if let Some(txsig) = self.perp_liq_bankruptcy().await? {
             return Ok(txsig);
         }
 
         // Socialize/insurance fund unliquidatable borrows
-        if let Some(txsig) = self.token_liq_bankruptcy()? {
+        if let Some(txsig) = self.token_liq_bankruptcy().await? {
             return Ok(txsig);
         }
 
@@ -597,7 +607,7 @@ impl<'a> LiquidateHelper<'a> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn maybe_liquidate_account(
+pub async fn maybe_liquidate_account(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     pubkey: &Pubkey,
@@ -606,8 +616,9 @@ pub fn maybe_liquidate_account(
     let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
 
     let account = account_fetcher.fetch_mango_account(pubkey)?;
-    let health_cache =
-        health_cache::new(&mango_client.context, account_fetcher, &account).expect("always ok");
+    let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
+        .await
+        .expect("always ok");
     let maint_health = health_cache.health(HealthType::Maint);
     if !health_cache.is_liquidatable() {
         return Ok(false);
@@ -623,9 +634,10 @@ pub fn maybe_liquidate_account(
     // Fetch a fresh account and re-compute
     // This is -- unfortunately -- needed because the websocket streams seem to not
     // be great at providing timely updates to the account data.
-    let account = account_fetcher.fetch_fresh_mango_account(pubkey)?;
-    let health_cache =
-        health_cache::new(&mango_client.context, account_fetcher, &account).expect("always ok");
+    let account = account_fetcher.fetch_fresh_mango_account(pubkey).await?;
+    let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
+        .await
+        .expect("always ok");
     if !health_cache.is_liquidatable() {
         return Ok(false);
     }
@@ -641,15 +653,21 @@ pub fn maybe_liquidate_account(
         health_cache: &health_cache,
         maint_health,
         liqor_min_health_ratio,
+        allowed_asset_tokens: HashSet::default(),
+        allowed_liab_tokens: HashSet::default(),
     }
-    .send_liq_tx()?;
+    .send_liq_tx()
+    .await?;
 
-    let slot = account_fetcher.transaction_max_slot(&[txsig])?;
-    if let Err(e) = account_fetcher.refresh_accounts_via_rpc_until_slot(
-        &[*pubkey, mango_client.mango_account_address],
-        slot,
-        config.refresh_timeout,
-    ) {
+    let slot = account_fetcher.transaction_max_slot(&[txsig]).await?;
+    if let Err(e) = account_fetcher
+        .refresh_accounts_via_rpc_until_slot(
+            &[*pubkey, mango_client.mango_account_address],
+            slot,
+            config.refresh_timeout,
+        )
+        .await
+    {
         log::info!("could not refresh after liquidation: {}", e);
     }
 
@@ -657,14 +675,14 @@ pub fn maybe_liquidate_account(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn maybe_liquidate_one<'a>(
+pub async fn maybe_liquidate_one<'a>(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     accounts: impl Iterator<Item = &'a Pubkey>,
     config: &Config,
 ) -> bool {
     for pubkey in accounts {
-        match maybe_liquidate_account(mango_client, account_fetcher, pubkey, config) {
+        match maybe_liquidate_account(mango_client, account_fetcher, pubkey, config).await {
             Err(err) => {
                 // Not all errors need to be raised to the user's attention.
                 let mut log_level = log::Level::Error;
