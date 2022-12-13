@@ -462,12 +462,33 @@ export class MangoAccount {
     const initHealthWithoutExistingPosition = initHealth.sub(
       existingPositionHealthContrib,
     );
-    const maxBorrowNative = initHealthWithoutExistingPosition
+    let maxBorrowNative = initHealthWithoutExistingPosition
       .div(tokenBank.initLiabWeight)
       .div(tokenBank.price);
+
+    // Cap maxBorrow to maintain minVaultToDepositsRatio on the bank
+    const vaultAmount = group.vaultAmountsMap.get(tokenBank.vault.toBase58());
+    if (!vaultAmount) {
+      throw new Error(
+        `No vault amount found for ${tokenBank.name} vault ${tokenBank.vault}!`,
+      );
+    }
+    const vaultAmountAfterWithdrawingDeposits = I80F48.fromU64(vaultAmount).sub(
+      existingTokenDeposits,
+    );
+    const expectedVaultMinAmount = tokenBank
+      .nativeDeposits()
+      .mul(I80F48.fromNumber(tokenBank.minVaultToDepositsRatio));
+    if (vaultAmountAfterWithdrawingDeposits.gt(expectedVaultMinAmount)) {
+      maxBorrowNative = maxBorrowNative.min(
+        vaultAmountAfterWithdrawingDeposits.sub(expectedVaultMinAmount),
+      );
+    }
+
     const maxBorrowNativeWithoutFees = maxBorrowNative.div(
       ONE_I80F48().add(tokenBank.loanOriginationFeeRate),
     );
+
     return maxBorrowNativeWithoutFees.add(existingTokenDeposits);
   }
 
