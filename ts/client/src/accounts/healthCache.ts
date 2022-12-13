@@ -548,26 +548,43 @@ export class HealthCache {
     );
   }
 
+  private static scanRightUntilLessThan(
+    start: I80F48,
+    target: I80F48,
+    fun: (amount: I80F48) => I80F48,
+  ): I80F48 {
+    const maxIterations = 20;
+    let current = start;
+    for (const key of Array(maxIterations).fill(0).keys()) {
+      const value = fun(current);
+      if (value.lt(target)) {
+        return current;
+      }
+      current = current.max(ONE_I80F48()).mul(I80F48.fromNumber(2));
+    }
+    throw new Error('Could not find amount that led to health ratio <=0');
+  }
+
   private static binaryApproximationSearch(
     left: I80F48,
-    leftRatio: I80F48,
+    leftValue: I80F48,
     right: I80F48,
-    rightRatio: I80F48,
-    targetRatio: I80F48,
+    targetValue: I80F48,
     minStep: I80F48,
-    healthRatioAfterActionFn: (I80F48) => I80F48,
+    fun: (I80F48) => I80F48,
   ): I80F48 {
     const maxIterations = 20;
     const targetError = I80F48.fromNumber(0.1);
+    const rightValue = fun(right);
 
     if (
-      (leftRatio.sub(targetRatio).isPos() &&
-        rightRatio.sub(targetRatio).isPos()) ||
-      (leftRatio.sub(targetRatio).isNeg() &&
-        rightRatio.sub(targetRatio).isNeg())
+      (leftValue.sub(targetValue).isPos() &&
+        rightValue.sub(targetValue).isPos()) ||
+      (leftValue.sub(targetValue).isNeg() &&
+        rightValue.sub(targetValue).isNeg())
     ) {
       throw new Error(
-        `Internal error: left ${leftRatio.toNumber()}  and right ${rightRatio.toNumber()} don't contain the target value ${targetRatio.toNumber()}, likely reason is the zeroAmount not been tight enough!`,
+        `Internal error: left ${leftValue.toNumber()}  and right ${rightValue.toNumber()} don't contain the target value ${targetValue.toNumber()}!`,
       );
     }
 
@@ -578,25 +595,16 @@ export class HealthCache {
         return left;
       }
       newAmount = left.add(right).mul(I80F48.fromNumber(0.5));
-      const newAmountRatio = healthRatioAfterActionFn(newAmount);
-      const error = newAmountRatio.sub(targetRatio);
+      const newAmountRatio = fun(newAmount);
+      const error = newAmountRatio.sub(targetValue);
       if (error.isPos() && error.lt(targetError)) {
         return newAmount;
       }
-      if (newAmountRatio.gt(targetRatio) != rightRatio.gt(targetRatio)) {
+      if (newAmountRatio.gt(targetValue) != rightValue.gt(targetValue)) {
         left = newAmount;
-        leftRatio = newAmountRatio;
       } else {
         right = newAmount;
-        rightRatio = newAmountRatio;
       }
-      // console.log(
-      //   ` -- ${left.toNumber().toFixed(3)} (${leftRatio
-      //     .toNumber()
-      //     .toFixed(3)}) ${right.toNumber().toFixed(3)} (${rightRatio
-      //     .toNumber()
-      //     .toFixed(3)})`,
-      // );
     }
 
     console.error(
@@ -726,33 +734,45 @@ export class HealthCache {
       // search to the right of point1Amount: but how far?
       // At point1, source.balance < 0 and target.balance > 0, so use a simple estimation for
       // zero health: health - source_liab_weight * a + target_asset_weight * a * priceFactor = 0.
+      // where a is the source token native amount.
+      // Note that this is just an estimate. Swapping can increase the amount that serum3
+      // reserved contributions offset, moving the actual zero point further to the right.
       if (point1Health.lte(ZERO_I80F48())) {
         return ZERO_I80F48();
       }
-      const zeroHealthAmount = point1Amount.sub(
-        point1Health.div(finalHealthSlope),
+      const zeroHealthEstimate = point1Amount.sub(
+        point1Health.sub(finalHealthSlope),
       );
-      const zeroHealthRatio = healthRatioAfterSwap(zeroHealthAmount);
-      const zeroHealth = healthAfterSwap(zeroHealthAmount);
-
-      console.log(` - zeroHealth ${zeroHealth}`);
-
-      amount = HealthCache.binaryApproximationSearch(
-        point1Amount,
-        point1Ratio,
-        zeroHealthAmount,
-        zeroHealthRatio,
+      const rightBound = HealthCache.scanRightUntilLessThan(
+        zeroHealthEstimate,
         minRatio,
-        ZERO_I80F48(),
         healthRatioAfterSwap,
       );
+      if (rightBound.eq(zeroHealthEstimate)) {
+        amount = HealthCache.binaryApproximationSearch(
+          point1Amount,
+          point1Ratio,
+          rightBound,
+          minRatio,
+          ZERO_I80F48(),
+          healthRatioAfterSwap,
+        );
+      } else {
+        amount = HealthCache.binaryApproximationSearch(
+          zeroHealthEstimate,
+          healthRatioAfterSwap(zeroHealthEstimate),
+          rightBound,
+          minRatio,
+          ZERO_I80F48(),
+          healthRatioAfterSwap,
+        );
+      }
     } else if (point0Ratio.gte(minRatio)) {
       // Must be between point0Amount and point1Amount.
       amount = HealthCache.binaryApproximationSearch(
         point0Amount,
         point0Ratio,
         point1Amount,
-        point1Ratio,
         minRatio,
         ZERO_I80F48(),
         healthRatioAfterSwap,
@@ -763,7 +783,6 @@ export class HealthCache {
         ZERO_I80F48(),
         initialRatio,
         point0Amount,
-        point0Ratio,
         minRatio,
         ZERO_I80F48(),
         healthRatioAfterSwap,
@@ -882,7 +901,6 @@ export class HealthCache {
       initialAmount,
       initialRatio,
       zeroAmount,
-      zeroAmountRatio,
       minRatio,
       ONE_I80F48(),
       healthRatioAfterPlacingOrder,
@@ -996,7 +1014,6 @@ export class HealthCache {
         case1Start,
         case1StartRatio,
         zeroHealthAmount,
-        zeroHealthRatio,
         minRatio,
         ONE_I80F48(),
         healthRatioAfterTradeTrunc,
@@ -1007,7 +1024,6 @@ export class HealthCache {
         ZERO_I80F48(),
         initialRatio,
         case1Start,
-        case1StartRatio,
         minRatio,
         ONE_I80F48(),
         healthRatioAfterTradeTrunc,
