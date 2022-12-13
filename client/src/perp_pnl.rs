@@ -66,7 +66,6 @@ pub async fn fetch_top(
             {
                 return None;
             }
-            log::info!("{pk} {pnl} {limited_pnl} {oracle_price}");
             Some((*pk, mango_acc, limited_pnl))
         })
         .collect::<Vec<_>>();

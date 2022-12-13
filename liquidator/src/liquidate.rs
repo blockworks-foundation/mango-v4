@@ -257,7 +257,6 @@ impl<'a> LiquidateHelper<'a> {
                     return None;
                 }
                 let pnl = pp.quote_position_native();
-                log::info!("{} {perp_settle_health} {pnl}", pp.market_index);
                 let settleable_pnl = if pnl > 0 {
                     pnl
                 } else if pnl < 0 && perp_settle_health > 0 {
@@ -276,16 +275,15 @@ impl<'a> LiquidateHelper<'a> {
         }
 
         for (perp_index, pnl) in perp_settleable_pnl {
-            let direction = if pnl > 0 {
-                client::perp_pnl::Direction::MaxNegative
-            } else {
-                client::perp_pnl::Direction::MaxPositive
-            };
+            if pnl <= 0 {
+                // Settling negative pnl can't bring up account health: not part of liquidation
+                continue;
+            }
             let counters = client::perp_pnl::fetch_top(
                 &self.client.context,
                 self.account_fetcher,
                 perp_index,
-                direction,
+                client::perp_pnl::Direction::MaxNegative,
                 2,
             )
             .await?;
@@ -297,6 +295,22 @@ impl<'a> LiquidateHelper<'a> {
                 continue;
             }
             let (counter_key, counter_acc, counter_pnl) = counters.first().unwrap();
+
+            // TODO: configurable
+            let settle_pnl_threshold = I80F48::from(10_000_000);
+            let settle_pnl_min_fraction = I80F48::from_num(0.01);
+
+            let settleable_pnl_abs = pnl.abs().min(counter_pnl.abs());
+            if settleable_pnl_abs < settle_pnl_threshold {
+                log::info!("Skipping settle perp pnl account: {} market_index: {perp_index} amount: {pnl} against {counter_key} with pnl: {counter_pnl}; settleable amount too low", self.pubkey);
+                continue;
+            }
+            let maint_health = self.health_cache.health(HealthType::Maint);
+            if settleable_pnl_abs < settle_pnl_min_fraction * maint_health.abs() {
+                log::info!("Skipping settle perp pnl account: {} market_index: {perp_index} amount: {pnl} against {counter_key} with pnl: {counter_pnl}; settleable amount below min health fraction", self.pubkey);
+                continue;
+            }
+
             log::info!("Trying to settle perp pnl account: {} market_index: {perp_index} amount: {pnl} against {counter_key} with pnl: {counter_pnl}", self.pubkey);
 
             let (account_a, account_b) = if pnl > 0 {
@@ -430,7 +444,7 @@ impl<'a> LiquidateHelper<'a> {
     }
 
     async fn token_liq(&self) -> anyhow::Result<Option<Signature>> {
-        if !self.health_cache.has_borrows() || self.health_cache.can_call_spot_bankruptcy() {
+        if !self.health_cache.has_spot_assets() || !self.health_cache.has_borrows() {
             return Ok(None);
         }
 
