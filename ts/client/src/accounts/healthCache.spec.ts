@@ -713,7 +713,7 @@ describe('Health Cache', () => {
   it('test_max_perp', (done) => {
     const baseLotSize = 100;
     const b0 = mockBankAndOracle(0 as TokenIndex, 0.0, 0.0, 1, 1);
-    const p0 = mockPerpMarket(0, 0.3, 0.3, baseLotSize, 2, 2);
+    const p0 = mockPerpMarket(0, 0.3, 0.3, baseLotSize, 2);
     const hc = new HealthCache(
       [TokenInfo.fromBank(b0, I80F48.fromNumber(0))],
       [],
