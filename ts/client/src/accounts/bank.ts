@@ -72,7 +72,6 @@ export class Bank implements BankForHealth {
   static from(
     publicKey: PublicKey,
     obj: {
-      // TODO: rearrange fields to have same order as in bank.rs
       group: PublicKey;
       name: number[];
       mint: PublicKey;

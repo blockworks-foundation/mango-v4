@@ -126,7 +126,6 @@ export async function buildVersionedTx(
     addressLookupTableAccounts: alts,
   });
   const vTx = new VersionedTransaction(message);
-  // TODO: remove use of any when possible in future
   vTx.sign([
     ((provider as AnchorProvider).wallet as any).payer as Signer,
     ...additionalSigners,
