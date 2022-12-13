@@ -104,29 +104,34 @@ async function debugUser(
       group.banksMapByName.get(src)![0].uiPrice /
         group.banksMapByName.get(tgt)![0].uiPrice,
     );
-    const maxTargetUi =
-      maxSourceUi *
+
+    const maxSourceWoFees =
+      -maxSourceUi *
+      (1 + group.banksMapByName.get(src)![0].loanOriginationFeeRate.toNumber());
+    const maxTargetWoFees =
+      -maxSourceWoFees *
       (group.banksMapByName.get(src)![0].uiPrice /
         group.banksMapByName.get(tgt)![0].uiPrice);
+
     const sim = mangoAccount.simHealthRatioWithTokenPositionUiChanges(group, [
       {
         mintPk: group.banksMapByName.get(src)![0].mint,
-        uiTokenAmount: -maxSourceUi,
+        uiTokenAmount: maxSourceWoFees,
       },
       {
         mintPk: group.banksMapByName.get(tgt)![0].mint,
-        uiTokenAmount: maxTargetUi,
+        uiTokenAmount: maxTargetWoFees,
       },
     ]);
-    if (maxSourceUi > 0) {
-      expect(sim).gt(2);
-      expect(sim).lt(3);
-    }
     console.log(
       `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
         maxSourceUi.toFixed(3).padStart(10) +
         `, health ratio after (${sim.toFixed(3).padStart(10)})`,
     );
+    if (maxSourceUi > 0 && src !== tgt) {
+      expect(sim).gt(2);
+      expect(sim).lt(3);
+    }
   }
   for (const srcToken of Array.from(group.banksMapByName.keys()).sort()) {
     for (const tgtToken of Array.from(group.banksMapByName.keys()).sort()) {
@@ -146,8 +151,6 @@ async function debugUser(
       maxQuoteUi / perpMarket.uiPrice,
       perpMarket.uiPrice,
     );
-    expect(simMaxQuote).gt(2);
-    expect(simMaxQuote).lt(3);
     const maxBaseUi = mangoAccount.getMaxBaseForPerpAskUi(
       group,
       perpMarket.perpMarketIndex,
@@ -159,8 +162,6 @@ async function debugUser(
       maxBaseUi,
       perpMarket.uiPrice,
     );
-    expect(simMaxBase).gt(2);
-    expect(simMaxBase).lt(3);
     console.log(
       `getMaxPerp ${perpMarket.name.padStart(
         10,
@@ -174,6 +175,8 @@ async function debugUser(
         .toFixed(3)
         .padStart(10)})`,
     );
+    expect(simMaxQuote).gt(2);
+    expect(simMaxQuote).lt(3);
   }
   for (const perpMarket of Array.from(
     group.perpMarketsMapByMarketIndex.values(),

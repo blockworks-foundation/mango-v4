@@ -124,29 +124,9 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // Cap settlement of unrealized pnl
     // Settles at most x100% each hour
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
-    let a_settle_limit_used =
-        a_perp_position.update_and_get_used_settle_limit(&perp_market, now_ts);
-    b_perp_position.update_and_get_used_settle_limit(&perp_market, now_ts);
-
-    let a_settleable_pnl = if perp_market.settle_pnl_limit_factor >= 0.0 {
-        let realized_pnl = a_perp_position.realized_pnl_native;
-        let unrealized_pnl = cm!(a_pnl - realized_pnl);
-        let a_base_lots = I80F48::from(a_perp_position.base_position_lots());
-        let avg_entry_price_lots = I80F48::from_num(a_perp_position.avg_entry_price_per_base_lot);
-        let max_allowed_in_window =
-            cm!(perp_market.settle_pnl_limit_factor() * a_base_lots * avg_entry_price_lots).abs();
-
-        let unrealized_pnl_capped_for_window = unrealized_pnl
-            .min(cm!(
-                max_allowed_in_window - I80F48::from_num(a_settle_limit_used)
-            ))
-            .max(I80F48::ZERO);
-        a_pnl
-            .min(cm!(realized_pnl + unrealized_pnl_capped_for_window))
-            .max(I80F48::ZERO)
-    } else {
-        a_pnl
-    };
+    a_perp_position.update_settle_limit(&perp_market, now_ts);
+    b_perp_position.update_settle_limit(&perp_market, now_ts);
+    let a_settleable_pnl = a_perp_position.apply_pnl_settle_limit(a_pnl, &perp_market);
 
     require!(
         a_settleable_pnl.is_positive(),

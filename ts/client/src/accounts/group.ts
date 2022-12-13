@@ -103,14 +103,14 @@ export class Group {
         Promise.all([
           this.reloadBankOraclePrices(client),
           this.reloadVaults(client),
+          this.reloadPerpMarkets(client, ids).then(() =>
+            this.reloadPerpMarketOraclePrices(client),
+          ),
         ]),
       ),
       this.reloadMintInfos(client, ids),
       this.reloadSerum3Markets(client, ids).then(() =>
         this.reloadSerum3ExternalMarkets(client),
-      ),
-      this.reloadPerpMarkets(client, ids).then(() =>
-        this.reloadPerpMarketOraclePrices(client),
       ),
     ]);
     // console.timeEnd('group.reload');
@@ -346,16 +346,16 @@ export class Group {
     ) {
       const stubOracle = coder.decode('stubOracle', ai.data);
       price = new I80F48(stubOracle.price.val);
-      uiPrice = this?.toUiPrice(price, baseDecimals);
+      uiPrice = this.toUiPrice(price, baseDecimals);
     } else if (isPythOracle(ai)) {
       uiPrice = parsePriceData(ai.data).previousPrice;
-      price = this?.toNativePrice(uiPrice, baseDecimals);
+      price = this.toNativePrice(uiPrice, baseDecimals);
     } else if (isSwitchboardOracle(ai)) {
       uiPrice = await parseSwitchboardOracle(
         ai,
         client.program.provider.connection,
       );
-      price = this?.toNativePrice(uiPrice, baseDecimals);
+      price = this.toNativePrice(uiPrice, baseDecimals);
     } else {
       throw new Error(
         `Unknown oracle provider (parsing not implemented) for oracle ${oracle}, with owner ${ai.owner}!`,
@@ -569,8 +569,8 @@ export class Group {
     }
   }
 
-  public toUiPrice(price: I80F48, baseDecimals: number): number {
-    return toUiDecimals(price, baseDecimals - this.getInsuranceMintDecimals());
+  public toUiPrice(price: I80F48 | number, baseDecimals: number): number {
+    return toUiDecimals(price, this.getInsuranceMintDecimals() - baseDecimals);
   }
 
   public toNativePrice(uiPrice: number, baseDecimals: number): I80F48 {
