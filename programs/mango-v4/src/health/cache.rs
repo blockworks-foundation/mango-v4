@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 
 use fixed::types::I80F48;
-use fixed_macro::types::I80F48;
 
 use crate::error::*;
 use crate::state::{
@@ -11,8 +10,6 @@ use crate::state::{
 use crate::util::checked_math as cm;
 
 use super::*;
-
-const ONE_NATIVE_USDC_IN_USD: I80F48 = I80F48!(0.000001);
 
 /// Information about prices for a bank or perp market.
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
