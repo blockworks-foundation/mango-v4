@@ -487,10 +487,16 @@ mod tests {
         let (mut bank0, _) = mock_bank_and_oracle(group, 0, 1.0, 0.1, 0.1);
         let (mut bank1, _) = mock_bank_and_oracle(group, 1, 5.0, 0.2, 0.2);
         let (mut bank2, _) = mock_bank_and_oracle(group, 2, 5.0, 0.3, 0.3);
+
+        let (mut bank3, _) = mock_bank_and_oracle(group, 3, 0.02, 0.3, 0.3);
+        bank3.data().init_asset_weight = I80F48::ZERO;
+        bank3.data().maint_asset_weight = I80F48::ZERO;
+
         let banks = [
             bank0.data().clone(),
             bank1.data().clone(),
             bank2.data().clone(),
+            bank3.data().clone(),
         ];
 
         let health_cache = HealthCache {
@@ -508,6 +514,13 @@ mod tests {
                 TokenInfo {
                     token_index: 2,
                     prices: Prices::new_single_price(I80F48::from_num(4.0)),
+                    ..default_token_info(0.3)
+                },
+                TokenInfo {
+                    token_index: 3,
+                    prices: Prices::new_single_price(I80F48::from_num(0.02)),
+                    maint_asset_weight: I80F48::ZERO,
+                    init_asset_weight: I80F48::ZERO,
                     ..default_token_info(0.3)
                 },
             ],
@@ -541,7 +554,7 @@ mod tests {
                                     target: TokenIndex,
                                     ratio: f64,
                                     price_factor: f64,
-                                    banks: [Bank; 3]| {
+                                    banks: [Bank; 4]| {
             let source_price = &c.token_infos[source as usize].prices;
             let source_bank = &banks[source as usize];
             let target_price = &c.token_infos[target as usize].prices;
@@ -585,7 +598,7 @@ mod tests {
                                      target: TokenIndex,
                                      ratio: f64,
                                      price_factor: f64,
-                                     banks: [Bank; 3]| {
+                                     banks: [Bank; 4]| {
             let (source_amount, actual_ratio, minus_ratio, plus_ratio) =
                 find_max_swap_actual(c, source, target, ratio, price_factor, banks);
             println!(
@@ -716,6 +729,20 @@ mod tests {
                     check_max_swap_result(&health_cache, 1, 2, target, price_factor, banks);
                     check_max_swap_result(&health_cache, 2, 0, target, price_factor, banks);
                     check_max_swap_result(&health_cache, 2, 1, target, price_factor, banks);
+                }
+            }
+        }
+
+        {
+            // swap to trustless token
+            println!("test 7");
+            let mut health_cache = health_cache.clone();
+            adjust_by_usdc(&mut health_cache, 0, 1.0);
+
+            for price_factor in [50] {
+                for target in 1..3 {
+                    let target = target as f64;
+                    check_max_swap_result(&health_cache, 0, 3, target, price_factor, banks);
                 }
             }
         }
