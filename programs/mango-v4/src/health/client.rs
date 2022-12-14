@@ -747,6 +747,25 @@ mod tests {
                 }
             }
         }
+
+        {
+            // swap out of <0 init health, by swapping a lower asset weight token to one with higher asset weight
+            println!("test 8");
+            let mut health_cache = health_cache.clone();
+            adjust_by_usdc(&mut health_cache, 0, -1.5);
+            adjust_by_usdc(&mut health_cache, 2, 1.0);
+            dbg!(health_cache.health(HealthType::Init));
+            check_max_swap_result(
+                &health_cache,
+                2,
+                0,
+                1.,
+                (health_cache.token_infos[2].prices.oracle
+                    / health_cache.token_infos[0].prices.oracle)
+                    .to_num(),
+                banks,
+            );
+        }
     }
 
     #[test]
