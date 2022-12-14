@@ -178,8 +178,10 @@ async function debugUser(
         .toFixed(3)
         .padStart(10)})`,
     );
-    expect(simMaxQuote).gt(2);
-    expect(simMaxQuote).lt(3);
+    if (maxQuoteUi > 0) {
+      expect(simMaxQuote).gt(2);
+      expect(simMaxQuote).lt(3);
+    }
   }
   for (const perpMarket of Array.from(
     group.perpMarketsMapByMarketIndex.values(),
@@ -254,8 +256,17 @@ async function main(): Promise<void> {
     // ]);
 
     for (const mangoAccount of mangoAccounts) {
-      console.log(`MangoAccount ${mangoAccount.publicKey}`);
-      await debugUser(client, group, mangoAccount);
+      if (
+        // eslint-disable-next-line no-constant-condition
+        true
+        // Enable below to debug specific mango accounts
+        // mangoAccount.publicKey.equals(
+        //   new PublicKey('BXUPaeAWRCPvPdpndXJeykD8VYZJwrCBjZdWNZAu8Ca'),
+        // )
+      ) {
+        console.log(`MangoAccount ${mangoAccount.publicKey}`);
+        await debugUser(client, group, mangoAccount);
+      }
     }
   }
 
