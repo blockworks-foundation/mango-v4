@@ -69,7 +69,6 @@ export type MangoClientOptions = {
   prioritizationFee?: number;
 };
 
-// TODO: replace ui values with native as input wherever possible
 export class MangoClient {
   private idsSource: IdsSource;
   private postSendTxCallback?: ({ txid }) => void;
@@ -2239,7 +2238,6 @@ export class MangoClient {
     group: Group,
     mintPk: PublicKey,
   ): Promise<TransactionSignature> {
-    // TODO: handle updating multiple banks
     const bank = group.getFirstBankByMint(mintPk);
     const mintInfo = group.mintInfosMapByMint.get(mintPk.toString())!;
 
@@ -2444,9 +2442,6 @@ export class MangoClient {
     provider: Provider,
     groupName: string,
   ): MangoClient {
-    // TODO: use IDL on chain or in repository? decide...
-    // Alternatively we could fetch IDL from chain.
-    // const idl = await Program.fetchIdl(MANGO_V4_ID, provider);
     const idl = IDL;
 
     const id = Id.fromIdsByName(groupName);

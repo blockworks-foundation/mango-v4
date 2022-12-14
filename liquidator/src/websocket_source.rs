@@ -4,7 +4,7 @@ use jsonrpc_core_client::transports::ws;
 use solana_account_decoder::UiAccountEncoding;
 use solana_client::{
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
-    rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType},
+    rpc_filter::{Memcmp, RpcFilterType},
     rpc_response::{Response, RpcKeyedAccount, RpcResponseContext},
 };
 use solana_rpc::rpc_pubsub::RpcSolPubSubClient;
@@ -78,17 +78,16 @@ async fn feed_data(
         // filter for only OpenOrders with v4 authority
         filters: Some(vec![
             RpcFilterType::DataSize(3228), // open orders size
-            RpcFilterType::Memcmp(Memcmp {
-                offset: 0,
-                // "serum" + u64 that is Initialized (1) + OpenOrders (4)
-                bytes: MemcmpEncodedBytes::Base58("AcUQf4PGf6fCHGwmpB".into()),
-                encoding: None,
-            }),
-            RpcFilterType::Memcmp(Memcmp {
-                offset: 45, // owner is the 4th field, after "serum" (header), account_flags: u64 and market: Pubkey
-                bytes: MemcmpEncodedBytes::Bytes(config.open_orders_authority.to_bytes().into()),
-                encoding: None,
-            }),
+            // "serum" + u64 that is Initialized (1) + OpenOrders (4)
+            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+                // new_base58_encoded() does not work with old RPC nodes
+                0,
+                [0x73, 0x65, 0x72, 0x75, 0x6d, 5, 0, 0, 0, 0, 0, 0, 0].to_vec(),
+            )),
+            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+                45,
+                config.open_orders_authority.to_bytes().to_vec(),
+            )),
         ]),
         with_context: Some(true),
         account_config: account_info_config.clone(),

@@ -500,7 +500,6 @@ export class Group {
   }
 
   public getSerum3FeeRates(maker = true): number {
-    // TODO: fetch msrm/srm vault balance
     const feeTier = getFeeTier(0, 0);
     const rates = getFeeRates(feeTier);
     return maker ? rates.maker : rates.taker;

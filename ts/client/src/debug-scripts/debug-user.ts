@@ -97,6 +97,9 @@ async function debugUser(
   }
 
   function getMaxSourceForTokenSwapWrapper(src, tgt): void {
+    // Turn on for debugging specific pairs
+    // if (src != 'DAI' || tgt != 'ETH') return;
+
     const maxSourceUi = mangoAccount.getMaxSourceUiForTokenSwap(
       group,
       group.banksMapByName.get(src)![0].mint,

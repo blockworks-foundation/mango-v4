@@ -72,7 +72,6 @@ export class Bank implements BankForHealth {
   static from(
     publicKey: PublicKey,
     obj: {
-      // TODO: rearrange fields to have same order as in bank.rs
       group: PublicKey;
       name: number[];
       mint: PublicKey;
@@ -198,7 +197,7 @@ export class Bank implements BankForHealth {
     public tokenIndex: TokenIndex,
     public mintDecimals: number,
     public bankNum: number,
-    minVaultToDepositsRatio: number,
+    public minVaultToDepositsRatio: number,
     netBorrowLimitWindowSizeTs: BN,
     lastNetBorrowsWindowStartTs: BN,
     public netBorrowLimitPerWindowQuote: BN,
