@@ -484,9 +484,6 @@ mod tests {
         account.ensure_token_position(2).unwrap();
 
         let group = Pubkey::new_unique();
-        // TODO: is the price here irrelevant? does the price from
-        // - prices: Prices::new_single_price(I80F48::from_num(2.0)),
-        // override it anyway?
         let (mut bank0, _) = mock_bank_and_oracle(group, 0, 1.0, 0.1, 0.1);
         let (mut bank1, _) = mock_bank_and_oracle(group, 1, 5.0, 0.2, 0.2);
         let (mut bank2, _) = mock_bank_and_oracle(group, 2, 5.0, 0.3, 0.3);
