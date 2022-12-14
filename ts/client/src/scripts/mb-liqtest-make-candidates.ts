@@ -27,11 +27,23 @@ const PRICES = {
 };
 
 const TOKEN_SCENARIOS: [string, [string, number][], [string, number][]][] = [
-  ['LIQTEST, FUNDING', [['USDC', 5000000], ['ETH', 100000], ['SOL', 150000000]], []],
+  [
+    'LIQTEST, FUNDING',
+    [
+      ['USDC', 5000000],
+      ['ETH', 100000],
+      ['SOL', 150000000],
+    ],
+    [],
+  ],
   ['LIQTEST, LIQOR', [['USDC', 1000000]], []],
   ['LIQTEST, A: USDC, L: SOL', [['USDC', 1000 * PRICES.SOL]], [['SOL', 920]]],
   ['LIQTEST, A: SOL, L: USDC', [['SOL', 1000]], [['USDC', 920 * PRICES.SOL]]],
-  ['LIQTEST, A: ETH, L: SOL', [['ETH', 20]], [['SOL', (18 * PRICES.ETH) / PRICES.SOL]]],
+  [
+    'LIQTEST, A: ETH, L: SOL',
+    [['ETH', 20]],
+    [['SOL', (18 * PRICES.ETH) / PRICES.SOL]],
+  ],
 ];
 
 async function main() {

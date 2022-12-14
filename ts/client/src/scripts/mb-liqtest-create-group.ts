@@ -1,8 +1,14 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import {
+  AddressLookupTableProgram,
+  Connection,
+  Keypair,
+  PublicKey,
+} from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
+import { buildVersionedTx } from '../utils';
 
 //
 // Script which depoys a new mango group, and registers 3 tokens
@@ -242,7 +248,127 @@ async function main() {
     console.log(error);
   }
 
+  await createAndPopulateAlt(client, admin);
+
   process.exit();
 }
 
 main();
+
+async function createAndPopulateAlt(client: MangoClient, admin: Keypair) {
+  let group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+
+  const connection = client.program.provider.connection;
+
+  // Create ALT, and set to group at index 0
+  if (group.addressLookupTables[0].equals(PublicKey.default)) {
+    try {
+      console.log(`ALT: Creating`);
+      const createIx = AddressLookupTableProgram.createLookupTable({
+        authority: admin.publicKey,
+        payer: admin.publicKey,
+        recentSlot: await connection.getSlot('finalized'),
+      });
+      const createTx = await buildVersionedTx(
+        client.program.provider as AnchorProvider,
+        [createIx[0]],
+      );
+      let sig = await connection.sendTransaction(createTx);
+      console.log(
+        `...created ALT ${createIx[1]} https://explorer.solana.com/tx/${sig}`,
+      );
+
+      console.log(`ALT: set at index 0 for group...`);
+      sig = await client.altSet(group, createIx[1], 0);
+      console.log(`...https://explorer.solana.com/tx/${sig}`);
+
+      group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  // Extend using mango v4 relevant pub keys
+  try {
+    let bankAddresses = Array.from(group.banksMapByMint.values())
+      .flat()
+      .map((bank) => [bank.publicKey, bank.oracle, bank.vault])
+      .flat()
+      .concat(
+        Array.from(group.banksMapByMint.values())
+          .flat()
+          .map((mintInfo) => mintInfo.publicKey),
+      );
+
+    let serum3MarketAddresses = Array.from(
+      group.serum3MarketsMapByExternal.values(),
+    )
+      .flat()
+      .map((serum3Market) => serum3Market.publicKey);
+
+    let serum3ExternalMarketAddresses = Array.from(
+      group.serum3ExternalMarketsMap.values(),
+    )
+      .flat()
+      .map((serum3ExternalMarket) => [
+        serum3ExternalMarket.publicKey,
+        serum3ExternalMarket.bidsAddress,
+        serum3ExternalMarket.asksAddress,
+      ])
+      .flat();
+
+    let perpMarketAddresses = Array.from(
+      group.perpMarketsMapByMarketIndex.values(),
+    )
+      .flat()
+      .map((perpMarket) => [
+        perpMarket.publicKey,
+        perpMarket.oracle,
+        perpMarket.bids,
+        perpMarket.asks,
+        perpMarket.eventQueue,
+      ])
+      .flat();
+
+    async function extendTable(addresses: PublicKey[]) {
+      await group.reloadAll(client);
+      const alt =
+        await client.program.provider.connection.getAddressLookupTable(
+          group.addressLookupTables[0],
+        );
+
+      addresses = addresses.filter(
+        (newAddress) =>
+          alt.value?.state.addresses &&
+          alt.value?.state.addresses.findIndex((addressInALt) =>
+            addressInALt.equals(newAddress),
+          ) === -1,
+      );
+      if (addresses.length === 0) {
+        return;
+      }
+      const extendIx = AddressLookupTableProgram.extendLookupTable({
+        lookupTable: group.addressLookupTables[0],
+        payer: admin.publicKey,
+        authority: admin.publicKey,
+        addresses,
+      });
+      const extendTx = await buildVersionedTx(
+        client.program.provider as AnchorProvider,
+        [extendIx],
+      );
+      let sig = await client.program.provider.connection.sendTransaction(
+        extendTx,
+      );
+      console.log(`https://explorer.solana.com/tx/${sig}`);
+    }
+
+    console.log(`ALT: extending using mango v4 relevant public keys`);
+    await extendTable(bankAddresses);
+    await extendTable(serum3MarketAddresses);
+    await extendTable(serum3ExternalMarketAddresses);
+    await extendTable(perpMarketAddresses);
+  } catch (error) {
+    console.log(error);
+  }
+}
