@@ -23,12 +23,12 @@ perl -0777 -pi -e 's/ *{\s*"name": "NodeRef(?<nested>(?:[^{}[\]]+|\{(?&nested)\}
 # Reduce size of idl to be uploaded to chain
 cp target/idl/mango_v4.json target/idl/mango_v4_no_docs.json
 jq 'del(.types[]?.docs)' target/idl/mango_v4_no_docs.json \
- > /tmp/mango_v4_no_docs.json && mv /tmp/mango_v4_no_docs.json target/idl/mango_v4_no_docs.json
+ > target/idl/mango_v4_no_docs.json.bak && mv target/idl/mango_v4_no_docs.json.bak target/idl/mango_v4_no_docs.json
 jq 'del(.accounts[]?.type.fields[]?.docs)' target/idl/mango_v4_no_docs.json \
- > /tmp/mango_v4_no_docs.json && mv /tmp/mango_v4_no_docs.json target/idl/mango_v4_no_docs.json
+ > target/idl/mango_v4_no_docs.json.bak && mv target/idl/mango_v4_no_docs.json.bak target/idl/mango_v4_no_docs.json
 jq 'del(.instructions[]?.docs)' target/idl/mango_v4_no_docs.json \
- > /tmp/mango_v4_no_docs.json && mv /tmp/mango_v4_no_docs.json target/idl/mango_v4_no_docs.json
+ > target/idl/mango_v4_no_docs.json.bak && mv target/idl/mango_v4_no_docs.json.bak target/idl/mango_v4_no_docs.json
 jq 'del(.instructions[]?.accounts[]?.docs)' target/idl/mango_v4_no_docs.json \
- > /tmp/mango_v4_no_docs.json && mv /tmp/mango_v4_no_docs.json target/idl/mango_v4_no_docs.json
+ > target/idl/mango_v4_no_docs.json.bak && mv target/idl/mango_v4_no_docs.json.bak target/idl/mango_v4_no_docs.json
 jq 'del(.types[]?.type.fields[]?.docs)' target/idl/mango_v4_no_docs.json \
- > /tmp/mango_v4_no_docs.json && mv /tmp/mango_v4_no_docs.json target/idl/mango_v4_no_docs.json
+ > target/idl/mango_v4_no_docs.json.bak && mv target/idl/mango_v4_no_docs.json.bak target/idl/mango_v4_no_docs.json
