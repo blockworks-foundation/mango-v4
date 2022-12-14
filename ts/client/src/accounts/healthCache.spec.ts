@@ -14,6 +14,7 @@ function mockBankAndOracle(
   maintWeight: number,
   initWeight: number,
   price: number,
+  stablePrice: number,
 ): BankForHealth {
   return {
     tokenIndex,
@@ -22,7 +23,7 @@ function mockBankAndOracle(
     maintLiabWeight: I80F48.fromNumber(1 + maintWeight),
     initLiabWeight: I80F48.fromNumber(1 + initWeight),
     price: I80F48.fromNumber(price),
-    stablePriceModel: { stablePrice: price } as StablePriceModel,
+    stablePriceModel: { stablePrice: stablePrice } as StablePriceModel,
     scaledInitAssetWeight: () => I80F48.fromNumber(1 - initWeight),
     scaledInitLiabWeight: () => I80F48.fromNumber(1 + initWeight),
   };
@@ -57,11 +58,13 @@ describe('Health Cache', () => {
       0.1,
       0.2,
       1,
+      1,
     );
     const targetBank: BankForHealth = mockBankAndOracle(
       4 as TokenIndex,
       0.3,
       0.5,
+      5,
       5,
     );
 
@@ -146,17 +149,20 @@ describe('Health Cache', () => {
         0.1,
         0.2,
         1,
+        1,
       );
       const bank2: BankForHealth = mockBankAndOracle(
         4 as TokenIndex,
         0.3,
         0.5,
         5,
+        5,
       );
       const bank3: BankForHealth = mockBankAndOracle(
         5 as TokenIndex,
         0.3,
         0.5,
+        10,
         10,
       );
 
@@ -390,9 +396,9 @@ describe('Health Cache', () => {
   });
 
   it('test_max_swap', (done) => {
-    const b0 = mockBankAndOracle(0 as TokenIndex, 0.1, 0.1, 2);
-    const b1 = mockBankAndOracle(1 as TokenIndex, 0.2, 0.2, 3);
-    const b2 = mockBankAndOracle(2 as TokenIndex, 0.3, 0.3, 4);
+    const b0 = mockBankAndOracle(0 as TokenIndex, 0.1, 0.1, 2, 2);
+    const b1 = mockBankAndOracle(1 as TokenIndex, 0.2, 0.2, 3, 3);
+    const b2 = mockBankAndOracle(2 as TokenIndex, 0.3, 0.3, 4, 4);
     const banks = [b0, b1, b2];
     const hc = new HealthCache(
       [
@@ -475,13 +481,13 @@ describe('Health Cache', () => {
 
       for (const priceFactor of [0.1, 0.9, 1.1]) {
         for (const target of _.range(1, 100, 1)) {
-          // checkMaxSwapResult(
-          //   clonedHc,
-          //   0 as TokenIndex,
-          //   1 as TokenIndex,
-          //   target,
-          //   priceFactor,
-          // );
+          checkMaxSwapResult(
+            clonedHc,
+            0 as TokenIndex,
+            1 as TokenIndex,
+            target,
+            priceFactor,
+          );
           checkMaxSwapResult(
             clonedHc,
             1 as TokenIndex,
@@ -489,13 +495,13 @@ describe('Health Cache', () => {
             target,
             priceFactor,
           );
-          // checkMaxSwapResult(
-          //   clonedHc,
-          //   0 as TokenIndex,
-          //   2 as TokenIndex,
-          //   target,
-          //   priceFactor,
-          // );
+          checkMaxSwapResult(
+            clonedHc,
+            0 as TokenIndex,
+            2 as TokenIndex,
+            target,
+            priceFactor,
+          );
         }
       }
 
@@ -623,12 +629,90 @@ describe('Health Cache', () => {
       checkMaxSwapResult(clonedHc, 0 as TokenIndex, 1 as TokenIndex, 4, 1);
     }
 
+    // TODO test 5
+
+    {
+      console.log(' - test 6');
+      const clonedHc = _.cloneDeep(hc);
+      clonedHc.serum3Infos = [
+        new Serum3Info(
+          I80F48.fromNumber(30 / 3),
+          I80F48.fromNumber(30 / 2),
+          1,
+          0,
+          0 as MarketIndex,
+        ),
+      ];
+
+      // adjust by usdc
+      clonedHc.tokenInfos[0].balanceNative.iadd(
+        I80F48.fromNumber(-20).div(clonedHc.tokenInfos[0].prices.oracle),
+      );
+      clonedHc.tokenInfos[1].balanceNative.iadd(
+        I80F48.fromNumber(-40).div(clonedHc.tokenInfos[1].prices.oracle),
+      );
+      clonedHc.tokenInfos[2].balanceNative.iadd(
+        I80F48.fromNumber(120).div(clonedHc.tokenInfos[2].prices.oracle),
+      );
+
+      for (const priceFactor of [
+        // 0.9,
+
+        1.1,
+      ]) {
+        for (const target of _.range(1, 100, 1)) {
+          checkMaxSwapResult(
+            clonedHc,
+            0 as TokenIndex,
+            1 as TokenIndex,
+            target,
+            priceFactor,
+          );
+          checkMaxSwapResult(
+            clonedHc,
+            1 as TokenIndex,
+            0 as TokenIndex,
+            target,
+            priceFactor,
+          );
+          checkMaxSwapResult(
+            clonedHc,
+            0 as TokenIndex,
+            2 as TokenIndex,
+            target,
+            priceFactor,
+          );
+          checkMaxSwapResult(
+            clonedHc,
+            1 as TokenIndex,
+            2 as TokenIndex,
+            target,
+            priceFactor,
+          );
+          checkMaxSwapResult(
+            clonedHc,
+            2 as TokenIndex,
+            0 as TokenIndex,
+            target,
+            priceFactor,
+          );
+          checkMaxSwapResult(
+            clonedHc,
+            2 as TokenIndex,
+            1 as TokenIndex,
+            target,
+            priceFactor,
+          );
+        }
+      }
+    }
+
     done();
   });
 
   it('test_max_perp', (done) => {
     const baseLotSize = 100;
-    const b0 = mockBankAndOracle(0 as TokenIndex, 0.0, 0.0, 1);
+    const b0 = mockBankAndOracle(0 as TokenIndex, 0.0, 0.0, 1, 1);
     const p0 = mockPerpMarket(0, 0.3, 0.3, baseLotSize, 2);
     const hc = new HealthCache(
       [TokenInfo.fromBank(b0, I80F48.fromNumber(0))],
