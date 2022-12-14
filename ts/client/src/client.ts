@@ -2623,4 +2623,49 @@ export class MangoClient {
 
     return healthRemainingAccounts;
   }
+
+  public async modifyPerpOrder(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    orderId: BN,
+    side: PerpOrderSide,
+    price: number,
+    quantity: number,
+    maxQuoteQuantity?: number,
+    clientOrderId?: number,
+    orderType?: PerpOrderType,
+    reduceOnly?: boolean,
+    expiryTimestamp?: number,
+    limit?: number,
+  ): Promise<TransactionSignature> {
+    const transactionInstructions: TransactionInstruction[] = [];
+    const [cancelOrderIx, placeOrderIx] = await Promise.all([
+      this.perpCancelOrderIx(group, mangoAccount, perpMarketIndex, orderId),
+      this.perpPlaceOrderIx(
+        group,
+        mangoAccount,
+        perpMarketIndex,
+        side,
+        price,
+        quantity,
+        maxQuoteQuantity,
+        clientOrderId,
+        orderType,
+        reduceOnly,
+        expiryTimestamp,
+        limit,
+      ),
+    ]);
+    transactionInstructions.push(cancelOrderIx, placeOrderIx);
+
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      transactionInstructions,
+      group.addressLookupTablesList,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
+  }
 }
