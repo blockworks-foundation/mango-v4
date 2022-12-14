@@ -122,7 +122,7 @@ impl MangoAccount {
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
             padding4: Default::default(),
-            tokens: vec![TokenPosition::default(); 3],
+            tokens: vec![TokenPosition::default(); 4],
             padding5: Default::default(),
             serum3: vec![Serum3Orders::default(); 5],
             padding6: Default::default(),

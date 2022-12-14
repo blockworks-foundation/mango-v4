@@ -482,6 +482,7 @@ mod tests {
         account.ensure_token_position(0).unwrap();
         account.ensure_token_position(1).unwrap();
         account.ensure_token_position(2).unwrap();
+        account.ensure_token_position(3).unwrap();
 
         let group = Pubkey::new_unique();
         let (mut bank0, _) = mock_bank_and_oracle(group, 0, 1.0, 0.1, 0.1);
@@ -739,7 +740,7 @@ mod tests {
             let mut health_cache = health_cache.clone();
             adjust_by_usdc(&mut health_cache, 0, 1.0);
 
-            for price_factor in [50] {
+            for price_factor in [50.] {
                 for target in 1..3 {
                     let target = target as f64;
                     check_max_swap_result(&health_cache, 0, 3, target, price_factor, banks);
