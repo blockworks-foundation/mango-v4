@@ -553,13 +553,17 @@ export class HealthCache {
     target: I80F48,
     fun: (amount: I80F48) => I80F48,
   ): I80F48 {
-    const maxIterations = 20;
+    const maxIterations = 100;
     let current = start;
+    // console.log(`scanRightUntilLessThan, start ${start.toLocaleString()}`);
     for (const key of Array(maxIterations).fill(0).keys()) {
       const value = fun(current);
       if (value.lt(target)) {
         return current;
       }
+      // console.log(
+      //   ` - current ${current.toLocaleString()}, value ${value.toLocaleString()}, target ${target.toLocaleString()}`,
+      // );
       current = current.max(ONE_I80F48()).mul(I80F48.fromNumber(2));
     }
     throw new Error('Could not find amount that led to health ratio <=0');
@@ -743,6 +747,24 @@ export class HealthCache {
       const zeroHealthEstimate = point1Amount.sub(
         point1Health.sub(finalHealthSlope),
       );
+      const zeroHealthEstimateRatio = healthRatioAfterSwap(zeroHealthEstimate);
+
+      // console.log(`getMaxSourceForTokenSwap`);
+      // console.log(` - finalHealthSlope ${finalHealthSlope.toLocaleString()}`);
+      // console.log(` - minRatio ${minRatio.toLocaleString()}`);
+      // console.log(` - point0Amount ${point0Amount.toLocaleString()}`);
+      // console.log(` - point0Health ${point0Health.toLocaleString()}`);
+      // console.log(` - point0Ratio ${point0Ratio.toLocaleString()}`);
+      // console.log(` - point1Amount ${point1Amount.toLocaleString()}`);
+      // console.log(` - point1Health ${point1Health.toLocaleString()}`);
+      // console.log(` - point1Ratio ${point1Ratio.toLocaleString()}`);
+      // console.log(
+      //   ` - zeroHealthEstimate ${zeroHealthEstimate.toLocaleString()}`,
+      // );
+      // console.log(
+      //   ` - zeroHealthEstimateRatio ${zeroHealthEstimateRatio.toLocaleString()}`,
+      // );
+
       const rightBound = HealthCache.scanRightUntilLessThan(
         zeroHealthEstimate,
         minRatio,
