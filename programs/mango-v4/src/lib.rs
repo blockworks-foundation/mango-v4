@@ -214,8 +214,8 @@ pub mod mango_v4 {
         instructions::account_edit(ctx, name_opt, delegate_opt)
     }
 
-    pub fn account_close(ctx: Context<AccountClose>, force_close_opt: Option<bool>) -> Result<()> {
-        instructions::account_close(ctx, force_close_opt)
+    pub fn account_close(ctx: Context<AccountClose>, force_close: bool) -> Result<()> {
+        instructions::account_close(ctx, force_close)
     }
 
     // todo:

@@ -775,7 +775,7 @@ export class MangoClient {
   public async closeMangoAccount(
     group: Group,
     mangoAccount: MangoAccount,
-    forceClose: boolean | null,
+    forceClose = false,
   ): Promise<TransactionSignature> {
     const ix = await this.program.methods
       .accountClose(forceClose)

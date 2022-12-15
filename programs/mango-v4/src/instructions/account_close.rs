@@ -24,10 +24,12 @@ pub struct AccountClose<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-pub fn account_close(ctx: Context<AccountClose>, force_close_opt: Option<bool>) -> Result<()> {
+pub fn account_close(ctx: Context<AccountClose>, force_close: bool) -> Result<()> {
     let account = ctx.accounts.account.load_mut()?;
 
-    let force_close = force_close_opt.unwrap_or_default();
+    if !ctx.accounts.group.load()?.is_testing() {
+        require!(!force_close, MangoError::SomeError);
+    }
 
     if !force_close {
         require!(!account.fixed.being_liquidated(), MangoError::SomeError);

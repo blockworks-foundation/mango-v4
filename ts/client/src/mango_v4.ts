@@ -1020,10 +1020,8 @@ export type MangoV4 = {
       ],
       "args": [
         {
-          "name": "forceCloseOpt",
-          "type": {
-            "option": "bool"
-          }
+          "name": "forceClose",
+          "type": "bool"
         }
       ]
     },
@@ -8431,10 +8429,8 @@ export const IDL: MangoV4 = {
       ],
       "args": [
         {
-          "name": "forceCloseOpt",
-          "type": {
-            "option": "bool"
-          }
+          "name": "forceClose",
+          "type": "bool"
         }
       ]
     },

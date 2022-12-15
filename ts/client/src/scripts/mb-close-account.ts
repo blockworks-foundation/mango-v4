@@ -120,7 +120,7 @@ async function closeUserAccount(userKeypairFile: string) {
   console.log(mangoAccount.toString());
 
   console.log(`Close mango account...`);
-  const res = await client.closeMangoAccount(group, mangoAccount, null);
+  const res = await client.closeMangoAccount(group, mangoAccount);
 
   process.exit();
 }

@@ -132,7 +132,7 @@ async function main() {
 
     // close account
     console.log(`Close mango account...`);
-    const res = await client.closeMangoAccount(group, mangoAccount, null);
+    const res = await client.closeMangoAccount(group, mangoAccount);
   } catch (error) {
     console.log(error);
   }
