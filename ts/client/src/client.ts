@@ -7,6 +7,7 @@ import {
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import {
   AccountMeta,
+  AddressLookupTableAccount,
   Cluster,
   Keypair,
   MemcmpFilter,
@@ -2132,6 +2133,7 @@ export class MangoClient {
     amountIn,
     outputMintPk,
     userDefinedInstructions,
+    userDefinedAlts = [],
     // margin trade is a general function
     // set flash_loan_type to FlashLoanType.swap if you desire the transaction to be recorded as a swap
     flashLoanType,
@@ -2142,6 +2144,7 @@ export class MangoClient {
     amountIn: number;
     outputMintPk: PublicKey;
     userDefinedInstructions: TransactionInstruction[];
+    userDefinedAlts: AddressLookupTableAccount[];
     flashLoanType: FlashLoanType;
   }): Promise<TransactionSignature> {
     const inputBank: Bank = group.getFirstBankByMint(inputMintPk);
@@ -2290,7 +2293,7 @@ export class MangoClient {
         ...userDefinedInstructions.filter((ix) => ix.keys.length > 2),
         flashLoanEndIx,
       ],
-      group.addressLookupTablesList,
+      [...group.addressLookupTablesList, ...userDefinedAlts],
       {
         postSendTxCallback: this.postSendTxCallback,
       },
