@@ -71,9 +71,9 @@ pub async fn runner(
         .collect::<Vec<_>>();
 
     futures::join!(
-        futures::future::join_all(handles1),
+        // futures::future::join_all(handles1),
         futures::future::join_all(handles2),
-        futures::future::join_all(handles3),
+        // futures::future::join_all(handles3),
         debugging_handle
     );
 
@@ -198,16 +198,24 @@ pub async fn loop_consume_events(
                 match EventType::try_from(event.event_type)? {
                     EventType::Fill => {
                         let fill: &FillEvent = cast_ref(event);
-                        ams_.push(AccountMeta {
-                            pubkey: fill.maker,
-                            is_signer: false,
-                            is_writable: true,
-                        });
-                        ams_.push(AccountMeta {
-                            pubkey: fill.taker,
-                            is_signer: false,
-                            is_writable: true,
-                        });
+                        if fill.maker == fill.taker {
+                            ams_.push(AccountMeta {
+                                pubkey: fill.maker,
+                                is_signer: false,
+                                is_writable: true,
+                            });
+                        } else {
+                            ams_.push(AccountMeta {
+                                pubkey: fill.maker,
+                                is_signer: false,
+                                is_writable: true,
+                            });
+                            ams_.push(AccountMeta {
+                                pubkey: fill.taker,
+                                is_signer: false,
+                                is_writable: true,
+                            });
+                        }
                     }
                     EventType::Out => {
                         let out: &OutEvent = cast_ref(event);
