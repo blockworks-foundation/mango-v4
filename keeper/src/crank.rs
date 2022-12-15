@@ -188,7 +188,6 @@ pub async fn loop_consume_events(
             let mut ams_ = vec![];
             let mut num_of_events = 0;
 
-            
             // TODO: future, choose better constant of how many max events to pack
             // TODO: future, choose better constant of how many max mango accounts to pack
             let mut already_packed_accounts = HashSet::new();
