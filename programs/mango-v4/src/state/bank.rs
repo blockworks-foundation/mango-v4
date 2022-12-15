@@ -237,18 +237,14 @@ impl Bank {
 
     /// Prevent borrowing away the full bank vault.
     /// Keep some in reserve to satisfy non-borrow withdraws.
-    pub fn enforce_min_vault_to_deposits_ratio(
-        &self,
-        is_borrow: bool,
-        vault_ai: &AccountInfo,
-    ) -> Result<()> {
+    pub fn enforce_min_vault_to_deposits_ratio(&self, vault_ai: &AccountInfo) -> Result<()> {
         require_keys_eq!(self.vault, vault_ai.key());
 
         let vault = Account::<TokenAccount>::try_from(vault_ai)?;
         let vault_amount = vault.amount as f64;
 
         let bank_native_deposits = self.native_deposits();
-        if bank_native_deposits != I80F48::ZERO && is_borrow {
+        if bank_native_deposits != I80F48::ZERO {
             let bank_native_deposits: f64 = bank_native_deposits.checked_to_num().unwrap();
             if vault_amount < self.min_vault_to_deposits_ratio * bank_native_deposits {
                 return err!(MangoError::BankBorrowLimitReached).with_context(|| {

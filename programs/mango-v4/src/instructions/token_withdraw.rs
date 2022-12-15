@@ -181,8 +181,11 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         });
     }
 
-    ctx.accounts.vault.reload()?;
-    bank.enforce_min_vault_to_deposits_ratio(is_borrow, ctx.accounts.vault.as_ref())?;
+    // Enforce min vault to deposits ratio
+    if is_borrow {
+        ctx.accounts.vault.reload()?;
+        bank.enforce_min_vault_to_deposits_ratio(ctx.accounts.vault.as_ref())?;
+    }
 
     Ok(())
 }

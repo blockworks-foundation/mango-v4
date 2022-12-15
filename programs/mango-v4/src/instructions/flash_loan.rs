@@ -387,6 +387,16 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             approved_amount
         };
 
+        // Enforce min vault to deposits ratio
+        if loan.gt(&I80F48::ZERO) {
+            let vault_ai = vaults
+                .iter()
+                .find(|vault_ai| vault_ai.key == &bank.vault)
+                .unwrap();
+            Account::<TokenAccount>::try_from(vault_ai)?.reload()?;
+            bank.enforce_min_vault_to_deposits_ratio(vault_ai)?;
+        }
+
         let loan_origination_fee = cm!(loan * bank.loan_origination_fee_rate);
         cm!(bank.collected_fees_native += loan_origination_fee);
 
