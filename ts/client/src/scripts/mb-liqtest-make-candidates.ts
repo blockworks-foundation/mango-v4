@@ -38,7 +38,7 @@ const TOKEN_SCENARIOS: [string, [string, number][], [string, number][]][] = [
   ],
   ['LIQTEST, LIQOR', [['USDC', 1000000]], []],
   ['LIQTEST, A: USDC, L: SOL', [['USDC', 1000 * PRICES.SOL]], [['SOL', 920]]],
-  ['LIQTEST, A: SOL, L: USDC', [['SOL', 1000]], [['USDC', 920 * PRICES.SOL]]],
+  ['LIQTEST, A: SOL, L: USDC', [['SOL', 1000]], [['USDC', 990 * PRICES.SOL]]],
   [
     'LIQTEST, A: ETH, L: SOL',
     [['ETH', 20]],
@@ -337,8 +337,8 @@ async function main() {
         mangoAccount,
         group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
         PerpOrderSide.bid,
-        1, // ui price that won't get hit
-        0.0011, // ui base quantity, 11 base lots, 1.1 MNGO, $0.022
+        0.001, // ui price that won't get hit
+        1.1, // ui base quantity, 11 base lots, 1.1 MNGO, $0.022
         0.022, // ui quote quantity
         4200,
         PerpOrderType.limit,
@@ -372,7 +372,7 @@ async function main() {
     ); // valued as 0.0003 SOL, $0.0045 maint collateral
     await mangoAccount.reload(client);
 
-    await setBankPrice(collateralBank, PRICES['SOL'] * 5);
+    await setBankPrice(collateralBank, PRICES['SOL'] * 10);
 
     try {
       await client.perpPlaceOrder(
@@ -380,9 +380,9 @@ async function main() {
         fundingAccount,
         group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
         PerpOrderSide.ask,
-        40,
-        0.0011, // ui base quantity, 11 base lots, $0.022
-        0.022, // ui quote quantity
+        0.03,
+        1.1, // ui base quantity, 11 base lots, $0.022 value, gain $0.033
+        0.033, // ui quote quantity
         4200,
         PerpOrderType.limit,
         false,
@@ -395,9 +395,9 @@ async function main() {
         mangoAccount,
         group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
         PerpOrderSide.bid,
-        40,
-        0.0011, // ui base quantity, 11 base lots, $0.022
-        0.022, // ui quote quantity
+        0.03,
+        1.1, // ui base quantity, 11 base lots, $0.022 value, cost $0.033
+        0.033, // ui quote quantity
         4200,
         PerpOrderType.market,
         false,
@@ -425,6 +425,7 @@ async function main() {
     );
 
     const perpMarket = group.perpMarketsMapByName.get('MNGO-PERP')!;
+    const perpIndex = perpMarket.perpMarketIndex;
     const liabMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
     const collateralMint = new PublicKey(MAINNET_MINTS.get('SOL')!);
     const collateralBank = group.banksMapByName.get('SOL')![0];
@@ -455,10 +456,10 @@ async function main() {
       await client.perpPlaceOrder(
         group,
         fundingAccount,
-        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+        perpIndex,
         PerpOrderSide.ask,
-        20,
-        0.0011, // ui base quantity, 11 base lots, $0.011
+        0.01,
+        1.1, // ui base quantity, 11 base lots, $0.011
         0.011, // ui quote quantity
         4200,
         PerpOrderType.limit,
@@ -469,10 +470,10 @@ async function main() {
       await client.perpPlaceOrder(
         group,
         mangoAccount,
-        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+        perpIndex,
         PerpOrderSide.bid,
-        20,
-        0.0011, // ui base quantity, 11 base lots, $0.011
+        0.01,
+        1.1, // ui base quantity, 11 base lots, $0.011
         0.011, // ui quote quantity
         4200,
         PerpOrderType.market,
@@ -480,20 +481,17 @@ async function main() {
         0,
         5,
       );
-      await client.perpConsumeAllEvents(
-        group,
-        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
-      );
+      await client.perpConsumeAllEvents(group, perpIndex);
 
       await setPerpPrice(perpMarket, PRICES['MNGO']);
 
       await client.perpPlaceOrder(
         group,
         fundingAccount,
-        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+        perpIndex,
         PerpOrderSide.bid,
-        40,
-        0.0011, // ui base quantity, 11 base lots, $0.022
+        0.02,
+        1.1, // ui base quantity, 11 base lots, $0.022
         0.022, // ui quote quantity
         4201,
         PerpOrderType.limit,
@@ -504,10 +502,10 @@ async function main() {
       await client.perpPlaceOrder(
         group,
         mangoAccount,
-        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
+        perpIndex,
         PerpOrderSide.ask,
-        40,
-        0.0011, // ui base quantity, 11 base lots, $0.022
+        0.02,
+        1.1, // ui base quantity, 11 base lots, $0.022
         0.022, // ui quote quantity
         4201,
         PerpOrderType.market,
@@ -515,10 +513,7 @@ async function main() {
         0,
         5,
       );
-      await client.perpConsumeAllEvents(
-        group,
-        group.perpMarketsMapByName.get('MNGO-PERP')?.perpMarketIndex!,
-      );
+      await client.perpConsumeAllEvents(group, perpIndex);
     } finally {
       await setPerpPrice(perpMarket, PRICES['MNGO']);
       await setBankPrice(collateralBank, PRICES['SOL']);

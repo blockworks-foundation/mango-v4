@@ -460,7 +460,7 @@ impl HealthCache {
             || p.has_open_orders
             // A remaining quote position can be reduced with perp_settle_pnl and that can improve health.
             // However, since it's not guaranteed that there is a counterparty, a positive perp quote position
-            // does not prevent perp bankruptcy.
+            // does not prevent bankruptcy.
         });
         spot_liquidatable || serum3_cancelable || perp_liquidatable
     }

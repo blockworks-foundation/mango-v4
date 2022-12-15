@@ -221,7 +221,7 @@ async function main() {
       0,
       'MNGO-PERP',
       defaultOracleConfig,
-      9,
+      6,
       10,
       100000, // base lots
       0.9,
@@ -241,7 +241,7 @@ async function main() {
       0,
       0,
       0,
-      1.0,
+      -1.0,
       2 * 60 * 60,
     );
   } catch (error) {
