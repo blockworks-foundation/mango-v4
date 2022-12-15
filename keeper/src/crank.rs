@@ -185,12 +185,11 @@ pub async fn loop_consume_events(
             let mut event_queue: EventQueue =
                 client.program().account(perp_market.event_queue).unwrap();
 
-            let mut ams_ = vec![];
             let mut num_of_events = 0;
 
             // TODO: future, choose better constant of how many max events to pack
             // TODO: future, choose better constant of how many max mango accounts to pack
-            let mut already_packed_accounts = HashSet::new();
+            let mut set = HashSet::new();
             for _ in 0..10 {
                 let event = match event_queue.peek_front() {
                     None => break,
@@ -199,45 +198,29 @@ pub async fn loop_consume_events(
                 match EventType::try_from(event.event_type)? {
                     EventType::Fill => {
                         let fill: &FillEvent = cast_ref(event);
-                        if fill.maker == fill.taker && !already_packed_accounts.contains(&fill.maker.to_string()) {
-                            ams_.push(AccountMeta {
-                                pubkey: fill.maker,
-                                is_signer: false,
-                                is_writable: true,
-                            });
-                            already_packed_accounts.insert(fill.maker.to_string());
-                        } else {
-                            if !already_packed_accounts.contains(&fill.maker.to_string()) {
-                            ams_.push(AccountMeta {
-                                pubkey: fill.maker,
-                                is_signer: false,
-                                is_writable: true,
-                            });
-                            already_packed_accounts.insert(fill.maker.to_string());
-                        }
-
-                        if  !already_packed_accounts.contains(&fill.taker.to_string()) {
-                            ams_.push(AccountMeta {
-                                pubkey: fill.taker,
-                                is_signer: false,
-                                is_writable: true,
-                            });
-                            already_packed_accounts.insert(fill.taker.to_string());
-                        }}
+                        set.insert(fill.maker);
+                        set.insert(fill.taker);
                     }
                     EventType::Out => {
                         let out: &OutEvent = cast_ref(event);
-                        ams_.push(AccountMeta {
-                            pubkey: out.owner,
-                            is_signer: false,
-                            is_writable: true,
-                        });
+                        set.insert(out.owner);
                     }
                     EventType::Liquidate => {}
                 }
                 event_queue.pop_front()?;
                 num_of_events+=1;
             }
+
+            let mut ams_ = set
+            .iter()
+            .map(|key| -> AccountMeta {
+                AccountMeta {
+                    pubkey: *key,
+                    is_signer: false,
+                    is_writable: true,
+                }
+            })
+            .collect::<Vec<_>>();
 
             if num_of_events == 0 {
                 return Ok(());
