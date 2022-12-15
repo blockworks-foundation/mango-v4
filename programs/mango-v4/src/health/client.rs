@@ -903,6 +903,23 @@ mod tests {
                     }
                 }
             }
+
+            {
+                // swap some assets into a zero-asset-weight token
+                println!("test 9 {test_name}");
+                let mut health_cache = health_cache.clone();
+                adjust_by_usdc(&mut health_cache, 0, 10.0);
+                health_cache.token_infos[1].init_asset_weight = I80F48::from(0);
+
+                assert!(find_max_swap(&health_cache, 0, 1, 1.0, 1.0, banks).0 > 0.0);
+
+                for price_factor in [0.9, 1.1] {
+                    for target in 1..100 {
+                        let target = target as f64;
+                        check(&health_cache, 0, 1, target, price_factor, banks);
+                    }
+                }
+            }
         }
     }
 
