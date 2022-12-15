@@ -211,14 +211,16 @@ pub async fn loop_consume_events(
                 num_of_events+=1;
             }
 
-            let mut ams_ = set.iter().map(|key| -> AccountMeta
-                {AccountMeta{
-                        pubkey: *key,
-                        is_signer: false,
-                        is_writable: true,
-                    }}
-                            )  .collect::<Vec<_>>();
-
+            let mut ams_ = set
+            .iter()
+            .map(|key| -> AccountMeta {
+                AccountMeta {
+                    pubkey: *key,
+                    is_signer: false,
+                    is_writable: true,
+                }
+            })
+            .collect::<Vec<_>>();
 
             if num_of_events == 0 {
                 return Ok(());
