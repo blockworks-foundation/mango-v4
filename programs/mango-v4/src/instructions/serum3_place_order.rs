@@ -348,13 +348,11 @@ pub fn serum3_place_order(
 
     // Enforce min vault to deposits ratio
     let change = cm!(I80F48::from(after_vault) - I80F48::from(before_vault));
-    if change > 0
-        && change
-            > account
-                .token_position_mut(payer_bank.token_index)?
-                .0
-                .native(&payer_bank)
-    {
+    let position_native = account
+        .token_position_mut(payer_bank.token_index)?
+        .0
+        .native(&payer_bank);
+    if change > 0 && change > position_native {
         payer_bank.enforce_min_vault_to_deposits_ratio((*ctx.accounts.payer_vault).as_ref())?;
     }
 
