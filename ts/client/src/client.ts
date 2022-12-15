@@ -766,9 +766,10 @@ export class MangoClient {
   public async closeMangoAccount(
     group: Group,
     mangoAccount: MangoAccount,
+    forceClose: boolean | null,
   ): Promise<TransactionSignature> {
     const ix = await this.program.methods
-      .accountClose()
+      .accountClose(forceClose)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
