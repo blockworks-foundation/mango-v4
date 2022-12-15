@@ -1123,7 +1123,7 @@ export class MangoClient {
       .rpc();
   }
 
-  public async serum3PlaceOrder(
+  public async serum3PlaceOrderIx(
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
@@ -1134,7 +1134,7 @@ export class MangoClient {
     orderType: Serum3OrderType,
     clientOrderId: number,
     limit: number,
-  ): Promise<TransactionSignature> {
+  ): Promise<TransactionInstruction> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
@@ -1226,6 +1226,34 @@ export class MangoClient {
         ),
       )
       .instruction();
+
+    return ix;
+  }
+
+  public async serum3PlaceOrder(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: Serum3Side,
+    price: number,
+    size: number,
+    selfTradeBehavior: Serum3SelfTradeBehavior,
+    orderType: Serum3OrderType,
+    clientOrderId: number,
+    limit: number,
+  ): Promise<TransactionSignature> {
+    const ix = await this.serum3PlaceOrderIx(
+      group,
+      mangoAccount,
+      externalMarketPk,
+      side,
+      price,
+      size,
+      selfTradeBehavior,
+      orderType,
+      clientOrderId,
+      limit,
+    );
 
     return await sendTransaction(
       this.program.provider as AnchorProvider,
@@ -1331,13 +1359,13 @@ export class MangoClient {
     );
   }
 
-  public async serum3CancelOrder(
+  public async serum3CancelOrderIx(
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
     side: Serum3Side,
     orderId: BN,
-  ): Promise<TransactionSignature> {
+  ): Promise<TransactionInstruction> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
@@ -1361,6 +1389,24 @@ export class MangoClient {
         marketEventQueue: serum3MarketExternal.decoded.eventQueue,
       })
       .instruction();
+
+    return ix;
+  }
+
+  public async serum3CancelOrder(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: Serum3Side,
+    orderId: BN,
+  ): Promise<TransactionSignature> {
+    const ix = await this.serum3CancelOrderIx(
+      group,
+      mangoAccount,
+      externalMarketPk,
+      side,
+      orderId,
+    );
 
     return await sendTransaction(
       this.program.provider as AnchorProvider,
@@ -2617,5 +2663,96 @@ export class MangoClient {
     }
 
     return healthRemainingAccounts;
+  }
+
+  public async modifyPerpOrder(
+    group: Group,
+    mangoAccount: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    orderId: BN,
+    side: PerpOrderSide,
+    price: number,
+    quantity: number,
+    maxQuoteQuantity?: number,
+    clientOrderId?: number,
+    orderType?: PerpOrderType,
+    reduceOnly?: boolean,
+    expiryTimestamp?: number,
+    limit?: number,
+  ): Promise<TransactionSignature> {
+    const transactionInstructions: TransactionInstruction[] = [];
+    const [cancelOrderIx, placeOrderIx] = await Promise.all([
+      this.perpCancelOrderIx(group, mangoAccount, perpMarketIndex, orderId),
+      this.perpPlaceOrderIx(
+        group,
+        mangoAccount,
+        perpMarketIndex,
+        side,
+        price,
+        quantity,
+        maxQuoteQuantity,
+        clientOrderId,
+        orderType,
+        reduceOnly,
+        expiryTimestamp,
+        limit,
+      ),
+    ]);
+    transactionInstructions.push(cancelOrderIx, placeOrderIx);
+
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      transactionInstructions,
+      group.addressLookupTablesList,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
+  }
+  public async modifySerum3Order(
+    group: Group,
+    orderId: BN,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: Serum3Side,
+    price: number,
+    size: number,
+    selfTradeBehavior: Serum3SelfTradeBehavior,
+    orderType: Serum3OrderType,
+    clientOrderId: number,
+    limit: number,
+  ): Promise<TransactionSignature> {
+    const transactionInstructions: TransactionInstruction[] = [];
+    const [cancelOrderIx, placeOrderIx] = await Promise.all([
+      this.serum3CancelOrderIx(
+        group,
+        mangoAccount,
+        externalMarketPk,
+        side,
+        orderId,
+      ),
+      this.serum3PlaceOrderIx(
+        group,
+        mangoAccount,
+        externalMarketPk,
+        side,
+        price,
+        size,
+        selfTradeBehavior,
+        orderType,
+        clientOrderId,
+        limit,
+      ),
+    ]);
+    transactionInstructions.push(cancelOrderIx, placeOrderIx);
+
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      transactionInstructions,
+      group.addressLookupTablesList,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
   }
 }
