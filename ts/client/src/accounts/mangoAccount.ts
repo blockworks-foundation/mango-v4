@@ -933,7 +933,7 @@ export class MangoAccount {
     );
   }
 
-  toString(group?: Group): string {
+  toString(group?: Group, onlyTokens = false): string {
     let res = 'MangoAccount';
     res = res + '\n pk: ' + this.publicKey.toString();
     res = res + '\n name: ' + this.name;
@@ -949,15 +949,17 @@ export class MangoAccount {
         ? res +
           '\n tokens:' +
           JSON.stringify(
-            this.tokens.map((token, i) =>
-              token.isActive()
-                ? token.toString(group, i)
-                : `index: ${i} - empty slot`,
-            ),
+            this.tokens
+              .filter((token, i) => token.isActive())
+              .map((token, i) => token.toString(group, i)),
             null,
             4,
           )
         : res + '';
+
+    if (onlyTokens) {
+      return res;
+    }
 
     res =
       this.serum3Active().length > 0
