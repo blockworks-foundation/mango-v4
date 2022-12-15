@@ -347,12 +347,12 @@ pub fn serum3_place_order(
     let mut payer_bank = ctx.accounts.payer_bank.load_mut()?;
 
     // Enforce min vault to deposits ratio
-    let withdrawn_from_vault = cm!(I80F48::from(before_vault) - I80F48::from(after_vault));
+    let withdrawn_from_vault = I80F48::from(cm!(before_vault - after_vault));
     let position_native = account
         .token_position_mut(payer_bank.token_index)?
         .0
         .native(&payer_bank);
-    if withdrawn_from_vault > 0 && withdrawn_from_vault > position_native {
+    if withdrawn_from_vault > position_native {
         payer_bank.enforce_min_vault_to_deposits_ratio((*ctx.accounts.payer_vault).as_ref())?;
     }
 
