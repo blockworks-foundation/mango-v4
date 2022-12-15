@@ -71,9 +71,9 @@ pub async fn runner(
         .collect::<Vec<_>>();
 
     futures::join!(
-        // futures::future::join_all(handles1),
+        futures::future::join_all(handles1),
         futures::future::join_all(handles2),
-        // futures::future::join_all(handles3),
+        futures::future::join_all(handles3),
         debugging_handle
     );
 
