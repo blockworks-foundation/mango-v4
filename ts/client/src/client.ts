@@ -1306,11 +1306,11 @@ export class MangoClient {
     );
   }
 
-  public async serum3SettleFunds(
+  public async serum3SettleFundsIx(
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-  ): Promise<TransactionSignature> {
+  ): Promise<TransactionInstruction> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
@@ -1348,6 +1348,20 @@ export class MangoClient {
           .vault,
       })
       .instruction();
+
+    return ix;
+  }
+
+  public async serum3SettleFunds(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+  ): Promise<TransactionSignature> {
+    const ix = await this.serum3SettleFundsIx(
+      group,
+      mangoAccount,
+      externalMarketPk,
+    );
 
     return await sendTransaction(
       this.program.provider as AnchorProvider,
