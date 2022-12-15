@@ -763,12 +763,22 @@ export class MangoClient {
     });
   }
 
+  /**
+   * Note: this ix doesn't settle liabs, reduce open positions, or withdraw tokens to wallet,
+   * it simply closes the account. To close successfully ensure all positions are closed, or
+   * use forceClose flag
+   * @param group
+   * @param mangoAccount
+   * @param forceClose
+   * @returns
+   */
   public async closeMangoAccount(
     group: Group,
     mangoAccount: MangoAccount,
+    forceClose = false,
   ): Promise<TransactionSignature> {
     const ix = await this.program.methods
-      .accountClose()
+      .accountClose(forceClose)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
