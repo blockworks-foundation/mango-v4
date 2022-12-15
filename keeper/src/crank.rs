@@ -231,7 +231,7 @@ pub async fn loop_consume_events(
                     EventType::Liquidate => {}
                 }
                 event_queue.pop_front()?;
-                num_of_events+=1;            
+                num_of_events+=1;
             }
 
             if num_of_events == 0 {
