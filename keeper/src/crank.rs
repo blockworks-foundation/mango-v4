@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration, time::Instant};
+use std::{collections::HashSet, sync::Arc, time::Duration, time::Instant};
 
 use crate::MangoClient;
 use itertools::Itertools;
@@ -190,6 +190,7 @@ pub async fn loop_consume_events(
 
             // TODO: future, choose better constant of how many max events to pack
             // TODO: future, choose better constant of how many max mango accounts to pack
+            let mut already_packed_accounts = HashSet::new();
             for _ in 0..10 {
                 let event = match event_queue.peek_front() {
                     None => break,
@@ -198,16 +199,31 @@ pub async fn loop_consume_events(
                 match EventType::try_from(event.event_type)? {
                     EventType::Fill => {
                         let fill: &FillEvent = cast_ref(event);
-                        ams_.push(AccountMeta {
-                            pubkey: fill.maker,
-                            is_signer: false,
-                            is_writable: true,
-                        });
-                        ams_.push(AccountMeta {
-                            pubkey: fill.taker,
-                            is_signer: false,
-                            is_writable: true,
-                        });
+                        if fill.maker == fill.taker && !already_packed_accounts.contains(&fill.maker.to_string()) {
+                            ams_.push(AccountMeta {
+                                pubkey: fill.maker,
+                                is_signer: false,
+                                is_writable: true,
+                            });
+                            already_packed_accounts.insert(fill.maker.to_string());
+                        } else {
+                            if !already_packed_accounts.contains(&fill.maker.to_string()) {
+                            ams_.push(AccountMeta {
+                                pubkey: fill.maker,
+                                is_signer: false,
+                                is_writable: true,
+                            });
+                            already_packed_accounts.insert(fill.maker.to_string());
+                        }
+
+                        if  !already_packed_accounts.contains(&fill.taker.to_string()) {
+                            ams_.push(AccountMeta {
+                                pubkey: fill.taker,
+                                is_signer: false,
+                                is_writable: true,
+                            });
+                            already_packed_accounts.insert(fill.taker.to_string());
+                        }}
                     }
                     EventType::Out => {
                         let out: &OutEvent = cast_ref(event);
