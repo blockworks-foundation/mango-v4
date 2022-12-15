@@ -5,6 +5,7 @@ use crate::state::{oracle, StablePriceModel};
 use crate::util;
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
+use anchor_spl::token::TokenAccount;
 use derivative::Derivative;
 use fixed::types::I80F48;
 use fixed_macro::types::I80F48;
@@ -232,6 +233,33 @@ impl Bank {
     #[inline(always)]
     pub fn native_deposits(&self) -> I80F48 {
         cm!(self.deposit_index * self.indexed_deposits)
+    }
+
+    /// Prevent borrowing away the full bank vault.
+    /// Keep some in reserve to satisfy non-borrow withdraws.
+    pub fn enforce_min_vault_to_deposits_ratio(
+        &self,
+        is_borrow: bool,
+        vault_ai: &AccountInfo,
+    ) -> Result<()> {
+        require_keys_eq!(self.vault, vault_ai.key());
+
+        let vault = Account::<TokenAccount>::try_from(vault_ai)?;
+        let vault_amount = vault.amount as f64;
+
+        let bank_native_deposits = self.native_deposits();
+        if bank_native_deposits != I80F48::ZERO && is_borrow {
+            let bank_native_deposits: f64 = bank_native_deposits.checked_to_num().unwrap();
+            if vault_amount < self.min_vault_to_deposits_ratio * bank_native_deposits {
+                return err!(MangoError::BankBorrowLimitReached).with_context(|| {
+                format!(
+                    "vault_amount ({:?}) below min_vault_to_deposits_ratio * bank_native_deposits ({:?})",
+                    vault_amount, self.min_vault_to_deposits_ratio * bank_native_deposits,
+                )
+            });
+            }
+        }
+        Ok(())
     }
 
     /// Deposits `native_amount`.
