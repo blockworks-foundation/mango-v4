@@ -344,8 +344,19 @@ pub fn serum3_place_order(
     // Placing an order cannot increase vault balance
     require_gte!(before_vault, after_vault);
 
-    // Charge the difference in vault balance to the user's account
     let mut payer_bank = ctx.accounts.payer_bank.load_mut()?;
+
+    // Enforce min vault to deposits ratio
+    let withdrawn_from_vault = I80F48::from(cm!(before_vault - after_vault));
+    let position_native = account
+        .token_position_mut(payer_bank.token_index)?
+        .0
+        .native(&payer_bank);
+    if withdrawn_from_vault > position_native {
+        payer_bank.enforce_min_vault_to_deposits_ratio((*ctx.accounts.payer_vault).as_ref())?;
+    }
+
+    // Charge the difference in vault balance to the user's account
     let vault_difference = {
         let oracle_price =
             payer_bank.oracle_price(&AccountInfoRef::borrow(&ctx.accounts.payer_oracle)?, None)?;
