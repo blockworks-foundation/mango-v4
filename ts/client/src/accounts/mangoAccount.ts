@@ -928,6 +928,7 @@ export class MangoAccount {
       perpMarket.loadBids(client),
       perpMarket.loadAsks(client),
     ]);
+
     return [...Array.from(bids.items()), ...Array.from(asks.items())].filter(
       (order) => order.owner.equals(this.publicKey),
     );
