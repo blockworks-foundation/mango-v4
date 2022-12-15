@@ -763,6 +763,9 @@ export class MangoClient {
     });
   }
 
+  // Note: this doesn't settle liabs, reduce open positions, or withdraw tokens to wallet,
+  // it simply closes the account. To close successfully ensure all positions are closed, or
+  // use froceClose flag
   public async closeMangoAccount(
     group: Group,
     mangoAccount: MangoAccount,
