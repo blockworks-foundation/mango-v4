@@ -6,7 +6,10 @@ Update this for each mainnet deployment.
 
 ## mainnet
 
+Dec 16, 2022 at 16:40 Central European Standard Time
 
+Oct 8, 2022 at 14:38:31 Central European Summer Time
+https://explorer.solana.com/tx/3m8EDohkgwJZyiwpGXztBWARWQVxyhnSNDVuH467D7FPS2wxJerr79HhdhDEed5hpConHgGsKHvxtW1HJP6GixX9
 
 Oct 8, 2022 at 14:38:31 Central European Summer Time
 https://explorer.solana.com/tx/3m8EDohkgwJZyiwpGXztBWARWQVxyhnSNDVuH467D7FPS2wxJerr79HhdhDEed5hpConHgGsKHvxtW1HJP6GixX9
