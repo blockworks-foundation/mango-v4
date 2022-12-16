@@ -501,7 +501,6 @@ async function main() {
       const quoteQty = mangoAccount.getMaxQuoteForPerpBidUi(
         group,
         perpMarket.perpMarketIndex,
-        perpMarket.uiPrice,
       );
       const baseQty = quoteQty / price;
       console.log(
@@ -509,7 +508,6 @@ async function main() {
           group,
           perpMarket.perpMarketIndex,
           baseQty,
-          perpMarket.uiPrice,
         )}`,
       );
       console.log(
@@ -552,7 +550,6 @@ async function main() {
         mangoAccount.getMaxQuoteForPerpBidUi(
           group,
           perpMarket.perpMarketIndex,
-          perpMarket.uiPrice,
         ) * 1.02;
 
       const baseQty = quoteQty / price;
@@ -588,14 +585,12 @@ async function main() {
       const baseQty = mangoAccount.getMaxBaseForPerpAskUi(
         group,
         perpMarket.perpMarketIndex,
-        perpMarket.uiPrice,
       );
       console.log(
         ` simHealthRatioWithPerpAskUiChanges - ${mangoAccount.simHealthRatioWithPerpAskUiChanges(
           group,
           perpMarket.perpMarketIndex,
           baseQty,
-          perpMarket.uiPrice,
         )}`,
       );
       const quoteQty = baseQty * price;
@@ -628,11 +623,8 @@ async function main() {
         group.banksMapByName.get('BTC')![0].uiPrice! +
         Math.floor(Math.random() * 100);
       const baseQty =
-        mangoAccount.getMaxBaseForPerpAskUi(
-          group,
-          perpMarket.perpMarketIndex,
-          perpMarket.uiPrice,
-        ) * 1.02;
+        mangoAccount.getMaxBaseForPerpAskUi(group, perpMarket.perpMarketIndex) *
+        1.02;
       const quoteQty = baseQty * price;
       console.log(
         `...placing max qty perp ask * 1.02 clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,

@@ -1,6 +1,5 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import { Cluster, Connection, Keypair } from '@solana/web3.js';
-import { expect } from 'chai';
 import fs from 'fs';
 import { Group } from '../accounts/group';
 import { HealthCache } from '../accounts/healthCache';
@@ -26,7 +25,11 @@ async function debugUser(
   group: Group,
   mangoAccount: MangoAccount,
 ): Promise<void> {
-  console.log(mangoAccount.toString(group));
+  // Log only tokens
+  console.log(mangoAccount.toString(group, true));
+
+  // Turn on, to see serum and perp stuff
+  // console.log(mangoAccount.toString(group));
 
   await mangoAccount.reload(client);
 
@@ -98,15 +101,18 @@ async function debugUser(
 
   function getMaxSourceForTokenSwapWrapper(src, tgt): void {
     // Turn on for debugging specific pairs
-    // if (src != 'DAI' || tgt != 'ETH') return;
+    // if (src != 'USDC' || tgt != 'MNGO') return;
 
-    const maxSourceUi = mangoAccount.getMaxSourceUiForTokenSwap(
-      group,
-      group.banksMapByName.get(src)![0].mint,
-      group.banksMapByName.get(tgt)![0].mint,
-      group.banksMapByName.get(src)![0].uiPrice /
-        group.banksMapByName.get(tgt)![0].uiPrice,
-    );
+    let maxSourceUi;
+    try {
+      maxSourceUi = mangoAccount.getMaxSourceUiForTokenSwap(
+        group,
+        group.banksMapByName.get(src)![0].mint,
+        group.banksMapByName.get(tgt)![0].mint,
+      );
+    } catch (error) {
+      console.log(`Error for ${src}->${tgt}, ` + error.toString());
+    }
 
     const maxSourceWoFees =
       -maxSourceUi *
@@ -131,10 +137,6 @@ async function debugUser(
         maxSourceUi.toFixed(3).padStart(10) +
         `, health ratio after (${sim.toFixed(3).padStart(10)})`,
     );
-    if (maxSourceUi > 0 && src !== tgt) {
-      expect(sim).gt(2);
-      expect(sim).lt(3);
-    }
   }
   for (const srcToken of Array.from(group.banksMapByName.keys()).sort()) {
     for (const tgtToken of Array.from(group.banksMapByName.keys()).sort()) {
@@ -146,24 +148,20 @@ async function debugUser(
     const maxQuoteUi = mangoAccount.getMaxQuoteForPerpBidUi(
       group,
       perpMarket.perpMarketIndex,
-      perpMarket.uiPrice,
     );
     const simMaxQuote = mangoAccount.simHealthRatioWithPerpBidUiChanges(
       group,
       perpMarket.perpMarketIndex,
       maxQuoteUi / perpMarket.uiPrice,
-      perpMarket.uiPrice,
     );
     const maxBaseUi = mangoAccount.getMaxBaseForPerpAskUi(
       group,
       perpMarket.perpMarketIndex,
-      perpMarket.uiPrice,
     );
     const simMaxBase = mangoAccount.simHealthRatioWithPerpAskUiChanges(
       group,
       perpMarket.perpMarketIndex,
       maxBaseUi,
-      perpMarket.uiPrice,
     );
     console.log(
       `getMaxPerp ${perpMarket.name.padStart(
@@ -178,10 +176,6 @@ async function debugUser(
         .toFixed(3)
         .padStart(10)})`,
     );
-    if (maxQuoteUi > 0) {
-      expect(simMaxQuote).gt(2);
-      expect(simMaxQuote).lt(3);
-    }
   }
   for (const perpMarket of Array.from(
     group.perpMarketsMapByMarketIndex.values(),
@@ -266,15 +260,11 @@ async function main(): Promise<void> {
         true
         // Enable below to debug specific mango accounts
         // mangoAccount.publicKey.equals(
-        //   new PublicKey('BXUPaeAWRCPvPdpndXJeykD8VYZJwrCBjZdWNZAu8Ca'),
+        //   new PublicKey('GGfkfpT4dY8hmNK6SKKSBFdn7ucQXSc4WtDCQpnQt4p2'),
         // )
       ) {
+        console.log();
         console.log(`MangoAccount ${mangoAccount.publicKey}`);
-
-        // Log only tokens
-        // console.log(mangoAccount.toString(group, true));
-
-        // Long all debug info
         await debugUser(client, group, mangoAccount);
       }
     }

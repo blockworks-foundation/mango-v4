@@ -198,7 +198,7 @@ impl Serum3Info {
 }
 
 #[derive(Clone)]
-struct Serum3Reserved {
+pub(crate) struct Serum3Reserved {
     /// base tokens when the serum3info.reserved_quote get converted to base and added to reserved_base
     all_reserved_as_base: I80F48,
     /// ditto the other way around
@@ -479,7 +479,7 @@ impl HealthCache {
         self.has_spot_borrows() || perp_borrows
     }
 
-    fn compute_serum3_reservations(
+    pub(crate) fn compute_serum3_reservations(
         &self,
         health_type: HealthType,
     ) -> (Vec<I80F48>, Vec<Serum3Reserved>) {
