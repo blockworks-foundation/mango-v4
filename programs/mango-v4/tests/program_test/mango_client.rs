@@ -1590,7 +1590,7 @@ impl ClientInstruction for AccountCloseInstruction {
         _account_loader: impl ClientAccountLoader + 'async_trait,
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
-        let instruction = Self::Instruction {};
+        let instruction = Self::Instruction { force_close: false };
 
         let accounts = Self::Accounts {
             group: self.group,
