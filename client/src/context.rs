@@ -1,23 +1,24 @@
 use std::collections::HashMap;
 
-use anchor_client::{Client, ClientError, Cluster, Program};
+use anchor_client::ClientError;
 
 use anchor_lang::__private::bytemuck;
 
 use mango_v4::state::{
-    MangoAccountValue, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market, Serum3MarketIndex,
-    TokenIndex,
+    Group, MangoAccountValue, MintInfo, PerpMarket, PerpMarketIndex, Serum3Market,
+    Serum3MarketIndex, TokenIndex,
 };
 
 use fixed::types::I80F48;
+use futures::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 
 use crate::gpa::*;
 
+use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::account::Account;
 use solana_sdk::instruction::AccountMeta;
-use solana_sdk::signature::Keypair;
-use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
+use solana_sdk::pubkey::Pubkey;
 
 #[derive(Clone)]
 pub struct TokenContext {
@@ -64,6 +65,8 @@ pub struct MangoGroupContext {
 
     pub perp_markets: HashMap<PerpMarketIndex, PerpMarketContext>,
     pub perp_market_indexes_by_name: HashMap<String, PerpMarketIndex>,
+
+    pub address_lookup_tables: Vec<Pubkey>,
 }
 
 impl MangoGroupContext {
@@ -94,17 +97,11 @@ impl MangoGroupContext {
         self.perp(perp_market_index).address
     }
 
-    pub fn new_from_rpc(
-        group: Pubkey,
-        cluster: Cluster,
-        commitment: CommitmentConfig,
-    ) -> Result<Self, ClientError> {
-        let program =
-            Client::new_with_options(cluster, std::rc::Rc::new(Keypair::new()), commitment)
-                .program(mango_v4::ID);
+    pub async fn new_from_rpc(rpc: &RpcClientAsync, group: Pubkey) -> anyhow::Result<Self> {
+        let program = mango_v4::ID;
 
         // tokens
-        let mint_info_tuples = fetch_mint_infos(&program, group)?;
+        let mint_info_tuples = fetch_mint_infos(rpc, program, group).await?;
         let mut tokens = mint_info_tuples
             .iter()
             .map(|(pk, mi)| {
@@ -124,7 +121,7 @@ impl MangoGroupContext {
         // reading the banks is only needed for the token names and decimals
         // FUTURE: either store the names on MintInfo as well, or maybe don't store them at all
         //         because they are in metaplex?
-        let bank_tuples = fetch_banks(&program, group)?;
+        let bank_tuples = fetch_banks(rpc, program, group).await?;
         for (_, bank) in bank_tuples {
             let token = tokens.get_mut(&bank.token_index).unwrap();
             token.name = bank.name().into();
@@ -133,11 +130,15 @@ impl MangoGroupContext {
         assert!(tokens.values().all(|t| t.decimals != u8::MAX));
 
         // serum3 markets
-        let serum3_market_tuples = fetch_serum3_markets(&program, group)?;
+        let serum3_market_tuples = fetch_serum3_markets(rpc, program, group).await?;
+        let serum3_markets_external = stream::iter(serum3_market_tuples.iter())
+            .then(|(_, s)| fetch_raw_account(rpc, s.serum_market_external))
+            .try_collect::<Vec<_>>()
+            .await?;
         let serum3_markets = serum3_market_tuples
             .iter()
-            .map(|(pk, s)| {
-                let market_external_account = fetch_raw_account(&program, s.serum_market_external)?;
+            .zip(serum3_markets_external.iter())
+            .map(|((pk, s), market_external_account)| {
                 let market_external: &serum_dex::state::MarketState = bytemuck::from_bytes(
                     &market_external_account.data
                         [5..5 + std::mem::size_of::<serum_dex::state::MarketState>()],
@@ -148,7 +149,7 @@ impl MangoGroupContext {
                     &s.serum_program,
                 )
                 .unwrap();
-                Ok((
+                (
                     s.market_index,
                     Serum3MarketContext {
                         address: *pk,
@@ -163,12 +164,12 @@ impl MangoGroupContext {
                         coin_lot_size: market_external.coin_lot_size,
                         pc_lot_size: market_external.pc_lot_size,
                     },
-                ))
+                )
             })
-            .collect::<Result<HashMap<_, _>, ClientError>>()?;
+            .collect::<HashMap<_, _>>();
 
         // perp markets
-        let perp_market_tuples = fetch_perp_markets(&program, group)?;
+        let perp_market_tuples = fetch_perp_markets(rpc, program, group).await?;
         let perp_markets = perp_market_tuples
             .iter()
             .map(|(pk, pm)| {
@@ -196,6 +197,14 @@ impl MangoGroupContext {
             .map(|(i, p)| (p.market.name().to_string(), *i))
             .collect::<HashMap<_, _>>();
 
+        let group_data = fetch_anchor_account::<Group>(rpc, &group).await?;
+        let address_lookup_tables = group_data
+            .address_lookup_tables
+            .iter()
+            .filter(|&&k| k != Pubkey::default())
+            .cloned()
+            .collect::<Vec<Pubkey>>();
+
         Ok(MangoGroupContext {
             group,
             tokens,
@@ -204,6 +213,7 @@ impl MangoGroupContext {
             serum3_market_indexes_by_name,
             perp_markets,
             perp_market_indexes_by_name,
+            address_lookup_tables,
         })
     }
 
@@ -331,9 +341,9 @@ fn from_serum_style_pubkey(d: [u64; 4]) -> Pubkey {
     Pubkey::new(bytemuck::cast_slice(&d as &[_]))
 }
 
-fn fetch_raw_account(program: &Program, address: Pubkey) -> Result<Account, ClientError> {
-    let rpc = program.rpc();
-    rpc.get_account_with_commitment(&address, rpc.commitment())?
+async fn fetch_raw_account(rpc: &RpcClientAsync, address: Pubkey) -> Result<Account, ClientError> {
+    rpc.get_account_with_commitment(&address, rpc.commitment())
+        .await?
         .value
         .ok_or(ClientError::AccountNotFound)
 }

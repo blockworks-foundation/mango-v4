@@ -16,9 +16,8 @@ pub async fn runner(
     mango_client: Arc<MangoClient>,
     _debugging_handle: impl Future,
 ) -> Result<(), anyhow::Error> {
-    ensure_deposit(&mango_client)?;
-
-    ensure_oo(&mango_client)?;
+    ensure_deposit(&mango_client).await?;
+    ensure_oo(&mango_client).await?;
 
     let mut price_arcs = HashMap::new();
     for market_name in mango_client.context.serum3_market_indexes_by_name.keys() {
@@ -30,6 +29,7 @@ pub async fn runner(
                     .first()
                     .unwrap(),
             )
+            .await
             .unwrap();
         price_arcs.insert(
             market_name.to_owned(),
@@ -73,23 +73,25 @@ pub async fn runner(
     Ok(())
 }
 
-fn ensure_oo(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> {
-    let account = mango_client.mango_account()?;
+async fn ensure_oo(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> {
+    let account = mango_client.mango_account().await?;
 
     for (market_index, serum3_market) in mango_client.context.serum3_markets.iter() {
         if account.serum3_orders(*market_index).is_err() {
-            mango_client.serum3_create_open_orders(serum3_market.market.name())?;
+            mango_client
+                .serum3_create_open_orders(serum3_market.market.name())
+                .await?;
         }
     }
 
     Ok(())
 }
 
-fn ensure_deposit(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> {
-    let mango_account = mango_client.mango_account()?;
+async fn ensure_deposit(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> {
+    let mango_account = mango_client.mango_account().await?;
 
     for &token_index in mango_client.context.tokens.keys() {
-        let bank = mango_client.first_bank(token_index)?;
+        let bank = mango_client.first_bank(token_index).await?;
         let desired_balance = I80F48::from_num(10_000 * 10u64.pow(bank.mint_decimals as u32));
 
         let token_account_opt = mango_account.token_position(token_index).ok();
@@ -114,7 +116,9 @@ fn ensure_deposit(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::Error> 
         }
 
         log::info!("Depositing {} {}", deposit_native, bank.name());
-        mango_client.token_deposit(bank.mint, desired_balance.to_num())?;
+        mango_client
+            .token_deposit(bank.mint, desired_balance.to_num())
+            .await?;
     }
 
     Ok(())
@@ -126,33 +130,15 @@ pub async fn loop_blocking_price_update(
     price: Arc<RwLock<I80F48>>,
 ) {
     let mut interval = time::interval(Duration::from_secs(1));
+    let token_name = market_name.split('/').collect::<Vec<&str>>()[0];
     loop {
         interval.tick().await;
 
-        let client1 = mango_client.clone();
-        let market_name1 = market_name.clone();
-        let price = price.clone();
-        let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-            let token_name = market_name1.split('/').collect::<Vec<&str>>()[0];
-            let fresh_price = client1.get_oracle_price(token_name).unwrap();
-            log::info!("{} Updated price is {:?}", token_name, fresh_price.price);
-            if let Ok(mut price) = price.write() {
-                *price = I80F48::from_num(fresh_price.price)
-                    / I80F48::from_num(10u64.pow(-fresh_price.expo as u32));
-            }
-            Ok(())
-        })
-        .await;
-
-        match res {
-            Ok(inner_res) => {
-                if inner_res.is_err() {
-                    log::error!("{}", inner_res.unwrap_err());
-                }
-            }
-            Err(join_error) => {
-                log::error!("{}", join_error);
-            }
+        let fresh_price = mango_client.get_oracle_price(token_name).await.unwrap();
+        log::info!("{} Updated price is {:?}", token_name, fresh_price.price);
+        if let Ok(mut price) = price.write() {
+            *price = I80F48::from_num(fresh_price.price)
+                / I80F48::from_num(10u64.pow(-fresh_price.expo as u32));
         }
     }
 }
@@ -165,7 +151,10 @@ pub async fn loop_blocking_orders(
     let mut interval = time::interval(Duration::from_secs(5));
 
     // Cancel existing orders
-    let orders: Vec<u128> = mango_client.serum3_cancel_all_orders(&market_name).unwrap();
+    let orders: Vec<u128> = mango_client
+        .serum3_cancel_all_orders(&market_name)
+        .await
+        .unwrap();
     log::info!("Cancelled orders - {:?} for {}", orders, market_name);
 
     loop {
@@ -175,8 +164,8 @@ pub async fn loop_blocking_orders(
         let market_name = market_name.clone();
         let price = price.clone();
 
-        let res = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-            client.serum3_settle_funds(&market_name)?;
+        let res = (|| async move {
+            client.serum3_settle_funds(&market_name).await?;
 
             let fresh_price = match price.read() {
                 Ok(price) => *price,
@@ -188,16 +177,18 @@ pub async fn loop_blocking_orders(
             let fresh_price = fresh_price.to_num::<f64>();
 
             let bid_price = fresh_price + fresh_price * 0.1;
-            let res = client.serum3_place_order(
-                &market_name,
-                Serum3Side::Bid,
-                bid_price,
-                0.0001,
-                Serum3SelfTradeBehavior::DecrementTake,
-                Serum3OrderType::ImmediateOrCancel,
-                SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
-                10,
-            );
+            let res = client
+                .serum3_place_order(
+                    &market_name,
+                    Serum3Side::Bid,
+                    bid_price,
+                    0.0001,
+                    Serum3SelfTradeBehavior::DecrementTake,
+                    Serum3OrderType::ImmediateOrCancel,
+                    SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
+                    10,
+                )
+                .await;
             if let Err(e) = res {
                 log::error!("Error while placing taker bid {:#?}", e)
             } else {
@@ -205,16 +196,18 @@ pub async fn loop_blocking_orders(
             }
 
             let ask_price = fresh_price - fresh_price * 0.1;
-            let res = client.serum3_place_order(
-                &market_name,
-                Serum3Side::Ask,
-                ask_price,
-                0.0001,
-                Serum3SelfTradeBehavior::DecrementTake,
-                Serum3OrderType::ImmediateOrCancel,
-                SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
-                10,
-            );
+            let res = client
+                .serum3_place_order(
+                    &market_name,
+                    Serum3Side::Ask,
+                    ask_price,
+                    0.0001,
+                    Serum3SelfTradeBehavior::DecrementTake,
+                    Serum3OrderType::ImmediateOrCancel,
+                    SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
+                    10,
+                )
+                .await;
             if let Err(e) = res {
                 log::error!("Error while placing taker ask {:#?}", e)
             } else {
@@ -222,18 +215,11 @@ pub async fn loop_blocking_orders(
             }
 
             Ok(())
-        })
+        })()
         .await;
 
-        match res {
-            Ok(inner_res) => {
-                if inner_res.is_err() {
-                    log::error!("{}", inner_res.unwrap_err());
-                }
-            }
-            Err(join_error) => {
-                log::error!("{}", join_error);
-            }
+        if let Err(err) = res {
+            log::error!("{:?}", err);
         }
     }
 }

@@ -80,7 +80,7 @@ async function main() {
     // close account
     try {
       console.log(`closing account: ${account}`);
-      await client.closeMangoAccount(group, account);
+      await client.closeMangoAccount(group, account, true);
     } catch (error) {
       console.log(`failed to close ${account.publicKey}: ${error}`);
     }

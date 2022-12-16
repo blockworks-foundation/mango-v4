@@ -1018,7 +1018,12 @@ export type MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "forceClose",
+          "type": "bool"
+        }
+      ]
     },
     {
       "name": "stubOracleCreate",
@@ -4403,7 +4408,8 @@ export type MangoV4 = {
           {
             "name": "settlePnlLimitFactor",
             "docs": [
-              "Fraction of perp base value that can be settled each window.",
+              "Fraction of perp base value (i.e. base_lots * entry_price_in_lots) of unrealized",
+              "positive pnl that can be settled each window.",
               "Set to a negative value to disable the limit."
             ],
             "type": "f32"
@@ -8421,7 +8427,12 @@ export const IDL: MangoV4 = {
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "forceClose",
+          "type": "bool"
+        }
+      ]
     },
     {
       "name": "stubOracleCreate",
@@ -11806,7 +11817,8 @@ export const IDL: MangoV4 = {
           {
             "name": "settlePnlLimitFactor",
             "docs": [
-              "Fraction of perp base value that can be settled each window.",
+              "Fraction of perp base value (i.e. base_lots * entry_price_in_lots) of unrealized",
+              "positive pnl that can be settled each window.",
               "Set to a negative value to disable the limit."
             ],
             "type": "f32"
