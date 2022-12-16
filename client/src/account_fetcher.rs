@@ -6,15 +6,22 @@ use anyhow::Context;
 use anchor_client::ClientError;
 use anchor_lang::AccountDeserialize;
 
-use solana_client::rpc_client::RpcClient;
+use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
 use solana_sdk::pubkey::Pubkey;
 
 use mango_v4::state::MangoAccountValue;
 
+#[async_trait::async_trait(?Send)]
 pub trait AccountFetcher: Sync + Send {
-    fn fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData>;
-    fn fetch_program_accounts(
+    async fn fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData>;
+    async fn fetch_raw_account_lookup_table(
+        &self,
+        address: &Pubkey,
+    ) -> anyhow::Result<AccountSharedData> {
+        self.fetch_raw_account(address).await
+    }
+    async fn fetch_program_accounts(
         &self,
         program: &Pubkey,
         discriminator: [u8; 8],
@@ -22,35 +29,37 @@ pub trait AccountFetcher: Sync + Send {
 }
 
 // Can't be in the trait, since then it would no longer be object-safe...
-pub fn account_fetcher_fetch_anchor_account<T: AccountDeserialize>(
+pub async fn account_fetcher_fetch_anchor_account<T: AccountDeserialize>(
     fetcher: &dyn AccountFetcher,
     address: &Pubkey,
 ) -> anyhow::Result<T> {
-    let account = fetcher.fetch_raw_account(address)?;
+    let account = fetcher.fetch_raw_account(address).await?;
     let mut data: &[u8] = &account.data();
     T::try_deserialize(&mut data)
         .with_context(|| format!("deserializing anchor account {}", address))
 }
 
 // Can't be in the trait, since then it would no longer be object-safe...
-pub fn account_fetcher_fetch_mango_account(
+pub async fn account_fetcher_fetch_mango_account(
     fetcher: &dyn AccountFetcher,
     address: &Pubkey,
 ) -> anyhow::Result<MangoAccountValue> {
-    let account = fetcher.fetch_raw_account(address)?;
+    let account = fetcher.fetch_raw_account(address).await?;
     let data: &[u8] = &account.data();
     MangoAccountValue::from_bytes(&data[8..])
         .with_context(|| format!("deserializing mango account {}", address))
 }
 
 pub struct RpcAccountFetcher {
-    pub rpc: RpcClient,
+    pub rpc: RpcClientAsync,
 }
 
+#[async_trait::async_trait(?Send)]
 impl AccountFetcher for RpcAccountFetcher {
-    fn fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
+    async fn fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
         self.rpc
             .get_account_with_commitment(address, self.rpc.commitment())
+            .await
             .with_context(|| format!("fetch account {}", *address))?
             .value
             .ok_or(ClientError::AccountNotFound)
@@ -58,7 +67,7 @@ impl AccountFetcher for RpcAccountFetcher {
             .map(Into::into)
     }
 
-    fn fetch_program_accounts(
+    async fn fetch_program_accounts(
         &self,
         program: &Pubkey,
         discriminator: [u8; 8],
@@ -78,7 +87,10 @@ impl AccountFetcher for RpcAccountFetcher {
             },
             with_context: Some(true),
         };
-        let accs = self.rpc.get_program_accounts_with_config(program, config)?;
+        let accs = self
+            .rpc
+            .get_program_accounts_with_config(program, config)
+            .await?;
         // convert Account -> AccountSharedData
         Ok(accs
             .into_iter()
@@ -121,18 +133,19 @@ impl<T: AccountFetcher> CachedAccountFetcher<T> {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl<T: AccountFetcher> AccountFetcher for CachedAccountFetcher<T> {
-    fn fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
+    async fn fetch_raw_account(&self, address: &Pubkey) -> anyhow::Result<AccountSharedData> {
         let mut cache = self.cache.lock().unwrap();
         if let Some(account) = cache.accounts.get(address) {
             return Ok(account.clone());
         }
-        let account = self.fetcher.fetch_raw_account(address)?;
+        let account = self.fetcher.fetch_raw_account(address).await?;
         cache.accounts.insert(*address, account.clone());
         Ok(account)
     }
 
-    fn fetch_program_accounts(
+    async fn fetch_program_accounts(
         &self,
         program: &Pubkey,
         discriminator: [u8; 8],
@@ -147,7 +160,8 @@ impl<T: AccountFetcher> AccountFetcher for CachedAccountFetcher<T> {
         }
         let accounts = self
             .fetcher
-            .fetch_program_accounts(program, discriminator)?;
+            .fetch_program_accounts(program, discriminator)
+            .await?;
         cache
             .keys_for_program_and_discriminator
             .insert(cache_key, accounts.iter().map(|(pk, _)| *pk).collect());

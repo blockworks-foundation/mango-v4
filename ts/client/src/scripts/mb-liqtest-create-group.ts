@@ -1,8 +1,14 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import {
+  AddressLookupTableProgram,
+  Connection,
+  Keypair,
+  PublicKey,
+} from '@solana/web3.js';
 import fs from 'fs';
 import { MangoClient } from '../client';
 import { MANGO_V4_ID } from '../constants';
+import { buildVersionedTx } from '../utils';
 
 //
 // Script which depoys a new mango group, and registers 3 tokens
@@ -14,23 +20,23 @@ const GROUP_NUM = Number(process.env.GROUP_NUM || 200);
 
 const MAINNET_MINTS = new Map([
   ['USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'],
-  ['BTC', '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E'],
+  ['ETH', '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs'],
   ['SOL', 'So11111111111111111111111111111111111111112'],
   ['MNGO', 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac'],
 ]);
 
 const STUB_PRICES = new Map([
   ['USDC', 1.0],
-  ['BTC', 20000.0], // btc and usdc both have 6 decimals
-  ['SOL', 0.04], // sol has 9 decimals, equivalent to $40 per SOL
-  ['MNGO', 0.04], // same price/decimals as SOL for convenience
+  ['ETH', 1200.0], // eth and usdc both have 6 decimals
+  ['SOL', 0.015], // sol has 9 decimals, equivalent to $15 per SOL
+  ['MNGO', 0.02], // same price/decimals as SOL for convenience
 ]);
 
 // External markets are matched with those in https://github.com/blockworks-foundation/mango-client-v3/blob/main/src/ids.json
 // and verified to have best liquidity for pair on https://openserum.io/
 const MAINNET_SERUM3_MARKETS = new Map([
-  ['BTC/USDC', 'A8YFbxQYFVqKZaoYJLLUVcQiWP7G2MeEgW5wsAQgMvFw'],
-  ['SOL/USDC', '9wFFyRfZBsuAha4YcuxcXLKwMxJR43S7fPfQLusDBzvT'],
+  ['ETH/USDC', 'FZxi3yWkE5mMjyaZj6utmYL54QQYfMCKMcLaQZq4UwnA'],
+  ['SOL/USDC', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'],
 ]);
 
 const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
@@ -130,17 +136,17 @@ async function main() {
   }
 
   // register token 1
-  console.log(`Registering BTC...`);
-  const btcMainnetMint = new PublicKey(MAINNET_MINTS.get('BTC')!);
-  const btcMainnetOracle = oracles.get('BTC');
+  console.log(`Registering ETH...`);
+  const ethMainnetMint = new PublicKey(MAINNET_MINTS.get('ETH')!);
+  const ethMainnetOracle = oracles.get('ETH');
   try {
     await client.tokenRegister(
       group,
-      btcMainnetMint,
-      btcMainnetOracle,
+      ethMainnetMint,
+      ethMainnetOracle,
       defaultOracleConfig,
       1,
-      'BTC',
+      'ETH',
       defaultInterestRate,
       0.0,
       0.0001,
@@ -215,7 +221,7 @@ async function main() {
       0,
       'MNGO-PERP',
       defaultOracleConfig,
-      9,
+      6,
       10,
       100000, // base lots
       0.9,
@@ -235,14 +241,134 @@ async function main() {
       0,
       0,
       0,
-      1.0,
+      -1.0,
       2 * 60 * 60,
     );
   } catch (error) {
     console.log(error);
   }
 
+  await createAndPopulateAlt(client, admin);
+
   process.exit();
 }
 
 main();
+
+async function createAndPopulateAlt(client: MangoClient, admin: Keypair) {
+  let group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+
+  const connection = client.program.provider.connection;
+
+  // Create ALT, and set to group at index 0
+  if (group.addressLookupTables[0].equals(PublicKey.default)) {
+    try {
+      console.log(`ALT: Creating`);
+      const createIx = AddressLookupTableProgram.createLookupTable({
+        authority: admin.publicKey,
+        payer: admin.publicKey,
+        recentSlot: await connection.getSlot('finalized'),
+      });
+      const createTx = await buildVersionedTx(
+        client.program.provider as AnchorProvider,
+        [createIx[0]],
+      );
+      let sig = await connection.sendTransaction(createTx);
+      console.log(
+        `...created ALT ${createIx[1]} https://explorer.solana.com/tx/${sig}`,
+      );
+
+      console.log(`ALT: set at index 0 for group...`);
+      sig = await client.altSet(group, createIx[1], 0);
+      console.log(`...https://explorer.solana.com/tx/${sig}`);
+
+      group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  // Extend using mango v4 relevant pub keys
+  try {
+    let bankAddresses = Array.from(group.banksMapByMint.values())
+      .flat()
+      .map((bank) => [bank.publicKey, bank.oracle, bank.vault])
+      .flat()
+      .concat(
+        Array.from(group.banksMapByMint.values())
+          .flat()
+          .map((mintInfo) => mintInfo.publicKey),
+      );
+
+    let serum3MarketAddresses = Array.from(
+      group.serum3MarketsMapByExternal.values(),
+    )
+      .flat()
+      .map((serum3Market) => serum3Market.publicKey);
+
+    let serum3ExternalMarketAddresses = Array.from(
+      group.serum3ExternalMarketsMap.values(),
+    )
+      .flat()
+      .map((serum3ExternalMarket) => [
+        serum3ExternalMarket.publicKey,
+        serum3ExternalMarket.bidsAddress,
+        serum3ExternalMarket.asksAddress,
+      ])
+      .flat();
+
+    let perpMarketAddresses = Array.from(
+      group.perpMarketsMapByMarketIndex.values(),
+    )
+      .flat()
+      .map((perpMarket) => [
+        perpMarket.publicKey,
+        perpMarket.oracle,
+        perpMarket.bids,
+        perpMarket.asks,
+        perpMarket.eventQueue,
+      ])
+      .flat();
+
+    async function extendTable(addresses: PublicKey[]) {
+      await group.reloadAll(client);
+      const alt =
+        await client.program.provider.connection.getAddressLookupTable(
+          group.addressLookupTables[0],
+        );
+
+      addresses = addresses.filter(
+        (newAddress) =>
+          alt.value?.state.addresses &&
+          alt.value?.state.addresses.findIndex((addressInALt) =>
+            addressInALt.equals(newAddress),
+          ) === -1,
+      );
+      if (addresses.length === 0) {
+        return;
+      }
+      const extendIx = AddressLookupTableProgram.extendLookupTable({
+        lookupTable: group.addressLookupTables[0],
+        payer: admin.publicKey,
+        authority: admin.publicKey,
+        addresses,
+      });
+      const extendTx = await buildVersionedTx(
+        client.program.provider as AnchorProvider,
+        [extendIx],
+      );
+      let sig = await client.program.provider.connection.sendTransaction(
+        extendTx,
+      );
+      console.log(`https://explorer.solana.com/tx/${sig}`);
+    }
+
+    console.log(`ALT: extending using mango v4 relevant public keys`);
+    await extendTable(bankAddresses);
+    await extendTable(serum3MarketAddresses);
+    await extendTable(serum3ExternalMarketAddresses);
+    await extendTable(perpMarketAddresses);
+  } catch (error) {
+    console.log(error);
+  }
+}

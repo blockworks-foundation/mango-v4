@@ -67,7 +67,6 @@ async function main() {
 
     // close all banks
     for (const banks of group.banksMapByMint.values()) {
-      console.log(banks[0].toString());
       sig = await client.tokenDeregister(group, banks[0].mint);
       console.log(
         `Removed token ${banks[0].name}, sig https://explorer.solana.com/tx/${sig}`,

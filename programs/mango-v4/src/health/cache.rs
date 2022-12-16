@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 
 use fixed::types::I80F48;
-use fixed_macro::types::I80F48;
 
 use crate::error::*;
 use crate::state::{
@@ -11,8 +10,6 @@ use crate::state::{
 use crate::util::checked_math as cm;
 
 use super::*;
-
-const ONE_NATIVE_USDC_IN_USD: I80F48 = I80F48!(0.000001);
 
 /// Information about prices for a bank or perp market.
 #[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
@@ -442,11 +439,15 @@ impl HealthCache {
         Ok(())
     }
 
-    pub fn has_liquidatable_assets(&self) -> bool {
-        let spot_liquidatable = self.token_infos.iter().any(|ti| {
+    pub fn has_spot_assets(&self) -> bool {
+        self.token_infos.iter().any(|ti| {
             // can use token_liq_with_token
             ti.balance_native.is_positive()
-        });
+        })
+    }
+
+    pub fn has_liquidatable_assets(&self) -> bool {
+        let spot_liquidatable = self.has_spot_assets();
         // can use serum3_liq_force_cancel_orders
         let serum3_cancelable = self
             .serum3_infos
@@ -455,10 +456,11 @@ impl HealthCache {
         let perp_liquidatable = self.perp_infos.iter().any(|p| {
             // can use perp_liq_base_position
             p.base_lots != 0
-            // can use perp_settle_pnl
-            || p.quote > ONE_NATIVE_USDC_IN_USD // TODO: we're not guaranteed to be able to settle positive perp pnl!
             // can use perp_liq_force_cancel_orders
             || p.has_open_orders
+            // A remaining quote position can be reduced with perp_settle_pnl and that can improve health.
+            // However, since it's not guaranteed that there is a counterparty, a positive perp quote position
+            // does not prevent bankruptcy.
         });
         spot_liquidatable || serum3_cancelable || perp_liquidatable
     }

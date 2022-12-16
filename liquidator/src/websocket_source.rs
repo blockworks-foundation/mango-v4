@@ -175,7 +175,10 @@ pub fn start(config: Config, mango_oracles: Vec<Pubkey>, sender: async_channel::
         loop {
             info!("connecting to solana websocket streams");
             let out = feed_data(&config, mango_oracles.clone(), sender.clone());
-            let _ = out.await;
+            let result = out.await;
+            if let Err(err) = result {
+                warn!("websocket stream error: {err}");
+            }
         }
     });
 }
