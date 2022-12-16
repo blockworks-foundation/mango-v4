@@ -12,7 +12,7 @@ use crate::util::checked_math as cm;
 use super::*;
 
 /// Information about prices for a bank or perp market.
-#[derive(Clone, AnchorDeserialize, AnchorSerialize)]
+#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct Prices {
     /// The current oracle price
     pub oracle: I80F48, // native/native
@@ -84,7 +84,7 @@ pub fn compute_health(
     Ok(new_health_cache(account, retriever)?.health(health_type))
 }
 
-#[derive(Clone, AnchorDeserialize, AnchorSerialize)]
+#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct TokenInfo {
     pub token_index: TokenIndex,
     pub maint_asset_weight: I80F48,
@@ -126,7 +126,7 @@ impl TokenInfo {
     }
 }
 
-#[derive(Clone, AnchorDeserialize, AnchorSerialize)]
+#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct Serum3Info {
     // reserved amounts as stored on the open orders
     pub reserved_base: I80F48,
@@ -205,7 +205,7 @@ struct Serum3Reserved {
     all_reserved_as_quote: I80F48,
 }
 
-#[derive(Clone, AnchorDeserialize, AnchorSerialize)]
+#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct PerpInfo {
     pub perp_market_index: PerpMarketIndex,
     pub maint_asset_weight: I80F48,
@@ -310,7 +310,7 @@ impl PerpInfo {
     }
 }
 
-#[derive(Clone, AnchorDeserialize, AnchorSerialize)]
+#[derive(Clone, AnchorDeserialize, AnchorSerialize, Debug)]
 pub struct HealthCache {
     pub(crate) token_infos: Vec<TokenInfo>,
     pub(crate) serum3_infos: Vec<Serum3Info>,

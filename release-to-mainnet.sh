@@ -22,7 +22,7 @@ solana --url $MB_CLUSTER_URL program deploy --program-id $PROGRAM_ID  \
 
 # publish idl
 cargo run -p anchor-cli -- idl upgrade --provider.cluster $MB_CLUSTER_URL --provider.wallet $WALLET_WITH_FUNDS \
-    --filepath target/idl/mango_v4.json $PROGRAM_ID
+    --filepath target/idl/mango_v4_no_docs.json $PROGRAM_ID
 
 
 # build npm package

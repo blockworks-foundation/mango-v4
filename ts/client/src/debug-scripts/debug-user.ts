@@ -97,6 +97,9 @@ async function debugUser(
   }
 
   function getMaxSourceForTokenSwapWrapper(src, tgt): void {
+    // Turn on for debugging specific pairs
+    // if (src != 'DAI' || tgt != 'ETH') return;
+
     const maxSourceUi = mangoAccount.getMaxSourceUiForTokenSwap(
       group,
       group.banksMapByName.get(src)![0].mint,
@@ -175,8 +178,10 @@ async function debugUser(
         .toFixed(3)
         .padStart(10)})`,
     );
-    expect(simMaxQuote).gt(2);
-    expect(simMaxQuote).lt(3);
+    if (maxQuoteUi > 0) {
+      expect(simMaxQuote).gt(2);
+      expect(simMaxQuote).lt(3);
+    }
   }
   for (const perpMarket of Array.from(
     group.perpMarketsMapByMarketIndex.values(),
@@ -237,11 +242,13 @@ async function main(): Promise<void> {
     const userWallet = new Wallet(user);
     console.log(`User ${userWallet.publicKey.toBase58()}`);
 
+    // 1. mango account for owner
     const mangoAccounts = await client.getMangoAccountsForOwner(
       group,
       user.publicKey,
     );
 
+    // 2. mango account by pubkey
     // const mangoAccounts = await Promise.all([
     //   await client.getMangoAccount({
     //     publicKey: new PublicKey(
@@ -250,9 +257,26 @@ async function main(): Promise<void> {
     //   } as any),
     // ]);
 
+    // 3. all mango accounts
+    // const mangoAccounts = await client.getAllMangoAccounts(group);
+
     for (const mangoAccount of mangoAccounts) {
-      console.log(`MangoAccount ${mangoAccount.publicKey}`);
-      await debugUser(client, group, mangoAccount);
+      if (
+        // eslint-disable-next-line no-constant-condition
+        true
+        // Enable below to debug specific mango accounts
+        // mangoAccount.publicKey.equals(
+        //   new PublicKey('BXUPaeAWRCPvPdpndXJeykD8VYZJwrCBjZdWNZAu8Ca'),
+        // )
+      ) {
+        console.log(`MangoAccount ${mangoAccount.publicKey}`);
+
+        // Log only tokens
+        // console.log(mangoAccount.toString(group, true));
+
+        // Long all debug info
+        await debugUser(client, group, mangoAccount);
+      }
     }
   }
 

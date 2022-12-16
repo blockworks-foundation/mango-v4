@@ -24,13 +24,14 @@ pub struct AccountClose<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-pub fn account_close(ctx: Context<AccountClose>) -> Result<()> {
-    let group = ctx.accounts.group.load()?;
-
+pub fn account_close(ctx: Context<AccountClose>, force_close: bool) -> Result<()> {
     let account = ctx.accounts.account.load_mut()?;
 
-    // don't perform checks if group is just testing
-    if !group.is_testing() {
+    if !ctx.accounts.group.load()?.is_testing() {
+        require!(!force_close, MangoError::SomeError);
+    }
+
+    if !force_close {
         require!(!account.fixed.being_liquidated(), MangoError::SomeError);
         for ele in account.all_token_positions() {
             require_eq!(ele.is_active(), false);

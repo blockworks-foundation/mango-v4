@@ -197,7 +197,7 @@ export class Bank implements BankForHealth {
     public tokenIndex: TokenIndex,
     public mintDecimals: number,
     public bankNum: number,
-    minVaultToDepositsRatio: number,
+    public minVaultToDepositsRatio: number,
     netBorrowLimitWindowSizeTs: BN,
     lastNetBorrowsWindowStartTs: BN,
     public netBorrowLimitPerWindowQuote: BN,

@@ -206,18 +206,36 @@ impl HealthCache {
                 //              - source_liab_weight * source_liab_price * a
                 //              + target_asset_weight * target_asset_price * price * a = 0.
                 // where a is the source token native amount.
+                // Note that this is just an estimate. Swapping can increase the amount that serum3
+                // reserved contributions offset, moving the actual zero point further to the right.
                 if point1_health <= 0 {
                     return Ok(I80F48::ZERO);
                 }
-                let zero_health_amount = point1_amount - point1_health / final_health_slope;
-                binary_search(
-                    point1_amount,
-                    point1_ratio,
-                    zero_health_amount,
+                let zero_health_estimate = point1_amount - point1_health / final_health_slope;
+                let right_bound = scan_right_until_less_than(
+                    zero_health_estimate,
                     min_ratio,
-                    I80F48::from_num(0.1),
                     health_ratio_after_swap,
-                )?
+                )?;
+                if right_bound == zero_health_estimate {
+                    binary_search(
+                        point1_amount,
+                        point1_ratio,
+                        right_bound,
+                        min_ratio,
+                        I80F48::from_num(0.1),
+                        health_ratio_after_swap,
+                    )?
+                } else {
+                    binary_search(
+                        zero_health_estimate,
+                        health_ratio_after_swap(zero_health_estimate)?,
+                        right_bound,
+                        min_ratio,
+                        I80F48::from_num(0.1),
+                        health_ratio_after_swap,
+                    )?
+                }
             } else if point0_ratio >= min_ratio {
                 // Must be between point0_amount and point1_amount.
                 binary_search(
@@ -371,6 +389,25 @@ impl HealthCache {
 
         Ok(base_lots.round_to_zero().to_num())
     }
+}
+
+fn scan_right_until_less_than(
+    start: I80F48,
+    target: I80F48,
+    fun: impl Fn(I80F48) -> Result<I80F48>,
+) -> Result<I80F48> {
+    let max_iterations = 20;
+    let mut current = start;
+    for _ in 0..max_iterations {
+        let value = fun(current)?;
+        if value <= target {
+            return Ok(current);
+        }
+        current = current.max(I80F48::ONE) * I80F48::from(2);
+    }
+    Err(error_msg!(
+        "could not find amount that lead to health ratio <= 0"
+    ))
 }
 
 fn binary_search(
@@ -536,12 +573,11 @@ mod tests {
                 .map(|c| c.health_ratio(HealthType::Init).to_num::<f64>())
                 .unwrap_or(f64::MIN)
             };
-            // With the binary search error, we can guarantee just +-1
             (
                 source_amount.to_num(),
                 ratio_for_amount(source_amount),
-                ratio_for_amount(source_amount.saturating_sub(I80F48::ONE)),
-                ratio_for_amount(source_amount.saturating_add(I80F48::ONE)),
+                ratio_for_amount(source_amount - I80F48::ONE),
+                ratio_for_amount(source_amount + I80F48::ONE),
             )
         };
         let check_max_swap_result = |c: &HealthCache,
@@ -556,8 +592,9 @@ mod tests {
                     "checking {source} to {target} for price_factor: {price_factor}, target ratio {ratio}: actual ratios: {minus_ratio}/{actual_ratio}/{plus_ratio}, amount: {source_amount}",
                 );
             assert!(actual_ratio >= ratio);
-            assert!(minus_ratio < ratio || actual_ratio < minus_ratio);
-            assert!(plus_ratio < ratio);
+            // either we're within tolerance of the target, or swapping 1 more would
+            // bring us below the target
+            assert!(actual_ratio < ratio + 1.0 || plus_ratio < ratio);
         };
 
         {
@@ -653,6 +690,34 @@ mod tests {
             // The net borrow limit restricts the amount that can be swapped
             // (tracking happens without decimals)
             assert!(find_max_swap_actual(&health_cache, 0, 1, 1.0, 1.0, banks).0 < 51.0);
+        }
+
+        {
+            // check with serum reserved
+            println!("test 6");
+            let mut health_cache = health_cache.clone();
+            health_cache.serum3_infos = vec![Serum3Info {
+                base_index: 1,
+                quote_index: 0,
+                market_index: 0,
+                reserved_base: I80F48::from(30 / 3),
+                reserved_quote: I80F48::from(30 / 2),
+            }];
+            adjust_by_usdc(&mut health_cache, 0, -20.0);
+            adjust_by_usdc(&mut health_cache, 1, -40.0);
+            adjust_by_usdc(&mut health_cache, 2, 120.0);
+
+            for price_factor in [0.9, 1.1] {
+                for target in 1..100 {
+                    let target = target as f64;
+                    check_max_swap_result(&health_cache, 0, 1, target, price_factor, banks);
+                    check_max_swap_result(&health_cache, 1, 0, target, price_factor, banks);
+                    check_max_swap_result(&health_cache, 0, 2, target, price_factor, banks);
+                    check_max_swap_result(&health_cache, 1, 2, target, price_factor, banks);
+                    check_max_swap_result(&health_cache, 2, 0, target, price_factor, banks);
+                    check_max_swap_result(&health_cache, 2, 1, target, price_factor, banks);
+                }
+            }
         }
     }
 

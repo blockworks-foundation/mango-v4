@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration, time::Instant};
+use std::{collections::HashSet, sync::Arc, time::Duration, time::Instant};
 
 use crate::MangoClient;
 use itertools::Itertools;
@@ -165,17 +165,16 @@ pub async fn loop_consume_events(
 
         let client = mango_client.clone();
 
-        let prepare_ams = || async {
+        let find_accounts = || async {
+            let mut num_of_events = 0;
             let mut event_queue: EventQueue = client
                 .client
                 .rpc_anchor_account(&perp_market.event_queue)
                 .await?;
 
-            let mut event_ams = vec![];
-            let mut num_of_events = 0;
-
             // TODO: future, choose better constant of how many max events to pack
             // TODO: future, choose better constant of how many max mango accounts to pack
+            let mut set = HashSet::new();
             for _ in 0..10 {
                 let event = match event_queue.peek_front() {
                     None => break,
@@ -184,24 +183,12 @@ pub async fn loop_consume_events(
                 match EventType::try_from(event.event_type)? {
                     EventType::Fill => {
                         let fill: &FillEvent = cast_ref(event);
-                        event_ams.push(AccountMeta {
-                            pubkey: fill.maker,
-                            is_signer: false,
-                            is_writable: true,
-                        });
-                        event_ams.push(AccountMeta {
-                            pubkey: fill.taker,
-                            is_signer: false,
-                            is_writable: true,
-                        });
+                        set.insert(fill.maker);
+                        set.insert(fill.taker);
                     }
                     EventType::Out => {
                         let out: &OutEvent = cast_ref(event);
-                        event_ams.push(AccountMeta {
-                            pubkey: out.owner,
-                            is_signer: false,
-                            is_writable: true,
-                        });
+                        set.insert(out.owner);
                     }
                     EventType::Liquidate => {}
                 }
@@ -213,12 +200,12 @@ pub async fn loop_consume_events(
                 return Ok(None);
             }
 
-            Ok(Some((event_ams, num_of_events)))
+            Ok(Some((set, num_of_events)))
         };
 
-        let event_info: anyhow::Result<Option<(Vec<AccountMeta>, u32)>> = prepare_ams().await;
+        let event_info: anyhow::Result<Option<(HashSet<Pubkey>, u32)>> = find_accounts().await;
 
-        let (mut event_ams, num_of_events) = match event_info {
+        let (event_accounts, num_of_events) = match event_info {
             Ok(Some(x)) => x,
             Ok(None) => continue,
             Err(err) => {
@@ -226,6 +213,17 @@ pub async fn loop_consume_events(
                 continue;
             }
         };
+
+        let mut event_ams = event_accounts
+            .iter()
+            .map(|key| -> AccountMeta {
+                AccountMeta {
+                    pubkey: *key,
+                    is_signer: false,
+                    is_writable: true,
+                }
+            })
+            .collect::<Vec<_>>();
 
         let pre = Instant::now();
         let ix = Instruction {

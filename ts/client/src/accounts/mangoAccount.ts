@@ -462,12 +462,33 @@ export class MangoAccount {
     const initHealthWithoutExistingPosition = initHealth.sub(
       existingPositionHealthContrib,
     );
-    const maxBorrowNative = initHealthWithoutExistingPosition
+    let maxBorrowNative = initHealthWithoutExistingPosition
       .div(tokenBank.initLiabWeight)
       .div(tokenBank.price);
+
+    // Cap maxBorrow to maintain minVaultToDepositsRatio on the bank
+    const vaultAmount = group.vaultAmountsMap.get(tokenBank.vault.toBase58());
+    if (!vaultAmount) {
+      throw new Error(
+        `No vault amount found for ${tokenBank.name} vault ${tokenBank.vault}!`,
+      );
+    }
+    const vaultAmountAfterWithdrawingDeposits = I80F48.fromU64(vaultAmount).sub(
+      existingTokenDeposits,
+    );
+    const expectedVaultMinAmount = tokenBank
+      .nativeDeposits()
+      .mul(I80F48.fromNumber(tokenBank.minVaultToDepositsRatio));
+    if (vaultAmountAfterWithdrawingDeposits.gt(expectedVaultMinAmount)) {
+      maxBorrowNative = maxBorrowNative.min(
+        vaultAmountAfterWithdrawingDeposits.sub(expectedVaultMinAmount),
+      );
+    }
+
     const maxBorrowNativeWithoutFees = maxBorrowNative.div(
       ONE_I80F48().add(tokenBank.loanOriginationFeeRate),
     );
+
     return maxBorrowNativeWithoutFees.add(existingTokenDeposits);
   }
 
@@ -907,15 +928,17 @@ export class MangoAccount {
       perpMarket.loadBids(client),
       perpMarket.loadAsks(client),
     ]);
+
     return [...Array.from(bids.items()), ...Array.from(asks.items())].filter(
       (order) => order.owner.equals(this.publicKey),
     );
   }
 
-  toString(group?: Group): string {
+  toString(group?: Group, onlyTokens = false): string {
     let res = 'MangoAccount';
     res = res + '\n pk: ' + this.publicKey.toString();
     res = res + '\n name: ' + this.name;
+    res = res + '\n accountNum: ' + this.accountNum;
     res = res + '\n owner: ' + this.owner;
     res = res + '\n delegate: ' + this.delegate;
 
@@ -927,15 +950,17 @@ export class MangoAccount {
         ? res +
           '\n tokens:' +
           JSON.stringify(
-            this.tokens.map((token, i) =>
-              token.isActive()
-                ? token.toString(group, i)
-                : `index: ${i} - empty slot`,
-            ),
+            this.tokens
+              .filter((token, i) => token.isActive())
+              .map((token, i) => token.toString(group, i)),
             null,
             4,
           )
         : res + '';
+
+    if (onlyTokens) {
+      return res;
+    }
 
     res =
       this.serum3Active().length > 0
