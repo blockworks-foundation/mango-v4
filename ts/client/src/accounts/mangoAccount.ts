@@ -505,16 +505,13 @@ export class MangoAccount {
 
   /**
    * The max amount of given source ui token you can swap to a target token.
-   *  Price is simply the source tokens price divided by target tokens price,
-   *  it is supposed to give an indication of how many source tokens can be traded for target tokens,
-   *  it can optionally contain information on slippage and fees.
    * @returns max amount of given source ui token you can swap to a target token, in ui token
    */
   getMaxSourceUiForTokenSwap(
     group: Group,
     sourceMintPk: PublicKey,
     targetMintPk: PublicKey,
-    price: number,
+    slippageAndFeesFactor = 1,
   ): number {
     if (sourceMintPk.equals(targetMintPk)) {
       return 0;
@@ -522,11 +519,14 @@ export class MangoAccount {
     const s = group.getFirstBankByMint(sourceMintPk);
     const t = group.getFirstBankByMint(targetMintPk);
     const hc = HealthCache.fromMangoAccount(group, this);
-    const maxSource = hc.getMaxSourceForTokenSwap(
+    const maxSource = hc.getMaxSwapSource(
       s,
       t,
-      I80F48.fromNumber(price * Math.pow(10, t.mintDecimals - s.mintDecimals)),
-      I80F48.fromNumber(2), // target 2% health
+      I80F48.fromNumber(
+        slippageAndFeesFactor *
+          ((s.uiPrice / t.uiPrice) *
+            Math.pow(10, t.mintDecimals - s.mintDecimals)),
+      ),
     );
     maxSource.idiv(
       ONE_I80F48().add(
@@ -831,13 +831,12 @@ export class MangoAccount {
   public getMaxQuoteForPerpBidUi(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
-    price: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
-      I80F48.fromNumber(price),
+      I80F48.fromNumber(perpMarket.uiPrice),
       PerpOrderSide.bid,
       I80F48.fromNumber(2),
     );
@@ -859,13 +858,12 @@ export class MangoAccount {
   public getMaxBaseForPerpAskUi(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
-    price: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const hc = HealthCache.fromMangoAccount(group, this);
     const baseLots = hc.getMaxPerpForHealthRatio(
       perpMarket,
-      I80F48.fromNumber(price),
+      I80F48.fromNumber(perpMarket.uiPrice),
       PerpOrderSide.ask,
       I80F48.fromNumber(2),
     );
@@ -876,7 +874,6 @@ export class MangoAccount {
     group: Group,
     perpMarketIndex: PerpMarketIndex,
     size: number,
-    price: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
@@ -889,7 +886,7 @@ export class MangoAccount {
           : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
         PerpOrderSide.bid,
         perpMarket.uiBaseToLots(size),
-        I80F48.fromNumber(price),
+        I80F48.fromNumber(perpMarket.uiPrice),
         HealthType.init,
       )
       .toNumber();
@@ -899,7 +896,6 @@ export class MangoAccount {
     group: Group,
     perpMarketIndex: PerpMarketIndex,
     size: number,
-    price: number,
   ): number {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const pp = this.getPerpPosition(perpMarket.perpMarketIndex);
@@ -912,7 +908,7 @@ export class MangoAccount {
           : PerpPosition.emptyFromPerpMarketIndex(perpMarket.perpMarketIndex),
         PerpOrderSide.ask,
         perpMarket.uiBaseToLots(size),
-        I80F48.fromNumber(price),
+        I80F48.fromNumber(perpMarket.uiPrice),
         HealthType.init,
       )
       .toNumber();

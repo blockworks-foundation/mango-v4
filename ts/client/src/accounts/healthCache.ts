@@ -10,6 +10,7 @@ import {
   ONE_I80F48,
   ZERO_I80F48,
 } from '../numbers/I80F48';
+import { toNativeI80F48ForQuote } from '../utils';
 import { Bank, BankForHealth, TokenIndex } from './bank';
 import { Group } from './group';
 
@@ -569,6 +570,72 @@ export class HealthCache {
     throw new Error('Could not find amount that led to health ratio <=0');
   }
 
+  /// This is not a generic function. It assumes there is a unique maximum between left and right.
+  private static findMaximum(
+    left: I80F48,
+    right: I80F48,
+    minStep: I80F48,
+    fun: (I80F48) => I80F48,
+  ): I80F48[] {
+    const half = I80F48.fromNumber(0.5);
+    let mid = half.mul(left.add(right));
+    let leftValue = fun(left);
+    let rightValue = fun(right);
+    let midValue = fun(mid);
+    while (right.sub(left).gt(minStep)) {
+      if (leftValue.gte(midValue)) {
+        // max must be between left and mid
+        right = mid;
+        rightValue = midValue;
+        mid = half.mul(left.add(mid));
+        midValue = fun(mid);
+      } else if (midValue.lte(rightValue)) {
+        // max must be between mid and right
+        left = mid;
+        leftValue = midValue;
+        mid = half.mul(mid.add(right));
+        midValue = fun(mid);
+      } else {
+        // mid is larger than both left and right, max could be on either side
+        const leftmid = half.mul(left.add(mid));
+        const leftMidValue = fun(leftmid);
+        if (leftMidValue.gte(midValue)) {
+          // max between left and mid
+          right = mid;
+          rightValue = midValue;
+          mid = leftmid;
+          midValue = leftMidValue;
+          continue;
+        }
+
+        const rightmid = half.mul(mid.add(right));
+        const rightMidValue = fun(rightmid);
+        if (rightMidValue.gte(midValue)) {
+          // max between mid and right
+          left = mid;
+          leftValue = midValue;
+          mid = rightmid;
+          midValue = rightMidValue;
+          continue;
+        }
+
+        // max between leftmid and rightmid
+        left = leftmid;
+        leftValue = leftMidValue;
+        right = rightmid;
+        rightValue = rightMidValue;
+      }
+    }
+
+    if (leftValue.gte(midValue)) {
+      return [left, leftValue];
+    } else if (midValue.gte(rightValue)) {
+      return [mid, midValue];
+    } else {
+      return [right, rightValue];
+    }
+  }
+
   private static binaryApproximationSearch(
     left: I80F48,
     leftValue: I80F48,
@@ -577,9 +644,13 @@ export class HealthCache {
     minStep: I80F48,
     fun: (I80F48) => I80F48,
   ): I80F48 {
-    const maxIterations = 20;
+    const maxIterations = 40;
     const targetError = I80F48.fromNumber(0.1);
     const rightValue = fun(right);
+
+    // console.log(
+    //   `binaryApproximationSearch left ${left}, leftValue ${leftValue}, right ${right}, rightValue ${rightValue}, targetValue ${targetValue}`,
+    // );
 
     if (
       (leftValue.sub(targetValue).isPos() &&
@@ -592,19 +663,22 @@ export class HealthCache {
       );
     }
 
-    let newAmount;
+    let newAmount, newAmountValue;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     for (const key of Array(maxIterations).fill(0).keys()) {
       if (right.sub(left).abs().lt(minStep)) {
         return left;
       }
       newAmount = left.add(right).mul(I80F48.fromNumber(0.5));
-      const newAmountRatio = fun(newAmount);
-      const error = newAmountRatio.sub(targetValue);
+      newAmountValue = fun(newAmount);
+      // console.log(
+      //   ` - left ${left}, right ${right}, newAmount ${newAmount}, newAmountValue ${newAmountValue}, targetValue ${targetValue}`,
+      // );
+      const error = newAmountValue.sub(targetValue);
       if (error.isPos() && error.lt(targetError)) {
         return newAmount;
       }
-      if (newAmountRatio.gt(targetValue) != rightValue.gt(targetValue)) {
+      if (newAmountValue.gt(targetValue) != rightValue.gt(targetValue)) {
         left = newAmount;
       } else {
         right = newAmount;
@@ -612,16 +686,74 @@ export class HealthCache {
     }
 
     console.error(
-      `Unable to get targetRatio within ${maxIterations} iterations`,
+      `Unable to get targetValue within ${maxIterations} iterations, newAmount ${newAmount}, newAmountValue ${newAmountValue}, target ${targetValue}`,
     );
+
     return newAmount;
   }
 
-  getMaxSourceForTokenSwap(
+  getMaxSwapSource(
+    sourceBank: BankForHealth,
+    targetBank: BankForHealth,
+    price: I80F48,
+  ): I80F48 {
+    const health = this.health(HealthType.init);
+    if (health.isNeg()) {
+      return this.getMaxSwapSourceForHealth(
+        sourceBank,
+        targetBank,
+        price,
+        toNativeI80F48ForQuote(1), // target 1 ui usd worth health
+      );
+    }
+    return this.getMaxSwapSourceForHealthRatio(
+      sourceBank,
+      targetBank,
+      price,
+      I80F48.fromNumber(2), // target 2% health
+    );
+  }
+
+  getMaxSwapSourceForHealthRatio(
     sourceBank: BankForHealth,
     targetBank: BankForHealth,
     price: I80F48,
     minRatio: I80F48,
+  ): I80F48 {
+    return this.getMaxSwapSourceForHealthFn(
+      sourceBank,
+      targetBank,
+      price,
+      minRatio,
+      function (hc: HealthCache): I80F48 {
+        return hc.healthRatio(HealthType.init);
+      },
+    );
+  }
+
+  getMaxSwapSourceForHealth(
+    sourceBank: BankForHealth,
+    targetBank: BankForHealth,
+    price: I80F48,
+    minHealth: I80F48,
+  ): I80F48 {
+    return this.getMaxSwapSourceForHealthFn(
+      sourceBank,
+      targetBank,
+      price,
+      minHealth,
+      function (hc: HealthCache): I80F48 {
+        return hc.health(HealthType.init);
+      },
+    );
+  }
+
+  getMaxSwapSourceForHealthFn(
+    sourceBank: BankForHealth,
+    targetBank: BankForHealth,
+    price: I80F48,
+    minFnValue: I80F48,
+    targetFn: (cache) => I80F48,
   ): I80F48 {
     if (
       sourceBank.initLiabWeight
@@ -632,26 +764,28 @@ export class HealthCache {
       return ZERO_I80F48();
     }
 
-    // The health_ratio is a nonlinear based on swap amount.
+    // The health and health_ratio are nonlinear based on swap amount.
     // For large swap amounts the slope is guaranteed to be negative, but small amounts
     // can have positive slope (e.g. using source deposits to pay back target borrows).
     //
     // That means:
-    // - even if the initial ratio is < minRatio it can be useful to swap to *increase* health
-    // - be careful about finding the minRatio point: the function isn't convex
+    // - even if the initial value is < minRatio it can be useful to swap to *increase* health
+    // - even if initial value is < 0, swapping can increase health (maybe above 0)
+    // - be careful about finding the minFnValue: the function isn't convex
 
     const initialRatio = this.healthRatio(HealthType.init);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const initialHealth = this.health(HealthType.init);
-    if (initialRatio.lte(ZERO_I80F48())) {
-      return ZERO_I80F48();
-    }
 
     const healthCacheClone: HealthCache = _.cloneDeep(this);
     const sourceIndex = healthCacheClone.getOrCreateTokenInfoIndex(sourceBank);
     const targetIndex = healthCacheClone.getOrCreateTokenInfoIndex(targetBank);
+
     const source = healthCacheClone.tokenInfos[sourceIndex];
     const target = healthCacheClone.tokenInfos[targetIndex];
+
+    const res = healthCacheClone.computeSerum3Reservations(HealthType.init);
+    const sourceReserved = res.tokenMaxReserved[sourceIndex];
+    const targetReserved = res.tokenMaxReserved[targetIndex];
 
     // If the price is sufficiently good, then health will just increase from swapping:
     // once we've swapped enough, swapping x reduces health by x * source_liab_weight and
@@ -688,126 +822,78 @@ export class HealthCache {
       return adjustedCache;
     }
 
-    function healthRatioAfterSwap(amount: I80F48): I80F48 {
-      return cacheAfterSwap(amount).healthRatio(HealthType.init);
+    function fnValueAfterSwap(amount: I80F48): I80F48 {
+      return targetFn(cacheAfterSwap(amount));
     }
 
-    function healthAfterSwap(amount: I80F48): I80F48 {
-      return cacheAfterSwap(amount).health(HealthType.init);
-    }
-
-    // There are two key slope changes: Assume source.balance > 0 and target.balance < 0.
+    // The function we're looking at has a unique maximum.
+    //
+    // If we discount serum3 reservations, there are two key slope changes:
+    // Assume source.balance > 0 and target.balance < 0.
     // When these values flip sign, the health slope decreases, but could still be positive.
-    // After point1 it's definitely negative (due to finalHealthSlope check above).
-    // The maximum health ratio will be at 0 or at one of these points (ignoring serum3 effects).
-    const sourceForZeroTargetBalance = target.balanceNative.neg().div(price);
-    const point0Amount = source.balanceNative
-      .min(sourceForZeroTargetBalance)
-      .max(ZERO_I80F48());
-    const point1Amount = source.balanceNative
-      .max(sourceForZeroTargetBalance)
-      .max(ZERO_I80F48());
-    const cache0 = cacheAfterSwap(point0Amount);
-    const point0Ratio = cache0.healthRatio(HealthType.init);
-    const point0Health = cache0.health(HealthType.init);
-    const cache1 = cacheAfterSwap(point1Amount);
-    const point1Ratio = cache1.healthRatio(HealthType.init);
-    const point1Health = cache1.health(HealthType.init);
+    //
+    // The first thing we do is to find this maximum.
+
+    // The largest amount that the maximum could be at
+    const rightmost = source.balanceNative
+      .abs()
+      .add(sourceReserved)
+      .max(target.balanceNative.abs().add(targetReserved).div(price));
+    const [amountForMaxValue, maxValue] = HealthCache.findMaximum(
+      ZERO_I80F48(),
+      rightmost,
+      I80F48.fromNumber(0.1),
+      fnValueAfterSwap,
+    );
+
+    if (maxValue.lte(minFnValue)) {
+      // We cannot reach min_ratio, just return the max
+      return amountForMaxValue;
+    }
 
     let amount: I80F48;
 
-    if (
-      initialRatio.lte(minRatio) &&
-      point0Ratio.lt(minRatio) &&
-      point1Ratio.lt(minRatio)
-    ) {
-      // If we have to stay below the target ratio, pick the highest one
-      if (point0Ratio.gt(initialRatio)) {
-        if (point1Ratio.gt(point0Ratio)) {
-          amount = point1Amount;
-        } else {
-          amount = point0Amount;
-        }
-      } else if (point1Ratio.gt(initialRatio)) {
-        amount = point1Amount;
-      } else {
-        amount = ZERO_I80F48();
-      }
-    } else if (point1Ratio.gte(minRatio)) {
-      // If point1Ratio is still bigger than minRatio, the target amount must be >point1Amount
-      // search to the right of point1Amount: but how far?
-      // At point1, source.balance < 0 and target.balance > 0, so use a simple estimation for
-      // zero health: health - source_liab_weight * a + target_asset_weight * a * priceFactor = 0.
-      // where a is the source token native amount.
-      // Note that this is just an estimate. Swapping can increase the amount that serum3
-      // reserved contributions offset, moving the actual zero point further to the right.
-      if (point1Health.lte(ZERO_I80F48())) {
-        return ZERO_I80F48();
-      }
-      const zeroHealthEstimate = point1Amount.sub(
-        point1Health.div(finalHealthSlope),
-      );
-      const zeroHealthEstimateRatio = healthRatioAfterSwap(zeroHealthEstimate);
-
-      // console.log(`getMaxSourceForTokenSwap`);
-      // console.log(` - finalHealthSlope ${finalHealthSlope.toLocaleString()}`);
-      // console.log(` - minRatio ${minRatio.toLocaleString()}`);
-      // console.log(` - point0Amount ${point0Amount.toLocaleString()}`);
-      // console.log(` - point0Health ${point0Health.toLocaleString()}`);
-      // console.log(` - point0Ratio ${point0Ratio.toLocaleString()}`);
-      // console.log(` - point1Amount ${point1Amount.toLocaleString()}`);
-      // console.log(` - point1Health ${point1Health.toLocaleString()}`);
-      // console.log(` - point1Ratio ${point1Ratio.toLocaleString()}`);
-      // console.log(
-      //   ` - zeroHealthEstimate ${zeroHealthEstimate.toLocaleString()}`,
-      // );
-      // console.log(
-      //   ` - zeroHealthEstimateRatio ${zeroHealthEstimateRatio.toLocaleString()}`,
-      // );
-
-      const rightBound = HealthCache.scanRightUntilLessThan(
-        zeroHealthEstimate,
-        minRatio,
-        healthRatioAfterSwap,
-      );
-      if (rightBound.eq(zeroHealthEstimate)) {
-        amount = HealthCache.binaryApproximationSearch(
-          point1Amount,
-          point1Ratio,
-          rightBound,
-          minRatio,
-          ZERO_I80F48(),
-          healthRatioAfterSwap,
-        );
-      } else {
-        amount = HealthCache.binaryApproximationSearch(
-          zeroHealthEstimate,
-          healthRatioAfterSwap(zeroHealthEstimate),
-          rightBound,
-          minRatio,
-          ZERO_I80F48(),
-          healthRatioAfterSwap,
-        );
-      }
-    } else if (point0Ratio.gte(minRatio)) {
-      // Must be between point0Amount and point1Amount.
+    // Now max_value is bigger than minFnValue, the target amount must be >amountForMaxValue.
+    // Search to the right of amountForMaxValue: but how far?
+    // Use a simple estimation for the amount that would lead to zero health:
+    //           health
+    //              - source_liab_weight * source_liab_price * a
+    //              + target_asset_weight * target_asset_price * price * a = 0.
+    // where a is the source token native amount.
+    // Note that this is just an estimate. Swapping can increase the amount that serum3
+    // reserved contributions offset, moving the actual zero point further to the right.
+    const healthAtMaxValue = cacheAfterSwap(amountForMaxValue).health(
+      HealthType.init,
+    );
+    if (healthAtMaxValue.lte(ZERO_I80F48())) {
+      return ZERO_I80F48();
+    }
+    const zeroHealthEstimate = amountForMaxValue.sub(
+      healthAtMaxValue.div(finalHealthSlope),
+    );
+    const rightBound = HealthCache.scanRightUntilLessThan(
+      zeroHealthEstimate,
+      minFnValue,
+      fnValueAfterSwap,
+    );
+    if (rightBound.eq(zeroHealthEstimate)) {
       amount = HealthCache.binaryApproximationSearch(
-        point0Amount,
-        point0Ratio,
-        point1Amount,
-        minRatio,
-        ZERO_I80F48(),
-        healthRatioAfterSwap,
+        amountForMaxValue,
+        maxValue,
+        rightBound,
+        minFnValue,
+        I80F48.fromNumber(0.1),
+        fnValueAfterSwap,
       );
     } else {
       // Must be between 0 and point0_amount
       amount = HealthCache.binaryApproximationSearch(
-        ZERO_I80F48(),
-        initialRatio,
-        point0Amount,
-        minRatio,
-        ZERO_I80F48(),
-        healthRatioAfterSwap,
+        zeroHealthEstimate,
+        fnValueAfterSwap(zeroHealthEstimate),
+        rightBound,
+        minFnValue,
+        I80F48.fromNumber(0.1),
+        fnValueAfterSwap,
       );
     }
 
@@ -1013,7 +1099,7 @@ export class HealthCache {
 
       // Need to figure out how many lots to trade to reach zero health (zero_health_amount).
       // We do this by looking at the starting health and the health slope per
-      // traded base lot (final_health_slope).
+      // traded base lot (finalHealthSlope).
       const startCache = cacheAfterTrade(new BN(case1Start.toNumber()));
       const startHealth = startCache.health(HealthType.init);
       if (startHealth.lte(ZERO_I80F48())) {

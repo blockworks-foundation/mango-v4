@@ -2,7 +2,7 @@ import { BN } from '@project-serum/anchor';
 import { OpenOrders } from '@project-serum/serum';
 import { expect } from 'chai';
 import _ from 'lodash';
-import { I80F48, ZERO_I80F48 } from '../numbers/I80F48';
+import { I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { BankForHealth, StablePriceModel, TokenIndex } from './bank';
 import { HealthCache, PerpInfo, Serum3Info, TokenInfo } from './healthCache';
 import { HealthType, PerpPosition } from './mangoAccount';
@@ -412,7 +412,7 @@ describe('Health Cache', () => {
 
     expect(
       hc
-        .getMaxSourceForTokenSwap(
+        .getMaxSwapSourceForHealthRatio(
           b0,
           b1,
           I80F48.fromNumber(2 / 3),
@@ -425,9 +425,10 @@ describe('Health Cache', () => {
       hc: HealthCache,
       source: TokenIndex,
       target: TokenIndex,
-      ratio: number,
+      minValue: number,
       priceFactor: number,
-    ): I80F48[] {
+      maxSwapFn: (HealthCache) => I80F48,
+    ): number[] {
       const clonedHc: HealthCache = _.cloneDeep(hc);
 
       const sourcePrice = clonedHc.tokenInfos[source].prices;
@@ -435,278 +436,428 @@ describe('Health Cache', () => {
       const swapPrice = I80F48.fromNumber(priceFactor)
         .mul(sourcePrice.oracle)
         .div(targetPrice.oracle);
-      const sourceAmount = clonedHc.getMaxSourceForTokenSwap(
+      const sourceAmount = clonedHc.getMaxSwapSourceForHealthFn(
         banks[source],
         banks[target],
         swapPrice,
-        I80F48.fromNumber(ratio),
+        I80F48.fromNumber(minValue),
+        maxSwapFn,
       );
 
-      // adjust token balance
-      clonedHc.tokenInfos[source].balanceNative.isub(sourceAmount);
-      clonedHc.tokenInfos[target].balanceNative.iadd(
-        sourceAmount.mul(swapPrice),
-      );
+      function valueForAmount(amount: I80F48) {
+        // adjust token balance
+        const clonedHcClone: HealthCache = _.cloneDeep(clonedHc);
+        clonedHc.tokenInfos[source].balanceNative.isub(amount);
+        clonedHc.tokenInfos[target].balanceNative.iadd(amount.mul(swapPrice));
+        return maxSwapFn(clonedHcClone);
+      }
 
-      return [sourceAmount, clonedHc.healthRatio(HealthType.init)];
+      return [
+        sourceAmount.toNumber(),
+        valueForAmount(sourceAmount).toNumber(),
+        valueForAmount(sourceAmount.sub(ONE_I80F48())).toNumber(),
+        valueForAmount(sourceAmount.add(ONE_I80F48())).toNumber(),
+      ];
     }
 
     function checkMaxSwapResult(
       hc: HealthCache,
       source: TokenIndex,
       target: TokenIndex,
-      ratio: number,
+      minValue: number,
       priceFactor: number,
+      maxSwapFn: (HealthCache) => I80F48,
     ): void {
-      const [sourceAmount, actualRatio] = findMaxSwapActual(
-        hc,
-        source,
-        target,
-        ratio,
-        priceFactor,
-      );
+      const [sourceAmount, actualValue, minusValue, plusValue] =
+        findMaxSwapActual(hc, source, target, minValue, priceFactor, maxSwapFn);
       console.log(
-        ` -- checking ${source} to ${target} for priceFactor: ${priceFactor}, target ratio ${ratio}: actual ratio: ${actualRatio}, amount: ${sourceAmount}`,
+        ` -- checking ${source} to ${target} for priceFactor: ${priceFactor}, target: ${minValue} actual: ${minusValue}/${actualValue}/${plusValue}, amount: ${sourceAmount}`,
       );
-      expect(Math.abs(actualRatio.toNumber() - ratio)).lessThan(1);
+      if (actualValue < minValue) {
+        // check that swapping more would decrease the ratio!
+        expect(plusValue < actualValue);
+      } else {
+        expect(actualValue >= minValue);
+        // either we're within tolerance of the target, or swapping 1 more would
+        // bring us below the target
+        expect(actualValue < minValue + 1 || plusValue < minValue);
+      }
     }
 
-    {
-      console.log(' - test 0');
-      // adjust by usdc
-      const clonedHc = _.cloneDeep(hc);
-      clonedHc.tokenInfos[1].balanceNative.iadd(
-        I80F48.fromNumber(100).div(clonedHc.tokenInfos[1].prices.oracle),
-      );
+    function maxSwapFnRatio(hc: HealthCache): I80F48 {
+      return hc.healthRatio(HealthType.init);
+    }
 
-      for (const priceFactor of [0.1, 0.9, 1.1]) {
-        for (const target of _.range(1, 100, 1)) {
-          checkMaxSwapResult(
+    function maxSwapFn(hc: HealthCache): I80F48 {
+      return hc.health(HealthType.init);
+    }
+
+    for (const fn of [maxSwapFn, maxSwapFnRatio]) {
+      {
+        console.log(' - test 0');
+        // adjust by usdc
+        const clonedHc = _.cloneDeep(hc);
+        clonedHc.tokenInfos[1].balanceNative.iadd(
+          I80F48.fromNumber(100).div(clonedHc.tokenInfos[1].prices.oracle),
+        );
+
+        for (const priceFactor of [0.1, 0.9, 1.1]) {
+          for (const target of _.range(1, 100, 1)) {
+            checkMaxSwapResult(
+              clonedHc,
+              0 as TokenIndex,
+              1 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+            checkMaxSwapResult(
+              clonedHc,
+              1 as TokenIndex,
+              0 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+            checkMaxSwapResult(
+              clonedHc,
+              0 as TokenIndex,
+              2 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+          }
+        }
+
+        // At this unlikely price it's healthy to swap infinitely
+        expect(function () {
+          findMaxSwapActual(
             clonedHc,
             0 as TokenIndex,
             1 as TokenIndex,
-            target,
-            priceFactor,
+            50.0,
+            1.5,
+            fn,
           );
-          checkMaxSwapResult(
-            clonedHc,
-            1 as TokenIndex,
-            0 as TokenIndex,
-            target,
-            priceFactor,
-          );
-          checkMaxSwapResult(
-            clonedHc,
-            0 as TokenIndex,
-            2 as TokenIndex,
-            target,
-            priceFactor,
-          );
+        }).to.throw('Number out of range');
+      }
+
+      {
+        console.log(' - test 1');
+        const clonedHc = _.cloneDeep(hc);
+        // adjust by usdc
+        clonedHc.tokenInfos[0].balanceNative.iadd(
+          I80F48.fromNumber(-20).div(clonedHc.tokenInfos[0].prices.oracle),
+        );
+        clonedHc.tokenInfos[1].balanceNative.iadd(
+          I80F48.fromNumber(100).div(clonedHc.tokenInfos[1].prices.oracle),
+        );
+
+        for (const priceFactor of [0.1, 0.9, 1.1]) {
+          for (const target of _.range(1, 100, 1)) {
+            checkMaxSwapResult(
+              clonedHc,
+              0 as TokenIndex,
+              1 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+            checkMaxSwapResult(
+              clonedHc,
+              1 as TokenIndex,
+              0 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+            checkMaxSwapResult(
+              clonedHc,
+              0 as TokenIndex,
+              2 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+            checkMaxSwapResult(
+              clonedHc,
+              2 as TokenIndex,
+              0 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+          }
         }
       }
 
-      // At this unlikely price it's healthy to swap infinitely
-      expect(function () {
-        findMaxSwapActual(
+      {
+        console.log(' - test 2');
+        const clonedHc = _.cloneDeep(hc);
+        // adjust by usdc
+        clonedHc.tokenInfos[0].balanceNative.iadd(
+          I80F48.fromNumber(-50).div(clonedHc.tokenInfos[0].prices.oracle),
+        );
+        clonedHc.tokenInfos[1].balanceNative.iadd(
+          I80F48.fromNumber(100).div(clonedHc.tokenInfos[1].prices.oracle),
+        );
+        // possible even though the init ratio is <100
+        checkMaxSwapResult(
+          clonedHc,
+          1 as TokenIndex,
+          0 as TokenIndex,
+          100,
+          1,
+
+          maxSwapFn,
+        );
+      }
+
+      {
+        console.log(' - test 3');
+        const clonedHc = _.cloneDeep(hc);
+        // adjust by usdc
+        clonedHc.tokenInfos[0].balanceNative.iadd(
+          I80F48.fromNumber(-30).div(clonedHc.tokenInfos[0].prices.oracle),
+        );
+        clonedHc.tokenInfos[1].balanceNative.iadd(
+          I80F48.fromNumber(100).div(clonedHc.tokenInfos[1].prices.oracle),
+        );
+        clonedHc.tokenInfos[2].balanceNative.iadd(
+          I80F48.fromNumber(-30).div(clonedHc.tokenInfos[2].prices.oracle),
+        );
+
+        // swapping with a high ratio advises paying back all liabs
+        // and then swapping even more because increasing assets in 0 has better asset weight
+        const initRatio = clonedHc.healthRatio(HealthType.init);
+        const [amount, actualRatio] = findMaxSwapActual(
+          clonedHc,
+          1 as TokenIndex,
+          0 as TokenIndex,
+          100,
+          1,
+          maxSwapFn,
+        );
+        expect(actualRatio / 2.0 > initRatio);
+        expect(amount - 100 / 3).lessThan(1);
+      }
+
+      {
+        console.log(' - test 4');
+        const clonedHc = _.cloneDeep(hc);
+        // adjust by usdc
+        clonedHc.tokenInfos[0].balanceNative.iadd(
+          I80F48.fromNumber(100).div(clonedHc.tokenInfos[0].prices.oracle),
+        );
+        clonedHc.tokenInfos[1].balanceNative.iadd(
+          I80F48.fromNumber(-2).div(clonedHc.tokenInfos[1].prices.oracle),
+        );
+        clonedHc.tokenInfos[2].balanceNative.iadd(
+          I80F48.fromNumber(-65).div(clonedHc.tokenInfos[2].prices.oracle),
+        );
+
+        const initRatio = clonedHc.healthRatio(HealthType.init);
+        expect(initRatio.toNumber()).greaterThan(3);
+        expect(initRatio.toNumber()).lessThan(4);
+
+        checkMaxSwapResult(
           clonedHc,
           0 as TokenIndex,
           1 as TokenIndex,
-          50.0,
-          1.5,
-        );
-      }).to.throw('Number out of range');
-    }
-
-    {
-      console.log(' - test 1');
-      const clonedHc = _.cloneDeep(hc);
-      // adjust by usdc
-      clonedHc.tokenInfos[0].balanceNative.iadd(
-        I80F48.fromNumber(-20).div(clonedHc.tokenInfos[0].prices.oracle),
-      );
-      clonedHc.tokenInfos[1].balanceNative.iadd(
-        I80F48.fromNumber(100).div(clonedHc.tokenInfos[1].prices.oracle),
-      );
-
-      for (const priceFactor of [0.1, 0.9, 1.1]) {
-        for (const target of _.range(1, 100, 1)) {
-          checkMaxSwapResult(
-            clonedHc,
-            0 as TokenIndex,
-            1 as TokenIndex,
-            target,
-            priceFactor,
-          );
-          checkMaxSwapResult(
-            clonedHc,
-            1 as TokenIndex,
-            0 as TokenIndex,
-            target,
-            priceFactor,
-          );
-          checkMaxSwapResult(
-            clonedHc,
-            0 as TokenIndex,
-            2 as TokenIndex,
-            target,
-            priceFactor,
-          );
-          checkMaxSwapResult(
-            clonedHc,
-            2 as TokenIndex,
-            0 as TokenIndex,
-            target,
-            priceFactor,
-          );
-        }
-      }
-    }
-
-    {
-      console.log(' - test 2');
-      const clonedHc = _.cloneDeep(hc);
-      // adjust by usdc
-      clonedHc.tokenInfos[0].balanceNative.iadd(
-        I80F48.fromNumber(-50).div(clonedHc.tokenInfos[0].prices.oracle),
-      );
-      clonedHc.tokenInfos[1].balanceNative.iadd(
-        I80F48.fromNumber(100).div(clonedHc.tokenInfos[1].prices.oracle),
-      );
-      // possible even though the init ratio is <100
-      checkMaxSwapResult(clonedHc, 1 as TokenIndex, 0 as TokenIndex, 100, 1);
-    }
-
-    {
-      console.log(' - test 3');
-      const clonedHc = _.cloneDeep(hc);
-      // adjust by usdc
-      clonedHc.tokenInfos[0].balanceNative.iadd(
-        I80F48.fromNumber(-30).div(clonedHc.tokenInfos[0].prices.oracle),
-      );
-      clonedHc.tokenInfos[1].balanceNative.iadd(
-        I80F48.fromNumber(100).div(clonedHc.tokenInfos[1].prices.oracle),
-      );
-      clonedHc.tokenInfos[2].balanceNative.iadd(
-        I80F48.fromNumber(-30).div(clonedHc.tokenInfos[2].prices.oracle),
-      );
-
-      // swapping with a high ratio advises paying back all liabs
-      // and then swapping even more because increasing assets in 0 has better asset weight
-      const initRatio = clonedHc.healthRatio(HealthType.init);
-      const [amount, actualRatio] = findMaxSwapActual(
-        clonedHc,
-        1 as TokenIndex,
-        0 as TokenIndex,
-        100,
-        1,
-      );
-      expect(actualRatio.div(I80F48.fromNumber(2)).toNumber()).greaterThan(
-        initRatio.toNumber(),
-      );
-      expect(amount.toNumber() - 100 / 3).lessThan(1);
-    }
-
-    {
-      console.log(' - test 4');
-      const clonedHc = _.cloneDeep(hc);
-      // adjust by usdc
-      clonedHc.tokenInfos[0].balanceNative.iadd(
-        I80F48.fromNumber(100).div(clonedHc.tokenInfos[0].prices.oracle),
-      );
-      clonedHc.tokenInfos[1].balanceNative.iadd(
-        I80F48.fromNumber(-2).div(clonedHc.tokenInfos[1].prices.oracle),
-      );
-      clonedHc.tokenInfos[2].balanceNative.iadd(
-        I80F48.fromNumber(-65).div(clonedHc.tokenInfos[2].prices.oracle),
-      );
-
-      const initRatio = clonedHc.healthRatio(HealthType.init);
-      expect(initRatio.toNumber()).greaterThan(3);
-      expect(initRatio.toNumber()).lessThan(4);
-
-      checkMaxSwapResult(clonedHc, 0 as TokenIndex, 1 as TokenIndex, 1, 1);
-      checkMaxSwapResult(clonedHc, 0 as TokenIndex, 1 as TokenIndex, 3, 1);
-      checkMaxSwapResult(clonedHc, 0 as TokenIndex, 1 as TokenIndex, 4, 1);
-    }
-
-    // TODO test 5
-
-    {
-      console.log(' - test 6');
-      const clonedHc = _.cloneDeep(hc);
-      clonedHc.serum3Infos = [
-        new Serum3Info(
-          I80F48.fromNumber(30 / 3),
-          I80F48.fromNumber(30 / 2),
           1,
-          0,
-          0 as MarketIndex,
-        ),
-      ];
+          1,
+          maxSwapFn,
+        );
+        checkMaxSwapResult(
+          clonedHc,
+          0 as TokenIndex,
+          1 as TokenIndex,
+          3,
+          1,
+          maxSwapFn,
+        );
+        checkMaxSwapResult(
+          clonedHc,
+          0 as TokenIndex,
+          1 as TokenIndex,
+          4,
+          1,
+          maxSwapFn,
+        );
+      }
 
-      // adjust by usdc
-      clonedHc.tokenInfos[0].balanceNative.iadd(
-        I80F48.fromNumber(-20).div(clonedHc.tokenInfos[0].prices.oracle),
-      );
-      clonedHc.tokenInfos[1].balanceNative.iadd(
-        I80F48.fromNumber(-40).div(clonedHc.tokenInfos[1].prices.oracle),
-      );
-      clonedHc.tokenInfos[2].balanceNative.iadd(
-        I80F48.fromNumber(120).div(clonedHc.tokenInfos[2].prices.oracle),
-      );
+      // TODO test 5
 
-      for (const priceFactor of [
-        // 0.9,
+      {
+        console.log(' - test 6');
+        const clonedHc = _.cloneDeep(hc);
+        clonedHc.serum3Infos = [
+          new Serum3Info(
+            I80F48.fromNumber(30 / 3),
+            I80F48.fromNumber(30 / 2),
+            1,
+            0,
+            0 as MarketIndex,
+          ),
+        ];
 
-        1.1,
-      ]) {
-        for (const target of _.range(1, 100, 1)) {
-          checkMaxSwapResult(
+        // adjust by usdc
+        clonedHc.tokenInfos[0].balanceNative.iadd(
+          I80F48.fromNumber(-20).div(clonedHc.tokenInfos[0].prices.oracle),
+        );
+        clonedHc.tokenInfos[1].balanceNative.iadd(
+          I80F48.fromNumber(-40).div(clonedHc.tokenInfos[1].prices.oracle),
+        );
+        clonedHc.tokenInfos[2].balanceNative.iadd(
+          I80F48.fromNumber(120).div(clonedHc.tokenInfos[2].prices.oracle),
+        );
+
+        for (const priceFactor of [0.9, 1.1]) {
+          for (const target of _.range(1, 100, 1)) {
+            checkMaxSwapResult(
+              clonedHc,
+              0 as TokenIndex,
+              1 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+            checkMaxSwapResult(
+              clonedHc,
+              1 as TokenIndex,
+              0 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+            checkMaxSwapResult(
+              clonedHc,
+              0 as TokenIndex,
+              2 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+            checkMaxSwapResult(
+              clonedHc,
+              1 as TokenIndex,
+              2 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+            checkMaxSwapResult(
+              clonedHc,
+              2 as TokenIndex,
+              0 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+            checkMaxSwapResult(
+              clonedHc,
+              2 as TokenIndex,
+              1 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+          }
+        }
+      }
+
+      {
+        // check starting with negative health but swapping can make it positive
+        console.log(' - test 7');
+        const clonedHc = _.cloneDeep(hc);
+
+        // adjust by usdc
+        clonedHc.tokenInfos[0].balanceNative.iadd(
+          I80F48.fromNumber(-20).div(clonedHc.tokenInfos[0].prices.oracle),
+        );
+        clonedHc.tokenInfos[1].balanceNative.iadd(
+          I80F48.fromNumber(20).div(clonedHc.tokenInfos[1].prices.oracle),
+        );
+        expect(clonedHc.health(HealthType.init) < 0);
+
+        for (const priceFactor of [0.9, 1.1]) {
+          for (const target of _.range(1, 100, 1)) {
+            checkMaxSwapResult(
+              clonedHc,
+              1 as TokenIndex,
+              0 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+          }
+        }
+      }
+
+      {
+        // check starting with negative health but swapping can't make it positive
+        console.log(' - test 8');
+        const clonedHc = _.cloneDeep(hc);
+
+        // adjust by usdc
+        clonedHc.tokenInfos[0].balanceNative.iadd(
+          I80F48.fromNumber(-20).div(clonedHc.tokenInfos[0].prices.oracle),
+        );
+        clonedHc.tokenInfos[1].balanceNative.iadd(
+          I80F48.fromNumber(10).div(clonedHc.tokenInfos[1].prices.oracle),
+        );
+        expect(clonedHc.health(HealthType.init) < 0);
+
+        for (const priceFactor of [0.9, 1.1]) {
+          for (const target of _.range(1, 100, 1)) {
+            checkMaxSwapResult(
+              clonedHc,
+              1 as TokenIndex,
+              0 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+          }
+        }
+      }
+
+      {
+        // swap some assets into a zero-asset-weight token
+        console.log(' - test 9');
+        const clonedHc = _.cloneDeep(hc);
+
+        // adjust by usdc
+        clonedHc.tokenInfos[0].balanceNative.iadd(
+          I80F48.fromNumber(10).div(clonedHc.tokenInfos[0].prices.oracle),
+        );
+        clonedHc.tokenInfos[1].initAssetWeight = ZERO_I80F48();
+        expect(
+          findMaxSwapActual(
             clonedHc,
             0 as TokenIndex,
             1 as TokenIndex,
-            target,
-            priceFactor,
-          );
-          checkMaxSwapResult(
-            clonedHc,
-            1 as TokenIndex,
-            0 as TokenIndex,
-            target,
-            priceFactor,
-          );
-          checkMaxSwapResult(
-            clonedHc,
-            0 as TokenIndex,
-            2 as TokenIndex,
-            target,
-            priceFactor,
-          );
-          checkMaxSwapResult(
-            clonedHc,
-            1 as TokenIndex,
-            2 as TokenIndex,
-            target,
-            priceFactor,
-          );
-          checkMaxSwapResult(
-            clonedHc,
-            2 as TokenIndex,
-            0 as TokenIndex,
-            target,
-            priceFactor,
-          );
-          checkMaxSwapResult(
-            clonedHc,
-            2 as TokenIndex,
-            1 as TokenIndex,
-            target,
-            priceFactor,
-          );
+            1,
+            1,
+            maxSwapFn,
+          )[0] > 0,
+        );
+
+        for (const priceFactor of [0.9, 1.1]) {
+          for (const target of _.range(1, 100, 1)) {
+            checkMaxSwapResult(
+              clonedHc,
+              0 as TokenIndex,
+              1 as TokenIndex,
+              target,
+              priceFactor,
+              fn,
+            );
+          }
         }
       }
     }
-
     done();
   });
 
