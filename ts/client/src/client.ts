@@ -1180,12 +1180,13 @@ export class MangoClient {
     const maxBaseQuantity = serum3MarketExternal.baseSizeNumberToLots(size);
     const maxQuoteQuantity = new BN(
       serum3MarketExternal.decoded.quoteLotSize.toNumber() *
-        (1 + group.getSerum3FeeRates(orderType === Serum3OrderType.postOnly)),
+        (1 + group.getSerum3FeeRates(false)),
     ).mul(
       serum3MarketExternal
         .baseSizeNumberToLots(size)
         .mul(serum3MarketExternal.priceNumberToLots(price)),
     );
+
     const payerTokenIndex = ((): TokenIndex => {
       if (side == Serum3Side.bid) {
         return serum3Market.quoteTokenIndex;
