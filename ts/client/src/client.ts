@@ -1179,8 +1179,8 @@ export class MangoClient {
     const limitPrice = serum3MarketExternal.priceNumberToLots(price);
     const maxBaseQuantity = serum3MarketExternal.baseSizeNumberToLots(size);
     const maxQuoteQuantity = new BN(
-      serum3MarketExternal.decoded.quoteLotSize.toNumber() * 1 +
-        group.getSerum3FeeRates(orderType === Serum3OrderType.postOnly),
+      serum3MarketExternal.decoded.quoteLotSize.toNumber() *
+        (1 + group.getSerum3FeeRates(orderType === Serum3OrderType.postOnly)),
     ).mul(
       serum3MarketExternal
         .baseSizeNumberToLots(size)
