@@ -1,8 +1,8 @@
 import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
 import {
+  WRAPPED_SOL_MINT,
   closeAccount,
   initializeAccount,
-  WRAPPED_SOL_MINT,
 } from '@project-serum/serum/lib/token-instructions';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import {
@@ -12,10 +12,10 @@ import {
   Keypair,
   MemcmpFilter,
   PublicKey,
-  Signer,
-  SystemProgram,
   SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
+  Signer,
+  SystemProgram,
   TransactionInstruction,
   TransactionSignature,
 } from '@solana/web3.js';
@@ -38,11 +38,11 @@ import {
   PerpOrderType,
 } from './accounts/perp';
 import {
-  generateSerum3MarketExternalVaultSignerAddress,
   Serum3Market,
   Serum3OrderType,
   Serum3SelfTradeBehavior,
   Serum3Side,
+  generateSerum3MarketExternalVaultSignerAddress,
 } from './accounts/serum3';
 import { OPENBOOK_PROGRAM_ID } from './constants';
 import { Id } from './ids';
@@ -50,9 +50,9 @@ import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
 import { FlashLoanType, InterestRateParams, OracleConfigParams } from './types';
 import {
+  I64_MAX_BN,
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
-  I64_MAX_BN,
   toNative,
 } from './utils';
 import { sendTransaction } from './utils/rpc';
@@ -1180,11 +1180,9 @@ export class MangoClient {
     const maxBaseQuantity = serum3MarketExternal.baseSizeNumberToLots(size);
     const maxQuoteQuantity = new BN(
       serum3MarketExternal.decoded.quoteLotSize.toNumber() *
-        (1 + group.getSerum3FeeRates(false)),
-    ).mul(
-      serum3MarketExternal
-        .baseSizeNumberToLots(size)
-        .mul(serum3MarketExternal.priceNumberToLots(price)),
+        (1 + group.getSerum3FeeRates(orderType === Serum3OrderType.postOnly)) *
+        serum3MarketExternal.baseSizeNumberToLots(size).toNumber() *
+        serum3MarketExternal.priceNumberToLots(price).toNumber(),
     );
 
     const payerTokenIndex = ((): TokenIndex => {
