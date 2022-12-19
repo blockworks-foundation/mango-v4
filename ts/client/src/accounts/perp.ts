@@ -5,7 +5,7 @@ import Big from 'big.js';
 import { MangoClient } from '../client';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
 import { Modify } from '../types';
-import { As, toNative, U64_MAX_BN } from '../utils';
+import { As, toNative, toUiDecimals, U64_MAX_BN } from '../utils';
 import {
   OracleConfig,
   OracleConfigDto,
@@ -368,6 +368,10 @@ export class PerpMarket {
 
   public priceLotsToUi(price: BN): number {
     return parseFloat(price.toString()) * this.priceLotsToUiConverter;
+  }
+
+  public priceNativeToUi(price: number): number {
+    return toUiDecimals(price, QUOTE_DECIMALS - this.baseDecimals);
   }
 
   public baseLotsToUi(quantity: BN): number {
