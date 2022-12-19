@@ -264,6 +264,9 @@ impl<'a> LiquidateHelper<'a> {
                 } else {
                     return None;
                 };
+                if settleable_pnl.abs() < 1 {
+                    return None;
+                }
                 Some((pp.market_index, settleable_pnl))
             })
             .collect::<Vec<(PerpMarketIndex, I80F48)>>();
