@@ -1,5 +1,5 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
-import { Cluster, Connection, Keypair } from '@solana/web3.js';
+import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { Group } from '../accounts/group';
 import { HealthCache } from '../accounts/healthCache';
@@ -17,6 +17,7 @@ const PAYER_KEYPAIR =
 const USER_KEYPAIR =
   process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
+const MANGO_ACCOUNT = process.env.MANGO_ACCOUNT;
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
 
@@ -256,12 +257,8 @@ async function main(): Promise<void> {
 
     for (const mangoAccount of mangoAccounts) {
       if (
-        // eslint-disable-next-line no-constant-condition
-        true
-        // Enable below to debug specific mango accounts
-        // mangoAccount.publicKey.equals(
-        //   new PublicKey('GGfkfpT4dY8hmNK6SKKSBFdn7ucQXSc4WtDCQpnQt4p2'),
-        // )
+        !MANGO_ACCOUNT ||
+        mangoAccount.publicKey.equals(new PublicKey(MANGO_ACCOUNT))
       ) {
         console.log();
         console.log(`MangoAccount ${mangoAccount.publicKey}`);
