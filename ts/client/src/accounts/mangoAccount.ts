@@ -6,7 +6,7 @@ import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
-import { Bank, QUOTE_DECIMALS, TokenIndex } from './bank';
+import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
 import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
@@ -698,7 +698,7 @@ export class MangoAccount {
     // If its a ask then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
     nativeAmount = nativeAmount
-      // .div(baseBank.price)
+      .div(baseBank.price)
       .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
       .div(ONE_I80F48().add(I80F48.fromNumber(group.getSerum3FeeRates(false))));
     return toUiDecimals(

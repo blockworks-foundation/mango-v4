@@ -649,7 +649,7 @@ export class HealthCache {
     const rightValue = fun(right);
 
     // console.log(
-    //   `binaryApproximationSearch left ${left}, leftValue ${leftValue}, right ${right}, rightValue ${rightValue}, targetValue ${targetValue}`,
+    //   ` - binaryApproximationSearch left ${left.toLocaleString()}, leftValue ${leftValue.toLocaleString()}, right ${right.toLocaleString()}, rightValue ${rightValue.toLocaleString()}, targetValue ${targetValue.toLocaleString()}`,
     // );
 
     if (
@@ -672,7 +672,7 @@ export class HealthCache {
       newAmount = left.add(right).mul(I80F48.fromNumber(0.5));
       newAmountValue = fun(newAmount);
       // console.log(
-      //   ` - left ${left}, right ${right}, newAmount ${newAmount}, newAmountValue ${newAmountValue}, targetValue ${targetValue}`,
+      //   `   - left ${left.toLocaleString()}, right ${right.toLocaleString()}, newAmount ${newAmount.toLocaleString()}, newAmountValue ${newAmountValue.toLocaleString()}, targetValue ${targetValue.toLocaleString()}`,
       // );
       const error = newAmountValue.sub(targetValue);
       if (error.isPos() && error.lt(targetError)) {
@@ -925,6 +925,8 @@ export class HealthCache {
       return ZERO_I80F48();
     }
 
+    // console.log(`getMaxSerum3OrderForHealthRatio`);
+
     // Amount which would bring health to 0
     // where M = max(A_deposits, B_borrows)
     // amount = M + (init_health + M * (B_init_liab - A_init_asset)) / (A_init_liab - B_init_asset);
@@ -948,6 +950,8 @@ export class HealthCache {
               .sub(quote.assetWeight(HealthType.init)),
           ),
       );
+      // console.log(` - quoteBorrows ${quoteBorrows.toLocaleString()}`);
+      // console.log(` - max ${max.toLocaleString()}`);
     } else {
       const baseBorrows = base.balanceNative.lt(ZERO_I80F48())
         ? base.balanceNative.abs().mul(base.prices.liab(HealthType.init))
@@ -964,12 +968,18 @@ export class HealthCache {
               .sub(base.assetWeight(HealthType.init)),
           ),
       );
+      // console.log(` - baseBorrows ${baseBorrows.toLocaleString()}`);
+      // console.log(` - max ${max.toLocaleString()}`);
     }
 
     const cache = cacheAfterPlacingOrder(zeroAmount);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const zeroAmountHealth = cache.health(HealthType.init);
     const zeroAmountRatio = cache.healthRatio(HealthType.init);
+
+    // console.log(` - zeroAmount ${zeroAmount.toLocaleString()}`);
+    // console.log(` - zeroAmountHealth ${zeroAmountHealth.toLocaleString()}`);
+    // console.log(` - zeroAmountRatio ${zeroAmountRatio.toLocaleString()}`);
 
     function cacheAfterPlacingOrder(amount: I80F48): HealthCache {
       const adjustedCache: HealthCache = _.cloneDeep(healthCacheClone);
