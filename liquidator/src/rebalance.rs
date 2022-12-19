@@ -10,7 +10,12 @@ use futures::{stream, StreamExt, TryStreamExt};
 use std::{collections::HashMap, time::Duration};
 
 pub struct Config {
+    /// Maximum slippage allowed in Jupiter
     pub slippage: f64,
+    /// When closing borrows, the rebalancer can't close token positions exactly.
+    /// Instead it purchases too much and then gets rid of the excess in a second step.
+    /// If this is 1.05, then it'll swap borrow_value * 1.05 quote token into borrow token.
+    pub borrow_settle_excess: f64,
     pub refresh_timeout: Duration,
 }
 
@@ -128,20 +133,23 @@ pub async fn zero_all_non_quote(
 
         let mut amount = token_state.native_position;
 
-        if amount > dust_threshold {
-            // Sell
+        if amount < 0 {
+            // Buy
+            let buy_amount = amount.abs().ceil() + (dust_threshold - I80F48::ONE).max(I80F48::ZERO);
+            let input_amount =
+                buy_amount * token_state.price * I80F48::from_num(config.borrow_settle_excess);
             let txsig = mango_client
                 .jupiter_swap(
-                    token_mint,
                     quote_mint,
-                    amount.to_num::<u64>(),
+                    token_mint,
+                    input_amount.to_num::<u64>(),
                     config.slippage,
                     client::JupiterSwapMode::ExactIn,
                 )
                 .await?;
             log::info!(
-                "sold {} {} for {} in tx {}",
-                token.native_to_ui(amount),
+                "bought {} {} for {} in tx {}",
+                token.native_to_ui(buy_amount),
                 token.name,
                 quote_token.name,
                 txsig
@@ -156,22 +164,22 @@ pub async fn zero_all_non_quote(
                 .token_position_and_raw_index(token_index)
                 .map(|(position, _)| position.native(&bank))
                 .unwrap_or(I80F48::ZERO);
-        } else if token_state.native_position < 0 {
-            // Buy
-            let buy_amount = (-token_state.native_position).ceil()
-                + (dust_threshold - I80F48::ONE).max(I80F48::ZERO);
+        }
+
+        if amount > dust_threshold {
+            // Sell
             let txsig = mango_client
                 .jupiter_swap(
-                    quote_mint,
                     token_mint,
-                    buy_amount.to_num::<u64>(),
+                    quote_mint,
+                    amount.to_num::<u64>(),
                     config.slippage,
-                    client::JupiterSwapMode::ExactOut,
+                    client::JupiterSwapMode::ExactIn,
                 )
                 .await?;
             log::info!(
-                "bought {} {} for {} in tx {}",
-                token.native_to_ui(buy_amount),
+                "sold {} {} for {} in tx {}",
+                token.native_to_ui(amount),
                 token.name,
                 quote_token.name,
                 txsig
