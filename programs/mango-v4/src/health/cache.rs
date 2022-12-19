@@ -442,7 +442,7 @@ impl HealthCache {
     pub fn has_spot_assets(&self) -> bool {
         self.token_infos.iter().any(|ti| {
             // can use token_liq_with_token
-            ti.balance_native.is_positive()
+            ti.balance_native >= 1
         })
     }
 
@@ -466,9 +466,7 @@ impl HealthCache {
     }
 
     pub fn has_spot_borrows(&self) -> bool {
-        self.token_infos
-            .iter()
-            .any(|ti| ti.balance_native.is_negative())
+        self.token_infos.iter().any(|ti| ti.balance_native < 0)
     }
 
     pub fn has_borrows(&self) -> bool {
