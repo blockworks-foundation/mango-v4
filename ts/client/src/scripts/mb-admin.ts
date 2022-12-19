@@ -127,6 +127,20 @@ async function createGroup() {
   console.log(`...registered group ${group.publicKey}`);
 }
 
+async function changeAdmin() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+
+  console.log(`Changing admin...`);
+  await client.groupEdit(
+    group,
+    new PublicKey('DSiGNQaKhFCSZbg4HczqCtPAPb1xV51c9GfbfqcVKTB4'),
+  );
+}
+
 async function registerTokens() {
   const result = await buildAdminClient();
   const client = result[0];
@@ -425,6 +439,7 @@ async function registerPerpMarkets() {
 async function main() {
   try {
     // await createGroup();
+    // await changeAdmin();
   } catch (error) {
     console.log(error);
   }
