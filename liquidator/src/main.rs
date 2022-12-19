@@ -224,6 +224,7 @@ async fn main() -> anyhow::Result<()> {
     let rebalance_config = rebalance::Config {
         slippage: cli.rebalance_slippage,
         // TODO: config
+        borrow_settle_excess: 1.05,
         refresh_timeout: Duration::from_secs(30),
     };
 
