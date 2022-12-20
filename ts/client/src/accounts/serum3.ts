@@ -54,6 +54,7 @@ export class Serum3Market {
   }
 
   public getFeeRates(taker = true): number {
+    // See https://github.com/openbook-dex/program/blob/master/dex/src/fees.rs#L81
     const ratesBps =
       this.name === 'USDT/USDC'
         ? { maker: -0.5, taker: 1 }
