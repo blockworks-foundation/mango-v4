@@ -63,6 +63,8 @@ pub enum MangoError {
     BankNetBorrowsLimitReached,
     #[msg("token position does not exist")]
     TokenPositionDoesNotExist,
+    #[msg("token deposits into accounts that are being liquidated must bring their health above the init threshold")]
+    DepositsIntoLiquidatingMustRecover,
 }
 
 impl MangoError {
