@@ -53,6 +53,14 @@ export class Serum3Market {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
   }
 
+  public getFeeRates(taker = true): number {
+    const ratesBps =
+      this.name === 'USDT/USDC'
+        ? { maker: -0.5, taker: 1 }
+        : { maker: -2, taker: 4 };
+    return taker ? ratesBps.maker * 0.0001 : ratesBps.taker * 0.0001;
+  }
+
   /**
    *
    * @param group

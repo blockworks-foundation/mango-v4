@@ -1,11 +1,6 @@
 import { BorshAccountsCoder } from '@project-serum/anchor';
 import { coder } from '@project-serum/anchor/dist/cjs/spl/token';
-import {
-  getFeeRates,
-  getFeeTier,
-  Market,
-  Orderbook,
-} from '@project-serum/serum';
+import { Market, Orderbook } from '@project-serum/serum';
 import { parsePriceData } from '@pythnetwork/client';
 import {
   AccountInfo,
@@ -497,12 +492,6 @@ export class Group {
   ): Promise<Orderbook> {
     const serum3Market = this.getSerum3MarketByExternalMarket(externalMarketPk);
     return await serum3Market.loadAsks(client, this);
-  }
-
-  public getSerum3FeeRates(taker = true): number {
-    const feeTier = getFeeTier(0, 0);
-    const rates = getFeeRates(feeTier);
-    return taker ? rates.maker : rates.taker;
   }
 
   public findPerpMarket(marketIndex: PerpMarketIndex): PerpMarket {
