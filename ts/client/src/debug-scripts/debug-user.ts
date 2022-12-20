@@ -17,7 +17,7 @@ const PAYER_KEYPAIR =
 const USER_KEYPAIR =
   process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
-const MANGO_ACCOUNT = process.env.MANGO_ACCOUNT_PK;
+const MANGO_ACCOUNT_PK = process.env.MANGO_ACCOUNT_PK;
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
 
@@ -257,8 +257,8 @@ async function main(): Promise<void> {
 
     for (const mangoAccount of mangoAccounts) {
       if (
-        !MANGO_ACCOUNT ||
-        mangoAccount.publicKey.equals(new PublicKey(MANGO_ACCOUNT))
+        !MANGO_ACCOUNT_PK ||
+        mangoAccount.publicKey.equals(new PublicKey(MANGO_ACCOUNT_PK))
       ) {
         console.log();
         console.log(`MangoAccount ${mangoAccount.publicKey}`);
