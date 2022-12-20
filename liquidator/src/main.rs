@@ -338,11 +338,22 @@ async fn main() -> anyhow::Result<()> {
 async fn liquidate<'a>(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
-    accounts: impl Iterator<Item = &'a Pubkey>,
+    accounts_iter: impl Iterator<Item = &'a Pubkey>,
     config: &liquidate::Config,
     rebalance_config: &rebalance::Config,
 ) -> anyhow::Result<()> {
-    if !liquidate::maybe_liquidate_one(mango_client, account_fetcher, accounts, config).await {
+    use rand::seq::SliceRandom;
+    let mut rng = rand::thread_rng();
+
+    let mut accounts = accounts_iter.collect::<Vec<&Pubkey>>();
+    accounts.shuffle(&mut rng);
+
+    let mut liquidated_one = false;
+    for pubkey in accounts {
+        liquidated_one |=
+            liquidate::maybe_liquidate(mango_client, account_fetcher, pubkey, config).await;
+    }
+    if !liquidated_one {
         return Ok(());
     }
 
