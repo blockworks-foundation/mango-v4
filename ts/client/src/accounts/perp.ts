@@ -5,7 +5,7 @@ import Big from 'big.js';
 import { MangoClient } from '../client';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
 import { Modify } from '../types';
-import { As, toNative, toUiDecimals, U64_MAX_BN } from '../utils';
+import { As, U64_MAX_BN, toNative, toUiDecimals } from '../utils';
 import {
   OracleConfig,
   OracleConfigDto,
@@ -240,6 +240,15 @@ export class PerpMarket {
 
   get tickSize(): number {
     return this.priceLotsToUiConverter;
+  }
+
+  insidePriceLimit(side: PerpOrderSide, orderPrice: number): boolean {
+    return (
+      (side === PerpOrderSide.bid &&
+        orderPrice <= this.maintLiabWeight.toNumber() * this.uiPrice) ||
+      (side === PerpOrderSide.ask &&
+        orderPrice >= this.maintAssetWeight.toNumber() * this.uiPrice)
+    );
   }
 
   public async loadAsks(
