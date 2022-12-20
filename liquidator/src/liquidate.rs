@@ -686,34 +686,30 @@ pub async fn maybe_liquidate_account(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn maybe_liquidate_one<'a>(
+pub async fn maybe_liquidate(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
-    accounts: impl Iterator<Item = &'a Pubkey>,
+    pubkey: &Pubkey,
     config: &Config,
 ) -> bool {
-    for pubkey in accounts {
-        match maybe_liquidate_account(mango_client, account_fetcher, pubkey, config).await {
-            Err(err) => {
-                // Not all errors need to be raised to the user's attention.
-                let mut log_level = log::Level::Error;
+    match maybe_liquidate_account(mango_client, account_fetcher, pubkey, config).await {
+        Err(err) => {
+            // Not all errors need to be raised to the user's attention.
+            let mut log_level = log::Level::Error;
 
-                // Simulation errors due to liqee precondition failures on the liquidation instructions
-                // will commonly happen if our liquidator is late or if there are chain forks.
-                match err.downcast_ref::<MangoClientError>() {
-                    Some(MangoClientError::SendTransactionPreflightFailure { logs }) => {
-                        if logs.contains("HealthMustBeNegative") || logs.contains("IsNotBankrupt") {
-                            log_level = log::Level::Trace;
-                        }
+            // Simulation errors due to liqee precondition failures on the liquidation instructions
+            // will commonly happen if our liquidator is late or if there are chain forks.
+            match err.downcast_ref::<MangoClientError>() {
+                Some(MangoClientError::SendTransactionPreflightFailure { logs }) => {
+                    if logs.contains("HealthMustBeNegative") || logs.contains("IsNotBankrupt") {
+                        log_level = log::Level::Trace;
                     }
-                    _ => {}
-                };
-                log::log!(log_level, "liquidating account {}: {:?}", pubkey, err);
-            }
-            Ok(true) => return true,
-            _ => {}
-        };
+                }
+                _ => {}
+            };
+            log::log!(log_level, "liquidating account {}: {:?}", pubkey, err);
+            false
+        }
+        Ok(liquidated) => liquidated,
     }
-
-    false
 }
