@@ -156,7 +156,12 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             let health = compute_health(&account.borrow(), HealthType::Init, &retriever)
                 .context("post-deposit init health")?;
             msg!("health: {}", health);
-            account.fixed.maybe_recover_from_being_liquidated(health);
+            let was_being_liquidated = account.being_liquidated();
+            let recovered = account.fixed.maybe_recover_from_being_liquidated(health);
+            require!(
+                !was_being_liquidated || recovered,
+                MangoError::DepositsIntoLiquidatingMustRecover
+            );
         }
 
         //
