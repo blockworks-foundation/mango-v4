@@ -621,7 +621,7 @@ pub async fn maybe_liquidate_account(
     let account = account_fetcher.fetch_mango_account(pubkey)?;
     let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
         .await
-        .expect("always ok");
+        .context("creating health cache 1")?;
     let maint_health = health_cache.health(HealthType::Maint);
     if !health_cache.is_liquidatable() {
         return Ok(false);
@@ -640,7 +640,7 @@ pub async fn maybe_liquidate_account(
     let account = account_fetcher.fetch_fresh_mango_account(pubkey).await?;
     let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
         .await
-        .expect("always ok");
+        .context("creating health cache 2")?;
     if !health_cache.is_liquidatable() {
         return Ok(false);
     }
