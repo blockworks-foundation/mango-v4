@@ -9,6 +9,7 @@ use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 use futures::{stream, StreamExt, TryStreamExt};
 use std::{collections::HashMap, time::Duration};
 
+#[derive(Clone)]
 pub struct Config {
     /// Maximum slippage allowed in Jupiter
     pub slippage: f64,

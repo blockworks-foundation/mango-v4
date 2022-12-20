@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use client::{chain_data, health_cache, AccountFetcher, MangoClient, MangoClientError};
+use client::{chain_data, health_cache, AccountFetcher, MangoClient};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::{HealthCache, HealthType};
 use mango_v4::state::{
@@ -683,33 +683,4 @@ pub async fn maybe_liquidate_account(
     }
 
     Ok(true)
-}
-
-#[allow(clippy::too_many_arguments)]
-pub async fn maybe_liquidate(
-    mango_client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
-    pubkey: &Pubkey,
-    config: &Config,
-) -> bool {
-    match maybe_liquidate_account(mango_client, account_fetcher, pubkey, config).await {
-        Err(err) => {
-            // Not all errors need to be raised to the user's attention.
-            let mut log_level = log::Level::Error;
-
-            // Simulation errors due to liqee precondition failures on the liquidation instructions
-            // will commonly happen if our liquidator is late or if there are chain forks.
-            match err.downcast_ref::<MangoClientError>() {
-                Some(MangoClientError::SendTransactionPreflightFailure { logs }) => {
-                    if logs.contains("HealthMustBeNegative") || logs.contains("IsNotBankrupt") {
-                        log_level = log::Level::Trace;
-                    }
-                }
-                _ => {}
-            };
-            log::log!(log_level, "liquidating account {}: {:?}", pubkey, err);
-            false
-        }
-        Ok(liquidated) => liquidated,
-    }
 }
