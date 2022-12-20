@@ -499,10 +499,10 @@ export class Group {
     return await serum3Market.loadAsks(client, this);
   }
 
-  public getSerum3FeeRates(maker = true): number {
+  public getSerum3FeeRates(taker = true): number {
     const feeTier = getFeeTier(0, 0);
     const rates = getFeeRates(feeTier);
-    return maker ? rates.maker : rates.taker;
+    return taker ? rates.maker : rates.taker;
   }
 
   public findPerpMarket(marketIndex: PerpMarketIndex): PerpMarket {
