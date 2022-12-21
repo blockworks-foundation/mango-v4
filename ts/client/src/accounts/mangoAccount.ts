@@ -662,7 +662,7 @@ export class MangoAccount {
     nativeAmount = nativeAmount
       .div(quoteBank.price)
       .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
-      .div(ONE_I80F48().add(I80F48.fromNumber(group.getSerum3FeeRates(false))));
+      .div(ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))));
     return toUiDecimals(
       nativeAmount,
       group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex).mintDecimals,
@@ -700,7 +700,7 @@ export class MangoAccount {
     nativeAmount = nativeAmount
       .div(baseBank.price)
       .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
-      .div(ONE_I80F48().add(I80F48.fromNumber(group.getSerum3FeeRates(false))));
+      .div(ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))));
     return toUiDecimals(
       nativeAmount,
       group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex).mintDecimals,
