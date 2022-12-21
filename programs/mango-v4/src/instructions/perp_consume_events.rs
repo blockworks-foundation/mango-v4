@@ -50,7 +50,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
 
                         Some(ai) => {
                             if group.is_testing() && ai.owner != &crate::id() {
-                                msg!("Mango account (taker) not owned by mango program");
+                                msg!("Mango account (maker+taker) not owned by mango program");
                                 event_queue.pop_front()?;
                                 continue;
                             }
@@ -85,7 +85,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         }
                         Some(ai) => {
                             if group.is_testing() && ai.owner != &crate::id() {
-                                msg!("Mango account (taker) not owned by mango program");
+                                msg!("Mango account (maker) not owned by mango program");
                                 event_queue.pop_front()?;
                                 continue;
                             }
@@ -169,7 +169,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     }
                     Some(ai) => {
                         if group.is_testing() && ai.owner != &crate::id() {
-                            msg!("Mango account (taker) not owned by mango program");
+                            msg!("Mango account (event owner) not owned by mango program");
                             event_queue.pop_front()?;
                             continue;
                         }
