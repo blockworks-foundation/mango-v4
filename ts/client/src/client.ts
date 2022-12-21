@@ -1181,7 +1181,7 @@ export class MangoClient {
     const isTaker = orderType !== Serum3OrderType.postOnly;
     const maxQuoteQuantity = new BN(
       serum3MarketExternal.decoded.quoteLotSize.toNumber() *
-        (1 + (isTaker ? serum3Market.getFeeRates() : 0)) *
+        (1 + Math.max(serum3Market.getFeeRates(isTaker), 0)) *
         serum3MarketExternal.baseSizeNumberToLots(size).toNumber() *
         serum3MarketExternal.priceNumberToLots(price).toNumber(),
     );
