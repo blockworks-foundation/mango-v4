@@ -601,8 +601,11 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
 
     //
     // SETUP: We want pnl settling to cause a negative quote position,
-    // thus we deposit some base token collateral
+    // thus we deposit some base token collateral. To be able to do that,
+    // we need to temporarily raise health > 0, deposit, then bring health
+    // negative again for the test
     //
+    set_bank_stub_oracle_price(solana, group, quote_token, admin, 2.0).await;
     send_tx(
         solana,
         TokenDepositInstruction {
@@ -616,6 +619,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     )
     .await
     .unwrap();
+    set_bank_stub_oracle_price(solana, group, quote_token, admin, 1.0).await;
 
     //
     // TEST: Can settle-pnl even though health is negative

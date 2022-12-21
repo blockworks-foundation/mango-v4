@@ -228,6 +228,17 @@ async fn main() -> anyhow::Result<()> {
         refresh_timeout: Duration::from_secs(30),
     };
 
+    let mut liquidation = LiquidationState {
+        mango_client: &mango_client,
+        account_fetcher: &account_fetcher,
+        liquidation_config: liq_config,
+        rebalance_config: rebalance_config.clone(),
+        accounts_with_errors: Default::default(),
+        error_skip_threshold: 5,
+        error_skip_duration: std::time::Duration::from_secs(120),
+        error_reset_duration: std::time::Duration::from_secs(360),
+    };
+
     info!("main loop");
     loop {
         tokio::select! {
@@ -255,12 +266,8 @@ async fn main() -> anyhow::Result<()> {
                             continue;
                         }
 
-                        liquidate(
-                            &mango_client,
-                            &account_fetcher,
+                        liquidation.maybe_liquidate_one_and_rebalance(
                             std::iter::once(&account_write.pubkey),
-                            &liq_config,
-                            &rebalance_config,
                         ).await?;
                     }
 
@@ -277,12 +284,8 @@ async fn main() -> anyhow::Result<()> {
                             log::debug!("change to oracle {}", &account_write.pubkey);
                         }
 
-                        liquidate(
-                            &mango_client,
-                            &account_fetcher,
+                        liquidation.maybe_liquidate_one_and_rebalance(
                             mango_accounts.iter(),
-                            &liq_config,
-                            &rebalance_config,
                         ).await?;
                     }
                 }
@@ -310,12 +313,8 @@ async fn main() -> anyhow::Result<()> {
                 snapshot_source::update_chain_data(&mut chain_data.write().unwrap(), message);
                 one_snapshot_done = true;
 
-                liquidate(
-                    &mango_client,
-                    &account_fetcher,
+                liquidation.maybe_liquidate_one_and_rebalance(
                     mango_accounts.iter(),
-                    &liq_config,
-                    &rebalance_config,
                 ).await?;
             },
 
@@ -335,24 +334,121 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-async fn liquidate<'a>(
-    mango_client: &MangoClient,
-    account_fetcher: &chain_data::AccountFetcher,
-    accounts: impl Iterator<Item = &'a Pubkey>,
-    config: &liquidate::Config,
-    rebalance_config: &rebalance::Config,
-) -> anyhow::Result<()> {
-    if !liquidate::maybe_liquidate_one(mango_client, account_fetcher, accounts, config).await {
-        return Ok(());
+struct ErrorTracking {
+    count: u64,
+    last_at: std::time::Instant,
+}
+
+struct LiquidationState<'a> {
+    mango_client: &'a MangoClient,
+    account_fetcher: &'a chain_data::AccountFetcher,
+    liquidation_config: liquidate::Config,
+    rebalance_config: rebalance::Config,
+    accounts_with_errors: HashMap<Pubkey, ErrorTracking>,
+    error_skip_threshold: u64,
+    error_skip_duration: std::time::Duration,
+    error_reset_duration: std::time::Duration,
+}
+
+impl<'a> LiquidationState<'a> {
+    async fn maybe_liquidate_one_and_rebalance<'b>(
+        &mut self,
+        accounts_iter: impl Iterator<Item = &'b Pubkey>,
+    ) -> anyhow::Result<()> {
+        use rand::seq::SliceRandom;
+        let mut rng = rand::thread_rng();
+
+        let mut accounts = accounts_iter.collect::<Vec<&Pubkey>>();
+        accounts.shuffle(&mut rng);
+
+        let mut liquidated_one = false;
+        for pubkey in accounts {
+            if self
+                .maybe_liquidate_and_log_error(pubkey)
+                .await
+                .unwrap_or(false)
+            {
+                liquidated_one = true;
+                break;
+            }
+        }
+        if !liquidated_one {
+            return Ok(());
+        }
+
+        let liqor = &self.mango_client.mango_account_address;
+        if let Err(err) = rebalance::zero_all_non_quote(
+            self.mango_client,
+            self.account_fetcher,
+            liqor,
+            &self.rebalance_config,
+        )
+        .await
+        {
+            log::error!("failed to rebalance liqor: {:?}", err);
+        }
+        Ok(())
     }
 
-    let liqor = &mango_client.mango_account_address;
-    if let Err(err) =
-        rebalance::zero_all_non_quote(mango_client, account_fetcher, liqor, rebalance_config).await
-    {
-        log::error!("failed to rebalance liqor: {:?}", err);
+    async fn maybe_liquidate_and_log_error(&mut self, pubkey: &Pubkey) -> anyhow::Result<bool> {
+        let now = std::time::Instant::now();
+
+        // Skip a pubkey if there've been too many errors recently
+        if let Some(error_entry) = self.accounts_with_errors.get(pubkey) {
+            if error_entry.count >= self.error_skip_threshold
+                && now.duration_since(error_entry.last_at) < self.error_skip_duration
+            {
+                log::trace!(
+                    "skip checking account {pubkey}, had {} errors recently",
+                    error_entry.count
+                );
+                return Ok(false);
+            }
+        }
+
+        let result = liquidate::maybe_liquidate_account(
+            self.mango_client,
+            self.account_fetcher,
+            pubkey,
+            &self.liquidation_config,
+        )
+        .await;
+
+        if let Err(err) = result.as_ref() {
+            // Keep track of pubkeys that had errors
+            let error_entry = self
+                .accounts_with_errors
+                .entry(*pubkey)
+                .or_insert(ErrorTracking {
+                    count: 0,
+                    last_at: now,
+                });
+            if now.duration_since(error_entry.last_at) > self.error_reset_duration {
+                error_entry.count = 0;
+            }
+            error_entry.count += 1;
+            error_entry.last_at = now;
+
+            // Not all errors need to be raised to the user's attention.
+            let mut log_level = log::Level::Error;
+
+            // Simulation errors due to liqee precondition failures on the liquidation instructions
+            // will commonly happen if our liquidator is late or if there are chain forks.
+            match err.downcast_ref::<client::MangoClientError>() {
+                Some(client::MangoClientError::SendTransactionPreflightFailure { logs }) => {
+                    if logs.contains("HealthMustBeNegative") || logs.contains("IsNotBankrupt") {
+                        log_level = log::Level::Trace;
+                    }
+                }
+                _ => {}
+            };
+            log::log!(log_level, "liquidating account {}: {:?}", pubkey, err);
+        } else {
+            self.accounts_with_errors.remove(pubkey);
+        }
+
+        result
     }
-    Ok(())
 }
 
 fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: &metrics::Metrics) {
