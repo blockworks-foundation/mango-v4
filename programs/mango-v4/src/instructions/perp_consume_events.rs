@@ -22,6 +22,8 @@ pub struct PerpConsumeEvents<'info> {
 }
 
 pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Result<()> {
+    let group = ctx.accounts.group.load()?;
+
     let limit = std::cmp::min(limit, 8);
 
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
@@ -47,6 +49,12 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         }
 
                         Some(ai) => {
+                            if group.is_testing() && ai.owner != &crate::id() {
+                                msg!("Mango account (taker) not owned by mango program");
+                                event_queue.pop_front()?;
+                                continue;
+                            }
+
                             let mal: AccountLoaderDynamic<MangoAccount> =
                                 AccountLoaderDynamic::try_from(ai)?;
                             let mut ma = mal.load_mut()?;
@@ -76,6 +84,12 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                             return Ok(());
                         }
                         Some(ai) => {
+                            if group.is_testing() && ai.owner != &crate::id() {
+                                msg!("Mango account (taker) not owned by mango program");
+                                event_queue.pop_front()?;
+                                continue;
+                            }
+
                             let mal: AccountLoaderDynamic<MangoAccount> =
                                 AccountLoaderDynamic::try_from(ai)?;
                             let mut maker = mal.load_mut()?;
@@ -86,6 +100,12 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                     return Ok(());
                                 }
                                 Some(ai) => {
+                                    if group.is_testing() && ai.owner != &crate::id() {
+                                        msg!("Mango account (taker) not owned by mango program");
+                                        event_queue.pop_front()?;
+                                        continue;
+                                    }
+
                                     let mal: AccountLoaderDynamic<MangoAccount> =
                                         AccountLoaderDynamic::try_from(ai)?;
                                     let mut taker = mal.load_mut()?;
@@ -148,6 +168,12 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         return Ok(());
                     }
                     Some(ai) => {
+                        if group.is_testing() && ai.owner != &crate::id() {
+                            msg!("Mango account (taker) not owned by mango program");
+                            event_queue.pop_front()?;
+                            continue;
+                        }
+
                         let mal: AccountLoaderDynamic<MangoAccount> =
                             AccountLoaderDynamic::try_from(ai)?;
                         let mut ma = mal.load_mut()?;
