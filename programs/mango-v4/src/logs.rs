@@ -1,5 +1,5 @@
 use crate::{
-    instructions::FlashLoanType,
+    accounts_ix::FlashLoanType,
     state::{PerpMarket, PerpPosition},
 };
 use anchor_lang::prelude::*;

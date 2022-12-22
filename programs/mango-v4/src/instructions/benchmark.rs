@@ -4,10 +4,8 @@ use anchor_lang::prelude::*;
 use fixed::types::{I80F48, U80F48};
 use solana_program::{log::sol_log_compute_units, program_memory::sol_memcmp};
 
+use crate::accounts_ix::*;
 use crate::i80f48::LowPrecisionDivision;
-
-#[derive(Accounts)]
-pub struct Benchmark {}
 
 #[inline(never)]
 pub fn division_i80f48(a: I80F48, b: I80F48) -> I80F48 {

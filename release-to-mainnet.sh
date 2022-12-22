@@ -6,7 +6,7 @@ WALLET_WITH_FUNDS=~/.config/solana/mango-mainnet-1.json
 PROGRAM_ID=4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
 
 # build program, 
-cargo run -p anchor-cli -- build
+cargo run -p anchor-cli -- build -- --features enable-gpl
 
 # patch types, which we want in rust, but anchor client doesn't support
 ./idl-fixup.sh

@@ -1,25 +1,9 @@
 use anchor_lang::prelude::*;
 
+use crate::accounts_ix::*;
 use crate::error::MangoError;
 use crate::state::*;
 use crate::util::fill_from_str;
-
-#[derive(Accounts)]
-pub struct AccountEdit<'info> {
-    #[account(
-        constraint = group.load()?.is_ix_enabled(IxGate::AccountEdit) @ MangoError::IxIsDisabled,
-    )]
-    pub group: AccountLoader<'info, Group>,
-
-    #[account(
-        mut,
-        has_one = group,
-        has_one = owner,
-        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
-    )]
-    pub account: AccountLoader<'info, MangoAccountFixed>,
-    pub owner: Signer<'info>,
-}
 
 pub fn account_edit(
     ctx: Context<AccountEdit>,

@@ -2,35 +2,13 @@ use anchor_lang::prelude::*;
 
 use fixed::types::I80F48;
 
-use super::InterestRateParams;
 use crate::accounts_zerocopy::{AccountInfoRef, LoadMutZeroCopyRef};
 
 use crate::error::MangoError;
 use crate::state::*;
 
+use crate::accounts_ix::*;
 use crate::logs::TokenMetaDataLog;
-
-/// Changes a token's parameters.
-///
-/// In addition to these accounts, all banks must be passed as remaining_accounts
-/// in MintInfo order.
-#[derive(Accounts)]
-pub struct TokenEdit<'info> {
-    pub group: AccountLoader<'info, Group>,
-    // group <-> admin relation is checked at #1
-    pub admin: Signer<'info>,
-
-    #[account(
-        mut,
-        has_one = group
-    )]
-    pub mint_info: AccountLoader<'info, MintInfo>,
-
-    /// The oracle account is optional and only used when reset_stable_price is set.
-    ///
-    /// CHECK: The oracle can be one of several different account types
-    pub oracle: UncheckedAccount<'info>,
-}
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]
@@ -109,7 +87,7 @@ pub fn token_edit(
 
         if let Some(ref interest_rate_params) = interest_rate_params_opt {
             // TODO: add a require! verifying relation between the parameters
-            msg!("Interest rate params: old - adjustment_factor {:?}, util0 {:?}, rate0 {:?}, util1 {:?}, rate1 {:?}, max_rate {:?}, new - adjustment_factor {:?}, util0 {:?}, rate0 {:?}, util1 {:?}, rate1 {:?}, max_rate {:?}", 
+            msg!("Interest rate params: old - adjustment_factor {:?}, util0 {:?}, rate0 {:?}, util1 {:?}, rate1 {:?}, max_rate {:?}, new - adjustment_factor {:?}, util0 {:?}, rate0 {:?}, util1 {:?}, rate1 {:?}, max_rate {:?}",
             bank.adjustment_factor,
             bank.util0,
             bank.rate0,

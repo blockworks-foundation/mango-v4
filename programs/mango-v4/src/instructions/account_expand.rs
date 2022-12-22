@@ -1,30 +1,8 @@
 use anchor_lang::prelude::*;
 
-use crate::error::MangoError;
+use crate::accounts_ix::*;
 use crate::state::*;
 use crate::util::checked_math as cm;
-
-#[derive(Accounts)]
-pub struct AccountExpand<'info> {
-    #[account(
-        constraint = group.load()?.is_ix_enabled(IxGate::AccountExpand) @ MangoError::IxIsDisabled,
-    )]
-    pub group: AccountLoader<'info, Group>,
-
-    #[account(
-        mut,
-        has_one = group,
-        has_one = owner,
-        constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
-    )]
-    pub account: AccountLoader<'info, MangoAccountFixed>,
-    pub owner: Signer<'info>,
-
-    #[account(mut)]
-    pub payer: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
-}
 
 pub fn account_expand(
     ctx: Context<AccountExpand>,

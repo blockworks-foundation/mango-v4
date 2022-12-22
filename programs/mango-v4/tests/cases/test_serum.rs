@@ -1,6 +1,6 @@
 use super::*;
 
-use mango_v4::instructions::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use std::sync::Arc;
 
 struct SerumOrderPlacer {

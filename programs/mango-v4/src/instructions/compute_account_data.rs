@@ -1,13 +1,6 @@
+use crate::accounts_ix::*;
 use crate::{events::MangoAccountData, health::*, state::*};
 use anchor_lang::prelude::*;
-
-#[derive(Accounts)]
-pub struct ComputeAccountData<'info> {
-    pub group: AccountLoader<'info, Group>,
-
-    #[account(has_one = group)]
-    pub account: AccountLoader<'info, MangoAccountFixed>,
-}
 
 pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
     let group_pk = ctx.accounts.group.key();

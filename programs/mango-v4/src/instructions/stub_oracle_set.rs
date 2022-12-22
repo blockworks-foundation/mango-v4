@@ -1,24 +1,6 @@
+use crate::accounts_ix::*;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
-
-use crate::{error::MangoError, state::*};
-
-#[derive(Accounts)]
-pub struct StubOracleSet<'info> {
-    #[account(
-        has_one = admin,
-        constraint = group.load()?.is_ix_enabled(IxGate::StubOracleSet) @ MangoError::IxIsDisabled,
-    )]
-    pub group: AccountLoader<'info, Group>,
-
-    pub admin: Signer<'info>,
-
-    #[account(
-        mut,
-        has_one = group
-    )]
-    pub oracle: AccountLoader<'info, StubOracle>,
-}
 
 pub fn stub_oracle_set(ctx: Context<StubOracleSet>, price: I80F48) -> Result<()> {
     let mut oracle = ctx.accounts.oracle.load_mut()?;

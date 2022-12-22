@@ -4865,6 +4865,38 @@ export type MangoV4 = {
   ],
   "types": [
     {
+      "name": "InterestRateParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "util0",
+            "type": "f32"
+          },
+          {
+            "name": "rate0",
+            "type": "f32"
+          },
+          {
+            "name": "util1",
+            "type": "f32"
+          },
+          {
+            "name": "rate1",
+            "type": "f32"
+          },
+          {
+            "name": "maxRate",
+            "type": "f32"
+          },
+          {
+            "name": "adjustmentFactor",
+            "type": "f32"
+          }
+        ]
+      }
+    },
+    {
       "name": "Equity",
       "type": {
         "kind": "struct",
@@ -5168,38 +5200,6 @@ export type MangoV4 = {
           {
             "name": "beingLiquidated",
             "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "InterestRateParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "util0",
-            "type": "f32"
-          },
-          {
-            "name": "rate0",
-            "type": "f32"
-          },
-          {
-            "name": "util1",
-            "type": "f32"
-          },
-          {
-            "name": "rate1",
-            "type": "f32"
-          },
-          {
-            "name": "maxRate",
-            "type": "f32"
-          },
-          {
-            "name": "adjustmentFactor",
-            "type": "f32"
           }
         ]
       }
@@ -6393,39 +6393,6 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "HealthType",
-      "docs": [
-        "There are three types of health:",
-        "- initial health (\"init\"): users can only open new positions if it's >= 0",
-        "- maintenance health (\"maint\"): users get liquidated if it's < 0",
-        "- liquidation end health: once liquidation started (see being_liquidated), it",
-        "only stops once this is >= 0",
-        "",
-        "The ordering is",
-        "init health <= liquidation end health <= maint health",
-        "",
-        "The different health types are realized by using different weights and prices:",
-        "- init health: init weights with scaling, stable-price adjusted prices",
-        "- liq end health: init weights without scaling, oracle prices",
-        "- maint health: maint weights, oracle prices",
-        ""
-      ],
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Init"
-          },
-          {
-            "name": "Maint"
-          },
-          {
-            "name": "LiquidationEnd"
-          }
-        ]
-      }
-    },
-    {
       "name": "FlashLoanType",
       "type": {
         "kind": "enum",
@@ -6486,6 +6453,39 @@ export type MangoV4 = {
           },
           {
             "name": "Ask"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HealthType",
+      "docs": [
+        "There are three types of health:",
+        "- initial health (\"init\"): users can only open new positions if it's >= 0",
+        "- maintenance health (\"maint\"): users get liquidated if it's < 0",
+        "- liquidation end health: once liquidation started (see being_liquidated), it",
+        "only stops once this is >= 0",
+        "",
+        "The ordering is",
+        "init health <= liquidation end health <= maint health",
+        "",
+        "The different health types are realized by using different weights and prices:",
+        "- init health: init weights with scaling, stable-price adjusted prices",
+        "- liq end health: init weights without scaling, oracle prices",
+        "- maint health: maint weights, oracle prices",
+        ""
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Init"
+          },
+          {
+            "name": "Maint"
+          },
+          {
+            "name": "LiquidationEnd"
           }
         ]
       }
@@ -8335,6 +8335,11 @@ export type MangoV4 = {
       "code": 6043,
       "name": "NoLiquidatablePerpBasePosition",
       "msg": "no liquidatable perp base position"
+    },
+    {
+      "code": 6044,
+      "name": "PerpOrderIdNotFound",
+      "msg": "perp order id not found on the orderbook"
     }
   ]
 };
@@ -13206,6 +13211,38 @@ export const IDL: MangoV4 = {
   ],
   "types": [
     {
+      "name": "InterestRateParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "util0",
+            "type": "f32"
+          },
+          {
+            "name": "rate0",
+            "type": "f32"
+          },
+          {
+            "name": "util1",
+            "type": "f32"
+          },
+          {
+            "name": "rate1",
+            "type": "f32"
+          },
+          {
+            "name": "maxRate",
+            "type": "f32"
+          },
+          {
+            "name": "adjustmentFactor",
+            "type": "f32"
+          }
+        ]
+      }
+    },
+    {
       "name": "Equity",
       "type": {
         "kind": "struct",
@@ -13509,38 +13546,6 @@ export const IDL: MangoV4 = {
           {
             "name": "beingLiquidated",
             "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "InterestRateParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "util0",
-            "type": "f32"
-          },
-          {
-            "name": "rate0",
-            "type": "f32"
-          },
-          {
-            "name": "util1",
-            "type": "f32"
-          },
-          {
-            "name": "rate1",
-            "type": "f32"
-          },
-          {
-            "name": "maxRate",
-            "type": "f32"
-          },
-          {
-            "name": "adjustmentFactor",
-            "type": "f32"
           }
         ]
       }
@@ -14734,39 +14739,6 @@ export const IDL: MangoV4 = {
       }
     },
     {
-      "name": "HealthType",
-      "docs": [
-        "There are three types of health:",
-        "- initial health (\"init\"): users can only open new positions if it's >= 0",
-        "- maintenance health (\"maint\"): users get liquidated if it's < 0",
-        "- liquidation end health: once liquidation started (see being_liquidated), it",
-        "only stops once this is >= 0",
-        "",
-        "The ordering is",
-        "init health <= liquidation end health <= maint health",
-        "",
-        "The different health types are realized by using different weights and prices:",
-        "- init health: init weights with scaling, stable-price adjusted prices",
-        "- liq end health: init weights without scaling, oracle prices",
-        "- maint health: maint weights, oracle prices",
-        ""
-      ],
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Init"
-          },
-          {
-            "name": "Maint"
-          },
-          {
-            "name": "LiquidationEnd"
-          }
-        ]
-      }
-    },
-    {
       "name": "FlashLoanType",
       "type": {
         "kind": "enum",
@@ -14827,6 +14799,39 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Ask"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HealthType",
+      "docs": [
+        "There are three types of health:",
+        "- initial health (\"init\"): users can only open new positions if it's >= 0",
+        "- maintenance health (\"maint\"): users get liquidated if it's < 0",
+        "- liquidation end health: once liquidation started (see being_liquidated), it",
+        "only stops once this is >= 0",
+        "",
+        "The ordering is",
+        "init health <= liquidation end health <= maint health",
+        "",
+        "The different health types are realized by using different weights and prices:",
+        "- init health: init weights with scaling, stable-price adjusted prices",
+        "- liq end health: init weights without scaling, oracle prices",
+        "- maint health: maint weights, oracle prices",
+        ""
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Init"
+          },
+          {
+            "name": "Maint"
+          },
+          {
+            "name": "LiquidationEnd"
           }
         ]
       }
@@ -16676,6 +16681,11 @@ export const IDL: MangoV4 = {
       "code": 6043,
       "name": "NoLiquidatablePerpBasePosition",
       "msg": "no liquidatable perp base position"
+    },
+    {
+      "code": 6044,
+      "name": "PerpOrderIdNotFound",
+      "msg": "perp order id not found on the orderbook"
     }
   ]
 };

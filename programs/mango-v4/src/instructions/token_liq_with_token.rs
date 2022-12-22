@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 use std::cmp::min;
 
+use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::logs::{
@@ -10,30 +11,6 @@ use crate::logs::{
 };
 use crate::state::*;
 use crate::util::checked_math as cm;
-
-#[derive(Accounts)]
-pub struct TokenLiqWithToken<'info> {
-    #[account(
-        constraint = group.load()?.is_ix_enabled(IxGate::TokenLiqWithToken) @ MangoError::IxIsDisabled,
-    )]
-    pub group: AccountLoader<'info, Group>,
-
-    #[account(
-        mut,
-        has_one = group,
-        constraint = liqor.load()?.is_operational() @ MangoError::AccountIsFrozen
-        // liqor_owner is checked at #1
-    )]
-    pub liqor: AccountLoader<'info, MangoAccountFixed>,
-    pub liqor_owner: Signer<'info>,
-
-    #[account(
-        mut,
-        has_one = group,
-        constraint = liqee.load()?.is_operational() @ MangoError::AccountIsFrozen
-    )]
-    pub liqee: AccountLoader<'info, MangoAccountFixed>,
-}
 
 pub fn token_liq_with_token(
     ctx: Context<TokenLiqWithToken>,

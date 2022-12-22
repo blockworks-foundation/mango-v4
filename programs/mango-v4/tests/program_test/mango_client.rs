@@ -5,7 +5,7 @@ use anchor_lang::solana_program::sysvar::{self, SysvarId};
 use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
-use mango_v4::instructions::{
+use mango_v4::accounts_ix::{
     InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
 };
 use mango_v4::state::{MangoAccount, MangoAccountValue};
@@ -494,7 +494,7 @@ pub struct FlashLoanEndInstruction {
     pub mango_token_bank: Pubkey,
     pub mango_token_vault: Pubkey,
     pub target_token_account: Pubkey,
-    pub flash_loan_type: mango_v4::instructions::FlashLoanType,
+    pub flash_loan_type: mango_v4::accounts_ix::FlashLoanType,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for FlashLoanEndInstruction {

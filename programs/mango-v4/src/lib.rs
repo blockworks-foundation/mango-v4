@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+
 use fixed::types::I80F48;
 
 #[macro_use]
@@ -8,19 +10,25 @@ extern crate static_assertions;
 
 use anchor_lang::prelude::*;
 
-use instructions::*;
+use accounts_ix::*;
 
+pub mod accounts_ix;
 pub mod accounts_zerocopy;
 pub mod address_lookup_table_program;
 pub mod error;
 pub mod events;
 pub mod health;
 pub mod i80f48;
-pub mod instructions;
 pub mod logs;
 pub mod serum3_cpi;
 pub mod state;
 pub mod types;
+
+#[cfg(feature = "enable-gpl")]
+pub mod instructions;
+
+#[cfg(all(not(feature = "no-entrypoint"), not(feature = "enable-gpl")))]
+compile_error!("compiling the program entrypoint without 'enable-gpl' makes no sense, enable it or use the 'cpi' or 'client' features");
 
 use state::{
     OracleConfigParams, PerpMarketIndex, PlaceOrderType, Serum3MarketIndex, Side, TokenIndex,
@@ -38,7 +46,9 @@ pub mod mango_v4 {
         testing: u8,
         version: u8,
     ) -> Result<()> {
-        instructions::group_create(ctx, group_num, testing, version)
+        #[cfg(feature = "enable-gpl")]
+        instructions::group_create(ctx, group_num, testing, version)?;
+        Ok(())
     }
 
     pub fn group_edit(
@@ -50,6 +60,7 @@ pub mod mango_v4 {
         version_opt: Option<u8>,
         deposit_limit_quote_opt: Option<u64>,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
         instructions::group_edit(
             ctx,
             admin_opt,
@@ -58,15 +69,20 @@ pub mod mango_v4 {
             testing_opt,
             version_opt,
             deposit_limit_quote_opt,
-        )
+        )?;
+        Ok(())
     }
 
     pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
-        instructions::ix_gate_set(ctx, ix_gate)
+        #[cfg(feature = "enable-gpl")]
+        instructions::ix_gate_set(ctx, ix_gate)?;
+        Ok(())
     }
 
     pub fn group_close(ctx: Context<GroupClose>) -> Result<()> {
-        instructions::group_close(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::group_close(ctx)?;
+        Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -87,6 +103,7 @@ pub mod mango_v4 {
         net_borrow_limit_window_size_ts: u64,
         net_borrow_limit_per_window_quote: i64,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
         instructions::token_register(
             ctx,
             token_index,
@@ -103,7 +120,8 @@ pub mod mango_v4 {
             min_vault_to_deposits_ratio,
             net_borrow_limit_window_size_ts,
             net_borrow_limit_per_window_quote,
-        )
+        )?;
+        Ok(())
     }
 
     pub fn token_register_trustless(
@@ -111,7 +129,9 @@ pub mod mango_v4 {
         token_index: TokenIndex,
         name: String,
     ) -> Result<()> {
-        instructions::token_register_trustless(ctx, token_index, name)
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_register_trustless(ctx, token_index, name)?;
+        Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -140,6 +160,7 @@ pub mod mango_v4 {
         reset_net_borrow_limit: bool,
         reduce_only_opt: Option<bool>,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
             ctx,
             oracle_opt,
@@ -164,7 +185,8 @@ pub mod mango_v4 {
             reset_stable_price,
             reset_net_borrow_limit,
             reduce_only_opt,
-        )
+        )?;
+        Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -173,17 +195,23 @@ pub mod mango_v4 {
         token_index: TokenIndex,
         bank_num: u32,
     ) -> Result<()> {
-        instructions::token_add_bank(ctx, token_index, bank_num)
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_add_bank(ctx, token_index, bank_num)?;
+        Ok(())
     }
 
     pub fn token_deregister<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, TokenDeregister<'info>>,
     ) -> Result<()> {
-        instructions::token_deregister(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_deregister(ctx)?;
+        Ok(())
     }
 
     pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Result<()> {
-        instructions::token_update_index_and_rate(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_update_index_and_rate(ctx)?;
+        Ok(())
     }
 
     pub fn account_create(
@@ -195,6 +223,7 @@ pub mod mango_v4 {
         perp_oo_count: u8,
         name: String,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
         instructions::account_create(
             ctx,
             account_num,
@@ -203,7 +232,8 @@ pub mod mango_v4 {
             perp_count,
             perp_oo_count,
             name,
-        )
+        )?;
+        Ok(())
     }
 
     pub fn account_expand(
@@ -213,7 +243,9 @@ pub mod mango_v4 {
         perp_count: u8,
         perp_oo_count: u8,
     ) -> Result<()> {
-        instructions::account_expand(ctx, token_count, serum3_count, perp_count, perp_oo_count)
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_expand(ctx, token_count, serum3_count, perp_count, perp_oo_count)?;
+        Ok(())
     }
 
     pub fn account_edit(
@@ -221,15 +253,21 @@ pub mod mango_v4 {
         name_opt: Option<String>,
         delegate_opt: Option<Pubkey>,
     ) -> Result<()> {
-        instructions::account_edit(ctx, name_opt, delegate_opt)
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_edit(ctx, name_opt, delegate_opt)?;
+        Ok(())
     }
 
     pub fn account_toggle_freeze(ctx: Context<AccountToggleFreeze>, freeze: bool) -> Result<()> {
-        instructions::account_toggle_freeze(ctx, freeze)
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_toggle_freeze(ctx, freeze)?;
+        Ok(())
     }
 
     pub fn account_close(ctx: Context<AccountClose>, force_close: bool) -> Result<()> {
-        instructions::account_close(ctx, force_close)
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_close(ctx, force_close)?;
+        Ok(())
     }
 
     // todo:
@@ -238,19 +276,27 @@ pub mod mango_v4 {
     // and it's tricky to use in typescript generally
     // lets do an interface pass later
     pub fn stub_oracle_create(ctx: Context<StubOracleCreate>, price: I80F48) -> Result<()> {
-        instructions::stub_oracle_create(ctx, price)
+        #[cfg(feature = "enable-gpl")]
+        instructions::stub_oracle_create(ctx, price)?;
+        Ok(())
     }
 
     pub fn stub_oracle_close(ctx: Context<StubOracleClose>) -> Result<()> {
-        instructions::stub_oracle_close(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::stub_oracle_close(ctx)?;
+        Ok(())
     }
 
     pub fn stub_oracle_set(ctx: Context<StubOracleSet>, price: I80F48) -> Result<()> {
-        instructions::stub_oracle_set(ctx, price)
+        #[cfg(feature = "enable-gpl")]
+        instructions::stub_oracle_set(ctx, price)?;
+        Ok(())
     }
 
     pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64, reduce_only: bool) -> Result<()> {
-        instructions::token_deposit(ctx, amount, reduce_only)
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_deposit(ctx, amount, reduce_only)?;
+        Ok(())
     }
 
     pub fn token_deposit_into_existing(
@@ -258,7 +304,9 @@ pub mod mango_v4 {
         amount: u64,
         reduce_only: bool,
     ) -> Result<()> {
-        instructions::token_deposit_into_existing(ctx, amount, reduce_only)
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_deposit_into_existing(ctx, amount, reduce_only)?;
+        Ok(())
     }
 
     pub fn token_withdraw(
@@ -266,33 +314,43 @@ pub mod mango_v4 {
         amount: u64,
         allow_borrow: bool,
     ) -> Result<()> {
-        instructions::token_withdraw(ctx, amount, allow_borrow)
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_withdraw(ctx, amount, allow_borrow)?;
+        Ok(())
     }
 
     pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanBegin<'info>>,
         loan_amounts: Vec<u64>,
     ) -> Result<()> {
-        instructions::flash_loan_begin(ctx, loan_amounts)
+        #[cfg(feature = "enable-gpl")]
+        instructions::flash_loan_begin(ctx, loan_amounts)?;
+        Ok(())
     }
 
     pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
         flash_loan_type: FlashLoanType,
     ) -> Result<()> {
-        instructions::flash_loan_end(ctx, flash_loan_type)
+        #[cfg(feature = "enable-gpl")]
+        instructions::flash_loan_end(ctx, flash_loan_type)?;
+        Ok(())
     }
 
     pub fn health_region_begin<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, HealthRegionBegin<'info>>,
     ) -> Result<()> {
-        instructions::health_region_begin(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::health_region_begin(ctx)?;
+        Ok(())
     }
 
     pub fn health_region_end<'key, 'accounts, 'remaining, 'info>(
         ctx: Context<'key, 'accounts, 'remaining, 'info, HealthRegionEnd<'info>>,
     ) -> Result<()> {
-        instructions::health_region_end(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::health_region_end(ctx)?;
+        Ok(())
     }
 
     ///
@@ -304,14 +362,18 @@ pub mod mango_v4 {
         market_index: Serum3MarketIndex,
         name: String,
     ) -> Result<()> {
-        instructions::serum3_register_market(ctx, market_index, name)
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_register_market(ctx, market_index, name)?;
+        Ok(())
     }
 
     pub fn serum3_edit_market(
         ctx: Context<Serum3EditMarket>,
         reduce_only_opt: Option<bool>,
     ) -> Result<()> {
-        instructions::serum3_edit_market(ctx, reduce_only_opt)
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_edit_market(ctx, reduce_only_opt)?;
+        Ok(())
     }
 
     // note:
@@ -320,15 +382,21 @@ pub mod mango_v4 {
     // should be edited once set on creation
 
     pub fn serum3_deregister_market(ctx: Context<Serum3DeregisterMarket>) -> Result<()> {
-        instructions::serum3_deregister_market(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_deregister_market(ctx)?;
+        Ok(())
     }
 
     pub fn serum3_create_open_orders(ctx: Context<Serum3CreateOpenOrders>) -> Result<()> {
-        instructions::serum3_create_open_orders(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_create_open_orders(ctx)?;
+        Ok(())
     }
 
     pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<()> {
-        instructions::serum3_close_open_orders(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_close_open_orders(ctx)?;
+        Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -343,6 +411,7 @@ pub mod mango_v4 {
         client_order_id: u64,
         limit: u16,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
         instructions::serum3_place_order(
             ctx,
             side,
@@ -353,7 +422,8 @@ pub mod mango_v4 {
             order_type,
             client_order_id,
             limit,
-        )
+        )?;
+        Ok(())
     }
 
     pub fn serum3_cancel_order(
@@ -361,22 +431,30 @@ pub mod mango_v4 {
         side: Serum3Side,
         order_id: u128,
     ) -> Result<()> {
-        instructions::serum3_cancel_order(ctx, side, order_id)
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_cancel_order(ctx, side, order_id)?;
+        Ok(())
     }
 
     pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) -> Result<()> {
-        instructions::serum3_cancel_all_orders(ctx, limit)
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_cancel_all_orders(ctx, limit)?;
+        Ok(())
     }
 
     pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
-        instructions::serum3_settle_funds(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_settle_funds(ctx)?;
+        Ok(())
     }
 
     pub fn serum3_liq_force_cancel_orders(
         ctx: Context<Serum3LiqForceCancelOrders>,
         limit: u8,
     ) -> Result<()> {
-        instructions::serum3_liq_force_cancel_orders(ctx, limit)
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_liq_force_cancel_orders(ctx, limit)?;
+        Ok(())
     }
 
     // DEPRECATED: use token_liq_with_token
@@ -386,12 +464,14 @@ pub mod mango_v4 {
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
         instructions::token_liq_with_token(
             ctx,
             asset_token_index,
             liab_token_index,
             max_liab_transfer,
-        )
+        )?;
+        Ok(())
     }
 
     // DEPRECATED: use token_liq_bankruptcy
@@ -399,7 +479,9 @@ pub mod mango_v4 {
         ctx: Context<TokenLiqBankruptcy>,
         max_liab_transfer: I80F48,
     ) -> Result<()> {
-        instructions::token_liq_bankruptcy(ctx, max_liab_transfer)
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_liq_bankruptcy(ctx, max_liab_transfer)?;
+        Ok(())
     }
 
     pub fn token_liq_with_token(
@@ -408,19 +490,23 @@ pub mod mango_v4 {
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
         instructions::token_liq_with_token(
             ctx,
             asset_token_index,
             liab_token_index,
             max_liab_transfer,
-        )
+        )?;
+        Ok(())
     }
 
     pub fn token_liq_bankruptcy(
         ctx: Context<TokenLiqBankruptcy>,
         max_liab_transfer: I80F48,
     ) -> Result<()> {
-        instructions::token_liq_bankruptcy(ctx, max_liab_transfer)
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_liq_bankruptcy(ctx, max_liab_transfer)?;
+        Ok(())
     }
 
     ///
@@ -458,6 +544,7 @@ pub mod mango_v4 {
         settle_pnl_limit_window_size_ts: u64,
         positive_pnl_liquidation_fee: f32,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
         instructions::perp_create_market(
             ctx,
             perp_market_index,
@@ -487,7 +574,8 @@ pub mod mango_v4 {
             settle_pnl_limit_factor,
             settle_pnl_limit_window_size_ts,
             positive_pnl_liquidation_fee,
-        )
+        )?;
+        Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -522,6 +610,7 @@ pub mod mango_v4 {
         reset_stable_price: bool,
         positive_pnl_liquidation_fee_opt: Option<f32>,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
         instructions::perp_edit_market(
             ctx,
             oracle_opt,
@@ -552,15 +641,20 @@ pub mod mango_v4 {
             reduce_only_opt,
             reset_stable_price,
             positive_pnl_liquidation_fee_opt,
-        )
+        )?;
+        Ok(())
     }
 
     pub fn perp_close_market(ctx: Context<PerpCloseMarket>) -> Result<()> {
-        instructions::perp_close_market(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_close_market(ctx)?;
+        Ok(())
     }
 
     pub fn perp_deactivate_position(ctx: Context<PerpDeactivatePosition>) -> Result<()> {
-        instructions::perp_deactivate_position(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_deactivate_position(ctx)?;
+        Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -619,7 +713,11 @@ pub mod mango_v4 {
                 },
             },
         };
-        instructions::perp_place_order(ctx, order, limit)
+        #[cfg(feature = "enable-gpl")]
+        return instructions::perp_place_order(ctx, order, limit);
+
+        #[cfg(not(feature = "enable-gpl"))]
+        Ok(None)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -686,22 +784,32 @@ pub mod mango_v4 {
                 max_oracle_staleness_slots,
             },
         };
-        instructions::perp_place_order(ctx, order, limit)
+        #[cfg(feature = "enable-gpl")]
+        return instructions::perp_place_order(ctx, order, limit);
+
+        #[cfg(not(feature = "enable-gpl"))]
+        Ok(None)
     }
 
     pub fn perp_cancel_order(ctx: Context<PerpCancelOrder>, order_id: u128) -> Result<()> {
-        instructions::perp_cancel_order(ctx, order_id)
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_cancel_order(ctx, order_id)?;
+        Ok(())
     }
 
     pub fn perp_cancel_order_by_client_order_id(
         ctx: Context<PerpCancelOrderByClientOrderId>,
         client_order_id: u64,
     ) -> Result<()> {
-        instructions::perp_cancel_order_by_client_order_id(ctx, client_order_id)
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_cancel_order_by_client_order_id(ctx, client_order_id)?;
+        Ok(())
     }
 
     pub fn perp_cancel_all_orders(ctx: Context<PerpCancelAllOrders>, limit: u8) -> Result<()> {
-        instructions::perp_cancel_all_orders(ctx, limit)
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_cancel_all_orders(ctx, limit)?;
+        Ok(())
     }
 
     pub fn perp_cancel_all_orders_by_side(
@@ -709,23 +817,33 @@ pub mod mango_v4 {
         side_option: Option<Side>,
         limit: u8,
     ) -> Result<()> {
-        instructions::perp_cancel_all_orders_by_side(ctx, side_option, limit)
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_cancel_all_orders_by_side(ctx, side_option, limit)?;
+        Ok(())
     }
 
     pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Result<()> {
-        instructions::perp_consume_events(ctx, limit)
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_consume_events(ctx, limit)?;
+        Ok(())
     }
 
     pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
-        instructions::perp_update_funding(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_update_funding(ctx)?;
+        Ok(())
     }
 
     pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
-        instructions::perp_settle_pnl(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_settle_pnl(ctx)?;
+        Ok(())
     }
 
     pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) -> Result<()> {
-        instructions::perp_settle_fees(ctx, max_settle_amount)
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_settle_fees(ctx, max_settle_amount)?;
+        Ok(())
     }
 
     pub fn perp_liq_base_or_positive_pnl(
@@ -733,25 +851,33 @@ pub mod mango_v4 {
         max_base_transfer: i64,
         max_pnl_transfer: u64,
     ) -> Result<()> {
-        instructions::perp_liq_base_or_positive_pnl(ctx, max_base_transfer, max_pnl_transfer)
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_liq_base_or_positive_pnl(ctx, max_base_transfer, max_pnl_transfer)?;
+        Ok(())
     }
 
     pub fn perp_liq_force_cancel_orders(
         ctx: Context<PerpLiqForceCancelOrders>,
         limit: u8,
     ) -> Result<()> {
-        instructions::perp_liq_force_cancel_orders(ctx, limit)
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_liq_force_cancel_orders(ctx, limit)?;
+        Ok(())
     }
 
     pub fn perp_liq_negative_pnl_or_bankruptcy(
         ctx: Context<PerpLiqNegativePnlOrBankruptcy>,
         max_liab_transfer: u64,
     ) -> Result<()> {
-        instructions::perp_liq_negative_pnl_or_bankruptcy(ctx, max_liab_transfer)
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_liq_negative_pnl_or_bankruptcy(ctx, max_liab_transfer)?;
+        Ok(())
     }
 
     pub fn alt_set(ctx: Context<AltSet>, index: u8) -> Result<()> {
-        instructions::alt_set(ctx, index)
+        #[cfg(feature = "enable-gpl")]
+        instructions::alt_set(ctx, index)?;
+        Ok(())
     }
 
     pub fn alt_extend(
@@ -759,11 +885,15 @@ pub mod mango_v4 {
         index: u8,
         new_addresses: Vec<Pubkey>,
     ) -> Result<()> {
-        instructions::alt_extend(ctx, index, new_addresses)
+        #[cfg(feature = "enable-gpl")]
+        instructions::alt_extend(ctx, index, new_addresses)?;
+        Ok(())
     }
 
     pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
-        instructions::compute_account_data(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::compute_account_data(ctx)?;
+        Ok(())
     }
 
     ///
@@ -771,7 +901,9 @@ pub mod mango_v4 {
     ///
 
     pub fn benchmark(ctx: Context<Benchmark>) -> Result<()> {
-        instructions::benchmark(ctx)
+        #[cfg(feature = "enable-gpl")]
+        instructions::benchmark(ctx)?;
+        Ok(())
     }
 }
 
