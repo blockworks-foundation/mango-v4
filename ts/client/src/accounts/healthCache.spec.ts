@@ -444,7 +444,7 @@ describe('Health Cache', () => {
         maxSwapFn,
       );
 
-      function valueForAmount(amount: I80F48) {
+      function valueForAmount(amount: I80F48): I80F48 {
         // adjust token balance
         const clonedHcClone: HealthCache = _.cloneDeep(clonedHc);
         clonedHc.tokenInfos[source].balanceNative.isub(amount);
@@ -496,7 +496,7 @@ describe('Health Cache', () => {
       {
         console.log(' - test 0');
         // adjust by usdc
-        const clonedHc = _.cloneDeep(hc);
+        const clonedHc: HealthCache = _.cloneDeep(hc);
         clonedHc.tokenInfos[1].balanceNative.iadd(
           I80F48.fromNumber(100).div(clonedHc.tokenInfos[1].prices.oracle),
         );
@@ -545,7 +545,7 @@ describe('Health Cache', () => {
 
       {
         console.log(' - test 1');
-        const clonedHc = _.cloneDeep(hc);
+        const clonedHc: HealthCache = _.cloneDeep(hc);
         // adjust by usdc
         clonedHc.tokenInfos[0].balanceNative.iadd(
           I80F48.fromNumber(-20).div(clonedHc.tokenInfos[0].prices.oracle),
@@ -594,7 +594,7 @@ describe('Health Cache', () => {
 
       {
         console.log(' - test 2');
-        const clonedHc = _.cloneDeep(hc);
+        const clonedHc: HealthCache = _.cloneDeep(hc);
         // adjust by usdc
         clonedHc.tokenInfos[0].balanceNative.iadd(
           I80F48.fromNumber(-50).div(clonedHc.tokenInfos[0].prices.oracle),
@@ -616,7 +616,7 @@ describe('Health Cache', () => {
 
       {
         console.log(' - test 3');
-        const clonedHc = _.cloneDeep(hc);
+        const clonedHc: HealthCache = _.cloneDeep(hc);
         // adjust by usdc
         clonedHc.tokenInfos[0].balanceNative.iadd(
           I80F48.fromNumber(-30).div(clonedHc.tokenInfos[0].prices.oracle),
@@ -630,7 +630,7 @@ describe('Health Cache', () => {
 
         // swapping with a high ratio advises paying back all liabs
         // and then swapping even more because increasing assets in 0 has better asset weight
-        const initRatio = clonedHc.healthRatio(HealthType.init);
+        const initRatio = clonedHc.healthRatio(HealthType.init).toNumber();
         const [amount, actualRatio] = findMaxSwapActual(
           clonedHc,
           1 as TokenIndex,
@@ -645,7 +645,7 @@ describe('Health Cache', () => {
 
       {
         console.log(' - test 4');
-        const clonedHc = _.cloneDeep(hc);
+        const clonedHc: HealthCache = _.cloneDeep(hc);
         // adjust by usdc
         clonedHc.tokenInfos[0].balanceNative.iadd(
           I80F48.fromNumber(100).div(clonedHc.tokenInfos[0].prices.oracle),
@@ -691,7 +691,7 @@ describe('Health Cache', () => {
 
       {
         console.log(' - test 6');
-        const clonedHc = _.cloneDeep(hc);
+        const clonedHc: HealthCache = _.cloneDeep(hc);
         clonedHc.serum3Infos = [
           new Serum3Info(
             I80F48.fromNumber(30 / 3),
@@ -770,7 +770,7 @@ describe('Health Cache', () => {
       {
         // check starting with negative health but swapping can make it positive
         console.log(' - test 7');
-        const clonedHc = _.cloneDeep(hc);
+        const clonedHc: HealthCache = _.cloneDeep(hc);
 
         // adjust by usdc
         clonedHc.tokenInfos[0].balanceNative.iadd(
@@ -779,7 +779,7 @@ describe('Health Cache', () => {
         clonedHc.tokenInfos[1].balanceNative.iadd(
           I80F48.fromNumber(20).div(clonedHc.tokenInfos[1].prices.oracle),
         );
-        expect(clonedHc.health(HealthType.init) < 0);
+        expect(clonedHc.health(HealthType.init).toNumber() < 0);
 
         for (const priceFactor of [0.9, 1.1]) {
           for (const target of _.range(1, 100, 1)) {
@@ -798,7 +798,7 @@ describe('Health Cache', () => {
       {
         // check starting with negative health but swapping can't make it positive
         console.log(' - test 8');
-        const clonedHc = _.cloneDeep(hc);
+        const clonedHc: HealthCache = _.cloneDeep(hc);
 
         // adjust by usdc
         clonedHc.tokenInfos[0].balanceNative.iadd(
@@ -807,7 +807,7 @@ describe('Health Cache', () => {
         clonedHc.tokenInfos[1].balanceNative.iadd(
           I80F48.fromNumber(10).div(clonedHc.tokenInfos[1].prices.oracle),
         );
-        expect(clonedHc.health(HealthType.init) < 0);
+        expect(clonedHc.health(HealthType.init).toNumber() < 0);
 
         for (const priceFactor of [0.9, 1.1]) {
           for (const target of _.range(1, 100, 1)) {
@@ -826,7 +826,7 @@ describe('Health Cache', () => {
       {
         // swap some assets into a zero-asset-weight token
         console.log(' - test 9');
-        const clonedHc = _.cloneDeep(hc);
+        const clonedHc: HealthCache = _.cloneDeep(hc);
 
         // adjust by usdc
         clonedHc.tokenInfos[0].balanceNative.iadd(
