@@ -1263,9 +1263,15 @@ export class MangoClient {
       limit,
     );
 
+    const ix2 = await this.serum3SettleFundsIx(
+      group,
+      mangoAccount,
+      externalMarketPk,
+    );
+
     return await sendTransaction(
       this.program.provider as AnchorProvider,
-      [ix],
+      [ix, ix2],
       group.addressLookupTablesList,
       {
         postSendTxCallback: this.postSendTxCallback,
