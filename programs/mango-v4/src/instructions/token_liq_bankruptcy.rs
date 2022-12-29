@@ -30,14 +30,14 @@ pub struct TokenLiqBankruptcy<'info> {
         has_one = group
         // liqor_owner is checked at #1
     )]
-    pub liqor: AccountLoaderDynamic<'info, MangoAccount>,
+    pub liqor: AccountLoader<'info, MangoAccountFixed>,
     pub liqor_owner: Signer<'info>,
 
     #[account(
         mut,
         has_one = group
     )]
-    pub liqee: AccountLoaderDynamic<'info, MangoAccount>,
+    pub liqee: AccountLoader<'info, MangoAccountFixed>,
 
     #[account(
         has_one = group,
@@ -81,7 +81,7 @@ pub fn token_liq_bankruptcy(
     let (bank_ais, health_ais) = &ctx.remaining_accounts.split_at(liab_mint_info.num_banks());
     liab_mint_info.verify_banks_ais(bank_ais)?;
 
-    let mut liqor = ctx.accounts.liqor.load_mut()?;
+    let mut liqor = ctx.accounts.liqor.load_full_mut()?;
     // account constraint #1
     require!(
         liqor
@@ -93,7 +93,7 @@ pub fn token_liq_bankruptcy(
 
     let mut account_retriever = ScanningAccountRetriever::new(health_ais, group_pk)?;
 
-    let mut liqee = ctx.accounts.liqee.load_mut()?;
+    let mut liqee = ctx.accounts.liqee.load_full_mut()?;
     let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
         .context("create liqee health cache")?;
     require!(

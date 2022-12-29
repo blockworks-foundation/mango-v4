@@ -12,7 +12,7 @@ pub struct AccountExpand<'info> {
         has_one = group,
         has_one = owner
     )]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -53,7 +53,7 @@ pub fn account_expand(
     realloc_account.realloc(new_space, false)?;
 
     // expand dynamic content, e.g. to grow token positions, we need to slide serum3orders further later, and so on....
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut account = ctx.accounts.account.load_full_mut()?;
     account.expand_dynamic_content(token_count, serum3_count, perp_count, perp_oo_count)?;
 
     Ok(())

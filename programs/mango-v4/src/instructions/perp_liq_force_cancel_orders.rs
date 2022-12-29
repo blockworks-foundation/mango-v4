@@ -10,7 +10,7 @@ pub struct PerpLiqForceCancelOrders<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group)]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
 
     #[account(
         mut,
@@ -29,7 +29,7 @@ pub fn perp_liq_force_cancel_orders(
     ctx: Context<PerpLiqForceCancelOrders>,
     limit: u8,
 ) -> Result<()> {
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut account = ctx.accounts.account.load_full_mut()?;
 
     //
     // Check liqee health if liquidation is allowed

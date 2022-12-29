@@ -12,7 +12,7 @@ pub struct PerpDeactivatePosition<'info> {
         has_one = group
         // owner is checked at #1
     )]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,
 
     #[account(has_one = group)]
@@ -20,7 +20,7 @@ pub struct PerpDeactivatePosition<'info> {
 }
 
 pub fn perp_deactivate_position(ctx: Context<PerpDeactivatePosition>) -> Result<()> {
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut account = ctx.accounts.account.load_full_mut()?;
     // account constraint #1
     require!(
         account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),

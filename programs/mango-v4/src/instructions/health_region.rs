@@ -19,7 +19,7 @@ pub struct HealthRegionBegin<'info> {
     pub instructions: UncheckedAccount<'info>,
 
     #[account(mut)]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
 }
 
 /// Ends a health region.
@@ -28,7 +28,7 @@ pub struct HealthRegionBegin<'info> {
 #[derive(Accounts)]
 pub struct HealthRegionEnd<'info> {
     #[account(mut)]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
 }
 
 pub fn health_region_begin<'key, 'accounts, 'remaining, 'info>(
@@ -69,7 +69,7 @@ pub fn health_region_begin<'key, 'accounts, 'remaining, 'info>(
         );
     }
 
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut account = ctx.accounts.account.load_full_mut()?;
     require_msg!(
         !account.fixed.is_in_health_region(),
         "account must not already be health wrapped"
@@ -91,7 +91,7 @@ pub fn health_region_begin<'key, 'accounts, 'remaining, 'info>(
 pub fn health_region_end<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, HealthRegionEnd<'info>>,
 ) -> Result<()> {
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut account = ctx.accounts.account.load_full_mut()?;
     require_msg!(
         account.fixed.is_in_health_region(),
         "account must be health wrapped"

@@ -18,7 +18,7 @@ pub struct TokenDepositIntoExisting<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group)]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
 
     #[account(
         mut,
@@ -48,7 +48,7 @@ pub struct TokenDeposit<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group, has_one = owner)]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,
 
     #[account(
@@ -76,7 +76,7 @@ pub struct TokenDeposit<'info> {
 
 struct DepositCommon<'a, 'info> {
     pub group: &'a AccountLoader<'info, Group>,
-    pub account: &'a AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: &'a AccountLoader<'info, MangoAccountFixed>,
     pub bank: &'a AccountLoader<'info, Bank>,
     pub vault: &'a Account<'info, TokenAccount>,
     pub oracle: &'a UncheckedAccount<'info>,
@@ -107,7 +107,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         let token_index = self.bank.load()?.token_index;
 
         // Get the account's position for that token index
-        let mut account = self.account.load_mut()?;
+        let mut account = self.account.load_full_mut()?;
 
         let (position, raw_token_index) = account.token_position_mut(token_index)?;
 
@@ -190,7 +190,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
 pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
     {
         let token_index = ctx.accounts.bank.load()?.token_index;
-        let mut account = ctx.accounts.account.load_mut()?;
+        let mut account = ctx.accounts.account.load_full_mut()?;
         account.ensure_token_position(token_index)?;
     }
 
