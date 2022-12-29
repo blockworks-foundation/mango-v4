@@ -14,8 +14,8 @@ Consider setting the git option `submodule.recurse=true`.
 
 ### Deployments
 
-Devnet - 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
-Mainnet-beta - 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
+- devnet: 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
+- mainnet-beta: 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
 
 ### Notes
 
