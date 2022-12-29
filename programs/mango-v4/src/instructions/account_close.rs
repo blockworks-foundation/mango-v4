@@ -14,7 +14,7 @@ pub struct AccountClose<'info> {
         has_one = owner,
         close = sol_destination
     )]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -25,7 +25,7 @@ pub struct AccountClose<'info> {
 }
 
 pub fn account_close(ctx: Context<AccountClose>, force_close: bool) -> Result<()> {
-    let account = ctx.accounts.account.load_mut()?;
+    let account = ctx.accounts.account.load_full_mut()?;
 
     if !ctx.accounts.group.load()?.is_testing() {
         require!(!force_close, MangoError::SomeError);

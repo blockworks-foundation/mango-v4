@@ -13,7 +13,7 @@ pub struct AccountEdit<'info> {
         has_one = group,
         has_one = owner
     )]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,
 }
 
@@ -28,7 +28,7 @@ pub fn account_edit(
         MangoError::SomeError
     );
 
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut account = ctx.accounts.account.load_full_mut()?;
 
     // note: unchanged fields are inline, and match exact definition in create_account
     // please maintain, and don't remove, makes it easy to reason about which support modification by owner

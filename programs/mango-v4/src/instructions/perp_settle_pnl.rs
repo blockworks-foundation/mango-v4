@@ -7,8 +7,7 @@ use crate::error::*;
 use crate::health::{new_health_cache, HealthType, ScanningAccountRetriever};
 use crate::logs::{emit_perp_balances, PerpSettlePnlLog, TokenBalanceLog};
 use crate::state::Bank;
-use crate::state::MangoAccount;
-use crate::state::{AccountLoaderDynamic, Group, PerpMarket};
+use crate::state::{Group, MangoAccountFixed, MangoAccountLoader, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpSettlePnl<'info> {
@@ -19,7 +18,7 @@ pub struct PerpSettlePnl<'info> {
         has_one = group,
         // settler_owner is checked at #1
     )]
-    pub settler: AccountLoaderDynamic<'info, MangoAccount>,
+    pub settler: AccountLoader<'info, MangoAccountFixed>,
     pub settler_owner: Signer<'info>,
 
     #[account(has_one = group, has_one = oracle)]
@@ -27,10 +26,10 @@ pub struct PerpSettlePnl<'info> {
 
     // This account MUST be profitable
     #[account(mut, has_one = group)]
-    pub account_a: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account_a: AccountLoader<'info, MangoAccountFixed>,
     // This account MUST have a loss
     #[account(mut, has_one = group)]
-    pub account_b: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account_b: AccountLoader<'info, MangoAccountFixed>,
 
     /// CHECK: Oracle can have different account types, constrained by address in perp_market
     pub oracle: UncheckedAccount<'info>,
@@ -58,8 +57,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         )
     };
 
-    let mut account_a = ctx.accounts.account_a.load_mut()?;
-    let mut account_b = ctx.accounts.account_b.load_mut()?;
+    let mut account_a = ctx.accounts.account_a.load_full_mut()?;
+    let mut account_b = ctx.accounts.account_b.load_full_mut()?;
 
     // check positions exist, for nicer error messages
     {
@@ -223,7 +222,7 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     drop(account_a);
     drop(account_b);
 
-    let mut settler = ctx.accounts.settler.load_mut()?;
+    let mut settler = ctx.accounts.settler.load_full_mut()?;
     // account constraint #1
     require!(
         settler

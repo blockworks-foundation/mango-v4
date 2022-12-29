@@ -20,14 +20,14 @@ pub struct TokenLiqWithToken<'info> {
         has_one = group
         // liqor_owner is checked at #1
     )]
-    pub liqor: AccountLoaderDynamic<'info, MangoAccount>,
+    pub liqor: AccountLoader<'info, MangoAccountFixed>,
     pub liqor_owner: Signer<'info>,
 
     #[account(
         mut,
         has_one = group
     )]
-    pub liqee: AccountLoaderDynamic<'info, MangoAccount>,
+    pub liqee: AccountLoader<'info, MangoAccountFixed>,
 }
 
 pub fn token_liq_with_token(
@@ -42,7 +42,7 @@ pub fn token_liq_with_token(
     let mut account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, group_pk)
         .context("create account retriever")?;
 
-    let mut liqor = ctx.accounts.liqor.load_mut()?;
+    let mut liqor = ctx.accounts.liqor.load_full_mut()?;
     // account constraint #1
     require!(
         liqor
@@ -52,7 +52,7 @@ pub fn token_liq_with_token(
     );
     require!(!liqor.fixed.being_liquidated(), MangoError::BeingLiquidated);
 
-    let mut liqee = ctx.accounts.liqee.load_mut()?;
+    let mut liqee = ctx.accounts.liqee.load_full_mut()?;
 
     // Initial liqee health check
     let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)

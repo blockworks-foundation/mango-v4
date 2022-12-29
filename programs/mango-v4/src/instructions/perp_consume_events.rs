@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use bytemuck::cast_ref;
 
 use crate::error::MangoError;
-use crate::state::{AccountLoaderDynamic, EventQueue, MangoAccount};
+use crate::state::{EventQueue, MangoAccountFixed, MangoAccountLoader};
 use crate::state::{EventType, FillEvent, Group, OutEvent, PerpMarket};
 
 use crate::logs::{emit_perp_balances, FillLog};
@@ -55,9 +55,9 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                 continue;
                             }
 
-                            let mal: AccountLoaderDynamic<MangoAccount> =
-                                AccountLoaderDynamic::try_from(ai)?;
-                            let mut ma = mal.load_mut()?;
+                            let mal: AccountLoader<MangoAccountFixed> =
+                                AccountLoader::try_from(ai)?;
+                            let mut ma = mal.load_full_mut()?;
                             ma.execute_perp_maker(
                                 perp_market.perp_market_index,
                                 &mut perp_market,
@@ -90,9 +90,9 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                 continue;
                             }
 
-                            let mal: AccountLoaderDynamic<MangoAccount> =
-                                AccountLoaderDynamic::try_from(ai)?;
-                            let mut maker = mal.load_mut()?;
+                            let mal: AccountLoader<MangoAccountFixed> =
+                                AccountLoader::try_from(ai)?;
+                            let mut maker = mal.load_full_mut()?;
 
                             match mango_account_ais.iter().find(|ai| ai.key == &fill.taker) {
                                 None => {
@@ -106,9 +106,9 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                                         continue;
                                     }
 
-                                    let mal: AccountLoaderDynamic<MangoAccount> =
-                                        AccountLoaderDynamic::try_from(ai)?;
-                                    let mut taker = mal.load_mut()?;
+                                    let mal: AccountLoader<MangoAccountFixed> =
+                                        AccountLoader::try_from(ai)?;
+                                    let mut taker = mal.load_full_mut()?;
 
                                     maker.execute_perp_maker(
                                         perp_market.perp_market_index,
@@ -174,9 +174,8 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                             continue;
                         }
 
-                        let mal: AccountLoaderDynamic<MangoAccount> =
-                            AccountLoaderDynamic::try_from(ai)?;
-                        let mut ma = mal.load_mut()?;
+                        let mal: AccountLoader<MangoAccountFixed> = AccountLoader::try_from(ai)?;
+                        let mut ma = mal.load_full_mut()?;
 
                         ma.remove_perp_order(out.owner_slot as usize, out.quantity)?;
                     }

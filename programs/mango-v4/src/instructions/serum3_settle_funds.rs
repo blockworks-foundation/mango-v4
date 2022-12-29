@@ -20,7 +20,7 @@ pub struct Serum3SettleFunds<'info> {
         has_one = group
         // owner is checked at #1
     )]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -76,7 +76,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     // Validation
     //
     {
-        let account = ctx.accounts.account.load()?;
+        let account = ctx.accounts.account.load_full()?;
         // account constraint #1
         require!(
             account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
@@ -119,7 +119,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
     {
         let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
         let before_oo = OpenOrdersSlim::from_oo(&open_orders);
-        let mut account = ctx.accounts.account.load_mut()?;
+        let mut account = ctx.accounts.account.load_full_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
         charge_loan_origination_fees(
@@ -155,7 +155,7 @@ pub fn serum3_settle_funds(ctx: Context<Serum3SettleFunds>) -> Result<()> {
         require_gte!(after_quote_vault, before_quote_vault);
 
         // Credit the difference in vault balances to the user's account
-        let mut account = ctx.accounts.account.load_mut()?;
+        let mut account = ctx.accounts.account.load_full_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
         apply_vault_difference(

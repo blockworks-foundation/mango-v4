@@ -16,7 +16,7 @@ pub struct AccountCreate<'info> {
         payer = payer,
         space = MangoAccount::space(token_count, serum3_count, perp_count, perp_oo_count)?,
     )]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -34,7 +34,7 @@ pub fn account_create(
     perp_oo_count: u8,
     name: String,
 ) -> Result<()> {
-    let mut account = ctx.accounts.account.load_init()?;
+    let mut account = ctx.accounts.account.load_full_init()?;
 
     msg!(
         "Initialized account with header version {}",
