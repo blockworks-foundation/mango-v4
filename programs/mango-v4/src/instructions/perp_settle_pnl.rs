@@ -126,19 +126,27 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     a_perp_position.update_settle_limit(&perp_market, now_ts);
     b_perp_position.update_settle_limit(&perp_market, now_ts);
     let a_settleable_pnl = a_perp_position.apply_pnl_settle_limit(a_pnl, &perp_market);
+    let b_settleable_pnl = b_perp_position.apply_pnl_settle_limit(b_pnl, &perp_market);
 
     require!(
         a_settleable_pnl.is_positive(),
         MangoError::ProfitabilityMismatch
     );
+    require!(
+        b_settleable_pnl.is_negative(),
+        MangoError::ProfitabilityMismatch
+    );
 
     // Settle for the maximum possible capped to b's settle health
-    let settlement = a_settleable_pnl.abs().min(b_pnl.abs()).min(b_settle_health);
+    let settlement = a_settleable_pnl
+        .abs()
+        .min(b_settleable_pnl.abs())
+        .min(b_settle_health);
     require!(settlement >= 0, MangoError::SettlementAmountMustBePositive);
 
     // Settle
-    a_perp_position.record_settle(settlement);
-    b_perp_position.record_settle(-settlement);
+    a_perp_position.record_settle(a_pnl, settlement);
+    b_perp_position.record_settle(b_pnl, -settlement);
 
     emit_perp_balances(
         ctx.accounts.group.key(),

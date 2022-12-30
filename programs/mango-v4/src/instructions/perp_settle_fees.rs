@@ -72,12 +72,20 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         MangoError::ProfitabilityMismatch
     );
 
+    let settleable_pnl = perp_position.apply_pnl_settle_limit(pnl, &perp_market);
+    require!(
+        settleable_pnl.is_negative(),
+        MangoError::ProfitabilityMismatch
+    );
+
     // Settle for the maximum possible capped to max_settle_amount
-    let settlement = pnl
+    let settlement = settleable_pnl
         .abs()
         .min(perp_market.fees_accrued.abs())
         .min(I80F48::from(max_settle_amount));
-    perp_position.record_settle(-settlement); // settle the negative pnl on the user perp position
+    require!(settlement >= 0, MangoError::SettlementAmountMustBePositive);
+
+    perp_position.record_settle(pnl, -settlement); // settle the negative pnl on the user perp position
     perp_market.fees_accrued = cm!(perp_market.fees_accrued - settlement);
 
     emit_perp_balances(
