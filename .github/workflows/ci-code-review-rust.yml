@@ -59,7 +59,7 @@ jobs:
         run: cargo fmt -- --check
 
       - name: Run clippy
-        run: cargo clippy -- --deny=warnings --allow=clippy::style --allow=clippy::complexity
+        run: cargo clippy --no-deps -- --deny=warnings --allow=clippy::style --allow=clippy::complexity
 
   tests:
     name: Run tests

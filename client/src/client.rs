@@ -220,7 +220,9 @@ impl MangoClient {
         owner: Keypair,
     ) -> anyhow::Result<Self> {
         let rpc = client.rpc_async();
-        let account_fetcher = Arc::new(CachedAccountFetcher::new(RpcAccountFetcher { rpc }));
+        let account_fetcher = Arc::new(CachedAccountFetcher::new(Arc::new(RpcAccountFetcher {
+            rpc,
+        })));
         let mango_account =
             account_fetcher_fetch_mango_account(&*account_fetcher, &account).await?;
         let group = mango_account.fixed.group;

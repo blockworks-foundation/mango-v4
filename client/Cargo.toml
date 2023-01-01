@@ -11,6 +11,7 @@ anchor-client = { path = "../anchor/client" }
 anchor-lang = { path = "../anchor/lang" }
 anchor-spl = { path = "../anchor/spl" }
 anyhow = "1.0"
+async-once-cell = { version = "0.4.2", features = ["unpin"] }
 async-trait = "0.1.52"
 fixed = { version = "=1.11.0", features = ["serde", "borsh"] }
 fixed-macro = "^1.1.1"
