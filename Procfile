@@ -1,0 +1,1 @@
+mm: npx ts-node ./ts/client/src/scripts/market-maker.ts
