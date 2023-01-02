@@ -88,10 +88,25 @@ export class MangoClient {
     Error.stackTraceLimit = 1000;
   }
 
-  /// public
+  /// Transactions
+  private async sendAndConfirmTransaction(
+    ixs: TransactionInstruction[],
+    alts: AddressLookupTableAccount[],
+    opts: any = {},
+  ): Promise<string> {
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      ixs,
+      alts,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+        prioritizationFee: this.prioritizationFee,
+        ...opts,
+      },
+    );
+  }
 
   // Group
-
   public async groupCreate(
     groupNum: number,
     testing: boolean,
@@ -390,13 +405,9 @@ export class MangoClient {
       )
       .instruction();
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       [...preInstructions, ix],
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 
@@ -570,13 +581,9 @@ export class MangoClient {
       })
       .instruction();
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       [ix],
-      [],
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
+      group.addressLookupTablesList,
     );
   }
 
@@ -640,13 +647,9 @@ export class MangoClient {
       })
       .instruction();
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       [ix],
-      [],
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
+      group.addressLookupTablesList,
     );
   }
 
@@ -788,13 +791,9 @@ export class MangoClient {
       })
       .instruction();
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       [ix],
-      [],
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
+      group.addressLookupTablesList,
     );
   }
 
@@ -888,14 +887,10 @@ export class MangoClient {
       )
       .instruction();
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       [...preInstructions, ix, ...postInstructions],
       group.addressLookupTablesList,
-      {
-        additionalSigners,
-        postSendTxCallback: this.postSendTxCallback,
-      },
+      { additionalSigners },
     );
   }
 
@@ -978,13 +973,9 @@ export class MangoClient {
       )
       .instruction();
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       [...preInstructions, ix, ...postInstructions],
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 
@@ -1263,13 +1254,15 @@ export class MangoClient {
       limit,
     );
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
-      [ix],
+    const ix2 = await this.serum3SettleFundsIx(
+      group,
+      mangoAccount,
+      externalMarketPk,
+    );
+
+    return await this.sendAndConfirmTransaction(
+      [ix, ix2],
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 
@@ -1304,13 +1297,9 @@ export class MangoClient {
       })
       .instruction();
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       [ix],
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 
@@ -1371,13 +1360,9 @@ export class MangoClient {
       externalMarketPk,
     );
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       [ix],
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 
@@ -1433,13 +1418,9 @@ export class MangoClient {
       this.serum3SettleFundsIx(group, mangoAccount, externalMarketPk),
     ]);
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       ixes,
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 
@@ -1715,28 +1696,24 @@ export class MangoClient {
     expiryTimestamp?: number,
     limit?: number,
   ): Promise<TransactionSignature> {
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
-      [
-        await this.perpPlaceOrderIx(
-          group,
-          mangoAccount,
-          perpMarketIndex,
-          side,
-          price,
-          quantity,
-          maxQuoteQuantity,
-          clientOrderId,
-          orderType,
-          reduceOnly,
-          expiryTimestamp,
-          limit,
-        ),
-      ],
+    const ix = await this.perpPlaceOrderIx(
+      group,
+      mangoAccount,
+      perpMarketIndex,
+      side,
+      price,
+      quantity,
+      maxQuoteQuantity,
+      clientOrderId,
+      orderType,
+      reduceOnly,
+      expiryTimestamp,
+      limit,
+    );
+
+    return await this.sendAndConfirmTransaction(
+      [ix],
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 
@@ -1812,29 +1789,25 @@ export class MangoClient {
     expiryTimestamp?: number,
     limit?: number,
   ): Promise<TransactionSignature> {
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
-      [
-        await this.perpPlaceOrderPeggedIx(
-          group,
-          mangoAccount,
-          perpMarketIndex,
-          side,
-          priceOffset,
-          pegLimit,
-          quantity,
-          maxQuoteQuantity,
-          clientOrderId,
-          orderType,
-          reduceOnly,
-          expiryTimestamp,
-          limit,
-        ),
-      ],
+    const ix = await this.perpPlaceOrderPeggedIx(
+      group,
+      mangoAccount,
+      perpMarketIndex,
+      side,
+      priceOffset,
+      pegLimit,
+      quantity,
+      maxQuoteQuantity,
+      clientOrderId,
+      orderType,
+      reduceOnly,
+      expiryTimestamp,
+      limit,
+    );
+
+    return await this.sendAndConfirmTransaction(
+      [ix],
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 
@@ -1924,20 +1897,16 @@ export class MangoClient {
     perpMarketIndex: PerpMarketIndex,
     orderId: BN,
   ): Promise<TransactionSignature> {
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
-      [
-        await this.perpCancelOrderIx(
-          group,
-          mangoAccount,
-          perpMarketIndex,
-          orderId,
-        ),
-      ],
+    const ix = await this.perpCancelOrderIx(
+      group,
+      mangoAccount,
+      perpMarketIndex,
+      orderId,
+    );
+
+    return await this.sendAndConfirmTransaction(
+      [ix],
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 
@@ -1947,20 +1916,16 @@ export class MangoClient {
     perpMarketIndex: PerpMarketIndex,
     limit: number,
   ): Promise<TransactionSignature> {
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
-      [
-        await this.perpCancelAllOrdersIx(
-          group,
-          mangoAccount,
-          perpMarketIndex,
-          limit,
-        ),
-      ],
+    const ix = await this.perpCancelAllOrdersIx(
+      group,
+      mangoAccount,
+      perpMarketIndex,
+      limit,
+    );
+
+    return await this.sendAndConfirmTransaction(
+      [ix],
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 
@@ -2023,13 +1988,9 @@ export class MangoClient {
       )
       .instruction();
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       [ix],
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 
@@ -2067,13 +2028,9 @@ export class MangoClient {
       )
       .instruction();
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       [ix],
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 
@@ -2292,8 +2249,7 @@ export class MangoClient {
       ])
       .instruction();
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       [
         ...preInstructions,
         flashLoanBeginIx,
@@ -2301,9 +2257,6 @@ export class MangoClient {
         flashLoanEndIx,
       ],
       [...group.addressLookupTablesList, ...userDefinedAlts],
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 
@@ -2379,13 +2332,9 @@ export class MangoClient {
       .remainingAccounts(parsedHealthAccounts)
       .instruction();
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       [ix],
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 
@@ -2403,13 +2352,9 @@ export class MangoClient {
       })
       .instruction();
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       [ix],
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 
@@ -2727,13 +2672,9 @@ export class MangoClient {
     ]);
     transactionInstructions.push(cancelOrderIx, placeOrderIx);
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       transactionInstructions,
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
   public async modifySerum3Order(
@@ -2774,13 +2715,9 @@ export class MangoClient {
     ]);
     transactionInstructions.push(cancelOrderIx, settleIx, placeOrderIx);
 
-    return await sendTransaction(
-      this.program.provider as AnchorProvider,
+    return await this.sendAndConfirmTransaction(
       transactionInstructions,
       group.addressLookupTablesList,
-      {
-        postSendTxCallback: this.postSendTxCallback,
-      },
     );
   }
 }
