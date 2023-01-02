@@ -1,1 +1,1 @@
-mm: npx ts-node ./ts/client/src/scripts/market-maker.ts
+mm: npx ts-node ./ts/client/src/scripts/mm/market-maker.ts
