@@ -105,6 +105,7 @@ async fn test_basic() -> Result<(), TransportError> {
             solana,
             TokenDepositInstruction {
                 amount: deposit_amount,
+                reduce_only: false,
                 account,
                 owner,
                 token_account: payer_mint0_account,

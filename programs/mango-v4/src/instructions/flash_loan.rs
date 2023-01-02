@@ -377,6 +377,10 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     let mut token_loan_details = Vec::with_capacity(changes.len());
     for (change, oracle_price) in changes.iter().zip(oracle_prices.iter()) {
         let mut bank = health_ais[change.bank_index].load_mut::<Bank>()?;
+        if change.amount.abs() > 0 {
+            require!(!bank.is_reduce_only(), MangoError::SomeError);
+        }
+
         let position = account.token_position_mut_by_raw_index(change.raw_token_index);
         let native = position.native(&bank);
         let approved_amount = I80F48::from(bank.flash_loan_approved_amount);

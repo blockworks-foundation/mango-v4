@@ -146,6 +146,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
             solana,
             TokenDepositInstruction {
                 amount: 10,
+                reduce_only: false,
                 account,
                 owner,
                 token_account: payer_mint_accounts[0],
@@ -262,6 +263,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
             solana,
             TokenDepositInstruction {
                 amount: 10,
+                reduce_only: false,
                 account,
                 owner,
                 token_account: payer_mint_accounts[0],

@@ -302,7 +302,12 @@ impl MangoClient {
             )
     }
 
-    pub async fn token_deposit(&self, mint: Pubkey, amount: u64) -> anyhow::Result<Signature> {
+    pub async fn token_deposit(
+        &self,
+        mint: Pubkey,
+        amount: u64,
+        reduce_only: bool,
+    ) -> anyhow::Result<Signature> {
         let token = self.context.token_by_mint(&mint)?;
         let token_index = token.token_index;
         let mint_info = token.mint_info;
@@ -333,6 +338,7 @@ impl MangoClient {
             },
             data: anchor_lang::InstructionData::data(&mango_v4::instruction::TokenDeposit {
                 amount,
+                reduce_only,
             }),
         };
         self.send_and_confirm_owner_tx(vec![ix]).await

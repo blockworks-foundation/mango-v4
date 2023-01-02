@@ -100,20 +100,38 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         &self,
         remaining_accounts: &[AccountInfo],
         amount: u64,
+        reduce_only: bool,
         allow_token_account_closure: bool,
     ) -> Result<()> {
         require_msg!(amount > 0, "deposit amount must be positive");
 
-        let token_index = self.bank.load()?.token_index;
+        let mut bank = self.bank.load_mut()?;
+        let token_index = bank.token_index;
 
-        // Get the account's position for that token index
+        let (amount_i80f48, token_index) = {
+            // Get the account's position for that token index
+            let account = self.account.load()?;
+            let position = account.token_position(token_index)?;
+
+            if bank.is_reduce_only() {
+                require!(reduce_only, MangoError::SomeError);
+            }
+            let amount_i80f48 = if reduce_only {
+                position
+                    .native(&bank)
+                    .min(I80F48::ZERO)
+                    .abs()
+                    .min(I80F48::from(amount))
+            } else {
+                I80F48::from(amount)
+            };
+            (amount_i80f48, token_index)
+        };
+
         let mut account = self.account.load_mut()?;
-
         let (position, raw_token_index) = account.token_position_mut(token_index)?;
 
-        let amount_i80f48 = I80F48::from(amount);
         let position_is_active = {
-            let mut bank = self.bank.load_mut()?;
             bank.deposit(
                 position,
                 amount_i80f48,
@@ -122,10 +140,12 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         };
 
         // Transfer the actual tokens
-        token::transfer(self.transfer_ctx(), amount)?;
+        token::transfer(
+            self.transfer_ctx(),
+            amount_i80f48.round_to_zero().to_num::<u64>(),
+        )?;
 
         let indexed_position = position.indexed_position;
-        let bank = self.bank.load()?;
         let oracle_price = bank.oracle_price(
             &AccountInfoRef::borrow(self.oracle.as_ref())?,
             None, // staleness checked in health
@@ -143,6 +163,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             deposit_index: bank.deposit_index.to_bits(),
             borrow_index: bank.borrow_index.to_bits(),
         });
+        drop(bank);
 
         //
         // Health computation
@@ -187,7 +208,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
     }
 }
 
-pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
+pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64, reduce_only: bool) -> Result<()> {
     {
         let token_index = ctx.accounts.bank.load()?.token_index;
         let mut account = ctx.accounts.account.load_mut()?;
@@ -204,12 +225,13 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
         token_authority: &ctx.accounts.token_authority,
         token_program: &ctx.accounts.token_program,
     }
-    .deposit_into_existing(ctx.remaining_accounts, amount, true)
+    .deposit_into_existing(ctx.remaining_accounts, amount, reduce_only, true)
 }
 
 pub fn token_deposit_into_existing(
     ctx: Context<TokenDepositIntoExisting>,
     amount: u64,
+    reduce_only: bool,
 ) -> Result<()> {
     DepositCommon {
         group: &ctx.accounts.group,
@@ -221,5 +243,5 @@ pub fn token_deposit_into_existing(
         token_authority: &ctx.accounts.token_authority,
         token_program: &ctx.accounts.token_program,
     }
-    .deposit_into_existing(ctx.remaining_accounts, amount, false)
+    .deposit_into_existing(ctx.remaining_accounts, amount, reduce_only, false)
 }

@@ -89,7 +89,8 @@ pub fn serum3_register_market(
         padding1: Default::default(),
         padding2: Default::default(),
         registration_time: Clock::get()?.unix_timestamp.try_into().unwrap(),
-        reserved: [0; 128],
+        reduce_only: 0,
+        reserved: [0; 127],
     };
 
     let mut serum_index_reservation = ctx.accounts.index_reservation.load_init()?;

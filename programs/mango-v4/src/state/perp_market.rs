@@ -105,7 +105,9 @@ pub struct PerpMarket {
     /// Window size in seconds for the perp settlement limit
     pub settle_pnl_limit_window_size_ts: u64,
 
-    pub reserved: [u8; 1944],
+    pub reduce_only: u8,
+
+    pub reserved: [u8; 1943],
 }
 
 const_assert_eq!(
@@ -138,7 +140,8 @@ const_assert_eq!(
         + 4 * 3
         + 8
         + 8
-        + 1944
+        + 1
+        + 1943
 );
 const_assert_eq!(size_of::<PerpMarket>(), 2808);
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
@@ -148,6 +151,10 @@ impl PerpMarket {
         std::str::from_utf8(&self.name)
             .unwrap()
             .trim_matches(char::from(0))
+    }
+
+    pub fn is_reduce_only(&self) -> bool {
+        self.reduce_only == 1
     }
 
     pub fn elligible_for_group_insurance_fund(&self) -> bool {
@@ -306,6 +313,8 @@ impl PerpMarket {
             perp_market_index: 0,
             trusted_market: 0,
             group_insurance_fund: 0,
+            bump: 0,
+            base_decimals: 0,
             name: Default::default(),
             bids: Pubkey::new_unique(),
             asks: Pubkey::new_unique(),
@@ -325,8 +334,6 @@ impl PerpMarket {
             init_liab_weight: I80F48::from(1),
             open_interest: 0,
             seq_num: 0,
-            bump: 0,
-            base_decimals: 0,
             registration_time: 0,
             min_funding: I80F48::ZERO,
             max_funding: I80F48::ZERO,
@@ -343,10 +350,11 @@ impl PerpMarket {
             settle_fee_flat: 0.0,
             settle_fee_amount_threshold: 0.0,
             settle_fee_fraction_low_health: 0.0,
-            padding3: Default::default(),
             settle_pnl_limit_factor: 0.2,
+            padding3: Default::default(),
             settle_pnl_limit_window_size_ts: 24 * 60 * 60,
-            reserved: [0; 1944],
+            reduce_only: 0,
+            reserved: [0; 1943],
         }
     }
 }

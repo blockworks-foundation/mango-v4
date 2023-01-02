@@ -95,6 +95,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
         solana,
         TokenDepositInstruction {
             amount: 1,
+            reduce_only: false,
             account,
             owner,
             token_account: payer_mint_accounts[1],
@@ -610,6 +611,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
         solana,
         TokenDepositInstruction {
             amount: 1,
+            reduce_only: false,
             account: account_1,
             owner,
             token_account: payer_mint_accounts[1],

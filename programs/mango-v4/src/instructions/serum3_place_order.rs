@@ -212,6 +212,7 @@ pub fn serum3_place_order(
     limit: u16,
 ) -> Result<()> {
     let serum_market = ctx.accounts.serum_market.load()?;
+    require!(!serum_market.is_reduce_only(), MangoError::SomeError);
 
     //
     // Validation

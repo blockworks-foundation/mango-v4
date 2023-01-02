@@ -617,7 +617,7 @@ impl ClientInstruction for TokenWithdrawInstruction {
 
 pub struct TokenDepositInstruction {
     pub amount: u64,
-
+    pub reduce_only: bool,
     pub account: Pubkey,
     pub owner: TestKeypair,
     pub token_account: Pubkey,
@@ -635,6 +635,7 @@ impl ClientInstruction for TokenDepositInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             amount: self.amount,
+            reduce_only: self.reduce_only,
         };
 
         // load account so we know its mint
@@ -688,7 +689,7 @@ impl ClientInstruction for TokenDepositInstruction {
 
 pub struct TokenDepositIntoExistingInstruction {
     pub amount: u64,
-
+    pub reduce_only: bool,
     pub account: Pubkey,
     pub token_account: Pubkey,
     pub token_authority: TestKeypair,
@@ -705,6 +706,7 @@ impl ClientInstruction for TokenDepositIntoExistingInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             amount: self.amount,
+            reduce_only: self.reduce_only,
         };
 
         // load account so we know its mint
@@ -1083,6 +1085,7 @@ impl ClientInstruction for TokenResetStablePriceModel {
             deposit_weight_scale_start_quote_opt: None,
             reset_stable_price: true,
             reset_net_borrow_limit: false,
+            reduce_only_opt: None,
         };
 
         let accounts = Self::Accounts {
@@ -1160,6 +1163,7 @@ impl ClientInstruction for TokenResetNetBorrows {
             deposit_weight_scale_start_quote_opt: None,
             reset_stable_price: false,
             reset_net_borrow_limit: true,
+            reduce_only_opt: None,
         };
 
         let accounts = Self::Accounts {
@@ -2570,6 +2574,7 @@ impl ClientInstruction for PerpResetStablePriceModel {
             stable_price_growth_limit_opt: None,
             settle_pnl_limit_factor_opt: None,
             settle_pnl_limit_window_size_ts: None,
+            reduce_only_opt: None,
         };
 
         let accounts = Self::Accounts {

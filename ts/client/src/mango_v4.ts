@@ -644,6 +644,12 @@ export type MangoV4 = {
         {
           "name": "resetNetBorrowLimit",
           "type": "bool"
+        },
+        {
+          "name": "reduceOnlyOpt",
+          "type": {
+            "option": "bool"
+          }
         }
       ]
     },
@@ -1200,6 +1206,10 @@ export type MangoV4 = {
         {
           "name": "amount",
           "type": "u64"
+        },
+        {
+          "name": "reduceOnly",
+          "type": "bool"
         }
       ]
     },
@@ -1251,6 +1261,10 @@ export type MangoV4 = {
         {
           "name": "amount",
           "type": "u64"
+        },
+        {
+          "name": "reduceOnly",
+          "type": "bool"
         }
       ]
     },
@@ -1508,6 +1522,34 @@ export type MangoV4 = {
         {
           "name": "name",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "serum3EditMarket",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "market",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "reduceOnlyOpt",
+          "type": {
+            "option": "bool"
+          }
         }
       ]
     },
@@ -2660,6 +2702,12 @@ export type MangoV4 = {
           "type": {
             "option": "u64"
           }
+        },
+        {
+          "name": "reduceOnlyOpt",
+          "type": {
+            "option": "bool"
+          }
         }
       ]
     },
@@ -3737,11 +3785,15 @@ export type MangoV4 = {
             "type": "f64"
           },
           {
+            "name": "reduceOnly",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2120
+                2119
               ]
             }
           }
@@ -4431,11 +4483,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "reduceOnly",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1944
+                1943
               ]
             }
           }
@@ -4507,11 +4563,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "reduceOnly",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                127
               ]
             }
           }
@@ -7403,6 +7463,11 @@ export type MangoV4 = {
       "code": 6028,
       "name": "TokenPositionDoesNotExist",
       "msg": "token position does not exist"
+    },
+    {
+      "code": 6029,
+      "name": "DepositsIntoLiquidatingMustRecover",
+      "msg": "token deposits into accounts that are being liquidated must bring their health above the init threshold"
     }
   ]
 };
@@ -8053,6 +8118,12 @@ export const IDL: MangoV4 = {
         {
           "name": "resetNetBorrowLimit",
           "type": "bool"
+        },
+        {
+          "name": "reduceOnlyOpt",
+          "type": {
+            "option": "bool"
+          }
         }
       ]
     },
@@ -8609,6 +8680,10 @@ export const IDL: MangoV4 = {
         {
           "name": "amount",
           "type": "u64"
+        },
+        {
+          "name": "reduceOnly",
+          "type": "bool"
         }
       ]
     },
@@ -8660,6 +8735,10 @@ export const IDL: MangoV4 = {
         {
           "name": "amount",
           "type": "u64"
+        },
+        {
+          "name": "reduceOnly",
+          "type": "bool"
         }
       ]
     },
@@ -8917,6 +8996,34 @@ export const IDL: MangoV4 = {
         {
           "name": "name",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "serum3EditMarket",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "market",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "reduceOnlyOpt",
+          "type": {
+            "option": "bool"
+          }
         }
       ]
     },
@@ -10069,6 +10176,12 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u64"
           }
+        },
+        {
+          "name": "reduceOnlyOpt",
+          "type": {
+            "option": "bool"
+          }
         }
       ]
     },
@@ -11146,11 +11259,15 @@ export const IDL: MangoV4 = {
             "type": "f64"
           },
           {
+            "name": "reduceOnly",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2120
+                2119
               ]
             }
           }
@@ -11840,11 +11957,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "reduceOnly",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1944
+                1943
               ]
             }
           }
@@ -11916,11 +12037,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "reduceOnly",
+            "type": "u8"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                127
               ]
             }
           }
@@ -14812,6 +14937,11 @@ export const IDL: MangoV4 = {
       "code": 6028,
       "name": "TokenPositionDoesNotExist",
       "msg": "token position does not exist"
+    },
+    {
+      "code": 6029,
+      "name": "DepositsIntoLiquidatingMustRecover",
+      "msg": "token deposits into accounts that are being liquidated must bring their health above the init threshold"
     }
   ]
 };

@@ -28,11 +28,13 @@ pub struct Serum3Market {
 
     pub registration_time: u64,
 
-    pub reserved: [u8; 128],
+    pub reduce_only: u8,
+
+    pub reserved: [u8; 127],
 }
 const_assert_eq!(
     size_of::<Serum3Market>(),
-    32 + 2 + 2 + 4 + 16 + 2 * 32 + 2 + 1 + 5 + 8 + 128
+    32 + 2 + 2 + 4 + 16 + 2 * 32 + 2 + 1 + 5 + 8 + 1 + 127
 );
 const_assert_eq!(size_of::<Serum3Market>(), 264);
 const_assert_eq!(size_of::<Serum3Market>() % 8, 0);
@@ -42,6 +44,10 @@ impl Serum3Market {
         std::str::from_utf8(&self.name)
             .unwrap()
             .trim_matches(char::from(0))
+    }
+
+    pub fn is_reduce_only(&self) -> bool {
+        self.reduce_only == 1
     }
 }
 

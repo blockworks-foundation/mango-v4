@@ -130,6 +130,7 @@ pub mod mango_v4 {
         deposit_weight_scale_start_quote_opt: Option<f64>,
         reset_stable_price: bool,
         reset_net_borrow_limit: bool,
+        reduce_only_opt: Option<bool>,
     ) -> Result<()> {
         instructions::token_edit(
             ctx,
@@ -154,6 +155,7 @@ pub mod mango_v4 {
             deposit_weight_scale_start_quote_opt,
             reset_stable_price,
             reset_net_borrow_limit,
+            reduce_only_opt,
         )
     }
 
@@ -235,15 +237,16 @@ pub mod mango_v4 {
         instructions::stub_oracle_set(ctx, price)
     }
 
-    pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64) -> Result<()> {
-        instructions::token_deposit(ctx, amount)
+    pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64, reduce_only: bool) -> Result<()> {
+        instructions::token_deposit(ctx, amount, reduce_only)
     }
 
     pub fn token_deposit_into_existing(
         ctx: Context<TokenDepositIntoExisting>,
         amount: u64,
+        reduce_only: bool,
     ) -> Result<()> {
-        instructions::token_deposit_into_existing(ctx, amount)
+        instructions::token_deposit_into_existing(ctx, amount, reduce_only)
     }
 
     pub fn token_withdraw(
@@ -290,6 +293,13 @@ pub mod mango_v4 {
         name: String,
     ) -> Result<()> {
         instructions::serum3_register_market(ctx, market_index, name)
+    }
+
+    pub fn serum3_edit_market(
+        ctx: Context<Serum3EditMarket>,
+        reduce_only_opt: Option<bool>,
+    ) -> Result<()> {
+        instructions::serum3_edit_market(ctx, reduce_only_opt)
     }
 
     // note:
@@ -491,6 +501,7 @@ pub mod mango_v4 {
         stable_price_growth_limit_opt: Option<f32>,
         settle_pnl_limit_factor_opt: Option<f32>,
         settle_pnl_limit_window_size_ts: Option<u64>,
+        reduce_only_opt: Option<bool>,
     ) -> Result<()> {
         instructions::perp_edit_market(
             ctx,
@@ -518,6 +529,7 @@ pub mod mango_v4 {
             stable_price_growth_limit_opt,
             settle_pnl_limit_factor_opt,
             settle_pnl_limit_window_size_ts,
+            reduce_only_opt,
         )
     }
 
