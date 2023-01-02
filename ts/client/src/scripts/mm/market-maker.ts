@@ -28,6 +28,7 @@ import {
   makeInitSequenceEnforcerAccountIx,
   seqEnforcerProgramIds,
 } from './sequence-enforcer-util';
+import * as defaultParams from './params/default.json';
 
 // Future
 // * use async nodejs logging
@@ -229,7 +230,11 @@ async function fullMarketMaker() {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(CLUSTER_URL!, options);
   const user = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(USER_KEYPAIR!, 'utf-8'))),
+    Buffer.from(
+      JSON.parse(
+        process.env.KEYPAIR || fs.readFileSync(USER_KEYPAIR!, 'utf-8'),
+      ),
+    ),
   );
   const userWallet = new Wallet(user);
   const userProvider = new AnchorProvider(connection, userWallet, options);
