@@ -22,36 +22,49 @@ on:
 env:
   CARGO_TERM_COLOR: always
   SOLANA_VERSION: '1.14.9'
+  RUST_TOOLCHAIN: '1.65.0'
   LOG_PROGRAM: 'm43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD'
 
 jobs:
-  lint:
-    name: Lint
+  format:
+    name: Format
     runs-on: ubuntu-latest
-    if: (github.actor != 'dependabot[bot]')
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
       - name: Checkout submodules
         run: git submodule update --init
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
         
-      - name: Version check
-        run: rustc --version --verbose
+      - name: Set Rust version
+        run: rustup toolchain install ${{ env.RUST_TOOLCHAIN }} --component rustfmt
       
       - name: Run fmt
         run: cargo fmt -- --check
-
-      - name: Run clippy
-        run: cargo clippy -- --deny=warnings --allow=clippy::style --allow=clippy::complexity
-
-  tests:
-    name: Run tests
+  
+  clippy:
+    name: Clippy
     runs-on: ubuntu-latest
-    if: (github.actor != 'dependabot[bot]')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Checkout submodules
+        run: git submodule update --init
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        
+      - name: Set Rust version
+        run: rustup toolchain install ${{ env.RUST_TOOLCHAIN }} --component clippy
+
+        # allow args to pass anchor warnings
+      - name: Run clippy
+        run: cargo clippy -- -D warnings --allow=clippy::style --allow=clippy::complexity --allow=clippy::manual-retain --allow=clippy::crate-in-macro-def --allow=clippy::result-large-err
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -61,6 +74,9 @@ jobs:
         
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
+        
+      - name: Set Rust version
+        run: rustup toolchain install ${{ env.RUST_TOOLCHAIN }}
 
       - name: Install Solana
         run: |
@@ -90,8 +106,7 @@ jobs:
   process-logs:
     name: Process logs
     runs-on: ubuntu-latest
-    if: (github.actor != 'dependabot[bot]')
-    needs: [lint, tests]
+    needs: [format, clippy, test]
     steps:
       - name: Download raw log
         uses: actions/download-artifact@v3
