@@ -125,8 +125,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     a_perp_position.update_settle_limit(&perp_market, now_ts);
     b_perp_position.update_settle_limit(&perp_market, now_ts);
-    let a_settleable_pnl = a_perp_position.apply_pnl_settle_limit(a_pnl, &perp_market);
-    let b_settleable_pnl = b_perp_position.apply_pnl_settle_limit(b_pnl, &perp_market);
+    let a_settleable_pnl = a_perp_position.apply_pnl_settle_limit(&perp_market, a_pnl);
+    let b_settleable_pnl = b_perp_position.apply_pnl_settle_limit(&perp_market, b_pnl);
 
     require!(
         a_settleable_pnl.is_positive(),
