@@ -114,7 +114,7 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, mut order: Order, limit: u
     let effective_pos = pp.effective_base_position_lots();
     let max_base_lots = if order.reduce_only || perp_market.is_reduce_only() {
         if (order.side == Side::Bid && effective_pos >= 0)
-            || (order.side == Side::Ask && effective_pos < 0)
+            || (order.side == Side::Ask && effective_pos <= 0)
         {
             0
         } else if order.side == Side::Bid {

@@ -392,21 +392,18 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         let loan_origination_fee = cm!(loan * bank.loan_origination_fee_rate);
         cm!(bank.collected_fees_native += loan_origination_fee);
 
+        let change_amount = cm!(change.amount - loan_origination_fee);
+        let native_after_change = cm!(native + change_amount);
         if bank.is_reduce_only() {
-            let change_amount = if change.amount >= 0 {
-                cm!(change.amount - loan_origination_fee)
-            } else {
-                cm!(change.amount + loan_origination_fee)
-            };
             require!(
-                (change_amount < 0 && native + change_amount >= 0)
-                    || (change_amount > 0 && native + change_amount < 2),
+                (change_amount < 0 && native_after_change >= 0)
+                    || (change_amount > 0 && native_after_change < 1),
                 MangoError::SomeError
             );
         }
 
         // Enforce min vault to deposits ratio
-        if native + change.amount - loan_origination_fee < 0 {
+        if native_after_change < 0 {
             let vault_ai = vaults
                 .iter()
                 .find(|vault_ai| vault_ai.key == &bank.vault)
