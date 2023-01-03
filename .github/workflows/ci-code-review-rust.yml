@@ -23,7 +23,7 @@ env:
   CARGO_TERM_COLOR: always
   SOLANA_VERSION: '1.14.9'
   RUST_TOOLCHAIN: '1.65.0'
-  LOG_PROGRAM: 'm43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD'
+  LOG_PROGRAM: '4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg'
 
 jobs:
   format:
