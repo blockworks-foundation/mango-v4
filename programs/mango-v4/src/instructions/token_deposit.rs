@@ -108,24 +108,28 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         let mut bank = self.bank.load_mut()?;
         let token_index = bank.token_index;
 
-        let (amount_i80f48, token_index) = {
+        let amount_i80f48 = {
             // Get the account's position for that token index
             let account = self.account.load()?;
             let position = account.token_position(token_index)?;
 
-            if bank.is_reduce_only() {
-                require!(reduce_only, MangoError::SomeError);
-            }
-            let amount_i80f48 = if reduce_only {
+            let amount_i80f48 = if reduce_only || bank.is_reduce_only() {
                 position
                     .native(&bank)
                     .min(I80F48::ZERO)
                     .abs()
+                    .ceil()
                     .min(I80F48::from(amount))
             } else {
                 I80F48::from(amount)
             };
-            (amount_i80f48, token_index)
+            if bank.is_reduce_only() {
+                require!(
+                    reduce_only || amount_i80f48 == I80F48::from(amount),
+                    MangoError::SomeError
+                );
+            }
+            amount_i80f48
         };
 
         let mut account = self.account.load_mut()?;

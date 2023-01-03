@@ -111,22 +111,21 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, mut order: Order, limit: u
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
     let pp = account.perp_position(perp_market_index)?;
-    let mut effective_pos = pp.effective_base_position_lots();
-    effective_pos = if effective_pos >= 0 {
-        effective_pos - pp.asks_base_lots
-    } else {
-        effective_pos + pp.bids_base_lots
-    };
-
+    let effective_pos = pp.effective_base_position_lots();
     let max_base_lots = if order.reduce_only || perp_market.is_reduce_only() {
-        if (order.side == Side::Bid && effective_pos > 0)
+        if (order.side == Side::Bid && effective_pos >= 0)
             || (order.side == Side::Ask && effective_pos < 0)
         {
             0
         } else if order.side == Side::Bid {
-            effective_pos.min(0).abs().min(order.max_base_lots)
+            (effective_pos + pp.bids_base_lots)
+                .min(0)
+                .abs()
+                .min(order.max_base_lots)
         } else {
-            effective_pos.max(0).min(order.max_base_lots)
+            (effective_pos - pp.asks_base_lots)
+                .max(0)
+                .min(order.max_base_lots)
         }
     } else {
         order.max_base_lots

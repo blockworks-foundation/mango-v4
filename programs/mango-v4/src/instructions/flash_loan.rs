@@ -377,12 +377,10 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     let mut token_loan_details = Vec::with_capacity(changes.len());
     for (change, oracle_price) in changes.iter().zip(oracle_prices.iter()) {
         let mut bank = health_ais[change.bank_index].load_mut::<Bank>()?;
-        if change.amount.abs() > 0 {
-            require!(!bank.is_reduce_only(), MangoError::SomeError);
-        }
 
         let position = account.token_position_mut_by_raw_index(change.raw_token_index);
         let native = position.native(&bank);
+
         let approved_amount = I80F48::from(bank.flash_loan_approved_amount);
 
         let loan = if native.is_positive() {
@@ -391,17 +389,26 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             approved_amount
         };
 
+        let loan_origination_fee = cm!(loan * bank.loan_origination_fee_rate);
+        cm!(bank.collected_fees_native += loan_origination_fee);
+
+        if bank.is_reduce_only() {
+            let change_amount = cm!(change.amount + loan_origination_fee);
+            require!(
+                (change_amount < 0 && native + change_amount >= 0)
+                    || (change_amount > 0 && native + change_amount < 2),
+                MangoError::SomeError
+            );
+        }
+
         // Enforce min vault to deposits ratio
-        if loan > 0 {
+        if native + change.amount - loan_origination_fee < 0 {
             let vault_ai = vaults
                 .iter()
                 .find(|vault_ai| vault_ai.key == &bank.vault)
                 .unwrap();
             bank.enforce_min_vault_to_deposits_ratio(vault_ai)?;
         }
-
-        let loan_origination_fee = cm!(loan * bank.loan_origination_fee_rate);
-        cm!(bank.collected_fees_native += loan_origination_fee);
 
         let is_active = bank.change_without_fee(
             position,

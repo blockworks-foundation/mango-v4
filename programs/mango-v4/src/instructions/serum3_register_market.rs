@@ -78,19 +78,19 @@ pub fn serum3_register_market(
 
     let mut serum_market = ctx.accounts.serum_market.load_init()?;
     *serum_market = Serum3Market {
-        name: fill_from_str(&name)?,
         group: ctx.accounts.group.key(),
+        base_token_index: base_bank.token_index,
+        quote_token_index: quote_bank.token_index,
+        reduce_only: 0,
+        padding1: Default::default(),
+        name: fill_from_str(&name)?,
         serum_program: ctx.accounts.serum_program.key(),
         serum_market_external: ctx.accounts.serum_market_external.key(),
         market_index,
-        base_token_index: base_bank.token_index,
-        quote_token_index: quote_bank.token_index,
         bump: *ctx.bumps.get("serum_market").ok_or(MangoError::SomeError)?,
-        padding1: Default::default(),
         padding2: Default::default(),
         registration_time: Clock::get()?.unix_timestamp.try_into().unwrap(),
-        reduce_only: 0,
-        reserved: [0; 127],
+        reserved: [0; 128],
     };
 
     let mut serum_index_reservation = ctx.accounts.index_reservation.load_init()?;
