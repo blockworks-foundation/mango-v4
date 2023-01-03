@@ -118,11 +118,13 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, mut order: Order, limit: u
         {
             0
         } else if order.side == Side::Bid {
+            // ignores open asks
             (effective_pos + pp.bids_base_lots)
                 .min(0)
                 .abs()
                 .min(order.max_base_lots)
         } else {
+            // ignores open bids
             (effective_pos - pp.asks_base_lots)
                 .max(0)
                 .min(order.max_base_lots)
@@ -133,7 +135,7 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, mut order: Order, limit: u
     if perp_market.is_reduce_only() {
         require!(
             order.reduce_only || max_base_lots == order.max_base_lots,
-            MangoError::SomeError
+            MangoError::MarketInReduceOnlyMode
         )
     };
     order.max_base_lots = max_base_lots;

@@ -331,7 +331,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     .await
     .unwrap();
 
-    // account_0 - place a new bid should fail
+    // account_0 - place a new bid with reduce only false should fail
     let res = send_tx(
         solana,
         PerpPlaceOrderInstruction {
@@ -348,6 +348,26 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     )
     .await;
     assert!(res.is_err());
+
+    // account_0 - place a new bid with reduce only true should pass
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+            side: Side::Bid,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            reduce_only: true,
+            client_order_id: 0,
+        },
+    )
+    .await
+    .unwrap();
+    let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
+    assert_eq!(mango_account_0.perps[0].bids_base_lots, 1);
 
     // account_0 - place a new ask should pass
     send_tx(
@@ -427,7 +447,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(mango_account_0.perps[0].asks_base_lots, 2);
 
-    // account_1 - place a new ask should fail
+    // account_1 - place a new ask with reduce only false should fail
     let res = send_tx(
         solana,
         PerpPlaceOrderInstruction {
@@ -444,6 +464,26 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     )
     .await;
     assert!(res.is_err());
+
+    // account_1 - place a new ask with reduce only true should pass
+    send_tx(
+        solana,
+        PerpPlaceOrderInstruction {
+            account: account_1,
+            perp_market,
+            owner,
+            side: Side::Ask,
+            price_lots,
+            max_base_lots: 1,
+            max_quote_lots: i64::MAX,
+            reduce_only: true,
+            client_order_id: 0,
+        },
+    )
+    .await
+    .unwrap();
+    let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
+    assert_eq!(mango_account_1.perps[0].asks_base_lots, 1);
 
     // account_1 - place a new bid should pass
     let price_lots = {
@@ -467,7 +507,6 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     .await
     .unwrap();
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
-    dbg!(mango_account_1.perps[0]);
     assert_eq!(mango_account_1.perps[0].bids_base_lots, 1);
 
     // account_1 - place a new bid should pass

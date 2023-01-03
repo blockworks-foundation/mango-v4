@@ -126,7 +126,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             if bank.is_reduce_only() {
                 require!(
                     reduce_only || amount_i80f48 == I80F48::from(amount),
-                    MangoError::SomeError
+                    MangoError::TokenInReduceOnlyMode
                 );
             }
             amount_i80f48
@@ -144,10 +144,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         };
 
         // Transfer the actual tokens
-        token::transfer(
-            self.transfer_ctx(),
-            amount_i80f48.round_to_zero().to_num::<u64>(),
-        )?;
+        token::transfer(self.transfer_ctx(), amount_i80f48.to_num::<u64>())?;
 
         let indexed_position = position.indexed_position;
         let oracle_price = bank.oracle_price(
