@@ -218,6 +218,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 0,
         },
     )
@@ -234,6 +235,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 0,
         },
     )

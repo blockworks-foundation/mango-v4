@@ -120,6 +120,7 @@ async fn test_liq_perps_force_cancel() -> Result<(), TransportError> {
             // health was 1000 * 0.6 = 600; this order is -14*100*(1.4-1) = -560
             max_base_lots: 14,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 0,
         },
     )
@@ -319,6 +320,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
             price_lots,
             max_base_lots: 20,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 0,
         },
     )
@@ -334,6 +336,7 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
             price_lots,
             max_base_lots: 20,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 0,
         },
     )

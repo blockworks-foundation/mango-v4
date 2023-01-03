@@ -393,7 +393,11 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         cm!(bank.collected_fees_native += loan_origination_fee);
 
         if bank.is_reduce_only() {
-            let change_amount = cm!(change.amount + loan_origination_fee);
+            let change_amount = if change.amount >= 0 {
+                cm!(change.amount - loan_origination_fee)
+            } else {
+                cm!(change.amount + loan_origination_fee)
+            };
             require!(
                 (change_amount < 0 && native + change_amount >= 0)
                     || (change_amount > 0 && native + change_amount < 2),
