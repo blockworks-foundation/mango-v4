@@ -118,11 +118,7 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, mut order: Order, limit: u
         effective_pos + pp.bids_base_lots
     };
 
-    if perp_market.is_reduce_only() {
-        require!(order.reduce_only, MangoError::SomeError)
-    };
-
-    order.max_base_lots = if order.reduce_only {
+    let max_base_lots = if order.reduce_only || perp_market.is_reduce_only() {
         if (order.side == Side::Bid && effective_pos > 0)
             || (order.side == Side::Ask && effective_pos < 0)
         {
@@ -135,6 +131,13 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, mut order: Order, limit: u
     } else {
         order.max_base_lots
     };
+    if perp_market.is_reduce_only() {
+        require!(
+            order.reduce_only || max_base_lots == order.max_base_lots,
+            MangoError::SomeError
+        )
+    };
+    order.max_base_lots = max_base_lots;
 
     book.new_order(
         order,
