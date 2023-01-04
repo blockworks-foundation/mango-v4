@@ -316,6 +316,7 @@ export class MangoClient {
     depositWeightScaleStartQuote: number | null,
     resetStablePrice: boolean | null,
     resetNetBorrowLimit: boolean | null,
+    reduceOnly: boolean | null,
   ): Promise<TransactionSignature> {
     const bank = group.getFirstBankByMint(mintPk);
     const mintInfo = group.mintInfosMapByTokenIndex.get(bank.tokenIndex)!;
@@ -347,6 +348,7 @@ export class MangoClient {
         depositWeightScaleStartQuote,
         resetStablePrice ?? false,
         resetNetBorrowLimit ?? false,
+        reduceOnly,
       )
       .accounts({
         group: group.publicKey,
@@ -802,6 +804,7 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
     amount: number,
+    reduceOnly = false,
   ): Promise<TransactionSignature> {
     const decimals = group.getMintDecimals(mintPk);
     const nativeAmount = toNative(amount, decimals);
@@ -810,6 +813,7 @@ export class MangoClient {
       mangoAccount,
       mintPk,
       nativeAmount,
+      reduceOnly,
     );
   }
 
@@ -818,6 +822,7 @@ export class MangoClient {
     mangoAccount: MangoAccount,
     mintPk: PublicKey,
     nativeAmount: BN,
+    reduceOnly = false,
   ): Promise<TransactionSignature> {
     const bank = group.getFirstBankByMint(mintPk);
 
@@ -868,7 +873,7 @@ export class MangoClient {
       );
 
     const ix = await this.program.methods
-      .tokenDeposit(new BN(nativeAmount))
+      .tokenDeposit(new BN(nativeAmount), reduceOnly)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -1571,6 +1576,7 @@ export class MangoClient {
     stablePriceGrowthLimit: number | null,
     settlePnlLimitFactor: number | null,
     settlePnlLimitWindowSize: number | null,
+    reduceOnly: boolean | null,
   ): Promise<TransactionSignature> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
 
@@ -1602,6 +1608,7 @@ export class MangoClient {
         settlePnlLimitWindowSize !== null
           ? new BN(settlePnlLimitWindowSize)
           : null,
+        reduceOnly,
       )
       .accounts({
         group: group.publicKey,

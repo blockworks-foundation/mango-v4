@@ -223,6 +223,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
             solana,
             TokenDepositInstruction {
                 amount: 100000,
+                reduce_only: false,
                 account: vault_account,
                 owner,
                 token_account,
@@ -260,6 +261,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         solana,
         TokenDepositInstruction {
             amount: deposit1_amount,
+            reduce_only: false,
             account,
             owner,
             token_account: payer_mint_accounts[2],
@@ -273,6 +275,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
         solana,
         TokenDepositInstruction {
             amount: deposit2_amount,
+            reduce_only: false,
             account,
             owner,
             token_account: payer_mint_accounts[3],

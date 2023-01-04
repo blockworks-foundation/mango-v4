@@ -117,7 +117,7 @@ async fn ensure_deposit(mango_client: &Arc<MangoClient>) -> Result<(), anyhow::E
 
         log::info!("Depositing {} {}", deposit_native, bank.name());
         mango_client
-            .token_deposit(bank.mint, desired_balance.to_num())
+            .token_deposit(bank.mint, desired_balance.to_num(), false)
             .await?;
     }
 

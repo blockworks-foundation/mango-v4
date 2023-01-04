@@ -162,7 +162,7 @@ async fn main() -> Result<(), anyhow::Error> {
             let owner = client::keypair_from_cli(&cmd.owner);
             let mint = client::pubkey_from_cli(&cmd.mint);
             let client = MangoClient::new_for_existing_account(client, account, owner).await?;
-            let txsig = client.token_deposit(mint, cmd.amount).await?;
+            let txsig = client.token_deposit(mint, cmd.amount, false).await?;
             println!("{}", txsig);
         }
         Command::JupiterSwap(cmd) => {

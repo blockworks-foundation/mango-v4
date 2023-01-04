@@ -78,6 +78,7 @@ async fn test_position_lifetime() -> Result<()> {
             solana,
             TokenDepositIntoExistingInstruction {
                 amount: deposit_amount,
+                reduce_only: false,
                 account,
                 token_account: payer_mint_accounts[0],
                 token_authority: payer,
@@ -93,6 +94,7 @@ async fn test_position_lifetime() -> Result<()> {
                 solana,
                 TokenDepositInstruction {
                     amount: deposit_amount,
+                    reduce_only: false,
                     account,
                     owner,
                     token_account: payer_token,
@@ -109,6 +111,7 @@ async fn test_position_lifetime() -> Result<()> {
             solana,
             TokenDepositIntoExistingInstruction {
                 amount: deposit_amount,
+                reduce_only: false,
                 account,
                 token_account: payer_mint_accounts[0],
                 token_authority: payer,
@@ -160,6 +163,7 @@ async fn test_position_lifetime() -> Result<()> {
             solana,
             TokenDepositInstruction {
                 amount: collateral_amount,
+                reduce_only: false,
                 account,
                 owner,
                 token_account: payer_mint_accounts[0],
@@ -197,6 +201,7 @@ async fn test_position_lifetime() -> Result<()> {
                 TokenDepositInstruction {
                     // deposit withdraw amount + some more to cover loan origination fees
                     amount: borrow_amount + 2,
+                    reduce_only: false,
                     account,
                     owner,
                     token_account: payer_mint_accounts[1],

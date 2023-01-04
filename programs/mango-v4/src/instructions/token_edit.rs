@@ -56,6 +56,7 @@ pub fn token_edit(
     deposit_weight_scale_start_quote_opt: Option<f64>,
     reset_stable_price: bool,
     reset_net_borrow_limit: bool,
+    reduce_only_opt: Option<bool>,
 ) -> Result<()> {
     let mut mint_info = ctx.accounts.mint_info.load_mut()?;
     mint_info.verify_banks_ais(ctx.remaining_accounts)?;
@@ -169,6 +170,10 @@ pub fn token_edit(
         if let Some(deposit_weight_scale_start_quote) = deposit_weight_scale_start_quote_opt {
             bank.deposit_weight_scale_start_quote = deposit_weight_scale_start_quote;
         }
+
+        if let Some(reduce_only) = reduce_only_opt {
+            bank.reduce_only = if reduce_only { 1 } else { 0 };
+        };
 
         // unchanged -
         // dust

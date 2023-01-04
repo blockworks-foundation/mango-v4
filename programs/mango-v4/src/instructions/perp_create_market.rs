@@ -130,7 +130,8 @@ pub fn perp_create_market(
         settle_pnl_limit_factor,
         padding3: Default::default(),
         settle_pnl_limit_window_size_ts,
-        reserved: [0; 1944],
+        reduce_only: 0,
+        reserved: [0; 1943],
     };
 
     let oracle_price =

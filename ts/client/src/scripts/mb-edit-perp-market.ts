@@ -66,6 +66,7 @@ async function editPerpMarket(perpMarketName: string) {
     null,
     null,
     null,
+    null,
   );
 
   console.log('Tx Successful:', signature);

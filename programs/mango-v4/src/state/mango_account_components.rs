@@ -284,6 +284,11 @@ impl PerpPosition {
         self.base_position_lots
     }
 
+    // This takes into account base lots from unprocessed events, but not anything from open orders
+    pub fn effective_base_position_lots(&self) -> i64 {
+        self.base_position_lots + self.taker_base_lots
+    }
+
     pub fn quote_position_native(&self) -> I80F48 {
         self.quote_position_native
     }

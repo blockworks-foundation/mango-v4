@@ -109,6 +109,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 0,
         },
     )
@@ -150,6 +151,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 1,
         },
     )
@@ -184,6 +186,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 2,
         },
     )
@@ -217,6 +220,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 4,
         },
     )
@@ -250,6 +254,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 5,
         },
     )
@@ -267,6 +272,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 6,
         },
     )
@@ -328,6 +334,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 7,
         },
     )
@@ -345,6 +352,7 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 8,
         },
     )
@@ -609,6 +617,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 6,
         },
     )
@@ -691,6 +700,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 60,
         },
     )
@@ -720,6 +730,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             price_lots,
             max_base_lots: 2,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 61,
         },
     )
@@ -771,6 +782,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             price_lots: price_lots + 2,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 62,
         },
     )
@@ -800,6 +812,7 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
             price_lots: price_lots + 3,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 63,
         },
     )
