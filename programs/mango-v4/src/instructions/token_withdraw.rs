@@ -18,7 +18,7 @@ pub struct TokenWithdraw<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group, has_one = owner)]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,
 
     #[account(
@@ -62,7 +62,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     let token_index = ctx.accounts.bank.load()?.token_index;
 
     // Create the account's position for that token index
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut account = ctx.accounts.account.load_full_mut()?;
     let (_, raw_token_index, _) = account.ensure_token_position(token_index)?;
 
     // Health check _after_ the token position is guaranteed to exist
@@ -96,6 +96,9 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     let is_borrow = amount > native_position;
     require!(allow_borrow || !is_borrow, MangoError::SomeError);
+    if bank.is_reduce_only() {
+        require!(!is_borrow, MangoError::TokenInReduceOnlyMode);
+    }
 
     let amount_i80f48 = I80F48::from(amount);
 

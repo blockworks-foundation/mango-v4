@@ -24,11 +24,11 @@ pub struct PerpLiqBasePosition<'info> {
         has_one = group
         // liqor_owner is checked at #1
     )]
-    pub liqor: AccountLoaderDynamic<'info, MangoAccount>,
+    pub liqor: AccountLoader<'info, MangoAccountFixed>,
     pub liqor_owner: Signer<'info>,
 
     #[account(mut, has_one = group)]
-    pub liqee: AccountLoaderDynamic<'info, MangoAccount>,
+    pub liqee: AccountLoader<'info, MangoAccountFixed>,
 }
 
 pub fn perp_liq_base_position(
@@ -37,7 +37,7 @@ pub fn perp_liq_base_position(
 ) -> Result<()> {
     let group_pk = &ctx.accounts.group.key();
 
-    let mut liqor = ctx.accounts.liqor.load_mut()?;
+    let mut liqor = ctx.accounts.liqor.load_full_mut()?;
     // account constraint #1
     require!(
         liqor
@@ -47,7 +47,7 @@ pub fn perp_liq_base_position(
     );
     require!(!liqor.fixed.being_liquidated(), MangoError::BeingLiquidated);
 
-    let mut liqee = ctx.accounts.liqee.load_mut()?;
+    let mut liqee = ctx.accounts.liqee.load_full_mut()?;
 
     // Initial liqee health check
     let mut liqee_health_cache = {

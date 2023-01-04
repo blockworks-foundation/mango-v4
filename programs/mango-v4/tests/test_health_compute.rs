@@ -146,6 +146,7 @@ async fn test_health_compute_serum() -> Result<(), TransportError> {
             solana,
             TokenDepositInstruction {
                 amount: 10,
+                reduce_only: false,
                 account,
                 owner,
                 token_account: payer_mint_accounts[0],
@@ -252,6 +253,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
                 price_lots,
                 max_base_lots: 1,
                 max_quote_lots: i64::MAX,
+                reduce_only: false,
                 client_order_id: 0,
             },
         )
@@ -262,6 +264,7 @@ async fn test_health_compute_perp() -> Result<(), TransportError> {
             solana,
             TokenDepositInstruction {
                 amount: 10,
+                reduce_only: false,
                 account,
                 owner,
                 token_account: payer_mint_accounts[0],

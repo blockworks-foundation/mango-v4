@@ -24,6 +24,7 @@ export class Serum3Market {
       serumMarketExternal: PublicKey;
       marketIndex: number;
       registrationTime: BN;
+      reduceOnly: number;
     },
   ): Serum3Market {
     return new Serum3Market(
@@ -36,6 +37,7 @@ export class Serum3Market {
       obj.serumMarketExternal,
       obj.marketIndex as MarketIndex,
       obj.registrationTime,
+      obj.reduceOnly == 1,
     );
   }
 
@@ -49,6 +51,7 @@ export class Serum3Market {
     public serumMarketExternal: PublicKey,
     public marketIndex: MarketIndex,
     public registrationTime: BN,
+    public reduceOnly: boolean,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
   }

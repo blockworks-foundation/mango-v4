@@ -6,13 +6,13 @@ pub struct ComputeAccountData<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(has_one = group)]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
 }
 
 pub fn compute_account_data(ctx: Context<ComputeAccountData>) -> Result<()> {
     let group_pk = ctx.accounts.group.key();
 
-    let account = ctx.accounts.account.load()?;
+    let account = ctx.accounts.account.load_full()?;
 
     let account_retriever = ScanningAccountRetriever::new(ctx.remaining_accounts, &group_pk)?;
 

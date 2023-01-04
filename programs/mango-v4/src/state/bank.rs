@@ -127,8 +127,10 @@ pub struct Bank {
     /// See scaled_init_asset_weight().
     pub deposit_weight_scale_start_quote: f64,
 
+    pub reduce_only: u8,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 2120],
+    pub reserved: [u8; 2119],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -155,7 +157,8 @@ const_assert_eq!(
         + 8 * 4
         + 8
         + 8
-        + 2120
+        + 1
+        + 2119
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -215,7 +218,8 @@ impl Bank {
             net_borrows_in_window: 0,
             borrow_weight_scale_start_quote: f64::MAX,
             deposit_weight_scale_start_quote: f64::MAX,
-            reserved: [0; 2120],
+            reduce_only: 0,
+            reserved: [0; 2119],
         }
     }
 
@@ -223,6 +227,10 @@ impl Bank {
         std::str::from_utf8(&self.name)
             .unwrap()
             .trim_matches(char::from(0))
+    }
+
+    pub fn is_reduce_only(&self) -> bool {
+        self.reduce_only == 1
     }
 
     #[inline(always)]

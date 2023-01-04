@@ -1,6 +1,8 @@
+use std::cell::{Ref, RefMut};
 use std::mem::size_of;
 
 use anchor_lang::prelude::*;
+use anchor_lang::Discriminator;
 use arrayref::array_ref;
 
 use fixed::types::I80F48;
@@ -248,10 +250,19 @@ impl MangoAccountFixed {
     }
 }
 
-impl DynamicAccountType for MangoAccount {
-    type Header = MangoAccountDynamicHeader;
-    type Fixed = MangoAccountFixed;
+impl Owner for MangoAccountFixed {
+    fn owner() -> Pubkey {
+        MangoAccount::owner()
+    }
 }
+
+impl Discriminator for MangoAccountFixed {
+    fn discriminator() -> [u8; 8] {
+        MangoAccount::discriminator()
+    }
+}
+
+impl anchor_lang::ZeroCopy for MangoAccountFixed {}
 
 #[derive(Clone)]
 pub struct MangoAccountDynamicHeader {
@@ -262,34 +273,34 @@ pub struct MangoAccountDynamicHeader {
 }
 
 impl DynamicHeader for MangoAccountDynamicHeader {
-    fn from_bytes(data: &[u8]) -> Result<Self> {
-        let header_version = u8::from_le_bytes(*array_ref![data, 0, size_of::<u8>()]);
+    fn from_bytes(dynamic_data: &[u8]) -> Result<Self> {
+        let header_version = u8::from_le_bytes(*array_ref![dynamic_data, 0, size_of::<u8>()]);
 
         match header_version {
             1 => {
                 let token_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
-                    data,
+                    dynamic_data,
                     MangoAccount::dynamic_token_vec_offset(),
                     BORSH_VEC_SIZE_BYTES
                 ]))
                 .unwrap();
 
                 let serum3_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
-                    data,
+                    dynamic_data,
                     MangoAccount::dynamic_serum3_vec_offset(token_count),
                     BORSH_VEC_SIZE_BYTES
                 ]))
                 .unwrap();
 
                 let perp_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
-                    data,
+                    dynamic_data,
                     MangoAccount::dynamic_perp_vec_offset(token_count, serum3_count),
                     BORSH_VEC_SIZE_BYTES
                 ]))
                 .unwrap();
 
                 let perp_oo_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
-                    data,
+                    dynamic_data,
                     MangoAccount::dynamic_perp_oo_vec_offset(token_count, serum3_count, perp_count),
                     BORSH_VEC_SIZE_BYTES
                 ]))
@@ -306,8 +317,8 @@ impl DynamicHeader for MangoAccountDynamicHeader {
         }
     }
 
-    fn initialize(data: &mut [u8]) -> Result<()> {
-        let dst: &mut [u8] = &mut data[0..1];
+    fn initialize(dynamic_data: &mut [u8]) -> Result<()> {
+        let dst: &mut [u8] = &mut dynamic_data[0..1];
         dst.copy_from_slice(&DEFAULT_MANGO_ACCOUNT_VERSION.to_le_bytes());
         Ok(())
     }
@@ -368,11 +379,25 @@ impl MangoAccountDynamicHeader {
     }
 }
 
-pub type MangoAccountValue = DynamicAccountValue<MangoAccount>;
-pub type MangoAccountRef<'a> = DynamicAccountRef<'a, MangoAccount>;
-pub type MangoAccountRefMut<'a> = DynamicAccountRefMut<'a, MangoAccount>;
-pub type MangoAccountRefWithHeader<'a> =
+/// Fully owned MangoAccount, useful for tests
+pub type MangoAccountValue = DynamicAccount<MangoAccountDynamicHeader, MangoAccountFixed, Vec<u8>>;
+
+/// Full reference type, useful for borrows
+pub type MangoAccountRef<'a> =
+    DynamicAccount<&'a MangoAccountDynamicHeader, &'a MangoAccountFixed, &'a [u8]>;
+/// Full reference type, useful for borrows
+pub type MangoAccountRefMut<'a> =
+    DynamicAccount<&'a mut MangoAccountDynamicHeader, &'a mut MangoAccountFixed, &'a mut [u8]>;
+
+/// Useful when loading from bytes
+pub type MangoAccountLoadedRef<'a> =
     DynamicAccount<MangoAccountDynamicHeader, &'a MangoAccountFixed, &'a [u8]>;
+/// Useful when loading from RefCell, like from AccountInfo
+pub type MangoAccountLoadedRefCell<'a> =
+    DynamicAccount<MangoAccountDynamicHeader, Ref<'a, MangoAccountFixed>, Ref<'a, [u8]>>;
+/// Useful when loading from RefCell, like from AccountInfo
+pub type MangoAccountLoadedRefCellMut<'a> =
+    DynamicAccount<MangoAccountDynamicHeader, RefMut<'a, MangoAccountFixed>, RefMut<'a, [u8]>>;
 
 impl MangoAccountValue {
     // bytes without discriminator
@@ -386,7 +411,7 @@ impl MangoAccountValue {
     }
 }
 
-impl<'a> MangoAccountRefWithHeader<'a> {
+impl<'a> MangoAccountLoadedRef<'a> {
     // bytes without discriminator
     pub fn from_bytes(bytes: &'a [u8]) -> Result<Self> {
         let (fixed, dynamic) = bytes.split_at(size_of::<MangoAccountFixed>());
@@ -399,7 +424,7 @@ impl<'a> MangoAccountRefWithHeader<'a> {
 }
 
 // This generic impl covers MangoAccountRef, MangoAccountRefMut and other
-// DynamicAccountValue variants that allow read access.
+// DynamicAccount variants that allow read access.
 impl<
         Header: DerefOrBorrow<MangoAccountDynamicHeader>,
         Fixed: DerefOrBorrow<MangoAccountFixed>,
@@ -541,8 +566,8 @@ impl<
         self.fixed().being_liquidated()
     }
 
-    pub fn borrow(&self) -> DynamicAccountRef<MangoAccount> {
-        DynamicAccount {
+    pub fn borrow(&self) -> MangoAccountRef {
+        MangoAccountRef {
             header: self.header(),
             fixed: self.fixed(),
             dynamic: self.dynamic(),
@@ -566,8 +591,8 @@ impl<
         self.dynamic.deref_or_borrow_mut()
     }
 
-    pub fn borrow_mut(&mut self) -> DynamicAccountRefMut<MangoAccount> {
-        DynamicAccount {
+    pub fn borrow_mut(&mut self) -> MangoAccountRefMut {
+        MangoAccountRefMut {
             header: self.header.deref_or_borrow_mut(),
             fixed: self.fixed.deref_or_borrow_mut(),
             dynamic: self.dynamic.deref_or_borrow_mut(),
@@ -1083,6 +1108,65 @@ impl<
         self.write_perp_oo_length();
 
         Ok(())
+    }
+}
+
+/// Trait to allow a AccountLoader<MangoAccountFixed> to create an accessor for the full account.
+pub trait MangoAccountLoader<'a> {
+    fn load_full(self) -> Result<MangoAccountLoadedRefCell<'a>>;
+    fn load_full_mut(self) -> Result<MangoAccountLoadedRefCellMut<'a>>;
+    fn load_full_init(self) -> Result<MangoAccountLoadedRefCellMut<'a>>;
+}
+
+impl<'a, 'info: 'a> MangoAccountLoader<'a> for &'a AccountLoader<'info, MangoAccountFixed> {
+    fn load_full(self) -> Result<MangoAccountLoadedRefCell<'a>> {
+        // Error checking
+        self.load()?;
+
+        let data = self.as_ref().try_borrow_data()?;
+        let header =
+            MangoAccountDynamicHeader::from_bytes(&data[8 + size_of::<MangoAccountFixed>()..])?;
+        let (_, data) = Ref::map_split(data, |d| d.split_at(8));
+        let (fixed_bytes, dynamic) =
+            Ref::map_split(data, |d| d.split_at(size_of::<MangoAccountFixed>()));
+        Ok(MangoAccountLoadedRefCell {
+            header,
+            fixed: Ref::map(fixed_bytes, |b| bytemuck::from_bytes(b)),
+            dynamic,
+        })
+    }
+
+    fn load_full_mut(self) -> Result<MangoAccountLoadedRefCellMut<'a>> {
+        // Error checking
+        self.load_mut()?;
+
+        let data = self.as_ref().try_borrow_mut_data()?;
+        let header =
+            MangoAccountDynamicHeader::from_bytes(&data[8 + size_of::<MangoAccountFixed>()..])?;
+        let (_, data) = RefMut::map_split(data, |d| d.split_at_mut(8));
+        let (fixed_bytes, dynamic) =
+            RefMut::map_split(data, |d| d.split_at_mut(size_of::<MangoAccountFixed>()));
+        Ok(MangoAccountLoadedRefCellMut {
+            header,
+            fixed: RefMut::map(fixed_bytes, |b| bytemuck::from_bytes_mut(b)),
+            dynamic,
+        })
+    }
+
+    fn load_full_init(self) -> Result<MangoAccountLoadedRefCellMut<'a>> {
+        // Error checking
+        self.load_init()?;
+
+        {
+            let mut data = self.as_ref().try_borrow_mut_data()?;
+
+            let disc_bytes: &mut [u8] = &mut data[0..8];
+            disc_bytes.copy_from_slice(bytemuck::bytes_of(&(MangoAccount::discriminator())));
+
+            MangoAccountDynamicHeader::initialize(&mut data[8 + size_of::<MangoAccountFixed>()..])?;
+        }
+
+        self.load_full_mut()
     }
 }
 

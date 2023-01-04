@@ -1,14 +1,14 @@
 use anchor_lang::prelude::*;
 
 use crate::error::MangoError;
-use crate::state::{AccountLoaderDynamic, BookSide, Group, MangoAccount, Orderbook, PerpMarket};
+use crate::state::{BookSide, Group, MangoAccountFixed, MangoAccountLoader, Orderbook, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpCancelAllOrders<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group)]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,
 
     #[account(
@@ -25,7 +25,7 @@ pub struct PerpCancelAllOrders<'info> {
 }
 
 pub fn perp_cancel_all_orders(ctx: Context<PerpCancelAllOrders>, limit: u8) -> Result<()> {
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut account = ctx.accounts.account.load_full_mut()?;
     require!(
         account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
         MangoError::SomeError

@@ -88,6 +88,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
             solana,
             TokenDepositInstruction {
                 amount: deposit_amount_initial,
+                reduce_only: false,
                 account,
                 owner,
                 token_account: payer_mint0_account,
