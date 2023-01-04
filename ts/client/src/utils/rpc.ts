@@ -23,7 +23,10 @@ export async function sendTransaction(
   const payer = (provider as AnchorProvider).wallet;
 
   if (opts.prioritizationFee) {
-    ixs = [createComputeBudgetIx(2, 200_000 * ixs.length + 1), ...ixs];
+    ixs = [
+      createComputeBudgetIx(opts.prioritizationFee, 200_000 * ixs.length + 1),
+      ...ixs,
+    ];
   }
 
   const message = MessageV0.compile({
