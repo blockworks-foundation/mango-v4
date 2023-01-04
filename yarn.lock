@@ -395,10 +395,10 @@
   dependencies:
     buffer "^6.0.1"
 
-"@pythnetwork/client@^2.7.0":
-  version "2.7.3"
-  resolved "https://registry.yarnpkg.com/@pythnetwork/client/-/client-2.7.3.tgz#6075a16dc394d1734e76b04e907a680490a61536"
-  integrity sha512-+2k5JXxv/yUA6WMESSppJlg4T/AP+nZZfBnHmeG3RPCIJx+bargxFLCK4B2KgpQYdeTWb+2z8yRCNF7tHooCFQ==
+"@pythnetwork/client@~2.8.0":
+  version "2.8.0"
+  resolved "https://registry.yarnpkg.com/@pythnetwork/client/-/client-2.8.0.tgz#1b764d710f17c2f3cd3c9ba0c4ae74d26e72b01b"
+  integrity sha512-YqqZSDDsEApC/F4H5ejcl8OCr7gsWv0noTK8YABT8pCtFRTQxXBP0r2S8KQMaIw1x97Mue/jkYybdMeFQzPjCw==
   dependencies:
     buffer "^6.0.1"
 
