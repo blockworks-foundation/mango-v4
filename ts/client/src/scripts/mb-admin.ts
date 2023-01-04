@@ -1,9 +1,13 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import {
   AddressLookupTableProgram,
+  ComputeBudgetProgram,
   Connection,
   Keypair,
   PublicKey,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
+  SYSVAR_RENT_PUBKEY,
+  SystemProgram,
 } from '@solana/web3.js';
 import fs from 'fs';
 import { TokenIndex } from '../accounts/bank';
@@ -14,8 +18,9 @@ import {
   Serum3Side,
 } from '../accounts/serum3';
 import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
+import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../constants';
 import { buildVersionedTx, toNative } from '../utils';
+import { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, NATIVE_MINT } from '@solana/spl-token';
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 
@@ -554,11 +559,25 @@ async function createAndPopulateAlt() {
     }
 
     console.log(`ALT: extending using mango v4 relevant public keys`);
+
     await extendTable(bankAddresses);
+    await extendTable([OPENBOOK_PROGRAM_ID['mainnet-beta']]);
     await extendTable(serum3MarketAddresses);
     await extendTable(serum3ExternalMarketAddresses);
+
     // TODO: dont extend for perps atm
     // await extendTable(perpMarketAddresses);
+
+    // Well known addressess
+    await extendTable([
+      SystemProgram.programId,
+      SYSVAR_RENT_PUBKEY,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID,
+      NATIVE_MINT,
+      SYSVAR_INSTRUCTIONS_PUBKEY,
+      ComputeBudgetProgram.programId,
+    ]);
   } catch (error) {
     console.log(error);
   }
@@ -595,7 +614,7 @@ async function main() {
   }
 
   try {
-    // createAndPopulateAlt();
+    createAndPopulateAlt();
   } catch (error) {}
 }
 

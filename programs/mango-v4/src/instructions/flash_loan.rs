@@ -397,7 +397,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             require!(
                 (change_amount < 0 && native_after_change >= 0)
                     || (change_amount > 0 && native_after_change < 1),
-                MangoError::SomeError
+                MangoError::TokenInReduceOnlyMode
             );
         }
 

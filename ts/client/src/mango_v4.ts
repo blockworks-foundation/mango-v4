@@ -4516,11 +4516,15 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "reduceOnly",
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                4
+                3
               ]
             }
           },
@@ -4563,15 +4567,11 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "reduceOnly",
-            "type": "u8"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                127
+                128
               ]
             }
           }
@@ -7468,6 +7468,16 @@ export type MangoV4 = {
       "code": 6029,
       "name": "DepositsIntoLiquidatingMustRecover",
       "msg": "token deposits into accounts that are being liquidated must bring their health above the init threshold"
+    },
+    {
+      "code": 6030,
+      "name": "TokenInReduceOnlyMode",
+      "msg": "token is in reduce only mode"
+    },
+    {
+      "code": 6031,
+      "name": "MarketInReduceOnlyMode",
+      "msg": "market is in reduce only mode"
     }
   ]
 };
@@ -11990,11 +12000,15 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "reduceOnly",
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                4
+                3
               ]
             }
           },
@@ -12037,15 +12051,11 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "reduceOnly",
-            "type": "u8"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                127
+                128
               ]
             }
           }
@@ -14942,6 +14952,16 @@ export const IDL: MangoV4 = {
       "code": 6029,
       "name": "DepositsIntoLiquidatingMustRecover",
       "msg": "token deposits into accounts that are being liquidated must bring their health above the init threshold"
+    },
+    {
+      "code": 6030,
+      "name": "TokenInReduceOnlyMode",
+      "msg": "token is in reduce only mode"
+    },
+    {
+      "code": 6031,
+      "name": "MarketInReduceOnlyMode",
+      "msg": "market is in reduce only mode"
     }
   ]
 };

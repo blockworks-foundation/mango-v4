@@ -17,7 +17,7 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
     let admin = TestKeypair::new();
     let owner = context.users[0].key;
     let payer = context.users[1].key;
-    let mints = &context.mints[0..2];
+    let mints = &context.mints[0..=2];
     let payer_mint_accounts = &context.users[1].token_accounts[0..=2];
 
     let initial_token_deposit = 10_000;
@@ -44,7 +44,19 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
         owner,
         0,
         &context.users[1],
-        &mints[0..2],
+        &mints[0..=2],
+        initial_token_deposit,
+        0,
+    )
+    .await;
+
+    let account_1 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        &mints[0..=1],
         initial_token_deposit,
         0,
     )
@@ -62,6 +74,10 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
     .await
     .unwrap();
 
+    //
+    // Withdraw deposits
+    //
+
     // deposit without reduce_only should fail
     let res = send_tx(
         solana,
@@ -78,7 +94,7 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
     .await;
     assert!(res.is_err());
 
-    // deposit with reduce_only should pass silently
+    // deposit with reduce_only should pass with no effect
     send_tx(
         solana,
         TokenDepositInstruction {
@@ -117,7 +133,7 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
     let res = send_tx(
         solana,
         TokenWithdrawInstruction {
-            amount: initial_token_deposit,
+            amount: 1,
             allow_borrow: true,
             account: account_0,
             owner,
@@ -127,6 +143,50 @@ async fn test_reduce_only_token() -> Result<(), TransportError> {
     )
     .await;
     assert!(res.is_err());
+
+    //
+    // Repay borrows
+    //
+    send_tx(
+        solana,
+        TokenWithdrawInstruction {
+            amount: initial_token_deposit / 2,
+            allow_borrow: true,
+            account: account_1,
+            owner,
+            token_account: payer_mint_accounts[2],
+            bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    // make token reduce only
+    send_tx(
+        solana,
+        TokenMakeReduceOnly {
+            admin,
+            group,
+            mint: mints[2].pubkey,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        TokenDepositInstruction {
+            amount: initial_token_deposit,
+            reduce_only: true,
+            account: account_1,
+            owner,
+            token_account: payer_mint_accounts[2],
+            token_authority: payer,
+            bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
 
     Ok(())
 }
@@ -155,10 +215,6 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     }
     .create(solana)
     .await;
-
-    let settler =
-        create_funded_account(&solana, group, owner, 251, &context.users[1], &[], 0, 0).await;
-    let settler_owner = owner.clone();
 
     let account_0 = create_funded_account(
         &solana,
@@ -202,7 +258,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             liquidation_fee: 0.012,
             maker_fee: 0.0002,
             taker_fee: 0.000,
-            settle_pnl_limit_factor: 0.2,
+            settle_pnl_limit_factor: -1.,
             settle_pnl_limit_window_size_ts: 24 * 60 * 60,
             ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
         },
@@ -216,17 +272,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     };
 
     // Set the initial oracle price
-    send_tx(
-        solana,
-        StubOracleSetInstruction {
-            group,
-            admin,
-            mint: mints[1].pubkey,
-            price: 1000.0,
-        },
-    )
-    .await
-    .unwrap();
+    set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1000.0).await;
 
     //
     // Place orders and create a position
@@ -278,17 +324,14 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     // account_0 - place a new bid
     // when user has a long, and market is in reduce only,
     // to reduce incoming asks to reduce position, we ignore existing bids
-    let res = send_tx(
+    send_tx(
         solana,
         PerpPlaceOrderInstruction {
             account: account_0,
             perp_market,
             owner,
             side: Side::Bid,
-            price_lots: {
-                let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
-                perp_market.native_price_to_lot(I80F48::from(500))
-            },
+            price_lots: price_lots / 2,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             reduce_only: false,
@@ -349,7 +392,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     .await;
     assert!(res.is_err());
 
-    // account_0 - place a new bid with reduce only true should pass
+    // account_0 - place a new bid with reduce only true should do nothing
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
@@ -486,10 +529,6 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
     assert_eq!(mango_account_1.perps[0].asks_base_lots, 1);
 
     // account_1 - place a new bid should pass
-    let price_lots = {
-        let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
-        perp_market.native_price_to_lot(I80F48::from(500))
-    };
     send_tx(
         solana,
         PerpPlaceOrderInstruction {
@@ -497,7 +536,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             perp_market,
             owner,
             side: Side::Bid,
-            price_lots,
+            price_lots: price_lots / 2,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             reduce_only: false,
@@ -517,7 +556,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             perp_market,
             owner,
             side: Side::Bid,
-            price_lots,
+            price_lots: price_lots / 2,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             reduce_only: false,
@@ -537,7 +576,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             perp_market,
             owner,
             side: Side::Bid,
-            price_lots,
+            price_lots: price_lots / 2,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             reduce_only: false,
@@ -555,7 +594,7 @@ async fn test_perp_reduce_only() -> Result<(), TransportError> {
             perp_market,
             owner,
             side: Side::Bid,
-            price_lots,
+            price_lots: price_lots / 2,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
             reduce_only: true,
