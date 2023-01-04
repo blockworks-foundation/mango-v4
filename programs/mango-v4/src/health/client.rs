@@ -846,6 +846,7 @@ mod tests {
                     market_index: 0,
                     reserved_base: I80F48::from(30 / 3),
                     reserved_quote: I80F48::from(30 / 2),
+                    has_zero_funds: false,
                 }];
                 adjust_by_usdc(&mut health_cache, 0, -20.0);
                 adjust_by_usdc(&mut health_cache, 1, -40.0);

@@ -96,10 +96,7 @@ pub fn token_liq_bankruptcy(
     let mut liqee = ctx.accounts.liqee.load_full_mut()?;
     let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
         .context("create liqee health cache")?;
-    require!(
-        !liqee_health_cache.has_liquidatable_assets(),
-        MangoError::IsNotBankrupt
-    );
+    liqee_health_cache.require_after_phase2_liquidation()?;
     liqee.fixed.set_being_liquidated(true);
 
     let (liab_bank, liab_price, opt_quote_bank_and_price) =
@@ -244,6 +241,7 @@ pub fn token_liq_bankruptcy(
     // Socialize loss if there's more loss and noone else could use the
     // insurance fund to cover it.
     let mut socialized_loss = I80F48::ZERO;
+    let starting_deposit_index = liab_deposit_index;
     if insurance_fund_exhausted && remaining_liab_loss.is_positive() {
         // find the total deposits
         let mut indexed_total_deposits = I80F48::ZERO;
@@ -318,7 +316,9 @@ pub fn token_liq_bankruptcy(
         liab_price: liab_price.to_bits(),
         insurance_token_index: QUOTE_TOKEN_INDEX,
         insurance_transfer: insurance_transfer_i80f48.to_bits(),
-        socialized_loss: socialized_loss.to_bits()
+        socialized_loss: socialized_loss.to_bits(),
+        starting_liab_deposit_index: starting_deposit_index.to_bits(),
+        ending_liab_deposit_index: liab_deposit_index.to_bits()
     });
 
     Ok(())

@@ -269,7 +269,7 @@ async fn derive_liquidation_remaining_account_metas(
 
     let perp_markets: Vec<Pubkey> = liqee
         .active_perp_positions()
-        .chain(liqee.active_perp_positions())
+        .chain(liqor.active_perp_positions())
         .map(|perp| get_perp_market_address_by_index(liqee.fixed.group, perp.market_index))
         .unique()
         .collect();
@@ -337,6 +337,17 @@ pub async fn account_position_f64(solana: &SolanaCookie, account: Pubkey, bank: 
         .unwrap()
         .native(&bank_data);
     native.to_num::<f64>()
+}
+
+pub async fn account_init_health(solana: &SolanaCookie, account: Pubkey) -> f64 {
+    send_tx(solana, ComputeAccountDataInstruction { account })
+        .await
+        .unwrap();
+    let health_data = solana
+        .program_log_events::<mango_v4::events::MangoAccountData>()
+        .pop()
+        .unwrap();
+    health_data.init_health.to_num::<f64>()
 }
 
 // Verifies that the "post_health: ..." log emitted by the previous instruction
@@ -1036,6 +1047,96 @@ impl ClientInstruction for TokenDeregisterInstruction {
     }
 }
 
+fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
+    mango_v4::instruction::TokenEdit {
+        oracle_opt: None,
+        oracle_config_opt: None,
+        group_insurance_fund_opt: None,
+        interest_rate_params_opt: None,
+        loan_fee_rate_opt: None,
+        loan_origination_fee_rate_opt: None,
+        maint_asset_weight_opt: None,
+        init_asset_weight_opt: None,
+        maint_liab_weight_opt: None,
+        init_liab_weight_opt: None,
+        liquidation_fee_opt: None,
+        stable_price_delay_interval_seconds_opt: None,
+        stable_price_delay_growth_limit_opt: None,
+        stable_price_growth_limit_opt: None,
+        min_vault_to_deposits_ratio_opt: None,
+        net_borrow_limit_per_window_quote_opt: None,
+        net_borrow_limit_window_size_ts_opt: None,
+        borrow_weight_scale_start_quote_opt: None,
+        deposit_weight_scale_start_quote_opt: None,
+        reset_stable_price: false,
+        reset_net_borrow_limit: false,
+        reduce_only_opt: None,
+    }
+}
+
+pub struct TokenEditWeights {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub mint: Pubkey,
+
+    pub maint_asset_weight: f32,
+    pub maint_liab_weight: f32,
+    pub init_asset_weight: f32,
+    pub init_liab_weight: f32,
+}
+
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenEditWeights {
+    type Accounts = mango_v4::accounts::TokenEdit;
+    type Instruction = mango_v4::instruction::TokenEdit;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let mint_info_key = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                self.group.as_ref(),
+                self.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let mint_info: MintInfo = account_loader.load(&mint_info_key).await.unwrap();
+
+        let instruction = Self::Instruction {
+            init_asset_weight_opt: Some(self.init_asset_weight),
+            init_liab_weight_opt: Some(self.init_liab_weight),
+            maint_asset_weight_opt: Some(self.maint_asset_weight),
+            maint_liab_weight_opt: Some(self.maint_liab_weight),
+            ..token_edit_instruction_default()
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            mint_info: mint_info_key,
+            oracle: mint_info.oracle,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction
+            .accounts
+            .extend(mint_info.banks().iter().map(|&k| AccountMeta {
+                pubkey: k,
+                is_signer: false,
+                is_writable: true,
+            }));
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
 pub struct TokenResetStablePriceModel {
     pub group: Pubkey,
     pub admin: TestKeypair,
@@ -1064,28 +1165,9 @@ impl ClientInstruction for TokenResetStablePriceModel {
         let mint_info: MintInfo = account_loader.load(&mint_info_key).await.unwrap();
 
         let instruction = Self::Instruction {
-            oracle_opt: None,
-            oracle_config_opt: None,
-            group_insurance_fund_opt: None,
-            interest_rate_params_opt: None,
-            loan_fee_rate_opt: None,
-            loan_origination_fee_rate_opt: None,
-            maint_asset_weight_opt: None,
-            init_asset_weight_opt: None,
-            maint_liab_weight_opt: None,
-            init_liab_weight_opt: None,
-            liquidation_fee_opt: None,
-            stable_price_delay_interval_seconds_opt: None,
-            stable_price_delay_growth_limit_opt: None,
-            stable_price_growth_limit_opt: None,
-            min_vault_to_deposits_ratio_opt: None,
-            net_borrow_limit_per_window_quote_opt: None,
-            net_borrow_limit_window_size_ts_opt: None,
-            borrow_weight_scale_start_quote_opt: None,
-            deposit_weight_scale_start_quote_opt: None,
             reset_stable_price: true,
             reset_net_borrow_limit: false,
-            reduce_only_opt: None,
+            ..token_edit_instruction_default()
         };
 
         let accounts = Self::Accounts {
@@ -1142,28 +1224,11 @@ impl ClientInstruction for TokenResetNetBorrows {
         let mint_info: MintInfo = account_loader.load(&mint_info_key).await.unwrap();
 
         let instruction = Self::Instruction {
-            oracle_opt: None,
-            oracle_config_opt: None,
-            group_insurance_fund_opt: None,
-            interest_rate_params_opt: None,
-            loan_fee_rate_opt: None,
-            loan_origination_fee_rate_opt: None,
-            maint_asset_weight_opt: None,
-            init_asset_weight_opt: None,
-            maint_liab_weight_opt: None,
-            init_liab_weight_opt: None,
-            liquidation_fee_opt: None,
-            stable_price_delay_interval_seconds_opt: None,
-            stable_price_delay_growth_limit_opt: None,
-            stable_price_growth_limit_opt: None,
             min_vault_to_deposits_ratio_opt: self.min_vault_to_deposits_ratio_opt,
             net_borrow_limit_per_window_quote_opt: self.net_borrow_limit_per_window_quote_opt,
             net_borrow_limit_window_size_ts_opt: self.net_borrow_limit_window_size_ts_opt,
-            borrow_weight_scale_start_quote_opt: None,
-            deposit_weight_scale_start_quote_opt: None,
-            reset_stable_price: false,
             reset_net_borrow_limit: true,
-            reduce_only_opt: None,
+            ..token_edit_instruction_default()
         };
 
         let accounts = Self::Accounts {
@@ -1217,28 +1282,8 @@ impl ClientInstruction for TokenMakeReduceOnly {
         let mint_info: MintInfo = account_loader.load(&mint_info_key).await.unwrap();
 
         let instruction = Self::Instruction {
-            oracle_opt: None,
-            oracle_config_opt: None,
-            group_insurance_fund_opt: None,
-            interest_rate_params_opt: None,
-            loan_fee_rate_opt: None,
-            loan_origination_fee_rate_opt: None,
-            maint_asset_weight_opt: None,
-            init_asset_weight_opt: None,
-            maint_liab_weight_opt: None,
-            init_liab_weight_opt: None,
-            liquidation_fee_opt: None,
-            stable_price_delay_interval_seconds_opt: None,
-            stable_price_delay_growth_limit_opt: None,
-            stable_price_growth_limit_opt: None,
-            min_vault_to_deposits_ratio_opt: None,
-            net_borrow_limit_per_window_quote_opt: None,
-            net_borrow_limit_window_size_ts_opt: None,
-            borrow_weight_scale_start_quote_opt: None,
-            deposit_weight_scale_start_quote_opt: None,
-            reset_stable_price: false,
-            reset_net_borrow_limit: false,
             reduce_only_opt: Some(true),
+            ..token_edit_instruction_default()
         };
 
         let accounts = Self::Accounts {
@@ -3361,7 +3406,7 @@ impl ClientInstruction for PerpLiqBasePositionInstruction {
     }
 }
 
-pub struct PerpLiqBankruptcyInstruction {
+pub struct PerpLiqQuoteAndBankruptcyInstruction {
     pub liqor: Pubkey,
     pub liqor_owner: TestKeypair,
     pub liqee: Pubkey,
@@ -3369,9 +3414,9 @@ pub struct PerpLiqBankruptcyInstruction {
     pub max_liab_transfer: u64,
 }
 #[async_trait::async_trait(?Send)]
-impl ClientInstruction for PerpLiqBankruptcyInstruction {
-    type Accounts = mango_v4::accounts::PerpLiqBankruptcy;
-    type Instruction = mango_v4::instruction::PerpLiqBankruptcy;
+impl ClientInstruction for PerpLiqQuoteAndBankruptcyInstruction {
+    type Accounts = mango_v4::accounts::PerpLiqQuoteAndBankruptcy;
+    type Instruction = mango_v4::instruction::PerpLiqQuoteAndBankruptcy;
     async fn to_instruction(
         &self,
         account_loader: impl ClientAccountLoader + 'async_trait,
@@ -3416,10 +3461,11 @@ impl ClientInstruction for PerpLiqBankruptcyInstruction {
 
         let accounts = Self::Accounts {
             group: group_key,
-            perp_market: self.perp_market,
             liqor: self.liqor,
             liqor_owner: self.liqor_owner.pubkey(),
             liqee: self.liqee,
+            perp_market: self.perp_market,
+            oracle: perp_market.oracle,
             settle_bank: quote_mint_info.first_bank(),
             settle_vault: quote_mint_info.first_vault(),
             settle_oracle: quote_mint_info.oracle,

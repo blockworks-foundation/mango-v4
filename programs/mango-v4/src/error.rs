@@ -69,6 +69,16 @@ pub enum MangoError {
     TokenInReduceOnlyMode,
     #[msg("market is in reduce only mode")]
     MarketInReduceOnlyMode,
+    #[msg("the perp position has non-zero base lots")]
+    PerpHasBaseLots,
+    #[msg("there are open or unsettled serum3 orders")]
+    HasOpenOrUnsettledSerum3Orders,
+    #[msg("has liquidatable token position")]
+    HasLiquidatableTokenPosition,
+    #[msg("has liquidatable perp base position")]
+    HasLiquidatablePerpBasePosition,
+    #[msg("has liquidatable trusted perp pnl")]
+    HasLiquidatableTrustedPerpPnl,
 }
 
 impl MangoError {

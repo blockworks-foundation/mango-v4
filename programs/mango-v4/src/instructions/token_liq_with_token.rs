@@ -58,6 +58,7 @@ pub fn token_liq_with_token(
     let mut liqee_health_cache = new_health_cache(&liqee.borrow(), &account_retriever)
         .context("create liqee health cache")?;
     let init_health = liqee_health_cache.health(HealthType::Init);
+    liqee_health_cache.require_after_phase1_liquidation()?;
 
     // Once maint_health falls below 0, we want to start liquidating,
     // we want to allow liquidation to continue until init_health is positive,
