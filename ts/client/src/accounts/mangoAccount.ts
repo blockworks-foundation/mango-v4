@@ -355,7 +355,7 @@ export class MangoAccount {
    * Sum of all positive assets.
    * @returns assets, in native quote
    */
-  public getAssetsValue(group: Group, healthType: HealthType): I80F48 {
+  public getAssetsValue(group: Group, healthType?: HealthType): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc.assets(healthType);
   }
@@ -364,7 +364,7 @@ export class MangoAccount {
    * Sum of all negative assets.
    * @returns liabs, in native quote
    */
-  public getLiabsValue(group: Group, healthType: HealthType): I80F48 {
+  public getLiabsValue(group: Group, healthType?: HealthType): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc.liabs(healthType);
   }

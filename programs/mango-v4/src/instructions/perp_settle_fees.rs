@@ -6,8 +6,7 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::{compute_health, new_fixed_order_account_retriever, HealthType};
 use crate::state::Bank;
-use crate::state::MangoAccount;
-use crate::state::{AccountLoaderDynamic, Group, PerpMarket};
+use crate::state::{Group, MangoAccountFixed, MangoAccountLoader, PerpMarket};
 
 use crate::logs::{emit_perp_balances, PerpSettleFeesLog, TokenBalanceLog};
 
@@ -20,7 +19,7 @@ pub struct PerpSettleFees<'info> {
 
     // This account MUST have a loss
     #[account(mut, has_one = group)]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
 
     /// CHECK: Oracle can have different account types, constrained by address in perp_market
     pub oracle: UncheckedAccount<'info>,
@@ -40,7 +39,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         MangoError::MaxSettleAmountMustBeGreaterThanZero
     );
 
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut account = ctx.accounts.account.load_full_mut()?;
     let mut bank = ctx.accounts.settle_bank.load_mut()?;
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
@@ -105,7 +104,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     let token_position = account
         .token_position_mut(perp_market.settle_token_index)?
         .0;
-    bank.withdraw_with_fee(
+    bank.withdraw_without_fee(
         token_position,
         settlement,
         Clock::get()?.unix_timestamp.try_into().unwrap(),

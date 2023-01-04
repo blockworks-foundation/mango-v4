@@ -1,12 +1,23 @@
-### Development
+## Development
 
-- rust version 1.59.0 (9d1b2106e 2022-02-23)
-- solana-cli 1.9.13
-- anchor-cli 0.24.2
+### Dependencies
+
+- rust version 1.65.0
+- solana-cli 1.14.9
 - npm 8.1.2
 - node v16.13.1
 
-Devnet deployment - 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
+### Submodules
+
+After cloning this repo you'll need to init and update its git submodules.
+Consider setting the git option `submodule.recurse=true`.
+
+### Deployments
+
+- devnet: 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
+- mainnet-beta: 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
+
+### Notes
 
 For testing latest program changes while developing,
 just run below scripts in given order form any branch,

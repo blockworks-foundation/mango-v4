@@ -3,8 +3,7 @@ use crate::error::*;
 use crate::group_seeds;
 use crate::health::{new_fixed_order_account_retriever, new_health_cache, AccountRetriever};
 use crate::logs::{FlashLoanLog, FlashLoanTokenDetail, TokenBalanceLog};
-use crate::state::MangoAccount;
-use crate::state::{AccountLoaderDynamic, Bank, Group, TokenIndex};
+use crate::state::*;
 use crate::util::checked_math as cm;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
@@ -32,7 +31,7 @@ pub mod jupiter_mainnet_3 {
 /// 4. the mango group
 #[derive(Accounts)]
 pub struct FlashLoanBegin<'info> {
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
     // owner is checked at #1
     pub owner: Signer<'info>,
 
@@ -55,7 +54,7 @@ pub struct FlashLoanBegin<'info> {
 #[derive(Accounts)]
 pub struct FlashLoanEnd<'info> {
     #[account(mut)]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
     // owner is checked at #1
     pub owner: Signer<'info>,
 
@@ -75,7 +74,7 @@ pub fn flash_loan_begin<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanBegin<'info>>,
     loan_amounts: Vec<u64>,
 ) -> Result<()> {
-    let account = ctx.accounts.account.load_mut()?;
+    let account = ctx.accounts.account.load_full_mut()?;
 
     // account constraint #1
     require!(
@@ -239,7 +238,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     ctx: Context<'key, 'accounts, 'remaining, 'info, FlashLoanEnd<'info>>,
     flash_loan_type: FlashLoanType,
 ) -> Result<()> {
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut account = ctx.accounts.account.load_full_mut()?;
 
     // account constraint #1
     require!(

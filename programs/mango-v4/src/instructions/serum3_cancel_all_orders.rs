@@ -14,7 +14,7 @@ pub struct Serum3CancelAllOrders<'info> {
         has_one = group
         // owner is checked at #1
     )]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,
 
     #[account(mut)]
@@ -51,7 +51,7 @@ pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) 
     // Validation
     //
     {
-        let account = ctx.accounts.account.load()?;
+        let account = ctx.accounts.account.load_full()?;
         // account constraint #1
         require!(
             account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),

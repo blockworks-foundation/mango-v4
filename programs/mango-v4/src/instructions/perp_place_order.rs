@@ -3,10 +3,10 @@ use anchor_lang::prelude::*;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::{new_fixed_order_account_retriever, new_health_cache};
-use crate::state::MangoAccount;
 use crate::state::Side;
 use crate::state::{
-    AccountLoaderDynamic, BookSide, EventQueue, Group, Order, Orderbook, PerpMarket,
+    BookSide, EventQueue, Group, MangoAccountFixed, MangoAccountLoader, Order, Orderbook,
+    PerpMarket,
 };
 
 #[derive(Accounts)]
@@ -14,7 +14,7 @@ pub struct PerpPlaceOrder<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group)]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
     pub owner: Signer<'info>,
 
     #[account(
@@ -65,7 +65,7 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, mut order: Order, limit: u
         perp_market.update_funding_and_stable_price(&book, oracle_price, now_ts)?;
     }
 
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut account = ctx.accounts.account.load_full_mut()?;
     require!(
         account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
         MangoError::SomeError

@@ -17,7 +17,7 @@ pub struct Serum3LiqForceCancelOrders<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group)]
-    pub account: AccountLoaderDynamic<'info, MangoAccount>,
+    pub account: AccountLoader<'info, MangoAccountFixed>,
 
     #[account(mut)]
     /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
@@ -77,7 +77,7 @@ pub fn serum3_liq_force_cancel_orders(
     //
     let serum_market = ctx.accounts.serum_market.load()?;
     {
-        let account = ctx.accounts.account.load()?;
+        let account = ctx.accounts.account.load_full()?;
 
         // Validate open_orders #2
         require!(
@@ -113,7 +113,7 @@ pub fn serum3_liq_force_cancel_orders(
     // Check liqee health if liquidation is allowed
     //
     let mut health_cache = {
-        let mut account = ctx.accounts.account.load_mut()?;
+        let mut account = ctx.accounts.account.load_full_mut()?;
         let retriever =
             new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
         let health_cache =
@@ -146,7 +146,7 @@ pub fn serum3_liq_force_cancel_orders(
     let before_oo = {
         let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
         let before_oo = OpenOrdersSlim::from_oo(&open_orders);
-        let mut account = ctx.accounts.account.load_mut()?;
+        let mut account = ctx.accounts.account.load_full_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
         charge_loan_origination_fees(
@@ -208,7 +208,7 @@ pub fn serum3_liq_force_cancel_orders(
     require_gte!(after_quote_vault, before_quote_vault);
 
     // Credit the difference in vault balances to the user's account
-    let mut account = ctx.accounts.account.load_mut()?;
+    let mut account = ctx.accounts.account.load_full_mut()?;
     let mut base_bank = ctx.accounts.base_bank.load_mut()?;
     let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
     apply_vault_difference(
