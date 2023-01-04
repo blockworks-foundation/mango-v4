@@ -1,4 +1,5 @@
 import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
+import { OpenOrders } from '@project-serum/serum';
 import {
   WRAPPED_SOL_MINT,
   closeAccount,
@@ -1102,11 +1103,36 @@ export class MangoClient {
       .rpc();
   }
 
-  public async serum3CloseOpenOrders(
+  public async serum3CreateOpenOrdersIx(
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-  ): Promise<TransactionSignature> {
+  ): Promise<TransactionInstruction> {
+    const serum3Market: Serum3Market = group.serum3MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const ix = await this.program.methods
+      .serum3CreateOpenOrders()
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        serumMarket: serum3Market.publicKey,
+        serumProgram: serum3Market.serumProgram,
+        serumMarketExternal: serum3Market.serumMarketExternal,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .instruction();
+
+    return ix;
+  }
+
+  public async serum3CloseOpenOrdersIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+  ): Promise<TransactionInstruction> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
@@ -1127,7 +1153,28 @@ export class MangoClient {
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
       })
-      .rpc();
+      .instruction();
+  }
+
+  public async serum3CloseOpenOrders(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+  ): Promise<TransactionSignature> {
+    const ix = await this.serum3CloseOpenOrdersIx(
+      group,
+      mangoAccount,
+      externalMarketPk,
+    );
+
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      [ix],
+      group.addressLookupTablesList,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
   }
 
   public async serum3PlaceOrderIx(
@@ -1141,18 +1188,47 @@ export class MangoClient {
     orderType: Serum3OrderType,
     clientOrderId: number,
     limit: number,
-  ): Promise<TransactionInstruction> {
+  ): Promise<TransactionInstruction[]> {
+    const txes: TransactionInstruction[] = [];
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
+    let openOrdersPk;
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        AccountRetriever.Fixed,
+        group,
+        [mangoAccount],
+        [],
+        [],
+      );
+
     if (!mangoAccount.getSerum3Account(serum3Market.marketIndex)) {
-      await this.serum3CreateOpenOrders(
+      const ix = await this.serum3CreateOpenOrdersIx(
         group,
         mangoAccount,
         serum3Market.serumMarketExternal,
       );
-      await mangoAccount.reload(this);
+
+      const [openOrderPublicKey] = await PublicKey.findProgramAddress(
+        [
+          Buffer.from('Serum300'),
+          mangoAccount.publicKey.toBuffer(),
+          serum3Market.publicKey.toBuffer(),
+        ],
+        serum3Market.serumProgram,
+      );
+      const baseBank = group.getFirstBankByTokenIndex(
+        serum3Market.baseTokenIndex,
+      );
+
+      openOrdersPk = openOrderPublicKey;
+      healthRemainingAccounts.push(
+        ...[openOrdersPk, baseBank.publicKey, baseBank.oracle],
+      );
+      txes.push(ix);
     }
+
     const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     )!;
@@ -1161,15 +1237,6 @@ export class MangoClient {
         this.cluster,
         serum3Market,
         serum3MarketExternal,
-      );
-
-    const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
-        group,
-        [mangoAccount],
-        [],
-        [],
       );
 
     const limitPrice = serum3MarketExternal.priceNumberToLots(price);
@@ -1191,7 +1258,6 @@ export class MangoClient {
     })();
 
     const payerBank = group.getFirstBankByTokenIndex(payerTokenIndex);
-
     const ix = await this.program.methods
       .serum3PlaceOrder(
         side,
@@ -1207,8 +1273,9 @@ export class MangoClient {
         group: group.publicKey,
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
-          ?.openOrders,
+        openOrders:
+          openOrdersPk ||
+          mangoAccount.getSerum3Account(serum3Market.marketIndex)?.openOrders,
         serumMarket: serum3Market.publicKey,
         serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
@@ -1230,8 +1297,8 @@ export class MangoClient {
         ),
       )
       .instruction();
-
-    return ix;
+    txes.push(ix);
+    return txes;
   }
 
   public async serum3PlaceOrder(
@@ -1246,7 +1313,11 @@ export class MangoClient {
     clientOrderId: number,
     limit: number,
   ): Promise<TransactionSignature> {
-    const ix = await this.serum3PlaceOrderIx(
+    const serum3Market = group.serum3MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
+    const txes: TransactionInstruction[] = [];
+    const placeOrderIxes = await this.serum3PlaceOrderIx(
       group,
       mangoAccount,
       externalMarketPk,
@@ -1258,15 +1329,18 @@ export class MangoClient {
       clientOrderId,
       limit,
     );
-
-    const ix2 = await this.serum3SettleFundsIx(
-      group,
-      mangoAccount,
-      externalMarketPk,
-    );
+    txes.push(...placeOrderIxes);
+    if (mangoAccount.getSerum3Account(serum3Market.marketIndex)?.openOrders) {
+      const ix2 = await this.serum3SettleFundsIx(
+        group,
+        mangoAccount,
+        externalMarketPk,
+      );
+      txes.push(ix2);
+    }
 
     return await this.sendAndConfirmTransaction(
-      [ix, ix2],
+      [...txes],
       group.addressLookupTablesList,
     );
   }
@@ -2720,7 +2794,7 @@ export class MangoClient {
         limit,
       ),
     ]);
-    transactionInstructions.push(cancelOrderIx, settleIx, placeOrderIx);
+    transactionInstructions.push(cancelOrderIx, settleIx, ...placeOrderIx);
 
     return await this.sendAndConfirmTransaction(
       transactionInstructions,
