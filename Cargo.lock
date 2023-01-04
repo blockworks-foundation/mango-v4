@@ -429,6 +429,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-once-cell"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f61305cacf1d0c5c9d3ee283d22f8f1f8c743a18ceb44a1b102bd53476c141de"
+
+[[package]]
 name = "async-stream"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1118,6 +1124,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "anyhow",
+ "async-once-cell",
  "async-trait",
  "base64 0.13.1",
  "bincode",
