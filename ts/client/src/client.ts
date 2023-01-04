@@ -49,7 +49,12 @@ import { OPENBOOK_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
-import { FlashLoanType, InterestRateParams, OracleConfigParams } from './types';
+import {
+  AdditionalHealthAccounts,
+  FlashLoanType,
+  InterestRateParams,
+  OracleConfigParams,
+} from './types';
 import {
   I64_MAX_BN,
   createAssociatedTokenAccountIdempotentInstruction,
@@ -1194,15 +1199,7 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
     let openOrdersPk;
-    const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
-        AccountRetriever.Fixed,
-        group,
-        [mangoAccount],
-        [],
-        [],
-      );
-
+    let additionalAccounts: AdditionalHealthAccounts | undefined = undefined;
     if (!mangoAccount.getSerum3Account(serum3Market.marketIndex)) {
       const ix = await this.serum3CreateOpenOrdersIx(
         group,
@@ -1212,23 +1209,33 @@ export class MangoClient {
 
       const [openOrderPublicKey] = await PublicKey.findProgramAddress(
         [
-          Buffer.from('Serum300'),
+          Buffer.from('Serum3OO'),
           mangoAccount.publicKey.toBuffer(),
           serum3Market.publicKey.toBuffer(),
         ],
-        serum3Market.serumProgram,
+        this.program.programId,
       );
       const baseBank = group.getFirstBankByTokenIndex(
         serum3Market.baseTokenIndex,
       );
-
       openOrdersPk = openOrderPublicKey;
-      healthRemainingAccounts.push(
-        ...[openOrdersPk, baseBank.publicKey, baseBank.oracle],
-      );
+      additionalAccounts = {
+        banks: [baseBank.publicKey],
+        oracles: [baseBank.oracle],
+        openOrders: [openOrdersPk],
+        perps: [],
+      };
       txes.push(ix);
     }
-
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(
+        AccountRetriever.Fixed,
+        group,
+        [mangoAccount],
+        [],
+        [],
+        additionalAccounts,
+      );
     const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     )!;
@@ -2564,6 +2571,7 @@ export class MangoClient {
     mangoAccounts: MangoAccount[],
     banks: Bank[],
     perpMarkets: PerpMarket[],
+    additionalAccounts?: AdditionalHealthAccounts,
   ): PublicKey[] {
     if (retriever === AccountRetriever.Fixed) {
       return this.buildFixedAccountRetrieverHealthAccounts(
@@ -2571,6 +2579,7 @@ export class MangoClient {
         mangoAccounts[0],
         banks,
         perpMarkets,
+        additionalAccounts,
       );
     } else {
       return this.buildScanningAccountRetrieverHealthAccounts(
@@ -2589,6 +2598,12 @@ export class MangoClient {
     // but user would potentially open new positions.
     banks: Bank[],
     perpMarkets: PerpMarket[],
+    additionalAccounts: AdditionalHealthAccounts = {
+      oracles: [],
+      banks: [],
+      perps: [],
+      openOrders: [],
+    },
   ): PublicKey[] {
     const healthRemainingAccounts: PublicKey[] = [];
 
@@ -2615,9 +2630,11 @@ export class MangoClient {
 
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.firstBank()),
+      ...additionalAccounts.banks,
     );
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.oracle),
+      ...additionalAccounts.oracles,
     );
 
     const allPerpIndices = mangoAccount.perps.map((perp) => perp.marketIndex);
@@ -2641,6 +2658,7 @@ export class MangoClient {
       .map((index) => group.findPerpMarket(index)!);
     healthRemainingAccounts.push(
       ...allPerpMarkets.map((perp) => perp.publicKey),
+      ...additionalAccounts.perps,
     );
     healthRemainingAccounts.push(...allPerpMarkets.map((perp) => perp.oracle));
 
@@ -2648,6 +2666,7 @@ export class MangoClient {
       ...mangoAccount.serum3
         .filter((serum3Account) => serum3Account.marketIndex !== 65535)
         .map((serum3Account) => serum3Account.openOrders),
+      ...additionalAccounts.openOrders,
     );
 
     // debugHealthAccounts(group, mangoAccount, healthRemainingAccounts);
