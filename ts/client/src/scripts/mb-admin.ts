@@ -1,5 +1,10 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  NATIVE_MINT,
+  TOKEN_PROGRAM_ID,
+} from '@solana/spl-token';
+import {
   AddressLookupTableProgram,
   ComputeBudgetProgram,
   Connection,
@@ -20,11 +25,6 @@ import {
 import { MangoClient } from '../client';
 import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../constants';
 import { buildVersionedTx, toNative } from '../utils';
-import {
-  TOKEN_PROGRAM_ID,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  NATIVE_MINT,
-} from '@solana/spl-token';
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 
@@ -77,7 +77,7 @@ const defaultInterestRate = {
   maxRate: 2.0,
 };
 
-async function buildAdminClient(): Promise<[MangoClient, Keypair]> {
+async function buildAdminClient(): Promise<[MangoClient, Keypair, Keypair]> {
   const admin = Keypair.fromSecretKey(
     Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER2_KEYPAIR!, 'utf-8'))),
   );
@@ -98,7 +98,11 @@ async function buildAdminClient(): Promise<[MangoClient, Keypair]> {
     },
   );
 
-  return [client, admin];
+  const creator = Keypair.fromSecretKey(
+    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER_KEYPAIR!, 'utf-8'))),
+  );
+
+  return [client, admin, creator];
 }
 
 async function buildUserClient(
@@ -143,8 +147,9 @@ async function changeAdmin() {
   const result = await buildAdminClient();
   const client = result[0];
   const admin = result[1];
+  const creator = result[2];
 
-  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
 
   console.log(`Changing admin...`);
   await client.groupEdit(
@@ -157,8 +162,9 @@ async function registerTokens() {
   const result = await buildAdminClient();
   const client = result[0];
   const admin = result[1];
+  const creator = result[2];
 
-  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
 
   console.log(`Creating USDC stub oracle...`);
   const usdcMainnetMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
@@ -329,8 +335,9 @@ async function registerSerum3Markets() {
   const result = await buildAdminClient();
   const client = result[0];
   const admin = result[1];
+  const creator = result[2];
 
-  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
 
   // Register SOL serum market
   await client.serum3RegisterMarket(
@@ -384,8 +391,9 @@ async function registerPerpMarkets() {
   const result = await buildAdminClient();
   const client = result[0];
   const admin = result[1];
+  const creator = result[2];
 
-  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
 
   await client.perpCreateMarket(
     group,
@@ -445,6 +453,45 @@ async function registerPerpMarkets() {
     0,
     1.0,
     2 * 60 * 60,
+  );
+}
+
+async function makePerpMarketReduceOnly() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+  const creator = result[2];
+
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
+  const perpMarket = group.getPerpMarketByName('MNGO-PERP');
+  await client.perpEditMarket(
+    group,
+    perpMarket.perpMarketIndex,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    true,
   );
 }
 
@@ -607,6 +654,7 @@ async function main() {
 
   try {
     // await registerPerpMarkets();
+    // await makePerpMarketReduceOnly();
   } catch (error) {
     console.log(error);
   }
@@ -618,7 +666,7 @@ async function main() {
   }
 
   try {
-    createAndPopulateAlt();
+    // createAndPopulateAlt();
   } catch (error) {}
 }
 
