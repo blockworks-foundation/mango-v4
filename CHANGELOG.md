@@ -6,7 +6,7 @@ Update this for each mainnet deployment.
 
 ## mainnet
 
-Jan 4, 2023 at 13:19:52 Central European Standard Time
+Jan 4, 2023 TODO Central European Standard Time
 
 - Reduce only mode for tokens, and perp markets
 - Perp settlement applies no loan origination fee
