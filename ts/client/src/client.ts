@@ -1207,21 +1207,23 @@ export class MangoClient {
         serum3Market.serumMarketExternal,
       );
 
-      const [openOrderPublicKey] = await PublicKey.findProgramAddress(
-        [
-          Buffer.from('Serum3OO'),
-          mangoAccount.publicKey.toBuffer(),
-          serum3Market.publicKey.toBuffer(),
-        ],
-        this.program.programId,
+      const openOrderPublicKey = await this.findOpenOrdersProgramAddress(
+        mangoAccount.publicKey,
+        serum3Market.publicKey,
       );
-      const baseBank = group.getFirstBankByTokenIndex(
-        serum3Market.baseTokenIndex,
-      );
+      const tokenIndex =
+        serum3Market[
+          side == Serum3Side.bid ? 'baseTokenIndex' : 'quoteTokenIndex'
+        ];
+      const baseBank = group.getFirstBankByTokenIndex(tokenIndex);
+      const hasBaseBank =
+        mangoAccount.tokens[tokenIndex].tokenIndex !==
+        TokenPosition.TokenIndexUnset;
+
       openOrdersPk = openOrderPublicKey;
       additionalAccounts = {
-        banks: [baseBank.publicKey],
-        oracles: [baseBank.oracle],
+        banks: !hasBaseBank ? [baseBank.publicKey] : [],
+        oracles: !hasBaseBank ? [baseBank.oracle] : [],
         openOrders: [openOrdersPk],
         perps: [],
       };
@@ -1320,10 +1322,6 @@ export class MangoClient {
     clientOrderId: number,
     limit: number,
   ): Promise<TransactionSignature> {
-    const serum3Market = group.serum3MarketsMapByExternal.get(
-      externalMarketPk.toBase58(),
-    )!;
-    const txes: TransactionInstruction[] = [];
     const placeOrderIxes = await this.serum3PlaceOrderIx(
       group,
       mangoAccount,
@@ -1336,18 +1334,14 @@ export class MangoClient {
       clientOrderId,
       limit,
     );
-    txes.push(...placeOrderIxes);
-    if (mangoAccount.getSerum3Account(serum3Market.marketIndex)?.openOrders) {
-      const ix2 = await this.serum3SettleFundsIx(
-        group,
-        mangoAccount,
-        externalMarketPk,
-      );
-      txes.push(ix2);
-    }
+    const settleIx = await this.serum3SettleFundsIx(
+      group,
+      mangoAccount,
+      externalMarketPk,
+    );
 
     return await this.sendAndConfirmTransaction(
-      [...txes],
+      [...placeOrderIxes, settleIx],
       group.addressLookupTablesList,
     );
   }
@@ -1400,12 +1394,19 @@ export class MangoClient {
     const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     )!;
-    const serum3MarketExternalVaultSigner =
-      await generateSerum3MarketExternalVaultSignerAddress(
-        this.cluster,
-        serum3Market,
-        serum3MarketExternal,
-      );
+
+    const [serum3MarketExternalVaultSigner, openOrderPublicKey] =
+      await Promise.all([
+        generateSerum3MarketExternalVaultSignerAddress(
+          this.cluster,
+          serum3Market,
+          serum3MarketExternal,
+        ),
+        this.findOpenOrdersProgramAddress(
+          mangoAccount.publicKey,
+          serum3Market.publicKey,
+        ),
+      ]);
 
     const ix = await this.program.methods
       .serum3SettleFunds()
@@ -1413,8 +1414,7 @@ export class MangoClient {
         group: group.publicKey,
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
-          ?.openOrders,
+        openOrders: openOrderPublicKey,
         serumMarket: serum3Market.publicKey,
         serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
@@ -2819,5 +2819,21 @@ export class MangoClient {
       transactionInstructions,
       group.addressLookupTablesList,
     );
+  }
+
+  private async findOpenOrdersProgramAddress(
+    mangoAccount: PublicKey,
+    serum3Market: PublicKey,
+  ): Promise<PublicKey> {
+    const [openOrderPublicKey] = await PublicKey.findProgramAddress(
+      [
+        Buffer.from('Serum3OO'),
+        mangoAccount.toBuffer(),
+        serum3Market.toBuffer(),
+      ],
+      this.program.programId,
+    );
+
+    return openOrderPublicKey;
   }
 }
