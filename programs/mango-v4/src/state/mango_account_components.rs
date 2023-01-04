@@ -165,7 +165,18 @@ pub struct PerpPosition {
 
     #[derivative(Debug = "ignore")]
     pub padding: [u8; 2],
+
+    /// Index of the current settle pnl limit window
     pub settle_pnl_limit_window: u32,
+
+    /// Amount of pnl that was already settled this window.
+    ///
+    /// Will be negative when negative pnl was settled. The settle limit
+    /// restricts the abs() of this value.
+    ///
+    /// Note that this will be adjusted for bookkeeping reasons when the settle limit
+    /// changes and is not useable for actually tracking how much pnl was settled
+    /// on balance.
     pub settle_pnl_limit_settled_in_current_window_native: i64,
 
     /// Active position size, measured in base lots
@@ -177,17 +188,19 @@ pub struct PerpPosition {
     /// Tracks what the position is to calculate average entry & break even price
     pub quote_running_native: i64,
 
-    /// Already settled funding
+    /// Already settled long funding
     pub long_settled_funding: I80F48,
+    /// Already settled short funding
     pub short_settled_funding: I80F48,
 
-    /// Base lots in bids
+    /// Base lots in open bids
     pub bids_base_lots: i64,
-    /// Base lots in asks
+    /// Base lots in open asks
     pub asks_base_lots: i64,
 
-    /// Amount that's on EventQueue waiting to be processed
+    /// Amount of base lots on the EventQueue waiting to be processed
     pub taker_base_lots: i64,
+    /// Amount of quote lots on the EventQueue waiting to be processed
     pub taker_quote_lots: i64,
 
     // (Display only)
@@ -206,10 +219,21 @@ pub struct PerpPosition {
     // Cumulative realized pnl in quote native units
     pub perp_spot_transfers: i64,
 
+    /// The native average entry price for the base lots of the current position.
+    /// Reset to 0 when the base position reaches or crosses 0.
     pub avg_entry_price_per_base_lot: f64,
 
+    /// Amount of pnl that was realized.
+    /// Pnl is realized when a trade brings the base position closer to 0.
     pub realized_pnl_native: I80F48,
 
+    /// Settle limit contribution from realized pnl.
+    ///
+    /// Every time positive pnl is realized, this is increased by a fraction of the stable
+    /// value of the realization. It's decreased when the realized pnl drops below this value.
+    ///
+    /// Note that settle limits only apply to positive realized pnl, negative realized
+    /// pnl is always settleable.
     pub settle_pnl_limit_realized_pnl_native: u64,
 
     #[derivative(Debug = "ignore")]
@@ -330,13 +354,20 @@ impl PerpPosition {
         self.short_settled_funding = perp_market.short_funding;
     }
 
-    /// Updates entry price, breakeven price, realized pnl
+    /// Updates avg entry price, breakeven price, realized pnl, realized pnl limit
     fn update_trade_stats(
         &mut self,
         base_change: i64,
         quote_change_native: I80F48,
         perp_market: &PerpMarket,
     ) {
+        msg!(
+            "update {} {} {} {}",
+            base_change,
+            quote_change_native,
+            self.base_position_lots,
+            self.quote_position_native
+        );
         if base_change == 0 {
             return;
         }
@@ -361,6 +392,13 @@ impl PerpPosition {
             let new_realized_pnl = cm!(self.quote_position_native + quote_change_native);
             newly_realized_pnl = cm!(new_realized_pnl - self.realized_pnl_native);
             self.realized_pnl_native = new_realized_pnl;
+            msg!(
+                "zeroed {} {} {} {}",
+                self.quote_position_native,
+                quote_change_native,
+                newly_realized_pnl,
+                old_position
+            );
         } else if old_position.signum() != new_position.signum() {
             // If the base position changes sign, we've crossed base_pos == 0 (or old_position == 0)
             reduced_lots = old_position.abs();
@@ -408,39 +446,48 @@ impl PerpPosition {
 
         // Whenever positive pnl is realized also bump up the realized pnl settle limit.
         if newly_realized_pnl > 0 {
-            let realized_safe_value =
+            let realized_stable_value =
                 cm!(I80F48::from(reduced_lots * perp_market.base_lot_size)
                     * perp_market.stable_price());
             let limit_increase =
-                cm!(I80F48::from_num(perp_market.settle_pnl_limit_factor) * realized_safe_value)
+                cm!(I80F48::from_num(perp_market.settle_pnl_limit_factor) * realized_stable_value)
                     .min(newly_realized_pnl)
                     .ceil()
                     .checked_to_num::<u64>()
                     .unwrap();
             cm!(self.settle_pnl_limit_realized_pnl_native += limit_increase);
         }
-        self.apply_realized_pnl_settle_limit_constraint();
+        self.apply_realized_pnl_settle_limit_constraint(newly_realized_pnl);
     }
 
-    fn apply_realized_pnl_settle_limit_constraint(&mut self) {
-        let new_realized_settle_limit = self
+    /// The realized pnl settle limit shall be <= max(0, realized pnl)
+    /// This function applies that constraint and deals with bookkeeping.
+    fn apply_realized_pnl_settle_limit_constraint(&mut self, realized_pnl_change: I80F48) {
+        let new_limit = self
             .settle_pnl_limit_realized_pnl_native
             .min(self.realized_pnl_native.ceil().clamped_to_u64());
-        let realized_settle_limit_reduction = (self.settle_pnl_limit_realized_pnl_native
-            - new_realized_settle_limit)
-            .clamped_to_i64();
-        self.settle_pnl_limit_realized_pnl_native = new_realized_settle_limit;
+        let limit_reduction =
+            (self.settle_pnl_limit_realized_pnl_native - new_limit).clamped_to_i64();
+        self.settle_pnl_limit_realized_pnl_native = new_limit;
 
         // If we reduce the budget we also need to decrease the used amount to keep
         // the free amount the same.
         // Example: settling the last remaining 50 realized pnl adds 50 to settled and brings the
         // realized pnl settle budget to 0 above. That means we reduced the budget _and_ used
         // up a part of it: it was double-counted.
-        // Here we reduce any positive settle balance by the budget reduction.
+        // Here we reduce a positive settle balance by the budget reduction.
+        //
+        // However, sometimes realized_pnl got reduced by non-settled such as funding or fees.
+        // To avoid overcorrecting, the adjustment is limited to the realized_pnl reduction
+        // passed into this function.
+        let active_limit_reduction = limit_reduction
+            .min((-realized_pnl_change).clamped_to_i64())
+            .max(0);
+
         let settled = &mut self.settle_pnl_limit_settled_in_current_window_native;
         if *settled > 0 {
             let prev_settled = *settled;
-            *settled = cm!(prev_settled - realized_settle_limit_reduction).max(0);
+            *settled = cm!(prev_settled - active_limit_reduction).max(0);
         }
     }
 
@@ -491,17 +538,6 @@ impl PerpPosition {
         let base_native = self.base_position_native(&perp_market);
         let pnl = cm!(self.quote_position_native() + base_native * price);
         Ok(pnl)
-    }
-
-    /// Calculate the realized and unrealized PnL of the position for a given price
-    pub fn realized_and_unrealized_pnl_for_price(
-        &self,
-        perp_market: &PerpMarket,
-        price: I80F48,
-    ) -> Result<(I80F48, I80F48)> {
-        let pnl = self.pnl_for_price(perp_market, price)?;
-        let unrealized_pnl = cm!(pnl - self.realized_pnl_native);
-        Ok((self.realized_pnl_native, unrealized_pnl))
     }
 
     /// Updates the perp pnl limit time windowing, resetting the amount
@@ -558,22 +594,22 @@ impl PerpPosition {
         self.change_quote_position(-settled_pnl);
 
         // Adjust realized pnl for the settlement
-        let used_realized = if settled_pnl > 0 {
+        let realized_pnl_reduction = if settled_pnl > 0 {
             // Example: settling 100 positive pnl, with 60 realized:
-            // pnl = 100 -> used_realized = 60
+            // pnl = 100 -> realized_pnl_reduction = 60
             settled_pnl.min(self.realized_pnl_native).max(I80F48::ZERO)
         } else {
             // Example: settling 100 negative pnl, with -60 realized:
-            // pnl = -100 -> used_realized = -60
+            // pnl = -100 -> realized_pnl_reduction = -60
             settled_pnl.max(self.realized_pnl_native).min(I80F48::ZERO)
         };
-        cm!(self.realized_pnl_native -= used_realized);
+        cm!(self.realized_pnl_native -= realized_pnl_reduction);
 
         // Consume settle limit budget
         let settled_pnl_i64 = settled_pnl.round_to_zero().clamped_to_i64();
         cm!(self.settle_pnl_limit_settled_in_current_window_native += settled_pnl_i64);
 
-        self.apply_realized_pnl_settle_limit_constraint()
+        self.apply_realized_pnl_settle_limit_constraint(-realized_pnl_reduction)
     }
 
     pub fn record_fee(&mut self, fee: I80F48) {

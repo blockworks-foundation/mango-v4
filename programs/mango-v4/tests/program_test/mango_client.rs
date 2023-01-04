@@ -2527,6 +2527,35 @@ impl ClientInstruction for PerpCreateMarketInstruction {
     }
 }
 
+fn perp_edit_instruction_default() -> mango_v4::instruction::PerpEditMarket {
+    mango_v4::instruction::PerpEditMarket {
+        oracle_opt: None,
+        oracle_config_opt: None,
+        base_decimals_opt: None,
+        maint_asset_weight_opt: None,
+        init_asset_weight_opt: None,
+        maint_liab_weight_opt: None,
+        init_liab_weight_opt: None,
+        liquidation_fee_opt: None,
+        maker_fee_opt: None,
+        taker_fee_opt: None,
+        min_funding_opt: None,
+        max_funding_opt: None,
+        impact_quantity_opt: None,
+        group_insurance_fund_opt: None,
+        trusted_market_opt: None,
+        fee_penalty_opt: None,
+        settle_fee_flat_opt: None,
+        settle_fee_amount_threshold_opt: None,
+        settle_fee_fraction_low_health_opt: None,
+        stable_price_delay_interval_seconds_opt: None,
+        stable_price_delay_growth_limit_opt: None,
+        stable_price_growth_limit_opt: None,
+        settle_pnl_limit_factor_opt: None,
+        settle_pnl_limit_window_size_ts: None,
+    }
+}
+
 pub struct PerpResetStablePriceModel {
     pub group: Pubkey,
     pub admin: TestKeypair,
@@ -2547,29 +2576,47 @@ impl ClientInstruction for PerpResetStablePriceModel {
 
         let instruction = Self::Instruction {
             oracle_opt: Some(perp_market.oracle),
-            oracle_config_opt: None,
-            base_decimals_opt: None,
-            maint_asset_weight_opt: None,
-            init_asset_weight_opt: None,
-            maint_liab_weight_opt: None,
-            init_liab_weight_opt: None,
-            liquidation_fee_opt: None,
-            maker_fee_opt: None,
-            taker_fee_opt: None,
-            min_funding_opt: None,
-            max_funding_opt: None,
-            impact_quantity_opt: None,
-            group_insurance_fund_opt: None,
-            trusted_market_opt: None,
-            fee_penalty_opt: None,
-            settle_fee_flat_opt: None,
-            settle_fee_amount_threshold_opt: None,
-            settle_fee_fraction_low_health_opt: None,
-            stable_price_delay_interval_seconds_opt: None,
-            stable_price_delay_growth_limit_opt: None,
-            stable_price_growth_limit_opt: None,
-            settle_pnl_limit_factor_opt: None,
-            settle_pnl_limit_window_size_ts: None,
+            ..perp_edit_instruction_default()
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            perp_market: self.perp_market,
+            oracle: perp_market.oracle,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
+pub struct PerpSetSettleLimitWindow {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub perp_market: Pubkey,
+    pub window_size_ts: u64,
+}
+
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpSetSettleLimitWindow {
+    type Accounts = mango_v4::accounts::PerpEditMarket;
+    type Instruction = mango_v4::instruction::PerpEditMarket;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+
+        let instruction = Self::Instruction {
+            settle_pnl_limit_window_size_ts: Some(self.window_size_ts),
+            ..perp_edit_instruction_default()
         };
 
         let accounts = Self::Accounts {

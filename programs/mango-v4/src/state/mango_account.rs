@@ -459,7 +459,7 @@ impl<
             .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| (p, raw_index)))
             .ok_or_else(|| {
                 error_msg_typed!(
-                    TokenPositionDoesNotExist,
+                    MangoError::TokenPositionDoesNotExist,
                     "position for token index {} not found",
                     token_index
                 )
@@ -612,7 +612,7 @@ impl<
             .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| raw_index))
             .ok_or_else(|| {
                 error_msg_typed!(
-                    TokenPositionDoesNotExist,
+                    MangoError::TokenPositionDoesNotExist,
                     "position for token index {} not found",
                     token_index
                 )
