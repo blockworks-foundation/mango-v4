@@ -58,10 +58,10 @@ jobs:
       - name: Set Rust version
         run: rustup toolchain install ${{ env.RUST_TOOLCHAIN }} --component clippy
 
-        # allow args to pass anchor warnings
       - name: Run clippy
-        run: cargo clippy -- -D warnings --allow=clippy::style --allow=clippy::complexity --allow=clippy::manual-retain --allow=clippy::crate-in-macro-def --allow=clippy::result-large-err
-
+        # The --allow args are due to clippy scanning anchor
+        run: cargo clippy --no-deps -- --deny=warnings --allow=clippy::style --allow=clippy::complexity --allow=clippy::manual-retain --allow=clippy::crate-in-macro-def --allow=clippy::result-large-err
+  
   test:
     name: Test
     runs-on: ubuntu-latest
