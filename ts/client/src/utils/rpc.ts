@@ -23,10 +23,7 @@ export async function sendTransaction(
   const payer = (provider as AnchorProvider).wallet;
 
   if (opts.prioritizationFee) {
-    ixs = [
-      createComputeBudgetIx(opts.prioritizationFee, 200_000 * ixs.length + 1),
-      ...ixs,
-    ];
+    ixs = [createComputeBudgetIx(opts.prioritizationFee), ...ixs];
   }
 
   const message = MessageV0.compile({
@@ -103,12 +100,10 @@ export async function sendTransaction(
 }
 
 export const createComputeBudgetIx = (
-  prioritizationFee: number,
-  units: number,
+  microLamports: number,
 ): TransactionInstruction => {
-  const computeBudgetIx = ComputeBudgetProgram.requestUnits({
-    additionalFee: prioritizationFee,
-    units,
+  const computeBudgetIx = ComputeBudgetProgram.setComputeUnitPrice({
+    microLamports,
   });
   return computeBudgetIx;
 };
