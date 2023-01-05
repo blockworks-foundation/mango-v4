@@ -56,6 +56,22 @@ export class Serum3Market {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
   }
 
+  public async findOoPda(
+    programId: PublicKey,
+    mangoAccount: PublicKey,
+  ): Promise<PublicKey> {
+    const [openOrderPublicKey] = await PublicKey.findProgramAddress(
+      [
+        Buffer.from('Serum3OO'),
+        mangoAccount.toBuffer(),
+        this.publicKey.toBuffer(),
+      ],
+      programId,
+    );
+
+    return openOrderPublicKey;
+  }
+
   public getFeeRates(taker = true): number {
     // See https://github.com/openbook-dex/program/blob/master/dex/src/fees.rs#L81
     const ratesBps =
