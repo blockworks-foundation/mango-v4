@@ -1200,6 +1200,7 @@ export class MangoClient {
     )!;
     let openOrdersPk;
     let additionalAccounts: AdditionalHealthAccounts | undefined = undefined;
+
     if (!mangoAccount.getSerum3Account(serum3Market.marketIndex)) {
       const ix = await this.serum3CreateOpenOrdersIx(
         group,
@@ -1216,6 +1217,8 @@ export class MangoClient {
           side == Serum3Side.bid ? 'baseTokenIndex' : 'quoteTokenIndex'
         ];
       const baseBank = group.getFirstBankByTokenIndex(tokenIndex);
+      //if someone deposit token before but never made order we don't need
+      //to push banks,oracles to additional accounts it will be inside already
       const hasBaseBank =
         mangoAccount.tokens[tokenIndex].tokenIndex !==
         TokenPosition.TokenIndexUnset;
