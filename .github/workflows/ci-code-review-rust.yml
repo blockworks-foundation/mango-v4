@@ -22,7 +22,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   SOLANA_VERSION: '1.14.9'
-  RUST_TOOLCHAIN: '1.60.0'
+  RUST_TOOLCHAIN: '1.65.0'
   LOG_PROGRAM: 'm43thNJ58XCjL798ZSq6JGAG1BnWskhdq5or6kcnfsD'
 
 defaults:
@@ -59,7 +59,8 @@ jobs:
         run: cargo fmt -- --check
 
       - name: Run clippy
-        run: cargo clippy -- --deny=warnings --allow=clippy::style --allow=clippy::complexity
+        # The --allow args are due to clippy scanning anchor
+        run: cargo clippy --no-deps -- --deny=warnings --allow=clippy::style --allow=clippy::complexity --allow=clippy::manual-retain --allow=clippy::crate-in-macro-def --allow=clippy::result-large-err
 
   tests:
     name: Run tests

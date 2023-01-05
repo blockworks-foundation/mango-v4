@@ -36,6 +36,7 @@ const MAINNET_MINTS = new Map([
   ['SOL', 'So11111111111111111111111111111111111111112'], // 4 Wrapped SOL
   ['MSOL', 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So'], // 5
   ['MNGO', 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac'], // 6
+  ['BONK', 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263'], // 7
 ]);
 const MAINNET_ORACLES = new Map([
   // USDC - stub oracle
@@ -46,6 +47,7 @@ const MAINNET_ORACLES = new Map([
   ['MSOL', 'E4v1BBgoso9s64TQvmyownAVJbhbEPGyzA3qn4n46qj9'],
   ['MNGO', '79wm3jjcPr6RaNQ4DGvP5KxG1mNd3gEBsg6FsNVFezK4'],
   ['BTC', 'GVXRSBjFk6e6J3NbVPXohDJetcTjaeeuykUpbQF8UoMU'],
+  ['BONK', '4SZ1qb4MtSUrZcoeaeQ3BDzVCyqxw3VwSFpPiMTmn4GE'],
 ]);
 
 // External markets are matched with those in https://github.com/openbook-dex/openbook-ts/blob/master/packages/serum/src/markets.json
@@ -320,6 +322,17 @@ async function registerTokens() {
     mngoMainnetOracle,
     6,
     'MNGO',
+  );
+
+  console.log(`Registering BONK...`);
+  const bonkMainnetMint = new PublicKey(MAINNET_MINTS.get('BONK')!);
+  const bonkMainnetOracle = new PublicKey(MAINNET_ORACLES.get('BONK')!);
+  await client.tokenRegisterTrustless(
+    group,
+    bonkMainnetMint,
+    bonkMainnetOracle,
+    7,
+    'BONK',
   );
 
   // log tokens/banks
