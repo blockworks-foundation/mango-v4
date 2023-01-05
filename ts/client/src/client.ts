@@ -1,5 +1,4 @@
 import { AnchorProvider, BN, Program, Provider } from '@project-serum/anchor';
-import { OpenOrders } from '@project-serum/serum';
 import {
   WRAPPED_SOL_MINT,
   closeAccount,
@@ -1194,13 +1193,13 @@ export class MangoClient {
     clientOrderId: number,
     limit: number,
   ): Promise<TransactionInstruction[]> {
-    const txes: TransactionInstruction[] = [];
+    const ixs: TransactionInstruction[] = [];
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
-    let openOrdersPk;
-    let additionalAccounts: AdditionalHealthAccounts | undefined = undefined;
 
+    let ooPk;
+    let additionalAccounts: AdditionalHealthAccounts | undefined = undefined;
     if (!mangoAccount.getSerum3Account(serum3Market.marketIndex)) {
       const ix = await this.serum3CreateOpenOrdersIx(
         group,
@@ -1208,30 +1207,30 @@ export class MangoClient {
         serum3Market.serumMarketExternal,
       );
 
-      const openOrderPublicKey = await this.findOpenOrdersProgramAddress(
+      ooPk = await serum3Market.findOoPda(
+        this.program.programId,
         mangoAccount.publicKey,
-        serum3Market.publicKey,
       );
       const tokenIndex =
         serum3Market[
           side == Serum3Side.bid ? 'baseTokenIndex' : 'quoteTokenIndex'
         ];
       const baseBank = group.getFirstBankByTokenIndex(tokenIndex);
-      //if someone deposit token before but never made order we don't need
-      //to push banks,oracles to additional accounts it will be inside already
+
+      // only push bank/oracle if no deposit has been previously made for same token
       const hasBaseBank =
         mangoAccount.tokens[tokenIndex].tokenIndex !==
         TokenPosition.TokenIndexUnset;
 
-      openOrdersPk = openOrderPublicKey;
       additionalAccounts = {
         banks: !hasBaseBank ? [baseBank.publicKey] : [],
         oracles: !hasBaseBank ? [baseBank.oracle] : [],
-        openOrders: [openOrdersPk],
+        openOrders: [ooPk],
         perps: [],
       };
-      txes.push(ix);
+      ixs.push(ix);
     }
+
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
         AccountRetriever.Fixed,
@@ -1241,6 +1240,7 @@ export class MangoClient {
         [],
         additionalAccounts,
       );
+
     const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     )!;
@@ -1286,7 +1286,7 @@ export class MangoClient {
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         openOrders:
-          openOrdersPk ||
+          ooPk ||
           mangoAccount.getSerum3Account(serum3Market.marketIndex)?.openOrders,
         serumMarket: serum3Market.publicKey,
         serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
@@ -1309,8 +1309,10 @@ export class MangoClient {
         ),
       )
       .instruction();
-    txes.push(ix);
-    return txes;
+
+    ixs.push(ix);
+
+    return ixs;
   }
 
   public async serum3PlaceOrder(
@@ -1405,10 +1407,7 @@ export class MangoClient {
           serum3Market,
           serum3MarketExternal,
         ),
-        this.findOpenOrdersProgramAddress(
-          mangoAccount.publicKey,
-          serum3Market.publicKey,
-        ),
+        serum3Market.findOoPda(this.program.programId, mangoAccount.publicKey),
       ]);
 
     const ix = await this.program.methods
@@ -2822,21 +2821,5 @@ export class MangoClient {
       transactionInstructions,
       group.addressLookupTablesList,
     );
-  }
-
-  private async findOpenOrdersProgramAddress(
-    mangoAccount: PublicKey,
-    serum3Market: PublicKey,
-  ): Promise<PublicKey> {
-    const [openOrderPublicKey] = await PublicKey.findProgramAddress(
-      [
-        Buffer.from('Serum3OO'),
-        mangoAccount.toBuffer(),
-        serum3Market.toBuffer(),
-      ],
-      this.program.programId,
-    );
-
-    return openOrderPublicKey;
   }
 }
