@@ -48,7 +48,12 @@ import { OPENBOOK_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
-import { FlashLoanType, InterestRateParams, OracleConfigParams } from './types';
+import {
+  AdditionalHealthAccounts,
+  FlashLoanType,
+  InterestRateParams,
+  OracleConfigParams,
+} from './types';
 import {
   I64_MAX_BN,
   createAssociatedTokenAccountIdempotentInstruction,
@@ -1102,11 +1107,36 @@ export class MangoClient {
       .rpc();
   }
 
-  public async serum3CloseOpenOrders(
+  public async serum3CreateOpenOrdersIx(
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-  ): Promise<TransactionSignature> {
+  ): Promise<TransactionInstruction> {
+    const serum3Market: Serum3Market = group.serum3MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const ix = await this.program.methods
+      .serum3CreateOpenOrders()
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        serumMarket: serum3Market.publicKey,
+        serumProgram: serum3Market.serumProgram,
+        serumMarketExternal: serum3Market.serumMarketExternal,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .instruction();
+
+    return ix;
+  }
+
+  public async serum3CloseOpenOrdersIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+  ): Promise<TransactionInstruction> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
@@ -1127,7 +1157,28 @@ export class MangoClient {
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
       })
-      .rpc();
+      .instruction();
+  }
+
+  public async serum3CloseOpenOrders(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+  ): Promise<TransactionSignature> {
+    const ix = await this.serum3CloseOpenOrdersIx(
+      group,
+      mangoAccount,
+      externalMarketPk,
+    );
+
+    return await sendTransaction(
+      this.program.provider as AnchorProvider,
+      [ix],
+      group.addressLookupTablesList,
+      {
+        postSendTxCallback: this.postSendTxCallback,
+      },
+    );
   }
 
   public async serum3PlaceOrderIx(
@@ -1141,27 +1192,44 @@ export class MangoClient {
     orderType: Serum3OrderType,
     clientOrderId: number,
     limit: number,
-  ): Promise<TransactionInstruction> {
+  ): Promise<TransactionInstruction[]> {
+    const ixs: TransactionInstruction[] = [];
     const serum3Market = group.serum3MarketsMapByExternal.get(
       externalMarketPk.toBase58(),
     )!;
+
+    let ooPk;
+    let additionalAccounts: AdditionalHealthAccounts | undefined = undefined;
     if (!mangoAccount.getSerum3Account(serum3Market.marketIndex)) {
-      await this.serum3CreateOpenOrders(
+      const ix = await this.serum3CreateOpenOrdersIx(
         group,
         mangoAccount,
         serum3Market.serumMarketExternal,
       );
-      await mangoAccount.reload(this);
-    }
-    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
-      externalMarketPk.toBase58(),
-    )!;
-    const serum3MarketExternalVaultSigner =
-      await generateSerum3MarketExternalVaultSignerAddress(
-        this.cluster,
-        serum3Market,
-        serum3MarketExternal,
+
+      ooPk = await serum3Market.findOoPda(
+        this.program.programId,
+        mangoAccount.publicKey,
       );
+      const tokenIndex =
+        serum3Market[
+          side == Serum3Side.bid ? 'baseTokenIndex' : 'quoteTokenIndex'
+        ];
+      const baseBank = group.getFirstBankByTokenIndex(tokenIndex);
+
+      // only push bank/oracle if no deposit has been previously made for same token
+      const hasBaseBank =
+        mangoAccount.tokens[tokenIndex].tokenIndex !==
+        TokenPosition.TokenIndexUnset;
+
+      additionalAccounts = {
+        banks: !hasBaseBank ? [baseBank.publicKey] : [],
+        oracles: !hasBaseBank ? [baseBank.oracle] : [],
+        openOrders: [ooPk],
+        perps: [],
+      };
+      ixs.push(ix);
+    }
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
@@ -1170,6 +1238,17 @@ export class MangoClient {
         [mangoAccount],
         [],
         [],
+        additionalAccounts,
+      );
+
+    const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
+    const serum3MarketExternalVaultSigner =
+      await generateSerum3MarketExternalVaultSignerAddress(
+        this.cluster,
+        serum3Market,
+        serum3MarketExternal,
       );
 
     const limitPrice = serum3MarketExternal.priceNumberToLots(price);
@@ -1191,7 +1270,6 @@ export class MangoClient {
     })();
 
     const payerBank = group.getFirstBankByTokenIndex(payerTokenIndex);
-
     const ix = await this.program.methods
       .serum3PlaceOrder(
         side,
@@ -1207,8 +1285,9 @@ export class MangoClient {
         group: group.publicKey,
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
-          ?.openOrders,
+        openOrders:
+          ooPk ||
+          mangoAccount.getSerum3Account(serum3Market.marketIndex)?.openOrders,
         serumMarket: serum3Market.publicKey,
         serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
@@ -1231,7 +1310,9 @@ export class MangoClient {
       )
       .instruction();
 
-    return ix;
+    ixs.push(ix);
+
+    return ixs;
   }
 
   public async serum3PlaceOrder(
@@ -1246,7 +1327,7 @@ export class MangoClient {
     clientOrderId: number,
     limit: number,
   ): Promise<TransactionSignature> {
-    const ix = await this.serum3PlaceOrderIx(
+    const placeOrderIxes = await this.serum3PlaceOrderIx(
       group,
       mangoAccount,
       externalMarketPk,
@@ -1258,15 +1339,14 @@ export class MangoClient {
       clientOrderId,
       limit,
     );
-
-    const ix2 = await this.serum3SettleFundsIx(
+    const settleIx = await this.serum3SettleFundsIx(
       group,
       mangoAccount,
       externalMarketPk,
     );
 
     return await this.sendAndConfirmTransaction(
-      [ix, ix2],
+      [...placeOrderIxes, settleIx],
       group.addressLookupTablesList,
     );
   }
@@ -1319,12 +1399,16 @@ export class MangoClient {
     const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     )!;
-    const serum3MarketExternalVaultSigner =
-      await generateSerum3MarketExternalVaultSignerAddress(
-        this.cluster,
-        serum3Market,
-        serum3MarketExternal,
-      );
+
+    const [serum3MarketExternalVaultSigner, openOrderPublicKey] =
+      await Promise.all([
+        generateSerum3MarketExternalVaultSignerAddress(
+          this.cluster,
+          serum3Market,
+          serum3MarketExternal,
+        ),
+        serum3Market.findOoPda(this.program.programId, mangoAccount.publicKey),
+      ]);
 
     const ix = await this.program.methods
       .serum3SettleFunds()
@@ -1332,8 +1416,7 @@ export class MangoClient {
         group: group.publicKey,
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
-        openOrders: mangoAccount.getSerum3Account(serum3Market.marketIndex)
-          ?.openOrders,
+        openOrders: openOrderPublicKey,
         serumMarket: serum3Market.publicKey,
         serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
         serumMarketExternal: serum3Market.serumMarketExternal,
@@ -2490,6 +2573,7 @@ export class MangoClient {
     mangoAccounts: MangoAccount[],
     banks: Bank[],
     perpMarkets: PerpMarket[],
+    additionalAccounts?: AdditionalHealthAccounts,
   ): PublicKey[] {
     if (retriever === AccountRetriever.Fixed) {
       return this.buildFixedAccountRetrieverHealthAccounts(
@@ -2497,6 +2581,7 @@ export class MangoClient {
         mangoAccounts[0],
         banks,
         perpMarkets,
+        additionalAccounts,
       );
     } else {
       return this.buildScanningAccountRetrieverHealthAccounts(
@@ -2515,6 +2600,12 @@ export class MangoClient {
     // but user would potentially open new positions.
     banks: Bank[],
     perpMarkets: PerpMarket[],
+    additionalAccounts: AdditionalHealthAccounts = {
+      oracles: [],
+      banks: [],
+      perps: [],
+      openOrders: [],
+    },
   ): PublicKey[] {
     const healthRemainingAccounts: PublicKey[] = [];
 
@@ -2541,9 +2632,11 @@ export class MangoClient {
 
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.firstBank()),
+      ...additionalAccounts.banks,
     );
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.oracle),
+      ...additionalAccounts.oracles,
     );
 
     const allPerpIndices = mangoAccount.perps.map((perp) => perp.marketIndex);
@@ -2567,6 +2660,7 @@ export class MangoClient {
       .map((index) => group.findPerpMarket(index)!);
     healthRemainingAccounts.push(
       ...allPerpMarkets.map((perp) => perp.publicKey),
+      ...additionalAccounts.perps,
     );
     healthRemainingAccounts.push(...allPerpMarkets.map((perp) => perp.oracle));
 
@@ -2574,6 +2668,7 @@ export class MangoClient {
       ...mangoAccount.serum3
         .filter((serum3Account) => serum3Account.marketIndex !== 65535)
         .map((serum3Account) => serum3Account.openOrders),
+      ...additionalAccounts.openOrders,
     );
 
     // debugHealthAccounts(group, mangoAccount, healthRemainingAccounts);
@@ -2720,7 +2815,7 @@ export class MangoClient {
         limit,
       ),
     ]);
-    transactionInstructions.push(cancelOrderIx, settleIx, placeOrderIx);
+    transactionInstructions.push(cancelOrderIx, settleIx, ...placeOrderIx);
 
     return await this.sendAndConfirmTransaction(
       transactionInstructions,

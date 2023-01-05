@@ -1,4 +1,5 @@
 import { BN } from '@project-serum/anchor';
+import { PublicKey } from '@solana/web3.js';
 
 export type Modify<T, R> = Omit<T, keyof R> & R;
 
@@ -25,3 +26,10 @@ export class OracleConfigParams {
   confFilter: number;
   maxStalenessSlots: number | null;
 }
+
+export type AdditionalHealthAccounts = {
+  banks: PublicKey[];
+  oracles: PublicKey[];
+  perps: PublicKey[];
+  openOrders: PublicKey[];
+};
