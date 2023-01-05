@@ -6,7 +6,11 @@ Update this for each mainnet deployment.
 
 ## mainnet
 
-Jan 4, 2023 TODO Central European Standard Time
+Jan 5, 2023 Central European Standard Time
+
+- Change max staleness slots from -1 to 600 for trustless token registering
+
+Jan 4, 2023 Central European Standard Time
 
 - Reduce only mode for tokens, and perp markets
 - Perp settlement applies no loan origination fee
