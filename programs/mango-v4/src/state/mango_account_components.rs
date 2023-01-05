@@ -229,12 +229,9 @@ pub struct PerpPosition {
 
     /// Settle limit contribution from realized pnl.
     ///
-    /// Every time positive pnl is realized, this is increased by a fraction of the stable
-    /// value of the realization. It's decreased when the realized pnl drops below this value.
-    ///
-    /// Note that settle limits only apply to positive realized pnl, negative realized
-    /// pnl is always settleable.
-    pub settle_pnl_limit_realized_pnl_native: u64,
+    /// Every time pnl is realized, this is increased by a fraction of the stable
+    /// value of the realization. It magnitude decreases when realized pnl drops below its value.
+    pub settle_pnl_limit_realized_pnl_native: i64,
 
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 120],
@@ -361,13 +358,6 @@ impl PerpPosition {
         quote_change_native: I80F48,
         perp_market: &PerpMarket,
     ) {
-        msg!(
-            "update {} {} {} {}",
-            base_change,
-            quote_change_native,
-            self.base_position_lots,
-            self.quote_position_native
-        );
         if base_change == 0 {
             return;
         }
@@ -375,13 +365,13 @@ impl PerpPosition {
         let old_position = self.base_position_lots;
         let new_position = cm!(old_position + base_change);
 
-        // abs amount of lots that were reduced (so going from -5 to 10 lots is a reduction of 5)
+        // amount of lots that were reduced (so going from -5 to 10 lots is a reduction of 5)
         let reduced_lots;
         // amount of pnl that was realized by the reduction (signed)
         let newly_realized_pnl;
 
         if new_position == 0 {
-            reduced_lots = old_position.abs();
+            reduced_lots = -old_position;
 
             // clear out entry and break-even prices
             self.avg_entry_price_per_base_lot = 0.0;
@@ -392,16 +382,9 @@ impl PerpPosition {
             let new_realized_pnl = cm!(self.quote_position_native + quote_change_native);
             newly_realized_pnl = cm!(new_realized_pnl - self.realized_pnl_native);
             self.realized_pnl_native = new_realized_pnl;
-            msg!(
-                "zeroed {} {} {} {}",
-                self.quote_position_native,
-                quote_change_native,
-                newly_realized_pnl,
-                old_position
-            );
         } else if old_position.signum() != new_position.signum() {
             // If the base position changes sign, we've crossed base_pos == 0 (or old_position == 0)
-            reduced_lots = old_position.abs();
+            reduced_lots = -old_position;
             let old_position = old_position as f64;
             let new_position = new_position as f64;
             let base_change = base_change as f64;
@@ -436,7 +419,7 @@ impl PerpPosition {
                 self.avg_entry_price_per_base_lot = new_position_quote_value / new_position_abs;
             } else {
                 // Decreasing position: pnl is realized, avg entry price does not change
-                reduced_lots = base_change.abs();
+                reduced_lots = base_change;
                 let avg_entry = I80F48::from_num(self.avg_entry_price_per_base_lot);
                 newly_realized_pnl =
                     cm!(quote_change_native + I80F48::from(base_change) * avg_entry);
@@ -444,51 +427,101 @@ impl PerpPosition {
             }
         }
 
-        // Whenever positive pnl is realized also bump up the realized pnl settle limit.
-        if newly_realized_pnl > 0 {
+        // Whenever pnl is realized also adjust realized pnl settle limit.
+        if newly_realized_pnl != 0 {
+            // When limit has a different sign from realized pnl, reset it completely
+            if (self.settle_pnl_limit_realized_pnl_native > 0 && !(self.realized_pnl_native > 0))
+                || (self.settle_pnl_limit_realized_pnl_native < 0
+                    && !(self.realized_pnl_native < 0))
+            {
+                self.settle_pnl_limit_realized_pnl_native = 0;
+            }
+
             let realized_stable_value =
-                cm!(I80F48::from(reduced_lots * perp_market.base_lot_size)
+                cm!(I80F48::from(reduced_lots.abs() * perp_market.base_lot_size)
                     * perp_market.stable_price());
-            let limit_increase =
-                cm!(I80F48::from_num(perp_market.settle_pnl_limit_factor) * realized_stable_value)
-                    .min(newly_realized_pnl)
+            let stable_value_fraction =
+                cm!(I80F48::from_num(perp_market.settle_pnl_limit_factor) * realized_stable_value);
+
+            // The realized pnl settle limit change is restricted to actually realized pnl:
+            // buying and then selling some base lots at the same price shouldn't affect
+            // the settle limit.
+            let limit_change = if newly_realized_pnl > 0 {
+                newly_realized_pnl
+                    .min(stable_value_fraction)
                     .ceil()
-                    .checked_to_num::<u64>()
-                    .unwrap();
-            cm!(self.settle_pnl_limit_realized_pnl_native += limit_increase);
+                    .clamp_to_i64()
+            } else {
+                newly_realized_pnl
+                    .max(-stable_value_fraction)
+                    .floor()
+                    .clamp_to_i64()
+            };
+            cm!(self.settle_pnl_limit_realized_pnl_native += limit_change);
+
+            self.apply_realized_pnl_settle_limit_constraint(newly_realized_pnl);
         }
-        self.apply_realized_pnl_settle_limit_constraint(newly_realized_pnl);
     }
 
-    /// The realized pnl settle limit shall be <= max(0, realized pnl)
+    /// The abs(realized pnl settle limit) should be roughly < abs(realized pnl).
+    ///
+    /// It's not always true, since realized_pnl can change with fees and funding
+    /// without updating the realized pnl settle limit. And rounding also breaks it.
+    ///
     /// This function applies that constraint and deals with bookkeeping.
     fn apply_realized_pnl_settle_limit_constraint(&mut self, realized_pnl_change: I80F48) {
-        let new_limit = self
-            .settle_pnl_limit_realized_pnl_native
-            .min(self.realized_pnl_native.ceil().clamped_to_u64());
-        let limit_reduction =
-            (self.settle_pnl_limit_realized_pnl_native - new_limit).clamped_to_i64();
+        let new_limit = if self.realized_pnl_native > 0 {
+            self.settle_pnl_limit_realized_pnl_native
+                .min(self.realized_pnl_native.ceil().clamp_to_i64())
+                .max(0)
+        } else {
+            self.settle_pnl_limit_realized_pnl_native
+                .max(self.realized_pnl_native.floor().clamp_to_i64())
+                .min(0)
+        };
+        let limit_change = new_limit - self.settle_pnl_limit_realized_pnl_native;
         self.settle_pnl_limit_realized_pnl_native = new_limit;
 
-        // If we reduce the budget we also need to decrease the used amount to keep
-        // the free amount the same.
-        // Example: settling the last remaining 50 realized pnl adds 50 to settled and brings the
-        // realized pnl settle budget to 0 above. That means we reduced the budget _and_ used
-        // up a part of it: it was double-counted.
-        // Here we reduce a positive settle balance by the budget reduction.
+        // If we reduce the budget for realized pnl settling we also need to decrease the
+        // used-up settle amount to keep the freely settleable amount the same.
         //
-        // However, sometimes realized_pnl got reduced by non-settled such as funding or fees.
-        // To avoid overcorrecting, the adjustment is limited to the realized_pnl reduction
-        // passed into this function.
-        let active_limit_reduction = limit_reduction
-            .min((-realized_pnl_change).clamped_to_i64())
-            .max(0);
+        // Example: Settling the last remaining 50 realized pnl adds 50 to settled and brings the
+        // realized pnl settle budget to 0 above. That means we reduced the budget _and_ used
+        // up a part of it: it was double-counted. Instead bring the budget to 0 and don't increase
+        // settled.
+        //
+        // Example: The same thing can happen with the opposite sign. Say you have
+        //     -50 realized pnl
+        //     -80 pnl overall
+        //    +-30 unrealized pnl settle limit
+        //     -40 realized pnl settle limit
+        //       0 settle limit used
+        //     -70 available settle limit
+        //   Settling -60 would result in
+        //       0 realized pnl
+        //     -20 pnl overall
+        //    +-30 unrealized pnl settle limit
+        //       0 realized pnl settle limit
+        //     -60 settle limit used
+        //       0 available settle limit
+        //   Which would mean no more unrealized pnl could be settled, when -10 more should be settleable!
+        //   This function notices the realized pnl limit_change was 40 and adjusts the settle limit:
+        //    +-30 unrealized pnl settle limit
+        //       0 realized pnl settle limit
+        //     -20 settle limit used
+        //     -10 available settle limit
 
-        let settled = &mut self.settle_pnl_limit_settled_in_current_window_native;
-        if *settled > 0 {
-            let prev_settled = *settled;
-            *settled = cm!(prev_settled - active_limit_reduction).max(0);
-        }
+        // Sometimes realized_pnl gets reduced by non-settles such as funding or fees.
+        // To avoid overcorrecting, the adjustment is limited to the realized_pnl change
+        // passed into this function.
+        let realized_pnl_change = realized_pnl_change.round_to_zero().clamp_to_i64();
+        let used_change = if limit_change >= 0 {
+            limit_change.min(realized_pnl_change).max(0)
+        } else {
+            limit_change.max(realized_pnl_change).min(0)
+        };
+
+        cm!(self.settle_pnl_limit_settled_in_current_window_native += used_change);
     }
 
     /// Change the base and quote positions as the result of a trade
@@ -552,24 +585,37 @@ impl PerpPosition {
         }
     }
 
-    /// Returns the quote-native amount of pnl that may still be settled this settle window.
-    /// Always >= 0.
-    pub fn available_settle_limit(&self, market: &PerpMarket) -> i64 {
+    /// Returns the (min_pnl, max_pnl) range of quote-native pnl that may still be settled
+    /// this settle window.
+    ///
+    /// The available settle limit is a combination of three factors:
+    /// - a fraction of the base position stable value, which gives settlement limit
+    ///   equally in both directions
+    /// - the stored realized pnl settle limit, which adds an extra settlement allowance
+    ///   in a single direction
+    /// - the amount that was already settled, which shifts both edges
+    pub fn available_settle_limit(&self, market: &PerpMarket) -> (i64, i64) {
         assert_eq!(self.market_index, market.perp_market_index);
         if market.settle_pnl_limit_factor < 0.0 {
-            return i64::MAX;
+            return (i64::MIN, i64::MAX);
         }
 
         let base_native = self.base_position_native(market);
         let position_value = cm!(market.stable_price() * base_native)
             .abs()
             .to_num::<f64>();
-        let window_unrealized =
-            (market.settle_pnl_limit_factor as f64 * position_value).clamped_to_i64();
-        let window_total = window_unrealized
-            .saturating_add(self.settle_pnl_limit_realized_pnl_native.clamped_to_i64());
+        let unrealized = (market.settle_pnl_limit_factor as f64 * position_value).clamp_to_i64();
+        let realized = self.settle_pnl_limit_realized_pnl_native;
+        let used = self.settle_pnl_limit_settled_in_current_window_native;
 
-        (window_total - self.settle_pnl_limit_settled_in_current_window_native.abs()).max(0)
+        let mut min_pnl = (-unrealized).saturating_sub(used);
+        let mut max_pnl = unrealized.saturating_sub(used);
+        if realized >= 0 {
+            max_pnl = max_pnl.saturating_add(realized);
+        } else {
+            min_pnl = min_pnl.saturating_add(realized);
+        };
+        (min_pnl.min(0), max_pnl.max(0))
     }
 
     /// Given some pnl, applies the pnl settle limit and returns the reduced pnl.
@@ -578,12 +624,11 @@ impl PerpPosition {
             return pnl;
         }
 
-        let available_settle_limit = I80F48::from(self.available_settle_limit(&market));
+        let (min_pnl, max_pnl) = self.available_settle_limit(&market);
         if pnl < 0 {
-            // negative realized pnl is always settleable in full
-            pnl.max(self.realized_pnl_native.min(-available_settle_limit))
+            pnl.max(I80F48::from(min_pnl))
         } else {
-            pnl.min(available_settle_limit)
+            pnl.min(I80F48::from(max_pnl))
         }
     }
 
@@ -606,7 +651,7 @@ impl PerpPosition {
         cm!(self.realized_pnl_native -= realized_pnl_reduction);
 
         // Consume settle limit budget
-        let settled_pnl_i64 = settled_pnl.round_to_zero().clamped_to_i64();
+        let settled_pnl_i64 = settled_pnl.round_to_zero().clamp_to_i64();
         cm!(self.settle_pnl_limit_settled_in_current_window_native += settled_pnl_i64);
 
         self.apply_realized_pnl_settle_limit_constraint(-realized_pnl_reduction)
@@ -763,7 +808,7 @@ mod tests {
         assert_eq!(pos.avg_entry_price(&market), 10.0); // Entry price remains the same when decreasing
         assert_eq!(pos.break_even_price(&market), -30.0); // Already broke even
         assert_eq!(pos.realized_pnl_native, I80F48::from(-200));
-        assert_eq!(pos.settle_pnl_limit_realized_pnl_native, 0);
+        assert_eq!(pos.settle_pnl_limit_realized_pnl_native, -5 * 10 / 5 - 1);
     }
 
     #[test]
@@ -802,7 +847,7 @@ mod tests {
         assert_eq!(pos.avg_entry_price(&market), 0.0); // Entry price zero when no position
         assert_eq!(pos.break_even_price(&market), 0.0);
         assert_eq!(pos.realized_pnl_native, I80F48::from(-150));
-        assert_eq!(pos.settle_pnl_limit_realized_pnl_native, 0);
+        assert_eq!(pos.settle_pnl_limit_realized_pnl_native, -10 * 10 / 5 - 1);
     }
 
     #[test]
@@ -828,7 +873,7 @@ mod tests {
         assert_eq!(pos.avg_entry_price(&market), 20.0);
         assert_eq!(pos.break_even_price(&market), 20.0);
         assert_eq!(pos.realized_pnl_native, I80F48::from(-100));
-        assert_eq!(pos.settle_pnl_limit_realized_pnl_native, 0);
+        assert_eq!(pos.settle_pnl_limit_realized_pnl_native, -10 * 10 / 5 - 1);
     }
 
     #[test]
@@ -976,37 +1021,42 @@ mod tests {
         pos.settle_pnl_limit_realized_pnl_native = 4;
         pos.settle_pnl_limit_settled_in_current_window_native = 0;
         pos.realized_pnl_native = I80F48::from(5);
+        assert_eq!(pos.available_settle_limit(&market), (0, 4));
         pos.record_settle(I80F48::from(-100), I80F48::from(-20));
         assert_eq!(pos.realized_pnl_native, I80F48::from(5));
         assert_eq!(pos.settle_pnl_limit_realized_pnl_native, 4);
         assert_eq!(pos.settle_pnl_limit_settled_in_current_window_native, -20);
+        assert_eq!(pos.available_settle_limit(&market), (0, 24));
 
         pos.record_settle(I80F48::from(100), I80F48::from(2));
         assert_eq!(pos.realized_pnl_native, I80F48::from(3));
         assert_eq!(pos.settle_pnl_limit_realized_pnl_native, 3);
-        assert_eq!(pos.settle_pnl_limit_settled_in_current_window_native, -18);
+        assert_eq!(pos.settle_pnl_limit_settled_in_current_window_native, -19);
+        assert_eq!(pos.available_settle_limit(&market), (0, 22));
 
         pos.record_settle(I80F48::from(100), I80F48::from(10));
         assert_eq!(pos.realized_pnl_native, I80F48::from(0));
         assert_eq!(pos.settle_pnl_limit_realized_pnl_native, 0);
-        assert_eq!(pos.settle_pnl_limit_settled_in_current_window_native, -8);
+        assert_eq!(pos.settle_pnl_limit_settled_in_current_window_native, -12);
+        assert_eq!(pos.available_settle_limit(&market), (0, 12));
 
         pos.realized_pnl_native = I80F48::from(-5);
-        pos.settle_pnl_limit_realized_pnl_native = 0;
+        pos.settle_pnl_limit_realized_pnl_native = -4;
+        pos.settle_pnl_limit_settled_in_current_window_native = 0;
         pos.record_settle(I80F48::from(20), I80F48::from(20));
         assert_eq!(pos.realized_pnl_native, I80F48::from(-5));
-        assert_eq!(pos.settle_pnl_limit_realized_pnl_native, 0);
-        assert_eq!(pos.settle_pnl_limit_settled_in_current_window_native, 12);
+        assert_eq!(pos.settle_pnl_limit_realized_pnl_native, -4);
+        assert_eq!(pos.settle_pnl_limit_settled_in_current_window_native, 20);
 
         pos.record_settle(I80F48::from(-100), I80F48::from(-2));
         assert_eq!(pos.realized_pnl_native, I80F48::from(-3));
-        assert_eq!(pos.settle_pnl_limit_realized_pnl_native, 0);
-        assert_eq!(pos.settle_pnl_limit_settled_in_current_window_native, 10);
+        assert_eq!(pos.settle_pnl_limit_realized_pnl_native, -3);
+        assert_eq!(pos.settle_pnl_limit_settled_in_current_window_native, 19);
 
         pos.record_settle(I80F48::from(-100), I80F48::from(-10));
         assert_eq!(pos.realized_pnl_native, I80F48::from(0));
         assert_eq!(pos.settle_pnl_limit_realized_pnl_native, 0);
-        assert_eq!(pos.settle_pnl_limit_settled_in_current_window_native, 0);
+        assert_eq!(pos.settle_pnl_limit_settled_in_current_window_native, 12);
     }
 
     #[test]
@@ -1022,46 +1072,80 @@ mod tests {
         };
 
         pos.settle_pnl_limit_realized_pnl_native = 5;
-        assert_eq!(pos.available_settle_limit(&market), 15); // 0.2 factor * 0.5 stable price * 100 lots + 5 realized
+        assert_eq!(pos.available_settle_limit(&market), (-10, 15)); // 0.2 factor * 0.5 stable price * 100 lots + 5 realized
         assert_eq!(limited_pnl(&pos, &market, 100), 15.0);
-        assert_eq!(limited_pnl(&pos, &market, -100), -15.0);
+        assert_eq!(limited_pnl(&pos, &market, -100), -10.0);
 
         pos.settle_pnl_limit_settled_in_current_window_native = 2;
-        assert_eq!(pos.available_settle_limit(&market), 13);
+        assert_eq!(pos.available_settle_limit(&market), (-12, 13));
         assert_eq!(limited_pnl(&pos, &market, 100), 13.0);
-        assert_eq!(limited_pnl(&pos, &market, -100), -13.0);
+        assert_eq!(limited_pnl(&pos, &market, -100), -12.0);
 
         pos.settle_pnl_limit_settled_in_current_window_native = 16;
-        assert_eq!(pos.available_settle_limit(&market), 0);
-        assert_eq!(limited_pnl(&pos, &market, 100), 0.0);
-        assert_eq!(limited_pnl(&pos, &market, -100), 0.0);
+        assert_eq!(pos.available_settle_limit(&market), (-26, 0));
+
+        pos.settle_pnl_limit_settled_in_current_window_native = -16;
+        assert_eq!(pos.available_settle_limit(&market), (0, 31));
 
         pos.settle_pnl_limit_realized_pnl_native = 0;
         pos.settle_pnl_limit_settled_in_current_window_native = 2;
-        assert_eq!(pos.available_settle_limit(&market), 8);
-        assert_eq!(limited_pnl(&pos, &market, 100), 8.0);
-        assert_eq!(limited_pnl(&pos, &market, -100), -8.0);
+        assert_eq!(pos.available_settle_limit(&market), (-12, 8));
 
         pos.settle_pnl_limit_settled_in_current_window_native = -2;
-        assert_eq!(pos.available_settle_limit(&market), 8);
-        assert_eq!(limited_pnl(&pos, &market, 100), 8.0);
-        assert_eq!(limited_pnl(&pos, &market, -100), -8.0);
+        assert_eq!(pos.available_settle_limit(&market), (-8, 12));
 
         market.stable_price_model.stable_price = 1.0;
-        assert_eq!(pos.available_settle_limit(&market), 18);
-        assert_eq!(limited_pnl(&pos, &market, 100), 18.0);
-        assert_eq!(limited_pnl(&pos, &market, -100), -18.0);
+        assert_eq!(pos.available_settle_limit(&market), (-18, 22));
 
         pos.settle_pnl_limit_realized_pnl_native = 1000;
         pos.settle_pnl_limit_settled_in_current_window_native = 2;
-        assert_eq!(limited_pnl(&pos, &market, 100), 100.0);
-        assert_eq!(limited_pnl(&pos, &market, -100), -100.0);
+        assert_eq!(pos.available_settle_limit(&market), (-22, 1018));
+    }
 
-        pos.realized_pnl_native = I80F48::from(-30);
-        pos.settle_pnl_limit_realized_pnl_native = 0;
-        pos.settle_pnl_limit_settled_in_current_window_native = 2;
-        assert_eq!(pos.available_settle_limit(&market), 18);
-        assert_eq!(limited_pnl(&pos, &market, 100), 18.0);
-        assert_eq!(limited_pnl(&pos, &market, -100), -30.0);
+    #[test]
+    fn test_perp_reduced_realized_pnl_settle_limit() {
+        let market = test_perp_market(0.5);
+        let mut pos = create_perp_position(&market, 100, -50);
+
+        let cases = vec![
+            // No change if realized > limit
+            (0, (100, 50, 70, -200), (50, 70)),
+            // No change if realized > limit
+            (1, (100, 50, 70, 200), (50, 70)),
+            // No change if abs(realized) > abs(limit)
+            (2, (-100, -50, 70, -200), (-50, 70)),
+            // No change if abs(realized) > abs(limit)
+            (3, (-100, -50, 70, 200), (-50, 70)),
+            // reduction limited by realized change
+            (4, (40, 50, 70, -5), (40, 65)),
+            // reduction max
+            (5, (40, 50, 70, -15), (40, 60)),
+            // reduction, with realized change wrong direction
+            (6, (40, 50, 70, 15), (40, 70)),
+            // reduction limited by realized change
+            (7, (-40, -50, -70, 5), (-40, -65)),
+            // reduction max
+            (8, (-40, -50, -70, 15), (-40, -60)),
+            // reduction, with realized change wrong direction
+            (9, (-40, -50, -70, -15), (-40, -70)),
+            // reduction when used amount is opposite sign
+            (10, (-40, -50, 70, -15), (-40, 70)),
+            // reduction when used amount is opposite sign
+            (11, (-40, -50, 70, 15), (-40, 80)),
+        ];
+
+        for (i, (realized, realized_limit, used, change), (expected_limit, expected_used)) in cases
+        {
+            println!("test case {i}");
+            pos.realized_pnl_native = I80F48::from(realized);
+            pos.settle_pnl_limit_realized_pnl_native = realized_limit;
+            pos.settle_pnl_limit_settled_in_current_window_native = used;
+            pos.apply_realized_pnl_settle_limit_constraint(I80F48::from(change));
+            assert_eq!(pos.settle_pnl_limit_realized_pnl_native, expected_limit);
+            assert_eq!(
+                pos.settle_pnl_limit_settled_in_current_window_native,
+                expected_used
+            );
+        }
     }
 }

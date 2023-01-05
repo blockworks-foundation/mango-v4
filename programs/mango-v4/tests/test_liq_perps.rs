@@ -626,7 +626,9 @@ async fn test_liq_perps_base_position_and_bankruptcy() -> Result<(), TransportEr
     //
     let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
     let perp_market_data = solana.get_account::<PerpMarket>(perp_market).await;
-    let liqor_max_settle = liqor_data.perps[0].available_settle_limit(&perp_market_data);
+    let liqor_max_settle = liqor_data.perps[0]
+        .available_settle_limit(&perp_market_data)
+        .1;
     let account_1_quote_before = account_position(solana, account_1, quote_token.bank).await;
 
     send_tx(
