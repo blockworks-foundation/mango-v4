@@ -516,27 +516,23 @@ export class MangoAccount {
     if (sourceMintPk.equals(targetMintPk)) {
       return 0;
     }
-    const s = group.getFirstBankByMint(sourceMintPk);
-    const t = group.getFirstBankByMint(targetMintPk);
+    const sourceBank = group.getFirstBankByMint(sourceMintPk);
+    const targetBank = group.getFirstBankByMint(targetMintPk);
     const hc = HealthCache.fromMangoAccount(group, this);
     let maxSource = hc.getMaxSwapSource(
-      s,
-      t,
+      sourceBank,
+      targetBank,
       I80F48.fromNumber(
         slippageAndFeesFactor *
-          ((s.uiPrice / t.uiPrice) *
-            Math.pow(10, t.mintDecimals - s.mintDecimals)),
+          ((sourceBank.uiPrice / targetBank.uiPrice) *
+            Math.pow(10, targetBank.mintDecimals - sourceBank.mintDecimals)),
       ),
     );
-    const sourceBalance = this.getTokenBalance(s);
+    const sourceBalance = this.getTokenBalance(sourceBank);
     if (maxSource.gt(sourceBalance)) {
-      const borrow = maxSource.sub(sourceBalance);
+      const sourceBorrow = maxSource.sub(sourceBalance);
       maxSource = sourceBalance.add(
-        borrow.div(
-          ONE_I80F48().add(
-            group.getFirstBankByMint(sourceMintPk).loanOriginationFeeRate,
-          ),
-        ),
+        sourceBorrow.div(ONE_I80F48().add(sourceBank.loanOriginationFeeRate)),
       );
     }
     return toUiDecimals(maxSource, group.getMintDecimals(sourceMintPk));
