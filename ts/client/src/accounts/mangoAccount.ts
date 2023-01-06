@@ -519,7 +519,7 @@ export class MangoAccount {
     const s = group.getFirstBankByMint(sourceMintPk);
     const t = group.getFirstBankByMint(targetMintPk);
     const hc = HealthCache.fromMangoAccount(group, this);
-    const maxSource = hc.getMaxSwapSource(
+    let maxSource = hc.getMaxSwapSource(
       s,
       t,
       I80F48.fromNumber(
@@ -528,11 +528,17 @@ export class MangoAccount {
             Math.pow(10, t.mintDecimals - s.mintDecimals)),
       ),
     );
-    maxSource.idiv(
-      ONE_I80F48().add(
-        group.getFirstBankByMint(sourceMintPk).loanOriginationFeeRate,
-      ),
-    );
+    const sourceBalance = this.getTokenBalance(s);
+    if (maxSource.gt(sourceBalance)) {
+      const borrow = maxSource.sub(sourceBalance);
+      maxSource = sourceBalance.add(
+        borrow.div(
+          ONE_I80F48().add(
+            group.getFirstBankByMint(sourceMintPk).loanOriginationFeeRate,
+          ),
+        ),
+      );
+    }
     return toUiDecimals(maxSource, group.getMintDecimals(sourceMintPk));
   }
 
@@ -650,23 +656,27 @@ export class MangoAccount {
       serum3Market.quoteTokenIndex,
     );
     const hc = HealthCache.fromMangoAccount(group, this);
-    let nativeAmount = hc.getMaxSerum3OrderForHealthRatio(
+    const nativeAmount = hc.getMaxSerum3OrderForHealthRatio(
       baseBank,
       quoteBank,
       serum3Market,
       Serum3Side.bid,
       I80F48.fromNumber(2),
     );
+    let quoteAmount = nativeAmount.div(quoteBank.price);
     // If its a bid then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
-    nativeAmount = nativeAmount
-      .div(quoteBank.price)
-      .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
-      .div(ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))));
-    return toUiDecimals(
-      nativeAmount,
-      group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex).mintDecimals,
+    const quoteBalance = this.getTokenBalance(quoteBank);
+    if (quoteAmount.gt(quoteBalance)) {
+      const quoteBorrow = quoteAmount.sub(quoteBalance);
+      quoteAmount = quoteBalance.add(
+        quoteBorrow.div(ONE_I80F48().add(quoteBank.loanOriginationFeeRate)),
+      );
+    }
+    quoteAmount = quoteAmount.div(
+      ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
     );
+    return toUiDecimals(nativeAmount, quoteBank.mintDecimals);
   }
 
   /**
@@ -688,23 +698,27 @@ export class MangoAccount {
       serum3Market.quoteTokenIndex,
     );
     const hc = HealthCache.fromMangoAccount(group, this);
-    let nativeAmount = hc.getMaxSerum3OrderForHealthRatio(
+    const nativeAmount = hc.getMaxSerum3OrderForHealthRatio(
       baseBank,
       quoteBank,
       serum3Market,
       Serum3Side.ask,
       I80F48.fromNumber(2),
     );
+    let baseAmount = nativeAmount.div(baseBank.price);
     // If its a ask then the reserved fund and potential loan is in base
     // also keep some buffer for fees, use taker fees for worst case simulation.
-    nativeAmount = nativeAmount
-      .div(baseBank.price)
-      .div(ONE_I80F48().add(baseBank.loanOriginationFeeRate))
-      .div(ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))));
-    return toUiDecimals(
-      nativeAmount,
-      group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex).mintDecimals,
+    const baseBalance = this.getTokenBalance(baseBank);
+    if (baseAmount.gt(baseBalance)) {
+      const baseBorrow = baseAmount.sub(baseBalance);
+      baseAmount = baseBalance.add(
+        baseBorrow.div(ONE_I80F48().add(baseBank.loanOriginationFeeRate)),
+      );
+    }
+    baseAmount = baseAmount.div(
+      ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
     );
+    return toUiDecimals(baseAmount, baseBank.mintDecimals);
   }
 
   /**
