@@ -168,8 +168,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     );
 
     // Settle
-    a_perp_position.record_settle(a_pnl, settlement);
-    b_perp_position.record_settle(b_pnl, -settlement);
+    a_perp_position.record_settle(settlement);
+    b_perp_position.record_settle(-settlement);
 
     emit_perp_balances(
         ctx.accounts.group.key(),

@@ -1046,11 +1046,11 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(
-        mango_account_0.perps[0].realized_pnl_native,
+        mango_account_0.perps[0].realized_trade_pnl_native,
         I80F48::from(200_000 - 80_000)
     );
     assert_eq!(
-        mango_account_1.perps[0].realized_pnl_native,
+        mango_account_1.perps[0].realized_trade_pnl_native,
         I80F48::from(-200_000 + 80_000)
     );
     // neither account has any settle limit left (check for 1 because of the ceil()ing)
@@ -1064,7 +1064,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     );
     // check that realized pnl settle limit was set up correctly
     assert_eq!(
-        mango_account_0.perps[0].settle_pnl_limit_realized_pnl_native,
+        mango_account_0.perps[0].settle_pnl_limit_realized_trade,
         (0.8 * 1.0 * 100.0 * 1000.0) as i64 + 1
     ); // +1 just for rounding
 
@@ -1098,7 +1098,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     // This time account 0's realized pnl settle limit kicks in.
     //
     let account_1_quote_before = mango_account_1.perps[0].quote_position_native();
-    let account_0_realized_limit = mango_account_0.perps[0].settle_pnl_limit_realized_pnl_native;
+    let account_0_realized_limit = mango_account_0.perps[0].settle_pnl_limit_realized_trade;
 
     send_tx(
         solana,
@@ -1135,8 +1135,10 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     );
     // account0's limit gets reduced to the realized pnl amount left over
     assert_eq!(
-        mango_account_0.perps[0].settle_pnl_limit_realized_pnl_native,
-        mango_account_0.perps[0].realized_pnl_native.to_num::<i64>()
+        mango_account_0.perps[0].settle_pnl_limit_realized_trade,
+        mango_account_0.perps[0]
+            .realized_trade_pnl_native
+            .to_num::<i64>()
     );
 
     // can't settle again
@@ -1159,7 +1161,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     //
 
     let account_1_quote_before = mango_account_1.perps[0].quote_position_native();
-    let account_0_realized_limit = mango_account_0.perps[0].settle_pnl_limit_realized_pnl_native;
+    let account_0_realized_limit = mango_account_0.perps[0].settle_pnl_limit_realized_trade;
 
     send_tx(
         solana,
@@ -1195,16 +1197,13 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
         I80F48::from(account_0_realized_limit)
     );
     // account0's limit gets reduced to the realized pnl amount left over
+    assert_eq!(mango_account_0.perps[0].settle_pnl_limit_realized_trade, 0);
     assert_eq!(
-        mango_account_0.perps[0].settle_pnl_limit_realized_pnl_native,
-        0
-    );
-    assert_eq!(
-        mango_account_0.perps[0].realized_pnl_native,
+        mango_account_0.perps[0].realized_trade_pnl_native,
         I80F48::from(0)
     );
     assert_eq!(
-        mango_account_1.perps[0].realized_pnl_native,
+        mango_account_1.perps[0].realized_trade_pnl_native,
         I80F48::from(0)
     );
 

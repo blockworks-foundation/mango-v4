@@ -107,7 +107,7 @@ pub struct PerpMarket {
     ///   multiplied with the stable value of the perp pnl being realized
     ///   (i.e. limit_factor * reduced_native * stable_price)
     ///
-    /// See also PerpPosition::settle_pnl_limit_realized_pnl_native
+    /// See also PerpPosition::settle_pnl_limit_realized_trade
     pub settle_pnl_limit_factor: f32,
     pub padding3: [u8; 4],
     /// Window size in seconds for the perp settlement limit
