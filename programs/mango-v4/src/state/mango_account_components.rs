@@ -435,8 +435,8 @@ impl PerpPosition {
         }
 
         // When realized limit has a different sign from realized pnl, reset it completely
-        if (self.settle_pnl_limit_realized_trade > 0 && !(self.realized_trade_pnl_native > 0))
-            || (self.settle_pnl_limit_realized_trade < 0 && !(self.realized_trade_pnl_native < 0))
+        if (self.settle_pnl_limit_realized_trade > 0 && self.realized_trade_pnl_native <= 0)
+            || (self.settle_pnl_limit_realized_trade < 0 && self.realized_trade_pnl_native >= 0)
         {
             self.settle_pnl_limit_realized_trade = 0;
         }
@@ -579,7 +579,7 @@ impl PerpPosition {
     /// Calculate the PnL of the position for a given price
     pub fn pnl_for_price(&self, perp_market: &PerpMarket, price: I80F48) -> Result<I80F48> {
         require_eq!(self.market_index, perp_market.perp_market_index);
-        let base_native = self.base_position_native(&perp_market);
+        let base_native = self.base_position_native(perp_market);
         let pnl = cm!(self.quote_position_native() + base_native * price);
         Ok(pnl)
     }
@@ -644,7 +644,7 @@ impl PerpPosition {
             return pnl;
         }
 
-        let (min_pnl, max_pnl) = self.available_settle_limit(&market);
+        let (min_pnl, max_pnl) = self.available_settle_limit(market);
         if pnl < 0 {
             pnl.max(I80F48::from(min_pnl))
         } else {
@@ -1186,7 +1186,7 @@ mod tests {
         pos.realized_trade_pnl_native = I80F48::from(60); // no effect
 
         let limited_pnl = |pos: &PerpPosition, market: &PerpMarket, pnl: i64| {
-            pos.apply_pnl_settle_limit(&market, I80F48::from(pnl))
+            pos.apply_pnl_settle_limit(market, I80F48::from(pnl))
                 .to_num::<f64>()
         };
 
