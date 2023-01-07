@@ -28,8 +28,5 @@ export class OracleConfigParams {
 }
 
 export type AdditionalHealthAccounts = {
-  banks: PublicKey[];
-  oracles: PublicKey[];
-  perps: PublicKey[];
   openOrders: PublicKey[];
 };

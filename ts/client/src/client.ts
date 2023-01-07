@@ -1200,6 +1200,8 @@ export class MangoClient {
 
     let ooPk;
     let additionalAccounts: AdditionalHealthAccounts | undefined = undefined;
+    let tokenIsInactive;
+    let baseBank;
     if (!mangoAccount.getSerum3Account(serum3Market.marketIndex)) {
       const ix = await this.serum3CreateOpenOrdersIx(
         group,
@@ -1211,17 +1213,14 @@ export class MangoClient {
         this.program.programId,
         mangoAccount.publicKey,
       );
-      const tokenIndex = serum3Market['baseTokenIndex'];
-      const baseBank = group.getFirstBankByTokenIndex(tokenIndex);
+      const tokenIndex = serum3Market.baseTokenIndex;
+      baseBank = group.getFirstBankByTokenIndex(tokenIndex);
 
       // only push bank/oracle if no deposit has been previously made for same token
-      const wasTokenInUseBefore = mangoAccount.getToken(tokenIndex);
+      tokenIsInactive = !mangoAccount.getToken(tokenIndex)?.isActive();
 
       additionalAccounts = {
-        banks: !wasTokenInUseBefore ? [baseBank.publicKey] : [],
-        oracles: !wasTokenInUseBefore ? [baseBank.oracle] : [],
         openOrders: [ooPk],
-        perps: [],
       };
       ixs.push(ix);
     }
@@ -1231,7 +1230,7 @@ export class MangoClient {
         AccountRetriever.Fixed,
         group,
         [mangoAccount],
-        [],
+        tokenIsInactive ? [baseBank] : [],
         [],
         additionalAccounts,
       );
@@ -2596,9 +2595,6 @@ export class MangoClient {
     banks: Bank[],
     perpMarkets: PerpMarket[],
     additionalAccounts: AdditionalHealthAccounts = {
-      oracles: [],
-      banks: [],
-      perps: [],
       openOrders: [],
     },
   ): PublicKey[] {
@@ -2627,11 +2623,9 @@ export class MangoClient {
 
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.firstBank()),
-      ...additionalAccounts.banks,
     );
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.oracle),
-      ...additionalAccounts.oracles,
     );
 
     const allPerpIndices = mangoAccount.perps.map((perp) => perp.marketIndex);
@@ -2655,7 +2649,6 @@ export class MangoClient {
       .map((index) => group.findPerpMarket(index)!);
     healthRemainingAccounts.push(
       ...allPerpMarkets.map((perp) => perp.publicKey),
-      ...additionalAccounts.perps,
     );
     healthRemainingAccounts.push(...allPerpMarkets.map((perp) => perp.oracle));
 
