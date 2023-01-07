@@ -1199,9 +1199,9 @@ export class MangoClient {
     )!;
 
     let ooPk;
-    let additionalAccounts: AdditionalHealthAccounts | undefined = undefined;
-    let tokenIsInactive;
-    let baseBank;
+    let healthAdditionalAccounts: AdditionalHealthAccounts | undefined =
+      undefined;
+    const healthBanks: Bank[] = [];
     if (!mangoAccount.getSerum3Account(serum3Market.marketIndex)) {
       const ix = await this.serum3CreateOpenOrdersIx(
         group,
@@ -1213,13 +1213,26 @@ export class MangoClient {
         this.program.programId,
         mangoAccount.publicKey,
       );
-      const tokenIndex = serum3Market.baseTokenIndex;
-      baseBank = group.getFirstBankByTokenIndex(tokenIndex);
+      const baseTokenIndex = serum3Market.baseTokenIndex;
+      const quoteTokenIndex = serum3Market.quoteTokenIndex;
+      const baseBank = group.getFirstBankByTokenIndex(baseTokenIndex);
+      const quoteBank = group.getFirstBankByTokenIndex(quoteTokenIndex);
 
       // only push bank/oracle if no deposit has been previously made for same token
-      tokenIsInactive = !mangoAccount.getToken(tokenIndex)?.isActive();
+      const baseTokenIsInactive = !mangoAccount
+        .getToken(baseTokenIndex)
+        ?.isActive();
+      const quoteTokenIsInactive = !mangoAccount
+        .getToken(quoteTokenIndex)
+        ?.isActive();
 
-      additionalAccounts = {
+      if (baseTokenIsInactive) {
+        healthBanks.push(baseBank);
+      }
+      if (quoteTokenIsInactive) {
+        healthBanks.push(quoteBank);
+      }
+      healthAdditionalAccounts = {
         openOrders: [ooPk],
       };
       ixs.push(ix);
@@ -1230,9 +1243,9 @@ export class MangoClient {
         AccountRetriever.Fixed,
         group,
         [mangoAccount],
-        tokenIsInactive ? [baseBank] : [],
+        healthBanks,
         [],
-        additionalAccounts,
+        healthAdditionalAccounts,
       );
 
     const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
