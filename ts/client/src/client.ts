@@ -22,11 +22,7 @@ import {
 import bs58 from 'bs58';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
-import {
-  MangoAccount,
-  PerpPosition,
-  TokenPosition,
-} from './accounts/mangoAccount';
+import { MangoAccount } from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
 import {
   FillEvent,
@@ -48,12 +44,7 @@ import { OPENBOOK_PROGRAM_ID } from './constants';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
-import {
-  AdditionalHealthAccounts,
-  FlashLoanType,
-  InterestRateParams,
-  OracleConfigParams,
-} from './types';
+import { FlashLoanType, InterestRateParams, OracleConfigParams } from './types';
 import {
   I64_MAX_BN,
   createAssociatedTokenAccountIdempotentInstruction,
@@ -1198,31 +1189,26 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
 
-    let ooPk;
-    let additionalAccounts: AdditionalHealthAccounts | undefined = undefined;
-    let tokenIsInactive;
-    let baseBank;
+    let openOrderPk: PublicKey | undefined = undefined;
+    const banks: Bank[] = [];
+    const openOrdersForMarket: [Serum3Market, PublicKey][] = [];
     if (!mangoAccount.getSerum3Account(serum3Market.marketIndex)) {
       const ix = await this.serum3CreateOpenOrdersIx(
         group,
         mangoAccount,
         serum3Market.serumMarketExternal,
       );
-
-      ooPk = await serum3Market.findOoPda(
+      ixs.push(ix);
+      openOrderPk = await serum3Market.findOoPda(
         this.program.programId,
         mangoAccount.publicKey,
       );
+      openOrdersForMarket.push([serum3Market, openOrderPk]);
       const tokenIndex = serum3Market.baseTokenIndex;
-      baseBank = group.getFirstBankByTokenIndex(tokenIndex);
-
-      // only push bank/oracle if no deposit has been previously made for same token
-      tokenIsInactive = !mangoAccount.getToken(tokenIndex)?.isActive();
-
-      additionalAccounts = {
-        openOrders: [ooPk],
-      };
-      ixs.push(ix);
+      // only include bank if no deposit has been previously made for same token
+      if (!mangoAccount.getToken(tokenIndex)?.isActive()) {
+        banks.push(group.getFirstBankByTokenIndex(tokenIndex));
+      }
     }
 
     const healthRemainingAccounts: PublicKey[] =
@@ -1230,9 +1216,9 @@ export class MangoClient {
         AccountRetriever.Fixed,
         group,
         [mangoAccount],
-        tokenIsInactive ? [baseBank] : [],
+        banks,
         [],
-        additionalAccounts,
+        openOrdersForMarket,
       );
 
     const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
@@ -1280,7 +1266,7 @@ export class MangoClient {
         account: mangoAccount.publicKey,
         owner: (this.program.provider as AnchorProvider).wallet.publicKey,
         openOrders:
-          ooPk ||
+          openOrderPk ||
           mangoAccount.getSerum3Account(serum3Market.marketIndex)?.openOrders,
         serumMarket: serum3Market.publicKey,
         serumProgram: OPENBOOK_PROGRAM_ID[this.cluster],
@@ -2565,9 +2551,9 @@ export class MangoClient {
     retriever: AccountRetriever,
     group: Group,
     mangoAccounts: MangoAccount[],
-    banks: Bank[],
-    perpMarkets: PerpMarket[],
-    additionalAccounts?: AdditionalHealthAccounts,
+    banks: Bank[] = [],
+    perpMarkets: PerpMarket[] = [],
+    openOrdersForMarket: [Serum3Market, PublicKey][] = [],
   ): PublicKey[] {
     if (retriever === AccountRetriever.Fixed) {
       return this.buildFixedAccountRetrieverHealthAccounts(
@@ -2575,7 +2561,7 @@ export class MangoClient {
         mangoAccounts[0],
         banks,
         perpMarkets,
-        additionalAccounts,
+        openOrdersForMarket,
       );
     } else {
       return this.buildScanningAccountRetrieverHealthAccounts(
@@ -2594,33 +2580,26 @@ export class MangoClient {
     // but user would potentially open new positions.
     banks: Bank[],
     perpMarkets: PerpMarket[],
-    additionalAccounts: AdditionalHealthAccounts = {
-      openOrders: [],
-    },
+    openOrdersForMarket: [Serum3Market, PublicKey][],
   ): PublicKey[] {
     const healthRemainingAccounts: PublicKey[] = [];
 
-    const allTokenIndices = mangoAccount.tokens.map(
-      (token) => token.tokenIndex,
-    );
-
-    if (banks) {
-      for (const bank of banks) {
-        if (allTokenIndices.indexOf(bank.tokenIndex) < 0) {
-          allTokenIndices[
-            mangoAccount.tokens.findIndex(
-              (token, index) =>
-                !token.isActive() &&
-                allTokenIndices[index] == TokenPosition.TokenIndexUnset,
-            )
-          ] = bank.tokenIndex;
+    const tokenPositions = [...mangoAccount.tokens];
+    for (const bank of banks) {
+      const tokenPositionExists = tokenPositions.find(
+        (t) => t.tokenIndex === bank.tokenIndex,
+      );
+      if (!tokenPositionExists) {
+        const inActiveTokenPosition = tokenPositions.find((t) => !t.isActive());
+        if (inActiveTokenPosition) {
+          inActiveTokenPosition.tokenIndex = bank.tokenIndex;
         }
       }
     }
-    const mintInfos = allTokenIndices
-      .filter((index) => index != TokenPosition.TokenIndexUnset)
-      .map((tokenIndex) => group.mintInfosMapByTokenIndex.get(tokenIndex)!);
 
+    const mintInfos = tokenPositions
+      .filter((token) => token.isActive())
+      .map((token) => group.mintInfosMapByTokenIndex.get(token.tokenIndex)!);
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.firstBank()),
     );
@@ -2628,35 +2607,49 @@ export class MangoClient {
       ...mintInfos.map((mintInfo) => mintInfo.oracle),
     );
 
-    const allPerpIndices = mangoAccount.perps.map((perp) => perp.marketIndex);
-
     // insert any extra perp markets in the free perp position slots
-    if (perpMarkets) {
-      for (const perpMarket of perpMarkets) {
-        if (allPerpIndices.indexOf(perpMarket.perpMarketIndex) < 0) {
-          allPerpIndices[
-            mangoAccount.perps.findIndex(
-              (perp, index) =>
-                !perp.isActive() &&
-                allPerpIndices[index] == PerpPosition.PerpMarketIndexUnset,
-            )
-          ] = perpMarket.perpMarketIndex;
+    const perpPositions = [...mangoAccount.perps];
+    for (const perpMarket of perpMarkets) {
+      const perpPositionExists = perpPositions.find(
+        (p) => p.marketIndex === perpMarket.perpMarketIndex,
+      );
+      if (!perpPositionExists) {
+        const perpPosition = perpPositions.find((perp) => !perp.isActive());
+        if (perpPosition) {
+          perpPosition.marketIndex = perpMarket.perpMarketIndex;
         }
       }
     }
-    const allPerpMarkets = allPerpIndices
-      .filter((index) => index != PerpPosition.PerpMarketIndexUnset)
-      .map((index) => group.findPerpMarket(index)!);
+
+    const allPerpMarkets = perpPositions
+      .filter((perp) => perp.isActive())
+      .map((perp) => group.getPerpMarketByMarketIndex(perp.marketIndex)!);
     healthRemainingAccounts.push(
       ...allPerpMarkets.map((perp) => perp.publicKey),
     );
     healthRemainingAccounts.push(...allPerpMarkets.map((perp) => perp.oracle));
 
+    // insert any extra open orders accounts in the cooresponding free serum market slot
+    const serumOpenOrders = [...mangoAccount.serum3];
+    for (const [serum3Market, openOrderPk] of openOrdersForMarket) {
+      const ooPositionExists = serumOpenOrders.find(
+        (oo) => oo.marketIndex === serum3Market.marketIndex,
+      );
+      if (!ooPositionExists) {
+        const serum3Order = serumOpenOrders.find(
+          (serumOrder) => !serumOrder.isActive(),
+        );
+        if (serum3Order) {
+          serum3Order.marketIndex = serum3Market.marketIndex;
+          serum3Order.openOrders = openOrderPk;
+        }
+      }
+    }
+
     healthRemainingAccounts.push(
-      ...mangoAccount.serum3
-        .filter((serum3Account) => serum3Account.marketIndex !== 65535)
+      ...serumOpenOrders
+        .filter((serum3Account) => serum3Account.isActive())
         .map((serum3Account) => serum3Account.openOrders),
-      ...additionalAccounts.openOrders,
     );
 
     // debugHealthAccounts(group, mangoAccount, healthRemainingAccounts);
