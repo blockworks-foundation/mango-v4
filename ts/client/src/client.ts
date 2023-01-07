@@ -1204,10 +1204,14 @@ export class MangoClient {
         mangoAccount.publicKey,
       );
       openOrdersForMarket.push([serum3Market, openOrderPk]);
-      const tokenIndex = serum3Market.baseTokenIndex;
-      // only include bank if no deposit has been previously made for same token
-      if (!mangoAccount.getToken(tokenIndex)?.isActive()) {
-        banks.push(group.getFirstBankByTokenIndex(tokenIndex));
+      const baseTokenIndex = serum3Market.baseTokenIndex;
+      const quoteTokenIndex = serum3Market.quoteTokenIndex;
+      // only include banks if no deposit has been previously made for same token
+      if (!mangoAccount.getToken(baseTokenIndex)?.isActive()) {
+        banks.push(group.getFirstBankByTokenIndex(baseTokenIndex));
+      }
+      if (!mangoAccount.getToken(quoteTokenIndex)?.isActive()) {
+        banks.push(group.getFirstBankByTokenIndex(quoteTokenIndex));
       }
     }
 
