@@ -26,7 +26,3 @@ export class OracleConfigParams {
   confFilter: number;
   maxStalenessSlots: number | null;
 }
-
-export type AdditionalHealthAccounts = {
-  openOrders: PublicKey[];
-};
