@@ -1211,20 +1211,15 @@ export class MangoClient {
         this.program.programId,
         mangoAccount.publicKey,
       );
-      const tokenIndex =
-        serum3Market[
-          side == Serum3Side.bid ? 'baseTokenIndex' : 'quoteTokenIndex'
-        ];
+      const tokenIndex = serum3Market['baseTokenIndex'];
       const baseBank = group.getFirstBankByTokenIndex(tokenIndex);
 
       // only push bank/oracle if no deposit has been previously made for same token
-      const hasBaseBank =
-        mangoAccount.tokens[tokenIndex].tokenIndex !==
-        TokenPosition.TokenIndexUnset;
+      const wasTokenInUseBefore = mangoAccount.getToken(tokenIndex);
 
       additionalAccounts = {
-        banks: !hasBaseBank ? [baseBank.publicKey] : [],
-        oracles: !hasBaseBank ? [baseBank.oracle] : [],
+        banks: !wasTokenInUseBefore ? [baseBank.publicKey] : [],
+        oracles: !wasTokenInUseBefore ? [baseBank.oracle] : [],
         openOrders: [ooPk],
         perps: [],
       };
