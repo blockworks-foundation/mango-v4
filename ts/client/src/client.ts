@@ -22,7 +22,12 @@ import {
 import bs58 from 'bs58';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
 import { Group } from './accounts/group';
-import { MangoAccount } from './accounts/mangoAccount';
+import {
+  MangoAccount,
+  PerpPosition,
+  Serum3Orders,
+  TokenPosition,
+} from './accounts/mangoAccount';
 import { StubOracle } from './accounts/oracle';
 import {
   FillEvent,
@@ -2588,22 +2593,23 @@ export class MangoClient {
   ): PublicKey[] {
     const healthRemainingAccounts: PublicKey[] = [];
 
-    const tokenPositions = [...mangoAccount.tokens];
+    const tokenPositionIndices = mangoAccount.tokens.map((t) => t.tokenIndex);
     for (const bank of banks) {
-      const tokenPositionExists = tokenPositions.find(
-        (t) => t.tokenIndex === bank.tokenIndex,
-      );
+      const tokenPositionExists =
+        tokenPositionIndices.indexOf(bank.tokenIndex) > 0;
       if (!tokenPositionExists) {
-        const inActiveTokenPosition = tokenPositions.find((t) => !t.isActive());
-        if (inActiveTokenPosition) {
-          inActiveTokenPosition.tokenIndex = bank.tokenIndex;
+        const inactiveTokenPosition = tokenPositionIndices.findIndex(
+          (index) => index === TokenPosition.TokenIndexUnset,
+        );
+        if (inactiveTokenPosition) {
+          tokenPositionIndices[inactiveTokenPosition] = bank.tokenIndex;
         }
       }
     }
 
-    const mintInfos = tokenPositions
-      .filter((token) => token.isActive())
-      .map((token) => group.mintInfosMapByTokenIndex.get(token.tokenIndex)!);
+    const mintInfos = tokenPositionIndices
+      .filter((tokenIndex) => tokenIndex !== TokenPosition.TokenIndexUnset)
+      .map((tokenIndex) => group.mintInfosMapByTokenIndex.get(tokenIndex)!);
     healthRemainingAccounts.push(
       ...mintInfos.map((mintInfo) => mintInfo.firstBank()),
     );
@@ -2612,48 +2618,58 @@ export class MangoClient {
     );
 
     // insert any extra perp markets in the free perp position slots
-    const perpPositions = [...mangoAccount.perps];
+    const perpPositionIndices = mangoAccount.perps.map((p) => p.marketIndex);
     for (const perpMarket of perpMarkets) {
-      const perpPositionExists = perpPositions.find(
-        (p) => p.marketIndex === perpMarket.perpMarketIndex,
-      );
+      const perpPositionExists =
+        perpPositionIndices.indexOf(perpMarket.perpMarketIndex) > 0;
       if (!perpPositionExists) {
-        const perpPosition = perpPositions.find((perp) => !perp.isActive());
-        if (perpPosition) {
-          perpPosition.marketIndex = perpMarket.perpMarketIndex;
+        const inactivePerpPosition = perpPositionIndices.find(
+          (perpIdx) => perpIdx === PerpPosition.PerpMarketIndexUnset,
+        );
+        if (inactivePerpPosition) {
+          perpPositionIndices[inactivePerpPosition] =
+            perpMarket.perpMarketIndex;
         }
       }
     }
 
-    const allPerpMarkets = perpPositions
-      .filter((perp) => perp.isActive())
-      .map((perp) => group.getPerpMarketByMarketIndex(perp.marketIndex)!);
+    const allPerpMarkets = perpPositionIndices
+      .filter((perpIdx) => perpIdx !== PerpPosition.PerpMarketIndexUnset)
+      .map((perpIdx) => group.getPerpMarketByMarketIndex(perpIdx)!);
     healthRemainingAccounts.push(
       ...allPerpMarkets.map((perp) => perp.publicKey),
     );
     healthRemainingAccounts.push(...allPerpMarkets.map((perp) => perp.oracle));
 
     // insert any extra open orders accounts in the cooresponding free serum market slot
-    const serumOpenOrders = [...mangoAccount.serum3];
+    const serumPositionIndices = mangoAccount.serum3.map((s) => ({
+      marketIndex: s.marketIndex,
+      openOrders: s.openOrders,
+    }));
     for (const [serum3Market, openOrderPk] of openOrdersForMarket) {
-      const ooPositionExists = serumOpenOrders.find(
-        (oo) => oo.marketIndex === serum3Market.marketIndex,
-      );
+      const ooPositionExists =
+        serumPositionIndices.findIndex(
+          (i) => i.marketIndex === serum3Market.marketIndex,
+        ) > 0;
       if (!ooPositionExists) {
-        const serum3Order = serumOpenOrders.find(
-          (serumOrder) => !serumOrder.isActive(),
+        const inactiveSerumPosition = serumPositionIndices.find(
+          (serumPos) =>
+            serumPos.marketIndex === Serum3Orders.Serum3MarketIndexUnset,
         );
-        if (serum3Order) {
-          serum3Order.marketIndex = serum3Market.marketIndex;
-          serum3Order.openOrders = openOrderPk;
+        if (inactiveSerumPosition) {
+          inactiveSerumPosition.marketIndex = serum3Market.marketIndex;
+          inactiveSerumPosition.openOrders = openOrderPk;
         }
       }
     }
 
     healthRemainingAccounts.push(
-      ...serumOpenOrders
-        .filter((serum3Account) => serum3Account.isActive())
-        .map((serum3Account) => serum3Account.openOrders),
+      ...serumPositionIndices
+        .filter(
+          (serumPosition) =>
+            serumPosition.marketIndex !== Serum3Orders.Serum3MarketIndexUnset,
+        )
+        .map((serumPosition) => serumPosition.openOrders),
     );
 
     // debugHealthAccounts(group, mangoAccount, healthRemainingAccounts);
