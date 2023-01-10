@@ -96,6 +96,9 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     let is_borrow = amount > native_position;
     require!(allow_borrow || !is_borrow, MangoError::SomeError);
+    if bank.is_reduce_only() {
+        require!(!is_borrow, MangoError::TokenInReduceOnlyMode);
+    }
 
     let amount_i80f48 = I80F48::from(amount);
 

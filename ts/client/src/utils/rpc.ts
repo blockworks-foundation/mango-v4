@@ -2,6 +2,7 @@ import { AnchorProvider } from '@project-serum/anchor';
 import NodeWallet from '@project-serum/anchor/dist/cjs/nodewallet';
 import {
   AddressLookupTableAccount,
+  ComputeBudgetProgram,
   MessageV0,
   Signer,
   TransactionInstruction,
@@ -20,6 +21,10 @@ export async function sendTransaction(
   );
 
   const payer = (provider as AnchorProvider).wallet;
+
+  if (opts.prioritizationFee) {
+    ixs = [createComputeBudgetIx(opts.prioritizationFee), ...ixs];
+  }
 
   const message = MessageV0.compile({
     payerKey: (provider as AnchorProvider).wallet.publicKey,
@@ -93,6 +98,15 @@ export async function sendTransaction(
 
   return signature;
 }
+
+export const createComputeBudgetIx = (
+  microLamports: number,
+): TransactionInstruction => {
+  const computeBudgetIx = ComputeBudgetProgram.setComputeUnitPrice({
+    microLamports,
+  });
+  return computeBudgetIx;
+};
 
 class MangoError extends Error {
   message: string;

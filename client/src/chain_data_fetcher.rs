@@ -141,7 +141,7 @@ impl AccountFetcher {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl crate::AccountFetcher for AccountFetcher {
     async fn fetch_raw_account(
         &self,

@@ -1,4 +1,5 @@
 import { BN } from '@project-serum/anchor';
+import { PublicKey } from '@solana/web3.js';
 
 export type Modify<T, R> = Omit<T, keyof R> & R;
 

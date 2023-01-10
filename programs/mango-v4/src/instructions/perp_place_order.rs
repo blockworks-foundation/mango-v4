@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::{new_fixed_order_account_retriever, new_health_cache};
+use crate::state::Side;
 use crate::state::{
     BookSide, EventQueue, Group, MangoAccountFixed, MangoAccountLoader, Order, Orderbook,
     PerpMarket,
@@ -38,7 +39,7 @@ pub struct PerpPlaceOrder<'info> {
 
 // TODO
 #[allow(clippy::too_many_arguments)]
-pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, order: Order, limit: u8) -> Result<()> {
+pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, mut order: Order, limit: u8) -> Result<()> {
     require_gte!(order.max_base_lots, 0);
     require_gte!(order.max_quote_lots, 0);
 
@@ -109,8 +110,35 @@ pub fn perp_place_order(ctx: Context<PerpPlaceOrder>, order: Order, limit: u8) -
 
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
-    // TODO apply reduce_only flag to compute final base_lots, also process event queue
-    require!(order.reduce_only == false, MangoError::SomeError);
+    let pp = account.perp_position(perp_market_index)?;
+    let effective_pos = pp.effective_base_position_lots();
+    let max_base_lots = if order.reduce_only || perp_market.is_reduce_only() {
+        if (order.side == Side::Bid && effective_pos >= 0)
+            || (order.side == Side::Ask && effective_pos <= 0)
+        {
+            0
+        } else if order.side == Side::Bid {
+            // ignores open asks
+            (effective_pos + pp.bids_base_lots)
+                .min(0)
+                .abs()
+                .min(order.max_base_lots)
+        } else {
+            // ignores open bids
+            (effective_pos - pp.asks_base_lots)
+                .max(0)
+                .min(order.max_base_lots)
+        }
+    } else {
+        order.max_base_lots
+    };
+    if perp_market.is_reduce_only() {
+        require!(
+            order.reduce_only || max_base_lots == order.max_base_lots,
+            MangoError::MarketInReduceOnlyMode
+        )
+    };
+    order.max_base_lots = max_base_lots;
 
     book.new_order(
         order,

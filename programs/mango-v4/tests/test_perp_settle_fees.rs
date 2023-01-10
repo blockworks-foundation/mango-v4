@@ -79,6 +79,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             solana,
             TokenDepositInstruction {
                 amount: deposit_amount,
+                reduce_only: false,
                 account: account_0,
                 owner,
                 token_account: payer_mint_accounts[0],
@@ -93,6 +94,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             solana,
             TokenDepositInstruction {
                 amount: deposit_amount,
+                reduce_only: false,
                 account: account_0,
                 owner,
                 token_account: payer_mint_accounts[1],
@@ -111,6 +113,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             solana,
             TokenDepositInstruction {
                 amount: deposit_amount,
+                reduce_only: false,
                 account: account_1,
                 owner,
                 token_account: payer_mint_accounts[0],
@@ -125,6 +128,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             solana,
             TokenDepositInstruction {
                 amount: deposit_amount,
+                reduce_only: false,
                 account: account_1,
                 owner,
                 token_account: payer_mint_accounts[1],
@@ -214,6 +218,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 0,
         },
     )
@@ -230,6 +235,7 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
             price_lots,
             max_base_lots: 1,
             max_quote_lots: i64::MAX,
+            reduce_only: false,
             client_order_id: 0,
         },
     )

@@ -1,9 +1,18 @@
 import { AnchorProvider, Wallet } from '@project-serum/anchor';
 import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  NATIVE_MINT,
+  TOKEN_PROGRAM_ID,
+} from '@solana/spl-token';
+import {
   AddressLookupTableProgram,
+  ComputeBudgetProgram,
   Connection,
   Keypair,
   PublicKey,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
+  SYSVAR_RENT_PUBKEY,
+  SystemProgram,
 } from '@solana/web3.js';
 import fs from 'fs';
 import { TokenIndex } from '../accounts/bank';
@@ -14,7 +23,7 @@ import {
   Serum3Side,
 } from '../accounts/serum3';
 import { MangoClient } from '../client';
-import { MANGO_V4_ID } from '../constants';
+import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../constants';
 import { buildVersionedTx, toNative } from '../utils';
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
@@ -27,6 +36,7 @@ const MAINNET_MINTS = new Map([
   ['SOL', 'So11111111111111111111111111111111111111112'], // 4 Wrapped SOL
   ['MSOL', 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So'], // 5
   ['MNGO', 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac'], // 6
+  ['BONK', 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263'], // 7
 ]);
 const MAINNET_ORACLES = new Map([
   // USDC - stub oracle
@@ -37,6 +47,7 @@ const MAINNET_ORACLES = new Map([
   ['MSOL', 'E4v1BBgoso9s64TQvmyownAVJbhbEPGyzA3qn4n46qj9'],
   ['MNGO', '79wm3jjcPr6RaNQ4DGvP5KxG1mNd3gEBsg6FsNVFezK4'],
   ['BTC', 'GVXRSBjFk6e6J3NbVPXohDJetcTjaeeuykUpbQF8UoMU'],
+  ['BONK', '4SZ1qb4MtSUrZcoeaeQ3BDzVCyqxw3VwSFpPiMTmn4GE'],
 ]);
 
 // External markets are matched with those in https://github.com/openbook-dex/openbook-ts/blob/master/packages/serum/src/markets.json
@@ -44,8 +55,11 @@ const MAINNET_SERUM3_MARKETS = new Map([
   ['SOL/USDC', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'],
 ]);
 
-const { MB_CLUSTER_URL, MB_PAYER_KEYPAIR, MB_USER_KEYPAIR, MB_USER4_KEYPAIR } =
-  process.env;
+const {
+  MB_CLUSTER_URL,
+  MB_PAYER_KEYPAIR,
+  MB_PAYER3_KEYPAIR: MB_PAYER2_KEYPAIR,
+} = process.env;
 
 const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
 const NET_BORROWS_WINDOW_SIZE_TS = 24 * 60 * 60;
@@ -65,9 +79,9 @@ const defaultInterestRate = {
   maxRate: 2.0,
 };
 
-async function buildAdminClient(): Promise<[MangoClient, Keypair]> {
+async function buildAdminClient(): Promise<[MangoClient, Keypair, Keypair]> {
   const admin = Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER_KEYPAIR!, 'utf-8'))),
+    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER2_KEYPAIR!, 'utf-8'))),
   );
 
   const options = AnchorProvider.defaultOptions();
@@ -76,17 +90,21 @@ async function buildAdminClient(): Promise<[MangoClient, Keypair]> {
   const adminWallet = new Wallet(admin);
   console.log(`Admin ${adminWallet.publicKey.toBase58()}`);
   const adminProvider = new AnchorProvider(connection, adminWallet, options);
-  return [
-    await MangoClient.connect(
-      adminProvider,
-      'mainnet-beta',
-      MANGO_V4_ID['mainnet-beta'],
-      {
-        idsSource: 'get-program-accounts',
-      },
-    ),
-    admin,
-  ];
+
+  const client = await MangoClient.connect(
+    adminProvider,
+    'mainnet-beta',
+    MANGO_V4_ID['mainnet-beta'],
+    {
+      idsSource: 'get-program-accounts',
+    },
+  );
+
+  const creator = Keypair.fromSecretKey(
+    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER_KEYPAIR!, 'utf-8'))),
+  );
+
+  return [client, admin, creator];
 }
 
 async function buildUserClient(
@@ -107,11 +125,11 @@ async function buildUserClient(
     MANGO_V4_ID['mainnet-beta'],
   );
 
-  const admin = Keypair.fromSecretKey(
+  const creator = Keypair.fromSecretKey(
     Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER_KEYPAIR!, 'utf-8'))),
   );
-  console.log(`Admin ${admin.publicKey.toBase58()}`);
-  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  console.log(`Creator ${creator.publicKey.toBase58()}`);
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
   return [client, group, user];
 }
 
@@ -131,12 +149,14 @@ async function changeAdmin() {
   const result = await buildAdminClient();
   const client = result[0];
   const admin = result[1];
+  const creator = result[2];
 
-  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
 
   console.log(`Changing admin...`);
   await client.groupEdit(
     group,
+    new PublicKey('DSiGNQaKhFCSZbg4HczqCtPAPb1xV51c9GfbfqcVKTB4'),
     new PublicKey('DSiGNQaKhFCSZbg4HczqCtPAPb1xV51c9GfbfqcVKTB4'),
   );
 }
@@ -145,8 +165,9 @@ async function registerTokens() {
   const result = await buildAdminClient();
   const client = result[0];
   const admin = result[1];
+  const creator = result[2];
 
-  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
 
   console.log(`Creating USDC stub oracle...`);
   const usdcMainnetMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
@@ -304,6 +325,17 @@ async function registerTokens() {
     'MNGO',
   );
 
+  console.log(`Registering BONK...`);
+  const bonkMainnetMint = new PublicKey(MAINNET_MINTS.get('BONK')!);
+  const bonkMainnetOracle = new PublicKey(MAINNET_ORACLES.get('BONK')!);
+  await client.tokenRegisterTrustless(
+    group,
+    bonkMainnetMint,
+    bonkMainnetOracle,
+    7,
+    'BONK',
+  );
+
   // log tokens/banks
   await group.reloadAll(client);
   for (const bank of await Array.from(group.banksMapByMint.values())
@@ -317,8 +349,9 @@ async function registerSerum3Markets() {
   const result = await buildAdminClient();
   const client = result[0];
   const admin = result[1];
+  const creator = result[2];
 
-  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
 
   // Register SOL serum market
   await client.serum3RegisterMarket(
@@ -372,8 +405,9 @@ async function registerPerpMarkets() {
   const result = await buildAdminClient();
   const client = result[0];
   const admin = result[1];
+  const creator = result[2];
 
-  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
 
   await client.perpCreateMarket(
     group,
@@ -436,56 +470,55 @@ async function registerPerpMarkets() {
   );
 }
 
-async function main() {
-  try {
-    // await createGroup();
-    // await changeAdmin();
-  } catch (error) {
-    console.log(error);
-  }
-  try {
-    // await registerTokens();
-  } catch (error) {
-    console.log(error);
-  }
-  try {
-    // await registerSerum3Markets();
-  } catch (error) {
-    console.log(error);
-  }
+async function makePerpMarketReduceOnly() {
+  const result = await buildAdminClient();
+  const client = result[0];
+  const admin = result[1];
+  const creator = result[2];
 
-  try {
-    // await registerPerpMarkets();
-  } catch (error) {
-    console.log(error);
-  }
-  try {
-    // await createUser(MB_USER_KEYPAIR!);
-    // depositForUser(MB_USER_KEYPAIR!);
-  } catch (error) {
-    console.log(error);
-  }
-
-  try {
-  } catch (error) {}
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
+  const perpMarket = group.getPerpMarketByName('MNGO-PERP');
+  await client.perpEditMarket(
+    group,
+    perpMarket.perpMarketIndex,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    true,
+  );
 }
-
-try {
-  main();
-} catch (error) {
-  console.log(error);
-}
-
-////////////////////////////////////////////////////////////
-/// UNUSED /////////////////////////////////////////////////
-////////////////////////////////////////////////////////////
 
 async function createAndPopulateAlt() {
   const result = await buildAdminClient();
   const client = result[0];
   const admin = result[1];
 
-  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  const creator = Keypair.fromSecretKey(
+    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER_KEYPAIR!, 'utf-8'))),
+  );
+  console.log(`Creator ${creator.publicKey.toBase58()}`);
+  const group = await client.getGroupForCreator(creator.publicKey, GROUP_NUM);
 
   const connection = client.program.provider.connection;
 
@@ -591,14 +624,75 @@ async function createAndPopulateAlt() {
     }
 
     console.log(`ALT: extending using mango v4 relevant public keys`);
+
     await extendTable(bankAddresses);
+    await extendTable([OPENBOOK_PROGRAM_ID['mainnet-beta']]);
     await extendTable(serum3MarketAddresses);
     await extendTable(serum3ExternalMarketAddresses);
-    await extendTable(perpMarketAddresses);
+
+    // TODO: dont extend for perps atm
+    // await extendTable(perpMarketAddresses);
+
+    // Well known addressess
+    await extendTable([
+      SystemProgram.programId,
+      SYSVAR_RENT_PUBKEY,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID,
+      NATIVE_MINT,
+      SYSVAR_INSTRUCTIONS_PUBKEY,
+      ComputeBudgetProgram.programId,
+    ]);
   } catch (error) {
     console.log(error);
   }
 }
+
+async function main() {
+  try {
+    // await createGroup();
+    // await changeAdmin();
+  } catch (error) {
+    console.log(error);
+  }
+  try {
+    // await registerTokens();
+  } catch (error) {
+    console.log(error);
+  }
+  try {
+    // await registerSerum3Markets();
+  } catch (error) {
+    console.log(error);
+  }
+
+  try {
+    // await registerPerpMarkets();
+    // await makePerpMarketReduceOnly();
+  } catch (error) {
+    console.log(error);
+  }
+  try {
+    // await createUser(MB_USER_KEYPAIR!);
+    // depositForUser(MB_USER_KEYPAIR!);
+  } catch (error) {
+    console.log(error);
+  }
+
+  try {
+    // createAndPopulateAlt();
+  } catch (error) {}
+}
+
+try {
+  main();
+} catch (error) {
+  console.log(error);
+}
+
+////////////////////////////////////////////////////////////
+/// UNUSED /////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
 
 async function expandMangoAccount(userKeypair: string) {
   const result = await buildUserClient(userKeypair);

@@ -49,6 +49,7 @@ pub fn perp_edit_market(
     stable_price_growth_limit_opt: Option<f32>,
     settle_pnl_limit_factor_opt: Option<f32>,
     settle_pnl_limit_window_size_ts_opt: Option<u64>,
+    reduce_only_opt: Option<bool>,
 ) -> Result<()> {
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
@@ -170,6 +171,10 @@ pub fn perp_edit_market(
     if let Some(settle_pnl_limit_window_size_ts) = settle_pnl_limit_window_size_ts_opt {
         perp_market.settle_pnl_limit_window_size_ts = settle_pnl_limit_window_size_ts;
     }
+
+    if let Some(reduce_only) = reduce_only_opt {
+        perp_market.reduce_only = if reduce_only { 1 } else { 0 };
+    };
 
     emit!(PerpMarketMetaDataLog {
         mango_group: ctx.accounts.group.key(),
