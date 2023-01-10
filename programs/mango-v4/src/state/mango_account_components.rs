@@ -225,11 +225,13 @@ pub struct PerpPosition {
     /// Amount of pnl that was realized by bringing the base position closer to 0.
     ///
     /// The settlement of this type of pnl is limited by settle_pnl_limit_realized_trade.
+    /// Settling pnl reduces this value once other_pnl below is exhausted.
     pub realized_trade_pnl_native: I80F48,
 
     /// Amount of pnl realized from fees, funding and liquidation.
     ///
     /// This type of realized pnl is always settleable.
+    /// Settling pnl reduces this value first.
     pub realized_other_pnl_native: I80F48,
 
     /// Settle limit contribution from realized pnl.
@@ -658,16 +660,13 @@ impl PerpPosition {
     pub fn record_settle(&mut self, settled_pnl: I80F48) {
         self.change_quote_position(-settled_pnl);
 
-        // Settlement reduces realized_other_pnl first
+        // Settlement reduces realized_other_pnl first.
+        // Reduction only happens if settled_pnl has the same sign as realized_other_pnl.
         let other_reduction = if settled_pnl > 0 {
-            // Example: settling 100 positive pnl, with 60 realized:
-            // pnl = 100 -> realized_pnl_reduction = 60
             settled_pnl
                 .min(self.realized_other_pnl_native)
                 .max(I80F48::ZERO)
         } else {
-            // Example: settling 100 negative pnl, with -60 realized:
-            // pnl = -100 -> realized_pnl_reduction = -60
             settled_pnl
                 .max(self.realized_other_pnl_native)
                 .min(I80F48::ZERO)
@@ -675,16 +674,12 @@ impl PerpPosition {
         cm!(self.realized_other_pnl_native -= other_reduction);
         let trade_and_unrealized_settlement = cm!(settled_pnl - other_reduction);
 
-        // Then reduces realized_trade_pnl
+        // Then reduces realized_trade_pnl, similar to other_pnl above.
         let trade_reduction = if trade_and_unrealized_settlement > 0 {
-            // Example: settling 100 positive pnl, with 60 realized:
-            // pnl = 100 -> realized_pnl_reduction = 60
             trade_and_unrealized_settlement
                 .min(self.realized_trade_pnl_native)
                 .max(I80F48::ZERO)
         } else {
-            // Example: settling 100 negative pnl, with -60 realized:
-            // pnl = -100 -> realized_pnl_reduction = -60
             trade_and_unrealized_settlement
                 .max(self.realized_trade_pnl_native)
                 .min(I80F48::ZERO)
@@ -772,17 +767,17 @@ mod tests {
 
     use super::PerpPosition;
 
-    fn create_perp_position(market: &PerpMarket, base_pos: i64, quote_pos: i64) -> PerpPosition {
+    fn create_perp_position(
+        market: &PerpMarket,
+        base_pos: i64,
+        entry_price_per_lot: i64,
+    ) -> PerpPosition {
         let mut pos = PerpPosition::default();
         pos.market_index = market.perp_market_index;
         pos.base_position_lots = base_pos;
-        pos.quote_position_native = I80F48::from(quote_pos);
-        pos.quote_running_native = quote_pos;
-        pos.avg_entry_price_per_base_lot = if base_pos != 0 {
-            ((quote_pos as f64) / (base_pos as f64)).abs()
-        } else {
-            0.0
-        };
+        pos.quote_position_native = I80F48::from(-base_pos * entry_price_per_lot);
+        pos.quote_running_native = -base_pos * entry_price_per_lot;
+        pos.avg_entry_price_per_base_lot = entry_price_per_lot as f64;
         pos
     }
 
@@ -821,7 +816,7 @@ mod tests {
     #[test]
     fn test_quote_entry_long_increasing_from_long() {
         let mut market = test_perp_market(10.0);
-        let mut pos = create_perp_position(&market, 10, -100);
+        let mut pos = create_perp_position(&market, 10, 10);
         // Go long 10 @ 30
         pos.record_trade(&mut market, 10, I80F48::from(-300));
         assert_eq!(pos.quote_running_native, -400);
@@ -834,8 +829,8 @@ mod tests {
     #[test]
     fn test_quote_entry_short_increasing_from_short() {
         let mut market = test_perp_market(10.0);
-        let mut pos = create_perp_position(&market, -10, 100);
-        // Go short 10 @ 10
+        let mut pos = create_perp_position(&market, -10, 10);
+        // Go short 10 @ 30
         pos.record_trade(&mut market, -10, I80F48::from(300));
         assert_eq!(pos.quote_running_native, 400);
         assert_eq!(pos.avg_entry_price(&market), 20.0);
@@ -847,12 +842,12 @@ mod tests {
     #[test]
     fn test_quote_entry_long_decreasing_from_short() {
         let mut market = test_perp_market(10.0);
-        let mut pos = create_perp_position(&market, -10, 100);
+        let mut pos = create_perp_position(&market, -10, 10);
         // Go long 5 @ 50
         pos.record_trade(&mut market, 5, I80F48::from(-250));
         assert_eq!(pos.quote_running_native, -150);
         assert_eq!(pos.avg_entry_price(&market), 10.0); // Entry price remains the same when decreasing
-        assert_eq!(pos.break_even_price(&market), -30.0); // Already broke even
+        assert_eq!(pos.break_even_price(&market), -30.0); // The short can't break even anymore
         assert_eq!(pos.realized_trade_pnl_native, I80F48::from(-200));
         assert_eq!(pos.settle_pnl_limit_realized_trade, -5 * 10 / 5 - 1);
     }
@@ -860,7 +855,7 @@ mod tests {
     #[test]
     fn test_quote_entry_short_decreasing_from_long() {
         let mut market = test_perp_market(10.0);
-        let mut pos = create_perp_position(&market, 10, -100);
+        let mut pos = create_perp_position(&market, 10, 10);
         // Go short 5 @ 50
         pos.record_trade(&mut market, -5, I80F48::from(250));
         assert_eq!(pos.quote_running_native, 150);
@@ -873,7 +868,7 @@ mod tests {
     #[test]
     fn test_quote_entry_long_close_with_short() {
         let mut market = test_perp_market(10.0);
-        let mut pos = create_perp_position(&market, 10, -100);
+        let mut pos = create_perp_position(&market, 10, 10);
         // Go short 10 @ 25
         pos.record_trade(&mut market, -10, I80F48::from(250));
         assert_eq!(pos.quote_running_native, 0);
@@ -886,7 +881,7 @@ mod tests {
     #[test]
     fn test_quote_entry_short_close_with_long() {
         let mut market = test_perp_market(10.0);
-        let mut pos = create_perp_position(&market, -10, 100);
+        let mut pos = create_perp_position(&market, -10, 10);
         // Go long 10 @ 25
         pos.record_trade(&mut market, 10, I80F48::from(-250));
         assert_eq!(pos.quote_running_native, 0);
@@ -899,7 +894,7 @@ mod tests {
     #[test]
     fn test_quote_entry_long_close_short_with_overflow() {
         let mut market = test_perp_market(10.0);
-        let mut pos = create_perp_position(&market, 10, -100);
+        let mut pos = create_perp_position(&market, 10, 10);
         // Go short 15 @ 20
         pos.record_trade(&mut market, -15, I80F48::from(300));
         assert_eq!(pos.quote_running_native, 100);
@@ -912,7 +907,7 @@ mod tests {
     #[test]
     fn test_quote_entry_short_close_long_with_overflow() {
         let mut market = test_perp_market(10.0);
-        let mut pos = create_perp_position(&market, -10, 100);
+        let mut pos = create_perp_position(&market, -10, 10);
         // Go long 15 @ 20
         pos.record_trade(&mut market, 15, I80F48::from(-300));
         assert_eq!(pos.quote_running_native, -100);
@@ -981,6 +976,28 @@ mod tests {
         pos.record_trade(&mut market, -1, I80F48::from(8_000));
         assert_eq!(pos.realized_trade_pnl_native, I80F48::from(-1_000));
         assert_eq!(pos.settle_pnl_limit_realized_trade, -(1 * 10 / 5 + 1));
+    }
+
+    #[test]
+    fn test_perp_trade_without_realized_pnl() {
+        let mut market = test_perp_market(10.0);
+        let mut pos = create_perp_position(&market, 0, 0);
+
+        // Buy 11 @ 10,000
+        pos.record_trade(&mut market, 11, I80F48::from(-11 * 10_000));
+
+        // Sell 1 @ 10,000
+        pos.record_trade(&mut market, -1, I80F48::from(10_000));
+        assert_eq!(pos.realized_trade_pnl_native, I80F48::from(0));
+        assert_eq!(pos.settle_pnl_limit_realized_trade, 0);
+
+        // Sell 10 @ 10,000
+        pos.record_trade(&mut market, -10, I80F48::from(10 * 10_000));
+        assert_eq!(pos.realized_trade_pnl_native, I80F48::from(0));
+        assert_eq!(pos.settle_pnl_limit_realized_trade, 0);
+
+        assert_eq!(pos.base_position_lots, 0);
+        assert_eq!(pos.quote_position_native, I80F48::ZERO);
     }
 
     #[test]
@@ -1074,13 +1091,13 @@ mod tests {
         let mut market = test_perp_market(10.0);
         market.base_lot_size = 10;
 
-        let long_pos = create_perp_position(&market, 50, -5000);
+        let long_pos = create_perp_position(&market, 50, 100);
         let pnl = long_pos.pnl_for_price(&market, I80F48::from(11)).unwrap();
         assert_eq!(pnl, I80F48::from(50 * 10 * 1), "long profitable");
         let pnl = long_pos.pnl_for_price(&market, I80F48::from(9)).unwrap();
         assert_eq!(pnl, I80F48::from(50 * 10 * -1), "long unprofitable");
 
-        let short_pos = create_perp_position(&market, -50, 5000);
+        let short_pos = create_perp_position(&market, -50, 100);
         let pnl = short_pos.pnl_for_price(&market, I80F48::from(11)).unwrap();
         assert_eq!(pnl, I80F48::from(50 * 10 * -1), "short unprofitable");
         let pnl = short_pos.pnl_for_price(&market, I80F48::from(9)).unwrap();
@@ -1182,7 +1199,7 @@ mod tests {
     fn test_perp_settle_limit() {
         let mut market = test_perp_market(0.5);
 
-        let mut pos = create_perp_position(&market, 100, -50);
+        let mut pos = create_perp_position(&market, 100, 1);
         pos.realized_trade_pnl_native = I80F48::from(60); // no effect
 
         let limited_pnl = |pos: &PerpPosition, market: &PerpMarket, pnl: i64| {
@@ -1230,7 +1247,7 @@ mod tests {
     #[test]
     fn test_perp_reduced_realized_pnl_settle_limit() {
         let market = test_perp_market(0.5);
-        let mut pos = create_perp_position(&market, 100, -50);
+        let mut pos = create_perp_position(&market, 100, 1);
 
         let cases = vec![
             // No change if realized > limit
