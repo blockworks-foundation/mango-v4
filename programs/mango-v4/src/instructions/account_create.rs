@@ -7,6 +7,9 @@ use crate::util::fill_from_str;
 #[derive(Accounts)]
 #[instruction(account_num: u32, token_count: u8, serum3_count: u8, perp_count: u8, perp_oo_count: u8)]
 pub struct AccountCreate<'info> {
+    #[account(
+        constraint = group.load()?.is_operational()
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(

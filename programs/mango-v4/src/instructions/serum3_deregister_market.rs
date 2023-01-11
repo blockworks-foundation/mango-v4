@@ -7,8 +7,9 @@ use crate::state::*;
 pub struct Serum3DeregisterMarket<'info> {
     #[account(
         mut,
-        constraint = group.load()?.is_testing(),
         has_one = admin,
+        constraint = group.load()?.is_testing(),
+        constraint = group.load()?.is_operational()
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,

@@ -13,6 +13,9 @@ use crate::logs::{LoanOriginationFeeInstruction, WithdrawLoanOriginationFeeLog};
 
 #[derive(Accounts)]
 pub struct Serum3SettleFunds<'info> {
+    #[account(
+        constraint = group.load()?.is_operational()
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(

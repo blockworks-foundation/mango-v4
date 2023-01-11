@@ -13,6 +13,7 @@ pub struct Serum3RegisterMarket<'info> {
     #[account(
         mut,
         has_one = admin,
+        constraint = group.load()?.is_operational(),
         constraint = group.load()?.serum3_supported()
     )]
     pub group: AccountLoader<'info, Group>,

@@ -13,6 +13,9 @@ use crate::serum3_cpi::load_open_orders_ref;
 
 #[derive(Accounts)]
 pub struct Serum3CancelOrder<'info> {
+    #[account(
+        constraint = group.load()?.is_operational()
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(

@@ -7,6 +7,7 @@ use crate::state::*;
 pub struct PerpCloseMarket<'info> {
     #[account(
         constraint = group.load()?.is_testing(),
+        constraint = group.load()?.is_operational(),
         has_one = admin,
     )]
     pub group: AccountLoader<'info, Group>,

@@ -5,6 +5,9 @@ use crate::state::{BookSide, Group, MangoAccountFixed, MangoAccountLoader, Order
 
 #[derive(Accounts)]
 pub struct PerpCancelAllOrders<'info> {
+    #[account(
+        constraint = group.load()?.is_operational()
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group)]

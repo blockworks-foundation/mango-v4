@@ -9,6 +9,7 @@ use crate::state::*;
 pub struct TokenAddBank<'info> {
     #[account(
         has_one = admin,
+        constraint = group.load()?.is_operational(),
         constraint = group.load()?.multiple_banks_supported()
     )]
     pub group: AccountLoader<'info, Group>,

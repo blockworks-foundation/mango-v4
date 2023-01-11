@@ -5,6 +5,9 @@ use crate::util::checked_math as cm;
 
 #[derive(Accounts)]
 pub struct AccountExpand<'info> {
+    #[account(
+        constraint = group.load()?.is_operational()
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(

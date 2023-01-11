@@ -14,6 +14,9 @@ use crate::state::*;
 
 #[derive(Accounts)]
 pub struct Serum3LiqForceCancelOrders<'info> {
+    #[account(
+        constraint = group.load()?.is_operational()
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(mut, has_one = group)]

@@ -6,8 +6,9 @@ use crate::state::*;
 #[derive(Accounts)]
 pub struct StubOracleClose<'info> {
     #[account(
-        constraint = group.load()?.is_testing(),
         has_one = admin,
+        constraint = group.load()?.is_operational(),
+        constraint = group.load()?.is_testing(),
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,

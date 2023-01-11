@@ -17,6 +17,7 @@ use crate::logs::{emit_perp_balances, PerpLiqBankruptcyLog, TokenBalanceLog};
 pub struct PerpLiqBankruptcy<'info> {
     #[account(
         has_one = insurance_vault,
+        constraint = group.load()?.is_operational()
     )]
     pub group: AccountLoader<'info, Group>,
 

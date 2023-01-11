@@ -122,6 +122,12 @@ export type MangoV4 = {
           }
         },
         {
+          "name": "securityAdminOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
           "name": "testingOpt",
           "type": {
             "option": "u8"
@@ -132,6 +138,27 @@ export type MangoV4 = {
           "type": {
             "option": "u8"
           }
+        }
+      ]
+    },
+    {
+      "name": "groupToggleHalt",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "halted",
+          "type": "bool"
         }
       ]
     },
@@ -3851,11 +3878,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "halted",
+            "type": "u8"
+          },
+          {
             "name": "padding2",
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           },
@@ -3869,11 +3900,15 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "securityAdmin",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1920
+                1888
               ]
             }
           }
@@ -7664,6 +7699,12 @@ export const IDL: MangoV4 = {
           }
         },
         {
+          "name": "securityAdminOpt",
+          "type": {
+            "option": "publicKey"
+          }
+        },
+        {
           "name": "testingOpt",
           "type": {
             "option": "u8"
@@ -7674,6 +7715,27 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u8"
           }
+        }
+      ]
+    },
+    {
+      "name": "groupToggleHalt",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "halted",
+          "type": "bool"
         }
       ]
     },
@@ -11393,11 +11455,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "halted",
+            "type": "u8"
+          },
+          {
             "name": "padding2",
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           },
@@ -11411,11 +11477,15 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "securityAdmin",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1920
+                1888
               ]
             }
           }

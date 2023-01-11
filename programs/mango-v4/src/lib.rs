@@ -45,6 +45,7 @@ pub mod mango_v4 {
         ctx: Context<GroupEdit>,
         admin_opt: Option<Pubkey>,
         fast_listing_admin_opt: Option<Pubkey>,
+        security_admin_opt: Option<Pubkey>,
         testing_opt: Option<u8>,
         version_opt: Option<u8>,
     ) -> Result<()> {
@@ -52,9 +53,14 @@ pub mod mango_v4 {
             ctx,
             admin_opt,
             fast_listing_admin_opt,
+            security_admin_opt,
             testing_opt,
             version_opt,
         )
+    }
+
+    pub fn group_toggle_halt(ctx: Context<GroupToggleHalt>, halted: bool) -> Result<()> {
+        instructions::group_toggle_halt(ctx, halted)
     }
 
     pub fn group_close(ctx: Context<GroupClose>) -> Result<()> {

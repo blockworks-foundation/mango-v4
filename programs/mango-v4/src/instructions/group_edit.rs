@@ -7,6 +7,7 @@ pub struct GroupEdit<'info> {
     #[account(
         mut,
         has_one = admin,
+        constraint = group.load()?.is_operational()
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
@@ -18,6 +19,7 @@ pub fn group_edit(
     ctx: Context<GroupEdit>,
     admin_opt: Option<Pubkey>,
     fast_listing_admin_opt: Option<Pubkey>,
+    security_admin_opt: Option<Pubkey>,
     testing_opt: Option<u8>,
     version_opt: Option<u8>,
 ) -> Result<()> {
@@ -29,6 +31,10 @@ pub fn group_edit(
 
     if let Some(fast_listing_admin) = fast_listing_admin_opt {
         group.fast_listing_admin = fast_listing_admin;
+    }
+
+    if let Some(security_admin) = security_admin_opt {
+        group.security_admin = security_admin;
     }
 
     if let Some(testing) = testing_opt {

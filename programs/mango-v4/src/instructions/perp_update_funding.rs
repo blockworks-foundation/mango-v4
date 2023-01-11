@@ -5,6 +5,9 @@ use crate::state::{BookSide, Group, Orderbook, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpUpdateFunding<'info> {
+    #[account(
+        constraint = group.load()?.is_operational()
+    )]
     pub group: AccountLoader<'info, Group>, // Required for group metadata parsing
 
     #[account(

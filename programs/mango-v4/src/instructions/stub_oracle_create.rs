@@ -8,6 +8,7 @@ use crate::state::*;
 pub struct StubOracleCreate<'info> {
     #[account(
         has_one = admin,
+        constraint = group.load()?.is_operational()
     )]
     pub group: AccountLoader<'info, Group>,
 

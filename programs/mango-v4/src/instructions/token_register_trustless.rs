@@ -17,6 +17,7 @@ const FIRST_BANK_NUM: u32 = 0;
 pub struct TokenRegisterTrustless<'info> {
     #[account(
         has_one = fast_listing_admin,
+        constraint = group.load()?.is_operational()
     )]
     pub group: AccountLoader<'info, Group>,
     pub fast_listing_admin: Signer<'info>,

@@ -3,6 +3,9 @@ use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct ComputeAccountData<'info> {
+    #[account(
+        constraint = group.load()?.is_operational()
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(has_one = group)]

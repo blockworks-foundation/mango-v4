@@ -8,6 +8,7 @@ use crate::logs::PerpMarketMetaDataLog;
 pub struct PerpEditMarket<'info> {
     #[account(
         has_one = admin,
+        constraint = group.load()?.is_operational()
     )]
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,

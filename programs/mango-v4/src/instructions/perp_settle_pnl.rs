@@ -11,6 +11,9 @@ use crate::state::{Group, MangoAccountFixed, MangoAccountLoader, PerpMarket};
 
 #[derive(Accounts)]
 pub struct PerpSettlePnl<'info> {
+    #[account(
+        constraint = group.load()?.is_operational()
+    )]
     pub group: AccountLoader<'info, Group>,
 
     #[account(
