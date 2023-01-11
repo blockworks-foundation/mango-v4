@@ -58,7 +58,7 @@ import {
 } from './utils';
 import { sendTransaction } from './utils/rpc';
 
-enum AccountRetriever {
+export enum AccountRetriever {
   Scanning,
   Fixed,
 }
@@ -2554,9 +2554,7 @@ export class MangoClient {
     );
   }
 
-  /// private
-
-  private buildHealthRemainingAccounts(
+  public buildHealthRemainingAccounts(
     retriever: AccountRetriever,
     group: Group,
     mangoAccounts: MangoAccount[],
@@ -2596,7 +2594,7 @@ export class MangoClient {
     const tokenPositionIndices = mangoAccount.tokens.map((t) => t.tokenIndex);
     for (const bank of banks) {
       const tokenPositionExists =
-        tokenPositionIndices.indexOf(bank.tokenIndex) > 0;
+        tokenPositionIndices.indexOf(bank.tokenIndex) > -1;
       if (!tokenPositionExists) {
         const inactiveTokenPosition = tokenPositionIndices.findIndex(
           (index) => index === TokenPosition.TokenIndexUnset,
@@ -2621,7 +2619,7 @@ export class MangoClient {
     const perpPositionIndices = mangoAccount.perps.map((p) => p.marketIndex);
     for (const perpMarket of perpMarkets) {
       const perpPositionExists =
-        perpPositionIndices.indexOf(perpMarket.perpMarketIndex) > 0;
+        perpPositionIndices.indexOf(perpMarket.perpMarketIndex) > -1;
       if (!perpPositionExists) {
         const inactivePerpPosition = perpPositionIndices.find(
           (perpIdx) => perpIdx === PerpPosition.PerpMarketIndexUnset,
