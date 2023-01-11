@@ -10,9 +10,7 @@ import { MANGO_V4_ID } from '../constants';
 //
 
 const GROUP_NUM = Number(process.env.GROUP_NUM || 200);
-const CLUSTER_URL =
-  process.env.CLUSTER_URL ||
-  'https://mango.rpcpool.com/946ef7337da3f5b8d3e4a34e7f88';
+const CLUSTER_URL = process.env.CLUSTER_URL;
 const MANGO_MAINNET_PAYER_KEYPAIR =
   process.env.MANGO_MAINNET_PAYER_KEYPAIR || '';
 

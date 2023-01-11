@@ -617,7 +617,7 @@ impl ClientInstruction for TokenWithdrawInstruction {
 
 pub struct TokenDepositInstruction {
     pub amount: u64,
-
+    pub reduce_only: bool,
     pub account: Pubkey,
     pub owner: TestKeypair,
     pub token_account: Pubkey,
@@ -635,6 +635,7 @@ impl ClientInstruction for TokenDepositInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             amount: self.amount,
+            reduce_only: self.reduce_only,
         };
 
         // load account so we know its mint
@@ -688,7 +689,7 @@ impl ClientInstruction for TokenDepositInstruction {
 
 pub struct TokenDepositIntoExistingInstruction {
     pub amount: u64,
-
+    pub reduce_only: bool,
     pub account: Pubkey,
     pub token_account: Pubkey,
     pub token_authority: TestKeypair,
@@ -705,6 +706,7 @@ impl ClientInstruction for TokenDepositIntoExistingInstruction {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
             amount: self.amount,
+            reduce_only: self.reduce_only,
         };
 
         // load account so we know its mint
@@ -1083,6 +1085,7 @@ impl ClientInstruction for TokenResetStablePriceModel {
             deposit_weight_scale_start_quote_opt: None,
             reset_stable_price: true,
             reset_net_borrow_limit: false,
+            reduce_only_opt: None,
         };
 
         let accounts = Self::Accounts {
@@ -1160,6 +1163,82 @@ impl ClientInstruction for TokenResetNetBorrows {
             deposit_weight_scale_start_quote_opt: None,
             reset_stable_price: false,
             reset_net_borrow_limit: true,
+            reduce_only_opt: None,
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            mint_info: mint_info_key,
+            oracle: mint_info.oracle,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, instruction);
+        instruction
+            .accounts
+            .extend(mint_info.banks().iter().map(|&k| AccountMeta {
+                pubkey: k,
+                is_signer: false,
+                is_writable: true,
+            }));
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
+pub struct TokenMakeReduceOnly {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub mint: Pubkey,
+}
+
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenMakeReduceOnly {
+    type Accounts = mango_v4::accounts::TokenEdit;
+    type Instruction = mango_v4::instruction::TokenEdit;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let mint_info_key = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                self.group.as_ref(),
+                self.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let mint_info: MintInfo = account_loader.load(&mint_info_key).await.unwrap();
+
+        let instruction = Self::Instruction {
+            oracle_opt: None,
+            oracle_config_opt: None,
+            group_insurance_fund_opt: None,
+            interest_rate_params_opt: None,
+            loan_fee_rate_opt: None,
+            loan_origination_fee_rate_opt: None,
+            maint_asset_weight_opt: None,
+            init_asset_weight_opt: None,
+            maint_liab_weight_opt: None,
+            init_liab_weight_opt: None,
+            liquidation_fee_opt: None,
+            stable_price_delay_interval_seconds_opt: None,
+            stable_price_delay_growth_limit_opt: None,
+            stable_price_growth_limit_opt: None,
+            min_vault_to_deposits_ratio_opt: None,
+            net_borrow_limit_per_window_quote_opt: None,
+            net_borrow_limit_window_size_ts_opt: None,
+            borrow_weight_scale_start_quote_opt: None,
+            deposit_weight_scale_start_quote_opt: None,
+            reset_stable_price: false,
+            reset_net_borrow_limit: false,
+            reduce_only_opt: Some(true),
         };
 
         let accounts = Self::Accounts {
@@ -2553,6 +2632,7 @@ fn perp_edit_instruction_default() -> mango_v4::instruction::PerpEditMarket {
         stable_price_growth_limit_opt: None,
         settle_pnl_limit_factor_opt: None,
         settle_pnl_limit_window_size_ts: None,
+        reduce_only_opt: None,
     }
 }
 
@@ -2616,6 +2696,45 @@ impl ClientInstruction for PerpSetSettleLimitWindow {
 
         let instruction = Self::Instruction {
             settle_pnl_limit_window_size_ts: Some(self.window_size_ts),
+            ..perp_edit_instruction_default()
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            perp_market: self.perp_market,
+            oracle: perp_market.oracle,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
+pub struct PerpMakeReduceOnly {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub perp_market: Pubkey,
+}
+
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpMakeReduceOnly {
+    type Accounts = mango_v4::accounts::PerpEditMarket;
+    type Instruction = mango_v4::instruction::PerpEditMarket;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+
+        let instruction = Self::Instruction {
+            reduce_only_opt: Some(true),
             ..perp_edit_instruction_default()
         };
 
@@ -2713,6 +2832,7 @@ pub struct PerpPlaceOrderInstruction {
     pub price_lots: i64,
     pub max_base_lots: i64,
     pub max_quote_lots: i64,
+    pub reduce_only: bool,
     pub client_order_id: u64,
 }
 #[async_trait::async_trait(?Send)]
@@ -2731,7 +2851,7 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
             max_quote_lots: self.max_quote_lots,
             client_order_id: self.client_order_id,
             order_type: PlaceOrderType::Limit,
-            reduce_only: false,
+            reduce_only: self.reduce_only,
             expiry_timestamp: 0,
             limit: 10,
         };

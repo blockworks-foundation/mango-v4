@@ -179,6 +179,7 @@ pub async fn create_funded_account(
             solana,
             TokenDepositInstruction {
                 amount: amounts,
+                reduce_only: false,
                 account,
                 owner,
                 token_account: payer.token_accounts[mint.index],

@@ -64,6 +64,7 @@ async fn test_health_wrap() -> Result<(), TransportError> {
         solana,
         TokenDepositInstruction {
             amount: 1,
+            reduce_only: false,
             account,
             owner,
             token_account: payer_mint_accounts[0],
@@ -91,6 +92,7 @@ async fn test_health_wrap() -> Result<(), TransportError> {
             .await;
             tx.add_instruction(TokenDepositInstruction {
                 amount: repay_amount,
+                reduce_only: false,
                 account,
                 owner,
                 token_account: payer_mint_accounts[1],

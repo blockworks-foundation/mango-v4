@@ -217,7 +217,8 @@ export class HealthCache {
     return health;
   }
 
-  public assets(healthType: HealthType): I80F48 {
+  // An undefined HealthType will use an asset and liab weight of 1
+  public assets(healthType?: HealthType): I80F48 {
     const assets = ZERO_I80F48();
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
@@ -246,7 +247,8 @@ export class HealthCache {
     return assets;
   }
 
-  public liabs(healthType: HealthType): I80F48 {
+  // An undefined HealthType will use an asset and liab weight of 1
+  public liabs(healthType?: HealthType): I80F48 {
     const liabs = ZERO_I80F48();
     for (const tokenInfo of this.tokenInfos) {
       const contrib = tokenInfo.healthContribution(healthType);
@@ -1155,15 +1157,15 @@ export class HealthCache {
 export class Prices {
   constructor(public oracle: I80F48, public stable: I80F48) {}
 
-  public liab(healthType: HealthType): I80F48 {
-    if (healthType == HealthType.maint) {
+  public liab(healthType: HealthType | undefined): I80F48 {
+    if (healthType === HealthType.maint || healthType === undefined) {
       return this.oracle;
     }
     return this.oracle.max(this.stable);
   }
 
-  public asset(healthType: HealthType): I80F48 {
-    if (healthType == HealthType.maint) {
+  public asset(healthType: HealthType | undefined): I80F48 {
+    if (healthType === HealthType.maint || healthType === undefined) {
       return this.oracle;
     }
     return this.oracle.min(this.stable);
@@ -1223,8 +1225,11 @@ export class TokenInfo {
       : this.maintLiabWeight;
   }
 
-  healthContribution(healthType: HealthType): I80F48 {
+  healthContribution(healthType?: HealthType): I80F48 {
     let weight, price;
+    if (healthType === undefined) {
+      return this.balanceNative.mul(this.prices.oracle);
+    }
     if (this.balanceNative.isNeg()) {
       weight = this.liabWeight(healthType);
       price = this.prices.liab(healthType);
@@ -1317,8 +1322,9 @@ export class Serum3Info {
     );
   }
 
+  // An undefined HealthType will use an asset and liab weight of 1
   healthContribution(
-    healthType: HealthType,
+    healthType: HealthType | undefined,
     tokenInfos: TokenInfo[],
     tokenMaxReserved: I80F48[],
     marketReserved: Serum3Reserved,
@@ -1359,6 +1365,13 @@ export class Serum3Info {
         assetPart = maxBalance;
         liabPart = marketReserved.sub(maxBalance);
       }
+
+      if (healthType === undefined) {
+        return assetPart
+          .mul(tokenInfo.prices.oracle)
+          .add(liabPart.mul(tokenInfo.prices.oracle));
+      }
+
       const assetWeight = tokenInfo.assetWeight(healthType);
       const liabWeight = tokenInfo.liabWeight(healthType);
       const assetPrice = tokenInfo.prices.asset(healthType);
@@ -1478,13 +1491,13 @@ export class PerpInfo {
     );
   }
 
-  healthContribution(healthType: HealthType): I80F48 {
+  healthContribution(healthType: HealthType | undefined): I80F48 {
     return this.trustedMarket
       ? this.uncappedHealthContribution(healthType)
       : this.uncappedHealthContribution(healthType).min(ZERO_I80F48());
   }
 
-  uncappedHealthContribution(healthType: HealthType): I80F48 {
+  uncappedHealthContribution(healthType: HealthType | undefined): I80F48 {
     function orderExecutionCase(
       pi: PerpInfo,
       ordersBaseLots: BN,

@@ -317,6 +317,11 @@ impl PerpPosition {
         self.base_position_lots
     }
 
+    // This takes into account base lots from unprocessed events, but not anything from open orders
+    pub fn effective_base_position_lots(&self) -> i64 {
+        self.base_position_lots + self.taker_base_lots
+    }
+
     pub fn quote_position_native(&self) -> I80F48 {
         self.quote_position_native
     }
@@ -591,7 +596,10 @@ impl PerpPosition {
     pub fn update_settle_limit(&mut self, market: &PerpMarket, now_ts: u64) {
         assert_eq!(self.market_index, market.perp_market_index);
         let window_size = market.settle_pnl_limit_window_size_ts;
-        let new_window = now_ts >= cm!((self.settle_pnl_limit_window + 1) as u64 * window_size);
+        let window_start = cm!(self.settle_pnl_limit_window as u64 * window_size);
+        let window_end = cm!(window_start + window_size);
+        // now_ts < window_start can happen when window size is changed on the market
+        let new_window = now_ts >= window_end || now_ts < window_start;
         if new_window {
             self.settle_pnl_limit_window = cm!(now_ts / window_size).try_into().unwrap();
             self.settle_pnl_limit_settled_in_current_window_native = 0;
@@ -1193,6 +1201,34 @@ mod tests {
         assert_eq!(pos.realized_other_pnl_native, I80F48::from(-9));
         assert_eq!(pos.realized_trade_pnl_native, I80F48::from(-25));
         assert_eq!(pos.settle_pnl_limit_realized_trade, -20);
+    }
+
+    #[test]
+    fn test_perp_settle_limit_window() {
+        let mut market = PerpMarket::default_for_tests();
+        let mut pos = create_perp_position(&market, 100, -50);
+
+        market.settle_pnl_limit_window_size_ts = 100;
+        pos.settle_pnl_limit_settled_in_current_window_native = 10;
+
+        pos.update_settle_limit(&market, 505);
+        assert_eq!(pos.settle_pnl_limit_settled_in_current_window_native, 0);
+        assert_eq!(pos.settle_pnl_limit_window, 5);
+
+        pos.settle_pnl_limit_settled_in_current_window_native = 10;
+        pos.update_settle_limit(&market, 550);
+        assert_eq!(pos.settle_pnl_limit_settled_in_current_window_native, 10);
+        assert_eq!(pos.settle_pnl_limit_window, 5);
+
+        pos.settle_pnl_limit_settled_in_current_window_native = 10;
+        pos.update_settle_limit(&market, 600);
+        assert_eq!(pos.settle_pnl_limit_settled_in_current_window_native, 0);
+        assert_eq!(pos.settle_pnl_limit_window, 6);
+
+        market.settle_pnl_limit_window_size_ts = 400;
+        pos.update_settle_limit(&market, 605);
+        assert_eq!(pos.settle_pnl_limit_settled_in_current_window_native, 0);
+        assert_eq!(pos.settle_pnl_limit_window, 1);
     }
 
     #[test]

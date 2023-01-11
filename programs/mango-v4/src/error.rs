@@ -65,6 +65,10 @@ pub enum MangoError {
     TokenPositionDoesNotExist,
     #[msg("token deposits into accounts that are being liquidated must bring their health above the init threshold")]
     DepositsIntoLiquidatingMustRecover,
+    #[msg("token is in reduce only mode")]
+    TokenInReduceOnlyMode,
+    #[msg("market is in reduce only mode")]
+    MarketInReduceOnlyMode,
 }
 
 impl MangoError {

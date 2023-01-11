@@ -15,7 +15,8 @@ pub struct Serum3Market {
     pub base_token_index: TokenIndex,
     // ABI: Clients rely on this being at offset 42
     pub quote_token_index: TokenIndex,
-    pub padding1: [u8; 4],
+    pub reduce_only: u8,
+    pub padding1: [u8; 3],
     pub name: [u8; 16],
     pub serum_program: Pubkey,
     pub serum_market_external: Pubkey,
@@ -32,7 +33,7 @@ pub struct Serum3Market {
 }
 const_assert_eq!(
     size_of::<Serum3Market>(),
-    32 + 2 + 2 + 4 + 16 + 2 * 32 + 2 + 1 + 5 + 8 + 128
+    32 + 2 + 2 + 1 + 3 + 16 + 2 * 32 + 2 + 1 + 5 + 8 + 128
 );
 const_assert_eq!(size_of::<Serum3Market>(), 264);
 const_assert_eq!(size_of::<Serum3Market>() % 8, 0);
@@ -42,6 +43,10 @@ impl Serum3Market {
         std::str::from_utf8(&self.name)
             .unwrap()
             .trim_matches(char::from(0))
+    }
+
+    pub fn is_reduce_only(&self) -> bool {
+        self.reduce_only == 1
     }
 }
 

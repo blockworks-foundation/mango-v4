@@ -94,6 +94,7 @@ export class PerpMarket {
       settleFeeFractionLowHealth: number;
       settlePnlLimitFactor: number;
       settlePnlLimitWindowSizeTs: BN;
+      reduceOnly: number;
     },
   ): PerpMarket {
     return new PerpMarket(
@@ -137,6 +138,7 @@ export class PerpMarket {
       obj.settleFeeFractionLowHealth,
       obj.settlePnlLimitFactor,
       obj.settlePnlLimitWindowSizeTs,
+      obj.reduceOnly == 1,
     );
   }
 
@@ -181,6 +183,7 @@ export class PerpMarket {
     public settleFeeFractionLowHealth: number,
     settlePnlLimitFactor: number,
     settlePnlLimitWindowSizeTs: BN,
+    public reduceOnly: boolean,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
