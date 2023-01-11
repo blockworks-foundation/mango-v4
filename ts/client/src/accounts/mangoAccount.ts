@@ -1242,10 +1242,6 @@ export class PerpPosition {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
 
-    if (perpMarket.perpMarketIndex !== this.marketIndex) {
-      throw new Error("PerpPosition doesn't belong to the given market!");
-    }
-
     if (this.basePositionLots.gt(new BN(0))) {
       return perpMarket.longFunding
         .sub(this.longSettledFunding)
@@ -1345,10 +1341,10 @@ export class PerpPosition {
     }
 
     const windowSize = perpMarket.settlePnlLimitWindowSizeTs;
+    const windowStart = new BN(this.settlePnlLimitWindow).mul(windowSize);
+    const windowEnd = windowStart.add(windowSize);
     const nowTs = new BN(Date.now() / 1000);
-    const newWindow = nowTs.gte(
-      new BN(this.settlePnlLimitWindow).add(new BN(1)).mul(windowSize),
-    );
+    const newWindow = nowTs.gte(windowEnd) || nowTs.lt(windowStart);
     if (newWindow) {
       this.settlePnlLimitWindow = nowTs.div(windowSize).toNumber();
       this.settlePnlLimitSettledInCurrentWindowNative = new BN(0);
@@ -1380,11 +1376,11 @@ export class PerpPosition {
     let minPnl = unrealized.neg().sub(used);
     let maxPnl = unrealized.sub(used);
 
-    const realizedtrade = this.settlePnlLimitRealizedTrade;
-    if (realizedtrade.gte(new BN(0))) {
-      maxPnl = maxPnl.add(realizedtrade);
+    const realizedTrade = this.settlePnlLimitRealizedTrade;
+    if (realizedTrade.gte(new BN(0))) {
+      maxPnl = maxPnl.add(realizedTrade);
     } else {
-      minPnl = minPnl.add(realizedtrade);
+      minPnl = minPnl.add(realizedTrade);
     }
 
     const realizedOther = new BN(this.realizedOtherPnlNative.toNumber());

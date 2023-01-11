@@ -410,25 +410,19 @@ export class PerpMarket {
     direction: 'negative' | 'positive',
     count = 2,
   ): Promise<{ account: MangoAccount; settleablePnl: I80F48 }[]> {
-    const filteredAccounts = (await client.getAllMangoAccounts(group)).filter(
-      (acc) => acc.perpPositionExistsForMarket(this),
-    );
-    filteredAccounts.forEach((acc) =>
-      acc
-        .perpActive()
-        .find((pp) => pp.marketIndex === this.perpMarketIndex)!
-        .updateSettleLimit(this),
-    );
-
-    let accountsWithSettleablePnl = filteredAccounts.map((acc) => {
-      return {
-        account: acc,
-        settleablePnl: acc
+    let accountsWithSettleablePnl = (await client.getAllMangoAccounts(group))
+      .filter((acc) => acc.perpPositionExistsForMarket(this))
+      .map((acc) => {
+        const pp = acc
           .perpActive()
-          .find((pp) => pp.marketIndex === this.perpMarketIndex)!
-          .getSettleablePnl(this),
-      };
-    });
+          .find((pp) => pp.marketIndex === this.perpMarketIndex)!;
+        pp.updateSettleLimit(this);
+
+        return {
+          account: acc,
+          settleablePnl: pp.getSettleablePnl(this),
+        };
+      });
 
     accountsWithSettleablePnl = accountsWithSettleablePnl
       .filter(
