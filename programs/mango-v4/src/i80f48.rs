@@ -1,5 +1,68 @@
 use fixed::types::I80F48;
 
+pub trait ClampedToNum {
+    fn clamp_to_i64(&self) -> i64;
+    fn clamp_to_u64(&self) -> u64;
+}
+
+impl ClampedToNum for I80F48 {
+    fn clamp_to_i64(&self) -> i64 {
+        if *self <= i64::MIN {
+            i64::MIN
+        } else if *self >= i64::MAX {
+            i64::MAX
+        } else {
+            self.to_num::<i64>()
+        }
+    }
+
+    fn clamp_to_u64(&self) -> u64 {
+        if *self <= 0 {
+            0
+        } else if *self >= u64::MAX {
+            u64::MAX
+        } else {
+            self.to_num::<u64>()
+        }
+    }
+}
+
+impl ClampedToNum for f64 {
+    fn clamp_to_i64(&self) -> i64 {
+        if *self <= i64::MIN as f64 {
+            i64::MIN
+        } else if *self >= i64::MAX as f64 {
+            i64::MAX
+        } else {
+            *self as i64
+        }
+    }
+
+    fn clamp_to_u64(&self) -> u64 {
+        if *self <= 0.0 {
+            0
+        } else if *self >= u64::MAX as f64 {
+            u64::MAX
+        } else {
+            *self as u64
+        }
+    }
+}
+
+impl ClampedToNum for u64 {
+    fn clamp_to_i64(&self) -> i64 {
+        if *self >= i64::MAX as u64 {
+            i64::MAX
+        } else {
+            *self as i64
+        }
+    }
+
+    fn clamp_to_u64(&self) -> u64 {
+        *self
+    }
+}
+
 pub trait LowPrecisionDivision {
     fn checked_div_30bit_precision(&self, rhs: I80F48) -> Option<I80F48>;
     fn checked_div_f64_precision(&self, rhs: I80F48) -> Option<I80F48>;

@@ -459,7 +459,7 @@ impl<
             .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| (p, raw_index)))
             .ok_or_else(|| {
                 error_msg_typed!(
-                    TokenPositionDoesNotExist,
+                    MangoError::TokenPositionDoesNotExist,
                     "position for token index {} not found",
                     token_index
                 )
@@ -612,7 +612,7 @@ impl<
             .find_map(|(raw_index, p)| p.is_active_for_token(token_index).then(|| raw_index))
             .ok_or_else(|| {
                 error_msg_typed!(
-                    TokenPositionDoesNotExist,
+                    MangoError::TokenPositionDoesNotExist,
                     "position for token index {} not found",
                     token_index
                 )
@@ -898,8 +898,8 @@ impl<
         let (base_change, quote_change) = fill.base_quote_change(side);
         let quote = cm!(I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change));
         let fees = cm!(quote.abs() * fill.maker_fee);
+        pa.record_trading_fee(fees);
         pa.record_trade(perp_market, base_change, quote);
-        pa.record_fee(fees);
 
         cm!(pa.maker_volume += quote.abs().to_num::<u64>());
 

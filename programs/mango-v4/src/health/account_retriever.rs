@@ -305,7 +305,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
     fn bank_index(&self, token_index: TokenIndex) -> Result<usize> {
         Ok(*self.token_index_map.get(&token_index).ok_or_else(|| {
             error_msg_typed!(
-                TokenPositionDoesNotExist,
+                MangoError::TokenPositionDoesNotExist,
                 "token index {} not found",
                 token_index
             )

@@ -3,6 +3,7 @@ import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
 import Big from 'big.js';
 import { MangoClient } from '../client';
+import { RUST_U64_MAX } from '../constants';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
 import { Modify } from '../types';
 import { As, U64_MAX_BN, toNative, toUiDecimals } from '../utils';
@@ -181,8 +182,8 @@ export class PerpMarket {
     public settleFeeFlat: number,
     public settleFeeAmountThreshold: number,
     public settleFeeFractionLowHealth: number,
-    settlePnlLimitFactor: number,
-    settlePnlLimitWindowSizeTs: BN,
+    public settlePnlLimitFactor: number,
+    public settlePnlLimitWindowSizeTs: BN,
     public reduceOnly: boolean,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
@@ -412,22 +413,21 @@ export class PerpMarket {
     direction: 'negative' | 'positive',
     count = 2,
   ): Promise<{ account: MangoAccount; settleablePnl: I80F48 }[]> {
-    let accs = (await client.getAllMangoAccounts(group))
-      .filter((acc) =>
-        // need a perp position in this market
-        acc.perpPositionExistsForMarket(this),
-      )
+    let accountsWithSettleablePnl = (await client.getAllMangoAccounts(group))
+      .filter((acc) => acc.perpPositionExistsForMarket(this))
       .map((acc) => {
+        const pp = acc
+          .perpActive()
+          .find((pp) => pp.marketIndex === this.perpMarketIndex)!;
+        pp.updateSettleLimit(this);
+
         return {
           account: acc,
-          settleablePnl: acc
-            .perpActive()
-            .find((pp) => pp.marketIndex === this.perpMarketIndex)!
-            .getPnl(this),
+          settleablePnl: pp.getSettleablePnl(this),
         };
       });
 
-    accs = accs
+    accountsWithSettleablePnl = accountsWithSettleablePnl
       .filter(
         (acc) =>
           // need perp positions with -ve pnl to settle +ve pnl and vice versa
@@ -444,10 +444,12 @@ export class PerpMarket {
 
     if (direction === 'negative') {
       let stable = 0;
-      for (let i = 0; i < accs.length; i++) {
-        const acc = accs[i];
+      for (let i = 0; i < accountsWithSettleablePnl.length; i++) {
+        const acc = accountsWithSettleablePnl[i];
         const nextPnl =
-          i + 1 < accs.length ? accs[i + 1].settleablePnl : ZERO_I80F48();
+          i + 1 < accountsWithSettleablePnl.length
+            ? accountsWithSettleablePnl[i + 1].settleablePnl
+            : ZERO_I80F48();
 
         const perpSettleHealth = acc.account.getPerpSettleHealth(group);
         acc.settleablePnl =
@@ -467,7 +469,7 @@ export class PerpMarket {
       }
     }
 
-    accs.sort((a, b) =>
+    accountsWithSettleablePnl.sort((a, b) =>
       direction === 'negative'
         ? // most negative
           a.settleablePnl.cmp(b.settleablePnl)
@@ -475,7 +477,7 @@ export class PerpMarket {
           b.settleablePnl.cmp(a.settleablePnl),
     );
 
-    return accs.slice(0, count);
+    return accountsWithSettleablePnl.slice(0, count);
   }
 
   toString(): string {
@@ -853,7 +855,7 @@ export class PerpOrder {
 
     return new PerpOrder(
       type === BookSideType.bids
-        ? new BN('18446744073709551615').sub(leafNode.key.maskn(64))
+        ? RUST_U64_MAX().sub(leafNode.key.maskn(64))
         : leafNode.key.maskn(64),
       leafNode.key,
       leafNode.owner,

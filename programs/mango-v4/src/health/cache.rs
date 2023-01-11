@@ -361,7 +361,7 @@ impl HealthCache {
             .position(|t| t.token_index == token_index)
             .ok_or_else(|| {
                 error_msg_typed!(
-                    TokenPositionDoesNotExist,
+                    MangoError::TokenPositionDoesNotExist,
                     "token index {} not found",
                     token_index
                 )
@@ -609,7 +609,7 @@ pub(crate) fn find_token_info_index(infos: &[TokenInfo], token_index: TokenIndex
         .position(|ti| ti.token_index == token_index)
         .ok_or_else(|| {
             error_msg_typed!(
-                TokenPositionDoesNotExist,
+                MangoError::TokenPositionDoesNotExist,
                 "token index {} not found",
                 token_index
             )

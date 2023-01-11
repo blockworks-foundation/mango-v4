@@ -117,24 +117,55 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
 
     // Account A must be profitable, and B must be unprofitable
     // PnL must be opposite signs for there to be a settlement
-    require!(a_pnl.is_positive(), MangoError::ProfitabilityMismatch);
-    require!(b_pnl.is_negative(), MangoError::ProfitabilityMismatch);
+    require_msg_typed!(
+        a_pnl.is_positive(),
+        MangoError::ProfitabilityMismatch,
+        "account a pnl is not positive: {}",
+        a_pnl
+    );
+    require_msg_typed!(
+        b_pnl.is_negative(),
+        MangoError::ProfitabilityMismatch,
+        "account b pnl is not negative: {}",
+        b_pnl
+    );
 
     // Cap settlement of unrealized pnl
     // Settles at most x100% each hour
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     a_perp_position.update_settle_limit(&perp_market, now_ts);
     b_perp_position.update_settle_limit(&perp_market, now_ts);
-    let a_settleable_pnl = a_perp_position.apply_pnl_settle_limit(a_pnl, &perp_market);
+    let a_settleable_pnl = a_perp_position.apply_pnl_settle_limit(&perp_market, a_pnl);
+    let b_settleable_pnl = b_perp_position.apply_pnl_settle_limit(&perp_market, b_pnl);
 
-    require!(
+    require_msg_typed!(
         a_settleable_pnl.is_positive(),
-        MangoError::ProfitabilityMismatch
+        MangoError::ProfitabilityMismatch,
+        "account a settleable pnl is not positive: {}, pnl: {}",
+        a_settleable_pnl,
+        a_pnl
+    );
+    require_msg_typed!(
+        b_settleable_pnl.is_negative(),
+        MangoError::ProfitabilityMismatch,
+        "account b settleable pnl is not negative: {}, pnl: {}",
+        b_settleable_pnl,
+        b_pnl
     );
 
     // Settle for the maximum possible capped to b's settle health
-    let settlement = a_settleable_pnl.abs().min(b_pnl.abs()).min(b_settle_health);
-    require!(settlement >= 0, MangoError::SettlementAmountMustBePositive);
+    let settlement = a_settleable_pnl
+        .abs()
+        .min(b_settleable_pnl.abs())
+        .min(b_settle_health);
+    require_msg_typed!(
+        settlement >= 0,
+        MangoError::SettlementAmountMustBePositive,
+        "a settleable: {}, b settleable: {}, b settle health: {}",
+        a_settleable_pnl,
+        b_settleable_pnl,
+        b_settle_health,
+    );
 
     // Settle
     a_perp_position.record_settle(settlement);
