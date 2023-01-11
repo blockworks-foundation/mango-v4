@@ -90,7 +90,9 @@ export class Group {
     public vaultAmountsMap: Map<string, BN>,
   ) {}
 
-  public async reloadAll(client: MangoClient, ids?: Id): Promise<void> {
+  public async reloadAll(client: MangoClient): Promise<void> {
+    const ids: Id | undefined = await client.getIds(this.publicKey);
+
     // console.time('group.reload');
     await Promise.all([
       this.reloadAlts(client),
@@ -308,7 +310,7 @@ export class Group {
       await client.program.provider.connection.getMultipleAccountsInfo(oracles);
 
     const coder = new BorshAccountsCoder(client.program.idl);
-    ais.forEach(async (ai, i) => {
+    for await (const [i, ai] of ais.entries()) {
       const perpMarket = perpMarkets[i];
       if (!ai)
         throw new Error(
@@ -323,7 +325,7 @@ export class Group {
       );
       perpMarket._price = price;
       perpMarket._uiPrice = uiPrice;
-    });
+    }
   }
 
   private async decodePriceFromOracleAi(
