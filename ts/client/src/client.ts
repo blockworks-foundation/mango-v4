@@ -2599,7 +2599,7 @@ export class MangoClient {
         const inactiveTokenPosition = tokenPositionIndices.findIndex(
           (index) => index === TokenPosition.TokenIndexUnset,
         );
-        if (inactiveTokenPosition) {
+        if (inactiveTokenPosition != -1) {
           tokenPositionIndices[inactiveTokenPosition] = bank.tokenIndex;
         }
       }
@@ -2621,10 +2621,10 @@ export class MangoClient {
       const perpPositionExists =
         perpPositionIndices.indexOf(perpMarket.perpMarketIndex) > -1;
       if (!perpPositionExists) {
-        const inactivePerpPosition = perpPositionIndices.find(
+        const inactivePerpPosition = perpPositionIndices.findIndex(
           (perpIdx) => perpIdx === PerpPosition.PerpMarketIndexUnset,
         );
-        if (inactivePerpPosition) {
+        if (inactivePerpPosition != -1) {
           perpPositionIndices[inactivePerpPosition] =
             perpMarket.perpMarketIndex;
         }
@@ -2648,15 +2648,16 @@ export class MangoClient {
       const ooPositionExists =
         serumPositionIndices.findIndex(
           (i) => i.marketIndex === serum3Market.marketIndex,
-        ) > 0;
+        ) > -1;
       if (!ooPositionExists) {
-        const inactiveSerumPosition = serumPositionIndices.find(
+        const inactiveSerumPosition = serumPositionIndices.findIndex(
           (serumPos) =>
             serumPos.marketIndex === Serum3Orders.Serum3MarketIndexUnset,
         );
-        if (inactiveSerumPosition) {
-          inactiveSerumPosition.marketIndex = serum3Market.marketIndex;
-          inactiveSerumPosition.openOrders = openOrderPk;
+        if (inactiveSerumPosition != -1) {
+          serumPositionIndices[inactiveSerumPosition].marketIndex =
+            serum3Market.marketIndex;
+          serumPositionIndices[inactiveSerumPosition].openOrders = openOrderPk;
         }
       }
     }
