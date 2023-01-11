@@ -3,7 +3,7 @@ import { utf8 } from '@project-serum/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { AccountInfo, PublicKey, TransactionSignature } from '@solana/web3.js';
 import { MangoClient } from '../client';
-import { OPENBOOK_PROGRAM_ID } from '../constants';
+import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { toNativeI80F48, toUiDecimals, toUiDecimalsForQuote } from '../utils';
 import { Bank, TokenIndex } from './bank';
@@ -1170,7 +1170,9 @@ export class PerpPosition {
       dto.takerVolume,
       dto.perpSpotTransfers,
       dto.avgEntryPricePerBaseLot,
-      I80F48.from(dto.realizedPnlNative),
+      I80F48.from(dto.realizedTradePnlNative),
+      I80F48.from(dto.realizedOtherPnlNative),
+      dto.settlePnlLimitRealizedTrade,
     );
   }
 
@@ -1197,6 +1199,8 @@ export class PerpPosition {
       new BN(0),
       0,
       ZERO_I80F48(),
+      ZERO_I80F48(),
+      new BN(0),
     );
   }
 
@@ -1219,7 +1223,9 @@ export class PerpPosition {
     public takerVolume: BN,
     public perpSpotTransfers: BN,
     public avgEntryPricePerBaseLot: number,
-    public realizedPnlNative: I80F48,
+    public realizedTradePnlNative: I80F48,
+    public realizedOtherPnlNative: I80F48,
+    public settlePnlLimitRealizedTrade: BN,
   ) {}
 
   isActive(): boolean {
@@ -1230,6 +1236,10 @@ export class PerpPosition {
     perpMarket: PerpMarket,
     useEventQueue?: boolean,
   ): number {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
     return perpMarket.baseLotsToUi(
       useEventQueue
         ? this.basePositionLots.add(this.takerBaseLots)
@@ -1238,6 +1248,10 @@ export class PerpPosition {
   }
 
   public getUnsettledFunding(perpMarket: PerpMarket): I80F48 {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
     if (this.basePositionLots.gt(new BN(0))) {
       return perpMarket.longFunding
         .sub(this.longSettledFunding)
@@ -1251,6 +1265,10 @@ export class PerpPosition {
   }
 
   public getEquityUi(group: Group, perpMarket: PerpMarket): number {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
     return toUiDecimals(
       this.getEquity(perpMarket),
       group.getMintDecimalsByTokenIndex(perpMarket.settleTokenIndex),
@@ -1258,6 +1276,10 @@ export class PerpPosition {
   }
 
   public getEquity(perpMarket: PerpMarket): I80F48 {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
     const lotsToQuote = I80F48.fromI64(perpMarket.baseLotSize).mul(
       perpMarket.price,
     );
@@ -1288,12 +1310,20 @@ export class PerpPosition {
   }
 
   public getAverageEntryPriceUi(perpMarket: PerpMarket): number {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
     return perpMarket.priceNativeToUi(
       this.avgEntryPricePerBaseLot / perpMarket.baseLotSize.toNumber(),
     );
   }
 
   public getBreakEvenPriceUi(perpMarket: PerpMarket): number {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
     if (this.basePositionLots.eq(new BN(0))) {
       return 0;
     }
@@ -1304,11 +1334,98 @@ export class PerpPosition {
   }
 
   public getPnl(perpMarket: PerpMarket): I80F48 {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
     return this.quotePositionNative.add(
       I80F48.fromI64(this.basePositionLots.mul(perpMarket.baseLotSize)).mul(
         perpMarket.price,
       ),
     );
+  }
+
+  public updateSettleLimit(perpMarket: PerpMarket): void {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
+    const windowSize = perpMarket.settlePnlLimitWindowSizeTs;
+    const windowStart = new BN(this.settlePnlLimitWindow).mul(windowSize);
+    const windowEnd = windowStart.add(windowSize);
+    const nowTs = new BN(Date.now() / 1000);
+    const newWindow = nowTs.gte(windowEnd) || nowTs.lt(windowStart);
+    if (newWindow) {
+      this.settlePnlLimitWindow = nowTs.div(windowSize).toNumber();
+      this.settlePnlLimitSettledInCurrentWindowNative = new BN(0);
+    }
+  }
+
+  public availableSettleLimit(perpMarket: PerpMarket): [BN, BN] {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
+    if (perpMarket.settlePnlLimitFactor < 0) {
+      return [RUST_I64_MIN(), RUST_I64_MAX()];
+    }
+
+    const baseNative = I80F48.fromI64(
+      this.basePositionLots.mul(perpMarket.baseLotSize),
+    );
+    const positionValue = I80F48.fromNumber(
+      perpMarket.stablePriceModel.stablePrice,
+    )
+      .mul(baseNative)
+      .toNumber();
+    const unrealized = new BN(perpMarket.settlePnlLimitFactor * positionValue);
+    const used = new BN(
+      this.settlePnlLimitSettledInCurrentWindowNative.toNumber(),
+    );
+
+    let minPnl = unrealized.neg().sub(used);
+    let maxPnl = unrealized.sub(used);
+
+    const realizedTrade = this.settlePnlLimitRealizedTrade;
+    if (realizedTrade.gte(new BN(0))) {
+      maxPnl = maxPnl.add(realizedTrade);
+    } else {
+      minPnl = minPnl.add(realizedTrade);
+    }
+
+    const realizedOther = new BN(this.realizedOtherPnlNative.toNumber());
+    if (realizedOther.gte(new BN(0))) {
+      maxPnl = maxPnl.add(realizedOther);
+    } else {
+      minPnl = minPnl.add(realizedOther);
+    }
+
+    return [BN.min(minPnl, new BN(0)), BN.max(maxPnl, new BN(0))];
+  }
+
+  public applyPnlSettleLimit(pnl: I80F48, perpMarket: PerpMarket): I80F48 {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
+    if (perpMarket.settlePnlLimitFactor < 0) {
+      return pnl;
+    }
+
+    const [minPnl, maxPnl] = this.availableSettleLimit(perpMarket);
+    if (pnl.lt(ZERO_I80F48())) {
+      return pnl.max(I80F48.fromI64(minPnl));
+    } else {
+      return pnl.min(I80F48.fromI64(maxPnl));
+    }
+  }
+
+  public getSettleablePnl(perpMarket: PerpMarket): I80F48 {
+    if (perpMarket.perpMarketIndex !== this.marketIndex) {
+      throw new Error("PerpPosition doesn't belong to the given market!");
+    }
+
+    return this.applyPnlSettleLimit(this.getPnl(perpMarket), perpMarket);
   }
 }
 
@@ -1332,7 +1449,9 @@ export class PerpPositionDto {
     public takerVolume: BN,
     public perpSpotTransfers: BN,
     public avgEntryPricePerBaseLot: number,
-    public realizedPnlNative: I80F48Dto,
+    public realizedTradePnlNative: I80F48Dto,
+    public realizedOtherPnlNative: I80F48Dto,
+    public settlePnlLimitRealizedTrade: BN,
   ) {}
 }
 

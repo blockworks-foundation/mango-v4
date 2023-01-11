@@ -4460,9 +4460,17 @@ export type MangoV4 = {
           {
             "name": "settlePnlLimitFactor",
             "docs": [
-              "Fraction of perp base value (i.e. base_lots * entry_price_in_lots) of unrealized",
-              "positive pnl that can be settled each window.",
-              "Set to a negative value to disable the limit."
+              "Controls the strictness of the settle limit.",
+              "Set to a negative value to disable the limit.",
+              "",
+              "This factor applies to the settle limit in two ways",
+              "- for the unrealized pnl settle limit, the factor is multiplied with the stable perp base value",
+              "(i.e. limit_factor * base_native * stable_price)",
+              "- when increasing the realized pnl settle limit (stored per PerpPosition), the factor is",
+              "multiplied with the stable value of the perp pnl being realized",
+              "(i.e. limit_factor * reduced_native * stable_price)",
+              "",
+              "See also PerpPosition::settle_pnl_limit_realized_trade"
             ],
             "type": "f32"
           },
@@ -5094,10 +5102,22 @@ export type MangoV4 = {
           },
           {
             "name": "settlePnlLimitWindow",
+            "docs": [
+              "Index of the current settle pnl limit window"
+            ],
             "type": "u32"
           },
           {
             "name": "settlePnlLimitSettledInCurrentWindowNative",
+            "docs": [
+              "Amount of realized trade pnl and unrealized pnl that was already settled this window.",
+              "",
+              "Will be negative when negative pnl was settled.",
+              "",
+              "Note that this will be adjusted for bookkeeping reasons when the realized_trade settle",
+              "limitchanges and is not useable for actually tracking how much pnl was settled",
+              "on balance."
+            ],
             "type": "i64"
           },
           {
@@ -5127,7 +5147,7 @@ export type MangoV4 = {
           {
             "name": "longSettledFunding",
             "docs": [
-              "Already settled funding"
+              "Already settled long funding"
             ],
             "type": {
               "defined": "I80F48"
@@ -5135,6 +5155,9 @@ export type MangoV4 = {
           },
           {
             "name": "shortSettledFunding",
+            "docs": [
+              "Already settled short funding"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -5142,26 +5165,29 @@ export type MangoV4 = {
           {
             "name": "bidsBaseLots",
             "docs": [
-              "Base lots in bids"
+              "Base lots in open bids"
             ],
             "type": "i64"
           },
           {
             "name": "asksBaseLots",
             "docs": [
-              "Base lots in asks"
+              "Base lots in open asks"
             ],
             "type": "i64"
           },
           {
             "name": "takerBaseLots",
             "docs": [
-              "Amount that's on EventQueue waiting to be processed"
+              "Amount of base lots on the EventQueue waiting to be processed"
             ],
             "type": "i64"
           },
           {
             "name": "takerQuoteLots",
+            "docs": [
+              "Amount of quote lots on the EventQueue waiting to be processed"
+            ],
             "type": "i64"
           },
           {
@@ -5186,20 +5212,52 @@ export type MangoV4 = {
           },
           {
             "name": "avgEntryPricePerBaseLot",
+            "docs": [
+              "The native average entry price for the base lots of the current position.",
+              "Reset to 0 when the base position reaches or crosses 0."
+            ],
             "type": "f64"
           },
           {
-            "name": "realizedPnlNative",
+            "name": "realizedTradePnlNative",
+            "docs": [
+              "Amount of pnl that was realized by bringing the base position closer to 0.",
+              "",
+              "The settlement of this type of pnl is limited by settle_pnl_limit_realized_trade.",
+              "Settling pnl reduces this value once other_pnl below is exhausted."
+            ],
             "type": {
               "defined": "I80F48"
             }
+          },
+          {
+            "name": "realizedOtherPnlNative",
+            "docs": [
+              "Amount of pnl realized from fees, funding and liquidation.",
+              "",
+              "This type of realized pnl is always settleable.",
+              "Settling pnl reduces this value first."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "settlePnlLimitRealizedTrade",
+            "docs": [
+              "Settle limit contribution from realized pnl.",
+              "",
+              "Every time pnl is realized, this is increased by a fraction of the stable",
+              "value of the realization. It magnitude decreases when realized pnl drops below its value."
+            ],
+            "type": "i64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                104
               ]
             }
           }
@@ -11944,9 +12002,17 @@ export const IDL: MangoV4 = {
           {
             "name": "settlePnlLimitFactor",
             "docs": [
-              "Fraction of perp base value (i.e. base_lots * entry_price_in_lots) of unrealized",
-              "positive pnl that can be settled each window.",
-              "Set to a negative value to disable the limit."
+              "Controls the strictness of the settle limit.",
+              "Set to a negative value to disable the limit.",
+              "",
+              "This factor applies to the settle limit in two ways",
+              "- for the unrealized pnl settle limit, the factor is multiplied with the stable perp base value",
+              "(i.e. limit_factor * base_native * stable_price)",
+              "- when increasing the realized pnl settle limit (stored per PerpPosition), the factor is",
+              "multiplied with the stable value of the perp pnl being realized",
+              "(i.e. limit_factor * reduced_native * stable_price)",
+              "",
+              "See also PerpPosition::settle_pnl_limit_realized_trade"
             ],
             "type": "f32"
           },
@@ -12578,10 +12644,22 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "settlePnlLimitWindow",
+            "docs": [
+              "Index of the current settle pnl limit window"
+            ],
             "type": "u32"
           },
           {
             "name": "settlePnlLimitSettledInCurrentWindowNative",
+            "docs": [
+              "Amount of realized trade pnl and unrealized pnl that was already settled this window.",
+              "",
+              "Will be negative when negative pnl was settled.",
+              "",
+              "Note that this will be adjusted for bookkeeping reasons when the realized_trade settle",
+              "limitchanges and is not useable for actually tracking how much pnl was settled",
+              "on balance."
+            ],
             "type": "i64"
           },
           {
@@ -12611,7 +12689,7 @@ export const IDL: MangoV4 = {
           {
             "name": "longSettledFunding",
             "docs": [
-              "Already settled funding"
+              "Already settled long funding"
             ],
             "type": {
               "defined": "I80F48"
@@ -12619,6 +12697,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "shortSettledFunding",
+            "docs": [
+              "Already settled short funding"
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -12626,26 +12707,29 @@ export const IDL: MangoV4 = {
           {
             "name": "bidsBaseLots",
             "docs": [
-              "Base lots in bids"
+              "Base lots in open bids"
             ],
             "type": "i64"
           },
           {
             "name": "asksBaseLots",
             "docs": [
-              "Base lots in asks"
+              "Base lots in open asks"
             ],
             "type": "i64"
           },
           {
             "name": "takerBaseLots",
             "docs": [
-              "Amount that's on EventQueue waiting to be processed"
+              "Amount of base lots on the EventQueue waiting to be processed"
             ],
             "type": "i64"
           },
           {
             "name": "takerQuoteLots",
+            "docs": [
+              "Amount of quote lots on the EventQueue waiting to be processed"
+            ],
             "type": "i64"
           },
           {
@@ -12670,20 +12754,52 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "avgEntryPricePerBaseLot",
+            "docs": [
+              "The native average entry price for the base lots of the current position.",
+              "Reset to 0 when the base position reaches or crosses 0."
+            ],
             "type": "f64"
           },
           {
-            "name": "realizedPnlNative",
+            "name": "realizedTradePnlNative",
+            "docs": [
+              "Amount of pnl that was realized by bringing the base position closer to 0.",
+              "",
+              "The settlement of this type of pnl is limited by settle_pnl_limit_realized_trade.",
+              "Settling pnl reduces this value once other_pnl below is exhausted."
+            ],
             "type": {
               "defined": "I80F48"
             }
+          },
+          {
+            "name": "realizedOtherPnlNative",
+            "docs": [
+              "Amount of pnl realized from fees, funding and liquidation.",
+              "",
+              "This type of realized pnl is always settleable.",
+              "Settling pnl reduces this value first."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "settlePnlLimitRealizedTrade",
+            "docs": [
+              "Settle limit contribution from realized pnl.",
+              "",
+              "Every time pnl is realized, this is increased by a fraction of the stable",
+              "value of the realization. It magnitude decreases when realized pnl drops below its value."
+            ],
+            "type": "i64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                104
               ]
             }
           }
