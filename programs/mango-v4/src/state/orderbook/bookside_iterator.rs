@@ -56,7 +56,7 @@ fn oracle_pegged_price(oracle_price_lots: i64, node: &LeafNode, side: Side) -> (
     let price_data = node.price_data();
     let price_offset = oracle_pegged_price_offset(price_data);
     let price = oracle_price_lots.saturating_add(price_offset);
-    if price >= 1 && price < i64::MAX {
+    if (1..i64::MAX).contains(&price) {
         if node.peg_limit != -1 && side.is_price_better(price, node.peg_limit) {
             return (OrderState::Invalid, price);
         } else {

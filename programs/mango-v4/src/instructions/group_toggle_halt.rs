@@ -14,6 +14,6 @@ pub struct GroupToggleHalt<'info> {
 
 pub fn group_toggle_halt(ctx: Context<GroupToggleHalt>, halted: bool) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
-    group.halted = if halted { 1 } else { 0 };
+    group.halted = u8::from(halted);
     Ok(())
 }

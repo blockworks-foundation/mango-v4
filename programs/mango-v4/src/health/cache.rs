@@ -228,7 +228,7 @@ impl PerpInfo {
     fn new(perp_position: &PerpPosition, perp_market: &PerpMarket, prices: Prices) -> Result<Self> {
         let base_lots = cm!(perp_position.base_position_lots() + perp_position.taker_base_lots);
 
-        let unsettled_funding = perp_position.unsettled_funding(&perp_market);
+        let unsettled_funding = perp_position.unsettled_funding(perp_market);
         let taker_quote = I80F48::from(cm!(
             perp_position.taker_quote_lots * perp_market.quote_lot_size
         ));
@@ -369,6 +369,7 @@ impl HealthCache {
     ///
     /// WARNING: You must also call recompute_token_weights() after all bank
     /// deposit/withdraw changes!
+    #[allow(clippy::too_many_arguments)]
     pub fn adjust_serum3_reserved(
         &mut self,
         market_index: Serum3MarketIndex,

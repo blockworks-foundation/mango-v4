@@ -170,7 +170,7 @@ impl OrderTreeNodes {
     ) -> Option<(NodeHandle, &LeafNode)> {
         let mut node_handle: NodeHandle = root.node()?;
 
-        let i = if find_max { 1 } else { 0 };
+        let i = usize::from(find_max);
         loop {
             let node_contents = self.node(node_handle)?;
             match node_contents.case()? {

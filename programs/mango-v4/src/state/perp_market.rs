@@ -170,7 +170,7 @@ impl PerpMarket {
     }
 
     pub fn set_elligible_for_group_insurance_fund(&mut self, v: bool) {
-        self.group_insurance_fund = if v { 1 } else { 0 };
+        self.group_insurance_fund = u8::from(v);
     }
 
     pub fn trusted_market(&self) -> bool {

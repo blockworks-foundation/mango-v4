@@ -197,7 +197,7 @@ pub fn perp_liq_base_position(
         perp_market_index: perp_market.perp_market_index,
         liqor: ctx.accounts.liqor.key(),
         liqee: ctx.accounts.liqee.key(),
-        base_transfer: base_transfer,
+        base_transfer,
         quote_transfer: quote_transfer.to_bits(),
         price: oracle_price.to_bits(),
     });
