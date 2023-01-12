@@ -20,13 +20,18 @@ pub struct PerpLiqQuoteAndBankruptcy<'info> {
     #[account(
         mut,
         has_one = group,
+        constraint = liqor.load()?.is_operational() @ MangoError::AccountIsFrozen,
         // liqor_owner is checked at #1
     )]
     pub liqor: AccountLoader<'info, MangoAccountFixed>,
     pub liqor_owner: Signer<'info>,
 
     // This account MUST have a loss
-    #[account(mut, has_one = group)]
+    #[account(
+        mut,
+        has_one = group,
+        constraint = liqee.load()?.is_operational() @ MangoError::AccountIsFrozen
+    )]
     pub liqee: AccountLoader<'info, MangoAccountFixed>,
 
     #[account(mut, has_one = group, has_one = oracle)]
