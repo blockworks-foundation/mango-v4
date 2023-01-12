@@ -178,8 +178,7 @@ export class MangoClient {
   public async getGroup(groupPk: PublicKey): Promise<Group> {
     const groupAccount = await this.program.account.group.fetch(groupPk);
     const group = Group.from(groupPk, groupAccount);
-    const ids: Id | undefined = await this.getIds(groupPk);
-    await group.reloadAll(this, ids);
+    await group.reloadAll(this);
     return group;
   }
 

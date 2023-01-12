@@ -8,19 +8,24 @@ export class Id {
     public publicKey: string,
     public serum3ProgramId: string,
     public mangoProgramId: string,
-    public banks: { name: string; publicKey: string }[],
+    public banks: { name: string; publicKey: string; active: boolean }[],
     public stubOracles: { name: string; publicKey: string }[],
     public mintInfos: { name: string; publicKey: string }[],
     public serum3Markets: {
       name: string;
       publicKey: string;
+      active: boolean;
       marketExternal: string;
     }[],
-    public perpMarkets: { name: string; publicKey: string }[],
+    public perpMarkets: { name: string; publicKey: string; active: boolean }[],
   ) {}
 
   public getBanks(): PublicKey[] {
-    return Array.from(this.banks.map((bank) => new PublicKey(bank.publicKey)));
+    return Array.from(
+      this.banks
+        .filter((perpMarket) => perpMarket.active)
+        .map((bank) => new PublicKey(bank.publicKey)),
+    );
   }
 
   public getStubOracles(): PublicKey[] {
@@ -37,15 +42,17 @@ export class Id {
 
   public getSerum3Markets(): PublicKey[] {
     return Array.from(
-      this.serum3Markets.map(
-        (serum3Market) => new PublicKey(serum3Market.publicKey),
-      ),
+      this.serum3Markets
+        .filter((perpMarket) => perpMarket.active)
+        .map((serum3Market) => new PublicKey(serum3Market.publicKey)),
     );
   }
 
   public getPerpMarkets(): PublicKey[] {
     return Array.from(
-      this.perpMarkets.map((perpMarket) => new PublicKey(perpMarket.publicKey)),
+      this.perpMarkets
+        .filter((perpMarket) => perpMarket.active)
+        .map((perpMarket) => new PublicKey(perpMarket.publicKey)),
     );
   }
 

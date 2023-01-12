@@ -97,7 +97,9 @@ export class Group {
     return this.halted === 0;
   }
 
-  public async reloadAll(client: MangoClient, ids?: Id): Promise<void> {
+  public async reloadAll(client: MangoClient): Promise<void> {
+    const ids: Id | undefined = await client.getIds(this.publicKey);
+
     // console.time('group.reload');
     await Promise.all([
       this.reloadAlts(client),
@@ -315,22 +317,24 @@ export class Group {
       await client.program.provider.connection.getMultipleAccountsInfo(oracles);
 
     const coder = new BorshAccountsCoder(client.program.idl);
-    ais.forEach(async (ai, i) => {
-      const perpMarket = perpMarkets[i];
-      if (!ai)
-        throw new Error(
-          `Undefined ai object in reloadPerpMarketOraclePrices for ${perpMarket.oracle}!`,
+    await Promise.all(
+      Array.from(ais.entries()).map(async ([i, ai]) => {
+        const perpMarket = perpMarkets[i];
+        if (!ai)
+          throw new Error(
+            `Undefined ai object in reloadPerpMarketOraclePrices for ${perpMarket.oracle}!`,
+          );
+        const { price, uiPrice } = await this.decodePriceFromOracleAi(
+          coder,
+          perpMarket.oracle,
+          ai,
+          perpMarket.baseDecimals,
+          client,
         );
-      const { price, uiPrice } = await this.decodePriceFromOracleAi(
-        coder,
-        perpMarket.oracle,
-        ai,
-        perpMarket.baseDecimals,
-        client,
-      );
-      perpMarket._price = price;
-      perpMarket._uiPrice = uiPrice;
-    });
+        perpMarket._price = price;
+        perpMarket._uiPrice = uiPrice;
+      }),
+    );
   }
 
   private async decodePriceFromOracleAi(
