@@ -310,22 +310,24 @@ export class Group {
       await client.program.provider.connection.getMultipleAccountsInfo(oracles);
 
     const coder = new BorshAccountsCoder(client.program.idl);
-    for await (const [i, ai] of ais.entries()) {
-      const perpMarket = perpMarkets[i];
-      if (!ai)
-        throw new Error(
-          `Undefined ai object in reloadPerpMarketOraclePrices for ${perpMarket.oracle}!`,
+    await Promise.all(
+      Array.from(ais.entries()).map(async ([i, ai]) => {
+        const perpMarket = perpMarkets[i];
+        if (!ai)
+          throw new Error(
+            `Undefined ai object in reloadPerpMarketOraclePrices for ${perpMarket.oracle}!`,
+          );
+        const { price, uiPrice } = await this.decodePriceFromOracleAi(
+          coder,
+          perpMarket.oracle,
+          ai,
+          perpMarket.baseDecimals,
+          client,
         );
-      const { price, uiPrice } = await this.decodePriceFromOracleAi(
-        coder,
-        perpMarket.oracle,
-        ai,
-        perpMarket.baseDecimals,
-        client,
-      );
-      perpMarket._price = price;
-      perpMarket._uiPrice = uiPrice;
-    }
+        perpMarket._price = price;
+        perpMarket._uiPrice = uiPrice;
+      }),
+    );
   }
 
   private async decodePriceFromOracleAi(
