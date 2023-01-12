@@ -829,6 +829,28 @@ export class MangoClient {
     );
   }
 
+  //withdraw all assets, close oo, deactivating perp positions, close account
+  public async totalCloseMangoAccount(
+    group: Group,
+    mangoAccount: MangoAccount,
+    forceClose = false,
+  ): Promise<TransactionSignature> {
+    const ix = await this.program.methods
+      .accountClose(forceClose)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+        solDestination: mangoAccount.owner,
+      })
+      .instruction();
+
+    return await this.sendAndConfirmTransaction(
+      [ix],
+      group.addressLookupTablesList,
+    );
+  }
+
   public async tokenDeposit(
     group: Group,
     mangoAccount: MangoAccount,
