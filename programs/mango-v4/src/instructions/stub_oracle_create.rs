@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use fixed::types::I80F48;
 
-use crate::{state::*, error::MangoError};
+use crate::{error::MangoError, state::*};
 
 #[derive(Accounts)]
 pub struct StubOracleCreate<'info> {

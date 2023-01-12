@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::Token;
 
-use crate::{state::*, error::MangoError};
+use crate::{error::MangoError, state::*};
 
 #[derive(Accounts)]
 pub struct StubOracleClose<'info> {

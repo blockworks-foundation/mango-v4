@@ -1,4 +1,4 @@
-use crate::{state::*, error::MangoError};
+use crate::{error::MangoError, state::*};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, CloseAccount, Token, TokenAccount};
 
