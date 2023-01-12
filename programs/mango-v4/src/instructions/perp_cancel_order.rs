@@ -11,7 +11,7 @@ pub struct PerpCancelOrder<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
-        mut, 
+        mut,
         has_one = group,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
     )]

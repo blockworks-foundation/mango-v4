@@ -21,7 +21,7 @@ pub struct TokenDepositIntoExisting<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
-        mut, 
+        mut,
         has_one = group,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
     )]
@@ -58,8 +58,8 @@ pub struct TokenDeposit<'info> {
     pub group: AccountLoader<'info, Group>,
 
     #[account(
-        mut, 
-        has_one = group, 
+        mut,
+        has_one = group,
         has_one = owner,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
     )]

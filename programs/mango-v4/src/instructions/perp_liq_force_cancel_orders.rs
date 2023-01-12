@@ -12,7 +12,8 @@ pub struct PerpLiqForceCancelOrders<'info> {
     )]
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut, 
+    #[account(
+        mut,
         has_one = group,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
     )]

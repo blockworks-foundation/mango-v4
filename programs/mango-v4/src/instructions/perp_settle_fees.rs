@@ -22,7 +22,7 @@ pub struct PerpSettleFees<'info> {
 
     // This account MUST have a loss
     #[account(
-        mut, 
+        mut,
         has_one = group,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
     )]

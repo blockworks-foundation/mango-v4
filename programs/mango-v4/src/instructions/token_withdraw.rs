@@ -20,8 +20,9 @@ pub struct TokenWithdraw<'info> {
     )]
     pub group: AccountLoader<'info, Group>,
 
-    #[account(mut, 
-        has_one = group, 
+    #[account(
+        mut,
+        has_one = group,
         has_one = owner,
         constraint = account.load()?.is_operational() @ MangoError::AccountIsFrozen
     )]
