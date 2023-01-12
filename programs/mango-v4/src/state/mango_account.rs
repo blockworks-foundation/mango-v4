@@ -976,6 +976,30 @@ impl<
         Ok(())
     }
 
+    pub fn check_liquidatable(&mut self, health_cache: &HealthCache) -> Result<bool> {
+        // Once maint_health falls below 0, we want to start liquidating,
+        // we want to allow liquidation to continue until init_health is positive,
+        // to prevent constant oscillation between the two states
+        if self.being_liquidated() {
+            let init_health = health_cache.health(HealthType::Init);
+            if self
+                .fixed_mut()
+                .maybe_recover_from_being_liquidated(init_health)
+            {
+                msg!("Liqee init_health above zero");
+                return Ok(false);
+            }
+        } else {
+            let maint_health = health_cache.health(HealthType::Maint);
+            require!(
+                maint_health < I80F48::ZERO,
+                MangoError::HealthMustBeNegative
+            );
+            self.fixed_mut().set_being_liquidated(true);
+        }
+        Ok(true)
+    }
+
     // writes length of tokens vec at appropriate offset so that borsh can infer the vector length
     // length used is that present in the header
     fn write_token_length(&mut self) {
